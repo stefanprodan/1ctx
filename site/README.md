@@ -119,8 +119,8 @@ README header, switching with the reader's theme:
 ```html
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/readme-dark.svg">
-    <img alt="1ctx" src="assets/readme-light.svg" width="640">
+    <source media="(prefers-color-scheme: dark)" srcset="site/readme-dark.svg">
+    <img alt="1ctx" src="site/readme-light.svg" width="640">
   </picture>
 </p>
 ```
