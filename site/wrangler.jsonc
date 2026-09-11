@@ -1,0 +1,19 @@
+// The 1ctx.dev site: static files from this folder, served by a
+// Cloudflare Worker with no code of its own.
+//
+//   bun install
+//   bunx wrangler deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "1ctx-site",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "routes": [
+    { "pattern": "1ctx.dev", "custom_domain": true },
+    { "pattern": "www.1ctx.dev", "custom_domain": true }
+  ]
+}

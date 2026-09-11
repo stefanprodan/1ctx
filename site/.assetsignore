@@ -1,0 +1,7 @@
+# Not served. Everything else in this folder is a public URL.
+README.md
+wrangler.jsonc
+package.json
+bun.lock
+node_modules
+.wrangler
