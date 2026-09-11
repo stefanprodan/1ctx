@@ -9,9 +9,10 @@ An open-cornered chip with a 1 inside and a sparkle on the corner. The
 chip is a 24-unit square: stroke 1.5, corner radius 4.68, the top edge
 stops 6.5 units short of the right corner and the right edge starts
 6.5 units below it. The 1 is 8.75 units tall, centred. The sparkle is
-5 units across, centred on the corner, so it pokes 2 units past the top
-and the right edge. The chip and the 1 take the foreground colour; the
-sparkle is always brand amber.
+a filled four-point star with concave sides, 7 units across, centred
+on the corner, so it pokes 3 units past the top and the right edge.
+The chip and the 1 take the foreground colour; the sparkle is always
+brand amber.
 
 Stroke by rendered size, so the lines stay about 1.5 px:
 
@@ -19,7 +20,7 @@ Stroke by rendered size, so the lines stay about 1.5 px:
 |---|---|
 | 32 px and up | 1.5 |
 | 22 to 24 px (the app header) | 1.75 |
-| 16 px (the favicon) | 2 |
+| 16 px (the favicon) | 2, sparkle scaled 1.25x |
 
 Minimum size 16 px. Clear space around the mark: half its height on
 every side, the sparkle included.
@@ -100,7 +101,7 @@ console's tokens and are UI, not brand; they never appear in a logo.
 |---|---|
 | `mark.svg` | The mark with the chip and the 1 in `currentColor`; for the app header and anywhere the page colour should drive it |
 | `mark-dark.svg`, `mark-light.svg` | The mark with a fixed foreground, for a dark or a light ground |
-| `favicon.svg` | The mark at stroke 2, foreground follows the browser's colour scheme |
+| `favicon.svg` | The mark at stroke 2 with the sparkle 1.25x, foreground follows the browser's colour scheme |
 | `favicon-32.png`, `favicon-16.png` | The same, light foreground on transparent, for browsers without SVG favicons |
 | `apple-touch-icon.png` | 180 px opaque dark tile; iOS applies its own mask |
 | `icon.svg`, `icon-512.png` | Rounded dark tile with the mark, transparent corners, for Slack, GitHub and app listings |

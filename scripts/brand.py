@@ -40,7 +40,18 @@ DIM_LIGHT = "#4f4b43"
 
 CHIP = "M13.5 4H11C6.757 4 4.636 4 3.318 5.318S2 8.758 2 13s0 6.364 1.318 7.682S6.758 22 11 22s6.364 0 7.682-1.318S20 17.242 20 13v-2.5"
 ONE = "M8.75 11.25 11.5 8.75V17.5"
-SPARK = "M19.5 2.938V4.5m0 0v1.563m0-1.563h-1.25m1.25 0h1.25m1.25 0l-1.084-.361a1.67 1.67 0 0 1-1.055-1.055L19.5 2l-.361 1.084a1.67 1.67 0 0 1-1.055 1.055L17 4.5l1.084.361c.498.166.889.557 1.055 1.055L19.5 7l.361-1.084a1.67 1.67 0 0 1 1.055-1.055z"
+# A filled four-point star with concave sides, centred on the chip's
+# open corner at (19.5, 4.5) with points SPARK_R units out. Filled, not
+# stroked, so it stays crisp when the mark is scaled up next to a heavy
+# chip stroke.
+SPARK_R = 3.5
+def _spark(r, cx=19.5, cy=4.5, k=0.55):
+    c = r * k
+    return (f"M{cx} {cy - r}C{cx} {cy - r + c} {cx + r - c} {cy} {cx + r} {cy}"
+            f"C{cx + r - c} {cy} {cx} {cy + r - c} {cx} {cy + r}"
+            f"C{cx} {cy + r - c} {cx - r + c} {cy} {cx - r} {cy}"
+            f"C{cx - r + c} {cy} {cx} {cy - r + c} {cx} {cy - r}Z")
+SPARK = _spark(SPARK_R)
 
 
 def text_path(font, text, size, x, y, tracking_em=0.0):
@@ -80,7 +91,7 @@ def mark(x, y, s, fg, accent, sw=1.5):
         f'stroke-linecap="round" stroke-linejoin="round">'
         f'<path stroke="{fg}" d="{CHIP}"/>'
         f'<path stroke="{fg}" d="{ONE}"/>'
-        f'<path stroke="{accent}" d="{SPARK}"/>'
+        f'<path fill="{accent}" stroke="none" d="{SPARK}"/>'
         f"</g>"
     )
 
@@ -105,7 +116,7 @@ write("mark.svg", (
     'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">\n'
     f'  <path stroke="currentColor" d="{CHIP}"/>\n'
     f'  <path stroke="currentColor" d="{ONE}"/>\n'
-    f'  <path stroke="{AMBER}" d="{SPARK}"/>\n'
+    f'  <path fill="{AMBER}" stroke="none" d="{SPARK}"/>\n'
     "</svg>\n"
 ))
 for variant, fg, acc in (("dark", FG_DARK, AMBER), ("light", FG_LIGHT, AMBER_LIGHT)):
@@ -114,21 +125,22 @@ for variant, fg, acc in (("dark", FG_DARK, AMBER), ("light", FG_LIGHT, AMBER_LIG
         'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">\n'
         f'  <path stroke="{fg}" d="{CHIP}"/>\n'
         f'  <path stroke="{fg}" d="{ONE}"/>\n'
-        f'  <path stroke="{acc}" d="{SPARK}"/>\n'
+        f'  <path fill="{acc}" stroke="none" d="{SPARK}"/>\n'
         "</svg>\n"
     ))
 
-# favicon: heavier stroke, follows the browser's colour scheme
+# favicon: heavier stroke and a sparkle scaled 1.25x about the corner,
+# so both survive 16 px; follows the browser's colour scheme
 write("favicon.svg", (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n'
     "  <style>\n"
-    f"    .fg {{ stroke: {FG_LIGHT}; }} .ac {{ stroke: {AMBER_LIGHT}; }}\n"
-    f"    @media (prefers-color-scheme: dark) {{ .fg {{ stroke: {FG_DARK}; }} .ac {{ stroke: {AMBER}; }} }}\n"
+    f"    .fg {{ stroke: {FG_LIGHT}; }} .ac {{ fill: {AMBER_LIGHT}; stroke: none; }}\n"
+    f"    @media (prefers-color-scheme: dark) {{ .fg {{ stroke: {FG_DARK}; }} .ac {{ fill: {AMBER}; stroke: none; }} }}\n"
     "  </style>\n"
     f'  <path class="fg" d="{CHIP}"/>\n'
     f'  <path class="fg" d="{ONE}"/>\n'
-    f'  <path class="ac" d="{SPARK}"/>\n'
+    f'  <path class="ac" transform="translate(19.5 4.5) scale(1.25) translate(-19.5 -4.5)" d="{SPARK}"/>\n'
     "</svg>\n"
 ))
 
@@ -199,8 +211,8 @@ def chip_wide(w, h, s):
 
 # Everything in the mark's 24-unit terms, so the wide chip keeps the
 # mark's proportions: the 1 is 8.75 units tall in a chip whose stroke is
-# 1.5, the sparkle sits on the corner and pokes 2 units past the top and
-# the right edge.
+# 1.5, the sparkle sits on the corner and pokes SPARK_R - 0.5 units past
+# the top and the right edge.
 s = 10
 CH = 18 * s                  # shorter than the mark: the word needs less headroom than the 1
 bcap_units = 8.75
@@ -216,7 +228,7 @@ cy0 = 150
 body = f'<g transform="translate({cx0} {cy0})" fill="none" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">'
 body += f'<path stroke="{FG_DARK}" d="{chip_wide(CW, CH, s)}"/>'
 # the mark's chip has its top edge at y=4 and right edge at x=20; the sparkle is drawn in those coordinates
-body += f'<path stroke="{AMBER}" stroke-width="1.5" transform="translate({CW - 19.5 * s} {-4.5 * s}) scale({s})" d="{SPARK}"/>'
+body += f'<path fill="{AMBER}" stroke="none" transform="translate({CW - 19.5 * s} {-4.5 * s}) scale({s})" d="{SPARK}"/>'
 body += "</g>"
 body += f'<path fill="{FG_DARK}" transform="translate({cx0 + side} {cy0 + CH / 2 + bcap / 2})" d="{bd}"/>'
 td, tw = text_path(PLEX, "One continuous context for agents", 34, 0, 0)
@@ -233,13 +245,14 @@ bcap = capr * fs
 side = 5 * s
 CW = bw + 2 * side
 sw = 1.5 * s
-# the sparkle reaches 2 units past the top and the right edge, plus half a stroke
-ox, oy = sw / 2, 2 * s + sw / 2
-LW_, LH_ = CW + ox + 2 * s + sw / 2, CH + oy + sw / 2
+# the sparkle reaches SPARK_R - 0.5 units past the top and the right edge, plus half a stroke
+poke = (SPARK_R - 0.5) * s
+ox, oy = sw / 2, poke + sw / 2
+LW_, LH_ = CW + ox + poke + sw / 2, CH + oy + sw / 2
 def logo_body(fg, acc):
     b = f'<g transform="translate({ox} {oy})" fill="none" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">'
     b += f'<path stroke="{fg}" d="{chip_wide(CW, CH, s)}"/>'
-    b += f'<path stroke="{acc}" stroke-width="1.5" transform="translate({CW - 19.5 * s} {-4.5 * s}) scale({s})" d="{SPARK}"/>'
+    b += f'<path fill="{acc}" stroke="none" transform="translate({CW - 19.5 * s} {-4.5 * s}) scale({s})" d="{SPARK}"/>'
     b += "</g>"
     b += f'<path fill="{fg}" transform="translate({ox + side} {oy + CH / 2 + bcap / 2})" d="{bd}"/>'
     return b
