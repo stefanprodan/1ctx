@@ -1,9 +1,9 @@
 # /// script
 # dependencies = ["fonttools"]
 # ///
-# Generates the brand files in assets/ with the type outlined, so they
+# Generates the brand files in site/ with the type outlined, so they
 # render the same everywhere without the fonts installed. The PNGs are
-# not made here; see assets/README.md for how they were rasterized.
+# not made here; see site/README.md for how they were rasterized.
 #
 #   uv run scripts/brand.py
 import os
@@ -14,7 +14,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.environ.get("BRAND_OUT") or os.path.join(HERE, "..", "assets")
+OUT = os.environ.get("BRAND_OUT") or os.path.join(HERE, "..", "site")
 FONTS = os.path.join(tempfile.gettempdir(), "1ctx-brand-fonts")
 os.makedirs(FONTS, exist_ok=True)
 FONT_URLS = {
