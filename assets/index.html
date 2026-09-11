@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1ctx</title>
+<meta name="description" content="One continuous context for agents.">
+<meta name="theme-color" content="#131314">
+<meta property="og:title" content="1ctx">
+<meta property="og:description" content="One continuous context for agents.">
+<meta property="og:image" content="https://1ctx.dev/social-preview.png">
+<meta property="og:url" content="https://1ctx.dev/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  @font-face {
+    font-family: "IBM Plex Sans";
+    src: url("fonts/IBMPlexSans-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  :root {
+    --page: #131314;
+    --fg: #e7e7e9;
+    --dim: #b3b3b8;
+    --faint: #8b8b91;
+    --brand: #f2c14e;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--page);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #silk {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  main {
+    position: relative;
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 40px 48px;
+  }
+
+  .logo {
+    display: block;
+    width: 200px;
+    height: auto;
+  }
+
+  .tagline {
+    margin: 20px 0 0;
+    color: var(--dim);
+    font-size: 17px;
+    max-width: 28ch;
+  }
+
+  .links {
+    margin: 34px 0 0;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .links a {
+    color: var(--faint);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 2px;
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+
+  .links a:hover,
+  .links a:focus-visible {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+    outline: none;
+  }
+
+  @media (max-width: 480px) {
+    .block { padding: 32px 20px; }
+    .logo { width: 170px; }
+    .tagline { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="silk" aria-hidden="true"></canvas>
+
+<main>
+  <div class="block">
+    <img class="logo" src="logo-dark.svg" width="170" height="90" alt="1ctx">
+    <p class="tagline">One continuous context for agents.</p>
+    <nav class="links" aria-label="Links">
+      <a href="https://github.com/stefanprodan/1ctx">github.com/stefanprodan/1ctx</a>
+    </nav>
+  </div>
+</main>
+
+<script>
+(() => {
+  // A silk of hairlines across the page, displaced by slow noise so
+  // the surface breathes. Nothing travels toward the viewer; the lines
+  // stay where they are and the fabric moves under them. A few amber
+  // signals travel along the strands.
+  const canvas = document.getElementById("silk");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const PAGE = "#131314";
+  const GAP = 26;           // px between strands
+  const STEP = 8;           // px between samples along a strand
+  const AMP = 44;           // px of displacement at full noise
+  const SPEED = 0.000045;   // noise time, per ms
+  const SIGNALS = 5;        // how many travel at once, at most
+  const TAIL = 140;         // px of fading tail behind a signal
+  let W, H, dpr, rows;
+  const signals = [];
+
+  // Value noise: a lattice of hashed values, smoothly interpolated.
+  const hash = (x, y) => {
+    let h = (x * 374761393 + y * 668265263) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  const fade = (t) => t * t * (3 - 2 * t);
+  function noise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = fade(x - xi), yf = fade(y - yi);
+    const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+    return (a + (b - a) * xf) * (1 - yf) + (c + (d - c) * xf) * yf;
+  }
+
+  function resize() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rows = Math.ceil(H / GAP) + 2;
+  }
+
+  // Where strand r sits at x: two octaves, a broad swell and a finer
+  // ripple, both slow.
+  function yAt(r, x, z) {
+    const n1 = noise(x * 0.0011 + z * 0.6, r * 0.07 + z) - 0.5;
+    const n2 = noise(x * 0.004 - z * 0.4, r * 0.2 - z * 0.7) - 0.5;
+    return r * GAP + (n1 * 1.4 + n2 * 0.5) * AMP;
+  }
+
+  function spawn(now) {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    signals.push({
+      r: 1 + Math.floor(Math.random() * (rows - 2)),
+      x: dir > 0 ? -TAIL : W + TAIL,
+      v: dir * (0.06 + Math.random() * 0.05),   // px per ms
+      born: now,
+    });
+  }
+
+  let lastT = 0;
+  function draw(t) {
+    const dt = Math.min(t - lastT, 50);
+    lastT = t;
+    ctx.fillStyle = PAGE;
+    ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    ctx.lineCap = "round";
+    const z = t * SPEED;
+    ctx.strokeStyle = "rgba(231, 231, 233, 0.08)";
+    for (let r = -1; r < rows; r++) {
+      ctx.beginPath();
+      for (let x = -STEP; x <= W + STEP; x += STEP) {
+        const y = yAt(r, x, z);
+        if (x === -STEP) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Signals: move, drop the ones that left, keep a few in flight.
+    for (let i = signals.length - 1; i >= 0; i--) {
+      const sg = signals[i];
+      sg.x += sg.v * dt;
+      if (sg.x < -TAIL - 20 || sg.x > W + TAIL + 20) signals.splice(i, 1);
+    }
+    if (signals.length < SIGNALS && Math.random() < dt / 2600) spawn(t);
+    for (const sg of signals) {
+      const dir = Math.sign(sg.v);
+      // The tail: short segments back along the strand, fading out.
+      const n = 12, seg = TAIL / n;
+      for (let k = 0; k < n; k++) {
+        const xa = sg.x - dir * seg * k, xb = sg.x - dir * seg * (k + 1);
+        const a = 0.7 * Math.pow(1 - k / n, 2);
+        ctx.strokeStyle = `rgba(242, 193, 78, ${a.toFixed(3)})`;
+        ctx.lineWidth = 1.5 - k / n;
+        ctx.beginPath();
+        ctx.moveTo(xa, yAt(sg.r, xa, z));
+        ctx.lineTo(xb, yAt(sg.r, xb, z));
+        ctx.stroke();
+      }
+      // The head: a soft glow and a bright point.
+      const hy = yAt(sg.r, sg.x, z);
+      const g = ctx.createRadialGradient(sg.x, hy, 0, sg.x, hy, 18);
+      g.addColorStop(0, "rgba(242, 193, 78, 0.35)");
+      g.addColorStop(1, "rgba(242, 193, 78, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(sg.x - 18, hy - 18, 36, 36);
+      ctx.fillStyle = "rgba(255, 228, 150, 0.95)";
+      ctx.beginPath();
+      ctx.arc(sg.x, hy, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function frame(t) {
+    draw(t);
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  addEventListener("resize", resize);
+  if (reduce) {
+    draw(0);
+  } else {
+    // Start with a couple already crossing.
+    for (let i = 0; i < 2; i++) { spawn(0); signals[i].x = W * (0.3 + 0.4 * i); }
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
