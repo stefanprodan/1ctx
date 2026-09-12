@@ -6,11 +6,30 @@
 // durable is maintained from a listener. transact() is the only
 // publisher of durable changes; it publishes after commit.
 
+import type {
+  Message,
+  SendSummary,
+  SessionSummary,
+} from "../../shared/contracts/session.ts";
+
 // the event map: one entry per event, payload by name
 export type BusEvents = {
-  // a user's logins were revoked (logout, or a later password change);
-  // the socket layer closes that user's connections
+  // a user's logins were revoked (logout, a password change, the
+  // expiry sweep); the socket layer closes that login's connections,
+  // or every connection of the user when the login id is null
   "login.revoked": { userId: string; loginId: string | null };
+  // one envelope per session transaction: the summary with its
+  // revision, the rows the transaction wrote, the send row or null
+  "session.changed": {
+    projectId: string;
+    session: SessionSummary;
+    messages: Message[];
+    send: SendSummary | null;
+  };
+  "session.deleted": { projectId: string; sessionId: string };
+  // what these users may see changed (a membership, a role, a team
+  // project made or gone); null means everyone recomputes
+  "access.changed": { userIds: string[] | null };
 };
 
 export type BusEvent = {

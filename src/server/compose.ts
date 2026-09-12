@@ -21,9 +21,14 @@ import {
   type Providers,
   providersArea,
 } from "./providers/index.ts";
+import { renderMarkdown } from "./render/index.ts";
+import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
+import { type SessionStore, sessionsArea } from "./sessions/index.ts";
+import { type UsageStore, usageArea } from "./usage/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
 import { healthRoute } from "./web/health.ts";
 import { type Router, router } from "./web/router.ts";
+import { type Socket, socketArea } from "./web/socket.ts";
 
 export type ComposeOptions = {
   db: Db;
@@ -36,6 +41,8 @@ export type ComposeOptions = {
   version: string;
   secureCookie: boolean;
   trustProxy: boolean;
+  // a test's registry with its own caps
+  registry?: Registry;
 };
 
 export type App = {
@@ -43,25 +50,30 @@ export type App = {
   projects: ProjectStore;
   providers: ProviderStore;
   agents: AgentStore;
+  sessions: SessionStore;
+  usage: UsageStore;
   catalogs: Catalogs;
-  // on App until the runner lands to call it, so the wire suite can
-  // drive it through the composed fetcher and secrets
   chat: Providers["chat"];
   // the one way a user is made: with its personal project
   createUser: Users["createUser"];
+  runner: Runner;
+  socket: Socket;
   routes: RouteDescriptor[];
   handle: Router;
   // drop expired logins; called at start and every hour
   sweep(): number;
+  // terminate every send and close every socket, in that order
+  shutdown(): Promise<void>;
 };
 
 export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock, secret } = options;
-  // Three ports point down the list, at an area built after the one
-  // that holds them: a user is made with its personal project, a
-  // provider an agent runs on cannot go, and a project route asks
-  // access what the principal may see. Each runs once the list is
-  // complete, never while it is built; a closure is the whole cost.
+  // Ports that point down the list, at an area built after the one that
+  // holds them, are closures called once the list is complete: a user
+  // is made with its personal project, a provider an agent runs on and
+  // an agent a chat runs on cannot go, a project route asks access
+  // what the principal may see, and the session detail asks the runner
+  // for the reply in flight.
   const users = usersArea({
     db,
     secret,
@@ -69,6 +81,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: options.log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
   });
+  const usage = usageArea({ db });
   const providers = providersArea({
     db,
     clock,
@@ -89,14 +102,51 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     projects,
   });
-  const agents = agentsArea({ db, clock, providers });
+  const agents = agentsArea({
+    db,
+    clock,
+    providers,
+    access,
+    sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
+  });
+  const sessions = sessionsArea({
+    db,
+    clock,
+    log: options.log("sessions"),
+    access,
+    live: (sessionId) => runner.live(sessionId),
+  });
+  const socket = socketArea({
+    visibleProjectIds: (userId) => access.visibleProjectIds(userId),
+    sessionProject: (principal, id) => sessions.sessionProject(principal, id),
+    live: (sessionId) => runner.live(sessionId),
+  });
+  const runner = runnerArea({
+    db,
+    clock,
+    log: options.log("runner"),
+    sessions: sessions.store,
+    access,
+    visible: (principal, id) => sessions.visible(principal, id),
+    agents,
+    users,
+    providers,
+    usage,
+    render: renderMarkdown,
+    stream: (sessionId, frame) => socket.stream(sessionId, frame),
+    registry: options.registry,
+  });
   await users.bootstrap();
+  sessions.repair();
   const routes: RouteDescriptor[] = [
     ...users.routes,
     ...providers.routes,
     ...projects.routes,
     ...access.routes,
     ...agents.routes,
+    ...sessions.routes,
+    ...runner.routes,
+    socket.route,
     healthRoute(options.version),
   ];
   const handle = router({
@@ -109,11 +159,19 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: projects.store,
     providers: providers.store,
     agents: agents.store,
+    sessions: sessions.store,
+    usage: usage.store,
     catalogs: providers.catalogs,
     chat: providers.chat,
     createUser: users.createUser,
+    runner,
+    socket,
     routes,
     handle,
     sweep: () => access.sweep(),
+    async shutdown() {
+      await runner.shutdown();
+      socket.dispose();
+    },
   };
 }

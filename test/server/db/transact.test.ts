@@ -16,7 +16,9 @@ const revoked = (id: string): BusEvent => ({
 
 function capture() {
   const seen: string[] = [];
-  const stop = subscribe((e) => seen.push(e.data.userId));
+  const stop = subscribe((e) => {
+    if (e.type === "login.revoked") seen.push(e.data.userId);
+  });
   return { seen, stop };
 }
 

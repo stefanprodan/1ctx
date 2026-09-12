@@ -7,20 +7,34 @@
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
-import { type ProvidersPort, routes } from "./routes.ts";
-import { AgentStore } from "./store.ts";
+import {
+  type AccessPort,
+  type ProvidersPort,
+  routes,
+  type SessionsPort,
+} from "./routes.ts";
+import { type AgentRow, AgentStore } from "./store.ts";
 
-export { type ProvidersPort, type RoutesDeps, routes } from "./routes.ts";
+export {
+  type AccessPort,
+  type ProvidersPort,
+  type RoutesDeps,
+  routes,
+  type SessionsPort,
+} from "./routes.ts";
 export { type AgentRow, AgentStore, summary } from "./store.ts";
 
 export type AgentsDeps = {
   db: Db;
   clock: Clock;
   providers: ProvidersPort;
+  access: AccessPort;
+  sessions: SessionsPort;
 };
 
 export type Agents = {
   store: AgentStore;
+  byId(id: string): AgentRow | null;
   usesProvider(providerId: string): boolean;
   routes: RouteDescriptor[];
 };
@@ -29,7 +43,14 @@ export function agentsArea(deps: AgentsDeps): Agents {
   const store = new AgentStore(deps.db);
   return {
     store,
+    byId: (id) => store.byId(id),
     usesProvider: (providerId) => store.usesProvider(providerId),
-    routes: routes({ store, providers: deps.providers, clock: deps.clock }),
+    routes: routes({
+      store,
+      providers: deps.providers,
+      access: deps.access,
+      sessions: deps.sessions,
+      clock: deps.clock,
+    }),
   };
 }
