@@ -94,3 +94,42 @@ export function isWire(value: unknown): value is Wire {
     typeof value === "string" && (WIRES as readonly string[]).includes(value)
   );
 }
+
+// a session's, and a send's, status: running while a send holds the
+// lock, then how the last send ended
+export const SESSION_STATUSES = [
+  "running",
+  "done",
+  "failed",
+  "stopped",
+] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
+// why a send ended: the model finished, a user stopped it, the
+// provider failed, the process shut down, or the process was found
+// restarted with the send still running
+export const SEND_CAUSES = [
+  "finish",
+  "stop",
+  "failure",
+  "shutdown",
+  "restart",
+] as const;
+export type SendCause = (typeof SEND_CAUSES)[number];
+
+export const MESSAGE_KINDS = ["user", "reply"] as const;
+export type MessageKind = (typeof MESSAGE_KINDS)[number];
+
+export const MESSAGE_STATUSES = [
+  "streaming",
+  "done",
+  "failed",
+  "stopped",
+] as const;
+export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
+
+// a message a user writes; the cap is in bytes, the server's
+export const MAX_MESSAGE_BYTES = 256 * 1024;
+export const MAX_TITLE = 80;
+// the stream's search box
+export const MAX_SEARCH = 100;

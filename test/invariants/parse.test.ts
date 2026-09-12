@@ -11,6 +11,17 @@ import {
   parseUsername,
 } from "../../src/server/access/parse.ts";
 import { BadRequest } from "../../src/server/lib/errors.ts";
+import {
+  parseCreateSession,
+  parseSendMessage,
+  parseStreamQuery,
+  titleFrom,
+} from "../../src/server/sessions/parse.ts";
+import {
+  MAX_MESSAGE_BYTES,
+  MAX_SEARCH,
+  MAX_TITLE,
+} from "../../src/shared/words.ts";
 import { testApp } from "../helpers/app.ts";
 
 describe("parseLogin", () => {
@@ -122,5 +133,100 @@ describe("over the wire", () => {
     const app = await testApp();
     expect((await app.client().call("GET", "/api/nothing")).status).toBe(404);
     expect((await app.client().call("DELETE", "/api/me")).status).toBe(405);
+  });
+});
+
+describe("parseCreateSession", () => {
+  test("accepts project, agent and message fields", () => {
+    expect(
+      parseCreateSession({ projectId: "p1", agentId: "a1", message: " hi " }),
+    ).toEqual({ projectId: "p1", agentId: "a1", message: " hi " });
+  });
+
+  test.each([
+    [null],
+    ["string"],
+    [[]],
+    [{}],
+    [{ projectId: "p1", agentId: "a1" }],
+    [{ projectId: "p1", message: "hi" }],
+    [{ agentId: "a1", message: "hi" }],
+    [{ projectId: "", agentId: "a1", message: "hi" }],
+    [{ projectId: 1, agentId: "a1", message: "hi" }],
+    [{ projectId: "p1", agentId: "", message: "hi" }],
+    [{ projectId: "p1", agentId: 1, message: "hi" }],
+    [{ projectId: "p1", agentId: "a1", message: "" }],
+    [{ projectId: "p1", agentId: "a1", message: "  \n " }],
+    [{ projectId: "p1", agentId: "a1", message: 1 }],
+    [{ projectId: "p1", agentId: "a1", message: "hi", extra: true }],
+    [
+      {
+        projectId: "p1",
+        agentId: "a1",
+        message: "x".repeat(MAX_MESSAGE_BYTES + 1),
+      },
+    ],
+  ])("refuses %p", (body) => {
+    expect(() => parseCreateSession(body)).toThrow(BadRequest);
+  });
+});
+
+describe("parseSendMessage", () => {
+  test("accepts a message and preserves its whitespace", () => {
+    expect(parseSendMessage({ message: " hi " })).toEqual({ message: " hi " });
+  });
+
+  test.each([
+    [null],
+    ["string"],
+    [[]],
+    [{}],
+    [{ message: "" }],
+    [{ message: " \t\n" }],
+    [{ message: 1 }],
+    [{ message: "hi", extra: true }],
+    [{ message: "x".repeat(MAX_MESSAGE_BYTES + 1) }],
+  ])("refuses %p", (body) => {
+    expect(() => parseSendMessage(body)).toThrow(BadRequest);
+  });
+});
+
+describe("parseStreamQuery", () => {
+  test.each([
+    ["http://one.test/api/sessions", { project: null, q: "" }],
+    ["http://one.test/api/sessions?project=", { project: null, q: "" }],
+    [
+      "http://one.test/api/sessions?project=p1&q=%20Alpha%20",
+      { project: "p1", q: "Alpha" },
+    ],
+  ])("accepts %s", (input, expected) => {
+    expect(parseStreamQuery(new URL(input))).toEqual(expected);
+  });
+
+  test("refuses a query over the search cap", () => {
+    const url = new URL("http://one.test/api/sessions");
+    url.searchParams.set("q", "x".repeat(MAX_SEARCH + 1));
+    expect(() => parseStreamQuery(url)).toThrow(BadRequest);
+  });
+
+  test.each([
+    "http://one.test/api/sessions?other=x",
+    "http://one.test/api/sessions?project=p1&project=p2",
+    "http://one.test/api/sessions?q=one&q=two",
+  ])("refuses unknown or duplicated parameters in %s", (input) => {
+    expect(() => parseStreamQuery(new URL(input))).toThrow(BadRequest);
+  });
+});
+
+describe("titleFrom", () => {
+  test.each([
+    [" hello ", "hello"],
+    ["  first line  \nsecond line", "first line"],
+    ["\nsecond line", "second line"],
+    ["", ""],
+    ["a".repeat(MAX_TITLE), "a".repeat(MAX_TITLE)],
+    ["a".repeat(MAX_TITLE + 1), `${"a".repeat(MAX_TITLE - 1)}…`],
+  ])("turns %p into %p", (input, expected) => {
+    expect(titleFrom(input)).toBe(expected);
   });
 });
