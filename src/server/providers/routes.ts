@@ -18,13 +18,16 @@ import { CatalogError, type Catalogs } from "./catalog.ts";
 import { parseProvider, parseQuery } from "./parse.ts";
 import { type ProviderRow, type ProviderStore, summary } from "./store.ts";
 
+export type AgentsPort = {
+  usesProvider(providerId: string): boolean;
+};
+
 export type RoutesDeps = {
   store: ProviderStore;
   catalogs: Catalogs;
   // the secrets port: whether the key file is there
   hasSecret: (name: string) => boolean;
-  // the agents port: whether an agent runs on the provider
-  inUse: (providerId: string) => boolean;
+  agents: AgentsPort;
   clock: Clock;
 };
 
@@ -68,7 +71,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         const provider = find(ctx.params.id);
-        if (deps.inUse(provider.id)) {
+        if (deps.agents.usesProvider(provider.id)) {
           throw new Conflict(`an agent runs on ${provider.name}`);
         }
         deps.store.delete(provider.id);

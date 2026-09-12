@@ -68,12 +68,17 @@ site/           1ctx.dev and the brand files; its own project, untouched
 ```
 
 An area under `src/server/<area>/` has `index.ts` (what others may
-import), `store.ts` (`<Noun>Store` over the tables the migrations
+import, and the factory `<area>Area(deps)`: the one place its store is
+built, returning the store, the routes and the capability other areas
+call), `store.ts` (`<Noun>Store` over the tables the migrations
 created), `routes.ts` (`routes(deps)` returning `RouteDescriptor[]`),
 `parse.ts` (the request parsers), and named files for logic. A module
-declares the port it needs as its own small interface; `main.ts` passes
-the implementation. An edge the layer order forbids is a port, never an
-import.
+declares the port it needs as its own small interface; `compose.ts`
+passes the capability of the area that answers it, so it is a list of
+factories in layer order. A port to an area built later in the list is
+a closure called only after the list is complete. An edge the layer
+order forbids is a port, never an import. A test that needs one area
+builds it with its factory and fakes for its ports.
 
 ## Rules the structure test enforces
 

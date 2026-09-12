@@ -2,14 +2,40 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import {
-  access,
-  cookieValue,
-  LoginStore,
-} from "../../../src/server/access/index.ts";
-import { ProjectStore } from "../../../src/server/projects/index.ts";
-import { createUser, UserStore } from "../../../src/server/users/index.ts";
+import { accessArea, cookieValue } from "../../../src/server/access/index.ts";
+import { silent } from "../../../src/server/lib/log.ts";
+import { usersArea } from "../../../src/server/users/index.ts";
 import { memoryDb } from "../../helpers/db.ts";
+
+// the access area with fakes for its ports, except the user: a login
+// row references its user row, so the one user comes from the real
+// users area, itself over a fake projects port
+function build(secureCookie: boolean) {
+  const db = memoryDb();
+  const users = usersArea({
+    db,
+    secret: () => null,
+    clock: () => 0,
+    log: silent,
+    projects: { createPersonal: () => {} },
+  });
+  const user = users.createUser({
+    username: "u",
+    fullName: "U",
+    role: "member",
+    passwordHash: "x",
+    now: 0,
+  });
+  const access = accessArea({
+    db,
+    clock: () => 0,
+    log: silent,
+    secureCookie,
+    users,
+    projects: { byId: () => null, isMember: () => false },
+  });
+  return { db, user, access };
+}
 
 describe("cookieValue", () => {
   test("finds the named cookie among others", () => {
@@ -29,74 +55,18 @@ describe("cookieValue", () => {
 
 describe("access", () => {
   test("marks the cookie Secure when asked", () => {
-    const db = memoryDb();
-    const users = new UserStore(db);
-    const user = createUser(
-      {
-        db,
-        store: users,
-        onCreated: (u) =>
-          new ProjectStore(db).createPersonal({
-            userId: u.id,
-            name: u.username,
-            now: 0,
-          }),
-      },
-      {
-        username: "u",
-        fullName: "U",
-        role: "member",
-        passwordHash: "x",
-        now: 0,
-      },
-    );
-    const auth = access({
-      logins: new LoginStore(db),
-      user: (id) => users.byId(id),
-      project: () => null,
-      member: () => false,
-      clock: () => 0,
-      secureCookie: true,
-    });
-    expect(auth.open(user).setCookie).toMatch(/; Secure$/);
-    expect(auth.clearCookie()).toMatch(/; Secure$/);
+    const { user, access } = build(true);
+    expect(access.open(user).setCookie).toMatch(/; Secure$/);
+    expect(access.clearCookie()).toMatch(/; Secure$/);
   });
 
   test("a login of a deleted user is nobody", () => {
-    const db = memoryDb();
-    const users = new UserStore(db);
-    const user = createUser(
-      {
-        db,
-        store: users,
-        onCreated: (u) =>
-          new ProjectStore(db).createPersonal({
-            userId: u.id,
-            name: u.username,
-            now: 0,
-          }),
-      },
-      {
-        username: "u",
-        fullName: "U",
-        role: "member",
-        passwordHash: "x",
-        now: 0,
-      },
-    );
-    const auth = access({
-      logins: new LoginStore(db),
-      user: (id) => users.byId(id),
-      project: () => null,
-      member: () => false,
-      clock: () => 0,
-      secureCookie: false,
-    });
-    const { setCookie } = auth.open(user);
+    const { db, user, access } = build(false);
+    const { setCookie } = access.open(user);
     const req = () =>
       new Request("http://x", { headers: { cookie: setCookie.split(";")[0] } });
-    expect(auth.resolve(req()).principal?.username).toBe("u");
+    expect(access.resolve(req()).principal?.username).toBe("u");
     db.query("delete from users where id = ?").run(user.id);
-    expect(auth.resolve(req()).principal).toBeNull();
+    expect(access.resolve(req()).principal).toBeNull();
   });
 });

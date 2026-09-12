@@ -10,21 +10,35 @@
 import { MIN_PASSWORD, type Role } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { profile, summary, type UserRow, UserStore } from "./store.ts";
 
 export { profile, summary, type UserRow, UserStore };
+
+export type UserFields = {
+  username: string;
+  fullName: string;
+  role: Role;
+  passwordHash: string;
+  now: number;
+};
 
 export const ADMIN_USERNAME = "admin";
 export const ADMIN_FULL_NAME = "Administrator";
 export const ADMIN_SECRET = "admin";
 export const MAX_PASSWORD_BYTES = 1024;
 
+// the projects port: the personal project a user is made with, inside
+// the same transaction, so a user never exists without it
+export type ProjectsPort = {
+  createPersonal(fields: { userId: string; name: string; now: number }): void;
+};
+
 export type UserDeps = {
   db: Db;
   store: UserStore;
-  // what a new user is made with, inside the same transaction
-  onCreated: (user: UserRow) => void;
+  projects: ProjectsPort;
 };
 
 export type BootstrapDeps = UserDeps & {
@@ -34,19 +48,14 @@ export type BootstrapDeps = UserDeps & {
   log: Log;
 };
 
-export function createUser(
-  deps: UserDeps,
-  fields: {
-    username: string;
-    fullName: string;
-    role: Role;
-    passwordHash: string;
-    now: number;
-  },
-): UserRow {
+export function createUser(deps: UserDeps, fields: UserFields): UserRow {
   return transact(deps.db, () => {
     const user = deps.store.create(fields);
-    deps.onCreated(user);
+    deps.projects.createPersonal({
+      userId: user.id,
+      name: user.username,
+      now: user.createdAt,
+    });
     return { result: user };
   });
 }
@@ -96,4 +105,39 @@ export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
   });
   deps.log(`created ${ADMIN_USERNAME} from ${ADMIN_SECRET}.key`);
   return user;
+}
+
+export type UsersDeps = {
+  db: Db;
+  secret: (name: string) => string | null;
+  clock: Clock;
+  log: Log;
+  projects: ProjectsPort;
+};
+
+export type Users = {
+  store: UserStore;
+  byId(id: string): UserRow | null;
+  byUsername(username: string): UserRow | null;
+  setDetails(id: string, fields: { fullName: string; about: string }): void;
+  setPasswordHash(id: string, hash: string): void;
+  createUser(fields: UserFields): UserRow;
+  // the first admin from admin.key, once the areas it is made with exist
+  bootstrap(): Promise<UserRow | null>;
+  routes: RouteDescriptor[];
+};
+
+export function usersArea(deps: UsersDeps): Users {
+  const store = new UserStore(deps.db);
+  const userDeps: UserDeps = { db: deps.db, store, projects: deps.projects };
+  return {
+    store,
+    byId: (id) => store.byId(id),
+    byUsername: (username) => store.byUsername(username),
+    setDetails: (id, fields) => store.setDetails(id, fields),
+    setPasswordHash: (id, hash) => store.setPasswordHash(id, hash),
+    createUser: (fields) => createUser(userDeps, fields),
+    bootstrap: () => bootstrap({ ...userDeps, ...deps }),
+    routes: [],
+  };
 }

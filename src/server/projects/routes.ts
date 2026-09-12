@@ -11,20 +11,23 @@ import type {
 } from "../../shared/api/projects.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import { type UserRow, summary as userSummary } from "../users/index.ts";
 import { type ProjectRow, type ProjectStore, summary } from "./store.ts";
 
-// the access port: what may be seen, decided in one place for every
-// area that serves a project resource
-export type ProjectAccess = {
-  // the project, or a 404 thrown
+// what may be seen is decided in one place for every area that serves
+// a project resource: the project, or the one 404 thrown
+export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
+};
+
+export type UsersPort = {
+  byId(id: string): UserRow | null;
 };
 
 export type RoutesDeps = {
   store: ProjectStore;
-  access: ProjectAccess;
-  // the users port
-  userSummary: (id: string) => UserSummary | null;
+  access: AccessPort;
+  users: UsersPort;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
@@ -46,10 +49,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
-        const members = deps.store
-          .memberIds(project.id)
-          .map(deps.userSummary)
-          .filter((u): u is UserSummary => u !== null);
+        const members: UserSummary[] = [];
+        for (const id of deps.store.memberIds(project.id)) {
+          const user = deps.users.byId(id);
+          if (user !== null) members.push(userSummary(user));
+        }
         const body: ProjectResponse = {
           project: {
             ...summary(project),
