@@ -1,0 +1,365 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The sessions entity: the chat on screen with the reply in flight,
+// the list of one project, and the agents its composer offers. The
+// rows come from the routes; the socket keeps them current. A durable
+// envelope counts when its revision is above the one held, so the
+// answer of a write and the event of the same commit are one change
+// however they arrive. The stream frames are applied to the live map
+// through the transcript's reducers; a frame out of sequence means the
+// detail is fetched again, so the page is never stuck on a gap.
+// Every answer is kept only for the user, the id and the turn it was
+// asked for, as the projects entity does.
+
+import { effect, signal } from "@preact/signals";
+import type {
+  CreateSessionRequest,
+  ProjectAgentsResponse,
+  SendMessageRequest,
+  SessionResponse,
+  SessionsResponse,
+} from "../../shared/api/sessions.ts";
+import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import type {
+  Message,
+  SessionDetail,
+  SessionSummary,
+} from "../../shared/contracts/session.ts";
+import type { SocketEvent } from "../../shared/socket.ts";
+import { navigate } from "../app/router.ts";
+import {
+  applyDelta,
+  applyHtml,
+  type Live,
+  liveOf,
+  liveOfSnapshot,
+} from "../transcript/stream.ts";
+import { api } from "./api.ts";
+import { me } from "./me.ts";
+import { onSocketEvent, watch } from "./socket.ts";
+
+// frames kept while the watch is being answered; past this the
+// snapshot is refetched instead
+export const BUFFER_MAX = 256;
+
+export const session = signal<SessionDetail | null>(null);
+export const sessionError = signal<string | null>(null);
+// the replies streaming on the chat on screen, by message id
+export const live = signal<ReadonlyMap<string, Live>>(new Map());
+export const projectSessions = signal<SessionSummary[] | null>(null);
+export const projectAgents = signal<AgentSummary[] | null>(null);
+// a send the composer asked for and the server has not answered
+export const sending = signal(false);
+
+type Frame = Extract<SocketEvent, { type: "delta" | "html" }>;
+
+let owner: string | null = null;
+let wanted: { id: string; turn: number } = { id: "", turn: 0 };
+let listFor: { projectId: string; turn: number } = { projectId: "", turn: 0 };
+// the watch in flight: the frames before its answer, and the sequence
+// the next frame must follow once answered
+let pending: { buffer: Frame[]; overflow: boolean } | null = null;
+let stream: { sendId: string; seq: number } | null = null;
+
+const reason = (err: unknown) =>
+  err instanceof Error ? err.message : String(err);
+
+const clock = () => Date.now();
+
+effect(() => {
+  const id = me.value?.id ?? null;
+  if (id === owner) return;
+  owner = id;
+  wanted = { id: "", turn: wanted.turn + 1 };
+  listFor = { projectId: "", turn: listFor.turn + 1 };
+  session.value = null;
+  sessionError.value = null;
+  live.value = new Map();
+  projectSessions.value = null;
+  projectAgents.value = null;
+  sending.value = false;
+  pending = null;
+  stream = null;
+});
+
+// the stream's order: running first, then by last activity, newest first
+export function ordered(rows: SessionSummary[]): SessionSummary[] {
+  return [...rows].sort((a, b) => {
+    const ra = a.status === "running" ? 1 : 0;
+    const rb = b.status === "running" ? 1 : 0;
+    if (ra !== rb) return rb - ra;
+    if (a.lastActivityAt !== b.lastActivityAt) {
+      return b.lastActivityAt - a.lastActivityAt;
+    }
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+// the live map from a detail: the streaming rows, the runner's
+// snapshot for the one it is about
+function liveFrom(detail: SessionDetail): Map<string, Live> {
+  const map = new Map<string, Live>();
+  for (const m of detail.messages) {
+    if (m.status !== "streaming") continue;
+    map.set(
+      m.id,
+      detail.live !== null && detail.live.messageId === m.id
+        ? liveOfSnapshot(detail.live, m)
+        : liveOf(m),
+    );
+  }
+  return map;
+}
+
+function show(detail: SessionDetail): void {
+  session.value = detail;
+  live.value = liveFrom(detail);
+  stream =
+    detail.live === null
+      ? null
+      : { sendId: detail.live.sendId, seq: detail.live.seq };
+}
+
+export async function loadSession(id: string): Promise<void> {
+  const turn = wanted.turn + 1;
+  wanted = { id, turn };
+  sessionError.value = null;
+  if (session.value !== null && session.value.session.id !== id) {
+    session.value = null;
+    live.value = new Map();
+  }
+  try {
+    const detail = await api<SessionResponse>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+    );
+    if (wanted.turn !== turn) return;
+    show(detail);
+    // registered before the watch is sent, so a frame that arrives
+    // before the answer is kept
+    pending = { buffer: [], overflow: false };
+    watch(id);
+  } catch (err) {
+    if (wanted.turn === turn) sessionError.value = reason(err);
+  }
+}
+
+// the page left the chat
+export function leaveSession(): void {
+  wanted = { id: "", turn: wanted.turn + 1 };
+  pending = null;
+  watch(null);
+}
+
+export async function loadProjectSessions(projectId: string): Promise<void> {
+  const turn = listFor.turn + 1;
+  listFor = { projectId, turn };
+  try {
+    const body = await api<SessionsResponse>(
+      `/api/sessions?project=${encodeURIComponent(projectId)}`,
+    );
+    if (listFor.turn === turn) projectSessions.value = ordered(body.sessions);
+  } catch {
+    if (listFor.turn === turn) projectSessions.value = null;
+  }
+}
+
+export async function loadProjectAgents(projectId: string): Promise<void> {
+  const forUser = owner;
+  try {
+    const body = await api<ProjectAgentsResponse>(
+      `/api/projects/${encodeURIComponent(projectId)}/agents`,
+    );
+    if (owner === forUser) projectAgents.value = body.agents;
+  } catch {
+    if (owner === forUser) projectAgents.value = null;
+  }
+}
+
+// a write's answer is the detail: applied like an envelope, so the
+// socket's copy of the same commit changes nothing
+function take(detail: SessionDetail): void {
+  const held = session.value;
+  if (held === null || held.session.id !== detail.session.id) return;
+  if (detail.session.revision <= held.session.revision) return;
+  show(detail);
+}
+
+export async function createSession(
+  body: CreateSessionRequest,
+): Promise<SessionDetail> {
+  sending.value = true;
+  try {
+    const detail = await api<SessionResponse>("/api/sessions", "POST", body);
+    navigate(`/chat/${detail.session.id}`);
+    return detail;
+  } finally {
+    sending.value = false;
+  }
+}
+
+export async function sendMessage(id: string, message: string): Promise<void> {
+  sending.value = true;
+  try {
+    const body: SendMessageRequest = { message };
+    const detail = await api<SessionResponse>(
+      `/api/sessions/${encodeURIComponent(id)}/messages`,
+      "POST",
+      body,
+    );
+    take(detail);
+  } finally {
+    sending.value = false;
+  }
+}
+
+// the answer is empty: the end of the send arrives as an envelope
+export async function stopSession(id: string): Promise<void> {
+  await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
+}
+
+function upsert(rows: Message[], next: Message[]): Message[] {
+  const out = rows.slice();
+  for (const m of next) {
+    const i = out.findIndex((x) => x.id === m.id);
+    if (i === -1) out.push(m);
+    else out[i] = m;
+  }
+  return out.sort((a, b) => a.seq - b.seq);
+}
+
+function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
+  const list = projectSessions.value;
+  if (list !== null && listFor.projectId === ev.projectId) {
+    const held = list.find((s) => s.id === ev.session.id);
+    if (held === undefined || held.revision < ev.session.revision) {
+      projectSessions.value = ordered([
+        ...list.filter((s) => s.id !== ev.session.id),
+        ev.session,
+      ]);
+    }
+  }
+  const held = session.value;
+  if (held === null || held.session.id !== ev.session.id) return;
+  if (ev.session.revision <= held.session.revision) return;
+  const messages = upsert(held.messages, ev.messages);
+  const map = new Map(live.value);
+  for (const m of ev.messages) {
+    if (m.kind !== "reply") continue;
+    if (m.status === "streaming") {
+      if (!map.has(m.id)) map.set(m.id, liveOf(m));
+    } else map.delete(m.id);
+  }
+  session.value = {
+    ...held,
+    session: ev.session,
+    messages,
+    send: ev.send ?? held.send,
+  };
+  live.value = map;
+}
+
+// the frames are refetched rather than reasoned about: one detail
+// answers a gap, an overflow, or a frame ahead of the buffer
+function refetch(): void {
+  const held = session.value;
+  if (held !== null) void loadSession(held.session.id);
+}
+
+function applyFrame(frame: Frame): boolean {
+  const held = session.value;
+  if (held === null || held.session.id !== frame.sessionId) return true;
+  if (stream === null || stream.sendId !== frame.sendId) {
+    stream = { sendId: frame.sendId, seq: 0 };
+  }
+  if (frame.seq !== stream.seq + 1) return false;
+  stream.seq = frame.seq;
+  const v = live.value.get(frame.messageId);
+  if (v === undefined) return true;
+  const map = new Map(live.value);
+  if (frame.type === "delta") {
+    const r = applyDelta(v, frame, clock());
+    if (r.gap) return false;
+    map.set(frame.messageId, r.live);
+  } else {
+    map.set(frame.messageId, applyHtml(v, frame));
+  }
+  live.value = map;
+  return true;
+}
+
+function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
+  const held = session.value;
+  if (held === null || held.session.id !== ev.sessionId) return;
+  const buffered = pending;
+  pending = null;
+  if (buffered === null || buffered.overflow) {
+    refetch();
+    return;
+  }
+  if (ev.live !== null) {
+    const m = held.messages.find((x) => x.id === ev.live?.messageId);
+    if (m !== undefined) {
+      const map = new Map(live.value);
+      map.set(m.id, liveOfSnapshot(ev.live, m));
+      live.value = map;
+    }
+    stream = { sendId: ev.live.sendId, seq: ev.live.seq };
+  }
+  for (const frame of buffered.buffer) {
+    if (stream !== null && frame.sendId === stream.sendId) {
+      if (frame.seq <= stream.seq) continue;
+    }
+    if (!applyFrame(frame)) {
+      refetch();
+      return;
+    }
+  }
+}
+
+export function onSocket(ev: SocketEvent): void {
+  switch (ev.type) {
+    case "session":
+      onEnvelope(ev);
+      break;
+    case "deleted": {
+      const list = projectSessions.value;
+      if (list !== null) {
+        projectSessions.value = list.filter((s) => s.id !== ev.sessionId);
+      }
+      const held = session.value;
+      if (held !== null && held.session.id === ev.sessionId) {
+        session.value = null;
+        live.value = new Map();
+        navigate(`/projects/${ev.projectId}`);
+      }
+      break;
+    }
+    case "revoked": {
+      if (listFor.projectId === ev.projectId) projectSessions.value = null;
+      const held = session.value;
+      if (held !== null && held.session.projectId === ev.projectId) {
+        session.value = null;
+        live.value = new Map();
+        navigate("/");
+      }
+      break;
+    }
+    case "watched":
+      onWatched(ev);
+      break;
+    case "delta":
+    case "html":
+      if (pending !== null) {
+        if (pending.buffer.length >= BUFFER_MAX) pending.overflow = true;
+        else pending.buffer.push(ev);
+        break;
+      }
+      if (!applyFrame(ev)) refetch();
+      break;
+    default:
+      break;
+  }
+}
+
+onSocketEvent(onSocket);
