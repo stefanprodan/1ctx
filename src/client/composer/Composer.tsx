@@ -69,10 +69,14 @@ export function Composer({
     const content = text.value.trim();
     if (content === "" || agent === null || !ready) return;
     failure.value = null;
+    const sent = text.value;
     try {
       await onSend(content, agent);
-      text.value = "";
-      writeDraft(key, "");
+      // what was typed while the send was on its way stays
+      if (text.value === sent) {
+        text.value = "";
+        writeDraft(key, "");
+      }
     } catch (err) {
       failure.value = err instanceof Error ? err.message : String(err);
     }
@@ -126,8 +130,12 @@ export function Composer({
           aria-label={running ? "Stop" : "Send"}
           disabled={running ? false : !ready || text.value.trim() === ""}
           onClick={() => {
-            if (running) void onStop();
-            else void submit();
+            if (running) {
+              onStop().catch((err) => {
+                failure.value =
+                  err instanceof Error ? err.message : String(err);
+              });
+            } else void submit();
           }}
         >
           <Icon name={running ? "stop" : "send"} size={16} />

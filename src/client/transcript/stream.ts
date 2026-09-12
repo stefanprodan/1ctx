@@ -95,22 +95,6 @@ export function applyHtml(live: Live, frame: HtmlFrame): Live {
   return { ...live, html: frame.html, htmlAt: frame.htmlAt };
 }
 
-export function finish(
-  live: Live | undefined,
-  message: Message,
-  now: number,
-): Live {
-  return {
-    content: message.content,
-    reasoning: message.reasoning,
-    html: message.html,
-    htmlAt: message.content.length,
-    thinkStart: live?.thinkStart ?? null,
-    thinkEnd: live ? (live.thinkEnd ?? now) : null,
-    thinkMs: message.thinkingMs,
-  };
-}
-
 export const tail = (live: Live): string => live.content.slice(live.htmlAt);
 
 export function thinkLabel(live: Live, done: boolean, now: number): string {

@@ -5,7 +5,6 @@ import { describe, expect, test } from "bun:test";
 import {
   applyDelta,
   applyHtml,
-  finish,
   type Live,
   liveOf,
   liveOfSnapshot,
@@ -163,29 +162,6 @@ describe("live transcript buffers", () => {
       ...before,
       html: "new",
       htmlAt: 6,
-    });
-  });
-
-  test("finishes from the row while keeping client clocks", () => {
-    const before = live({ thinkStart: 1_000, thinkEnd: 4_200 });
-    const done = finish(
-      before,
-      message({
-        content: "answer",
-        reasoning: "thought",
-        html: "<p>answer</p>",
-        status: "done",
-        thinkingMs: 3_100,
-      }),
-      5_000,
-    );
-    expect(done).toMatchObject({
-      content: "answer",
-      reasoning: "thought",
-      htmlAt: 6,
-      thinkStart: 1_000,
-      thinkEnd: 4_200,
-      thinkMs: 3_100,
     });
   });
 

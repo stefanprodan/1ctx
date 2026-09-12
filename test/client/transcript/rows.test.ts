@@ -79,19 +79,4 @@ describe("transcript rows", () => {
     expect(rows.map((node) => reply(node).think)).toEqual([true, true, false]);
     expect(reply(rows[1]).live?.reasoning).toBe("streaming");
   });
-
-  test("marks only the final reply as last", () => {
-    const rows = groupRows(
-      [
-        message("u1", 1, "user"),
-        message("r1", 2, "reply"),
-        message("u2", 3, "user"),
-        message("r2", 4, "reply"),
-      ],
-      new Map(),
-    );
-    expect(
-      rows.filter((node) => node.kind === "reply").map((node) => node.last),
-    ).toEqual([false, true]);
-  });
 });

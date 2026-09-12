@@ -11,7 +11,6 @@ export type Node =
       message: Message;
       live: Live | null;
       think: boolean;
-      last: boolean;
     };
 
 export function groupRows(
@@ -19,11 +18,6 @@ export function groupRows(
   live: ReadonlyMap<string, Live>,
 ): Node[] {
   const ordered = [...messages].sort((left, right) => left.seq - right.seq);
-  let lastReplyId: string | null = null;
-  for (const message of ordered) {
-    if (message.kind === "reply") lastReplyId = message.id;
-  }
-
   return ordered.map((message) => {
     if (message.kind === "user") return { kind: "user", message };
     const current = live.get(message.id) ?? null;
@@ -32,7 +26,6 @@ export function groupRows(
       message,
       live: current,
       think: (current?.reasoning ?? "") !== "" || message.reasoning !== "",
-      last: message.id === lastReplyId,
     };
   });
 }

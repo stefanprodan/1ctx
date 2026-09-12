@@ -61,6 +61,7 @@ let listFor: { projectId: string; turn: number } = { projectId: "", turn: 0 };
 // the next frame must follow once answered
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
 let stream: { sendId: string; seq: number } | null = null;
+let agentsTurn = 0;
 
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
@@ -134,7 +135,16 @@ export async function loadSession(id: string): Promise<void> {
       `/api/sessions/${encodeURIComponent(id)}`,
     );
     if (wanted.turn !== turn) return;
-    show(detail);
+    // an envelope may have moved the session past this answer while it
+    // was in flight; the rows held are then the newer ones
+    const held = session.value;
+    if (
+      held === null ||
+      held.session.id !== id ||
+      detail.session.revision >= held.session.revision
+    ) {
+      show(detail);
+    }
     // registered before the watch is sent, so a frame that arrives
     // before the answer is kept
     pending = { buffer: [], overflow: false };
@@ -144,15 +154,20 @@ export async function loadSession(id: string): Promise<void> {
   }
 }
 
-// the page left the chat
+// the page left the chat: nothing of it is kept, so a late frame, a
+// deletion or a revocation of it moves the page nowhere
 export function leaveSession(): void {
   wanted = { id: "", turn: wanted.turn + 1 };
   pending = null;
+  stream = null;
+  session.value = null;
+  live.value = new Map();
   watch(null);
 }
 
 export async function loadProjectSessions(projectId: string): Promise<void> {
   const turn = listFor.turn + 1;
+  if (listFor.projectId !== projectId) projectSessions.value = null;
   listFor = { projectId, turn };
   try {
     const body = await api<SessionsResponse>(
@@ -166,13 +181,15 @@ export async function loadProjectSessions(projectId: string): Promise<void> {
 
 export async function loadProjectAgents(projectId: string): Promise<void> {
   const forUser = owner;
+  const turn = ++agentsTurn;
+  const current = () => owner === forUser && turn === agentsTurn;
   try {
     const body = await api<ProjectAgentsResponse>(
       `/api/projects/${encodeURIComponent(projectId)}/agents`,
     );
-    if (owner === forUser) projectAgents.value = body.agents;
+    if (current()) projectAgents.value = body.agents;
   } catch {
-    if (owner === forUser) projectAgents.value = null;
+    if (current()) projectAgents.value = null;
   }
 }
 
@@ -292,18 +309,27 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
   const held = session.value;
   if (held === null || held.session.id !== ev.sessionId) return;
   const buffered = pending;
+  // an answer nobody waits for: a watch the socket repeated on open,
+  // answered before the load that follows sends its own
+  if (buffered === null) return;
   pending = null;
-  if (buffered === null || buffered.overflow) {
+  if (buffered.overflow) {
     refetch();
     return;
   }
-  if (ev.live !== null) {
+  if (ev.live === null) {
+    // the rows say running and the runner has nothing: the end went by
+    // before this connection heard it
+    if (held.session.status === "running") refetch();
+  } else {
     const m = held.messages.find((x) => x.id === ev.live?.messageId);
-    if (m !== undefined) {
-      const map = new Map(live.value);
-      map.set(m.id, liveOfSnapshot(ev.live, m));
-      live.value = map;
+    if (m === undefined) {
+      refetch();
+      return;
     }
+    const map = new Map(live.value);
+    map.set(m.id, liveOfSnapshot(ev.live, m));
+    live.value = map;
     stream = { sendId: ev.live.sendId, seq: ev.live.seq };
   }
   for (const frame of buffered.buffer) {
