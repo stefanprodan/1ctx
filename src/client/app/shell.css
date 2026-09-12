@@ -1,0 +1,42 @@
+/* The shell: the rail on the left, the view on the right. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .shell {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .shell-main {
+    flex-grow: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-5) 28px;
+    overflow: hidden;
+  }
+
+  /* the first load failed: the reason and a retry, centred */
+  .shell-fail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    height: 100%;
+    padding: var(--space-4);
+  }
+
+  @media (max-width: 720px) {
+    .shell {
+      flex-direction: column;
+    }
+    .shell-main {
+      padding: var(--space-4);
+      overflow: auto;
+    }
+  }
+}

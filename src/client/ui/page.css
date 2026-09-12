@@ -1,0 +1,55 @@
+/* The head of a view and its states. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .page-head {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-4);
+  }
+
+  .page-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .page-title {
+    margin: 0;
+    font-size: var(--text-title);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .page-aside {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  .page-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .page-aside + .page-actions {
+    margin-left: 0;
+  }
+  .page-heading + .page-actions {
+    margin-left: auto;
+  }
+
+  .page-state {
+    margin: 0;
+    color: var(--faint);
+  }
+}

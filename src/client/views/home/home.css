@@ -1,0 +1,11 @@
+/* Home: the stream takes the rest of the page and scrolls inside it. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .home-stream {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}

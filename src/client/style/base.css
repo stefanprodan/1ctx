@@ -1,0 +1,111 @@
+/* The reset and the primitives every view composes: button, field, label,
+   card. The only stylesheet allowed element, attribute and root selectors.
+   Anything drawn by a component under ui/ has its own stylesheet there. */
+
+@layer tokens, base, owners;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    background: var(--page);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app {
+    height: 100%;
+  }
+
+  a {
+    color: var(--brand);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--brand-hover);
+  }
+
+  input,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  input::placeholder {
+    color: var(--faint);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--brand);
+    outline-offset: 1px;
+  }
+
+  /* a section label: mono, uppercase, tracked, dim */
+  .label {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--faint);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn:hover {
+    color: var(--fg);
+  }
+  .btn-primary {
+    background: var(--line);
+    border-color: var(--line-strong);
+    color: var(--fg);
+  }
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field input {
+    height: 36px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+    border: 1px solid var(--line);
+    font-size: var(--text-input);
+  }
+
+  .card {
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+  }
+
+  .error {
+    color: var(--failed);
+  }
+}
