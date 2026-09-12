@@ -157,7 +157,13 @@ violation, and every rule has a rejected fixture under
   wire carries. The catalog is cached an hour per provider and searched
   on the server; the browser never gets the whole list. Anything that
   reaches a provider goes through the `fetcher` compose option, so a
-  test passes a fake and the suite never reaches a network. An agent
+  test passes a fake and the suite never reaches a network. A chat
+  request goes out through the providers capability's `chat()`, over
+  the row's wire (`providers/openai.ts`, the OpenRouter rules in
+  `providers/openrouter.ts`), as one `ChatEvent` stream; the key is
+  read from the secrets port at each request and scrubbed from every
+  error, and the recorded frames under `test/fixtures/providers/` are
+  what the tests and the fake fetch answer with. An agent
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider an agent runs on is a 409 to
   delete.

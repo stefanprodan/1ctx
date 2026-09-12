@@ -18,6 +18,7 @@ import {
   type Catalogs,
   type Fetcher,
   type ProviderStore,
+  type Providers,
   providersArea,
 } from "./providers/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
@@ -43,6 +44,9 @@ export type App = {
   providers: ProviderStore;
   agents: AgentStore;
   catalogs: Catalogs;
+  // on App until the runner lands to call it, so the wire suite can
+  // drive it through the composed fetcher and secrets
+  chat: Providers["chat"];
   // the one way a user is made: with its personal project
   createUser: Users["createUser"];
   routes: RouteDescriptor[];
@@ -106,6 +110,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers: providers.store,
     agents: agents.store,
     catalogs: providers.catalogs,
+    chat: providers.chat,
     createUser: users.createUser,
     routes,
     handle,

@@ -1,0 +1,97 @@
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":"We"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" need to answer in"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" one short sentence:"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" what is a Mac"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" Studio? Provide"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" concise definition"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":". Probably: \""},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":"The Mac Studio is"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" a compact,"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" high-performance desktop computer"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" from Apple designed for"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" professional workload"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":"s, featuring Apple"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":"'s"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" M-series chips"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" and a range"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" of connectivity options.\""},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" One"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" sentence. Ensure"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" it"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":"'s short."},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" Let's craft"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":":"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" \"The Mac Studio"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" is Apple's compact"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":", high\u2011end"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" desktop workstation powered"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" by M"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":"\u2011series chips,"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" aimed at creators"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" and"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" professionals needing powerful"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" performance in a small"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" form"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":" factor.\"\n\n"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"The","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" Mac Studio is","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" Apple\u2019s compact,","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" high\u2011end","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" desktop workstation powered","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" by M\u2011series","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" chips, designed","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" for creators and professionals","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" who need powerful performance","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" in a small form","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":" factor.","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning_content":null},"finish_reason":"stop","native_finish_reason":"stop"}]}
+
+data: {"id":"gen-1789063867-COQlF662B6zrSySn2KII","object":"chat.completion.chunk","created":1789063867,"model":"nvidia/nemotron-3-super-120b-a12b:free","service_tier":null,"choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"stop","native_finish_reason":"stop"}],"usage":{"prompt_tokens":27,"completion_tokens":141,"total_tokens":168,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0}}}
+
+data: [DONE]

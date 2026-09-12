@@ -18,19 +18,31 @@ export const ORIGIN = "http://1ctx.test";
 // else, so the suite never reaches a network
 export const PROVIDER_URL = "http://models.test/v1";
 
-const catalogBody = () =>
-  readFileSync(
-    join(import.meta.dir, "..", "fixtures", "providers", "models.json"),
-    "utf8",
-  );
+const fixture = (...parts: string[]) =>
+  readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
+const catalogBody = () => fixture("providers", "models.json");
+// a reply with reasoning, content, a finish and usage, in the shape of
+// the wire the request went out on: the OpenRouter recording for its
+// body (usage asked for, the reasoning object), and for the plain wire
+// the same reply derived from it with the reasoning under
+// reasoning_content and no cost, since the one recorded from an
+// OpenAI-compatible server is cut by length with no content
+const chatBody = (body: string | null) =>
+  body?.includes('"stream_options"')
+    ? fixture("providers", "openai", "chat-reply.sse")
+    : fixture("providers", "openrouter", "chat-stream.sse");
 
-// the recorded catalog for the fake provider, a 502-worthy answer for
-// any other host; every call is kept so a test can see what went out
-export function fakeFetch(): {
-  fetcher: typeof fetch;
-  calls: { url: string; headers: Record<string, string> }[];
-} {
-  const calls: { url: string; headers: Record<string, string> }[] = [];
+export type FakeCall = {
+  url: string;
+  headers: Record<string, string>;
+  body: string | null;
+};
+
+// the recorded catalog and the recorded chat for the fake provider, a
+// 502-worthy answer for any other host; every call is kept so a test
+// can see what went out
+export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
+  const calls: FakeCall[] = [];
   const fetcher = (async (
     input: string | URL | Request,
     init?: RequestInit,
@@ -40,10 +52,16 @@ export function fakeFetch(): {
     new Headers(init?.headers).forEach((v, k) => {
       headers[k] = v;
     });
-    calls.push({ url, headers });
+    const body = typeof init?.body === "string" ? init.body : null;
+    calls.push({ url, headers, body });
     if (url === `${PROVIDER_URL}/models`) {
       return new Response(catalogBody(), {
         headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === `${PROVIDER_URL}/chat/completions`) {
+      return new Response(chatBody(body), {
+        headers: { "content-type": "text/event-stream" },
       });
     }
     throw new TypeError("unable to connect");
@@ -56,7 +74,7 @@ export type TestApp = App & {
   db: Db;
   now: { value: number };
   // what the fake fetch was asked
-  fetched: { url: string; headers: Record<string, string> }[];
+  fetched: FakeCall[];
   // one cookie jar per client: a browser tab, or another user's
   client(address?: string): TestClient;
 };
