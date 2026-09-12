@@ -54,6 +54,7 @@ export type Access = Auth & {
 export function accessArea(deps: AccessDeps): Access {
   const logins = new LoginStore(deps.db);
   const built = auth({
+    db: deps.db,
     logins,
     users: deps.users,
     projects: deps.projects,

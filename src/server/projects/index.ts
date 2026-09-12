@@ -23,6 +23,8 @@ export type Projects = {
   store: ProjectStore;
   byId(id: string): ProjectRow | null;
   isMember(projectId: string, userId: string): boolean;
+  memberProjectIds(userId: string): string[];
+  teamProjectIds(): string[];
   createPersonal(fields: { userId: string; name: string; now: number }): void;
   routes: RouteDescriptor[];
 };
@@ -33,6 +35,8 @@ export function projectsArea(deps: ProjectsDeps): Projects {
     store,
     byId: (id) => store.byId(id),
     isMember: (projectId, userId) => store.isMember(projectId, userId),
+    memberProjectIds: (userId) => store.memberProjectIds(userId),
+    teamProjectIds: () => store.teamProjectIds(),
     createPersonal: (fields) => {
       store.createPersonal(fields);
     },

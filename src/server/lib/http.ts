@@ -33,18 +33,28 @@ export type RouteContext = {
   url: URL;
   // the client address, for rate limits
   address: string;
+  // on an upgrade route served by Bun: hand the connection to the
+  // websocket handlers with this data; true once Bun holds it. Absent
+  // when the request cannot be upgraded, and the handler answers 426
+  upgrade?: (data: unknown) => boolean;
 };
+
+// no Response means the connection was upgraded and Bun holds it
+export type RouteOutcome = Response | undefined;
 
 export type RouteHandler = (
   req: Request,
   ctx: RouteContext,
-) => Response | Promise<Response>;
+) => RouteOutcome | Promise<RouteOutcome>;
 
 export type RouteDescriptor = {
   method: Method;
   // "/api/projects/:id"; a segment starting with ":" captures one segment
   path: string;
   policy: Policy;
+  // a websocket upgrade: same-origin is checked as for a write, and
+  // the handler gets ctx.upgrade
+  upgrade?: true;
   handle: RouteHandler;
 };
 
