@@ -150,6 +150,15 @@ violation, and every rule has a rejected fixture under
   `app/routes.ts` wrapped in `lazy()`; the rail is computed from it.
   Bun does not yet split the HTML bundle, so the views still ship in one
   chunk; the table stays lazy so they will not the day it does.
+- **One shell, two widths, no header.** `app/shell.ts` holds the
+  state: from 720 up the rail is a column the user can hide, and the
+  choice is kept in `localStorage`; below 720 the rail covers the
+  screen, and Escape or a navigation closes it, never kept. From 720
+  up a hidden rail folds to a strip in its colour with the button that
+  unfolds it and the mark; below, the button floats at the top left of
+  the view on the page head's row. The width is `NARROW` in `shell.ts`
+  and the same number in `shell.css`. The rail never becomes a header
+  row and there is no top bar.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,

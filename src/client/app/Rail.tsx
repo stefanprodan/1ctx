@@ -1,11 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The rail: the logo, the pages the route table lists, and the user row
-// at the bottom with its menu: the profile and sign out.
-// A sign out the server refuses stays in the menu with the reason.
+// The rail: the logo with the button that hides it, the pages the route
+// table lists, and the user row at the bottom with its menu: the
+// profile and sign out. A sign out the server refuses stays in the menu
+// with the reason. As a drawer the hide button is a close, it takes the
+// focus when the drawer opens, and any link closes the drawer, the one
+// to the page already shown included, since that is no navigation.
 
 import { useSignal } from "@preact/signals";
+import { useEffect, useRef } from "preact/hooks";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
 import { initials } from "../lib/format.ts";
@@ -14,22 +18,47 @@ import { navigate, path } from "./router.ts";
 import { navEntries } from "./routes.ts";
 import "./rail.css";
 
-export function Rail({ user }: { user: UserSummary }) {
+export function Rail({
+  user,
+  narrow,
+  onHide,
+}: {
+  user: UserSummary;
+  narrow: boolean;
+  onHide: () => void;
+}) {
   const open = useSignal(false);
   const failure = useSignal<string | null>(null);
   const here = path.value;
+  const hide = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (narrow) hide.current?.focus();
+  }, [narrow]);
+  const follow = narrow ? onHide : undefined;
   return (
-    <aside class="rail">
+    <aside class={`rail${narrow ? " rail-drawer" : ""}`}>
       <div class="rail-top">
-        <a class="rail-logo" href="/" aria-label="Home">
-          <Logo height={26} />
-        </a>
+        <div class="rail-head">
+          <a class="rail-logo" href="/" aria-label="Home" onClick={follow}>
+            <Logo height={26} />
+          </a>
+          <button
+            ref={hide}
+            type="button"
+            class="rail-hide"
+            aria-label={narrow ? "Close the menu" : "Hide the menu"}
+            onClick={onHide}
+          >
+            <Icon name={narrow ? "close" : "sidebar"} />
+          </button>
+        </div>
         <nav class="rail-nav">
           {navEntries(user.role).map((route) => (
             <a
               key={route.path}
               href={route.path}
               class={`rail-item${here === route.path ? " rail-item-on" : ""}`}
+              onClick={follow}
             >
               <Icon name={route.nav!.icon} />
               <span>{route.nav!.label}</span>
@@ -45,6 +74,7 @@ export function Rail({ user }: { user: UserSummary }) {
               href="/profile"
               onClick={() => {
                 open.value = false;
+                follow?.();
               }}
             >
               <Icon name="user" size={14} />

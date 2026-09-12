@@ -9,6 +9,8 @@ import "./style/base.css";
 import { render } from "preact";
 import { App } from "./app/App.tsx";
 import { boot } from "./app/router.ts";
+import { watchWidth } from "./app/shell.ts";
 
 boot();
+watchWidth();
 render(<App />, document.getElementById("app")!);
