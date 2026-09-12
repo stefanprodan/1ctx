@@ -22,3 +22,26 @@ export function longDate(ms: number): string {
     year: "numeric",
   });
 }
+
+// the time of day, "08:41"
+export function clock(ms: number): string {
+  return new Date(ms).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// how long ago, at the coarseness a list wants: "40 s ago", "5 min
+// ago", "2 h ago", "yesterday", the weekday within the week, else the
+// day and month
+export function ago(ms: number, now: number): string {
+  const delta = Math.max(0, now - ms);
+  if (delta < 60_000) return `${Math.floor(delta / 1000)} s ago`;
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} min ago`;
+  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} h ago`;
+  const days = Math.floor(delta / 86_400_000);
+  if (days === 1) return "yesterday";
+  const date = new Date(ms);
+  if (days < 7) return date.toLocaleDateString("en-GB", { weekday: "short" });
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}

@@ -1,0 +1,28 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
+import { describe, expect, test } from "bun:test";
+import { ago, clock } from "../../../src/client/lib/format.ts";
+
+describe("time formatting", () => {
+  const now = new Date(2026, 8, 13, 12).getTime();
+
+  test.each([
+    ["59 seconds", 59_000, "59 s ago"],
+    ["1 minute", 60_000, "1 min ago"],
+    ["59 minutes", 59 * 60_000, "59 min ago"],
+    ["1 hour", 60 * 60_000, "1 h ago"],
+    ["23 hours", 23 * 60 * 60_000, "23 h ago"],
+    ["yesterday", 24 * 60 * 60_000, "yesterday"],
+    ["a weekday within the week", 2 * 24 * 60 * 60_000, "Fri"],
+    ["a date beyond the week", 7 * 24 * 60 * 60_000, "6 Sep"],
+  ])("formats %s", (_name, delta, expected) => {
+    expect(ago(now - delta, now)).toBe(expected);
+  });
+
+  test("formats the clock in hours and minutes", () => {
+    const time = new Date(2026, 8, 13, 8, 41).getTime();
+
+    expect(clock(time)).toBe("08:41");
+  });
+});

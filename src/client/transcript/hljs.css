@@ -1,0 +1,63 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .hljs-comment,
+  .hljs-quote,
+  .hljs-meta {
+    color: var(--faint);
+    font-style: italic;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-doctag,
+  .hljs-name,
+  .hljs-tag {
+    color: var(--brand);
+  }
+
+  .hljs-string,
+  .hljs-char,
+  .hljs-regexp,
+  .hljs-addition,
+  .hljs-template-tag,
+  .hljs-subst {
+    color: var(--done);
+  }
+
+  .hljs-number,
+  .hljs-literal,
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-link {
+    color: var(--brand-hover);
+  }
+
+  .hljs-title,
+  .hljs-section,
+  .hljs-built_in,
+  .hljs-type,
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-property,
+  .hljs-selector-class,
+  .hljs-selector-id,
+  .hljs-selector-attr,
+  .hljs-selector-pseudo,
+  .hljs-variable,
+  .hljs-template-variable {
+    color: var(--running);
+  }
+
+  .hljs-deletion {
+    color: var(--failed);
+  }
+
+  .hljs-emphasis {
+    font-style: italic;
+  }
+
+  .hljs-strong {
+    font-weight: 600;
+  }
+}
