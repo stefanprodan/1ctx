@@ -219,6 +219,18 @@ violation, and every rule has a rejected fixture under
 - **Rendered HTML carries `md-` classes on every element** and
   highlight.js tokens keep `hljs-`, so a stylesheet owns those prefixes
   and styles nothing by element. Render is server-side in `render/`.
+- **The socket client reconciles, never reasons.** `data/socket.ts` is
+  the tab's one connection, open while someone is signed in, with a
+  backoff on close and none after a revocation; on every open it runs
+  the route's load again and watches the session on screen again,
+  so a reconnect goes through the path a navigation does. It knows no
+  entity: `data/sessions.ts` registers for the frames, applies a
+  durable envelope only when its revision is above the one held, and
+  applies stream frames through `transcript/stream.ts`, in sequence; a
+  gap, a frame ahead of the buffer, or too many frames before
+  `watched` refetch the detail. The reducers are pure and tested on
+  fixtures; the transcript, the composer and the chat view render
+  what the entity holds.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
   reads signals and renders with the primitives under `ui/`. A route
   entry names its `load` in `app/routes.ts`, and `app/loading.ts`

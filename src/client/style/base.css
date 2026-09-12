@@ -118,4 +118,11 @@
   .error {
     color: var(--failed);
   }
+
+  /* the one turn a spinner needs */
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 }

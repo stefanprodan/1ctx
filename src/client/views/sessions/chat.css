@@ -1,0 +1,16 @@
+/* The chat: one column, the transcript above the composer. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .chat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    flex-grow: 1;
+    min-height: 0;
+    width: 860px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+}
