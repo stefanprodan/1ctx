@@ -6,11 +6,11 @@
 // with the about text, and the password. The username is shown, not
 // edited; an admin changes it. A Save wakes when something changed,
 // says Saved for a moment, and a refusal stays beside it until the
-// next edit; Profile.state.ts holds that.
+// next edit; lib/save.ts holds that.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
   changePassword,
@@ -20,61 +20,15 @@ import {
   saveProfile,
 } from "../../data/profile.ts";
 import { initials, longDate } from "../../lib/format.ts";
-import { Icon } from "../../lib/icons.tsx";
+import { useSave } from "../../lib/save.ts";
+import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
   aboutProblem,
   fullNameProblem,
   passwordProblem,
 } from "./Profile.model.ts";
-import { Save, type Status } from "./Profile.state.ts";
 import "./profile.css";
-
-// one Save per form, gone with it
-function useSave(call: () => Promise<void>): Save {
-  const ref = useRef<Save | null>(null);
-  if (ref.current === null) ref.current = new Save(call);
-  useEffect(() => () => ref.current?.dispose(), []);
-  return ref.current;
-}
-
-// every label is laid out in the same cell, so the button keeps the
-// width of the widest one whatever it says
-function Foot({
-  status,
-  dirty,
-  label,
-}: {
-  status: Status;
-  dirty: boolean;
-  label: string;
-}) {
-  const done = status === "done";
-  const busy = status === "busy";
-  const on = (yes: boolean) =>
-    `profile-btn-label${yes ? " profile-btn-label-on" : ""}`;
-  return (
-    <div class="profile-foot">
-      <button
-        type="submit"
-        class={`btn btn-primary${done ? " profile-done" : ""}`}
-        disabled={busy || done || !dirty}
-      >
-        <span class="profile-btn-labels">
-          <span class={on(!busy && !done)}>{label}</span>
-          <span class={on(busy)}>Saving</span>
-          <span class={on(done)}>
-            <Icon name="check" size={14} />
-            Saved
-          </span>
-        </span>
-      </button>
-      {typeof status === "object" && (
-        <span class="profile-note error">{status.error}</span>
-      )}
-    </div>
-  );
-}
 
 // a heading and a line on the left, the form on the right
 function Section({

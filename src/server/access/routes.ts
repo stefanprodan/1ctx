@@ -7,13 +7,14 @@
 
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
 import { type Db, transact } from "../db/index.ts";
+import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { summary, type UserRow, verifyPassword } from "../users/index.ts";
 import type { Access } from "./auth.ts";
-import { jsonBody, parseLogin } from "./parse.ts";
+import { parseLogin } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 
 export const LOGIN_LIMIT = 10;
