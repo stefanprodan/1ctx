@@ -1,0 +1,7 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .base {
+    width: 100%;
+  }
+}

@@ -1,0 +1,8 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .x {
+    font:
+      500 14px/1.4 sans-serif;
+  }
+}

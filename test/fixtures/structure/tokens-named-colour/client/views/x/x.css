@@ -1,0 +1,7 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .x {
+    color: red;
+  }
+}
