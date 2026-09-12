@@ -31,7 +31,8 @@ describe("access", () => {
     const db = memoryDb();
     const users = new UserStore(db);
     const user = users.create({
-      name: "u",
+      username: "u",
+      fullName: "U",
       role: "member",
       passwordHash: "x",
       now: 0,
@@ -50,7 +51,8 @@ describe("access", () => {
     const db = memoryDb();
     const users = new UserStore(db);
     const user = users.create({
-      name: "u",
+      username: "u",
+      fullName: "U",
       role: "member",
       passwordHash: "x",
       now: 0,
@@ -64,7 +66,7 @@ describe("access", () => {
     const { setCookie } = auth.open(user);
     const req = () =>
       new Request("http://x", { headers: { cookie: setCookie.split(";")[0] } });
-    expect(auth.resolve(req()).principal?.name).toBe("u");
+    expect(auth.resolve(req()).principal?.username).toBe("u");
     db.query("delete from users where id = ?").run(user.id);
     expect(auth.resolve(req()).principal).toBeNull();
   });

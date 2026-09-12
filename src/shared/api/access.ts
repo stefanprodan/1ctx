@@ -6,7 +6,7 @@
 import type { UserSummary } from "../contracts/user.ts";
 
 // POST /api/login
-export type LoginRequest = { name: string; password: string };
+export type LoginRequest = { username: string; password: string };
 export type LoginResponse = { user: UserSummary };
 
 // GET /api/me: null when nobody is signed in

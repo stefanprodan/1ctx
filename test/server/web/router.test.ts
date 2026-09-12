@@ -163,7 +163,13 @@ describe("router", () => {
         },
       ],
       resolve: () => ({
-        principal: { userId: "u", name: "u", role: "member", loginId: "l" },
+        principal: {
+          userId: "u",
+          username: "u",
+          fullName: "U",
+          role: "member",
+          loginId: "l",
+        },
         setCookie: "login=t; Max-Age=9",
       }),
       trustProxy: false,

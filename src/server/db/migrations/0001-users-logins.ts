@@ -12,7 +12,9 @@ export const m0001: Migration = {
     db.exec(`
       create table users (
         id text primary key,
-        name text not null unique,
+        username text not null unique,
+        full_name text not null,
+        about text not null default '',
         role text not null check (role in ('admin', 'member')),
         password_hash text not null,
         created_at integer not null

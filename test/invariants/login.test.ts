@@ -12,11 +12,16 @@ import { testApp } from "../helpers/app.ts";
 
 describe("bootstrap", () => {
   test("creates admin from the secret when there are no users", async () => {
-    const app = await testApp({ adminPassword: "s3cret" });
-    const admin = app.users.byName("admin");
+    const app = await testApp({ adminPassword: "s3cret-key" });
+    const admin = app.users.byUsername("admin");
     expect(admin?.role).toBe("admin");
     expect(admin?.passwordHash.startsWith("$argon2id$")).toBe(true);
-    expect(admin?.passwordHash).not.toContain("s3cret");
+    expect(admin?.passwordHash).not.toContain("s3cret-key");
+  });
+
+  test("refuses a secret under the password floor", async () => {
+    const app = await testApp({ adminPassword: "short" });
+    expect(app.users.count()).toBe(0);
   });
 
   test("refuses a secret over the password cap", async () => {
@@ -34,21 +39,26 @@ describe("login", () => {
   test("sets an HttpOnly, SameSite=Lax cookie and answers the user", async () => {
     const app = await testApp();
     const client = app.client();
-    const res = await client.login("admin", "hunter2");
+    const res = await client.login("admin", "hunter2-test");
     expect(res.status).toBe(200);
     const cookie = res.headers.get("set-cookie")!;
     expect(cookie).toMatch(
       /^login=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=2592000$/,
     );
     expect(await res.json()).toEqual({
-      user: { id: expect.any(String), name: "admin", role: "admin" },
+      user: {
+        id: expect.any(String),
+        username: "admin",
+        fullName: "Administrator",
+        role: "admin",
+      },
     });
   });
 
   test("stores a hash of the token, never the token", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     const token = client.cookie!.split("=")[1];
     const rows = app.db
       .query<{ token_hash: string }, []>("select token_hash from logins")
@@ -58,7 +68,7 @@ describe("login", () => {
     expect(rows[0].token_hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test("answers a wrong password and an unknown name the same way", async () => {
+  test("answers a wrong password and an unknown username the same way", async () => {
     const app = await testApp();
     const wrong = await app.client().login("admin", "nope");
     const unknown = await app.client().login("ghost", "nope");
@@ -74,10 +84,10 @@ describe("login", () => {
     const nobody = await client.call("GET", "/api/me");
     expect(nobody.status).toBe(200);
     expect(await nobody.json()).toEqual({ user: null });
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     const res = await client.call("GET", "/api/me");
     expect(res.status).toBe(200);
-    expect((await res.json()).user.name).toBe("admin");
+    expect((await res.json()).user.username).toBe("admin");
   });
 
   test("a forged cookie is nobody", async () => {
@@ -94,7 +104,7 @@ describe("logout", () => {
   test("revokes the row and clears the cookie", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     const token = client.cookie!;
     const res = await client.call("POST", "/api/logout");
     expect(res.status).toBe(200);
@@ -115,8 +125,8 @@ describe("logout", () => {
     const app = await testApp();
     const tab1 = app.client();
     const tab2 = app.client();
-    await tab1.login("admin", "hunter2");
-    await tab2.login("admin", "hunter2");
+    await tab1.login("admin", "hunter2-test");
+    await tab2.login("admin", "hunter2-test");
     await tab1.call("POST", "/api/logout");
     expect((await tab2.call("GET", "/api/me")).status).toBe(200);
   });
@@ -126,7 +136,7 @@ describe("expiry", () => {
   test("slides on use and ends after thirty idle days", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     app.now.value += LOGIN_TTL_MS - 1000;
     expect((await client.call("GET", "/api/me")).status).toBe(200);
     app.now.value += LOGIN_TTL_MS - 1000;
@@ -145,7 +155,7 @@ describe("same origin", () => {
   test("a write from another origin is refused before the handler", async () => {
     const app = await testApp();
     const client = app.client();
-    const res = await client.login("admin", "hunter2");
+    const res = await client.login("admin", "hunter2-test");
     expect(res.status).toBe(200);
     const cross = await client.call("POST", "/api/logout", {
       origin: "http://evil.test",
@@ -158,7 +168,7 @@ describe("same origin", () => {
     const app = await testApp();
     const client = app.client();
     const res = await client.call("POST", "/api/login", {
-      body: { name: "admin", password: "hunter2" },
+      body: { username: "admin", password: "hunter2-test" },
       origin: null,
       headers: { "sec-fetch-site": "cross-site" },
     });
@@ -168,7 +178,7 @@ describe("same origin", () => {
   test("a GET needs no origin", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     expect((await client.call("GET", "/api/me", { origin: null })).status).toBe(
       200,
     );
@@ -182,12 +192,12 @@ describe("rate limit", () => {
     for (let i = 0; i < LOGIN_LIMIT; i++) {
       expect((await client.login("admin", "wrong")).status).toBe(401);
     }
-    expect((await client.login("admin", "hunter2")).status).toBe(429);
+    expect((await client.login("admin", "hunter2-test")).status).toBe(429);
     expect(
-      (await app.client("10.0.0.10").login("admin", "hunter2")).status,
+      (await app.client("10.0.0.10").login("admin", "hunter2-test")).status,
     ).toBe(200);
     app.now.value += 61_000;
-    expect((await client.login("admin", "hunter2")).status).toBe(200);
+    expect((await client.login("admin", "hunter2-test")).status).toBe(200);
   });
 });
 
@@ -195,7 +205,7 @@ describe("the sliding cookie", () => {
   test("is re-sent with a full Max-Age once an hour has passed", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     const first = client.cookie!;
     // within the hour nothing is re-sent
     app.now.value += TOUCH_AFTER_MS - 1;
@@ -217,7 +227,7 @@ describe("the sliding cookie", () => {
   test("logout wins over a renewal on the same response", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2");
+    await client.login("admin", "hunter2-test");
     app.now.value += TOUCH_AFTER_MS;
     const res = await client.call("POST", "/api/logout");
     expect(res.headers.get("set-cookie")).toMatch(/^login=; /);
@@ -228,9 +238,9 @@ describe("the sliding cookie", () => {
 describe("sweep", () => {
   test("removes the rows whose expiry passed", async () => {
     const app = await testApp();
-    await app.client().login("admin", "hunter2");
+    await app.client().login("admin", "hunter2-test");
     app.now.value += LOGIN_TTL_MS / 2;
-    await app.client().login("admin", "hunter2");
+    await app.client().login("admin", "hunter2-test");
     app.now.value += LOGIN_TTL_MS / 2;
     expect(app.sweep()).toBe(1);
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({
@@ -244,7 +254,10 @@ describe("the body cap", () => {
     const app = await testApp();
     const client = app.client();
     const res = await client.call("POST", "/api/login", {
-      raw: JSON.stringify({ name: "admin", password: "x".repeat(MAX_BODY) }),
+      raw: JSON.stringify({
+        username: "admin",
+        password: "x".repeat(MAX_BODY),
+      }),
     });
     expect(res.status).toBe(413);
   });
@@ -261,7 +274,7 @@ describe("a trusted proxy", () => {
     const app = await testApp({ trustProxy: true });
     const proxied = (ip: string) =>
       app.client("127.0.0.1").call("POST", "/api/login", {
-        body: { name: "admin", password: "wrong" },
+        body: { username: "admin", password: "wrong" },
         headers: { "x-forwarded-for": ip },
       });
     for (let i = 0; i < LOGIN_LIMIT; i++) {

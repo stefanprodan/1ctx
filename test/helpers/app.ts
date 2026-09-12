@@ -34,7 +34,7 @@ export type TestClient = {
       origin?: string | null;
     },
   ): Promise<Response>;
-  login(name: string, password: string): Promise<Response>;
+  login(username: string, password: string): Promise<Response>;
 };
 
 export async function testApp(
@@ -44,7 +44,9 @@ export async function testApp(
   const now = { value: 1_000_000 };
   const trustProxy = options.trustProxy ?? false;
   const adminPassword =
-    options.adminPassword === undefined ? "hunter2" : options.adminPassword;
+    options.adminPassword === undefined
+      ? "hunter2-test"
+      : options.adminPassword;
   const app = await compose({
     db,
     secret: (name) => (name === "admin" ? adminPassword : null),
@@ -92,9 +94,9 @@ export async function testApp(
           }
           return res;
         },
-        login(name, password) {
+        login(username, password) {
           return client.call("POST", "/api/login", {
-            body: { name, password },
+            body: { username, password },
           });
         },
       };

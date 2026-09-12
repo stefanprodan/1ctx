@@ -11,7 +11,8 @@ import type { Role } from "../../shared/words.ts";
 // who is asking: resolved by access from the cookie, checked by the router
 export type Principal = {
   userId: string;
-  name: string;
+  username: string;
+  fullName: string;
   role: Role;
   // the login row behind the cookie, so logout can revoke exactly it
   loginId: string;

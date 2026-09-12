@@ -11,7 +11,7 @@ import { Logo } from "../../lib/icons.tsx";
 import "./login.css";
 
 export function Login() {
-  const name = useSignal("");
+  const username = useSignal("");
   const password = useSignal("");
   const error = useSignal<string | null>(null);
   const busy = useSignal(false);
@@ -22,7 +22,7 @@ export function Login() {
     busy.value = true;
     error.value = null;
     try {
-      await login({ name: name.value, password: password.value });
+      await login({ username: username.value, password: password.value });
       navigate("/", true);
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err);
@@ -39,13 +39,14 @@ export function Login() {
       </div>
       <form class="login-form card" onSubmit={submit}>
         <label class="field">
-          <span class="label">User</span>
+          <span class="label">Username</span>
           <input
-            name="name"
+            name="username"
             autocomplete="username"
-            value={name.value}
+            autocapitalize="none"
+            value={username.value}
             onInput={(e) => {
-              name.value = (e.currentTarget as HTMLInputElement).value;
+              username.value = (e.currentTarget as HTMLInputElement).value;
             }}
           />
         </label>

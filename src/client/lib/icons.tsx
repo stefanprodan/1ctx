@@ -1,12 +1,35 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The inline SVGs: the logo from the brand book, and the 16 px stroke
-// icons, one style. A colour comes from currentColor; the sparkle is
-// always brand amber.
+// The inline SVGs: the mark and the logo from the brand book, and the
+// 16 px stroke icons, one style. A colour comes from currentColor; the
+// sparkle is always brand amber.
 
 const SPARKLE =
   "M19.5 1.0C19.5 2.925 21.075 4.5 23.0 4.5C21.075 4.5 19.5 6.075 19.5 8.0C19.5 6.075 17.925 4.5 16.0 4.5C17.925 4.5 19.5 2.925 19.5 1.0Z";
+
+// the mark alone (site/mark.svg): the chip with the 1 and the sparkle.
+// The stroke follows the brand book: 1.75 under 32 px, 1.5 from there
+export function Mark({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width={size < 32 ? 1.75 : 1.5}
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-label="1ctx"
+      role="img"
+    >
+      <path d="M13.5 4H11C6.757 4 4.636 4 3.318 5.318S2 8.758 2 13s0 6.364 1.318 7.682S6.758 22 11 22s6.364 0 7.682-1.318S20 17.242 20 13v-2.5" />
+      <path d="M8.75 11.25 11.5 8.75V17.5" />
+      <path fill="var(--brand)" stroke="none" d={SPARKLE} />
+    </svg>
+  );
+}
 
 // the wordmark inside the wide chip (site/logo.svg, 170.19 by 90)
 export function Logo({ height = 26 }: { height?: number }) {
@@ -56,6 +79,10 @@ const PATHS: Record<string, string> = {
   "chevron-right": "M6.5 5l3 3-3 3",
   check: "M3 8.5l3 3 7-7",
   "sign-out": "M6.5 3H3v10h3.5M10 5l3 3-3 3M13 8H6",
+  sidebar:
+    "M3.5 3h9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM6 3v10",
+  close: "M4 4l8 8M12 4l-8 8",
+  user: "M8 8.5a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5zM2.5 13.5c0-2.5 2.5-3.5 5.5-3.5s5.5 1 5.5 3.5",
 };
 
 export type IconName = keyof typeof PATHS;

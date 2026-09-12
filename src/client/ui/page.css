@@ -15,6 +15,8 @@
     display: flex;
     align-items: flex-end;
     gap: var(--space-4);
+    /* room the shell asks for when its button sits on this row */
+    padding-left: var(--page-lead, 0);
   }
 
   .page-heading {
@@ -28,6 +30,21 @@
     font-size: var(--text-title);
     font-weight: 600;
     line-height: 1;
+  }
+
+  /* one line: the section dim, the slash fainter, the title lit */
+  .page-crumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    line-height: 32px;
+  }
+  .page-crumb-sep {
+    color: var(--line-strong);
+  }
+  .page-crumb-on {
+    color: var(--fg);
   }
 
   .page-aside {
@@ -44,7 +61,8 @@
   .page-aside + .page-actions {
     margin-left: 0;
   }
-  .page-heading + .page-actions {
+  .page-heading + .page-actions,
+  .page-crumb + .page-actions {
     margin-left: auto;
   }
 

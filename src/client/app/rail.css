@@ -1,4 +1,5 @@
-/* The rail: 220 wide, the rail ground, the user row flush at the bottom. */
+/* The rail: 220 wide, the rail ground, the user row flush at the bottom.
+   On a phone it covers the screen. */
 
 @layer tokens, base, owners;
 
@@ -11,6 +12,13 @@
     border-right: 1px solid var(--line);
     background: var(--rail);
   }
+  .rail-drawer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    border-right: 0;
+  }
 
   .rail-top {
     display: flex;
@@ -19,11 +27,34 @@
     padding: 14px var(--space-3);
   }
 
-  .rail-logo {
+  .rail-head {
     display: flex;
     align-items: center;
     height: 36px;
+  }
+
+  .rail-logo {
+    display: flex;
+    align-items: center;
     padding: 0 var(--space-2);
+    color: var(--fg);
+  }
+
+  .rail-hide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+  }
+  .rail-hide:hover {
+    background: var(--card);
     color: var(--fg);
   }
 
@@ -31,6 +62,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    overflow-y: auto;
   }
 
   .rail-item {
@@ -42,6 +74,7 @@
     border-radius: var(--radius);
     color: var(--dim);
     font-weight: 500;
+    flex-shrink: 0;
   }
   .rail-item:hover {
     color: var(--fg);
@@ -88,6 +121,9 @@
 
   .rail-user-name {
     font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .rail-user-chevron {
@@ -118,6 +154,7 @@
     background: transparent;
     color: var(--dim);
     text-align: left;
+    text-decoration: none;
     cursor: pointer;
   }
   .rail-menu-item:hover {
@@ -127,33 +164,5 @@
 
   .rail-menu-error {
     margin: var(--space-1) 10px var(--space-1);
-  }
-
-  @media (max-width: 720px) {
-    .rail {
-      width: 100%;
-      flex-direction: row;
-      align-items: center;
-      border-right: 0;
-      border-bottom: 1px solid var(--line);
-    }
-    .rail-top {
-      flex-direction: row;
-      align-items: center;
-      flex-grow: 1;
-    }
-    .rail-nav {
-      flex-direction: row;
-    }
-    .rail-user {
-      margin-top: 0;
-      border-top: 0;
-    }
-    .rail-menu {
-      left: auto;
-      bottom: auto;
-      top: 52px;
-      width: 160px;
-    }
   }
 }

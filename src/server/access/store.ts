@@ -83,6 +83,14 @@ export class LoginStore {
     this.db.query("delete from logins where id = ?").run(id);
   }
 
+  // every login of a user but one: a password change keeps the tab
+  // that changed it
+  deleteOthers(userId: string, keepId: string): number {
+    return this.db
+      .query("delete from logins where user_id = ? and id != ?")
+      .run(userId, keepId).changes;
+  }
+
   deleteExpired(now: number): number {
     return this.db.query("delete from logins where expires_at <= ?").run(now)
       .changes;
