@@ -12,6 +12,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
+import type { Avatar, Wire } from "../../../shared/words.ts";
 import { agents, agentsError, loadAgents } from "../../data/agents.ts";
 import {
   deleteProvider,
@@ -19,7 +20,9 @@ import {
   providers,
   providersError,
 } from "../../data/providers.ts";
-import { Icon, type IconName } from "../../lib/icons.tsx";
+import { AvatarIcon } from "../../lib/avatars.tsx";
+import { Icon } from "../../lib/icons.tsx";
+import { WireMark } from "../../lib/marks.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AgentForm } from "./AgentForm.tsx";
 import { keyLine, modelMeta } from "./Agents.model.ts";
@@ -29,10 +32,26 @@ import "./agents.css";
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
-function Tile({ icon, lit }: { icon: IconName; lit: boolean }) {
+// an agent shows its avatar; a provider its service's mark, or a
+// cloud for a server without one
+function Tile({
+  avatar,
+  wire,
+  lit,
+}: {
+  avatar?: Avatar;
+  wire?: Wire;
+  lit: boolean;
+}) {
   return (
     <span class={`agents-tile${lit ? " agents-tile-lit" : ""}`}>
-      <Icon name={icon} size={15} />
+      {avatar ? (
+        <AvatarIcon name={avatar} size={15} />
+      ) : wire === "openrouter" ? (
+        <WireMark wire={wire} size={15} />
+      ) : (
+        <Icon name="providers" size={15} />
+      )}
     </span>
   );
 }
@@ -65,7 +84,7 @@ function AgentRow({
           size={14}
           class={`agents-chevron${open ? " agents-chevron-open" : ""}`}
         />
-        <Tile icon="agents" lit={open} />
+        <Tile avatar={agent.avatar} lit={open} />
         <span class="agents-name">{agent.name}</span>
         <span class="agents-desc">{agent.model.name}</span>
         <span class="agents-meta">{meta}</span>
@@ -98,7 +117,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
   return (
     <div class="agents-item">
       <div class="agents-provider">
-        <Tile icon="providers" lit={false} />
+        <Tile wire={provider.wire} lit={false} />
         <span class="agents-name">{provider.name}</span>
         <span class="agents-desc agents-url">{provider.baseUrl}</span>
         <span class={`agents-meta${keyMissing ? " agents-meta-bad" : ""}`}>

@@ -63,7 +63,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       if (!model) {
         throw new BadRequest(`${provider.name} does not list ${body.model}`);
       }
-      return { name: body.name, providerId: provider.id, model };
+      return {
+        name: body.name,
+        avatar: body.avatar,
+        providerId: provider.id,
+        model,
+        prompt: body.prompt,
+      };
     };
   };
   const find = (id: string) => {

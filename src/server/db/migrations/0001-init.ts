@@ -10,7 +10,7 @@ import type { Migration } from "../migration.ts";
 // the user) or team; memberships: who is in a project. providers: where
 // the models come from, with the name of the key file, never the key;
 // agents: a name, a provider and a model, with what the catalog said
-// about the model when it was picked.
+// about the model when it was picked, the avatar and the system prompt.
 export const m0001: Migration = {
   id: "0001-init",
   up(db) {
@@ -60,6 +60,7 @@ export const m0001: Migration = {
       create table agents (
         id text primary key,
         name text not null unique,
+        avatar text not null default 'bot',
         provider_id text not null references providers(id),
         model text not null,
         model_name text not null,
@@ -68,6 +69,7 @@ export const m0001: Migration = {
         completion_price real,
         tools integer not null default 0,
         reasoning integer not null default 0,
+        prompt text not null default '',
         created_at integer not null
       );
       create index agents_provider on agents(provider_id);

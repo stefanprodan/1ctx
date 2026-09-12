@@ -210,6 +210,34 @@
     color: var(--faint);
   }
 
+  /* the avatar picker: the five robots, the chosen one lit */
+  .agents-avatars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    min-height: 36px;
+    align-items: center;
+  }
+  .agents-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    color: var(--dim);
+    cursor: pointer;
+  }
+  .agents-avatar:hover {
+    color: var(--fg);
+  }
+  .agents-avatar-on {
+    border-color: var(--brand);
+    color: var(--fg);
+  }
+
   /* the provider picker: one chip per provider, the chosen one lit */
   .agents-picks {
     display: flex;
@@ -244,6 +272,11 @@
   }
   .agents-field-wide {
     grid-column: 1 / -1;
+  }
+
+  .agents-prompt {
+    font-family: var(--mono);
+    font-size: var(--text-small);
   }
 
   .agents-hint {

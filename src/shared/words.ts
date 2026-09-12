@@ -78,6 +78,15 @@ export function isName(value: unknown): value is string {
 // the wire a provider speaks: OpenRouter, with its catalog, prices and
 // reasoning object, or any server speaking the OpenAI chat completions
 // shape, which is not OpenAI itself
+// the robots an agent shows as; adding one is a code change
+export const AVATARS = ["bot", "face", "dome", "boxy", "bust"] as const;
+export type Avatar = (typeof AVATARS)[number];
+export function isAvatar(value: unknown): value is Avatar {
+  return (
+    typeof value === "string" && (AVATARS as readonly string[]).includes(value)
+  );
+}
+
 export const WIRES = ["openrouter", "openai-compatible"] as const;
 export type Wire = (typeof WIRES)[number];
 export function isWire(value: unknown): value is Wire {

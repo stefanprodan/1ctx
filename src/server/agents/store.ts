@@ -3,6 +3,7 @@
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import type { Avatar } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
@@ -11,6 +12,7 @@ export type AgentRow = AgentSummary;
 type Raw = {
   id: string;
   name: string;
+  avatar: Avatar;
   provider_id: string;
   model: string;
   model_name: string;
@@ -19,12 +21,14 @@ type Raw = {
   completion_price: number | null;
   tools: number;
   reasoning: number;
+  prompt: string;
   created_at: number;
 };
 
 const row = (raw: Raw): AgentRow => ({
   id: raw.id,
   name: raw.name,
+  avatar: raw.avatar,
   providerId: raw.provider_id,
   model: {
     id: raw.model,
@@ -35,6 +39,7 @@ const row = (raw: Raw): AgentRow => ({
     tools: raw.tools === 1,
     reasoning: raw.reasoning === 1,
   },
+  prompt: raw.prompt,
   createdAt: raw.created_at,
 });
 
@@ -42,9 +47,11 @@ export const summary = (agent: AgentRow): AgentSummary => agent;
 
 export type AgentFields = {
   name: string;
+  avatar: Avatar;
   providerId: string;
   // what the catalog said about the model when it was picked
   model: CatalogMatch;
+  prompt: string;
 };
 
 export class AgentStore {
@@ -86,14 +93,15 @@ export class AgentStore {
     const m = fields.model;
     this.db
       .query(
-        `insert into agents (id, name, provider_id, model, model_name,
+        `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           prompt, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         fields.name,
+        fields.avatar,
         fields.providerId,
         m.id,
         m.name,
@@ -102,6 +110,7 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        fields.prompt,
         fields.now,
       );
     return this.byId(id)!;
@@ -111,13 +120,14 @@ export class AgentStore {
     const m = fields.model;
     this.db
       .query(
-        `update agents set name = ?, provider_id = ?, model = ?, model_name = ?,
+        `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
-           tools = ?, reasoning = ?
+           tools = ?, reasoning = ?, prompt = ?
          where id = ?`,
       )
       .run(
         fields.name,
+        fields.avatar,
         fields.providerId,
         m.id,
         m.name,
@@ -126,6 +136,7 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        fields.prompt,
         id,
       );
     return this.byId(id);

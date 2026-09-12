@@ -50,24 +50,60 @@ describe("parseAgent", () => {
     [{ name: "coder", providerId: 1, model: "m" }],
     [{ name: "coder", providerId: "p", model: "" }],
     [{ name: "coder", providerId: "p", model: "m".repeat(201) }],
+    [{ name: "coder", providerId: "p", model: "m", prompt: 1 }],
+    [{ name: "coder", providerId: "p", model: "m", avatar: "cat" }],
+    [
+      {
+        name: "coder",
+        providerId: "p",
+        model: "m",
+        prompt: "p".repeat(16_001),
+      },
+    ],
   ])("refuses %p", (body) => {
     expect(() => parseAgent(body)).toThrow(BadRequest);
   });
 });
 
 describe("the agents", () => {
+  test("the prompt is optional and trimmed, the avatar a bot by default", () => {
+    const bare = parseAgent({ name: "coder", providerId: "p", model: "m" });
+    expect(bare.prompt).toBe("");
+    expect(bare.avatar).toBe("bot");
+    expect(
+      parseAgent({ name: "coder", providerId: "p", model: "m", avatar: "dome" })
+        .avatar,
+    ).toBe("dome");
+    expect(
+      parseAgent({
+        name: "coder",
+        providerId: "p",
+        model: "m",
+        prompt: " x \n",
+      }).prompt,
+    ).toBe("x");
+  });
+
   test("are made on a listed model and keep what the catalog said", async () => {
     const { app, client, provider } = await setup();
     const res = await client.call("POST", "/api/agents", {
-      body: { name: "coder", providerId: provider.id, model: flash.id },
+      body: {
+        name: "coder",
+        providerId: provider.id,
+        model: flash.id,
+        avatar: "boxy",
+        prompt: "You write Go.",
+      },
     });
     expect(res.status).toBe(201);
     const { agent } = await res.json();
     expect(agent).toEqual({
       id: expect.any(String),
       name: "coder",
+      avatar: "boxy",
       providerId: provider.id,
       model: flash,
+      prompt: "You write Go.",
       createdAt: app.now.value,
     });
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({

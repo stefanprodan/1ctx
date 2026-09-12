@@ -4,6 +4,7 @@
 // Request and response bodies of the agent routes, all for admins.
 
 import type { AgentSummary } from "../contracts/agent.ts";
+import type { Avatar } from "../words.ts";
 
 // GET /api/agents
 export type AgentsResponse = { agents: AgentSummary[] };
@@ -13,6 +14,8 @@ export type AgentResponse = { agent: AgentSummary };
 // the model is an id the provider's catalog lists
 export type SaveAgentRequest = {
   name: string;
+  avatar: Avatar;
   providerId: string;
   model: string;
+  prompt: string;
 };

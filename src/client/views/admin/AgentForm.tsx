@@ -1,10 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An agent's form: the name, the provider it runs on, and the model,
-// found by typing part of its name or id into that provider's catalog.
-// The pick shows its window and prices when the catalog has them.
-// Delete asks once in place.
+// An agent's form: the name, the provider it runs on, the model, found
+// by typing part of its name or id into that provider's catalog, and
+// the system prompt. The pick shows its window and prices when the
+// catalog has them. Delete asks once in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -13,8 +13,10 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../shared/contracts/provider.ts";
+import { AVATARS, type Avatar } from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import { searchCatalog } from "../../data/providers.ts";
+import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
@@ -50,6 +52,8 @@ export function AgentForm({
   const name = useSignal(agent?.name ?? "");
   const providerId = useSignal(agent?.providerId ?? providers[0]?.id ?? "");
   const model = useSignal<CatalogMatch | null>(agent?.model ?? null);
+  const prompt = useSignal(agent?.prompt ?? "");
+  const avatar = useSignal<Avatar>(agent?.avatar ?? "bot");
   const asking = useSignal(false);
   const failure = useSignal<string | null>(null);
   const search = useRef<CatalogSearch | null>(null);
@@ -74,8 +78,10 @@ export function AgentForm({
   const save = useSave(async () => {
     const body = {
       name: name.value.trim(),
+      avatar: avatar.value,
       providerId: providerId.value,
       model: model.value?.id ?? "",
+      prompt: prompt.value.trim(),
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -97,8 +103,10 @@ export function AgentForm({
   const dirty =
     agent === null ||
     name.value.trim() !== agent.name ||
+    avatar.value !== agent.avatar ||
     providerId.value !== agent.providerId ||
-    model.value?.id !== agent.model.id;
+    model.value?.id !== agent.model.id ||
+    prompt.value.trim() !== agent.prompt;
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -135,6 +143,27 @@ export function AgentForm({
             }}
           />
         </label>
+        <div class="field">
+          <span class="label">Avatar</span>
+          <div class="agents-avatars">
+            {AVATARS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                aria-pressed={avatar.value === a}
+                aria-label={a}
+                disabled={busy}
+                class={`agents-avatar${avatar.value === a ? " agents-avatar-on" : ""}`}
+                onClick={() => {
+                  avatar.value = a;
+                  save.touch();
+                }}
+              >
+                <AvatarIcon name={a} size={16} />
+              </button>
+            ))}
+          </div>
+        </div>
         <div class="field">
           <span class="label">Provider</span>
           <div class="agents-picks">
@@ -210,6 +239,22 @@ export function AgentForm({
             </div>
           )}
         </div>
+        <label class="field agents-field-wide">
+          <span class="label">System prompt</span>
+          <textarea
+            name="prompt"
+            class="agents-prompt"
+            rows={5}
+            spellcheck={false}
+            disabled={busy}
+            placeholder="What the agent is and how it works. Empty runs the model as it comes."
+            value={prompt.value}
+            onInput={(e) => {
+              prompt.value = (e.currentTarget as HTMLTextAreaElement).value;
+              save.touch();
+            }}
+          />
+        </label>
       </div>
       <Foot
         status={save.status.value}

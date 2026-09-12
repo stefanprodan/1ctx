@@ -65,8 +65,10 @@ const flash: CatalogMatch = {
 const coder: AgentSummary = {
   id: "ag1",
   name: "coder",
+  avatar: "bot",
   providerId: "pr1",
   model: flash,
+  prompt: "",
   createdAt: 0,
 };
 
