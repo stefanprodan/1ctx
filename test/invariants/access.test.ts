@@ -33,16 +33,19 @@ describe("the authorization matrix", () => {
       test(`${c.method} ${c.path} as ${caller} is ${c.expect[caller]}`, async () => {
         const app = await testApp();
         app.users.create({
-          name: "ana",
+          username: "oana",
+          fullName: "Oana",
           role: "member",
           passwordHash: await hashPassword("pw"),
           now: app.now.value,
         });
         const client = app.client();
         if (caller === "admin")
-          expect((await client.login("admin", "hunter2")).status).toBe(200);
+          expect((await client.login("admin", "hunter2-test")).status).toBe(
+            200,
+          );
         if (caller === "member")
-          expect((await client.login("ana", "pw")).status).toBe(200);
+          expect((await client.login("oana", "pw")).status).toBe(200);
         const res = await client.call(c.method, c.path, { body: c.body });
         expect(res.status).toBe(c.expect[caller]);
       });

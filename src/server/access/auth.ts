@@ -84,7 +84,8 @@ export function access(deps: AccessDeps): Access {
       return {
         principal: {
           userId: user.id,
-          name: user.name,
+          username: user.username,
+          fullName: user.fullName,
           role: user.role,
           loginId: login.id,
         },

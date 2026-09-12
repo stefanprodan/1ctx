@@ -19,7 +19,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/login",
-    body: { name: "nobody", password: "wrong" },
+    body: { username: "nobody", password: "wrong" },
     // public: everyone reaches the handler; the wrong password is a 401
     // from it, not from the router
     expect: { anonymous: 401, member: 401, admin: 401 },
@@ -34,6 +34,26 @@ export const AUTH_CASES: AuthCase[] = [
     path: "/api/me",
     // public: anonymous gets { user: null }
     expect: { anonymous: 200, member: 200, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/profile",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/profile",
+    body: { fullName: "Oana", about: "" },
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/profile/password",
+    // authenticated: the handler then checks the current password,
+    // which this body gets wrong on purpose, and that is a 403 so the
+    // client does not take it for a lost login
+    body: { current: "nope", next: "longenough" },
+    expect: { anonymous: 401, member: 403, admin: 403 },
   },
   {
     method: "GET",

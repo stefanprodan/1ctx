@@ -34,7 +34,7 @@ describe("the route table", () => {
   });
 
   test("every view loads and renders against fixture state", async () => {
-    me.value = { id: "u1", name: "ana", role: "member" };
+    me.value = { id: "u1", username: "oana", fullName: "Oana", role: "member" };
     for (const route of ROUTES) {
       const View = route.view;
       await View.load();

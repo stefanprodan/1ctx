@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The head of a view and its states in one place: a label over the
-// title, actions on the right, then either the content, a loading line,
-// an empty line or an error. A view composes this, never restyles it.
+// title, or a crumb with the title on one line for a page whose title
+// is a noun, actions on the right, then either the content, a loading
+// line, an empty line or an error. A view composes this, never
+// restyles it.
 
 import type { ComponentChildren } from "preact";
 import "./page.css";
 
 export function Page({
   label,
+  crumb,
   title,
   aside,
   actions,
@@ -19,6 +22,8 @@ export function Page({
   children,
 }: {
   label?: string;
+  // "Account / Profile" on one line, the title in the foreground
+  crumb?: string;
   title: string;
   aside?: ComponentChildren;
   actions?: ComponentChildren;
@@ -30,10 +35,18 @@ export function Page({
   return (
     <div class="page">
       <div class="page-head">
-        <div class="page-heading">
-          {label && <span class="label">{label}</span>}
-          <h1 class="page-title">{title}</h1>
-        </div>
+        {crumb ? (
+          <h1 class="page-crumb label">
+            <span>{crumb}</span>
+            <span class="page-crumb-sep">/</span>
+            <span class="page-crumb-on">{title}</span>
+          </h1>
+        ) : (
+          <div class="page-heading">
+            {label && <span class="label">{label}</span>}
+            <h1 class="page-title">{title}</h1>
+          </div>
+        )}
         {aside && <div class="page-aside">{aside}</div>}
         {actions && <div class="page-actions">{actions}</div>}
       </div>

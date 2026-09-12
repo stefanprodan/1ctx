@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The rail: the logo, the pages the route table lists, and the user row
-// at the bottom with its menu. The menu holds only what exists: sign out.
+// at the bottom with its menu: the profile and sign out.
 // A sign out the server refuses stays in the menu with the reason.
 
 import { useSignal } from "@preact/signals";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
+import { initials } from "../lib/format.ts";
 import { Icon, Logo } from "../lib/icons.tsx";
 import { navigate, path } from "./router.ts";
 import { navEntries } from "./routes.ts";
@@ -17,7 +18,6 @@ export function Rail({ user }: { user: UserSummary }) {
   const open = useSignal(false);
   const failure = useSignal<string | null>(null);
   const here = path.value;
-  const initials = user.name.slice(0, 2).toUpperCase();
   return (
     <aside class="rail">
       <div class="rail-top">
@@ -40,6 +40,16 @@ export function Rail({ user }: { user: UserSummary }) {
       <div class="rail-user">
         {open.value && (
           <div class="rail-menu">
+            <a
+              class="rail-menu-item"
+              href="/profile"
+              onClick={() => {
+                open.value = false;
+              }}
+            >
+              <Icon name="user" size={14} />
+              <span>Profile</span>
+            </a>
             <button
               type="button"
               class="rail-menu-item"
@@ -72,8 +82,8 @@ export function Rail({ user }: { user: UserSummary }) {
             open.value = !open.value;
           }}
         >
-          <span class="rail-avatar">{initials}</span>
-          <span class="rail-user-name">{user.name}</span>
+          <span class="rail-avatar">{initials(user.fullName)}</span>
+          <span class="rail-user-name">{user.fullName}</span>
           <Icon name="chevron" size={14} class="rail-user-chevron" />
         </button>
       </div>

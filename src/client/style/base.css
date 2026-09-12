@@ -34,11 +34,13 @@
   }
 
   input,
+  textarea,
   button {
     font: inherit;
     color: inherit;
   }
-  input::placeholder {
+  input::placeholder,
+  textarea::placeholder {
     color: var(--faint);
   }
 
@@ -90,13 +92,21 @@
     flex-direction: column;
     gap: 6px;
   }
-  .field input {
-    height: 36px;
+  .field input,
+  .field textarea {
     padding: 0 var(--space-3);
     border-radius: var(--radius);
     background: var(--inset);
     border: 1px solid var(--line);
     font-size: var(--text-input);
+  }
+  .field input {
+    height: 36px;
+  }
+  .field textarea {
+    padding: var(--space-2) var(--space-3);
+    resize: vertical;
+    line-height: 1.5;
   }
 
   .card {

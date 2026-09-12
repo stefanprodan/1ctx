@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Login, logout and me. Login is rate limited per address and answers a
-// wrong name and a wrong password the same way, after the same hash
+// wrong username and a wrong password the same way, after the same hash
 // work, so neither leaks which one was wrong.
 
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
@@ -27,7 +27,7 @@ export type RoutesDeps = {
   db: Db;
   access: Access;
   // the users port
-  userByName: (name: string) => UserRow | null;
+  userByUsername: (username: string) => UserRow | null;
   clock: Clock;
   log: Log;
 };
@@ -43,15 +43,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         if (!limit.hit(ctx.address, deps.clock())) {
           throw new TooManyRequests("too many sign-in attempts; wait a minute");
         }
-        const { name, password } = parseLogin(await jsonBody(req));
-        const user = deps.userByName(name);
+        const { username, password } = parseLogin(await jsonBody(req));
+        const user = deps.userByUsername(username);
         const ok = await verifyPassword(password, user?.passwordHash ?? NOBODY);
         if (!ok || user === null)
-          throw new Unauthorized("wrong name or password");
+          throw new Unauthorized("wrong username or password");
         const { setCookie } = transact(deps.db, () => ({
           result: deps.access.open(user),
         }));
-        deps.log(`${user.name} signed in`);
+        deps.log(`${user.username} signed in`);
         const body: LoginResponse = { user: summary(user) };
         return json(body, 200, { "set-cookie": setCookie });
       },
@@ -71,7 +71,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             },
           ],
         }));
-        deps.log(`${principal.name} signed out`);
+        deps.log(`${principal.username} signed out`);
         return json({ ok: true }, 200, { "set-cookie": cleared });
       },
     },
@@ -84,7 +84,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const p = ctx.principal;
         const body: MeResponse = {
-          user: p ? { id: p.userId, name: p.name, role: p.role } : null,
+          user: p
+            ? {
+                id: p.userId,
+                username: p.username,
+                fullName: p.fullName,
+                role: p.role,
+              }
+            : null,
         };
         return json(body);
       },

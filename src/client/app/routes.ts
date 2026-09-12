@@ -36,6 +36,14 @@ export const ROUTES: Route[] = [
     role: "authenticated",
     nav: { label: "Home", icon: "home", order: 1 },
   },
+  {
+    path: "/profile",
+    view: lazy(() =>
+      import("../views/profile/Profile.tsx").then((m) => m.Profile),
+    ),
+    title: () => "Profile",
+    role: "authenticated",
+  },
 ];
 
 export type Match = { route: Route; params: Params };

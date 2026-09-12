@@ -32,18 +32,18 @@ curl -sf "$URL$script" | grep -q 'preact\|render' || fail "the script did not se
 
 login=$(curl -s -o /dev/null -w '%{http_code} %{header_json}' \
   -H 'content-type: application/json' -H "origin: $URL" \
-  -d '{"name":"admin","password":"smoke-pass"}' "$URL/api/login")
+  -d '{"username":"admin","password":"smoke-pass"}' "$URL/api/login")
 [[ "$login" == 200* ]] || fail "login answered ${login%% *}"
 echo "$login" | grep -q 'login=' || fail "login set no cookie"
 
 wrong=$(curl -s -o /dev/null -w '%{http_code}' \
   -H 'content-type: application/json' -H "origin: $URL" \
-  -d '{"name":"admin","password":"nope"}' "$URL/api/login")
+  -d '{"username":"admin","password":"nope"}' "$URL/api/login")
 [[ "$wrong" == 401 ]] || fail "a wrong password answered $wrong"
 
 cross=$(curl -s -o /dev/null -w '%{http_code}' \
   -H 'content-type: application/json' -H 'origin: http://evil.test' \
-  -d '{"name":"admin","password":"smoke-pass"}' "$URL/api/login")
+  -d '{"username":"admin","password":"smoke-pass"}' "$URL/api/login")
 [[ "$cross" == 403 ]] || fail "a cross-origin write answered $cross"
 
 grep -q 'admin.key' "$TMP/log" || fail "admin.key was not read"

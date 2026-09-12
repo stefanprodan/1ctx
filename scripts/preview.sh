@@ -42,7 +42,7 @@ start() {
   if [ ! -f "$DIR/secrets/admin.key" ]; then
     # the bootstrap password for the preview's admin; read once, when the
     # users table is empty, and hashed into the db
-    (umask 077 && printf 'admin' >"$DIR/secrets/admin.key")
+    (umask 077 && printf 'admin-preview' >"$DIR/secrets/admin.key")
   fi
   chmod 600 "$DIR/secrets"/*.key
   ONECTX_DEV=1 nohup bun --watch "$ENTRY" \

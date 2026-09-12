@@ -13,7 +13,7 @@ export function Home() {
   const user = me.value!;
   const now = new Date();
   return (
-    <Page label={dateLine(now)} title={greeting(now, user.name)}>
+    <Page label={dateLine(now)} title={greeting(now, user.fullName)}>
       <div class="home-stream" />
     </Page>
   );

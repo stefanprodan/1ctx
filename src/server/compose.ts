@@ -6,7 +6,12 @@
 // the flags; the test helper calls it with a memory db and a fake clock,
 // so a test exercises the wiring the binary runs.
 
-import { access, routes as accessRoutes, LoginStore } from "./access/index.ts";
+import {
+  access,
+  routes as accessRoutes,
+  LoginStore,
+  profileRoutes,
+} from "./access/index.ts";
 import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
@@ -55,7 +60,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...accessRoutes({
       db,
       access: auth,
-      userByName: (name) => users.byName(name),
+      userByUsername: (username) => users.byUsername(username),
+      clock,
+      log: options.log("access"),
+    }),
+    ...profileRoutes({
+      db,
+      logins,
+      userById: (id) => users.byId(id),
+      setDetails: (id, fields) => users.setDetails(id, fields),
+      setPasswordHash: (id, hash) => users.setPasswordHash(id, hash),
       clock,
       log: options.log("access"),
     }),
