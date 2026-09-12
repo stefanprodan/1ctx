@@ -12,11 +12,18 @@ import {
   LoginStore,
   profileRoutes,
 } from "./access/index.ts";
+import { AgentStore, routes as agentRoutes } from "./agents/index.ts";
 import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
 import { ProjectStore, routes as projectRoutes } from "./projects/index.ts";
+import {
+  Catalogs,
+  type Fetcher,
+  ProviderStore,
+  routes as providerRoutes,
+} from "./providers/index.ts";
 import {
   bootstrap,
   createUser,
@@ -32,6 +39,8 @@ export type ComposeOptions = {
   // the secrets port: the bare value or null
   secret: (name: string) => string | null;
   clock: Clock;
+  // what reaches a provider; a test passes a fake
+  fetcher?: Fetcher;
   log: (area: string) => Log;
   version: string;
   secureCookie: boolean;
@@ -42,6 +51,9 @@ export type App = {
   users: UserStore;
   projects: ProjectStore;
   logins: LoginStore;
+  providers: ProviderStore;
+  agents: AgentStore;
+  catalogs: Catalogs;
   // the one way a user is made: with its personal project
   createUser: (
     fields: Parameters<typeof createUser>[1],
@@ -73,6 +85,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: options.log("users"),
   });
   const logins = new LoginStore(db);
+  const providers = new ProviderStore(db);
+  const agents = new AgentStore(db);
+  const catalogs = new Catalogs({
+    fetcher: options.fetcher ?? fetch,
+    clock,
+    secret: options.secret,
+  });
   const auth = access({
     logins,
     user: (id) => users.byId(id),
@@ -106,6 +125,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
         return user ? userSummary(user) : null;
       },
     }),
+    ...providerRoutes({
+      store: providers,
+      catalogs,
+      hasSecret: (name) => options.secret(name) !== null,
+      inUse: (providerId) => agents.usesProvider(providerId),
+      clock,
+    }),
+    ...agentRoutes({ store: agents, providers, catalogs, clock }),
     healthRoute(options.version),
   ];
   const handle = router({
@@ -117,6 +144,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     projects,
     logins,
+    providers,
+    agents,
+    catalogs,
     createUser: (fields) => createUser(userDeps, fields),
     routes,
     handle,
