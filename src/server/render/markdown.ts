@@ -1,0 +1,127 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Markdown is rendered on the server so the client receives safe HTML and
+// ships no parser. Model output is untrusted, making this the safety boundary.
+
+import { highlight } from "./highlight.ts";
+
+const OPTIONS = { noHtmlBlocks: true, noHtmlSpans: true } as const;
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// This reverses escapeHtml in reverse order so text such as "&amp;lt;"
+// returns to the entity the model wrote before the grammar escapes it again.
+function unescapeHtml(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&amp;/g, "&");
+}
+
+const SAFE_HREF = /^(https?:|mailto:)/i;
+const COPY_BLOCK =
+  '<button type="button" class="md-copy" title="Copy" aria-label="Copy block">Copy</button>';
+
+// Info strings may contain attributes after the first word, but only a plain
+// language token is safe and useful in a data attribute.
+function language(info: string | undefined): string {
+  const word = (info ?? "").trim().split(/\s+/)[0] ?? "";
+  return /^[\w+#.-]{1,24}$/.test(word) ? word.toLowerCase() : "";
+}
+
+function codeBlock(text: string, info: string | undefined): string {
+  const lang = language(info);
+  const label = lang
+    ? `<span class="md-block-lang">${escapeHtml(lang)}</span>`
+    : "";
+  const head = `<div class="md-block-head">${label}${COPY_BLOCK}</div>`;
+  const body = (lang && highlight(unescapeHtml(text), lang)) || text;
+  const data = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
+  return (
+    `<div class="md-block"${data}>${head}` +
+    `<pre class="md-pre"><code class="md-block-code">${body}</code></pre>` +
+    "</div>"
+  );
+}
+
+const TABLE_ALIGNMENTS = new Map([
+  ["left", "left"],
+  ["center", "center"],
+  ["right", "right"],
+]);
+
+export const tableAlign = (value: string | undefined) => {
+  const alignment = value ? TABLE_ALIGNMENTS.get(value) : undefined;
+  return alignment ? ` style="text-align:${alignment}"` : "";
+};
+
+const CALLBACKS = {
+  text: (content: string) => escapeHtml(content),
+  paragraph: (content: string) => `<p class="md-p">${content}</p>`,
+  heading: (content: string, meta: { level: number }) =>
+    `<h${meta.level} class="md-h${meta.level}">${content}</h${meta.level}>`,
+  blockquote: (content: string) =>
+    `<blockquote class="md-quote">${content}</blockquote>`,
+  hr: () => '<hr class="md-hr">',
+  strong: (content: string) => `<strong class="md-strong">${content}</strong>`,
+  emphasis: (content: string) => `<em class="md-em">${content}</em>`,
+  strikethrough: (content: string) => `<del class="md-del">${content}</del>`,
+  codespan: (content: string) => `<code class="md-code">${content}</code>`,
+  code: (content: string, meta?: { language?: string }) =>
+    codeBlock(content, meta?.language),
+  link: (content: string, meta: { href: string; title?: string }): string => {
+    if (!SAFE_HREF.test(meta.href)) return content;
+    const title = meta.title ? ` title="${escapeHtml(meta.title)}"` : "";
+    return `<a class="md-link" href="${escapeHtml(meta.href)}"${title} target="_blank" rel="noopener">${content}</a>`;
+  },
+  // Showing the source preserves useful context without causing a browser
+  // request chosen by untrusted model output.
+  image: (content: string, meta: { src: string }) =>
+    `<span class="md-img">[image${content ? `: ${content}` : ""}${
+      meta.src ? ` ${escapeHtml(meta.src)}` : ""
+    }]</span>`,
+  list: (content: string, meta: { ordered: boolean; start?: number }) =>
+    meta.ordered
+      ? `<ol class="md-ol"${
+          meta.start !== undefined && meta.start !== 1
+            ? ` start="${meta.start}"`
+            : ""
+        }>${content}</ol>`
+      : `<ul class="md-ul">${content}</ul>`,
+  listItem: (content: string, meta: { checked?: boolean }) =>
+    meta.checked === undefined
+      ? `<li class="md-li">${content}</li>`
+      : `<li class="md-li md-task"><input class="md-check" type="checkbox" disabled${
+          meta.checked ? " checked" : ""
+        }> ${content}</li>`,
+  // The wrapper contains wide tables within the rendered reply.
+  table: (content: string) =>
+    `<div class="md-table-wrap"><table class="md-table">${content}</table></div>`,
+  thead: (content: string) => `<thead class="md-thead">${content}</thead>`,
+  tbody: (content: string) => `<tbody class="md-tbody">${content}</tbody>`,
+  tr: (content: string) => `<tr class="md-tr">${content}</tr>`,
+  th: (content: string, meta?: { align?: string }) =>
+    `<th class="md-th"${tableAlign(meta?.align)}>${content}</th>`,
+  td: (content: string, meta?: { align?: string }) =>
+    `<td class="md-td"${tableAlign(meta?.align)}>${content}</td>`,
+};
+
+// Parser failures keep the reply readable. Streaming will control diagram
+// rendering when diagrams are added.
+export function renderMarkdown(md: string, streaming = false): string {
+  if (md === "") return "";
+  void streaming;
+  try {
+    return Bun.markdown.render(md, CALLBACKS, OPTIONS);
+  } catch {
+    return `<p class="md-p">${escapeHtml(md)}</p>`;
+  }
+}
