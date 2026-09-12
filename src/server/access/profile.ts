@@ -30,13 +30,16 @@ import type { LoginStore } from "./store.ts";
 export const PASSWORD_LIMIT = 5;
 export const PASSWORD_WINDOW_MS = 60 * 1000;
 
+export type UsersPort = {
+  byId(id: string): UserRow | null;
+  setDetails(id: string, fields: { fullName: string; about: string }): void;
+  setPasswordHash(id: string, hash: string): void;
+};
+
 export type ProfileDeps = {
   db: Db;
   logins: LoginStore;
-  // the users port
-  userById: (id: string) => UserRow | null;
-  setDetails: (id: string, fields: { fullName: string; about: string }) => void;
-  setPasswordHash: (id: string, hash: string) => void;
+  users: UsersPort;
   clock: Clock;
   log: Log;
 };
@@ -45,7 +48,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
   const limit = new RateLimit(PASSWORD_LIMIT, PASSWORD_WINDOW_MS);
   // the row behind the principal; gone only in the race with a delete
   const self = (id: string): UserRow => {
-    const user = deps.userById(id);
+    const user = deps.users.byId(id);
     if (user === null) throw new Unauthorized("signed out");
     return user;
   };
@@ -69,7 +72,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
         const details = parseProfile(await jsonBody(req));
         const id = ctx.principal!.userId;
         const user = transact(deps.db, () => {
-          deps.setDetails(id, details);
+          deps.users.setDetails(id, details);
           return { result: self(id) };
         });
         const body: ProfileResponse = { user: profile(user) };
@@ -95,7 +98,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           // changes racing with the same current password would otherwise
           // both pass, and the second would revoke the first tab's login
           if (self(user.id).passwordHash !== user.passwordHash) throw wrong;
-          deps.setPasswordHash(user.id, hash);
+          deps.users.setPasswordHash(user.id, hash);
           const revoked = deps.logins.deleteOthers(user.id, principal.loginId);
           return {
             result: self(user.id),

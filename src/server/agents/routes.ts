@@ -10,22 +10,23 @@ import type {
   AgentsResponse,
   SaveAgentRequest,
 } from "../../shared/api/agents.ts";
+import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
+import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import {
-  CatalogError,
-  type Catalogs,
-  type ProviderStore,
-} from "../providers/index.ts";
+import type { ProviderRow } from "../providers/index.ts";
 import { parseAgent } from "./parse.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
 
+export type ProvidersPort = {
+  byId(id: string): ProviderRow | null;
+  model(provider: ProviderRow, id: string): Promise<CatalogMatch | null>;
+};
+
 export type RoutesDeps = {
   store: AgentStore;
-  providers: ProviderStore;
-  catalogs: Catalogs;
+  providers: ProvidersPort;
   clock: Clock;
 };
 
@@ -50,13 +51,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     except: string | null,
   ): Promise<() => AgentFields> => {
     const body = parseAgent(await jsonBody(req));
-    let model: Awaited<ReturnType<Catalogs["model"]>>;
-    try {
-      model = await deps.catalogs.model(check(body, except), body.model);
-    } catch (err) {
-      if (err instanceof CatalogError) throw new BadGateway(err.message);
-      throw err;
-    }
+    const model = await deps.providers.model(check(body, except), body.model);
     // called by the handler right before its write, with no await between
     return () => {
       const provider = check(body, except);

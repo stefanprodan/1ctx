@@ -13,7 +13,7 @@ import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { summary, type UserRow, verifyPassword } from "../users/index.ts";
-import type { Access } from "./auth.ts";
+import type { Auth } from "./auth.ts";
 import { parseLogin } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 
@@ -24,11 +24,14 @@ export const LOGIN_WINDOW_MS = 60 * 1000;
 // time are the same as for a known name
 const NOBODY = await Bun.password.hash("nobody", { algorithm: "argon2id" });
 
+export type UsersPort = {
+  byUsername(username: string): UserRow | null;
+};
+
 export type RoutesDeps = {
   db: Db;
-  access: Access;
-  // the users port
-  userByUsername: (username: string) => UserRow | null;
+  auth: Auth;
+  users: UsersPort;
   clock: Clock;
   log: Log;
 };
@@ -45,12 +48,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           throw new TooManyRequests("too many sign-in attempts; wait a minute");
         }
         const { username, password } = parseLogin(await jsonBody(req));
-        const user = deps.userByUsername(username);
+        const user = deps.users.byUsername(username);
         const ok = await verifyPassword(password, user?.passwordHash ?? NOBODY);
         if (!ok || user === null)
           throw new Unauthorized("wrong username or password");
         const { setCookie } = transact(deps.db, () => ({
-          result: deps.access.open(user),
+          result: deps.auth.open(user),
         }));
         deps.log(`${user.username} signed in`);
         const body: LoginResponse = { user: summary(user) };
@@ -64,7 +67,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const cleared = transact(deps.db, () => ({
-          result: deps.access.close(principal.loginId),
+          result: deps.auth.close(principal.loginId),
           events: [
             {
               type: "login.revoked",

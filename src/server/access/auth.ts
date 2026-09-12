@@ -19,13 +19,19 @@ export const COOKIE = "login";
 export const LOGIN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const TOUCH_AFTER_MS = 60 * 60 * 1000;
 
-export type AccessDeps = {
+export type UsersPort = {
+  byId(id: string): UserRow | null;
+};
+
+export type ProjectsPort = {
+  byId(id: string): ProjectRow | null;
+  isMember(projectId: string, userId: string): boolean;
+};
+
+export type AuthDeps = {
   logins: LoginStore;
-  // the users port: the row by id, or null
-  user: (id: string) => UserRow | null;
-  // the projects port
-  project: (id: string) => ProjectRow | null;
-  member: (projectId: string, userId: string) => boolean;
+  users: UsersPort;
+  projects: ProjectsPort;
   clock: Clock;
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
@@ -38,7 +44,7 @@ export type Resolution = {
   setCookie: string | null;
 };
 
-export type Access = {
+export type Auth = {
   // null principal when there is no cookie, it is unknown, or it expired
   resolve(req: Request): Resolution;
   // a new login for a user: the row and the Set-Cookie header value
@@ -64,7 +70,7 @@ export function cookieValue(req: Request, name: string): string | null {
   return null;
 }
 
-export function access(deps: AccessDeps): Access {
+export function auth(deps: AuthDeps): Auth {
   const attrs = (maxAge: number) =>
     `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${deps.secureCookie ? "; Secure" : ""}`;
   const clearCookie = () => `${COOKIE}=; ${attrs(0)}`;
@@ -82,7 +88,7 @@ export function access(deps: AccessDeps): Access {
         deps.logins.delete(login.id);
         return nobody;
       }
-      const user = deps.user(login.userId);
+      const user = deps.users.byId(login.userId);
       if (user === null) return nobody;
       let setCookie: string | null = null;
       if (now - login.lastSeenAt >= TOUCH_AFTER_MS) {
@@ -120,10 +126,14 @@ export function access(deps: AccessDeps): Access {
       return deps.logins.deleteExpired(deps.clock());
     },
     project(principal, id) {
-      const project = deps.project(id);
+      const project = deps.projects.byId(id);
       if (
         project === null ||
-        !visible(project, principal, deps.member(id, principal.userId))
+        !visible(
+          project,
+          principal,
+          deps.projects.isMember(id, principal.userId),
+        )
       ) {
         throw new NotFound("no such project");
       }
