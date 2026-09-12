@@ -44,9 +44,10 @@ src/server/     the binary. main.ts parses the flags, opens the db and the
                 areas in layer order with the ports they declare, the
                 complete route list, the router. The test helper calls
                 compose() too, so a test runs the binary's wiring. lib/
-                (http.ts: Principal, Policy, RouteDescriptor; errors, log,
-                clock, ids, bus), db/ (open, transact, migrations/), then
-                one directory per area.
+                (http.ts: Principal, Policy, RouteDescriptor; body.ts:
+                readBody, jsonBody, fields; errors, log, clock, ids, bus),
+                db/ (open, transact, migrations/), then one directory per
+                area.
 src/client/     the Preact app, bundled by Bun from client/index.html.
                 app/ (routes.ts, router.ts, lazy.ts, App, Rail), data/
                 (api, the entity cache), lib/, ui/ (the primitives, each
@@ -55,7 +56,9 @@ src/client/     the Preact app, bundled by Bun from client/index.html.
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
                 tests, helpers/ (app.ts wires the server over a test db
-                with a fake clock and a cookie jar; auth-cases.ts is the
+                with a fake clock, a cookie jar and a fake fetch that
+                answers the recorded catalog for `PROVIDER_URL` and
+                fails every other host; auth-cases.ts is the
                 authorization matrix), fixtures/ (recorded bodies,
                 structure/ holds one violating root per layout rule).
 scripts/        preview.sh, and brand.py which regenerates the brand SVGs
@@ -143,6 +146,16 @@ violation, and every rule has a rejected fixture under
 - **Secrets are files.** One bare value per `<name>.key` in the secrets
   directory, read by the holder, never logged, never returned by a
   route, never a database row.
+- **A provider is added and deleted, never changed.** Its wire is
+  `openrouter` or `openai-compatible`; both answer `GET /models` under
+  the base URL, parsed by `providers/catalog.ts` into the one shape the
+  wire carries. The catalog is cached an hour per provider and searched
+  on the server; the browser never gets the whole list. Anything that
+  reaches a provider goes through the `fetcher` compose option, so a
+  test passes a fake and the suite never reaches a network. An agent
+  names a provider and a model the catalog lists; what the catalog said
+  is kept on the agent row, and a provider an agent runs on is a 409 to
+  delete.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

@@ -3,11 +3,12 @@
 //
 // The rail: the logo with the button that hides it, the pages the route
 // table lists with the user's projects under Projects, personal first,
+// a group as a row that opens to its pages, open while one is shown,
 // and the user row at the bottom with its menu: the profile and sign
-// out. A sign out the server refuses stays in the menu
-// with the reason. As a drawer the hide button is a close, it takes the
-// focus when the drawer opens, and any link closes the drawer, the one
-// to the page already shown included, since that is no navigation.
+// out. A sign out the server refuses stays in the menu with the
+// reason. As a drawer the hide button is a close, it takes the focus
+// when the drawer opens, and any link closes the drawer, the one to the
+// page already shown included, since that is no navigation.
 
 import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
@@ -16,10 +17,82 @@ import type { UserSummary } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
 import { loadProjects, projects } from "../data/projects.ts";
 import { initials } from "../lib/format.ts";
-import { Icon, Logo } from "../lib/icons.tsx";
+import { Icon, type IconName, Logo } from "../lib/icons.tsx";
 import { navigate, path } from "./router.ts";
-import { navEntries } from "./routes.ts";
+import { type Route, railRows } from "./routes.ts";
 import "./rail.css";
+
+function Sub({
+  href,
+  here,
+  follow,
+  children,
+}: {
+  href: string;
+  here: string;
+  follow?: () => void;
+  children: string;
+}) {
+  const on = here === href;
+  return (
+    <a
+      href={href}
+      class={`rail-sub${on ? " rail-sub-on" : ""}`}
+      aria-current={on ? "page" : undefined}
+      onClick={follow}
+    >
+      {children}
+    </a>
+  );
+}
+
+// a row that opens to its pages: open by the user, or while one of its
+// pages is on screen
+function Group({
+  name,
+  icon,
+  routes,
+  here,
+  follow,
+}: {
+  name: string;
+  icon: IconName;
+  routes: Route[];
+  here: string;
+  follow?: () => void;
+}) {
+  const inside = routes.some((r) => r.path === here);
+  const open = useSignal(inside);
+  useEffect(() => {
+    if (inside) open.value = true;
+  }, [inside]);
+  return (
+    <>
+      <button
+        type="button"
+        class={`rail-item rail-group${inside ? " rail-item-in" : ""}`}
+        aria-expanded={open.value}
+        onClick={() => {
+          open.value = !open.value;
+        }}
+      >
+        <Icon name={icon} />
+        <span>{name}</span>
+        <Icon
+          name="chevron"
+          size={14}
+          class={`rail-item-chevron${open.value ? " rail-item-chevron-open" : ""}`}
+        />
+      </button>
+      {open.value &&
+        routes.map((r) => (
+          <Sub key={r.path} href={r.path} here={here} follow={follow}>
+            {r.nav!.label}
+          </Sub>
+        ))}
+    </>
+  );
+}
 
 export function Rail({
   user,
@@ -59,33 +132,41 @@ export function Rail({
           </button>
         </div>
         <nav class="rail-nav">
-          {navEntries(user.role).map((route) => (
-            <Fragment key={route.path}>
-              <a
-                href={route.path}
-                class={`rail-item${here === route.path ? " rail-item-on" : ""}`}
-                aria-current={here === route.path ? "page" : undefined}
-                onClick={follow}
-              >
-                <Icon name={route.nav!.icon} />
-                <span>{route.nav!.label}</span>
-              </a>
-              {route.path === "/projects" &&
-                (projects.value ?? []).map((p) => (
-                  <a
-                    key={p.id}
-                    href={`/projects/${p.id}`}
-                    class={`rail-sub${here === `/projects/${p.id}` ? " rail-sub-on" : ""}`}
-                    aria-current={
-                      here === `/projects/${p.id}` ? "page" : undefined
-                    }
-                    onClick={follow}
-                  >
-                    {p.name}
-                  </a>
-                ))}
-            </Fragment>
-          ))}
+          {railRows(user.role).map((row) =>
+            row.kind === "group" ? (
+              <Group
+                key={row.name}
+                name={row.name}
+                icon={row.icon}
+                routes={row.routes}
+                here={here}
+                follow={follow}
+              />
+            ) : (
+              <Fragment key={row.route.path}>
+                <a
+                  href={row.route.path}
+                  class={`rail-item${here === row.route.path ? " rail-item-on" : ""}`}
+                  aria-current={here === row.route.path ? "page" : undefined}
+                  onClick={follow}
+                >
+                  <Icon name={row.route.nav!.icon} />
+                  <span>{row.route.nav!.label}</span>
+                </a>
+                {row.route.path === "/projects" &&
+                  (projects.value ?? []).map((p) => (
+                    <Sub
+                      key={p.id}
+                      href={`/projects/${p.id}`}
+                      here={here}
+                      follow={follow}
+                    >
+                      {p.name}
+                    </Sub>
+                  ))}
+              </Fragment>
+            ),
+          )}
         </nav>
       </div>
       <div class="rail-user">

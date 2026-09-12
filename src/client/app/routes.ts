@@ -3,10 +3,12 @@
 //
 // The one route table. Every view is one entry: the path pattern, the
 // view, its title, the role it needs, and either a rail entry or hidden.
-// The rail and the tests read this; the server enforces access, never
-// this table. A view is loaded on first use, so the table stays one
-// small module however many views there are; only Login is in the first
-// bundle, since App needs it before any route.
+// A rail entry may sit in a group, a row that expands to its entries;
+// Admin is the one so far, and only admins get its routes. The rail and
+// the tests read this; the server enforces access, never this table.
+// A view is loaded on first use, so the table stays one small module
+// however many views there are; only Login is in the first bundle,
+// since App needs it before any route.
 
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
@@ -20,8 +22,11 @@ export type Route = {
   view: Lazy<{ params: Params }>;
   title: (params: Params) => string;
   role: "public" | "authenticated" | "admin";
-  nav?: { label: string; icon: IconName; order: number };
+  nav?: { label: string; icon: IconName; order: number; group?: string };
 };
+
+// the icon of a group's row in the rail
+export const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
 
 export const ROUTES: Route[] = [
   {
@@ -53,6 +58,13 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Project",
     role: "authenticated",
+  },
+  {
+    path: "/admin/agents",
+    view: lazy(() => import("../views/admin/Agents.tsx").then((m) => m.Agents)),
+    title: () => "Agents",
+    role: "admin",
+    nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
   },
   {
     path: "/profile",
@@ -116,4 +128,32 @@ export function navEntries(role: "admin" | "member", routes = ROUTES) {
   return routes
     .filter((r) => r.nav && (r.role !== "admin" || role === "admin"))
     .sort((a, b) => a.nav!.order - b.nav!.order);
+}
+
+// the rail's rows in order: a route on its own, or a group with the
+// routes it holds, placed where its first route sorts
+export type RailRow =
+  | { kind: "route"; route: Route }
+  | { kind: "group"; name: string; icon: IconName; routes: Route[] };
+
+export function railRows(role: "admin" | "member", routes = ROUTES) {
+  const rows: RailRow[] = [];
+  for (const route of navEntries(role, routes)) {
+    const group = route.nav!.group;
+    if (group === undefined) {
+      rows.push({ kind: "route", route });
+      continue;
+    }
+    const open = rows.find((r) => r.kind === "group" && r.name === group);
+    if (open && open.kind === "group") open.routes.push(route);
+    else {
+      rows.push({
+        kind: "group",
+        name: group,
+        icon: GROUP_ICONS[group] ?? "settings",
+        routes: [route],
+      });
+    }
+  }
+  return rows;
 }

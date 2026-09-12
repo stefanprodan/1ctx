@@ -99,38 +99,6 @@
     gap: var(--space-4);
   }
 
-  .profile-foot {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .profile-note {
-    color: var(--faint);
-  }
-
-  /* the labels share one cell; the hidden ones still take their width */
-  .profile-btn-labels {
-    display: grid;
-  }
-  .profile-btn-label {
-    grid-area: 1 / 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    visibility: hidden;
-  }
-  .profile-btn-label-on {
-    visibility: visible;
-  }
-
-  /* the moment after a save: the check in brand, the button quiet */
-  .profile-done:disabled {
-    opacity: 1;
-    color: var(--brand);
-  }
-
   @media (max-width: 719px) {
     .profile-section {
       grid-template-columns: 1fr;

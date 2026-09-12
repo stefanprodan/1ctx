@@ -6,6 +6,6 @@
 // db wiped.
 
 import type { Migration } from "../migration.ts";
-import { m0001 } from "./0001-users-logins.ts";
+import { m0001 } from "./0001-init.ts";
 
 export const MIGRATIONS: Migration[] = [m0001];

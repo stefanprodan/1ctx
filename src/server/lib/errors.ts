@@ -48,3 +48,16 @@ export class PayloadTooLarge extends HttpError {
     super(413, message);
   }
 }
+
+export class Conflict extends HttpError {
+  constructor(message = "conflict") {
+    super(409, message);
+  }
+}
+
+// the upstream this request needed did not answer
+export class BadGateway extends HttpError {
+  constructor(message = "upstream did not answer") {
+    super(502, message);
+  }
+}

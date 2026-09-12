@@ -69,6 +69,55 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/providers",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/providers",
+    body: {
+      name: "local",
+      wire: "openai-compatible",
+      baseUrl: "http://models.test/v1",
+      keyName: null,
+    },
+    expect: { anonymous: 401, member: 403, admin: 201 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/providers/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/providers/:id/catalog",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/agents",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    // admin: the parser passes and the handler finds no such provider
+    method: "POST",
+    path: "/api/agents",
+    body: { name: "coder", providerId: "none", model: "x" },
+    expect: { anonymous: 401, member: 403, admin: 400 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/agents/:id",
+    body: { name: "coder", providerId: "none", model: "x" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/agents/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/health",
     expect: { anonymous: 200, member: 200, admin: 200 },
   },

@@ -6,8 +6,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { LOGIN_TTL_MS, TOUCH_AFTER_MS } from "../../src/server/access/index.ts";
-import { MAX_BODY } from "../../src/server/access/parse.ts";
 import { LOGIN_LIMIT } from "../../src/server/access/routes.ts";
+import { MAX_BODY } from "../../src/server/lib/body.ts";
 import { testApp } from "../helpers/app.ts";
 
 describe("bootstrap", () => {

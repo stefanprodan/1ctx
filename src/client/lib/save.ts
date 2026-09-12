@@ -7,6 +7,7 @@
 // a call that answers after the form is gone changes nothing.
 
 import { signal } from "@preact/signals";
+import { useEffect, useRef } from "preact/hooks";
 
 export type Status = "idle" | "busy" | "done" | { error: string };
 
@@ -64,4 +65,12 @@ export class Save {
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
   }
+}
+
+// one Save per form, gone with it
+export function useSave(call: () => Promise<void>): Save {
+  const ref = useRef<Save | null>(null);
+  if (ref.current === null) ref.current = new Save(call);
+  useEffect(() => () => ref.current?.dispose(), []);
+  return ref.current;
 }

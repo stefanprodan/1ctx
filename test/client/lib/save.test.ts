@@ -8,7 +8,7 @@
 // changes nothing.
 
 import { describe, expect, test } from "bun:test";
-import { Save } from "../../../src/client/views/profile/Profile.state.ts";
+import { Save } from "../../../src/client/lib/save.ts";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 

@@ -59,3 +59,38 @@ export function isProjectKind(value: unknown): value is ProjectKind {
     (PROJECT_KINDS as readonly string[]).includes(value)
   );
 }
+
+// a name an admin gives a thing on the server: a provider, an agent,
+// an automation. Lowercase letters, digits and dashes, short enough for
+// a rail row
+export const MIN_NAME = 2;
+export const MAX_NAME = 32;
+export const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+export function isName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= MIN_NAME &&
+    value.length <= MAX_NAME &&
+    NAME_RE.test(value)
+  );
+}
+
+// the wire a provider speaks: OpenRouter, with its catalog, prices and
+// reasoning object, or any server speaking the OpenAI chat completions
+// shape, which is not OpenAI itself
+// the robots an agent shows as; adding one is a code change
+export const AVATARS = ["bot", "face", "dome", "boxy", "bust"] as const;
+export type Avatar = (typeof AVATARS)[number];
+export function isAvatar(value: unknown): value is Avatar {
+  return (
+    typeof value === "string" && (AVATARS as readonly string[]).includes(value)
+  );
+}
+
+export const WIRES = ["openrouter", "openai-compatible"] as const;
+export type Wire = (typeof WIRES)[number];
+export function isWire(value: unknown): value is Wire {
+  return (
+    typeof value === "string" && (WIRES as readonly string[]).includes(value)
+  );
+}

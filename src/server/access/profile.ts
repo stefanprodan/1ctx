@@ -12,6 +12,7 @@
 
 import type { ProfileResponse } from "../../shared/api/profile.ts";
 import { type Db, transact } from "../db/index.ts";
+import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -22,7 +23,7 @@ import {
   type UserRow,
   verifyPassword,
 } from "../users/index.ts";
-import { jsonBody, parsePasswordChange, parseProfile } from "./parse.ts";
+import { parsePasswordChange, parseProfile } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 import type { LoginStore } from "./store.ts";
 

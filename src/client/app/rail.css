@@ -83,6 +83,26 @@
     background: var(--card);
     color: var(--fg);
   }
+  /* a group's row is a button: the same row, the chevron at its end,
+     lit while one of its pages is on screen */
+  .rail-group {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+  .rail-item-in {
+    color: var(--fg);
+  }
+  .rail-item-chevron {
+    margin-left: auto;
+    color: var(--faint);
+    transition: transform 120ms;
+  }
+  .rail-item-chevron-open {
+    transform: rotate(180deg);
+  }
 
   /* a project under Projects: indented past the icon, in mono */
   .rail-sub {

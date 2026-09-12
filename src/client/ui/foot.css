@@ -1,0 +1,44 @@
+/* The foot of a form: the submit with its states, the refusal beside it. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .foot-start {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-right: auto;
+  }
+
+  .foot-note {
+    color: var(--faint);
+  }
+
+  /* the labels share one cell; the hidden ones still take their width */
+  .foot-labels {
+    display: grid;
+  }
+  .foot-label {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    visibility: hidden;
+  }
+  .foot-label-on {
+    visibility: visible;
+  }
+
+  /* the moment after a save: the check in brand, the button quiet */
+  .foot-done:disabled {
+    opacity: 1;
+    color: var(--brand);
+  }
+}
