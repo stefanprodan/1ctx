@@ -103,6 +103,64 @@
     font-weight: 500;
   }
 
+  .projects-empty {
+    margin: 0;
+    color: var(--faint);
+  }
+
+  .projects-chats {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .projects-chat {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 44px;
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .projects-chat:hover {
+    color: var(--brand-hover);
+  }
+
+  .projects-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--faint);
+  }
+  .projects-dot-running {
+    background: var(--running);
+  }
+  .projects-dot-done {
+    background: var(--done);
+  }
+  .projects-dot-failed {
+    background: var(--failed);
+  }
+
+  .projects-chat-title {
+    flex-grow: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .projects-chat-when {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
   .projects-member-meta {
     font-family: var(--mono);
     font-size: var(--text-label);

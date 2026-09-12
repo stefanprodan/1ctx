@@ -13,8 +13,14 @@
 
 import { loadAgents } from "../data/agents.ts";
 import { loadProfile } from "../data/profile.ts";
-import { loadProject, loadProjects } from "../data/projects.ts";
+import { loadProject, loadProjects, project } from "../data/projects.ts";
 import { loadProviders } from "../data/providers.ts";
+import {
+  loadProjectAgents,
+  loadProjectSessions,
+  loadSession,
+  session,
+} from "../data/sessions.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -68,7 +74,29 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Project",
     role: "authenticated",
-    load: (params) => loadProject(params.id),
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectSessions(params.id),
+        loadProjectAgents(params.id),
+      ]);
+    },
+  },
+  {
+    path: "/chat/:id",
+    view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Chat)),
+    title: () => "Chat",
+    role: "authenticated",
+    // the project and the agents follow the session, since only its
+    // row says which project it is in
+    load: async (params) => {
+      await loadSession(params.id);
+      const detail = session.value;
+      if (detail === null || detail.session.id !== params.id) return;
+      const projectId = detail.session.projectId;
+      if (project.value?.id !== projectId) await loadProject(projectId);
+      await loadProjectAgents(projectId);
+    },
   },
   {
     path: "/admin/agents",

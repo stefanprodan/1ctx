@@ -1,0 +1,160 @@
+/* The composer: a card with the text, then a row with the agent chip
+   and its list, the hint and Send. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .composer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: var(--space-3) 14px;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+  }
+  .composer:focus-within {
+    border-color: var(--line-strong);
+  }
+
+  .composer-text {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    resize: none;
+    font-size: var(--text-input);
+    line-height: 1.5;
+    outline: none;
+  }
+
+  .composer-failure {
+    margin: 0;
+    font-size: var(--text-small);
+  }
+
+  .composer-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .composer-hint {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  .composer-agent {
+    position: relative;
+  }
+
+  .composer-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 26px;
+    padding: 0 9px 0 4px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+    cursor: pointer;
+  }
+  .composer-chip:disabled {
+    cursor: default;
+  }
+  .composer-chip-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    color: var(--brand);
+    flex-shrink: 0;
+  }
+  .composer-chip-name {
+    color: var(--fg);
+  }
+  .composer-chip-model {
+    color: var(--faint);
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .composer-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 240px;
+    max-width: 420px;
+    margin: 0;
+    padding: var(--space-1);
+    list-style: none;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line-strong);
+  }
+  .composer-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    height: 30px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+    text-align: left;
+    cursor: pointer;
+  }
+  .composer-option:hover,
+  .composer-option-on {
+    background: var(--line);
+  }
+
+  .composer-send {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    background: var(--line);
+    color: var(--brand);
+    cursor: pointer;
+  }
+  .composer-send:disabled {
+    color: var(--faint);
+    cursor: default;
+  }
+  .composer-stop {
+    color: var(--failed);
+  }
+
+  @media (max-width: 719px) {
+    .composer-hint {
+      display: none;
+    }
+    .composer-chip-model {
+      max-width: 120px;
+    }
+  }
+}
