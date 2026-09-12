@@ -14,6 +14,7 @@ import { compose } from "./compose.ts";
 import { open } from "./db/index.ts";
 import { wallClock } from "./lib/clock.ts";
 import { logger } from "./lib/log.ts";
+import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { defaultDir, type SecretsMode, secrets } from "./secrets/index.ts";
 import { serve } from "./web/serve.ts";
 
@@ -134,12 +135,36 @@ const app = await compose({
 app.sweep();
 setInterval(() => app.sweep(), TOUCH_AFTER_MS);
 
-const { server } = serve({
+const { server, stop } = serve({
   hostname,
   port,
   page,
   handle: app.handle,
+  socket: app.socket,
   trustProxy,
   development: process.env.ONECTX_DEV === "1",
 });
 log(`${VERSION} listening on http://${server.hostname}:${server.port}`);
+
+// in order: no more sends, every send ended and its rows written, the
+// sockets closed with the restart code, the listener stopped without
+// cutting a request, then the db
+let stopping = false;
+const shutdown = async (signal: string) => {
+  if (stopping) return;
+  stopping = true;
+  log(`${signal}: shutting down`);
+  await app.shutdown();
+  await stop();
+  db.close();
+  process.exit(0);
+};
+const onSignal = (signal: string) => {
+  shutdownOnSignal(signal, {
+    shutdown,
+    log,
+    exit: (code) => process.exit(code),
+  });
+};
+process.on("SIGINT", () => onSignal("SIGINT"));
+process.on("SIGTERM", () => onSignal("SIGTERM"));

@@ -58,7 +58,8 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 tests, helpers/ (app.ts wires the server over a test db
                 with a fake clock, a cookie jar and a fake fetch that
                 answers the recorded catalog for `PROVIDER_URL` and
-                fails every other host; auth-cases.ts is the
+                fails every other host; chat.ts drives a chat with a
+                scripted provider stream; auth-cases.ts is the
                 authorization matrix), fixtures/ (recorded bodies,
                 structure/ holds one violating root per layout rule).
 scripts/        preview.sh, and brand.py which regenerates the brand SVGs
@@ -172,8 +173,52 @@ violation, and every rule has a rejected fixture under
   published after the outermost commit and never on a throw, so a
   nested transact() is safe. Bus events are hints; a subscriber reads
   rows for the truth.
-- **Migrations are appended.** `db/migrations/` is the ordered list;
-  a store never creates a table.
+- **One migration until the first release.** `db/migrations/` is the
+  ordered list and a store never creates a table; while alpha the
+  schema is edited in place in `0001-init.ts` and the preview db wiped
+  with `make preview-clean`. After the first release a migration is
+  appended, never edited.
+- **A send is a row and ends once.** A chat is a session in a project
+  with one agent for its life; a user message starts a send under the
+  runner's lock, one per session, taken synchronously before anything
+  is written, with a cap on sends in the process and per user
+  (`runner/registry.ts`). The writer's three transactions: `startSend`
+  (the session when new, the user message, the streaming reply, the
+  send row, the running state), `finalizeRound` (the reply's end and
+  its usage row) and `finalizeSend` (the send's end and the session's
+  state, with the last round inside it). Each bumps the session's
+  revision once and publishes one `session.changed` envelope after
+  commit. The reply in flight is checkpointed every 250 ms or 2 KB
+  without a revision. A send ends for one cause (finish, stop,
+  failure, shutdown) through one compare-and-set in the runner, and
+  `finalizeSend` runs exactly once; the lock is held until the stream
+  has let go. A stream quiet for two minutes or a reply past 1 MB is
+  a failure (`runner/round.ts`). A `finalizeSend` that fails after
+  its retries keeps the lock, so the session answers 409 until a
+  restart. At start `sessions.repair()` ends whatever a crash left
+  running with cause `restart`. Shutdown terminates every send, waits
+  for the streams, closes the sockets with 1012, then stops the
+  listener. An agent a session references is a 409 to delete.
+- **The socket is per connection, never a topic.** `web/socket.ts`
+  keeps every connection by user with the project ids the user may see,
+  from `access.visibleProjectIds()` (memberships, plus every team
+  project for an admin), and at most one watched session. A durable
+  event (`session`, `deleted`) goes to the connections holding its
+  project; a stream frame (`delta`, `html`, with a sequence per send)
+  goes to the connections watching its session, straight from the
+  writer through a port. `watch` is authorized through a port to
+  sessions and answered with `watched` and the runner's live snapshot.
+  `access.changed` recomputes a connection's set and sends `revoked`
+  for a project that left it; `login.revoked` closes the login's
+  connections, and the expiry sweep publishes it too. Backpressure
+  closes a slow connection; a dropped frame closes with 1013; the
+  client reloads on every open. The upgrade is `GET /api/socket` with
+  `upgrade: true` on the descriptor: the router applies the same-origin
+  check as for a write and hands the handler `ctx.upgrade()`; without
+  an upgrade the route answers 426. The protocol is `shared/socket.ts`.
+- **Rendered HTML carries `md-` classes on every element** and
+  highlight.js tokens keep `hljs-`, so a stylesheet owns those prefixes
+  and styles nothing by element. Render is server-side in `render/`.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
   reads signals and renders with the primitives under `ui/`. A route
   entry names its `load` in `app/routes.ts`, and `app/loading.ts`

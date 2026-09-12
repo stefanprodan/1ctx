@@ -9,6 +9,7 @@ import { BadRequest } from "../../../src/server/lib/errors.ts";
 import { json, type RouteDescriptor } from "../../../src/server/lib/http.ts";
 import {
   conflicts,
+  type Router,
   router,
   sameOrigin,
 } from "../../../src/server/web/router.ts";
@@ -22,6 +23,12 @@ const echo: RouteDescriptor = {
 };
 
 const nobody = () => ({ principal: null, setCookie: null });
+
+// without an upgrader the router always answers
+const answered =
+  (handle: Router) =>
+  (...args: Parameters<Router>) =>
+    handle(...args).then((res) => res!);
 
 describe("conflicts", () => {
   test("a parameter opposite a literal is an overlap", () => {
@@ -107,8 +114,44 @@ describe("clientAddress", () => {
 });
 
 describe("router", () => {
-  const handle = router({ routes: [echo], resolve: nobody, trustProxy: false });
+  const handle = answered(
+    router({ routes: [echo], resolve: nobody, trustProxy: false }),
+  );
   const get = (path: string) => handle(new Request(`http://x${path}`), "a");
+
+  test("checks the origin of GET upgrade routes", async () => {
+    let reached = 0;
+    const upgrade: RouteDescriptor = {
+      ...echo,
+      path: "/api/socket",
+      upgrade: true,
+      handle: () => {
+        reached++;
+        return json({});
+      },
+    };
+    const route = answered(
+      router({ routes: [upgrade], resolve: nobody, trustProxy: false }),
+    );
+    const cross = await route(
+      new Request("http://x/api/socket", {
+        headers: { origin: "http://other.test" },
+      }),
+      "a",
+      () => true,
+    );
+    expect(cross.status).toBe(403);
+    expect(reached).toBe(0);
+    const same = await route(
+      new Request("http://x/api/socket", {
+        headers: { origin: "http://x" },
+      }),
+      "a",
+      () => true,
+    );
+    expect(same.status).toBe(200);
+    expect(reached).toBe(1);
+  });
 
   test("decodes a parameter and refuses a malformed one", async () => {
     expect(await (await get("/api/things/a%20b")).json()).toEqual({
@@ -132,18 +175,20 @@ describe("router", () => {
   });
 
   test("a renewed cookie rides back unless the handler set one", async () => {
-    const renew = router({
-      routes: [
-        echo,
-        {
-          ...echo,
-          path: "/api/own",
-          handle: () => json({}, 200, { "set-cookie": "login=; Max-Age=0" }),
-        },
-      ],
-      resolve: () => ({ principal: null, setCookie: "login=t; Max-Age=9" }),
-      trustProxy: false,
-    });
+    const renew = answered(
+      router({
+        routes: [
+          echo,
+          {
+            ...echo,
+            path: "/api/own",
+            handle: () => json({}, 200, { "set-cookie": "login=; Max-Age=0" }),
+          },
+        ],
+        resolve: () => ({ principal: null, setCookie: "login=t; Max-Age=9" }),
+        trustProxy: false,
+      }),
+    );
     const a = await renew(new Request("http://x/api/things/1"), "a");
     expect(a.headers.get("set-cookie")).toBe("login=t; Max-Age=9");
     const b = await renew(new Request("http://x/api/own"), "a");
@@ -151,29 +196,31 @@ describe("router", () => {
   });
 
   test("a renewed cookie rides back on a denial and on an error too", async () => {
-    const renew = router({
-      routes: [
-        { ...echo, path: "/api/admin", policy: "admin" },
-        {
-          ...echo,
-          path: "/api/boom",
-          handle: () => {
-            throw new BadRequest("no");
+    const renew = answered(
+      router({
+        routes: [
+          { ...echo, path: "/api/admin", policy: "admin" },
+          {
+            ...echo,
+            path: "/api/boom",
+            handle: () => {
+              throw new BadRequest("no");
+            },
           },
-        },
-      ],
-      resolve: () => ({
-        principal: {
-          userId: "u",
-          username: "u",
-          fullName: "U",
-          role: "member",
-          loginId: "l",
-        },
-        setCookie: "login=t; Max-Age=9",
+        ],
+        resolve: () => ({
+          principal: {
+            userId: "u",
+            username: "u",
+            fullName: "U",
+            role: "member",
+            loginId: "l",
+          },
+          setCookie: "login=t; Max-Age=9",
+        }),
+        trustProxy: false,
       }),
-      trustProxy: false,
-    });
+    );
     const denied = await renew(new Request("http://x/api/admin"), "a");
     expect(denied.status).toBe(403);
     expect(denied.headers.get("set-cookie")).toBe("login=t; Max-Age=9");

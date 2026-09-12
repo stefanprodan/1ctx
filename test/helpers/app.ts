@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { type App, compose } from "../../src/server/compose.ts";
 import type { Db } from "../../src/server/db/index.ts";
 import { silent } from "../../src/server/lib/log.ts";
+import type { Registry } from "../../src/server/runner/index.ts";
 import { clientAddress } from "../../src/server/web/serve.ts";
 import { memoryDb } from "./db.ts";
 
@@ -102,10 +103,32 @@ export async function testApp(
     fetcher?: typeof fetch;
     // the secrets beside admin.key
     secrets?: Record<string, string>;
+    // a runner registry with its own caps
+    registry?: Registry;
   } = {},
 ): Promise<TestApp> {
   const db = memoryDb();
-  const now = { value: 1_000_000 };
+  let current = 1_000_000;
+  const sleepers = new Set<{ at: number; resolve: () => void }>();
+  const now = {
+    get value() {
+      return current;
+    },
+    set value(value: number) {
+      current = value;
+      for (const sleeper of [...sleepers]) {
+        if (sleeper.at > current) continue;
+        sleepers.delete(sleeper);
+        sleeper.resolve();
+      }
+    },
+  };
+  const clock = Object.assign(() => current, {
+    sleep: (ms: number) =>
+      new Promise<void>((resolve) => {
+        sleepers.add({ at: current + ms, resolve });
+      }),
+  });
   const trustProxy = options.trustProxy ?? false;
   const adminPassword =
     options.adminPassword === undefined
@@ -116,12 +139,13 @@ export async function testApp(
     db,
     secret: (name) =>
       name === "admin" ? adminPassword : (options.secrets?.[name] ?? null),
-    clock: () => now.value,
+    clock,
     fetcher: options.fetcher ?? fake.fetcher,
     log: () => silent,
     version: VERSION,
     secureCookie: false,
     trustProxy,
+    registry: options.registry,
   });
   return {
     ...app,
@@ -149,11 +173,12 @@ export async function testApp(
             headers,
             body,
           });
-          // the address as serve() would derive it
-          const res = await app.handle(
+          // the address as serve() would derive it; without an upgrader
+          // the router always answers, an upgrade route with a 426
+          const res = (await app.handle(
             req,
             clientAddress(req, address, trustProxy),
-          );
+          ))!;
           const set = res.headers.get("set-cookie");
           if (set) {
             const [pair] = set.split(";");

@@ -3,6 +3,8 @@
 //
 // Milliseconds since the epoch, as a port so a test can move time.
 
-export type Clock = () => number;
+export type Clock = (() => number) & {
+  sleep?: (ms: number) => Promise<void>;
+};
 
 export const wallClock: Clock = () => Date.now();

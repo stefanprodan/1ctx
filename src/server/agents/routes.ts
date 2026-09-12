@@ -10,11 +10,13 @@ import type {
   AgentsResponse,
   SaveAgentRequest,
 } from "../../shared/api/agents.ts";
+import type { ProjectAgentsResponse } from "../../shared/api/sessions.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
-import { json, type RouteDescriptor } from "../lib/http.ts";
+import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import type { ProjectRow } from "../projects/index.ts";
 import type { ProviderRow } from "../providers/index.ts";
 import { parseAgent } from "./parse.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
@@ -24,9 +26,21 @@ export type ProvidersPort = {
   model(provider: ProviderRow, id: string): Promise<CatalogMatch | null>;
 };
 
+export type AccessPort = {
+  project(principal: Principal, id: string): ProjectRow;
+};
+
+// whether a session runs on the agent: a closure, since sessions are
+// built after agents
+export type SessionsPort = {
+  usesAgent(agentId: string): boolean;
+};
+
 export type RoutesDeps = {
   store: AgentStore;
   providers: ProvidersPort;
+  access: AccessPort;
+  sessions: SessionsPort;
   clock: Clock;
 };
 
@@ -112,8 +126,26 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/agents/:id",
       policy: "admin",
       handle(_req, ctx) {
-        deps.store.delete(find(ctx.params.id).id);
+        const agent = find(ctx.params.id);
+        if (deps.sessions.usesAgent(agent.id)) {
+          throw new Conflict(`a chat runs on ${agent.name}`);
+        }
+        deps.store.delete(agent.id);
         return json({});
+      },
+    },
+    {
+      // the agents the composer offers in a project: every agent, until
+      // agents are members of projects
+      method: "GET",
+      path: "/api/projects/:id/agents",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        deps.access.project(ctx.principal!, ctx.params.id);
+        const body: ProjectAgentsResponse = {
+          agents: deps.store.list().map(summary),
+        };
+        return json(body);
       },
     },
   ];

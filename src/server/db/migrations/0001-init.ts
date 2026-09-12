@@ -11,6 +11,11 @@ import type { Migration } from "../migration.ts";
 // the models come from, with the name of the key file, never the key;
 // agents: a name, a provider and a model, with what the catalog said
 // about the model when it was picked, the avatar and the system prompt.
+// sessions: a chat in a project, run by one agent, with a revision that
+// counts its transactions; messages: the rows of a session in order,
+// a user's or a reply; sends: one durable send per user message, with
+// its terminal status and cause; usage: one row per round, what the
+// provider reported.
 export const m0001: Migration = {
   id: "0001-init",
   up(db) {
@@ -73,6 +78,78 @@ export const m0001: Migration = {
         created_at integer not null
       );
       create index agents_provider on agents(provider_id);
+      create table sessions (
+        id text primary key,
+        project_id text not null references projects(id) on delete cascade,
+        owner_id text not null references users(id),
+        agent_id text not null references agents(id),
+        origin text not null check (origin in ('chat')),
+        title text not null,
+        status text not null
+          check (status in ('running', 'done', 'failed', 'stopped')),
+        revision integer not null default 0,
+        created_at integer not null,
+        last_activity_at integer not null
+      );
+      create index sessions_project on sessions(project_id, last_activity_at);
+      create index sessions_agent on sessions(agent_id);
+      create table messages (
+        id text primary key,
+        session_id text not null references sessions(id) on delete cascade,
+        seq integer not null,
+        kind text not null check (kind in ('user', 'reply')),
+        user_id text references users(id),
+        agent_id text references agents(id),
+        content text not null default '',
+        reasoning text not null default '',
+        html text not null default '',
+        status text not null
+          check (status in ('streaming', 'done', 'failed', 'stopped')),
+        error text,
+        finish_reason text,
+        reasoning_details text,
+        model text,
+        ttft_ms integer,
+        thinking_ms integer,
+        created_at integer not null,
+        finished_at integer,
+        unique (session_id, seq)
+      );
+      create table sends (
+        id text primary key,
+        session_id text not null references sessions(id) on delete cascade,
+        kind text not null check (kind in ('chat')),
+        user_id text not null references users(id),
+        agent_id text not null references agents(id),
+        provider_id text not null references providers(id),
+        model text not null,
+        status text not null
+          check (status in ('running', 'done', 'failed', 'stopped')),
+        cause text,
+        error text,
+        first_message_id text not null,
+        started_at integer not null,
+        finished_at integer
+      );
+      create index sends_session on sends(session_id, started_at);
+      create table usage (
+        id text primary key,
+        send_id text not null,
+        session_id text not null,
+        project_id text not null,
+        user_id text not null,
+        agent_id text not null,
+        provider_id text not null,
+        model text not null,
+        round integer not null,
+        prompt_tokens integer not null,
+        completion_tokens integer not null,
+        cached_tokens integer,
+        reasoning_tokens integer,
+        cost real,
+        created_at integer not null
+      );
+      create index usage_project on usage(project_id, created_at);
     `);
   },
 };

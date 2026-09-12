@@ -7,6 +7,7 @@
 // the last touch pushes the row's expiry out and re-sends the cookie
 // with a full Max-Age, so the browser's copy slides with it.
 
+import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
@@ -26,9 +27,12 @@ export type UsersPort = {
 export type ProjectsPort = {
   byId(id: string): ProjectRow | null;
   isMember(projectId: string, userId: string): boolean;
+  memberProjectIds(userId: string): string[];
+  teamProjectIds(): string[];
 };
 
 export type AuthDeps = {
+  db: Db;
   logins: LoginStore;
   users: UsersPort;
   projects: ProjectsPort;
@@ -52,11 +56,15 @@ export type Auth = {
   // revoke one login; the cleared cookie header value
   close(loginId: string): string;
   clearCookie(): string;
-  // drop the rows whose expiry passed; how many went
+  // drop the rows whose expiry passed, telling the socket layer about
+  // each; how many went
   sweep(): number;
   // the project, when the principal may see it; the same 404 whether it
   // is not there or is not theirs to see, so neither leaks
   project(principal: Principal, id: string): ProjectRow;
+  // every project the user may see, by the same rule: the memberships,
+  // plus every team project for an admin; null for a user that is gone
+  visibleProjectIds(userId: string): string[] | null;
 };
 
 export function cookieValue(req: Request, name: string): string | null {
@@ -85,7 +93,18 @@ export function auth(deps: AuthDeps): Auth {
       if (login === null) return nobody;
       const now = deps.clock();
       if (login.expiresAt <= now) {
-        deps.logins.delete(login.id);
+        transact(deps.db, () => {
+          deps.logins.delete(login.id);
+          return {
+            result: undefined,
+            events: [
+              {
+                type: "login.revoked" as const,
+                data: { userId: login.userId, loginId: login.id },
+              },
+            ],
+          };
+        });
         return nobody;
       }
       const user = deps.users.byId(login.userId);
@@ -123,7 +142,16 @@ export function auth(deps: AuthDeps): Auth {
     },
     clearCookie,
     sweep() {
-      return deps.logins.deleteExpired(deps.clock());
+      return transact(deps.db, () => {
+        const gone = deps.logins.deleteExpired(deps.clock());
+        return {
+          result: gone.length,
+          events: gone.map((login) => ({
+            type: "login.revoked" as const,
+            data: { userId: login.userId, loginId: login.id },
+          })),
+        };
+      });
     },
     project(principal, id) {
       const project = deps.projects.byId(id);
@@ -138,6 +166,15 @@ export function auth(deps: AuthDeps): Auth {
         throw new NotFound("no such project");
       }
       return project;
+    },
+    visibleProjectIds(userId) {
+      const user = deps.users.byId(userId);
+      if (user === null) return null;
+      const ids = new Set(deps.projects.memberProjectIds(userId));
+      if (user.role === "admin") {
+        for (const id of deps.projects.teamProjectIds()) ids.add(id);
+      }
+      return [...ids];
     },
   };
 }

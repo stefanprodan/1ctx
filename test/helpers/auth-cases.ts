@@ -118,6 +118,51 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/sessions",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    // the parser passes and the project is not there, or not theirs
+    method: "POST",
+    path: "/api/sessions",
+    body: { projectId: "none", agentId: "none", message: "hi" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/sessions/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/sessions/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/sessions/:id/messages",
+    body: { message: "hi" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/sessions/:id/stop",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/agents",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    // authenticated, and without the upgrade a signed-in caller gets
+    // told to upgrade
+    method: "GET",
+    path: "/api/socket",
+    expect: { anonymous: 401, member: 426, admin: 426 },
+  },
+  {
+    method: "GET",
     path: "/api/health",
     expect: { anonymous: 200, member: 200, admin: 200 },
   },

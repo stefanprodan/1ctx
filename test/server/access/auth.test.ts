@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { accessArea, cookieValue } from "../../../src/server/access/index.ts";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { usersArea } from "../../../src/server/users/index.ts";
 import { memoryDb } from "../../helpers/db.ts";
@@ -32,7 +33,12 @@ function build(secureCookie: boolean) {
     log: silent,
     secureCookie,
     users,
-    projects: { byId: () => null, isMember: () => false },
+    projects: {
+      byId: () => null,
+      isMember: () => false,
+      memberProjectIds: () => [],
+      teamProjectIds: () => [],
+    },
   });
   return { db, user, access };
 }
@@ -68,5 +74,25 @@ describe("access", () => {
     expect(access.resolve(req()).principal?.username).toBe("u");
     db.query("delete from users where id = ?").run(user.id);
     expect(access.resolve(req()).principal).toBeNull();
+  });
+
+  test("resolving an expired login publishes its revocation", () => {
+    const { db, user, access } = build(false);
+    const { login, setCookie } = access.open(user);
+    db.query("update logins set expires_at = 0 where id = ?").run(login.id);
+    const events: BusEvent[] = [];
+    const unsubscribe = subscribe((event) => events.push(event));
+    try {
+      const req = new Request("http://x", {
+        headers: { cookie: setCookie.split(";")[0] },
+      });
+      expect(access.resolve(req).principal).toBeNull();
+    } finally {
+      unsubscribe();
+    }
+    expect(events).toContainEqual({
+      type: "login.revoked",
+      data: { userId: user.id, loginId: login.id },
+    });
   });
 });

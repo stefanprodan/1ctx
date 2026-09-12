@@ -57,6 +57,24 @@ export class ProjectStore {
       .map(row);
   }
 
+  // the ids a user is a member of, and the team projects an admin sees
+  // without being one; the two halves of the visible set
+  memberProjectIds(userId: string): string[] {
+    return this.db
+      .query<{ project_id: string }, [string]>(
+        "select project_id from memberships where user_id = ?",
+      )
+      .all(userId)
+      .map((r) => r.project_id);
+  }
+
+  teamProjectIds(): string[] {
+    return this.db
+      .query<{ id: string }, []>("select id from projects where kind = 'team'")
+      .all()
+      .map((r) => r.id);
+  }
+
   personal(userId: string): ProjectRow | null {
     const raw = this.db
       .query<Raw, [string]>(

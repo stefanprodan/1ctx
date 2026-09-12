@@ -91,8 +91,15 @@ export class LoginStore {
       .run(userId, keepId).changes;
   }
 
-  deleteExpired(now: number): number {
-    return this.db.query("delete from logins where expires_at <= ?").run(now)
-      .changes;
+  // the rows whose expiry passed, dropped, and who they belonged to,
+  // so the sockets behind them can be closed
+  deleteExpired(now: number): { id: string; userId: string }[] {
+    const rows = this.db
+      .query<{ id: string; user_id: string }, [number]>(
+        "select id, user_id from logins where expires_at <= ?",
+      )
+      .all(now);
+    this.db.query("delete from logins where expires_at <= ?").run(now);
+    return rows.map((r) => ({ id: r.id, userId: r.user_id }));
   }
 }

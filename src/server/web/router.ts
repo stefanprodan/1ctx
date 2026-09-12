@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The one place access is enforced. A request is matched to a
-// descriptor, checked for same origin when it is not a GET, given a
+// descriptor, checked for same origin when it is not a GET (an upgrade
+// counts as a write: a browser sends Origin on the handshake), given a
 // principal, checked against the descriptor's policy, and only then
 // handed to the handler. An HttpError becomes a JSON body; anything
 // else propagates as the bug it is. A cookie the resolver renewed rides
-// back on the response unless the handler set its own.
+// back on the response unless the handler set its own, and on an
+// upgrade it rides in the handshake headers.
 
 import { BadRequest, HttpError } from "../lib/errors.ts";
 import {
@@ -14,11 +16,23 @@ import {
   type Method,
   type Principal,
   type RouteDescriptor,
+  type RouteOutcome,
 } from "../lib/http.ts";
 
 type Compiled = RouteDescriptor & { pattern: RegExp; names: string[] };
 
-export type Router = (req: Request, address: string) => Promise<Response>;
+// what serve() gives an upgrade route: Bun's upgrade with the data and
+// the handshake headers; true once Bun holds the connection
+export type Upgrader = (
+  data: unknown,
+  headers: Record<string, string>,
+) => boolean;
+
+export type Router = (
+  req: Request,
+  address: string,
+  upgrader?: Upgrader,
+) => Promise<RouteOutcome>;
 
 export type Resolver = (req: Request) => {
   principal: Principal | null;
@@ -102,8 +116,13 @@ async function dispatch(
   route: Compiled,
   match: RegExpExecArray,
   principal: Principal | null,
-  ctx: { req: Request; url: URL; address: string },
-): Promise<Response> {
+  ctx: {
+    req: Request;
+    url: URL;
+    address: string;
+    upgrade?: (data: unknown) => boolean;
+  },
+): Promise<RouteOutcome> {
   if (route.policy === "authenticated" || route.policy === "admin") {
     if (principal === null) return json({ error: "sign in" }, 401);
     if (route.policy === "admin" && principal.role !== "admin") {
@@ -124,6 +143,7 @@ async function dispatch(
       params,
       url: ctx.url,
       address: ctx.address,
+      ...(ctx.upgrade ? { upgrade: ctx.upgrade } : {}),
     });
   } catch (err) {
     if (err instanceof HttpError) {
@@ -137,7 +157,7 @@ export function router(deps: RouterDeps): Router {
   const clashes = conflicts(deps.routes);
   if (clashes.length > 0) throw new Error(`routes: ${clashes.join("; ")}`);
   const compiled = deps.routes.map(compile);
-  return async (req, address) => {
+  return async (req, address, upgrader) => {
     const url = new URL(req.url);
     const method = req.method as Method;
     let pathMatched = false;
@@ -146,18 +166,33 @@ export function router(deps: RouterDeps): Router {
       if (match === null) continue;
       pathMatched = true;
       if (route.method !== method) continue;
-      if (method !== "GET" && !sameOrigin(req, url, deps.trustProxy)) {
+      if (
+        (method !== "GET" || route.upgrade) &&
+        !sameOrigin(req, url, deps.trustProxy)
+      ) {
         return json({ error: "cross-origin request" }, 403);
       }
       const resolution =
         route.policy === "webhook"
           ? { principal: null, setCookie: null }
           : deps.resolve(req);
+      const upgrade =
+        route.upgrade && upgrader
+          ? (data: unknown) =>
+              upgrader(
+                data,
+                resolution.setCookie === null
+                  ? {}
+                  : { "set-cookie": resolution.setCookie },
+              )
+          : undefined;
       const res = await dispatch(route, match, resolution.principal, {
         req,
         url,
         address,
+        upgrade,
       });
+      if (res === undefined) return undefined;
       // the row already moved, so the browser's copy must move with it
       // whatever the answer was, unless the handler replaced the cookie
       if (resolution.setCookie !== null && !res.headers.has("set-cookie")) {
