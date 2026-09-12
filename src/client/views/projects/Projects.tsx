@@ -4,17 +4,13 @@
 // The user's projects, one row each, the personal one first. Only the
 // personal project exists so far, so the page is one row.
 
-import { useEffect } from "preact/hooks";
-import { loadProjects, projects, projectsError } from "../../data/projects.ts";
+import { projects, projectsError } from "../../data/projects.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { kindLine } from "./Project.model.ts";
 import "./projects.css";
 
 export function Projects() {
-  useEffect(() => {
-    if (projects.value === null) void loadProjects();
-  }, []);
   const list = projects.value;
   return (
     <Page

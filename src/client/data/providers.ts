@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The providers entity: the admin's list, loaded once per signed-in
-// user and dropped with them, and the calls that change it. A write
+// The providers entity: the admin's list, loaded when its page is
+// reached and dropped with the signed-in user, and the calls that
+// change it. A write
 // answers the new list from the server's row, so what shows is what
 // was saved. The catalog search is a plain call: its answer belongs to
 // the form that asked, not here.
@@ -37,14 +38,21 @@ effect(() => {
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
+// a load's answer is kept only when it is still the one wanted: for
+// the signed-in user of the moment and the latest word on the list, a
+// failure included, since a route arrival reloads and a write can land
+// while a load is in flight
+let turn = 0;
+
 export async function loadProviders(): Promise<void> {
   const forUser = owner;
+  const mine = ++turn;
   providersError.value = null;
   try {
     const body = await api<ProvidersResponse>("/api/providers");
-    if (owner === forUser) providers.value = body.providers;
+    if (owner === forUser && turn === mine) providers.value = body.providers;
   } catch (err) {
-    if (owner === forUser) providersError.value = reason(err);
+    if (owner === forUser && turn === mine) providersError.value = reason(err);
   }
 }
 
@@ -57,6 +65,7 @@ export async function createProvider(
     "POST",
     body,
   );
+  turn++;
   if (owner === forUser) {
     providers.value = [...(providers.value ?? []), provider];
   }
@@ -66,6 +75,7 @@ export async function createProvider(
 export async function deleteProvider(id: string): Promise<void> {
   const forUser = owner;
   await api(`/api/providers/${encodeURIComponent(id)}`, "DELETE");
+  turn++;
   if (owner === forUser) {
     providers.value = (providers.value ?? []).filter((p) => p.id !== id);
   }

@@ -10,11 +10,9 @@
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
-import { useEffect } from "preact/hooks";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
   changePassword,
-  loadProfile,
   profile,
   profileError,
   saveProfile,
@@ -161,9 +159,6 @@ function PasswordForm() {
 }
 
 export function Profile() {
-  useEffect(() => {
-    void loadProfile();
-  }, []);
   const user = profile.value;
   return (
     <Page

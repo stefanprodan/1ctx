@@ -18,24 +18,40 @@ import { api, onUnauthorized } from "./api.ts";
 export const me = signal<UserSummary | null | undefined>(undefined);
 export const meError = signal<string | null>(null);
 
+// every change of who is signed in bumps this, so a load that started
+// before the change is dropped when it answers: the first load of the
+// page can still be in flight when a sign-in on /login lands, and its
+// "nobody" must not undo that sign-in
+let turn = 0;
+
+// the one way to change who is signed in; profile.ts calls it too,
+// since a saved profile replaces the row
+export function setMe(user: UserSummary | null): void {
+  turn++;
+  me.value = user;
+}
+
 // any 401 means the login behind the cookie is gone
 onUnauthorized(() => {
-  if (me.value) me.value = null;
+  if (me.value) setMe(null);
 });
 
 export async function loadMe(): Promise<void> {
+  const mine = ++turn;
   meError.value = null;
   try {
     const { user } = await api<MeResponse>("/api/me");
-    me.value = user;
+    if (turn === mine) me.value = user;
   } catch (err) {
-    meError.value = err instanceof Error ? err.message : String(err);
+    if (turn === mine) {
+      meError.value = err instanceof Error ? err.message : String(err);
+    }
   }
 }
 
 export async function login(body: LoginRequest): Promise<void> {
   const { user } = await api<LoginResponse>("/api/login", "POST", body);
-  me.value = user;
+  setMe(user);
 }
 
 // a 401 here means the login was already gone: signed out either way
@@ -47,5 +63,5 @@ export async function logout(): Promise<void> {
       throw err;
     }
   }
-  me.value = null;
+  setMe(null);
 }

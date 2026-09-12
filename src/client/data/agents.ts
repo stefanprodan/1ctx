@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The agents entity: the admin's list, loaded once per signed-in user
-// and dropped with them, and the calls that change it. A write puts
+// The agents entity: the admin's list, loaded when its page is reached
+// and dropped with the signed-in user, and the calls that change it. A write puts
 // the server's row in the list, so what shows is what was saved.
 
 import { effect, signal } from "@preact/signals";
@@ -31,14 +31,21 @@ effect(() => {
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
+// a load's answer is kept only when it is still the one wanted: for
+// the signed-in user of the moment and the latest word on the list, a
+// failure included, since a route arrival reloads and a write can land
+// while a load is in flight
+let turn = 0;
+
 export async function loadAgents(): Promise<void> {
   const forUser = owner;
+  const mine = ++turn;
   agentsError.value = null;
   try {
     const body = await api<AgentsResponse>("/api/agents");
-    if (owner === forUser) agents.value = body.agents;
+    if (owner === forUser && turn === mine) agents.value = body.agents;
   } catch (err) {
-    if (owner === forUser) agentsError.value = reason(err);
+    if (owner === forUser && turn === mine) agentsError.value = reason(err);
   }
 }
 
@@ -47,6 +54,7 @@ export async function createAgent(
 ): Promise<AgentSummary> {
   const forUser = owner;
   const { agent } = await api<AgentResponse>("/api/agents", "POST", body);
+  turn++;
   if (owner === forUser) agents.value = [...(agents.value ?? []), agent];
   return agent;
 }
@@ -61,6 +69,7 @@ export async function updateAgent(
     "PATCH",
     body,
   );
+  turn++;
   if (owner === forUser) {
     agents.value = (agents.value ?? []).map((a) => (a.id === id ? agent : a));
   }
@@ -70,6 +79,7 @@ export async function updateAgent(
 export async function deleteAgent(id: string): Promise<void> {
   const forUser = owner;
   await api(`/api/agents/${encodeURIComponent(id)}`, "DELETE");
+  turn++;
   if (owner === forUser) {
     agents.value = (agents.value ?? []).filter((a) => a.id !== id);
   }
