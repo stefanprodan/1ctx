@@ -8,9 +8,11 @@ import "./style/tokens.css";
 import "./style/base.css";
 import { render } from "preact";
 import { App } from "./app/App.tsx";
+import { startLoading } from "./app/loading.ts";
 import { boot } from "./app/router.ts";
 import { watchWidth } from "./app/shell.ts";
 
 boot();
 watchWidth();
+startLoading();
 render(<App />, document.getElementById("app")!);

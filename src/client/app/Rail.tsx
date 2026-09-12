@@ -15,7 +15,7 @@ import { Fragment } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
-import { loadProjects, projects } from "../data/projects.ts";
+import { projects } from "../data/projects.ts";
 import { initials } from "../lib/format.ts";
 import { Icon, type IconName, Logo } from "../lib/icons.tsx";
 import { navigate, path } from "./router.ts";
@@ -111,9 +111,6 @@ export function Rail({
     if (narrow) hide.current?.focus();
   }, [narrow]);
   const follow = narrow ? onHide : undefined;
-  useEffect(() => {
-    if (projects.value === null) void loadProjects();
-  }, []);
   return (
     <aside class={`rail${narrow ? " rail-drawer" : ""}`}>
       <div class="rail-top">

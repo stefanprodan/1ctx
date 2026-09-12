@@ -169,7 +169,13 @@ violation, and every rule has a rejected fixture under
 - **Migrations are appended.** `db/migrations/` is the ordered list;
   a store never creates a table.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
-  reads signals and renders with the primitives under `ui/`. Any 401
+  reads signals and renders with the primitives under `ui/`. A route
+  entry names its `load` in `app/routes.ts`, and `app/loading.ts`
+  starts it when the path, the query or the signed-in user changes,
+  before the view renders, and again on `reload()`; the rail's
+  project list loads there too, once per user. An entity keeps only
+  the latest word on its row: a later load or a write supersedes a
+  load in flight. Any 401
   from `api()` drops the signed-in user, so a revoked login leaves the
   shell at once. A view with real logic gets `Name.model.ts` or
   `Name.state.ts`, tested without a DOM. Every route is one entry in

@@ -5,7 +5,7 @@
 // with pushState, and the back button. It knows no route and no view,
 // so a view may import it to navigate without a cycle through the table.
 
-import { signal } from "@preact/signals";
+import { batch, signal } from "@preact/signals";
 
 const here = () =>
   typeof location === "undefined"
@@ -23,8 +23,12 @@ export function navigate(to: string, replace = false): void {
   const target = url.pathname + url.search;
   if (replace) history.replaceState(null, "", target);
   else history.pushState(null, "", target);
-  path.value = url.pathname;
-  query.value = url.search;
+  // one navigation is one change: an effect over both signals must not
+  // see the new path with the old query in between
+  batch(() => {
+    path.value = url.pathname;
+    query.value = url.search;
+  });
 }
 
 // the click on any in-page link goes through navigate, so the page
@@ -41,8 +45,10 @@ export function onLinkClick(event: MouseEvent): void {
 
 export function boot(): void {
   window.addEventListener("popstate", () => {
-    path.value = location.pathname;
-    query.value = location.search;
+    batch(() => {
+      path.value = location.pathname;
+      query.value = location.search;
+    });
   });
   document.addEventListener("click", onLinkClick);
 }

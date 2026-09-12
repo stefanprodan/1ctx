@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The user's projects: the list the rail and the Projects page read,
-// loaded once per signed-in user, and the one project a page shows.
+// loaded with the shell and again on the Projects page, and the one
+// project a page shows.
 // Every answer is kept only when it is still the one wanted: for the
 // signed-in user of the moment, for the project on screen, and from
 // the latest request, a failure included. Both are dropped with the

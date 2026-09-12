@@ -15,28 +15,37 @@ import type {
 } from "../../shared/api/profile.ts";
 import type { Profile } from "../../shared/contracts/user.ts";
 import { api } from "./api.ts";
-import { me } from "./me.ts";
+import { me, setMe } from "./me.ts";
 
 export const profile = signal<Profile | null>(null);
 export const profileError = signal<string | null>(null);
 
+// a load's answer is kept only while it is the latest word on the row:
+// a later load, or a write, supersedes it, since a route arrival
+// reloads and a save can land while one is in flight
+let turn = 0;
+
 function settle(user: Profile): void {
   if (me.value?.id !== user.id) return;
+  turn++;
   profile.value = user;
   const { createdAt: _, about: __, ...summary } = user;
-  me.value = summary;
+  setMe(summary);
 }
 
 export async function loadProfile(): Promise<void> {
+  const mine = ++turn;
   profileError.value = null;
   if (profile.value !== null && profile.value.id !== me.value?.id) {
     profile.value = null;
   }
   try {
     const { user } = await api<ProfileResponse>("/api/profile");
-    settle(user);
+    if (turn === mine) settle(user);
   } catch (err) {
-    profileError.value = err instanceof Error ? err.message : String(err);
+    if (turn === mine) {
+      profileError.value = err instanceof Error ? err.message : String(err);
+    }
   }
 }
 

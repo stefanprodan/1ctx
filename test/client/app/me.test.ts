@@ -1,0 +1,79 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The signed-in user survives a first load that answers late: the
+// page asks who is signed in, the person signs in before the answer
+// comes, and the answer, "nobody", must not undo the sign-in.
+
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { loadMe, login, logout, me } from "../../../src/client/data/me.ts";
+
+const oana = {
+  id: "u1",
+  username: "oana",
+  fullName: "Oana",
+  role: "member" as const,
+};
+
+const realFetch = globalThis.fetch;
+let gates: (() => void)[] = [];
+
+beforeEach(() => {
+  me.value = undefined;
+  gates = [];
+  globalThis.fetch = (async (url: string) => {
+    if (url === "/api/me") {
+      // held until the test lets it go
+      await new Promise<void>((r) => gates.push(r));
+      return Response.json({ user: null });
+    }
+    if (url === "/api/login") return Response.json({ user: oana });
+    if (url === "/api/logout") return Response.json({ ok: true });
+    throw new Error(`unexpected ${url}`);
+  }) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = realFetch;
+  me.value = undefined;
+});
+
+describe("me", () => {
+  test("a late first load does not undo a sign-in", async () => {
+    const first = loadMe();
+    await login({ username: "oana", password: "pw" });
+    expect(me.value).toEqual(oana);
+    gates.shift()?.();
+    await first;
+    expect(me.value).toEqual(oana);
+  });
+
+  test("a late load does not undo a sign-out either", async () => {
+    await login({ username: "oana", password: "pw" });
+    globalThis.fetch = (async (url: string) => {
+      if (url === "/api/me") {
+        await new Promise<void>((r) => gates.push(r));
+        return Response.json({ user: oana });
+      }
+      return Response.json({ ok: true });
+    }) as unknown as typeof fetch;
+    const late = loadMe();
+    await logout();
+    expect(me.value).toBeNull();
+    gates.shift()?.();
+    await late;
+    expect(me.value).toBeNull();
+  });
+
+  test("the latest of two loads wins", async () => {
+    const first = loadMe();
+    const second = loadMe();
+    gates[1]();
+    await second;
+    expect(me.value).toBeNull();
+    me.value = oana;
+    gates[0]();
+    await first;
+    expect(me.value).toEqual(oana);
+  });
+});

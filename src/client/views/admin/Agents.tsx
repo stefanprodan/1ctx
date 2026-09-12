@@ -9,14 +9,12 @@
 // ProviderForm.tsx.
 
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
 import type { Avatar, Wire } from "../../../shared/words.ts";
-import { agents, agentsError, loadAgents } from "../../data/agents.ts";
+import { agents, agentsError } from "../../data/agents.ts";
 import {
   deleteProvider,
-  loadProviders,
   providers,
   providersError,
 } from "../../data/providers.ts";
@@ -167,10 +165,6 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 }
 
 export function Agents() {
-  useEffect(() => {
-    if (agents.value === null) void loadAgents();
-    if (providers.value === null) void loadProviders();
-  }, []);
   const list = agents.value;
   const rows = providers.value;
   const open = useSignal<string | null>(null);

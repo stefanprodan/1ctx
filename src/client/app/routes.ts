@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The one route table. Every view is one entry: the path pattern, the
-// view, its title, the role it needs, and either a rail entry or hidden.
+// view, its title, the role it needs, what it loads, and either a rail
+// entry or hidden.
 // A rail entry may sit in a group, a row that expands to its entries;
 // Admin is the one so far, and only admins get its routes. The rail and
 // the tests read this; the server enforces access, never this table.
@@ -10,6 +11,10 @@
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { loadAgents } from "../data/agents.ts";
+import { loadProfile } from "../data/profile.ts";
+import { loadProject, loadProjects } from "../data/projects.ts";
+import { loadProviders } from "../data/providers.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -22,6 +27,10 @@ export type Route = {
   view: Lazy<{ params: Params }>;
   title: (params: Params) => string;
   role: "public" | "authenticated" | "admin";
+  // what the view reads, started by app/loading.ts when the route
+  // matches, with the query for a view filtered by it; a view never
+  // fetches
+  load?: (params: Params, query: URLSearchParams) => Promise<void>;
   nav?: { label: string; icon: IconName; order: number; group?: string };
 };
 
@@ -49,6 +58,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Projects",
     role: "authenticated",
+    load: () => loadProjects(),
     nav: { label: "Projects", icon: "projects", order: 2 },
   },
   {
@@ -58,12 +68,16 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Project",
     role: "authenticated",
+    load: (params) => loadProject(params.id),
   },
   {
     path: "/admin/agents",
     view: lazy(() => import("../views/admin/Agents.tsx").then((m) => m.Agents)),
     title: () => "Agents",
     role: "admin",
+    load: async () => {
+      await Promise.all([loadAgents(), loadProviders()]);
+    },
     nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
   },
   {
@@ -73,6 +87,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Profile",
     role: "authenticated",
+    load: () => loadProfile(),
   },
 ];
 
