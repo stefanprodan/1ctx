@@ -40,6 +40,7 @@
     --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
 
     --text-label: 11px;
+    --text-small: 12px;
     --text-ui: 13px;
     --text-body: 15px;
     --text-title: 22px;

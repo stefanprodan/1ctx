@@ -13,6 +13,7 @@ import "./page.css";
 export function Page({
   label,
   crumb,
+  crumbHref,
   title,
   aside,
   actions,
@@ -22,8 +23,11 @@ export function Page({
   children,
 }: {
   label?: string;
-  // "Account / Profile" on one line, the title in the foreground
+  // "Account / Profile" on one line, the title in the foreground; an
+  // empty crumb is the one-line head with the title alone
   crumb?: string;
+  // where the crumb's parent leads, when it is a page
+  crumbHref?: string;
   title: string;
   aside?: ComponentChildren;
   actions?: ComponentChildren;
@@ -35,10 +39,20 @@ export function Page({
   return (
     <div class="page">
       <div class="page-head">
-        {crumb ? (
+        {crumb !== undefined ? (
           <h1 class="page-crumb label">
-            <span>{crumb}</span>
-            <span class="page-crumb-sep">/</span>
+            {crumb !== "" && (
+              <>
+                {crumbHref ? (
+                  <a class="page-crumb-up" href={crumbHref}>
+                    {crumb}
+                  </a>
+                ) : (
+                  <span>{crumb}</span>
+                )}
+                <span class="page-crumb-sep">/</span>
+              </>
+            )}
             <span class="page-crumb-on">{title}</span>
           </h1>
         ) : (

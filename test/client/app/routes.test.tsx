@@ -53,9 +53,13 @@ describe("the route table", () => {
         nav: { label: "X", icon: "settings" as const, order: 9 },
       },
     ];
-    expect(navEntries("member", withAdmin).map((r) => r.path)).toEqual(["/"]);
+    expect(navEntries("member", withAdmin).map((r) => r.path)).toEqual([
+      "/",
+      "/projects",
+    ]);
     expect(navEntries("admin", withAdmin).map((r) => r.path)).toEqual([
       "/",
+      "/projects",
       "/admin/x",
     ]);
   });

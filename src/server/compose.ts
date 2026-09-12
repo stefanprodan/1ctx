@@ -16,7 +16,14 @@ import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
-import { bootstrap, UserStore } from "./users/index.ts";
+import { ProjectStore, routes as projectRoutes } from "./projects/index.ts";
+import {
+  bootstrap,
+  createUser,
+  type UserDeps,
+  UserStore,
+  summary as userSummary,
+} from "./users/index.ts";
 import { healthRoute } from "./web/health.ts";
 import { type Router, router } from "./web/router.ts";
 
@@ -33,7 +40,12 @@ export type ComposeOptions = {
 
 export type App = {
   users: UserStore;
+  projects: ProjectStore;
   logins: LoginStore;
+  // the one way a user is made: with its personal project
+  createUser: (
+    fields: Parameters<typeof createUser>[1],
+  ) => ReturnType<typeof createUser>;
   routes: RouteDescriptor[];
   handle: Router;
   // drop expired logins; called at start and every hour
@@ -43,8 +55,19 @@ export type App = {
 export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock } = options;
   const users = new UserStore(db);
-  await bootstrap({
+  const projects = new ProjectStore(db);
+  const userDeps: UserDeps = {
+    db,
     store: users,
+    onCreated: (user) =>
+      projects.createPersonal({
+        userId: user.id,
+        name: user.username,
+        now: user.createdAt,
+      }),
+  };
+  await bootstrap({
+    ...userDeps,
     secret: options.secret,
     clock,
     log: options.log("users"),
@@ -53,6 +76,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const auth = access({
     logins,
     user: (id) => users.byId(id),
+    project: (id) => projects.byId(id),
+    member: (projectId, userId) => projects.isMember(projectId, userId),
     clock,
     secureCookie: options.secureCookie,
   });
@@ -73,6 +98,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
       clock,
       log: options.log("access"),
     }),
+    ...projectRoutes({
+      store: projects,
+      access: auth,
+      userSummary: (id) => {
+        const user = users.byId(id);
+        return user ? userSummary(user) : null;
+      },
+    }),
     healthRoute(options.version),
   ];
   const handle = router({
@@ -80,5 +113,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     resolve: (req) => auth.resolve(req),
     trustProxy: options.trustProxy,
   });
-  return { users, logins, routes, handle, sweep: () => auth.sweep() };
+  return {
+    users,
+    projects,
+    logins,
+    createUser: (fields) => createUser(userDeps, fields),
+    routes,
+    handle,
+    sweep: () => auth.sweep(),
+  };
 }

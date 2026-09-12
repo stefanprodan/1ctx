@@ -1,10 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Users: identity, the password hash, and the bootstrap of the first
-// admin from the admin secret.
+// Users: identity, the password hash, the one way a user is created,
+// and the bootstrap of the first admin from the admin secret. A user
+// is made with what belongs to it, the personal project first of all,
+// in one transaction: the port below runs inside it, so a user never
+// exists without its project.
 
-import { MIN_PASSWORD } from "../../shared/words.ts";
+import { MIN_PASSWORD, type Role } from "../../shared/words.ts";
+import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import { profile, summary, type UserRow, UserStore } from "./store.ts";
@@ -16,13 +20,36 @@ export const ADMIN_FULL_NAME = "Administrator";
 export const ADMIN_SECRET = "admin";
 export const MAX_PASSWORD_BYTES = 1024;
 
-export type BootstrapDeps = {
+export type UserDeps = {
+  db: Db;
   store: UserStore;
+  // what a new user is made with, inside the same transaction
+  onCreated: (user: UserRow) => void;
+};
+
+export type BootstrapDeps = UserDeps & {
   // the secrets port: the bare value or null
   secret: (name: string) => string | null;
   clock: Clock;
   log: Log;
 };
+
+export function createUser(
+  deps: UserDeps,
+  fields: {
+    username: string;
+    fullName: string;
+    role: Role;
+    passwordHash: string;
+    now: number;
+  },
+): UserRow {
+  return transact(deps.db, () => {
+    const user = deps.store.create(fields);
+    deps.onCreated(user);
+    return { result: user };
+  });
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: "argon2id" });
@@ -60,7 +87,7 @@ export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
     );
     return null;
   }
-  const user = deps.store.create({
+  const user = createUser(deps, {
     username: ADMIN_USERNAME,
     fullName: ADMIN_FULL_NAME,
     role: "admin",

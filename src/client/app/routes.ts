@@ -11,8 +11,9 @@
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
+import type { Params } from "./params.ts";
 
-export type Params = Record<string, string>;
+export type { Params };
 
 export type Route = {
   path: string;
@@ -35,6 +36,23 @@ export const ROUTES: Route[] = [
     title: () => "Home",
     role: "authenticated",
     nav: { label: "Home", icon: "home", order: 1 },
+  },
+  {
+    path: "/projects",
+    view: lazy(() =>
+      import("../views/projects/Projects.tsx").then((m) => m.Projects),
+    ),
+    title: () => "Projects",
+    role: "authenticated",
+    nav: { label: "Projects", icon: "projects", order: 2 },
+  },
+  {
+    path: "/projects/:id",
+    view: lazy(() =>
+      import("../views/projects/Project.tsx").then((m) => m.Project),
+    ),
+    title: () => "Project",
+    role: "authenticated",
   },
   {
     path: "/profile",

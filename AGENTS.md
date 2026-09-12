@@ -132,6 +132,14 @@ violation, and every rule has a rejected fixture under
   the same cap for `admin.key`. The first admin comes from `admin.key`
   in the secrets directory, read once when there are no users. Session
   is the domain noun and never means a cookie.
+- **Everything is in a project.** A user is made with its personal
+  project, named after the username, in one transaction through
+  `createUser()` in `users/`; nothing else creates a user, tests
+  included. A personal project is its owner's alone, an admin
+  included; a team project is open to its members and to admins. A
+  handler gets a project through `access.project(principal, id)`,
+  which answers the same 404 whether the project is missing or not
+  theirs to see. The rule is `projects/visible.ts`, pure.
 - **Secrets are files.** One bare value per `<name>.key` in the secrets
   directory, read by the holder, never logged, never returned by a
   route, never a database row.

@@ -8,8 +8,10 @@
 // with a full Max-Age, so the browser's copy slides with it.
 
 import type { Clock } from "../lib/clock.ts";
+import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newToken, sha256 } from "../lib/ids.ts";
+import { type ProjectRow, visible } from "../projects/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { Login, LoginStore } from "./store.ts";
 
@@ -21,6 +23,9 @@ export type AccessDeps = {
   logins: LoginStore;
   // the users port: the row by id, or null
   user: (id: string) => UserRow | null;
+  // the projects port
+  project: (id: string) => ProjectRow | null;
+  member: (projectId: string, userId: string) => boolean;
   clock: Clock;
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
@@ -43,6 +48,9 @@ export type Access = {
   clearCookie(): string;
   // drop the rows whose expiry passed; how many went
   sweep(): number;
+  // the project, when the principal may see it; the same 404 whether it
+  // is not there or is not theirs to see, so neither leaks
+  project(principal: Principal, id: string): ProjectRow;
 };
 
 export function cookieValue(req: Request, name: string): string | null {
@@ -110,6 +118,16 @@ export function access(deps: AccessDeps): Access {
     clearCookie,
     sweep() {
       return deps.logins.deleteExpired(deps.clock());
+    },
+    project(principal, id) {
+      const project = deps.project(id);
+      if (
+        project === null ||
+        !visible(project, principal, deps.member(id, principal.userId))
+      ) {
+        throw new NotFound("no such project");
+      }
+      return project;
     },
   };
 }

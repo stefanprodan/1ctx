@@ -7,7 +7,8 @@ import {
   cookieValue,
   LoginStore,
 } from "../../../src/server/access/index.ts";
-import { UserStore } from "../../../src/server/users/index.ts";
+import { ProjectStore } from "../../../src/server/projects/index.ts";
+import { createUser, UserStore } from "../../../src/server/users/index.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 describe("cookieValue", () => {
@@ -30,16 +31,30 @@ describe("access", () => {
   test("marks the cookie Secure when asked", () => {
     const db = memoryDb();
     const users = new UserStore(db);
-    const user = users.create({
-      username: "u",
-      fullName: "U",
-      role: "member",
-      passwordHash: "x",
-      now: 0,
-    });
+    const user = createUser(
+      {
+        db,
+        store: users,
+        onCreated: (u) =>
+          new ProjectStore(db).createPersonal({
+            userId: u.id,
+            name: u.username,
+            now: 0,
+          }),
+      },
+      {
+        username: "u",
+        fullName: "U",
+        role: "member",
+        passwordHash: "x",
+        now: 0,
+      },
+    );
     const auth = access({
       logins: new LoginStore(db),
       user: (id) => users.byId(id),
+      project: () => null,
+      member: () => false,
       clock: () => 0,
       secureCookie: true,
     });
@@ -50,16 +65,30 @@ describe("access", () => {
   test("a login of a deleted user is nobody", () => {
     const db = memoryDb();
     const users = new UserStore(db);
-    const user = users.create({
-      username: "u",
-      fullName: "U",
-      role: "member",
-      passwordHash: "x",
-      now: 0,
-    });
+    const user = createUser(
+      {
+        db,
+        store: users,
+        onCreated: (u) =>
+          new ProjectStore(db).createPersonal({
+            userId: u.id,
+            name: u.username,
+            now: 0,
+          }),
+      },
+      {
+        username: "u",
+        fullName: "U",
+        role: "member",
+        passwordHash: "x",
+        now: 0,
+      },
+    );
     const auth = access({
       logins: new LoginStore(db),
       user: (id) => users.byId(id),
+      project: () => null,
+      member: () => false,
       clock: () => 0,
       secureCookie: false,
     });
