@@ -49,3 +49,13 @@ export function isAbout(value: unknown): value is string {
 
 // a password a user picks; the cap in bytes is the server's
 export const MIN_PASSWORD = 8;
+
+// a project is personal (one per user, made with the user) or team
+export const PROJECT_KINDS = ["personal", "team"] as const;
+export type ProjectKind = (typeof PROJECT_KINDS)[number];
+export function isProjectKind(value: unknown): value is ProjectKind {
+  return (
+    typeof value === "string" &&
+    (PROJECT_KINDS as readonly string[]).includes(value)
+  );
+}

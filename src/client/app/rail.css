@@ -84,6 +84,29 @@
     color: var(--fg);
   }
 
+  /* a project under Projects: indented past the icon, in mono */
+  .rail-sub {
+    display: flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 10px 0 36px;
+    border-radius: var(--radius);
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rail-sub:hover {
+    color: var(--fg);
+  }
+  .rail-sub-on {
+    background: var(--card);
+    color: var(--fg);
+  }
+
   .rail-user {
     position: relative;
     margin-top: auto;

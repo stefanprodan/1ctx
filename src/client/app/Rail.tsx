@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The rail: the logo with the button that hides it, the pages the route
-// table lists, and the user row at the bottom with its menu: the
-// profile and sign out. A sign out the server refuses stays in the menu
+// table lists with the user's projects under Projects, personal first,
+// and the user row at the bottom with its menu: the profile and sign
+// out. A sign out the server refuses stays in the menu
 // with the reason. As a drawer the hide button is a close, it takes the
 // focus when the drawer opens, and any link closes the drawer, the one
 // to the page already shown included, since that is no navigation.
 
 import { useSignal } from "@preact/signals";
+import { Fragment } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
+import { loadProjects, projects } from "../data/projects.ts";
 import { initials } from "../lib/format.ts";
 import { Icon, Logo } from "../lib/icons.tsx";
 import { navigate, path } from "./router.ts";
@@ -35,6 +38,9 @@ export function Rail({
     if (narrow) hide.current?.focus();
   }, [narrow]);
   const follow = narrow ? onHide : undefined;
+  useEffect(() => {
+    if (projects.value === null) void loadProjects();
+  }, []);
   return (
     <aside class={`rail${narrow ? " rail-drawer" : ""}`}>
       <div class="rail-top">
@@ -54,15 +60,31 @@ export function Rail({
         </div>
         <nav class="rail-nav">
           {navEntries(user.role).map((route) => (
-            <a
-              key={route.path}
-              href={route.path}
-              class={`rail-item${here === route.path ? " rail-item-on" : ""}`}
-              onClick={follow}
-            >
-              <Icon name={route.nav!.icon} />
-              <span>{route.nav!.label}</span>
-            </a>
+            <Fragment key={route.path}>
+              <a
+                href={route.path}
+                class={`rail-item${here === route.path ? " rail-item-on" : ""}`}
+                aria-current={here === route.path ? "page" : undefined}
+                onClick={follow}
+              >
+                <Icon name={route.nav!.icon} />
+                <span>{route.nav!.label}</span>
+              </a>
+              {route.path === "/projects" &&
+                (projects.value ?? []).map((p) => (
+                  <a
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    class={`rail-sub${here === `/projects/${p.id}` ? " rail-sub-on" : ""}`}
+                    aria-current={
+                      here === `/projects/${p.id}` ? "page" : undefined
+                    }
+                    onClick={follow}
+                  >
+                    {p.name}
+                  </a>
+                ))}
+            </Fragment>
           ))}
         </nav>
       </div>

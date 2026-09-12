@@ -57,6 +57,18 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/projects",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    // the literal ":id" names no project, and a project the caller may
+    // not see answers the same 404
+    method: "GET",
+    path: "/api/projects/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/health",
     expect: { anonymous: 200, member: 200, admin: 200 },
   },

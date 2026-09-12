@@ -5,9 +5,11 @@ import type { Migration } from "../migration.ts";
 
 // users: identity and the password hash (argon2id, PHC string). logins:
 // the row behind a cookie, holding a hash of the token so a database
-// read never yields a usable cookie.
+// read never yields a usable cookie. projects: the container everything
+// lives in, personal (one per user, made with the user and gone with
+// the user) or team; memberships: who is in a project.
 export const m0001: Migration = {
-  id: "0001-users-logins",
+  id: "0001-users-logins-projects",
   up(db) {
     db.exec(`
       create table users (
@@ -28,6 +30,22 @@ export const m0001: Migration = {
         expires_at integer not null
       );
       create index logins_user on logins(user_id);
+      create table projects (
+        id text primary key,
+        kind text not null check (kind in ('personal', 'team')),
+        name text not null unique,
+        owner_id text not null references users(id) on delete cascade,
+        created_at integer not null
+      );
+      create unique index projects_personal
+        on projects(owner_id) where kind = 'personal';
+      create table memberships (
+        project_id text not null references projects(id) on delete cascade,
+        user_id text not null references users(id) on delete cascade,
+        created_at integer not null,
+        primary key (project_id, user_id)
+      );
+      create index memberships_user on memberships(user_id);
     `);
   },
 };

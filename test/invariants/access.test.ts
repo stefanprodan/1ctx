@@ -32,7 +32,7 @@ describe("the authorization matrix", () => {
     for (const caller of Object.keys(c.expect) as Caller[]) {
       test(`${c.method} ${c.path} as ${caller} is ${c.expect[caller]}`, async () => {
         const app = await testApp();
-        app.users.create({
+        app.createUser({
           username: "oana",
           fullName: "Oana",
           role: "member",

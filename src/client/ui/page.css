@@ -40,6 +40,14 @@
     margin: 0;
     line-height: 32px;
   }
+  .page-crumb-up {
+    color: inherit;
+    text-decoration: none;
+  }
+  .page-crumb-up:hover {
+    color: var(--fg);
+  }
+
   .page-crumb-sep {
     color: var(--line-strong);
   }
