@@ -1,0 +1,60 @@
+/* The brand book's numbers (site/README.md) as custom properties, and the
+   three cascade layers every stylesheet writes into. Colour, type, radius
+   and the spacing steps come from here and nowhere else. */
+
+@layer tokens, base, owners;
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/IBMPlexSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    --page: #131314;
+    --rail: #1a1a1c;
+    --card: #1e1f20;
+    --inset: #0f1216;
+    --line: #2a2b2d;
+    --line-strong: #35363a;
+    --fg: #e7e7e9;
+    --dim: #b3b3b8;
+    --faint: #8b8b91;
+    --brand: #f2c14e;
+    --brand-hover: #f7d27a;
+    --running: #60a5fa;
+    --done: #4ade80;
+    --failed: #f87171;
+
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+
+    --text-label: 11px;
+    --text-ui: 13px;
+    --text-body: 15px;
+    --text-title: 22px;
+    --text-mono: 13px;
+    --text-input: 14px;
+    --text-tiny: 10px;
+
+    --radius: 6px;
+    --radius-card: 10px;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+  }
+}

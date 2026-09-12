@@ -1,0 +1,7 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .x {
+    font-size: var(--text-body, 16px);
+  }
+}

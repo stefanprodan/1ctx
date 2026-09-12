@@ -1,0 +1,80 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The one SQLite file: open it in WAL mode, apply the migrations in order,
+// and run compound writes through transact(). A transaction body returns
+// its result and the events it wants published; they are published only
+// after the outermost commit and never on a throw, so a publisher cannot
+// get it wrong.
+
+import { Database } from "bun:sqlite";
+import { type BusEvent, publish } from "../lib/bus.ts";
+import type { Migration } from "./migration.ts";
+import { MIGRATIONS } from "./migrations/index.ts";
+
+export type Db = Database;
+
+export type Transaction<T> = { result: T; events?: BusEvent[] };
+
+export function open(path: string): Db {
+  const db = new Database(path, { create: true, strict: true });
+  db.exec("pragma journal_mode = wal");
+  db.exec("pragma foreign_keys = on");
+  db.exec("pragma busy_timeout = 5000");
+  migrate(db);
+  return db;
+}
+
+// the applied ids live in the meta table; a fresh file gets every
+// migration, an older file the ones after its last. A migration that
+// throws leaves no trace: its statements and its row roll back together.
+export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {
+  db.exec(
+    "create table if not exists migrations (id text primary key, applied_at integer not null)",
+  );
+  const applied = new Set(
+    db
+      .query<{ id: string }, []>("select id from migrations")
+      .all()
+      .map((row) => row.id),
+  );
+  const ran: string[] = [];
+  for (const migration of list) {
+    if (applied.has(migration.id)) continue;
+    db.transaction(() => {
+      migration.up(db);
+      db.query("insert into migrations (id, applied_at) values (?, ?)").run(
+        migration.id,
+        Date.now(),
+      );
+    })();
+    ran.push(migration.id);
+  }
+  return ran;
+}
+
+// the events every open body collected so far, per db, held until the
+// outermost body commits. A body that throws truncates back to where it
+// started, so a savepoint that rolled back leaves no event behind, even
+// when a body above it catches the throw and commits.
+const pending = new WeakMap<Db, BusEvent[]>();
+
+export function transact<T>(db: Db, body: () => Transaction<T>): T {
+  const outermost = !pending.has(db);
+  if (outermost) pending.set(db, []);
+  const events = pending.get(db)!;
+  const mark = events.length;
+  try {
+    const tx = db.transaction(body)();
+    events.push(...(tx.events ?? []));
+    if (outermost) {
+      pending.delete(db);
+      for (const event of events) publish(event);
+    }
+    return tx.result;
+  } catch (err) {
+    if (outermost) pending.delete(db);
+    else events.length = mark;
+    throw err;
+  }
+}

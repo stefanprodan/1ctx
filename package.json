@@ -1,0 +1,34 @@
+{
+  "name": "1ctx",
+  "version": "0.0.0-dev",
+  "description": "One continuous context for agents",
+  "type": "module",
+  "bin": {
+    "1ctx": "./src/server/main.ts"
+  },
+  "scripts": {
+    "start": "bun src/server/main.ts",
+    "dev": "ONECTX_DEV=1 bun --watch src/server/main.ts",
+    "test": "bun test test/",
+    "lint": "bun biome check --write . && bun tsc --noEmit",
+    "build": "mkdir -p bin && bun build src/server/main.ts --compile --define \"process.env.ONECTX_BUILD_VERSION=\\\"${VERSION:-}\\\"\" --outfile bin/1ctx && rm -f .*.bun-build",
+    "smoke": "scripts/smoke.sh",
+    "clean": "scripts/preview.sh clean && rm -rf bin .*.bun-build",
+    "preview": "scripts/preview.sh restart",
+    "preview-stop": "scripts/preview.sh stop",
+    "preview-log": "scripts/preview.sh log",
+    "preview-clean": "scripts/preview.sh clean"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "@preact/signals": "2.11.2",
+    "@types/bun": "1.4.0",
+    "preact": "10.29.8",
+    "preact-render-to-string": "6.7.0",
+    "typescript": "7.0.2"
+  }
+}

@@ -115,3 +115,8 @@ dist
 # Local dev space
 workspace/
 .wrangler/
+
+# 1ctx
+.preview/
+bin/
+.*.bun-build

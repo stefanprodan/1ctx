@@ -1,0 +1,47 @@
+/* The sign-in page, centred, one card. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .login {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    height: 100%;
+    padding: var(--space-4);
+  }
+
+  .login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    color: var(--fg);
+  }
+
+  .login-line {
+    margin: 0;
+    font-size: var(--text-body);
+    color: var(--dim);
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    width: 340px;
+    max-width: 100%;
+    padding: var(--space-5);
+  }
+
+  .login-form .btn {
+    height: 36px;
+    width: 100%;
+  }
+
+  .login-error {
+    margin: 0;
+  }
+}

@@ -1,0 +1,12 @@
+/* A view that failed to load: the reason and a retry, in place. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .lazy-fail {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+}
