@@ -25,13 +25,14 @@ import {
 } from "../../../src/client/views/projects/Project.model.ts";
 import { Project } from "../../../src/client/views/projects/Project.tsx";
 import { Projects } from "../../../src/client/views/projects/Projects.tsx";
-import type { UserSummary } from "../../../src/shared/contracts/user.ts";
+import type { Me } from "../../../src/shared/contracts/user.ts";
 
-const oana: UserSummary = {
+const oana: Me = {
   id: "u1",
   username: "oana",
   fullName: "Oana Pellea",
   role: "member",
+  mustChangePassword: false,
 };
 const personal = { id: "p1", kind: "personal" as const, name: "oana" };
 

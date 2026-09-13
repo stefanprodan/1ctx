@@ -12,10 +12,10 @@ import type {
   LoginResponse,
   MeResponse,
 } from "../../shared/api/access.ts";
-import type { UserSummary } from "../../shared/contracts/user.ts";
+import type { Me } from "../../shared/contracts/user.ts";
 import { api, onUnauthorized } from "./api.ts";
 
-export const me = signal<UserSummary | null | undefined>(undefined);
+export const me = signal<Me | null | undefined>(undefined);
 export const meError = signal<string | null>(null);
 
 // every change of who is signed in bumps this, so a load that started
@@ -26,7 +26,7 @@ let turn = 0;
 
 // the one way to change who is signed in; profile.ts calls it too,
 // since a saved profile replaces the row
-export function setMe(user: UserSummary | null): void {
+export function setMe(user: Me | null): void {
   turn++;
   me.value = user;
 }

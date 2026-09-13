@@ -51,6 +51,8 @@ export type Resolution = {
 export type Auth = {
   // null principal when there is no cookie, it is unknown, or it expired
   resolve(req: Request): Resolution;
+  // the principal again from the current user row, for a long-lived socket
+  refresh(principal: Principal): Principal | null;
   // a new login for a user: the row and the Set-Cookie header value
   open(user: UserRow): { login: Login; setCookie: string };
   // revoke one login; the cleared cookie header value
@@ -85,6 +87,19 @@ export function auth(deps: AuthDeps): Auth {
   const withToken = (token: string) =>
     `${COOKIE}=${token}; ${attrs(LOGIN_TTL_MS / 1000)}`;
   const nobody: Resolution = { principal: null, setCookie: null };
+  const current = (userId: string, loginId: string): Principal | null => {
+    const user = deps.users.byId(userId);
+    return user === null || user.disabled
+      ? null
+      : {
+          userId: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+          loginId,
+        };
+  };
   return {
     resolve(req) {
       const token = cookieValue(req, COOKIE);
@@ -107,23 +122,17 @@ export function auth(deps: AuthDeps): Auth {
         });
         return nobody;
       }
-      const user = deps.users.byId(login.userId);
-      if (user === null) return nobody;
+      const principal = current(login.userId, login.id);
+      if (principal === null) return nobody;
       let setCookie: string | null = null;
       if (now - login.lastSeenAt >= TOUCH_AFTER_MS) {
         deps.logins.touch(login.id, now, now + LOGIN_TTL_MS);
         setCookie = withToken(token);
       }
-      return {
-        principal: {
-          userId: user.id,
-          username: user.username,
-          fullName: user.fullName,
-          role: user.role,
-          loginId: login.id,
-        },
-        setCookie,
-      };
+      return { principal, setCookie };
+    },
+    refresh(principal) {
+      return current(principal.userId, principal.loginId);
     },
     open(user) {
       const now = deps.clock();
@@ -169,7 +178,7 @@ export function auth(deps: AuthDeps): Auth {
     },
     visibleProjectIds(userId) {
       const user = deps.users.byId(userId);
-      if (user === null) return null;
+      if (user === null || user.disabled) return null;
       const ids = new Set(deps.projects.memberProjectIds(userId));
       if (user.role === "admin") {
         for (const id of deps.projects.teamProjectIds()) ids.add(id);

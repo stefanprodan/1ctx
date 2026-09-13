@@ -18,6 +18,9 @@ const oana: Profile = {
   id: "u1",
   username: "oana",
   fullName: "Oana",
+  email: "oana@example.com",
+  disabled: false,
+  mustChangePassword: false,
   about: "",
   role: "member",
   createdAt: 1,
@@ -39,7 +42,13 @@ afterEach(() => {
 
 describe("the profile entity", () => {
   test("keeps the row and updates me for the signed-in user", async () => {
-    me.value = { id: "u1", username: "oana", fullName: "O", role: "member" };
+    me.value = {
+      id: "u1",
+      username: "oana",
+      fullName: "O",
+      role: "member",
+      mustChangePassword: false,
+    };
     answer = () => oana;
     await loadProfile();
     expect(profile.value).toEqual(oana);
@@ -48,11 +57,18 @@ describe("the profile entity", () => {
       username: "oana",
       fullName: "Oana",
       role: "member",
+      mustChangePassword: false,
     });
   });
 
   test("drops a row that answers for someone else", async () => {
-    me.value = { id: "u2", username: "admin", fullName: "A", role: "admin" };
+    me.value = {
+      id: "u2",
+      username: "admin",
+      fullName: "A",
+      role: "admin",
+      mustChangePassword: false,
+    };
     answer = () => oana;
     await saveProfile({ fullName: "Oana", about: "" });
     expect(profile.value).toBeNull();
@@ -69,7 +85,13 @@ describe("the profile entity", () => {
 
   test("the previous user's row goes before the next load", async () => {
     profile.value = oana;
-    me.value = { id: "u2", username: "admin", fullName: "A", role: "admin" };
+    me.value = {
+      id: "u2",
+      username: "admin",
+      fullName: "A",
+      role: "admin",
+      mustChangePassword: false,
+    };
     let seen: Profile | null | undefined;
     answer = () => {
       seen = profile.value;

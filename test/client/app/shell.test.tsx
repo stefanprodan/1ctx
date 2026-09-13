@@ -33,7 +33,13 @@ const fakeStorage = {
 beforeEach(() => {
   store.clear();
   (globalThis as { localStorage?: unknown }).localStorage = fakeStorage;
-  me.value = { id: "u1", username: "oana", fullName: "Oana", role: "member" };
+  me.value = {
+    id: "u1",
+    username: "oana",
+    fullName: "Oana",
+    role: "member",
+    mustChangePassword: false,
+  };
   path.value = "/";
   narrow.value = false;
   showRail();

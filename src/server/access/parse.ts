@@ -10,19 +10,27 @@ import type {
   ChangePasswordRequest,
   UpdateProfileRequest,
 } from "../../shared/api/profile.ts";
+import type {
+  CreateUserRequest,
+  ResetPasswordRequest,
+  UpdateUserRequest,
+} from "../../shared/api/users.ts";
 import {
   isAbout,
+  isEmail,
   isFullName,
+  isRole,
   isUsername,
   MAX_ABOUT,
+  MAX_EMAIL,
   MAX_FULL_NAME,
+  MAX_PASSWORD_BYTES,
   MAX_USERNAME,
   MIN_PASSWORD,
   MIN_USERNAME,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { MAX_PASSWORD_BYTES } from "../users/index.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s).length;
 
@@ -75,6 +83,15 @@ export function parseFullName(value: unknown): string {
   return value;
 }
 
+export function parseEmail(value: unknown): string {
+  if (!isEmail(value)) {
+    throw new BadRequest(
+      `email must be 3 to ${MAX_EMAIL} characters with a domain`,
+    );
+  }
+  return value.toLowerCase();
+}
+
 export function parseAbout(value: unknown): string {
   if (!isAbout(value)) {
     throw new BadRequest(
@@ -95,4 +112,43 @@ export function parsePasswordChange(body: unknown): ChangePasswordRequest {
     current: password(b.current, "current password"),
     next: password(b.next, "new password", MIN_PASSWORD),
   };
+}
+
+export function parseNewUser(body: unknown): CreateUserRequest {
+  const b = fields(body, ["username", "fullName", "email", "role", "password"]);
+  if (!isRole(b.role)) throw new BadRequest("role must be admin or member");
+  return {
+    username: parseUsername(b.username),
+    fullName: parseFullName(b.fullName),
+    email: parseEmail(b.email),
+    role: b.role,
+    password: password(b.password, "password", MIN_PASSWORD),
+  };
+}
+
+export function parseUserPatch(body: unknown): UpdateUserRequest {
+  const b = fields(body, ["username", "fullName", "email", "role", "disabled"]);
+  const patch: UpdateUserRequest = {};
+  if (b.username !== undefined) patch.username = parseUsername(b.username);
+  if (b.fullName !== undefined) patch.fullName = parseFullName(b.fullName);
+  if (b.email !== undefined) patch.email = parseEmail(b.email);
+  if (b.role !== undefined) {
+    if (!isRole(b.role)) throw new BadRequest("role must be admin or member");
+    patch.role = b.role;
+  }
+  if (b.disabled !== undefined) {
+    if (typeof b.disabled !== "boolean") {
+      throw new BadRequest("disabled must be a boolean");
+    }
+    patch.disabled = b.disabled;
+  }
+  if (Object.keys(patch).length === 0) {
+    throw new BadRequest("at least one field is required");
+  }
+  return patch;
+}
+
+export function parseUserPassword(body: unknown): ResetPasswordRequest {
+  const b = fields(body, ["password"]);
+  return { password: password(b.password, "password", MIN_PASSWORD) };
 }

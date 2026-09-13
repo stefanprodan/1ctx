@@ -214,6 +214,7 @@ describe("router", () => {
             username: "u",
             fullName: "U",
             role: "member",
+            mustChangePassword: false,
             loginId: "l",
           },
           setCookie: "login=t; Max-Age=9",

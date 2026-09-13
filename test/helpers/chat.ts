@@ -284,8 +284,10 @@ export async function chatApp(
   const user = app.createUser({
     username: "oana",
     fullName: "Oana Pellea",
+    email: "oana@example.com",
     role: "member",
     passwordHash: await hashPassword("pw"),
+    mustChangePassword: false,
     now: app.now.value,
   });
   const member = app.client();

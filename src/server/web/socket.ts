@@ -41,6 +41,8 @@ export type Conn = {
 };
 
 export type SocketDeps = {
+  // the current principal, or null for a user that is gone
+  refresh(principal: Principal): Principal | null;
   // every project the user may see now, or null for a user that is gone
   visibleProjectIds(userId: string): string[] | null;
   // the session's project when the principal may see it, else null
@@ -101,7 +103,13 @@ export function socketArea(deps: SocketDeps): Socket {
   // the visible set again, from the rows: a project that left it is
   // announced and unwatched, a user that is gone is closed
   const recompute = (conn: Conn): void => {
-    const ids = deps.visibleProjectIds(conn.data.principal.userId);
+    const principal = deps.refresh(conn.data.principal);
+    if (principal === null) {
+      conn.close(CLOSE_REVOKED, "signed out");
+      return;
+    }
+    conn.data.principal = principal;
+    const ids = deps.visibleProjectIds(principal.userId);
     if (ids === null) {
       conn.close(CLOSE_REVOKED, "signed out");
       return;
@@ -124,14 +132,20 @@ export function socketArea(deps: SocketDeps): Socket {
     switch (event.type) {
       case "session.changed":
         each((conn) => {
-          if (conn.data.projects.has(event.data.projectId)) {
+          if (
+            !conn.data.principal.mustChangePassword &&
+            conn.data.projects.has(event.data.projectId)
+          ) {
             deliver(conn, { type: "session", ...event.data });
           }
         });
         break;
       case "session.deleted":
         each((conn) => {
-          if (conn.data.projects.has(event.data.projectId)) {
+          if (
+            !conn.data.principal.mustChangePassword &&
+            conn.data.projects.has(event.data.projectId)
+          ) {
             if (conn.data.watching === event.data.sessionId) unwatch(conn);
             deliver(conn, { type: "deleted", ...event.data });
           }
@@ -147,10 +161,15 @@ export function socketArea(deps: SocketDeps): Socket {
         for (const data of pending) {
           const ids = event.data.userIds;
           if (ids !== null && !ids.includes(data.principal.userId)) continue;
-          const projects = deps.visibleProjectIds(data.principal.userId);
-          if (projects === null) {
+          const principal = deps.refresh(data.principal);
+          const projects =
+            principal === null
+              ? null
+              : deps.visibleProjectIds(principal.userId);
+          if (principal === null || projects === null) {
             data.revoked = true;
           } else {
+            data.principal = principal;
             data.projects = new Set(projects);
           }
         }
@@ -184,6 +203,7 @@ export function socketArea(deps: SocketDeps): Socket {
       method: "GET",
       path: "/api/socket",
       policy: "authenticated",
+      passwordChange: true,
       upgrade: true,
       handle(_req, ctx) {
         const principal = ctx.principal!;
@@ -226,14 +246,20 @@ export function socketArea(deps: SocketDeps): Socket {
         conn.close(CLOSE_BAD_COMMAND, "bad command");
         return;
       }
+      const principal = deps.refresh(conn.data.principal);
+      if (principal === null) {
+        conn.close(CLOSE_REVOKED, "signed out");
+        return;
+      }
+      conn.data.principal = principal;
       if (parsed.type === "unwatch") {
         if (conn.data.watching === parsed.sessionId) unwatch(conn);
         return;
       }
-      const project = deps.sessionProject(
-        conn.data.principal,
-        parsed.sessionId,
-      );
+      // The socket stays open so revocation reaches a locked tab, but it must
+      // not become a route around the password-change gate.
+      if (principal.mustChangePassword) return;
+      const project = deps.sessionProject(principal, parsed.sessionId);
       if (project === null || !conn.data.projects.has(project)) return;
       unwatch(conn);
       conn.data.watching = parsed.sessionId;

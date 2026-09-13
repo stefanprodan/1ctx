@@ -5,10 +5,14 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  parseEmail,
   parseLogin,
+  parseNewUser,
   parsePasswordChange,
   parseProfile,
   parseUsername,
+  parseUserPassword,
+  parseUserPatch,
 } from "../../src/server/access/parse.ts";
 import { BadRequest } from "../../src/server/lib/errors.ts";
 import {
@@ -19,6 +23,7 @@ import {
   titleFrom,
 } from "../../src/server/sessions/parse.ts";
 import {
+  isEmail,
   MAX_MESSAGE_BYTES,
   MAX_SEARCH,
   MAX_TITLE,
@@ -65,6 +70,31 @@ describe("parseUsername", () => {
   );
 });
 
+describe("parseEmail", () => {
+  test.each(["a@b.co", "name@example.com", "A@B.CO"])("accepts %s", (value) => {
+    expect(isEmail(value)).toBe(true);
+  });
+
+  test("lowercases an accepted address", () => {
+    expect(parseEmail("Oana@Example.COM")).toBe("oana@example.com");
+  });
+
+  test.each([
+    "a@b",
+    " a@b.co",
+    "a b@c.co",
+    "a@b.c",
+    "a@.co",
+    "a@b..co",
+    "@b.co",
+    "a@@b.co",
+    `${"a".repeat(250)}@b.co`,
+  ])("refuses %p", (value) => {
+    expect(isEmail(value)).toBe(false);
+    expect(() => parseEmail(value)).toThrow(BadRequest);
+  });
+});
+
 describe("parseProfile", () => {
   test("accepts a full name and an about text", () => {
     expect(
@@ -109,6 +139,90 @@ describe("parsePasswordChange", () => {
       { current: "pw", next: "longenough", again: "longenough" },
     ],
     parsePasswordChange,
+  );
+});
+
+describe("parseNewUser", () => {
+  const body = {
+    username: "oana",
+    fullName: "Oana Pellea",
+    email: "OANA@EXAMPLE.COM",
+    role: "member" as const,
+    password: "longenough",
+  };
+
+  test("accepts every required field and lowercases the email", () => {
+    expect(parseNewUser(body)).toEqual({
+      ...body,
+      email: "oana@example.com",
+    });
+  });
+
+  refuses(
+    [
+      {},
+      { ...body, username: undefined },
+      { ...body, fullName: undefined },
+      { ...body, email: "a@b" },
+      { ...body, role: "owner" },
+      { ...body, password: "short" },
+      { ...body, extra: true },
+    ],
+    parseNewUser,
+  );
+});
+
+describe("parseUserPatch", () => {
+  test("accepts any supplied field and lowercases the email", () => {
+    expect(parseUserPatch({ username: "maria" })).toEqual({
+      username: "maria",
+    });
+    expect(
+      parseUserPatch({
+        fullName: "Maria Popescu",
+        email: "MARIA@EXAMPLE.COM",
+        role: "admin",
+        disabled: true,
+      }),
+    ).toEqual({
+      fullName: "Maria Popescu",
+      email: "maria@example.com",
+      role: "admin",
+      disabled: true,
+    });
+  });
+
+  refuses(
+    [
+      {},
+      { username: "no" },
+      { fullName: "" },
+      { email: "a@b" },
+      { role: "owner" },
+      { disabled: 1 },
+      { disabled: "true" },
+      { disabled: null },
+      { email: "a@b.co", extra: true },
+    ],
+    parseUserPatch,
+  );
+});
+
+describe("parseUserPassword", () => {
+  test("accepts a password at the floor", () => {
+    expect(parseUserPassword({ password: "12345678" })).toEqual({
+      password: "12345678",
+    });
+  });
+
+  refuses(
+    [
+      {},
+      { password: "short" },
+      { password: "x".repeat(1025) },
+      { password: "longenough", current: "old" },
+    ],
+    parseUserPassword,
   );
 });
 

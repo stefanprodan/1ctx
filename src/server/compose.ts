@@ -140,6 +140,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       render: renderMarkdown,
     });
   const socket = socketArea({
+    refresh: (principal) => access.refresh(principal),
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
     live: (sessionId) => runner.live(sessionId),

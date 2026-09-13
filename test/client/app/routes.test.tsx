@@ -34,7 +34,13 @@ describe("the route table", () => {
   });
 
   test("every view loads and renders against fixture state", async () => {
-    me.value = { id: "u1", username: "oana", fullName: "Oana", role: "member" };
+    me.value = {
+      id: "u1",
+      username: "oana",
+      fullName: "Oana",
+      role: "member",
+      mustChangePassword: false,
+    };
     for (const route of ROUTES) {
       const View = route.view;
       await View.load();
@@ -60,6 +66,7 @@ describe("the route table", () => {
     expect(navEntries("admin", withAdmin).map((r) => r.path)).toEqual([
       "/",
       "/projects",
+      "/admin/users",
       "/admin/x",
       "/admin/agents",
       "/admin/tools",

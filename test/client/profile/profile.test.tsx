@@ -62,6 +62,9 @@ describe("Profile", () => {
       id: "u1",
       username: "oana",
       fullName: "Oana Pellea",
+      email: "oana@example.com",
+      disabled: false,
+      mustChangePassword: false,
       about: "Actor.",
       role: "member",
       createdAt: new Date(2026, 8, 12).getTime(),
@@ -77,6 +80,25 @@ describe("Profile", () => {
     expect(html).toContain(">Actor.</textarea>");
     expect(html).toContain('autocomplete="new-password"');
     expect(html).toContain("Change password");
+  });
+
+  test("tells a person with a handed password to change it", () => {
+    profile.value = {
+      id: "u1",
+      username: "oana",
+      fullName: "Oana Pellea",
+      email: "oana@example.com",
+      disabled: false,
+      mustChangePassword: true,
+      about: "",
+      role: "member",
+      createdAt: 0,
+    };
+    const html = render(<Profile />);
+    expect(html).toContain("profile-notice");
+    expect(html).toContain("before going on");
+    profile.value = { ...profile.value, mustChangePassword: false };
+    expect(render(<Profile />)).not.toContain("profile-notice");
   });
 
   test("shows the loading line before the row arrives", () => {

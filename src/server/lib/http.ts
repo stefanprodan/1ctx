@@ -14,6 +14,7 @@ export type Principal = {
   username: string;
   fullName: string;
   role: Role;
+  mustChangePassword: boolean;
   // the login row behind the cookie, so logout can revoke exactly it
   loginId: string;
 };
@@ -52,6 +53,9 @@ export type RouteDescriptor = {
   // "/api/projects/:id"; a segment starting with ":" captures one segment
   path: string;
   policy: Policy;
+  // reachable while the principal must change their password; the router
+  // refuses every other authenticated route with 403
+  passwordChange?: true;
   // a websocket upgrade: same-origin is checked as for a write, and
   // the handler gets ctx.upgrade
   upgrade?: true;

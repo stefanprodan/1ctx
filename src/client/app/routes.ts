@@ -28,6 +28,7 @@ import {
 } from "../data/sessions.ts";
 import { loadTools } from "../data/tools.ts";
 import { loadWeek } from "../data/usage.ts";
+import { loadUsers } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -131,6 +132,14 @@ export const ROUTES: Route[] = [
       if (project.value?.id !== projectId) await loadProject(projectId);
       await loadProjectAgents(projectId);
     },
+  },
+  {
+    path: "/admin/users",
+    view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
+    title: () => "Users",
+    role: "admin",
+    load: () => loadUsers(),
+    nav: { label: "Users", icon: "users", order: 9, group: "Admin" },
   },
   {
     path: "/admin/agents",

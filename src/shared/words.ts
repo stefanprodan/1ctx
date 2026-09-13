@@ -41,14 +41,39 @@ export function isFullName(value: unknown): value is string {
   );
 }
 
+export const MAX_EMAIL = 254;
+const WHITESPACE = /\s/;
+export function isEmail(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    value.length < 3 ||
+    value.length > MAX_EMAIL ||
+    value !== value.trim() ||
+    LINE_BREAK.test(value) ||
+    WHITESPACE.test(value)
+  ) {
+    return false;
+  }
+  const at = value.indexOf("@");
+  if (at <= 0 || at !== value.lastIndexOf("@")) return false;
+  const domain = value.slice(at + 1);
+  const labels = domain.split(".");
+  return (
+    labels.length >= 2 &&
+    labels.every((label) => label.length > 0) &&
+    labels[labels.length - 1].length >= 2
+  );
+}
+
 // what a user says about themself, for the agents: free text
 export const MAX_ABOUT = 2000;
 export function isAbout(value: unknown): value is string {
   return typeof value === "string" && value.length <= MAX_ABOUT;
 }
 
-// a password a user picks; the cap in bytes is the server's
+// a password a user picks
 export const MIN_PASSWORD = 8;
+export const MAX_PASSWORD_BYTES = 1024;
 
 // a project is personal (one per user, made with the user) or team
 export const PROJECT_KINDS = ["personal", "team"] as const;

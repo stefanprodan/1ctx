@@ -169,11 +169,17 @@ export function Profile() {
     >
       {user && (
         <div class="profile">
+          {user.mustChangePassword && (
+            <p class="profile-notice">
+              Change the password you were handed before going on.
+            </p>
+          )}
           <div class="profile-head">
             <span class="profile-avatar">{initials(user.fullName)}</span>
             <div class="profile-who">
               <span class="profile-name">{user.fullName}</span>
               <span class="profile-meta">@{user.username}</span>
+              <span class="profile-meta">{user.email}</span>
               <span class="profile-meta">
                 joined {longDate(user.createdAt)}
               </span>

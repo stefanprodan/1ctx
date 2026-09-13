@@ -12,7 +12,7 @@ import type { Clock } from "../lib/clock.ts";
 import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import { summary, type UserRow, verifyPassword } from "../users/index.ts";
+import { meOf, type UserRow, verifyPassword } from "../users/index.ts";
 import type { Auth } from "./auth.ts";
 import { parseLogin } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
@@ -50,20 +50,33 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const { username, password } = parseLogin(await jsonBody(req));
         const user = deps.users.byUsername(username);
         const ok = await verifyPassword(password, user?.passwordHash ?? NOBODY);
-        if (!ok || user === null)
-          throw new Unauthorized("wrong username or password");
-        const { setCookie } = transact(deps.db, () => ({
-          result: deps.auth.open(user),
-        }));
-        deps.log(`${user.username} signed in`);
-        const body: LoginResponse = { user: summary(user) };
-        return json(body, 200, { "set-cookie": setCookie });
+        const wrong = new Unauthorized("wrong username or password");
+        if (!ok || user === null || user.disabled) throw wrong;
+        const opened = transact(deps.db, () => {
+          // Password verification yields. Re-read under the write transaction so
+          // a disable, reset or rename that won meanwhile cannot open a login.
+          const current = deps.users.byUsername(username);
+          if (
+            current === null ||
+            current.id !== user.id ||
+            current.passwordHash !== user.passwordHash ||
+            current.disabled
+          ) {
+            throw wrong;
+          }
+          const { setCookie } = deps.auth.open(current);
+          return { result: { user: current, setCookie } };
+        });
+        deps.log(`${opened.user.username} signed in`);
+        const body: LoginResponse = { user: meOf(opened.user) };
+        return json(body, 200, { "set-cookie": opened.setCookie });
       },
     },
     {
       method: "POST",
       path: "/api/logout",
       policy: "authenticated",
+      passwordChange: true,
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const cleared = transact(deps.db, () => ({
@@ -94,6 +107,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
                 username: p.username,
                 fullName: p.fullName,
                 role: p.role,
+                mustChangePassword: p.mustChangePassword,
               }
             : null,
         };

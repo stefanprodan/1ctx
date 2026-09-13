@@ -458,7 +458,7 @@ describe("0006-compaction", () => {
            1, 10, 5, 100, 1, 1);
     `);
 
-    expect(migrate(db)).toEqual(["0006-compaction"]);
+    expect(migrate(db, MIGRATIONS.slice(0, 6))).toEqual(["0006-compaction"]);
     expect(db.query("select content from messages order by seq").all()).toEqual(
       [{ content: "hi" }, { content: "hello" }],
     );

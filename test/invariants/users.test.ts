@@ -1,0 +1,677 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Admin user writes keep identity, the personal project, access and logins
+// coherent, while every response stays a projection without the hash.
+
+import { Database } from "bun:sqlite";
+import { describe, expect, test } from "bun:test";
+import { migrate } from "../../src/server/db/index.ts";
+import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
+import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import type { RouteDescriptor } from "../../src/server/lib/http.ts";
+import type { Conn, ConnData } from "../../src/server/web/socket.ts";
+import type { SocketEvent } from "../../src/shared/socket.ts";
+import {
+  ORIGIN,
+  type TestApp,
+  type TestClient,
+  testApp,
+} from "../helpers/app.ts";
+
+type FakeConn = Conn & {
+  frames: SocketEvent[];
+  closed: { code?: number; reason?: string }[];
+};
+
+const userBody = (username: string) => ({
+  username,
+  fullName: `${username[0].toUpperCase()}${username.slice(1)}`,
+  email: `${username}@example.com`,
+  role: "member" as const,
+  password: "longenough",
+});
+
+async function admin(app: TestApp): Promise<TestClient> {
+  const client = app.client();
+  expect((await client.login("admin", "hunter2-test")).status).toBe(200);
+  return client;
+}
+
+async function create(client: TestClient, username: string) {
+  const response = await client.call("POST", "/api/users", {
+    body: userBody(username),
+  });
+  expect(response.status).toBe(201);
+  return (await response.json()).user as {
+    id: string;
+    username: string;
+    email: string;
+  };
+}
+
+async function connection(app: TestApp, client: TestClient): Promise<FakeConn> {
+  if (client.cookie === null) throw new Error("the client is not signed in");
+  let captured: ConnData | null = null;
+  const req = new Request(`${ORIGIN}/api/socket`, {
+    headers: {
+      cookie: client.cookie,
+      host: "1ctx.test",
+      origin: ORIGIN,
+    },
+  });
+  const outcome = await app.handle(req, "127.0.0.1", (data) => {
+    captured = data as ConnData;
+    return true;
+  });
+  expect(outcome).toBeUndefined();
+  if (captured === null) throw new Error("the upgrade did not capture data");
+  const conn: FakeConn = {
+    data: captured,
+    frames: [],
+    closed: [],
+    send(text) {
+      conn.frames.push(JSON.parse(text));
+      return text.length;
+    },
+    close(code, reason) {
+      conn.closed.push({ code, reason });
+    },
+  };
+  return conn;
+}
+
+async function expectConflict(response: Response, field: string) {
+  expect(response.status).toBe(409);
+  expect((await response.json()).error).toContain(field);
+}
+
+function userRoute(
+  app: TestApp,
+  method: string,
+  path: string,
+): RouteDescriptor {
+  const route = app.routes.find((item) => {
+    return item.method === method && item.path === path;
+  });
+  if (route === undefined) throw new Error(`${method} ${path} is not a route`);
+  return route;
+}
+
+describe("admin users", () => {
+  test("create stores a lowercase email with the personal project", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const response = await client.call("POST", "/api/users", {
+      body: {
+        ...userBody("oana"),
+        email: "OANA@EXAMPLE.COM",
+      },
+    });
+    expect(response.status).toBe(201);
+    const { user } = await response.json();
+    expect(user.email).toBe("oana@example.com");
+    expect(app.users.byId(user.id)?.email).toBe("oana@example.com");
+    expect(app.projects.personal(user.id)?.name).toBe("oana");
+  });
+
+  test("create rolls the user back when its personal project fails", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const original = app.projects.createPersonal.bind(app.projects);
+    app.projects.createPersonal = () => {
+      throw new Error("project write failed");
+    };
+    try {
+      await expect(
+        client.call("POST", "/api/users", { body: userBody("ghost") }),
+      ).rejects.toThrow("project write failed");
+    } finally {
+      app.projects.createPersonal = original;
+    }
+    expect(app.users.byUsername("ghost")).toBeNull();
+  });
+
+  test("taken identity fields answer field-specific conflicts", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const first = await create(client, "oana");
+    const second = await create(client, "elena");
+
+    await expectConflict(
+      await client.call("POST", "/api/users", {
+        body: { ...userBody("oana"), email: "other@example.com" },
+      }),
+      "username",
+    );
+
+    const owner = app.users.byUsername("admin")!;
+    app.db
+      .query(
+        "insert into projects (id, kind, name, owner_id, created_at) values ('taken', 'team', 'maria', ?, 0)",
+      )
+      .run(owner.id);
+    await expectConflict(
+      await client.call("POST", "/api/users", {
+        body: userBody("maria"),
+      }),
+      "project name",
+    );
+
+    await expectConflict(
+      await client.call("POST", "/api/users", {
+        body: { ...userBody("ana"), email: first.email.toUpperCase() },
+      }),
+      "email",
+    );
+
+    await expectConflict(
+      await client.call("PATCH", `/api/users/${second.id}`, {
+        body: { username: first.username },
+      }),
+      "username",
+    );
+    await expectConflict(
+      await client.call("PATCH", `/api/users/${second.id}`, {
+        body: { username: "maria" },
+      }),
+      "project name",
+    );
+    await expectConflict(
+      await client.call("PATCH", `/api/users/${second.id}`, {
+        body: { email: first.email.toUpperCase() },
+      }),
+      "email",
+    );
+  });
+
+  test("rename follows the personal project and keeps every login", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    const first = app.client();
+    const second = app.client();
+    await first.login("oana", "longenough");
+    await second.login("oana", "longenough");
+    const before = app.db
+      .query<{ n: number }, [string]>(
+        "select count(*) as n from logins where user_id = ?",
+      )
+      .get(user.id)!.n;
+
+    const response = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: { username: "maria" },
+    });
+    expect(response.status).toBe(200);
+    expect(app.projects.personal(user.id)?.name).toBe("maria");
+    expect(
+      app.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from logins where user_id = ?",
+        )
+        .get(user.id)!.n,
+    ).toBe(before);
+    expect((await first.call("GET", "/api/me")).status).toBe(200);
+    expect((await second.call("GET", "/api/me")).status).toBe(200);
+  });
+
+  test("same identity values are accepted and a full name keeps about", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    app.users.setDetails(user.id, { fullName: "Oana", about: "Actor." });
+
+    const response = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: {
+        username: user.username,
+        fullName: "Oana Pellea",
+        email: user.email,
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(app.users.byId(user.id)).toMatchObject({
+      username: "oana",
+      fullName: "Oana Pellea",
+      email: "oana@example.com",
+      about: "Actor.",
+    });
+  });
+
+  test("own role and the last admin role are conflicts", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const adminUser = app.users.byUsername("admin")!;
+    await expectConflict(
+      await client.call("PATCH", `/api/users/${adminUser.id}`, {
+        body: { role: "member" },
+      }),
+      "role",
+    );
+
+    const caller = await create(client, "oana");
+    const route = userRoute(app, "PATCH", "/api/users/:id");
+    const request = new Request(`${ORIGIN}/api/users/${adminUser.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role: "member" }),
+    });
+    await expect(
+      route.handle(request, {
+        principal: {
+          userId: caller.id,
+          username: caller.username,
+          fullName: "Oana",
+          role: "admin",
+          mustChangePassword: false,
+          loginId: "stale",
+        },
+        params: { id: adminUser.id },
+        url: new URL(request.url),
+        address: "127.0.0.1",
+      }),
+    ).rejects.toThrow("last admin");
+  });
+
+  test("role changes publish access and update the socket project set", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    app.users.setMustChangePassword(user.id, false);
+    const member = app.client();
+    await member.login("oana", "longenough");
+    const owner = app.users.byUsername("admin")!;
+    app.db
+      .query(
+        "insert into projects (id, kind, name, owner_id, created_at) values ('team', 'team', 'team', ?, 0)",
+      )
+      .run(owner.id);
+    app.db.exec(`
+      insert into providers
+        (id, name, wire, base_url, key_name, created_at)
+      values
+        ('provider', 'provider', 'openai-compatible', 'http://models.test', null, 0);
+      insert into agents
+        (id, name, avatar, provider_id, model, model_name, context_length,
+         prompt_price, completion_price, tools, reasoning, prompt, created_at)
+      values
+        ('agent', 'agent', 'bot', 'provider', 'model', 'Model', null,
+         null, null, 0, 0, '', 0);
+    `);
+    const chat = app.sessions.create({
+      projectId: "team",
+      ownerId: user.id,
+      agentId: "agent",
+      title: "Chat",
+      now: 0,
+    });
+    const conn = await connection(app, member);
+    app.socket.open(conn);
+    expect(conn.data.projects.has("team")).toBe(false);
+    const seen: BusEvent[] = [];
+    const stop = subscribe((event) => seen.push(event));
+    try {
+      const promoted = await client.call("PATCH", `/api/users/${user.id}`, {
+        body: { role: "admin" },
+      });
+      expect(promoted.status).toBe(200);
+      expect(conn.data.projects.has("team")).toBe(true);
+      expect(conn.data.principal.role).toBe("admin");
+      conn.frames = [];
+      app.socket.message(
+        conn,
+        JSON.stringify({ type: "watch", sessionId: chat.id }),
+      );
+      expect(conn.frames).toContainEqual({
+        type: "watched",
+        sessionId: chat.id,
+        live: null,
+      });
+      expect(seen).toContainEqual({
+        type: "access.changed",
+        data: { userIds: [user.id] },
+      });
+
+      conn.frames = [];
+      const demoted = await client.call("PATCH", `/api/users/${user.id}`, {
+        body: { role: "member" },
+      });
+      expect(demoted.status).toBe(200);
+      expect(conn.data.projects.has("team")).toBe(false);
+      expect(conn.data.principal.role).toBe("member");
+      expect(conn.frames).toContainEqual({
+        type: "revoked",
+        projectId: "team",
+      });
+    } finally {
+      stop();
+      app.socket.close(conn);
+    }
+  });
+
+  test("reset revokes every login and closes the user's socket", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    const first = app.client();
+    const second = app.client();
+    await first.login("oana", "longenough");
+    await second.login("oana", "longenough");
+    const conn = await connection(app, first);
+    app.socket.open(conn);
+
+    const response = await client.call(
+      "POST",
+      `/api/users/${user.id}/password`,
+      { body: { password: "new-password" } },
+    );
+    expect(response.status).toBe(204);
+    expect(
+      app.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from logins where user_id = ?",
+        )
+        .get(user.id),
+    ).toEqual({ n: 0 });
+    expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
+    expect((await first.call("GET", "/api/profile")).status).toBe(401);
+    expect((await second.call("GET", "/api/profile")).status).toBe(401);
+    expect((await app.client().login("oana", "new-password")).status).toBe(200);
+  });
+
+  test("an admin resets their own password only from the profile", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const id = app.users.byUsername("admin")!.id;
+    await expectConflict(
+      await client.call("POST", `/api/users/${id}/password`, {
+        body: { password: "new-password" },
+      }),
+      "own password",
+    );
+  });
+
+  test("list, create and patch responses never carry a password hash", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const created = await client.call("POST", "/api/users", {
+      body: userBody("oana"),
+    });
+    const user = (await created.clone().json()).user;
+    const responses = [
+      created,
+      await client.call("GET", "/api/users"),
+      await client.call("PATCH", `/api/users/${user.id}`, {
+        body: { fullName: "Oana Pellea" },
+      }),
+      await client.call("GET", "/api/profile"),
+    ];
+    for (const response of responses) {
+      const text = await response.text();
+      expect(text).not.toContain("passwordHash");
+      expect(text).not.toContain("$argon2");
+    }
+  });
+
+  test("list is sorted by username", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    await create(client, "zed");
+    await create(client, "alice");
+    const response = await client.call("GET", "/api/users");
+    const body = await response.json();
+    expect(
+      body.users.map((user: { username: string }) => user.username),
+    ).toEqual(["admin", "alice", "zed"]);
+  });
+});
+
+describe("user email projections", () => {
+  test("the bootstrap admin has the fixed email", async () => {
+    const app = await testApp();
+    expect(app.users.byUsername("admin")?.email).toBe("admin@1ctx.dev");
+    const client = await admin(app);
+    const profile = await (await client.call("GET", "/api/profile")).json();
+    expect(profile.user.email).toBe("admin@1ctx.dev");
+  });
+
+  test("migration 0007 fills an existing row from its username", () => {
+    const db = new Database(":memory:");
+    migrate(db, MIGRATIONS.slice(0, 6));
+    db.query(
+      `insert into users
+        (id, username, full_name, role, password_hash, created_at)
+       values ('u', 'oana', 'Oana', 'member', 'x', 0)`,
+    ).run();
+    db.query(
+      "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'oana', 'u', 0)",
+    ).run();
+    expect(migrate(db, MIGRATIONS.slice(0, 7))).toEqual(["0007-users-email"]);
+    expect(db.query("select email from users where id = 'u'").get()).toEqual({
+      email: "oana@1ctx.dev",
+    });
+    expect(
+      db.query("select owner_id from projects where id = 'p'").get(),
+    ).toEqual({ owner_id: "u" });
+    const email = db
+      .query<{ required: number }, []>(
+        `select "notnull" as required
+         from pragma_table_info('users') where name = 'email'`,
+      )
+      .get();
+    expect(email).toEqual({ required: 1 });
+    expect(() =>
+      db
+        .query(
+          `insert into users
+            (id, username, full_name, email, role, password_hash, created_at)
+           values ('v', 'maria', 'Maria', 'oana@1ctx.dev', 'member', 'x', 0)`,
+        )
+        .run(),
+    ).toThrow();
+    db.close();
+  });
+
+  test("login and me keep the email private", async () => {
+    const app = await testApp();
+    const client = app.client();
+    const login = await client.login("admin", "hunter2-test");
+    expect((await login.json()).user).not.toHaveProperty("email");
+    const me = await client.call("GET", "/api/me");
+    expect((await me.json()).user).not.toHaveProperty("email");
+  });
+
+  test("a project member summary carries no email", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    app.users.setMustChangePassword(user.id, false);
+    const member = app.client();
+    await member.login("oana", "longenough");
+    const project = app.projects.personal(user.id)!;
+    const response = await member.call("GET", `/api/projects/${project.id}`);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.project.members[0]).toEqual({
+      id: user.id,
+      username: "oana",
+      fullName: "Oana",
+      role: "member",
+    });
+    expect(body.project.members[0]).not.toHaveProperty("email");
+  });
+});
+
+describe("disabled accounts", () => {
+  test("disabling revokes open access and enabling restores sign-in", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    const first = app.client();
+    const second = app.client();
+    expect((await first.login("oana", "longenough")).status).toBe(200);
+    expect((await second.login("oana", "longenough")).status).toBe(200);
+    const conn = await connection(app, first);
+    app.socket.open(conn);
+
+    const disabled = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: { disabled: true },
+    });
+    expect(disabled.status).toBe(200);
+    expect((await disabled.json()).user.disabled).toBe(true);
+    expect(app.users.byId(user.id)?.disabled).toBe(true);
+    expect(
+      app.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from logins where user_id = ?",
+        )
+        .get(user.id),
+    ).toEqual({ n: 0 });
+    expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
+    expect((await first.call("GET", "/api/profile")).status).toBe(401);
+    const refused = await app.client().login("oana", "longenough");
+    expect(refused.status).toBe(401);
+    expect(await refused.json()).toEqual({
+      error: "wrong username or password",
+    });
+
+    const again = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: { disabled: true },
+    });
+    expect(again.status).toBe(200);
+
+    const enabled = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: { disabled: false },
+    });
+    expect(enabled.status).toBe(200);
+    expect((await enabled.json()).user.disabled).toBe(false);
+    expect((await app.client().login("oana", "longenough")).status).toBe(200);
+  });
+
+  test("the caller and last enabled admin guards preserve an administrator", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const bootstrap = app.users.byUsername("admin")!;
+    await expectConflict(
+      await client.call("PATCH", `/api/users/${bootstrap.id}`, {
+        body: { disabled: true },
+      }),
+      "own account",
+    );
+
+    const route = userRoute(app, "PATCH", "/api/users/:id");
+    const callAs = async (
+      caller: { id: string; username: string },
+      body: { role?: "member"; disabled?: boolean },
+    ) => {
+      const request = new Request(`${ORIGIN}/api/users/${bootstrap.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      return route.handle(request, {
+        principal: {
+          userId: caller.id,
+          username: caller.username,
+          fullName: caller.username,
+          role: "admin",
+          mustChangePassword: false,
+          loginId: "stale",
+        },
+        params: { id: bootstrap.id },
+        url: new URL(request.url),
+        address: "127.0.0.1",
+      });
+    };
+    const outsider = { id: "other", username: "other" };
+    await expect(callAs(outsider, { disabled: true })).rejects.toThrow(
+      "last admin",
+    );
+    await expect(callAs(outsider, { role: "member" })).rejects.toThrow(
+      "last admin",
+    );
+
+    const second = await create(client, "oana");
+    expect(
+      (
+        await client.call("PATCH", `/api/users/${second.id}`, {
+          body: { role: "admin" },
+        })
+      ).status,
+    ).toBe(200);
+    expect(app.users.countAdmins()).toBe(2);
+    expect((await callAs(second, { disabled: true }))?.status).toBe(200);
+    expect(app.users.countAdmins()).toBe(1);
+    expect((await callAs(second, { disabled: false }))?.status).toBe(200);
+    expect((await callAs(second, { role: "member" }))?.status).toBe(200);
+    expect(app.users.countAdmins()).toBe(1);
+  });
+});
+
+describe("required password changes", () => {
+  test("admin-set passwords restrict the account until profile change", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "oana");
+    expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
+
+    const member = app.client();
+    const login = await member.login("oana", "longenough");
+    expect(login.status).toBe(200);
+    expect((await login.json()).user.mustChangePassword).toBe(true);
+    const forbidden = await member.call("GET", "/api/projects");
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toEqual({
+      error: "change your password first",
+    });
+    const profile = await member.call("GET", "/api/profile");
+    expect(profile.status).toBe(200);
+    expect((await profile.json()).user.mustChangePassword).toBe(true);
+    expect((await member.call("POST", "/api/logout")).status).toBe(200);
+
+    expect((await member.login("oana", "longenough")).status).toBe(200);
+    const changed = await member.call("POST", "/api/profile/password", {
+      body: { current: "longenough", next: "changed-password" },
+    });
+    expect(changed.status).toBe(200);
+    expect((await changed.json()).user.mustChangePassword).toBe(false);
+    expect((await member.call("GET", "/api/projects")).status).toBe(200);
+    const me = await member.call("GET", "/api/me");
+    expect((await me.json()).user.mustChangePassword).toBe(false);
+
+    const reset = await client.call("POST", `/api/users/${user.id}/password`, {
+      body: { password: "reset-password" },
+    });
+    expect(reset.status).toBe(204);
+    expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
+    const afterReset = await app.client().login("oana", "reset-password");
+    expect(afterReset.status).toBe(200);
+    expect((await afterReset.json()).user.mustChangePassword).toBe(true);
+  });
+
+  test("the bootstrap admin starts without a required change", async () => {
+    const app = await testApp();
+    expect(app.users.byUsername("admin")?.mustChangePassword).toBe(false);
+    const client = app.client();
+    const login = await client.login("admin", "hunter2-test");
+    expect((await login.json()).user.mustChangePassword).toBe(false);
+  });
+});
+
+describe("user state migration", () => {
+  test("migration 0008 adds false states to an existing user", () => {
+    const db = new Database(":memory:");
+    migrate(db, MIGRATIONS.slice(0, 7));
+    db.query(
+      `insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+       values ('u', 'oana', 'Oana', 'oana@example.com', 'member', 'x', 0)`,
+    ).run();
+    expect(migrate(db, MIGRATIONS.slice(7))).toEqual(["0008-users-state"]);
+    expect(
+      db
+        .query(
+          "select disabled, must_change_password from users where id = 'u'",
+        )
+        .get(),
+    ).toEqual({ disabled: 0, must_change_password: 0 });
+    db.close();
+  });
+});

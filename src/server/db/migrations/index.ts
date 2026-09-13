@@ -12,6 +12,8 @@ import { m0003 } from "./0003-tools.ts";
 import { m0004 } from "./0004-tools-page.ts";
 import { m0005 } from "./0005-agent-thinking.ts";
 import { m0006 } from "./0006-compaction.ts";
+import { m0007 } from "./0007-users-email.ts";
+import { m0008 } from "./0008-users-state.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -20,4 +22,6 @@ export const MIGRATIONS: Migration[] = [
   m0004,
   m0005,
   m0006,
+  m0007,
+  m0008,
 ];

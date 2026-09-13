@@ -27,11 +27,14 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
   const owner = {};
   let last = { user: "", pathname: "", search: "" };
   const dispose = effect(() => {
-    // the user's id and role, not the row: a profile save replaces the
-    // row and must not reload the page's entities, while a role change
-    // may open an admin page that has not loaded
+    // the user's id, role and password state, not the row: a profile
+    // save replaces the row and must not reload the page's entities,
+    // while a role change may open an admin page that has not loaded,
+    // and a password change opens everything
     const row = me.value;
-    const user = row ? `${row.id} ${row.role}` : "";
+    const user = row
+      ? `${row.id} ${row.role} ${row.mustChangePassword ? "locked" : ""}`
+      : "";
     const pathname = path.value;
     const search = query.value;
     if (
@@ -45,8 +48,10 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     last = { user, pathname, search };
     current = null;
     if (row === null || row === undefined) return;
-    if (newUser) void loadProjects();
     const m = match(pathname, routes);
+    // the server refuses every other route until the password changes
+    if (row.mustChangePassword && m?.route.path !== "/profile") return;
+    if (newUser && !row.mustChangePassword) void loadProjects();
     if (m === null || m.route.load === undefined) return;
     if (m.route.role === "admin" && row.role !== "admin") return;
     const load = m.route.load;

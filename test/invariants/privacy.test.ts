@@ -18,6 +18,7 @@ function conn(chat: Awaited<ReturnType<typeof chatApp>>, admin: boolean) {
         username: admin ? "admin" : "oana",
         fullName: admin ? "Administrator" : "Oana Pellea",
         role: admin ? "admin" : "member",
+        mustChangePassword: false,
         loginId: admin ? "la" : "lm",
       },
       projects: new Set(
