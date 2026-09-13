@@ -303,6 +303,14 @@ violation, and every rule has a rejected fixture under
   `app/routes.ts` wrapped in `lazy()`; the rail is computed from it.
   Bun does not yet split the HTML bundle, so the views still ship in one
   chunk; the table stays lazy so they will not the day it does.
+- **A page with an aside is `ui/Split.tsx`.** Home and the project
+  pages put their content in the main column, 900px at most, and
+  cards in the 280px aside at the right; under 1100 the aside drops
+  below. The cards hold only honest numbers: the agents and the past
+  seven days from `GET /api/usage/week` on Home, the About facts on a
+  project. Times in a list are `ago()` and `elapsed()` in
+  `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
+  ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

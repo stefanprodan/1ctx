@@ -137,12 +137,12 @@ describe("whenText", () => {
       session: session({ status: "running" }),
       send: send({ status: "running", startedAt: now - 40_000 }),
     });
-    expect(whenText(running, now)).toBe("40 s");
-    expect(whenText({ ...running, send: null }, now)).toBe("12 min");
+    expect(whenText(running, now)).toBe("40s");
+    expect(whenText({ ...running, send: null }, now)).toBe("12m");
   });
 
   test("any other row shows how long ago it moved", () => {
-    expect(whenText(row(), now)).toBe("12 min ago");
+    expect(whenText(row(), now)).toBe("12m ago");
   });
 
   test("the clock ticks every second only while a row runs", () => {

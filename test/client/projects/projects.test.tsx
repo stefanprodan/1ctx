@@ -185,7 +185,9 @@ describe("the pages", () => {
   test("Project renders the feed of the project on screen only", () => {
     project.value = { ...personal, createdAt: 0, members: [oana] };
     const html = render(<Project params={{ id: "p1" }} />);
-    expect(html).toContain("yours alone");
+    expect(html).toContain(">personal<");
+    expect(html).toContain(">1 member<");
+    expect(html).toContain('class="split-face" title="Oana Pellea">OP<');
     expect(html).toContain('href="/projects/p1/members"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
     expect(html).toContain('placeholder="Search sessions"');

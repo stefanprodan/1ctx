@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Usage: one row per round, what the provider reported, written by the
-// runner in the round's transaction. The sums for a dashboard come
-// later; the rows are here from the first send so nothing is lost.
+// runner in the round's transaction. The weekly summary reads the rows
+// here so the runner does not own dashboard policy.
 
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
+import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
+import { type AccessPort, routes } from "./routes.ts";
 import { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
 
 export { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
 
-export type UsageDeps = { db: Db };
+export type UsageDeps = { db: Db; clock: Clock; access: AccessPort };
 
 export type Usage = {
   store: UsageStore;
@@ -32,6 +34,6 @@ export function usageArea(deps: UsageDeps): Usage {
     deleteSend: (sendId) => store.deleteSend(sendId),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
-    routes: [],
+    routes: routes({ clock: deps.clock, store, access: deps.access }),
   };
 }

@@ -1,6 +1,6 @@
-/* Projects: the list, a row per project; and one project: the kind
-   line under the head, the tabs, then the tab's content: the feed, or
-   the cards of users and agents. */
+/* Projects: the list, a row per project; and one project: the tabs,
+   then the tab's content: the feed, or the cards of users and agents.
+   The kind and the dates are in the About card at the right. */
 
 @layer tokens, base, owners;
 
@@ -41,19 +41,6 @@
   .projects-go {
     margin-left: auto;
     color: var(--faint);
-  }
-
-  .projects-one {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-    width: 760px;
-    max-width: 100%;
-  }
-
-  .projects-kind-text {
-    margin: 0;
-    color: var(--dim);
   }
 
   .projects-card {

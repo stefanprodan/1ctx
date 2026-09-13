@@ -27,6 +27,7 @@ import {
   session,
 } from "../data/sessions.ts";
 import { loadTools } from "../data/tools.ts";
+import { loadWeek } from "../data/usage.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -66,10 +67,12 @@ export const ROUTES: Route[] = [
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
       const rows = loadList({ project: null, q });
+      const spent = loadWeek();
       await loadProjects();
       const personal = projects.value?.find((p) => p.kind === "personal");
       await Promise.all([
         rows,
+        spent,
         personal === undefined
           ? Promise.resolve()
           : loadProjectAgents(personal.id),

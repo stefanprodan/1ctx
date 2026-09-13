@@ -32,6 +32,10 @@
     outline: none;
   }
 
+  .composer-tall .composer-text {
+    min-height: 42px;
+  }
+
   .composer-failure {
     margin: 0;
     font-size: var(--text-small);

@@ -85,7 +85,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: options.log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
   });
-  const usage = usageArea({ db });
+  const usage = usageArea({
+    db,
+    clock,
+    access: {
+      visibleProjectIds: (userId) => access.visibleProjectIds(userId),
+    },
+  });
   const limits = limitsArea({ db, clock });
   const providers = providersArea({
     db,
@@ -159,6 +165,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   sessions.repair();
   const routes: RouteDescriptor[] = [
     ...users.routes,
+    ...usage.routes,
     ...limits.routes,
     ...providers.routes,
     ...projects.routes,

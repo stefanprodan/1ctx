@@ -7,6 +7,7 @@ import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import { list, projectAgents } from "../../../src/client/data/sessions.ts";
+import { week } from "../../../src/client/data/usage.ts";
 import {
   dateLine,
   greeting,
@@ -45,15 +46,30 @@ describe("Home", () => {
       } as never,
     ];
     list.value = null;
+    week.value = null;
   });
 
   test("renders the head, the composer and the search", () => {
     const html = render(<Home />);
     expect(html).toContain('class="page-title"');
     expect(html).toContain(", Oana</h1>");
-    expect(html).toContain('class="composer"');
+    expect(html).toContain('class="composer composer-tall"');
+    expect(html).toContain('rows="2"');
     expect(html).toContain('placeholder="Search sessions"');
     expect(html).toContain("Loading");
+    // the aside: the agents, and the week once it answers
+    expect(html).toContain('class="split-row-name">assistant<');
+    expect(html).not.toContain("Manage");
+    week.value = {
+      since: 0,
+      sessions: 637,
+      promptTokens: 2_130_000,
+      completionTokens: 12_400,
+    };
+    const again = render(<Home />);
+    expect(again).toContain('class="split-stat-value">637<');
+    expect(again).toContain('class="split-stat-value">2.13M<');
+    expect(again).toContain('class="split-stat-value">12.4k<');
   });
 
   test("renders the rows with the project name and the state line", () => {
@@ -82,7 +98,7 @@ describe("Home", () => {
     expect(html).toContain("Which pods restarted");
     expect(html).toContain('<span class="stream-project">oana</span>');
     expect(html).toContain("assistant: nine pods");
-    expect(html).toContain("2 min ago");
+    expect(html).toContain("2m ago");
   });
 
   test("the search box carries the address's query and the empty line says so", () => {
@@ -98,7 +114,7 @@ describe("Home", () => {
   test("without the personal project the composer waits", () => {
     projects.value = null;
     const html = render(<Home />);
-    expect(html).not.toContain('class="composer"');
+    expect(html).not.toContain('class="composer');
     expect(html).toContain('placeholder="Search sessions"');
   });
 });

@@ -6,6 +6,11 @@
 import type { ProjectKind } from "../../../shared/words.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 
+// "1 member", "2 agents"
+export function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
 // Feed carries no count: the list is capped, so a number would lie
 // on a busy project
 export function tabsOf(id: string, members: number | null): Tab[] {

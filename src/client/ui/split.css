@@ -1,0 +1,191 @@
+/* Two columns: the content and the aside of cards. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .split {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-5);
+    flex-grow: 1;
+  }
+
+  .split-main {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-grow: 1;
+    min-width: 0;
+    max-width: 900px;
+  }
+
+  .split-aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    flex: 0 0 280px;
+    min-width: 0;
+  }
+
+  .split-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .split-card-head {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .split-card-act {
+    margin-left: auto;
+    font-size: var(--text-small);
+  }
+
+  /* a row in a card: a tile, then a name over a faint line */
+  .split-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .split-row:last-child {
+    border-bottom: 0;
+  }
+  .split-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    color: var(--dim);
+  }
+  .split-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .split-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    font-weight: 500;
+  }
+  .split-row-line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  /* the stats: a number over its word, three across */
+  .split-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+  }
+  .split-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .split-stat-value {
+    font-family: var(--mono);
+    font-size: var(--text-body);
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .split-stat-word {
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  /* a line of facts: a word and its value */
+  .split-fact {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 36px;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--line);
+    color: var(--dim);
+  }
+  .split-fact:last-child {
+    border-bottom: 0;
+  }
+  .split-fact-value {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    text-align: right;
+  }
+  .split-fact-link {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+
+  .split-empty {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  /* the members' avatars, overlapping */
+  .split-faces {
+    display: flex;
+    align-items: center;
+  }
+  .split-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: var(--text-tiny);
+    font-weight: 600;
+    color: var(--dim);
+  }
+  .split-face + .split-face {
+    margin-left: -6px;
+  }
+
+  @media (max-width: 1099px) {
+    .split {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .split-main {
+      max-width: none;
+    }
+    .split-aside {
+      flex-basis: auto;
+    }
+  }
+}

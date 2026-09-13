@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Home: the greeting, the composer that starts a chat in the personal
-// project, the search, then every session the user may see as one
-// stream. The query is the address; the route's load fetches the
-// rows, and a clock moves the times without a fetch.
+// project, then every session the user may see as one stream, with
+// the search in its head. At the right, the agents the composer can
+// pick and what the week spent. The query is the address; the route's
+// load fetches the rows, and a clock moves the times without a fetch.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -18,9 +19,13 @@ import {
   projectAgents,
   sending,
 } from "../../data/sessions.ts";
+import { week } from "../../data/usage.ts";
+import { AvatarIcon } from "../../lib/avatars.tsx";
+import { count } from "../../lib/format.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { AsideCard, Split } from "../../ui/Split.tsx";
 import {
   dateLine,
   greeting,
@@ -28,7 +33,6 @@ import {
   searchHref,
   searchOf,
 } from "./Home.model.ts";
-import "./home.css";
 
 export function Home() {
   const user = me.value!;
@@ -45,16 +49,75 @@ export function Home() {
   const q = searchOf(query.value);
   const projectName = (id: string) =>
     projects.value?.find((p) => p.id === id)?.name ?? null;
+  const agents = projectAgents.value;
+  const spent = week.value;
   return (
     <Page
       label={dateLine(new Date())}
       title={greeting(new Date(), user.fullName)}
     >
-      <div class="home">
+      <Split
+        aside={
+          <>
+            <AsideCard
+              label="Agents"
+              action={
+                user.role === "admin" ? (
+                  <a href="/admin/agents">Manage</a>
+                ) : undefined
+              }
+            >
+              {agents === null ? (
+                <p class="split-empty">Loading</p>
+              ) : agents.length === 0 ? (
+                <p class="split-empty">No agents yet.</p>
+              ) : (
+                agents.map((a) => (
+                  <div key={a.id} class="split-row">
+                    <span class="split-tile">
+                      <AvatarIcon name={a.avatar} size={14} />
+                    </span>
+                    <span class="split-row-text">
+                      <span class="split-row-name">{a.name}</span>
+                      <span class="split-row-line">{a.model.id}</span>
+                    </span>
+                  </div>
+                ))
+              )}
+            </AsideCard>
+            <AsideCard label="This week">
+              {spent === null ? (
+                <p class="split-empty">Loading</p>
+              ) : (
+                <div class="split-stats">
+                  <span class="split-stat">
+                    <span class="split-stat-value">
+                      {count(spent.sessions)}
+                    </span>
+                    <span class="split-stat-word">sessions</span>
+                  </span>
+                  <span class="split-stat">
+                    <span class="split-stat-value">
+                      {count(spent.promptTokens)}
+                    </span>
+                    <span class="split-stat-word">prompt tokens</span>
+                  </span>
+                  <span class="split-stat">
+                    <span class="split-stat-value">
+                      {count(spent.completionTokens)}
+                    </span>
+                    <span class="split-stat-word">completion</span>
+                  </span>
+                </div>
+              )}
+            </AsideCard>
+          </>
+        }
+      >
         {personal !== null && (
           <Composer
             scope={{ projectId: personal.id }}
-            agents={projectAgents.value}
+            agents={agents}
             agentId={null}
             running={false}
             busy={sending.value}
@@ -76,7 +139,7 @@ export function Home() {
           }
           now={now.value}
         />
-      </div>
+      </Split>
     </Page>
   );
 }
