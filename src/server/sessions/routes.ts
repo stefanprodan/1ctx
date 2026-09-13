@@ -75,7 +75,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           project === null
             ? (deps.access.visibleProjectIds(principal.userId) ?? [])
             : [deps.access.project(principal, project).id];
-        const body: SessionsResponse = { sessions: deps.store.list(ids, q) };
+        const body: SessionsResponse = { rows: deps.store.list(ids, q) };
         return json(body);
       },
     },

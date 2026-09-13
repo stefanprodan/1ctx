@@ -10,6 +10,7 @@ import type {
   RenameSessionRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
+import { MAX_LAST_LINE } from "../../shared/contracts/session.ts";
 import {
   hasLineBreak,
   MAX_MESSAGE_BYTES,
@@ -102,4 +103,21 @@ export function titleFrom(text: string): string {
   return line.length > MAX_TITLE
     ? `${line.slice(0, MAX_TITLE - 1).trimEnd()}…`
     : line;
+}
+
+// the stream's last line: the first non-empty line, its Markdown
+// markers stripped so a reply that opens with a heading reads as
+// words and one with bold reads without the stars, cut as a title is
+export function lineFrom(text: string): string {
+  const line = text
+    .split(/\r?\n/)
+    .find((part) => part.trim() !== "")
+    ?.trim();
+  const stripped = (line ?? "")
+    .replace(/^(?:(?:#+|[-*+]|\d+\.)\s+|>\s*)+/, "")
+    .replace(/\*\*|__|`+/g, "")
+    .trim();
+  return stripped.length > MAX_LAST_LINE
+    ? `${stripped.slice(0, MAX_LAST_LINE - 1).trimEnd()}…`
+    : stripped;
 }

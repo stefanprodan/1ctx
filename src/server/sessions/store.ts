@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type {
   MessageStatus,
@@ -28,6 +29,7 @@ import {
   session,
   type UsagePort,
 } from "./rows.ts";
+import { streamRows } from "./stream.ts";
 
 export class SessionStore {
   constructor(
@@ -44,7 +46,7 @@ export class SessionStore {
 
   // the stream: the sessions of the given projects, running first, then
   // by last activity, the title searched when there is a query
-  list(projectIds: string[], q: string, limit = STREAM_LIMIT): SessionRow[] {
+  list(projectIds: string[], q: string, limit = STREAM_LIMIT): StreamRow[] {
     if (projectIds.length === 0) return [];
     const marks = projectIds.map(() => "?").join(", ");
     const needle = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
@@ -58,7 +60,7 @@ export class SessionStore {
       )
       .all(...projectIds, q, needle, limit);
     const usage = this.usage.latestFor(rows.map((r) => r.id));
-    return rows.map((raw) => session(raw, usage.get(raw.id) ?? null));
+    return streamRows(this.db, rows, usage);
   }
 
   // the id may come from the caller: the runner admits a new session

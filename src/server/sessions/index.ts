@@ -16,6 +16,7 @@ import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 
 export {
+  lineFrom,
   MAX_SESSION_BODY,
   parseCreateSession,
   parseMessage,

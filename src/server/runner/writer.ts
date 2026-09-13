@@ -19,11 +19,11 @@ import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
-import { offWire, type SessionRow } from "../sessions/index.ts";
+import type { SessionRow } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
+import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy, ToolResult } from "./policy.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import { streamDelta } from "./stream.ts";
@@ -75,22 +75,6 @@ export function statusOf(cause: SendCause): Exclude<SessionStatus, "running"> {
       return "failed";
   }
 }
-
-const envelope = (
-  session: SessionSummary,
-  messages: Message[],
-  send: SendSummary | null,
-  removedMessageIds: string[] = [],
-): BusEvent => ({
-  type: "session.changed",
-  data: {
-    projectId: session.projectId,
-    session,
-    messages: messages.map(offWire),
-    ...(removedMessageIds.length > 0 ? { removedMessageIds } : {}),
-    send,
-  },
-});
 
 export class Writer {
   constructor(private readonly deps: WriterDeps) {}
@@ -176,7 +160,15 @@ export class Writer {
       })!;
       return {
         result: { session, user, reply, send },
-        events: [envelope(session, [user, reply], send, removedMessageIds)],
+        events: [
+          envelope(
+            session,
+            [user, reply],
+            send,
+            removedMessageIds,
+            lastLine(user, policy.username),
+          ),
+        ],
       };
     });
   }
@@ -488,9 +480,13 @@ export class Writer {
         now,
       })!;
       const changed = [...(reply ? [reply] : []), ...stopped];
+      const last =
+        reply?.status === "done" && reply.slot === "answer"
+          ? lastLine(reply, send.policy.agentName)
+          : undefined;
       return {
         result: { session, reply, send: row },
-        events: [envelope(session, changed, row)],
+        events: [envelope(session, changed, row, [], last)],
       };
     });
     send.openTools = new Map();

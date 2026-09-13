@@ -64,6 +64,11 @@ describe("startSend", () => {
       expect(seen[0].session.revision).toBe(1);
       expect(seen[0].messages).toHaveLength(2);
       expect(seen[0].send?.id).toBe(detail.send.id);
+      expect(seen[0].last).toEqual({
+        seq: 1,
+        author: "oana",
+        text: "Hello there",
+      });
     } finally {
       stop();
     }
@@ -179,6 +184,11 @@ describe("finalizeSend", () => {
       expect(seen[1].messages.map((m) => m.id)).toEqual([reply.id]);
       expect(seen[1].send?.status).toBe("done");
       expect(seen[1].session.usage?.promptTokens).toBe(12);
+      expect(seen[1].last).toEqual({
+        seq: reply.seq,
+        author: "coder",
+        text: "Hi there",
+      });
       expect(chat.app.runner.registry.size).toBe(0);
     } finally {
       stop();
@@ -210,6 +220,25 @@ describe("finalizeSend", () => {
     );
     expect(roles).toEqual(["system", "user", "assistant", "user"]);
     second.reply("two");
+  });
+
+  test("omits the last line when a reply is stopped", async () => {
+    const chat = await chatApp();
+    const { seen, stop } = envelopes();
+    try {
+      const { script, sessionId } = await startChat(chat, "stop this");
+      script.content("partial answer");
+      await tick();
+      await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+      await tick();
+      await tick();
+      const ended = seen.find((event) => event.send?.cause === "stop");
+      expect(ended).toBeDefined();
+      expect(ended!.last).toBeUndefined();
+    } finally {
+      stop();
+      chat.app.socket.dispose();
+    }
   });
 });
 
