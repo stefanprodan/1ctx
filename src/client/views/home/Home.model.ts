@@ -39,3 +39,11 @@ export function personalOf(
 export function searchOf(search: string): string {
   return new URLSearchParams(search).get("q")?.trim() ?? "";
 }
+
+// the address for a query on a page, none when it is blank
+export function searchHref(pathname: string, q: string): string {
+  const params = new URLSearchParams();
+  if (q.trim() !== "") params.set("q", q.trim());
+  const search = params.toString();
+  return `${pathname}${search === "" ? "" : `?${search}`}`;
+}

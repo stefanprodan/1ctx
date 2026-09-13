@@ -1,0 +1,40 @@
+/* Tabs under a page head: labels on a hairline, the one on screen
+   underlined in the foreground. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .tabs {
+    display: flex;
+    gap: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tabs-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 2px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .tabs-tab:hover {
+    color: var(--fg);
+  }
+  .tabs-tab-on {
+    color: var(--fg);
+    border-bottom-color: var(--fg);
+  }
+
+  .tabs-count {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    color: var(--faint);
+  }
+}

@@ -94,12 +94,23 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Project",
     role: "authenticated",
-    load: async (params) => {
+    load: async (params, query) => {
       await Promise.all([
         loadProject(params.id),
-        loadList({ project: params.id, q: "" }),
+        loadList({ project: params.id, q: query.get("q")?.trim() ?? "" }),
         loadProjectAgents(params.id),
       ]);
+    },
+  },
+  {
+    path: "/projects/:id/members",
+    view: lazy(() =>
+      import("../views/projects/Members.tsx").then((m) => m.Members),
+    ),
+    title: () => "Members",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([loadProject(params.id), loadProjectAgents(params.id)]);
     },
   },
   {

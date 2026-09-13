@@ -19,10 +19,15 @@ import {
   sending,
 } from "../../data/sessions.ts";
 import { tickMs } from "../../stream/Row.model.ts";
-import { Search } from "../../stream/Search.tsx";
 import { Stream } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { dateLine, greeting, personalOf, searchOf } from "./Home.model.ts";
+import {
+  dateLine,
+  greeting,
+  personalOf,
+  searchHref,
+  searchOf,
+} from "./Home.model.ts";
 import "./home.css";
 
 export function Home() {
@@ -59,20 +64,13 @@ export function Home() {
             onStop={async () => {}}
           />
         )}
-        <div class="home-bar">
-          <Search
-            value={q}
-            onChange={(next) => {
-              const params = new URLSearchParams();
-              if (next.trim() !== "") params.set("q", next.trim());
-              const search = params.toString();
-              navigate(`/${search === "" ? "" : `?${search}`}`, true);
-            }}
-          />
-        </div>
         <Stream
           rows={rows}
           projectName={projectName}
+          search={{
+            value: q,
+            onChange: (next) => navigate(searchHref("/", next), true),
+          }}
           empty={
             q === "" ? "No chats yet. Start one above." : "Nothing matches."
           }

@@ -53,8 +53,9 @@ src/client/     the Preact app, bundled by Bun from client/index.html.
                 app/ (routes.ts, router.ts, lazy.ts, App, Rail), data/
                 (api, the entity cache), lib/, ui/ (the primitives, each
                 with its stylesheet), transcript/, composer/, stream/ (the
-                session row Home and the project page draw), views/<area>/,
-                style/ (tokens.css, base.css only).
+                session row Home and the project page draw), agents/ (the
+                agent row the admin page and the project page draw),
+                views/<area>/, style/ (tokens.css, base.css only).
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
                 tests, helpers/ (app.ts wires the server over a test db

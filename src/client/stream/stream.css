@@ -1,5 +1,5 @@
-/* The stream: a card of rows with a hairline between them, and the
-   search box above it. */
+/* The stream: a card with the search in its head band, then rows with
+   a hairline between them. */
 
 @layer tokens, base, owners;
 
@@ -11,6 +11,14 @@
     background: var(--card);
     border: 1px solid var(--line);
     overflow: hidden;
+  }
+
+  .stream-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--line);
   }
 
   .stream-state {

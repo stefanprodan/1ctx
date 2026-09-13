@@ -1,4 +1,4 @@
-/* Home: the composer, the search and the stream in one column. */
+/* Home: the composer and the stream in one column. */
 
 @layer tokens, base, owners;
 
@@ -8,11 +8,5 @@
     flex-direction: column;
     gap: 14px;
     flex-grow: 1;
-  }
-
-  .home-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
   }
 }

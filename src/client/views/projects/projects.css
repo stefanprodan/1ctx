@@ -1,5 +1,6 @@
 /* Projects: the list, a row per project; and one project: the kind
-   line under the head, the composer, its chats, then its members. */
+   line under the head, the tabs, then the tab's content: the feed, or
+   the cards of users and agents. */
 
 @layer tokens, base, owners;
 
@@ -55,33 +56,39 @@
     color: var(--dim);
   }
 
-  .projects-section {
+  .projects-card {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+    overflow: hidden;
   }
-
-  .projects-section-title {
-    margin: 0;
-    font-size: var(--text-body);
-    font-weight: 600;
-  }
-
-  .projects-members {
+  .projects-card-head {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .projects-card-state {
     margin: 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--line);
+    padding: var(--space-3) var(--space-4);
+    color: var(--faint);
   }
 
-  .projects-member {
+  .projects-member,
+  .projects-agent {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    height: 48px;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--line);
+  }
+  .projects-member:last-child,
+  .projects-agent:last-child {
+    border-bottom: 0;
   }
 
   .projects-avatar {

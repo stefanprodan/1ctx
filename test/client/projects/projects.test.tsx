@@ -17,6 +17,8 @@ import {
   projects,
   projectsError,
 } from "../../../src/client/data/projects.ts";
+import { projectAgents } from "../../../src/client/data/sessions.ts";
+import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   kindLine,
   kindText,
@@ -180,13 +182,61 @@ describe("the pages", () => {
     expect(html).toContain(">personal<");
   });
 
-  test("Project renders the members of the project on screen only", () => {
+  test("Project renders the feed of the project on screen only", () => {
     project.value = { ...personal, createdAt: 0, members: [oana] };
     const html = render(<Project params={{ id: "p1" }} />);
     expect(html).toContain("yours alone");
+    expect(html).toContain('href="/projects/p1/members"');
+    expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
+    expect(html).toContain('placeholder="Search sessions"');
+    expect(html).not.toContain("@oana");
+    expect(render(<Project params={{ id: "p9" }} />)).toContain("Loading");
+  });
+
+  test("Members renders the users and the agents of the project", () => {
+    project.value = { ...personal, createdAt: 0, members: [oana] };
+    projectAgents.value = null;
+    let html = render(<Members params={{ id: "p1" }} />);
+    expect(html).toContain(
+      'class="tabs-tab tabs-tab-on" href="/projects/p1/members"',
+    );
+    expect(html).toContain('<span class="tabs-count">1</span>');
     expect(html).toContain('class="projects-avatar">OP<');
     expect(html).toContain("@oana");
-    expect(render(<Project params={{ id: "p9" }} />)).toContain("Loading");
+    expect(html).toContain("Loading");
+    projectAgents.value = [
+      {
+        id: "a1",
+        name: "coder",
+        avatar: "bot",
+        providerId: "pr1",
+        model: {
+          id: "deepseek/deepseek-v4-flash",
+          name: "DeepSeek: V4 Flash",
+          contextLength: 128_000,
+          promptPrice: 0.14,
+          completionPrice: 0.28,
+          tools: true,
+          reasoning: true,
+        },
+        thinking: null,
+        effort: null,
+        prompt: "",
+        createdAt: 0,
+      } as never,
+    ];
+    html = render(<Members params={{ id: "p1" }} />);
+    expect(html).toContain('class="agent-row-name">coder<');
+    expect(html).toContain("deepseek/deepseek-v4-flash");
+    // no provider name for a member, and no form to open
+    expect(html).toContain(
+      'class="agent-row-meta">128k · $0.14 / $0.28 · tools · reasoning<',
+    );
+    expect(html).not.toContain("agents-row");
+    projectAgents.value = [];
+    expect(render(<Members params={{ id: "p1" }} />)).toContain(
+      "No agents yet",
+    );
   });
 
   test("Project heads with the name from the list while loading", () => {
