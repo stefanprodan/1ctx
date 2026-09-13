@@ -180,6 +180,7 @@ describe("live transcript buffers", () => {
 describe("thinking labels", () => {
   test("formats each clock state", () => {
     expect(thinkLabel(live(), false, 3_200)).toBe("Thinking");
+    expect(thinkLabel(live(), true, 3_200)).toBe("Thought");
     expect(thinkLabel(live({ thinkStart: 0 }), false, 3_200)).toBe(
       "Thinking for 3.2 s",
     );

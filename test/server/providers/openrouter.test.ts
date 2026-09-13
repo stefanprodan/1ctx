@@ -107,6 +107,7 @@ describe("OpenRouter chat body", () => {
     expect(body.session_id).toBe("session-1");
     expect(body.prompt_cache_key).toBeUndefined();
     expect(body.stream_options).toBeUndefined();
+    expect(body).not.toHaveProperty("enable_thinking");
     expect(body.stream).toBe(true);
     expect(body.tools).toHaveLength(1);
     // earlier reasoning goes back as OpenRouter's field

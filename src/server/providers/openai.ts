@@ -38,6 +38,7 @@ export type ChatBodyOptions = {
   // the field earlier reasoning goes back in on an assistant message:
   // reasoning_content (mlx-serve, llama-server) or reasoning (OpenRouter)
   reasoningField?: "reasoning_content" | "reasoning";
+  includeThinkingFlag?: boolean;
 };
 
 export function buildChatBody(
@@ -96,6 +97,11 @@ export function buildChatBody(
     stream: true,
     stream_options: { include_usage: true },
   };
+  // mlx-serve and llama-server read the flag on every request, off
+  // included; OpenRouter takes the reasoning object instead
+  if (options.includeThinkingFlag ?? true) {
+    body.enable_thinking = req.thinking;
+  }
   if (req.tools && req.tools.length > 0) {
     body.tools = req.tools.map((tool) => ({
       type: "function",

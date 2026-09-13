@@ -19,8 +19,6 @@ import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
 import { UserRow } from "./UserRow.tsx";
-import { sendCounters } from "./Work.model.ts";
-import { Work } from "./Work.tsx";
 import "./transcript.css";
 import "./md.css";
 import "./hljs.css";
@@ -127,22 +125,11 @@ export function Transcript({
                 />
               );
             }
-            if (node.kind === "work") {
-              return (
-                <Work key={`work:${node.sendId}`} node={node} live={live} />
-              );
-            }
-            const current = live.get(node.message.id) ?? null;
             return (
               <Reply
-                key={node.message.id}
-                message={node.message}
-                live={current}
-                think={
-                  (current?.reasoning ?? "") !== "" ||
-                  node.message.reasoning !== ""
-                }
-                counters={sendCounters(node.rows, node.send)}
+                key={`reply:${node.sendId}`}
+                node={node}
+                live={live}
                 agent={agent}
               />
             );

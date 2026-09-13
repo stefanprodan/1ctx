@@ -1,7 +1,8 @@
-/* The transcript: the rows, a user row (author line and card), a reply
-   (agent line, the reasoning fold, the rendered body, the tail with
-   its cursor, the line under it), and the foot stuck to the bottom of
-   the shell's scroll box with the composer and Jump to latest. */
+/* The transcript: the rows, a user row (author line and card), the
+   agent's turn (its line, the work fold, the reasoning fold, the
+   rendered body, the tail with its cursor, the line under it), and the
+   foot stuck to the bottom of the shell's scroll box with the composer
+   and Jump to latest. */
 
 @layer tokens, base, owners;
 
@@ -216,7 +217,6 @@
 
   .transcript-work {
     min-width: 0;
-    padding-left: 32px;
     color: var(--dim);
   }
   .transcript-work-head {
@@ -274,8 +274,10 @@
   .transcript-work-text,
   .transcript-work-tail,
   .transcript-work-plain {
+    margin: var(--space-2) 0 var(--space-1);
     font-size: var(--text-ui);
     line-height: 1.55;
+    color: var(--dim);
     overflow-wrap: anywhere;
   }
   .transcript-work-tail,

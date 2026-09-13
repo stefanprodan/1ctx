@@ -106,7 +106,8 @@ export function thinkLabel(live: Live, done: boolean, now: number): string {
   if (done && live.thinkMs !== null) {
     return `Thought for ${secs(live.thinkMs)}`;
   }
-  if (live.thinkStart === null) return "Thinking";
+  // a round with words but no reasoning: the model talking to itself
+  if (live.thinkStart === null) return done ? "Thought" : "Thinking";
   const end = live.thinkEnd ?? now;
   const word = done || live.thinkEnd !== null ? "Thought" : "Thinking";
   return `${word} for ${secs(end - live.thinkStart)}`;

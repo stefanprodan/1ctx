@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The transcript's nodes. Rows are grouped by send and placed by the
-// server's slot. Tool calls are read only after placement, to pair each
-// work round with its result rows.
+// server's slot: a user row, then the agent's turn, which holds the
+// work (the rounds that called tools, folded) and the answer. Tool
+// calls are read only after placement, to pair each work round with
+// its result rows.
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
@@ -20,7 +22,6 @@ export type WorkRound = {
 };
 
 export type WorkNode = {
-  kind: "work";
   sendId: string;
   rows: Message[];
   rounds: WorkRound[];
@@ -28,15 +29,18 @@ export type WorkNode = {
   send: SendSummary | null;
 };
 
-export type Node =
-  | { kind: "user"; message: Message }
-  | WorkNode
-  | {
-      kind: "reply";
-      message: Message;
-      rows: Message[];
-      send: SendSummary | null;
-    };
+export type ReplyNode = {
+  kind: "reply";
+  sendId: string;
+  // the answer, or the reply streaming before its slot is known; null
+  // while the send is between rounds or ended without an answer
+  message: Message | null;
+  work: WorkNode | null;
+  rows: Message[];
+  send: SendSummary | null;
+};
+
+export type Node = { kind: "user"; message: Message } | ReplyNode;
 
 function isMainReply(message: Message): boolean {
   if (message.kind !== "reply") return false;
@@ -80,6 +84,24 @@ function workRounds(rows: Message[]): WorkRound[] {
   }));
 }
 
+// a stop during a tool is recorded on the tool row, not the preceding
+// reply; historical sends no longer carry their summary
+export function endedBy(node: ReplyNode): Message | null {
+  if (node.message !== null) return node.message;
+  const status = node.send?.status;
+  if (status === "stopped" || status === "failed" || node.send === null) {
+    for (let index = node.rows.length - 1; index >= 0; index--) {
+      const row = node.rows[index];
+      if (row?.status === "stopped" || row?.status === "failed") return row;
+    }
+  }
+  for (let index = node.rows.length - 1; index >= 0; index--) {
+    const row = node.rows[index];
+    if (row?.kind === "reply") return row;
+  }
+  return null;
+}
+
 export function groupRows(
   messages: Message[],
   currentSend: SendSummary | null = null,
@@ -99,25 +121,25 @@ export function groupRows(
 
     const answer =
       rows.find((row) => row.kind === "reply" && row.slot === "answer") ?? null;
-    const work = rows.filter(
+    const workRows = rows.filter(
       (row) =>
         (row.kind === "reply" && row.slot === "work") || row.kind === "tool",
     );
     const send = currentSend?.id === sendId ? currentSend : null;
-    if (work.length > 0) {
-      nodes.push({
-        kind: "work",
-        sendId,
-        rows: work,
-        rounds: workRounds(work),
-        answer,
-        send,
-      });
-    }
+    const work: WorkNode | null =
+      workRows.length > 0
+        ? {
+            sendId,
+            rows: workRows,
+            rounds: workRounds(workRows),
+            answer,
+            send,
+          }
+        : null;
 
-    const reply = answer ?? rows.find(isMainReply);
-    if (reply !== undefined && reply !== null) {
-      nodes.push({ kind: "reply", message: reply, rows, send });
+    const reply = answer ?? rows.find(isMainReply) ?? null;
+    if (reply !== null || work !== null) {
+      nodes.push({ kind: "reply", sendId, message: reply, work, rows, send });
     }
   }
   return nodes;

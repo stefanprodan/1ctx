@@ -5,8 +5,12 @@
 // streams the label counts this tab's clock every 250 ms; a finished
 // row shows the runner's measurement. Whether a fold is open is kept
 // per message for the life of the page, so a re-render never shuts it.
+// A work round's text, what the model said before calling, is the
+// model talking to itself and sits in the same fold, under the
+// reasoning.
 
 import { signal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
@@ -17,9 +21,11 @@ const opened = signal<ReadonlySet<string>>(new Set());
 export function Think({
   message,
   live,
+  children,
 }: {
   message: Message;
   live: Live | null;
+  children?: ComponentChildren;
 }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -46,7 +52,8 @@ export function Think({
         <Icon name="chevron-right" size={12} class="transcript-think-chevron" />
         <span>{thinkLabel(v, live === null, Date.now())}</span>
       </summary>
-      <div class="transcript-reasoning">{reasoning}</div>
+      {reasoning !== "" && <div class="transcript-reasoning">{reasoning}</div>}
+      {children}
     </details>
   );
 }

@@ -104,7 +104,10 @@ export function mergeReasoningDetail(
 // cached prefix; prompt_cache_key is only its fallback) and the
 // per-family message rules above.
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
-  const body = buildOpenAiChatBody(req, { reasoningField: "reasoning" });
+  const body = buildOpenAiChatBody(req, {
+    reasoningField: "reasoning",
+    includeThinkingFlag: false,
+  });
   delete body.prompt_cache_key;
   delete body.stream_options;
   if (req.cacheKey) body.session_id = req.cacheKey;

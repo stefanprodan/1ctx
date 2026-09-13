@@ -1,73 +1,80 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The fold's label. One word while the send runs, with the calls
+// finished so far as a sign of progress; once done, how long the work
+// took, the calls, the failures and whether a cap ended the loop.
 
-import type { Message, SendSummary } from "../../shared/contracts/session.ts";
+import type { Message } from "../../shared/contracts/session.ts";
 import type { WorkNode } from "./rows.ts";
 import { secs } from "./stream.ts";
 
-export type SendCounters = {
-  rounds: number;
-  toolCalls: number;
-};
+const count = (value: number) => `${value} tool call${value === 1 ? "" : "s"}`;
 
-const count = (value: number, one: string, many: string) =>
-  `${value} ${value === 1 ? one : many}`;
-
-// the send's counters, from its summary when the client holds it, else
-// from its rows the way the server counts: a round per reply, a call
-// per tool row (a launched call; a call a cap cut has no row). Null
-// when the send did no work
-export function sendCounters(
-  rows: Message[],
-  send: SendSummary | null,
-): SendCounters | null {
-  const worked = rows.some(
-    (row) =>
-      row.kind === "tool" || (row.kind === "reply" && row.slot === "work"),
-  );
-  if (!worked) return null;
-  return {
-    rounds:
-      send?.rounds ?? rows.reduce((last, row) => Math.max(last, row.round), 1),
-    toolCalls:
-      send?.toolCalls ?? rows.filter((row) => row.kind === "tool").length,
-  };
-}
-
-export function counterText(counters: SendCounters): string {
-  return `${count(counters.rounds, "round", "rounds")} · ${count(
-    counters.toolCalls,
-    "tool call",
-    "tool calls",
-  )}`;
-}
-
-export type WorkSummary = SendCounters & {
+export type WorkSummary = {
   live: boolean;
+  toolCalls: number;
+  failed: number;
   durationMs: number;
   text: string;
 };
 
+export function workJustEnded(wasRunning: boolean, running: boolean): boolean {
+  return wasRunning && !running;
+}
+
+function isTool(row: Message): boolean {
+  return row.kind === "tool";
+}
+
+// the reason the runner ended the loop, from any reply of the send: the
+// answer round carries it when a cap forced the answer
+export function capWord(rows: Message[]): string | null {
+  for (const row of rows) {
+    if (row.kind !== "reply") continue;
+    if (row.finishReason === "tool_limit") return "tool limit";
+    if (row.finishReason === "tool_loop") return "tool loop";
+  }
+  return null;
+}
+
 export function workSummary(node: WorkNode, live: boolean): WorkSummary {
-  const sendRows =
-    node.answer === null ? node.rows : [...node.rows, node.answer];
-  // a work node always has work rows, so the counters exist
-  const counters = sendCounters(sendRows, node.send) ?? {
-    rounds: 1,
-    toolCalls: 0,
-  };
+  const tools = node.rows.filter(isTool);
+  const finished = tools.filter(
+    (row) => row.status === "done" || row.status === "failed",
+  ).length;
+  const failed = tools.filter((row) => row.status === "failed").length;
+  // the calls the runner counts are the launched ones: a row each
+  const toolCalls = node.send?.toolCalls ?? tools.length;
+
   const first =
     node.rounds[0]?.message.createdAt ?? node.rows[0]?.createdAt ?? 0;
   const rowEnd = node.rows.reduce(
     (end, row) => Math.max(end, row.finishedAt ?? row.createdAt),
     first,
   );
-  const end =
-    node.answer?.createdAt ?? node.send?.finishedAt ?? (live ? first : rowEnd);
+  // the answer's own thinking sits in the fold, so its time counts
+  const answer = node.answer;
+  const thoughtEnd =
+    answer !== null && answer.thinkingMs !== null
+      ? answer.createdAt + (answer.ttftMs ?? 0) + answer.thinkingMs
+      : (answer?.createdAt ?? null);
+  // answer generation is outside the fold; without an answer, the send
+  // end is the only timestamp that includes the final work interval
+  const end = live
+    ? first
+    : Math.max(rowEnd, thoughtEnd ?? node.send?.finishedAt ?? rowEnd);
   const durationMs = Math.max(0, end - first);
-  const calls = count(counters.toolCalls, "tool call", "tool calls");
-  const text = live
-    ? `working · ${calls}`
-    : `worked ${secs(durationMs)} · ${counterText(counters)}`;
-  return { ...counters, live, durationMs, text };
+
+  let text: string;
+  if (live) {
+    text = finished > 0 ? `Working · ${count(finished)}` : "Working";
+  } else {
+    text = `Worked for ${secs(durationMs)}`;
+    if (toolCalls > 0) text += ` · ${count(toolCalls)}`;
+    if (failed > 0) text += `, ${failed} failed`;
+    const cap = capWord(answer === null ? node.rows : [...node.rows, answer]);
+    if (cap !== null) text += `, ${cap}`;
+  }
+  return { live, toolCalls, failed, durationMs, text };
 }

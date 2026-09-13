@@ -13,8 +13,10 @@ import {
   session,
 } from "../../../src/client/data/sessions.ts";
 import {
+  endedBy,
   groupRows,
   type Node,
+  type ReplyNode,
   type WorkNode,
 } from "../../../src/client/transcript/rows.ts";
 import type {
@@ -56,7 +58,7 @@ afterEach(() => {
 });
 
 function nodeSendId(node: Node): string {
-  return node.kind === "work" ? node.sendId : node.message.sendId;
+  return node.kind === "reply" ? node.sendId : node.message.sendId;
 }
 
 function invariant(name: string, step: number): void {
@@ -92,9 +94,12 @@ function invariant(name: string, step: number): void {
     if (expectedUser === undefined) {
       throw new Error(`${name}:${step}:${sendId}: no user row`);
     }
+    // the agent's turn holds the work and the answer; a send with
+    // neither has only its user row
     const expectedKinds: Node["kind"][] = ["user"];
-    if (workRows.length > 0) expectedKinds.push("work");
-    if (expectedReply !== undefined) expectedKinds.push("reply");
+    if (workRows.length > 0 || expectedReply !== undefined) {
+      expectedKinds.push("reply");
+    }
 
     expect(sendNodes.map((node) => node.kind)).toEqual(expectedKinds);
     const userNode = sendNodes[0];
@@ -104,27 +109,34 @@ function invariant(name: string, step: number): void {
     }
 
     const reply = sendNodes.find((node) => node.kind === "reply");
+    if (reply?.kind === "reply") {
+      expect(reply.rows.map((row) => row.id)).toEqual(
+        rows.map((row) => row.id),
+      );
+    }
     if (expectedReply === undefined) {
-      expect(reply).toBeUndefined();
+      expect(reply?.message ?? null).toBeNull();
     } else {
       expect(reply?.kind).toBe("reply");
       if (reply?.kind === "reply") {
-        expect(reply.message.id).toBe(expectedReply.id);
+        expect(reply.message?.id).toBe(expectedReply.id);
         expect(
-          reply.message.slot === "answer" ||
-            (reply.message.slot === null &&
+          reply.message?.slot === "answer" ||
+            (reply.message?.slot === null &&
               reply.message.status === "streaming"),
         ).toBeTrue();
       }
     }
 
-    const work = sendNodes.find((node) => node.kind === "work");
+    const work = reply?.kind === "reply" ? reply.work : null;
     if (workRows.length === 0) {
-      expect(work).toBeUndefined();
+      expect(work).toBeNull();
       continue;
     }
-    expect(work?.kind).toBe("work");
-    if (work?.kind !== "work") continue;
+    if (work === null || work === undefined) {
+      throw new Error(`${name}:${step}:${sendId}: no work`);
+    }
+    expect(work.answer?.id ?? null).toBe(answer?.id ?? null);
     expect(work.rows.map((row) => row.id)).toEqual(
       workRows.map((row) => row.id),
     );
@@ -182,10 +194,16 @@ const message = (
   ...fields,
 });
 
-const workNode = (nodes: Node[]): WorkNode => {
-  const node = nodes.find((item) => item.kind === "work");
-  if (node?.kind !== "work") throw new Error("expected work node");
+const replyNode = (nodes: Node[]): ReplyNode => {
+  const node = nodes.find((item) => item.kind === "reply");
+  if (node?.kind !== "reply") throw new Error("expected reply node");
   return node;
+};
+
+const workNode = (nodes: Node[]): WorkNode => {
+  const work = replyNode(nodes).work;
+  if (work === null) throw new Error("expected work");
+  return work;
 };
 
 describe("transcript rows", () => {
@@ -212,7 +230,7 @@ describe("transcript rows", () => {
     }
   });
 
-  test("orders the three node kinds and pairs duplicate call ids once", () => {
+  test("puts the work in the agent's turn and pairs duplicate call ids once", () => {
     const messages = [
       message("answer", 6, "reply", { round: 2 }),
       message("tool-2", 4, "tool", {
@@ -236,7 +254,8 @@ describe("transcript rows", () => {
     ];
 
     const nodes = groupRows(messages);
-    expect(nodes.map((node) => node.kind)).toEqual(["user", "work", "reply"]);
+    expect(nodes.map((node) => node.kind)).toEqual(["user", "reply"]);
+    expect(replyNode(nodes).message?.id).toBe("answer");
     const work = workNode(nodes);
     expect(work.rows.map((row) => row.id)).toEqual([
       "work",
@@ -256,7 +275,7 @@ describe("transcript rows", () => {
     ]);
   });
 
-  test("keeps a call without a result as not run", () => {
+  test("keeps work while a send is between rounds", () => {
     const nodes = groupRows([
       message("user", 1, "user"),
       message("work", 2, "reply", {
@@ -271,6 +290,37 @@ describe("transcript rows", () => {
       }),
     ]);
 
-    expect(workNode(nodes).rounds[0]?.calls[0]?.result).toBeNull();
+    const reply = replyNode(nodes);
+    expect(reply.message).toBeNull();
+    expect(reply.work).not.toBeNull();
+    expect(reply.work?.rows.map((row) => row.id)).toEqual(["work"]);
+    expect(reply.work?.rounds[0]?.calls[0]?.result).toBeNull();
+  });
+
+  test("takes a stopped work turn's ending from its tool row", () => {
+    const nodes = groupRows([
+      message("user", 1, "user"),
+      message("work", 2, "reply", {
+        slot: "work",
+        finishReason: "tool_calls",
+        toolCalls: [
+          {
+            id: "call-1",
+            name: "websearch",
+            arguments: '{"query":"where"}',
+          },
+        ],
+      }),
+      message("tool", 3, "tool", {
+        status: "stopped",
+        toolCallId: "call-1",
+        toolName: "websearch",
+      }),
+    ]);
+
+    const reply = replyNode(nodes);
+    expect(reply.message).toBeNull();
+    expect(endedBy(reply)?.id).toBe("tool");
+    expect(endedBy(reply)?.status).toBe("stopped");
   });
 });

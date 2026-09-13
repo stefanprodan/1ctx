@@ -4,8 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import type { WorkNode } from "../../../src/client/transcript/rows.ts";
 import {
-  counterText,
-  sendCounters,
+  capWord,
+  workJustEnded,
   workSummary,
 } from "../../../src/client/transcript/Work.model.ts";
 import type {
@@ -72,7 +72,6 @@ function send(changes: Partial<SendSummary> = {}): SendSummary {
 function node(changes: Partial<WorkNode> = {}): WorkNode {
   const work = message();
   return {
-    kind: "work",
     sendId: "send-1",
     rows: [work],
     rounds: [{ message: work, calls: [] }],
@@ -91,16 +90,41 @@ function node(changes: Partial<WorkNode> = {}): WorkNode {
 }
 
 describe("work summaries", () => {
-  test("uses the send counters and the answer start for elapsed time", () => {
+  test("shuts only when a running send ends", () => {
+    expect(workJustEnded(true, false)).toBeTrue();
+    expect(workJustEnded(false, false)).toBeFalse();
+    expect(workJustEnded(false, true)).toBeFalse();
+    expect(workJustEnded(true, true)).toBeFalse();
+  });
+
+  test("says how long the work took and counts the launched calls", () => {
     const summary = workSummary(node(), false);
 
     expect(summary).toMatchObject({
-      rounds: 2,
       toolCalls: 1,
+      failed: 0,
       durationMs: 51_000,
       live: false,
     });
-    expect(summary.text).toBe("worked 51 s · 2 rounds · 1 tool call");
+    expect(summary.text).toBe("Worked for 51 s · 1 tool call");
+  });
+
+  test("counts the answer's thinking into the time", () => {
+    const summary = workSummary(
+      node({
+        answer: message({
+          id: "answer-1",
+          slot: "answer",
+          toolCalls: null,
+          createdAt: 61_000,
+          ttftMs: 500,
+          thinkingMs: 4_000,
+        }),
+      }),
+      false,
+    );
+
+    expect(summary.durationMs).toBe(55_500);
   });
 
   test("uses the send end when the send has no answer", () => {
@@ -109,17 +133,35 @@ describe("work summaries", () => {
     expect(summary.durationMs).toBe(51_000);
   });
 
-  test("shows the live wording without an elapsed clock", () => {
-    const summary = workSummary(
-      node({ send: send({ status: "running", finishedAt: null }) }),
-      true,
-    );
+  test("is one word while it runs, with the calls finished so far", () => {
+    const running = node({
+      send: send({ status: "running", finishedAt: null }),
+    });
+    expect(workSummary(running, true).text).toBe("Working");
 
-    expect(summary.text).toBe("working · 1 tool call");
+    const tool = message({
+      id: "call-1",
+      seq: 3,
+      kind: "tool",
+      slot: null,
+      toolCalls: null,
+      toolCallId: "call-1",
+      toolName: "get_current_time",
+    });
+    const withRow = node({
+      rows: [message(), tool],
+      send: send({ status: "running", finishedAt: null }),
+    });
+    expect(workSummary(withRow, true).text).toBe("Working · 1 tool call");
   });
 
-  test("counts rounds and launched calls from the rows without a send", () => {
-    const tool = (id: string, round: number, seq: number) =>
+  test("names the failures and the cap that ended the loop", () => {
+    const tool = (
+      id: string,
+      round: number,
+      seq: number,
+      status: "done" | "failed",
+    ) =>
       message({
         id,
         seq,
@@ -129,32 +171,44 @@ describe("work summaries", () => {
         toolCalls: null,
         toolCallId: id,
         toolName: "websearch",
+        status,
       });
     // the second round asked for two calls; a cap cut them, so no row
     const second = message({
       id: "work-2",
-      seq: 4,
+      seq: 5,
       round: 2,
       toolCalls: [
         { id: "call-2", name: "websearch", arguments: "{}" },
         { id: "call-3", name: "webfetch", arguments: "{}" },
       ],
     });
-    const rows = [message(), tool("call-1", 1, 3), second];
-    const counters = sendCounters(rows, null);
-
-    expect(counters).toEqual({ rounds: 2, toolCalls: 1 });
-    expect(counterText(counters!)).toBe("2 rounds · 1 tool call");
-    expect(workSummary(node({ send: null }), false).rounds).toBe(2);
-  });
-
-  test("has no counters for a send that did no work", () => {
-    const answer = message({ id: "answer-1", slot: "answer", toolCalls: null });
-
-    expect(sendCounters([answer], send())).toBeNull();
-    expect(sendCounters([message()], send({ toolCalls: 0 }))).toEqual({
-      rounds: 2,
-      toolCalls: 0,
+    const rows = [
+      message(),
+      tool("call-1", 1, 3, "failed"),
+      tool("call-1b", 1, 4, "done"),
+      second,
+    ];
+    const capped = node({
+      rows,
+      send: null,
+      answer: message({
+        id: "answer-1",
+        seq: 6,
+        round: 3,
+        slot: "answer",
+        toolCalls: null,
+        finishReason: "tool_limit",
+        createdAt: 61_000,
+      }),
     });
+
+    expect(capWord(rows)).toBeNull();
+    expect(workSummary(capped, false).text).toBe(
+      "Worked for 51 s · 2 tool calls, 1 failed, tool limit",
+    );
+    expect(
+      workSummary(node({ rows, send: null, answer: null }), false).text,
+    ).toBe("Worked for 10 s · 2 tool calls, 1 failed");
   });
 });
