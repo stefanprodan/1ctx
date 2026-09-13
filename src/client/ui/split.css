@@ -71,7 +71,15 @@
     color: var(--fg);
   }
 
-  /* an agent: a small tile, the name, the model faint after it */
+  /* an agent: a small tile, the name over the model in faint mono */
+  .split-stack {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+    padding: 2px 0;
+  }
   .split-tile {
     display: inline-flex;
     align-items: center;
@@ -91,6 +99,7 @@
     color: var(--fg);
   }
   .split-faint {
+    display: block;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

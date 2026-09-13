@@ -308,7 +308,9 @@ violation, and every rule has a rejected fixture under
   sections of plain lines in the 280px aside at the right, no boxes;
   under 1100 the aside drops below. The aside holds only honest numbers: the agents and the past
   seven days from `GET /api/usage/week` on Home, the About facts on a
-  project. Times in a list are `ago()` and `elapsed()` in
+  project, an agent as its name over its model, through `ui/Fit.tsx`, which
+  shows the short form of a text (the model without its org) when the
+  long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
   ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
 - **One shell, two widths, no header.** `app/shell.ts` holds the

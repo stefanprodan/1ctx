@@ -55,3 +55,10 @@ export function thinkingLine(
     .filter((s) => s !== "")
     .join(" · ");
 }
+
+// the model's own name, the org before the slash gone: what a narrow
+// line shows when "org/name" does not fit
+export function shortModel(id: string): string {
+  const slash = id.lastIndexOf("/");
+  return slash === -1 ? id : id.slice(slash + 1);
+}

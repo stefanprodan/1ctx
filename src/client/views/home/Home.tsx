@@ -9,6 +9,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { shortModel } from "../../agents/meta.ts";
 import { navigate, query } from "../../app/router.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { me } from "../../data/me.ts";
@@ -24,6 +25,7 @@ import { AvatarIcon } from "../../lib/avatars.tsx";
 import { count } from "../../lib/format.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
+import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import {
@@ -97,8 +99,14 @@ export function Home() {
                     <span class="split-tile">
                       <AvatarIcon name={a.avatar} size={13} />
                     </span>
-                    <span class="split-name">{a.name}</span>
-                    <span class="split-faint">{a.model.id}</span>
+                    <span class="split-stack">
+                      <span class="split-name">{a.name}</span>
+                      <Fit
+                        class="split-faint"
+                        long={a.model.id}
+                        short={shortModel(a.model.id)}
+                      />
+                    </span>
                   </div>
                 ))
               )}

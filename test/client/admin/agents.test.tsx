@@ -7,6 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { shortModel } from "../../../src/client/agents/meta.ts";
 import { railRows } from "../../../src/client/app/routes.ts";
 import {
   agents,
@@ -101,6 +102,14 @@ afterEach(() => {
 });
 
 describe("the words", () => {
+  test("the model's own name, the org gone", () => {
+    expect(shortModel("openrouter/free")).toBe("free");
+    expect(shortModel("stefanprodan/Ornith-1.5-35B-A3B")).toBe(
+      "Ornith-1.5-35B-A3B",
+    );
+    expect(shortModel("gpt-oss-120b")).toBe("gpt-oss-120b");
+  });
+
   test("window, price and key", () => {
     expect(windowLine(128000)).toBe("128k");
     expect(windowLine(1048576)).toBe("1M");

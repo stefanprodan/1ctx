@@ -40,10 +40,20 @@ describe("Home", () => {
         name: "assistant",
         avatar: "bot",
         providerId: "pr1",
-        model: "small",
+        model: {
+          id: "acme/small",
+          name: "Small",
+          contextLength: null,
+          promptPrice: null,
+          completionPrice: null,
+          tools: false,
+          reasoning: false,
+        },
         thinking: null,
         effort: null,
-      } as never,
+        prompt: "",
+        createdAt: 1_756_684_800_000,
+      },
     ];
     list.value = null;
     week.value = null;
@@ -59,6 +69,7 @@ describe("Home", () => {
     expect(html).toContain("Loading");
     // the aside: the agents, and the week once it answers
     expect(html).toContain('class="split-name">assistant<');
+    expect(html).toContain('class="split-faint">acme/small<');
     expect(html).not.toContain("Manage");
     week.value = {
       since: 0,
