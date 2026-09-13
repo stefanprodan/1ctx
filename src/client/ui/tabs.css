@@ -30,11 +30,4 @@
     color: var(--fg);
     border-bottom-color: var(--fg);
   }
-
-  .tabs-count {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    font-weight: 400;
-    color: var(--faint);
-  }
 }

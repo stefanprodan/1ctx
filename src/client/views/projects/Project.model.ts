@@ -11,12 +11,10 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-// Feed carries no count: the list is capped, so a number would lie
-// on a busy project
-export function tabsOf(id: string, members: number | null): Tab[] {
+export function tabsOf(id: string): Tab[] {
   return [
     { label: "Feed", href: `/projects/${id}` },
-    { label: "Members", href: `/projects/${id}/members`, count: members },
+    { label: "Members", href: `/projects/${id}/members` },
   ];
 }
 

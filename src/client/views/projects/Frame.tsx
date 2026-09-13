@@ -30,9 +30,7 @@ export function Frame({
   const row = project.value;
   const shown = row !== null && row.id === id ? row : null;
   const listed = projects.value?.find((p) => p.id === id);
-  // the users are on the row; the agents are counted with them once
-  // membership makes that number the project's own
-  const tabs = tabsOf(id, shown?.members.length ?? null);
+  const tabs = tabsOf(id);
   const agents = projectAgents.value;
   return (
     <Page

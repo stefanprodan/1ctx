@@ -4,7 +4,8 @@
 // A page in two columns: the content, and a quiet aside at its right
 // with a few sections of plain lines, as a repository page has its
 // About column. Wide screens get structure instead of rows stretched
-// across them; under 1100 the aside drops below the content.
+// across them; under 1100, a tablet or a phone, the aside is hidden
+// and the content has the width.
 
 import type { ComponentChildren } from "preact";
 import "./split.css";

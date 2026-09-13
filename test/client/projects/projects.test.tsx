@@ -202,7 +202,6 @@ describe("the pages", () => {
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/projects/p1/members"',
     );
-    expect(html).toContain('<span class="tabs-count">1</span>');
     expect(html).toContain('class="projects-avatar">OP<');
     expect(html).toContain("@oana");
     expect(html).toContain("Loading");

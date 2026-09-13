@@ -306,7 +306,7 @@ violation, and every rule has a rejected fixture under
 - **A page with an aside is `ui/Split.tsx`.** Home and the project
   pages put their content in the main column, 900px at most, and
   sections of plain lines in the 280px aside at the right, no boxes;
-  under 1100 the aside drops below. The aside holds only honest numbers: the agents and the past
+  under 1100, a tablet or a phone, the aside is hidden. The aside holds only honest numbers: the agents and the past
   seven days from `GET /api/usage/week` on Home, the About facts on a
   project, an agent as its name over its model, through `ui/Fit.tsx`, which
   shows the short form of a text (the model without its org) when the
