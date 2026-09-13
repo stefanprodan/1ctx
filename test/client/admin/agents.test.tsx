@@ -295,6 +295,7 @@ describe("the rail", () => {
     const group = rows.find((r) => r.kind === "group");
     expect(group?.kind === "group" && group.name).toBe("Admin");
     expect(group?.kind === "group" && group.routes.map((r) => r.path)).toEqual([
+      "/admin/projects",
       "/admin/users",
       "/admin/agents",
       "/admin/tools",

@@ -122,6 +122,24 @@ export class SessionStore {
     );
   }
 
+  count(projectId: string): number {
+    return this.db
+      .query<{ n: number }, [string]>(
+        "select count(*) as n from sessions where project_id = ?",
+      )
+      .get(projectId)!.n;
+  }
+
+  running(projectId: string): boolean {
+    return (
+      this.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from sessions where project_id = ? and status = 'running'",
+        )
+        .get(projectId)!.n > 0
+    );
+  }
+
   usesAgent(agentId: string): boolean {
     return (
       this.db

@@ -159,8 +159,20 @@ describe("Home.model", () => {
     expect(personalOf(null)).toBeNull();
     expect(
       personalOf([
-        { id: "p2", kind: "team", name: "platform" },
-        { id: "p1", kind: "personal", name: "oana" },
+        {
+          id: "p2",
+          kind: "team",
+          name: "platform",
+          createdAt: 0,
+          memberCount: 1,
+        },
+        {
+          id: "p1",
+          kind: "personal",
+          name: "oana",
+          createdAt: 0,
+          memberCount: 1,
+        },
       ])?.id,
     ).toBe("p1");
   });

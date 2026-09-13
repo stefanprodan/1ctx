@@ -1,22 +1,37 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Projects: the container everything lives in. Only the personal
-// project exists so far, made with the user.
+// Projects: the personal and team containers everything lives in.
 
 import type { Db } from "../db/index.ts";
+import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
-import { type AccessPort, routes, type UsersPort } from "./routes.ts";
+import {
+  type AccessPort,
+  routes,
+  type SessionsPort,
+  type UsagePort,
+  type UsersPort,
+} from "./routes.ts";
 import { type ProjectRow, ProjectStore } from "./store.ts";
 
-export { type AccessPort, type RoutesDeps, routes } from "./routes.ts";
+export {
+  type AccessPort,
+  type RoutesDeps,
+  routes,
+  type SessionsPort,
+  type UsagePort,
+} from "./routes.ts";
 export { type ProjectRow, ProjectStore, summary } from "./store.ts";
 export { visible } from "./visible.ts";
 
 export type ProjectsDeps = {
   db: Db;
+  clock: Clock;
   access: AccessPort;
   users: UsersPort;
+  sessions: SessionsPort;
+  usage: UsagePort;
 };
 
 export type Projects = {
@@ -25,7 +40,7 @@ export type Projects = {
   isMember(projectId: string, userId: string): boolean;
   memberProjectIds(userId: string): string[];
   teamProjectIds(): string[];
-  nameTaken(name: string): boolean;
+  nameTaken(name: string, exceptId?: string): boolean;
   renamePersonal(userId: string, name: string): void;
   createPersonal(fields: { userId: string; name: string; now: number }): void;
   routes: RouteDescriptor[];
@@ -39,11 +54,19 @@ export function projectsArea(deps: ProjectsDeps): Projects {
     isMember: (projectId, userId) => store.isMember(projectId, userId),
     memberProjectIds: (userId) => store.memberProjectIds(userId),
     teamProjectIds: () => store.teamProjectIds(),
-    nameTaken: (name) => store.nameTaken(name),
+    nameTaken: (name, exceptId) => store.nameTaken(name, exceptId),
     renamePersonal: (userId, name) => store.renamePersonal(userId, name),
     createPersonal: (fields) => {
       store.createPersonal(fields);
     },
-    routes: routes({ store, access: deps.access, users: deps.users }),
+    routes: routes({
+      db: deps.db,
+      store,
+      access: deps.access,
+      users: deps.users,
+      sessions: deps.sessions,
+      usage: deps.usage,
+      clock: deps.clock,
+    }),
   };
 }

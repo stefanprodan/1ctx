@@ -112,9 +112,21 @@ describe("GET /api/projects", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       projects: [
-        { id: expect.any(String), kind: "personal", name: "admin" },
-        { id: "t-aa", kind: "team", name: "aa" },
-        { id: "t-zed", kind: "team", name: "zed" },
+        {
+          id: expect.any(String),
+          kind: "personal",
+          name: "admin",
+          createdAt: expect.any(Number),
+          memberCount: 1,
+        },
+        { id: "t-aa", kind: "team", name: "aa", createdAt: 0, memberCount: 1 },
+        {
+          id: "t-zed",
+          kind: "team",
+          name: "zed",
+          createdAt: 0,
+          memberCount: 1,
+        },
       ],
     });
   });
@@ -135,6 +147,8 @@ describe("GET /api/projects/:id", () => {
         kind: "personal",
         name: "admin",
         createdAt: admin.createdAt,
+        memberCount: 1,
+        chats: 0,
         members: [
           {
             id: admin.id,

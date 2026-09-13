@@ -574,7 +574,7 @@ describe("DELETE /api/sessions/:id", () => {
     chat.app.socket.dispose();
   });
 
-  test("refuses a chat in a team project until its rule is decided", async () => {
+  test("the owner deletes a chat in a team project", async () => {
     const chat = await chatApp();
     chat.app.db
       .query(
@@ -588,18 +588,13 @@ describe("DELETE /api/sessions/:id", () => {
       .run(chat.memberId);
     const started = await startChat(chat, "hello", chat.member, "t1");
     await finish(started.script);
-    const refused = await chat.member.call(
+    const deleted = await chat.member.call(
       "DELETE",
       `/api/sessions/${started.sessionId}`,
     );
-    expect(refused.status).toBe(403);
-    expect(chat.app.sessions.byId(started.sessionId)).not.toBeNull();
+    expect(deleted.status).toBe(200);
+    expect(chat.app.sessions.byId(started.sessionId)).toBeNull();
     chat.app.socket.dispose();
-  });
-
-  test.skip("a visible non-owner cannot delete a chat", () => {
-    // Team projects have no route yet, so v0 cannot make another owner
-    // visible through supported application behavior.
   });
 });
 
@@ -860,6 +855,7 @@ describe("the usage on the summary", () => {
 const noUsage: UsagePort = {
   latest: () => null,
   latestFor: () => new Map(),
+  deleteSession: () => 0,
 };
 
 function seededStore() {

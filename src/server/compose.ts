@@ -24,9 +24,13 @@ import {
 } from "./providers/index.ts";
 import { renderMarkdown } from "./render/index.ts";
 import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
-import { type SessionStore, sessionsArea } from "./sessions/index.ts";
+import {
+  type SessionStore,
+  type Sessions,
+  sessionsArea,
+} from "./sessions/index.ts";
 import { type Tools, toolsArea } from "./tools/index.ts";
-import { type UsageStore, usageArea } from "./usage/index.ts";
+import { type Usage, type UsageStore, usageArea } from "./usage/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
 import { healthRoute } from "./web/health.ts";
 import { type Router, router } from "./web/router.ts";
@@ -74,23 +78,19 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock, secret } = options;
   // Ports that point down the list, at an area built after the one that
   // holds them, are closures called once the list is complete: a user
-  // is made with its personal project, a provider an agent runs on and
-  // an agent a chat runs on cannot go, a project route asks access
-  // what the principal may see, and the session detail asks the runner
-  // for the reply in flight.
+  // is made with its personal project, project routes read sessions and
+  // usage built later, a provider an agent runs on and an agent a chat
+  // runs on cannot go, a project route asks access what the principal
+  // may see, and the session detail asks the runner for the reply in
+  // flight.
+  let usage!: Usage;
+  let sessions!: Sessions;
   const users = usersArea({
     db,
     secret,
     clock,
     log: options.log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
-  });
-  const usage = usageArea({
-    db,
-    clock,
-    access: {
-      visibleProjectIds: (userId) => access.visibleProjectIds(userId),
-    },
   });
   const limits = limitsArea({ db, clock });
   const providers = providersArea({
@@ -102,8 +102,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
   });
   const projects = projectsArea({
     db,
+    clock,
     access: { project: (principal, id) => access.project(principal, id) },
     users,
+    sessions: {
+      count: (projectId) => sessions.store.count(projectId),
+      running: (projectId) => sessions.store.running(projectId),
+    },
+    usage: {
+      deleteProject: (projectId) => usage.deleteProject(projectId),
+    },
   });
   const access: Access = accessArea({
     db,
@@ -113,6 +121,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     projects,
   });
+  usage = usageArea({
+    db,
+    clock,
+    access: {
+      visibleProjectIds: (userId) => access.visibleProjectIds(userId),
+    },
+  });
   const agents = agentsArea({
     db,
     clock,
@@ -120,7 +135,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
   });
-  const sessions = sessionsArea({
+  sessions = sessionsArea({
     db,
     clock,
     log: options.log("sessions"),

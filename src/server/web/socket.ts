@@ -120,7 +120,11 @@ export function socketArea(deps: SocketDeps): Socket {
       conn.data.projects.delete(id);
       deliver(conn, { type: "revoked", projectId: id });
     }
-    for (const id of next) conn.data.projects.add(id);
+    for (const id of next) {
+      if (conn.data.projects.has(id)) continue;
+      conn.data.projects.add(id);
+      deliver(conn, { type: "granted", projectId: id });
+    }
     const watching = conn.data.watching;
     if (watching !== null) {
       const project = deps.sessionProject(conn.data.principal, watching);

@@ -39,7 +39,15 @@ describe("Home", () => {
       mustChangePassword: false,
     };
     query.value = "";
-    projects.value = [{ id: "p1", kind: "personal", name: "oana" }];
+    projects.value = [
+      {
+        id: "p1",
+        kind: "personal",
+        name: "oana",
+        createdAt: 0,
+        memberCount: 1,
+      },
+    ];
     projectAgents.value = [
       {
         id: "a1",

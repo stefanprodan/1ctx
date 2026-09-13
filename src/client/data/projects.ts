@@ -18,8 +18,10 @@ import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
+import type { SocketEvent } from "../../shared/socket.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { onSocketEvent } from "./socket.ts";
 
 export const projects = signal<ProjectSummary[] | null>(null);
 export const projectsError = signal<string | null>(null);
@@ -27,15 +29,14 @@ export const project = signal<ProjectDetail | null>(null);
 export const projectError = signal<string | null>(null);
 
 let owner: string | null = null;
-let listing: Promise<void> | null = null;
-let marks: object = {};
+let listTurn = 0;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 
 effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
   owner = id;
-  listing = null;
+  listTurn++;
   wanted = { id: "", turn: wanted.turn + 1 };
   projects.value = null;
   projectsError.value = null;
@@ -46,27 +47,20 @@ effect(() => {
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
-// one request at a time: the rail and the page asking together share it
-export function loadProjects(): Promise<void> {
-  if (listing !== null) return listing;
+export async function loadProjects(): Promise<void> {
   const forUser = owner;
+  const turn = ++listTurn;
   projectsError.value = null;
-  // this request's mark: a later user change replaces the shared
-  // promise, and only the request that still holds it clears it
-  const mark = {};
-  marks = mark;
-  const run = (async () => {
-    try {
-      const body = await api<ProjectsResponse>("/api/projects");
-      if (owner === forUser) projects.value = body.projects;
-    } catch (err) {
-      if (owner === forUser) projectsError.value = reason(err);
-    } finally {
-      if (marks === mark) listing = null;
+  try {
+    const body = await api<ProjectsResponse>("/api/projects");
+    if (owner === forUser && listTurn === turn) {
+      projects.value = body.projects;
     }
-  })();
-  listing = run;
-  return run;
+  } catch (err) {
+    if (owner === forUser && listTurn === turn) {
+      projectsError.value = reason(err);
+    }
+  }
 }
 
 export async function loadProject(id: string): Promise<void> {
@@ -83,3 +77,11 @@ export async function loadProject(id: string): Promise<void> {
     if (wanted.turn === turn) projectError.value = reason(err);
   }
 }
+
+function onAccessChanged(event: SocketEvent): void {
+  if (event.type === "granted" || event.type === "revoked") {
+    void loadProjects();
+  }
+}
+
+onSocketEvent(onAccessChanged);

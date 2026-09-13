@@ -11,6 +11,7 @@
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
@@ -132,6 +133,18 @@ export const ROUTES: Route[] = [
       if (project.value?.id !== projectId) await loadProject(projectId);
       await loadProjectAgents(projectId);
     },
+  },
+  {
+    path: "/admin/projects",
+    view: lazy(() =>
+      import("../views/admin/AdminProjects.tsx").then((m) => m.AdminProjects),
+    ),
+    title: () => "Projects",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadAdminProjects(), loadUsers()]);
+    },
+    nav: { label: "Projects", icon: "projects", order: 8, group: "Admin" },
   },
   {
     path: "/admin/users",

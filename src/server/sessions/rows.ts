@@ -47,6 +47,7 @@ export type RawSession = {
 export type UsagePort = {
   latest(sessionId: string): RoundUsage | null;
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
+  deleteSession(sessionId: string): number;
 };
 
 export const session = (

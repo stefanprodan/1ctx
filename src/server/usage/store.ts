@@ -168,6 +168,18 @@ export class UsageStore {
     );
   }
 
+  deleteProject(projectId: string): number {
+    return this.db
+      .query("delete from usage where project_id = ?")
+      .run(projectId).changes;
+  }
+
+  deleteSession(sessionId: string): number {
+    return this.db
+      .query("delete from usage where session_id = ?")
+      .run(sessionId).changes;
+  }
+
   // the last round the provider counted for a session
   latest(sessionId: string): RoundUsage | null {
     const raw = this.db

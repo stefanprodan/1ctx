@@ -16,7 +16,7 @@ import type {
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -37,6 +37,8 @@ export type SocketEvent =
       last?: LastLine;
     }
   | { type: "deleted"; projectId: string; sessionId: string }
+  // the connection may now see the project
+  | { type: "granted"; projectId: string }
   // the connection may no longer see the project
   | { type: "revoked"; projectId: string }
   // the answer to a watch: the send in flight as far as it got

@@ -58,6 +58,12 @@ export function Frame({
                   </span>
                   {plural(shown.members.length, "user")}
                 </a>
+                <div class="split-line">
+                  <span class="split-tile">
+                    <Icon name="chat" size={13} />
+                  </span>
+                  {plural(shown.chats, "chat")}
+                </div>
                 <a class="split-line split-link" href={tabs[1].href}>
                   <span class="split-tile">
                     <Icon name="agents" size={13} />

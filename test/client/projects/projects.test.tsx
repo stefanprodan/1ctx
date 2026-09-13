@@ -34,7 +34,13 @@ const oana: Me = {
   role: "member",
   mustChangePassword: false,
 };
-const personal = { id: "p1", kind: "personal" as const, name: "oana" };
+const personal = {
+  id: "p1",
+  kind: "personal" as const,
+  name: "oana",
+  createdAt: 0,
+  memberCount: 1,
+};
 
 const realFetch = globalThis.fetch;
 let answer: () => unknown;
@@ -60,7 +66,7 @@ describe("the projects entity", () => {
 
   test("drops the list with the signed-in user", async () => {
     projects.value = [personal];
-    project.value = { ...personal, createdAt: 0, members: [oana] };
+    project.value = { ...personal, createdAt: 0, chats: 0, members: [oana] };
     me.value = null;
     expect(projects.value).toBeNull();
     expect(project.value).toBeNull();
@@ -84,15 +90,20 @@ describe("the projects entity", () => {
     expect(projectsError.value).toBeNull();
   });
 
-  test("two askers at once share one request", async () => {
-    let calls = 0;
-    answer = () => {
-      calls++;
-      return { projects: [personal] };
-    };
-    await Promise.all([loadProjects(), loadProjects()]);
-    expect(calls).toBe(1);
-    expect(projects.value).toEqual([personal]);
+  test("an older list answer never overwrites a newer one", async () => {
+    const gates: ((rows: (typeof personal)[]) => void)[] = [];
+    globalThis.fetch = (() =>
+      new Promise<Response>((resolve) => {
+        gates.push((rows) => resolve(Response.json({ projects: rows })));
+      })) as unknown as typeof fetch;
+    const newer = { ...personal, name: "current" };
+    const first = loadProjects();
+    const second = loadProjects();
+    gates[1]([newer]);
+    await second;
+    gates[0]([personal]);
+    await first;
+    expect(projects.value).toEqual([newer]);
   });
 
   test("an older project answer never overwrites a newer one", async () => {
@@ -103,7 +114,14 @@ describe("the projects entity", () => {
         gates.push(() =>
           resolve(
             Response.json({
-              project: { ...personal, id, name: id, createdAt: 0, members: [] },
+              project: {
+                ...personal,
+                id,
+                name: id,
+                createdAt: 0,
+                chats: 0,
+                members: [],
+              },
             }),
           ),
         );
@@ -129,7 +147,13 @@ describe("the projects entity", () => {
             id === "p1"
               ? Response.json({ error: "no such project" }, { status: 404 })
               : Response.json({
-                  project: { ...personal, id, createdAt: 0, members: [] },
+                  project: {
+                    ...personal,
+                    id,
+                    createdAt: 0,
+                    chats: 0,
+                    members: [],
+                  },
                 }),
           ),
         );
@@ -147,7 +171,10 @@ describe("the projects entity", () => {
 
 describe("the rail", () => {
   test("lists the projects under Projects", () => {
-    projects.value = [personal, { id: "p2", kind: "team", name: "ops" }];
+    projects.value = [
+      personal,
+      { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 1 },
+    ];
     const html = render(<Rail user={oana} narrow={false} onHide={() => {}} />);
     expect(html).toContain('href="/projects"');
     expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
@@ -184,7 +211,7 @@ describe("the pages", () => {
   });
 
   test("Project renders the feed of the project on screen only", () => {
-    project.value = { ...personal, createdAt: 0, members: [oana] };
+    project.value = { ...personal, createdAt: 0, chats: 0, members: [oana] };
     const html = render(<Project params={{ id: "p1" }} />);
     expect(html).toContain("yours alone");
     expect(html).toContain("1 user</a>");
@@ -197,7 +224,7 @@ describe("the pages", () => {
   });
 
   test("Members renders the users and the agents of the project", () => {
-    project.value = { ...personal, createdAt: 0, members: [oana] };
+    project.value = { ...personal, createdAt: 0, chats: 0, members: [oana] };
     projectAgents.value = null;
     let html = render(<Members params={{ id: "p1" }} />);
     expect(html).toContain(
@@ -242,7 +269,9 @@ describe("the pages", () => {
   });
 
   test("Project heads with the name from the list while loading", () => {
-    projects.value = [{ id: "p9", kind: "team", name: "ops" }];
+    projects.value = [
+      { id: "p9", kind: "team", name: "ops", createdAt: 0, memberCount: 1 },
+    ];
     const html = render(<Project params={{ id: "p9" }} />);
     expect(html).toContain('class="page-crumb-on">ops<');
     expect(html).toContain("Loading");

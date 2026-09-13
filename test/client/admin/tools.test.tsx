@@ -289,7 +289,7 @@ describe("the page", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual(["Users", "Agents", "Tools"]);
+    expect(labels).toEqual(["Projects", "Users", "Agents", "Tools"]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });
 

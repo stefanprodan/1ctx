@@ -162,10 +162,13 @@ violation, and every rule has a rejected fixture under
   project, named after the username, in one transaction through
   `createUser()` in `users/`; nothing else creates a user, tests
   included. A personal project is its owner's alone, an admin
-  included; a team project is open to its members and to admins. A
-  handler gets a project through `access.project(principal, id)`,
-  which answers the same 404 whether the project is missing or not
-  theirs to see. The rule is `projects/visible.ts`, pure.
+  included. Admins make, rename, fill and delete team projects; names
+  are unique across personal and team projects. A team project is open
+  to its members and to admins. Deleting one takes its chats and their
+  usage and is refused while a chat runs. A handler gets a project
+  through `access.project(principal, id)`, which answers the same 404
+  whether the project is missing or not theirs to see. The rule is
+  `projects/visible.ts`, pure.
 - **Secrets are files.** One bare value per `<name>.key` in the secrets
   directory, read by the holder, never logged, never returned by a
   route, never a database row.
@@ -226,9 +229,10 @@ violation, and every rule has a rejected fixture under
   them in `removedMessageIds`; 409 while the session runs, 400 when
   the last message is the user's.
   Rename (`PATCH /api/sessions/:id`, the composer's `/rename <title>`)
-  and delete are the owner's, 409 while the session runs; a rename is
-  one revision and one envelope without rows, and a delete is refused
-  in a team project until its rule is decided.
+  and delete are the session owner's or, in a team project, an admin's;
+  a member who did not start the chat gets 403. Neither may change a
+  running chat; a rename is one revision and one envelope without rows,
+  and a delete removes its usage rows.
 - **Compaction is a final provider round.** A summary is a message of
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through
@@ -270,8 +274,8 @@ violation, and every rule has a rejected fixture under
   goes to the connections watching its session, straight from the
   writer through a port. `watch` is authorized through a port to
   sessions and answered with `watched` and the runner's live snapshot.
-  `access.changed` recomputes a connection's set and sends `revoked`
-  for a project that left it; `login.revoked` closes the login's
+  `access.changed` recomputes a connection's set and sends `granted`
+  for a project that joined it or `revoked` for one that left it; `login.revoked` closes the login's
   connections, and the expiry sweep publishes it too. Backpressure
   closes a slow connection; a dropped frame closes with 1013; the
   client reloads on every open. The upgrade is `GET /api/socket` with

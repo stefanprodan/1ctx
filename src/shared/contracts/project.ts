@@ -12,9 +12,12 @@ export type ProjectSummary = {
   kind: ProjectKind;
   // the personal project is named after its user
   name: string;
+  createdAt: number;
+  // the membership rows, so a list row counts people without the detail
+  memberCount: number;
 };
 
 export type ProjectDetail = ProjectSummary & {
-  createdAt: number;
   members: UserSummary[];
+  chats: number;
 };

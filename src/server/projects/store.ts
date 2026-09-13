@@ -6,7 +6,10 @@ import type { ProjectKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
-export type ProjectRow = ProjectSummary & {
+export type ProjectRow = {
+  id: string;
+  kind: ProjectKind;
+  name: string;
   ownerId: string;
   createdAt: number;
 };
@@ -27,10 +30,15 @@ const row = (raw: Raw): ProjectRow => ({
   createdAt: raw.created_at,
 });
 
-export const summary = (project: ProjectRow): ProjectSummary => ({
+export const summary = (
+  project: ProjectRow,
+  memberCount: number,
+): ProjectSummary => ({
   id: project.id,
   kind: project.kind,
   name: project.name,
+  createdAt: project.createdAt,
+  memberCount,
 });
 
 export class ProjectStore {
@@ -43,22 +51,25 @@ export class ProjectStore {
     return raw ? row(raw) : null;
   }
 
-  // the projects a user is a member of: the personal one first, then
-  // the rest by name
-  forUser(userId: string): ProjectRow[] {
+  visibleFor(userId: string, admin: boolean): ProjectSummary[] {
     return this.db
-      .query<Raw, [string]>(
-        `select p.* from projects p
-         join memberships m on m.project_id = p.id
-         where m.user_id = ?
+      .query<Raw & { member_count: number }, [string, number, string]>(
+        `select p.*,
+                (select count(*) from memberships c where c.project_id = p.id)
+                  as member_count
+         from projects p
+         where (p.kind = 'personal' and p.owner_id = ?)
+            or (p.kind = 'team' and
+                (? = 1 or exists (
+                  select 1 from memberships m
+                  where m.project_id = p.id and m.user_id = ?
+                )))
          order by p.kind = 'personal' desc, p.name`,
       )
-      .all(userId)
-      .map(row);
+      .all(userId, admin ? 1 : 0, userId)
+      .map((raw) => summary(row(raw), raw.member_count));
   }
 
-  // the ids a user is a member of, and the team projects an admin sees
-  // without being one; the two halves of the visible set
   memberProjectIds(userId: string): string[] {
     return this.db
       .query<{ project_id: string }, [string]>(
@@ -103,13 +114,64 @@ export class ProjectStore {
       .map((r) => r.user_id);
   }
 
-  nameTaken(name: string): boolean {
+  nameTaken(name: string, exceptId?: string): boolean {
+    const found =
+      exceptId === undefined
+        ? this.db
+            .query<{ n: number }, [string]>(
+              "select count(*) as n from projects where name = ?",
+            )
+            .get(name)!.n
+        : this.db
+            .query<{ n: number }, [string, string]>(
+              "select count(*) as n from projects where name = ? and id != ?",
+            )
+            .get(name, exceptId)!.n;
+    return found > 0;
+  }
+
+  createTeam(fields: {
+    ownerId: string;
+    name: string;
+    now: number;
+  }): ProjectRow {
+    const id = newId();
+    this.db
+      .query(
+        "insert into projects (id, kind, name, owner_id, created_at) values (?, 'team', ?, ?, ?)",
+      )
+      .run(id, fields.name, fields.ownerId, fields.now);
+    return this.byId(id)!;
+  }
+
+  rename(id: string, name: string): ProjectRow | null {
+    this.db
+      .query("update projects set name = ? where id = ? and kind = 'team'")
+      .run(name, id);
+    return this.byId(id);
+  }
+
+  remove(id: string): boolean {
     return (
       this.db
-        .query<{ n: number }, [string]>(
-          "select count(*) as n from projects where name = ?",
-        )
-        .get(name)!.n > 0
+        .query("delete from projects where id = ? and kind = 'team'")
+        .run(id).changes > 0
+    );
+  }
+
+  addMember(projectId: string, userId: string, now: number): void {
+    this.db
+      .query(
+        "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
+      )
+      .run(projectId, userId, now);
+  }
+
+  removeMember(projectId: string, userId: string): boolean {
+    return (
+      this.db
+        .query("delete from memberships where project_id = ? and user_id = ?")
+        .run(projectId, userId).changes > 0
     );
   }
 
@@ -122,8 +184,7 @@ export class ProjectStore {
       .run(name, userId);
   }
 
-  // the personal project of a user, with the user as its one member;
-  // called inside the transaction that creates the user
+  // the user and their project must either both exist or neither does
   createPersonal(fields: { userId: string; name: string; now: number }) {
     const id = newId();
     this.db
