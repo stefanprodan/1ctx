@@ -36,6 +36,13 @@ function id(value: unknown, what: string): string {
   return value;
 }
 
+export function parseMessageId(value: unknown): string {
+  if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
+    throw new BadRequest("messageId must be an id");
+  }
+  return value;
+}
+
 export function parseCreateSession(body: unknown): CreateSessionRequest {
   const b = fields(body, ["projectId", "agentId", "message"]);
   return {

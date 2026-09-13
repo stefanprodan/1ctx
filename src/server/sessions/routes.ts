@@ -9,14 +9,15 @@
 import type {
   SessionResponse,
   SessionsResponse,
+  ToolResultResponse,
 } from "../../shared/api/sessions.ts";
 import type { LiveSend } from "../../shared/contracts/session.ts";
 import { type Db, transact } from "../db/index.ts";
-import { Conflict, Forbidden } from "../lib/errors.ts";
+import { Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import { parseStreamQuery } from "./parse.ts";
-import type { SessionRow } from "./rows.ts";
+import { parseMessageId, parseStreamQuery } from "./parse.ts";
+import { cutResult, offWire, type SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
 
 export type AccessPort = {
@@ -45,7 +46,7 @@ export function detail(
 ): SessionResponse {
   return {
     session,
-    messages: store.messages(session.id),
+    messages: store.messages(session.id).map(offWire),
     send: store.lastSend(session.id),
     live,
   };
@@ -75,6 +76,28 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const session = deps.visible(ctx.principal!, ctx.params.id);
         return json(detail(deps.store, session, deps.live(session.id)));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/sessions/:id/messages/:messageId/result",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const session = deps.visible(ctx.principal!, ctx.params.id);
+        const messageId = parseMessageId(ctx.params.messageId);
+        const message = deps.store.message(messageId);
+        if (
+          message === null ||
+          message.sessionId !== session.id ||
+          message.kind !== "tool"
+        ) {
+          throw new NotFound("no such tool result");
+        }
+        const body: ToolResultResponse = {
+          ...cutResult(message.content),
+          bytes: Buffer.byteLength(message.content, "utf8"),
+        };
+        return json(body);
       },
     },
     {

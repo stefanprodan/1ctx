@@ -62,7 +62,12 @@ export type Message = {
   // who wrote it: a user for a user message, an agent for a reply
   userId: string | null;
   agentId: string | null;
+  // a tool result stays in storage but travels as empty content; every
+  // other row carries its content unchanged
   content: string;
+  // the UTF-8 byte length of stored tool content on the wire; null on
+  // every non-tool row
+  resultBytes: number | null;
   reasoning: string;
   // the rendered content, empty for a user message
   html: string;

@@ -227,9 +227,12 @@ violation, and every rule has a rejected fixture under
   `send_id` and `round`, and a reply row its `slot`, `work` or `answer`,
   written by the server: at the first call delta, or when the round
   ends. The client groups by send and slot and never infers placement
-  from the call arrays, the finish reason or the live map. Widening a
-  table check is an appended migration that rebuilds the table in
-  place (create, copy, drop, rename) and keeps the rows.
+  from the call arrays, the finish reason or the live map. A tool row
+  travels without its result; detail and envelopes carry `resultBytes`,
+  and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
+  at the display cap. The runner reads the full row from the store.
+  Widening a table check is an appended migration that rebuilds the
+  table in place (create, copy, drop, rename) and keeps the rows.
 - **The socket is per connection, never a topic.** `web/socket.ts`
   keeps every connection by user with the project ids the user may see,
   from `access.visibleProjectIds()` (memberships, plus every team

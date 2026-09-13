@@ -10,10 +10,12 @@ import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import {
   RESTART_ERROR,
+  RESULT_DISPLAY_CHARS,
   SessionStore,
   titleFrom,
   type UsagePort,
 } from "../../src/server/sessions/index.ts";
+import type { Tools } from "../../src/server/tools/index.ts";
 import { fakeFetch, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -21,6 +23,7 @@ import {
   type Script,
   startChat,
   tick,
+  waitScript,
 } from "../helpers/chat.ts";
 import { memoryDb } from "../helpers/db.ts";
 
@@ -29,6 +32,28 @@ async function finish(script: Script, content = "done") {
   await tick();
   await tick();
 }
+
+function fixedTools(content: string): Tools {
+  return {
+    offered: () => ({
+      tools: [
+        {
+          name: "get_current_time",
+          description: "the current time",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+      search: null,
+    }),
+    run: () => Promise.resolve({ content, error: false }),
+  };
+}
+
+const timeCall = {
+  id: "time-1",
+  name: "get_current_time",
+  arguments: '{"timezone":"UTC"}',
+};
 
 function addTeam(chat: ChatApp, id: string) {
   chat.app.db
@@ -143,6 +168,228 @@ describe("GET /api/sessions/:id", () => {
     ).toBe(404);
     await finish(mine.script);
     await finish(theirs.script);
+    chat.app.socket.dispose();
+  });
+
+  test("keeps tool results in storage and strips every wire row", async () => {
+    const result = "résultat 🙂";
+    const chat = await chatApp({ tools: fixedTools(result) });
+    const changed: Extract<BusEvent, { type: "session.changed" }>["data"][] =
+      [];
+    const unsubscribe = subscribe((event) => {
+      if (event.type === "session.changed") changed.push(event.data);
+    });
+    const started = await startChat(chat, "use a tool");
+    started.script.toolRound([timeCall]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+
+    const providerTool = (
+      answer.body.messages as { role: string; content: string }[]
+    ).find((message) => message.role === "tool");
+    expect(providerTool?.content).toBe(result);
+
+    const toolEnd = changed.find((event) =>
+      event.messages.some(
+        (message) => message.kind === "tool" && message.status === "done",
+      ),
+    );
+    expect(toolEnd).toBeDefined();
+    expect(
+      toolEnd!.messages.find((message) => message.kind === "tool"),
+    ).toMatchObject({
+      content: "",
+      resultBytes: new TextEncoder().encode(result).length,
+    });
+
+    await finish(answer, "answer");
+    const response = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}`,
+    );
+    const detail = await response.json();
+    const tool = detail.messages.find(
+      (message: { kind: string }) => message.kind === "tool",
+    );
+    expect(tool).toMatchObject({
+      content: "",
+      resultBytes: new TextEncoder().encode(result).length,
+    });
+    expect(
+      detail.messages
+        .filter((message: { kind: string }) => message.kind !== "tool")
+        .every(
+          (message: { resultBytes: number | null }) =>
+            message.resultBytes === null,
+        ),
+    ).toBe(true);
+    expect(detail.messages[0].content).toBe("use a tool");
+    expect(detail.messages.at(-1).content).toBe("answer");
+
+    const stored = chat.app.sessions.message(tool.id)!;
+    expect(stored).toMatchObject({ content: result, resultBytes: null });
+    const resultResponse = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(resultResponse.status).toBe(200);
+    expect(await resultResponse.json()).toEqual({
+      content: result,
+      bytes: new TextEncoder().encode(result).length,
+      cut: false,
+    });
+    unsubscribe();
+    chat.app.socket.dispose();
+  });
+
+  test("a failed tool leaves its error text off the wire too", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "failed tool");
+    const [streaming] = chat.app.sessions.addToolRows([
+      {
+        sessionId: started.sessionId,
+        sendId: started.detail.send.id,
+        round: 1,
+        toolCallId: "failed-call",
+        toolName: "webfetch",
+        now: chat.app.now.value,
+      },
+    ]);
+    const tool = chat.app.sessions.finishTool(streaming!.id, {
+      content: "Error: HTTP status 404",
+      status: "failed",
+      error: "Error: HTTP status 404",
+      finishedAt: chat.app.now.value,
+    })!;
+    const detail = await (
+      await chat.member.call("GET", `/api/sessions/${started.sessionId}`)
+    ).json();
+    expect(
+      detail.messages.find((message: { id: string }) => message.id === tool.id),
+    ).toMatchObject({
+      status: "failed",
+      content: "",
+      error: null,
+      resultBytes: 22,
+    });
+    const result = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(await result.json()).toEqual({
+      content: "Error: HTTP status 404",
+      bytes: 22,
+      cut: false,
+    });
+    await finish(started.script);
+    chat.app.socket.dispose();
+  });
+
+  test("never cuts a result inside a surrogate pair", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "emoji result");
+    const content = `${"a".repeat(RESULT_DISPLAY_CHARS - 1)}\u{1F642}b`;
+    const [streaming] = chat.app.sessions.addToolRows([
+      {
+        sessionId: started.sessionId,
+        sendId: started.detail.send.id,
+        round: 1,
+        toolCallId: "emoji-call",
+        toolName: "webfetch",
+        now: chat.app.now.value,
+      },
+    ]);
+    const tool = chat.app.sessions.finishTool(streaming!.id, {
+      content,
+      status: "done",
+      error: null,
+      finishedAt: chat.app.now.value,
+    })!;
+    const result = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(await result.json()).toEqual({
+      content: "a".repeat(RESULT_DISPLAY_CHARS - 1),
+      bytes: RESULT_DISPLAY_CHARS + 4,
+      cut: true,
+    });
+    await finish(started.script);
+    chat.app.socket.dispose();
+  });
+
+  test("cuts tool result display and rejects unavailable rows", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "long result");
+    const long = "x".repeat(RESULT_DISPLAY_CHARS + 1);
+    const [streaming] = chat.app.sessions.addToolRows([
+      {
+        sessionId: started.sessionId,
+        sendId: started.detail.send.id,
+        round: 1,
+        toolCallId: "long-call",
+        toolName: "webfetch",
+        now: chat.app.now.value,
+      },
+    ]);
+    const tool = chat.app.sessions.finishTool(streaming!.id, {
+      content: long,
+      status: "done",
+      error: null,
+      finishedAt: chat.app.now.value,
+    })!;
+    const response = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      content: "x".repeat(RESULT_DISPLAY_CHARS),
+      bytes: long.length,
+      cut: true,
+    });
+
+    const other = chat.app.sessions.create({
+      projectId: chat.projectId,
+      ownerId: chat.memberId,
+      agentId: chat.agentId,
+      title: "other",
+      now: chat.app.now.value,
+    });
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/${other.id}/messages/${tool.id}/result`,
+        )
+      ).status,
+    ).toBe(404);
+    const replyId = started.detail.messages[1].id;
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/${started.sessionId}/messages/${replyId}/result`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/000000000000/messages/${tool.id}/result`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/${started.sessionId}/messages/bad-id/result`,
+        )
+      ).status,
+    ).toBe(400);
+    await finish(started.script);
     chat.app.socket.dispose();
   });
 });

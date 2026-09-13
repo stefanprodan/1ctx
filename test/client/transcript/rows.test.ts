@@ -181,6 +181,7 @@ const message = (
   userId: kind === "user" ? "u1" : null,
   agentId: kind === "reply" ? "a1" : null,
   content: id,
+  resultBytes: null,
   reasoning: "",
   html: kind === "reply" ? `<p>${id}</p>` : "",
   status: "done",

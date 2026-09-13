@@ -3,11 +3,12 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  DISPLAY_RESULT_CHARS,
+  bytesWord,
   displayResult,
   prettyArguments,
   shortArg,
   toolSummary,
+  wantsResult,
 } from "../../../src/client/transcript/Tool.model.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import type { ToolCall } from "../../../src/shared/contracts/tool.ts";
@@ -30,6 +31,7 @@ function result(changes: Partial<Message> = {}): Message {
     userId: null,
     agentId: null,
     content: "result",
+    resultBytes: 6,
     reasoning: "",
     html: "",
     status: "done",
@@ -88,11 +90,60 @@ describe("tool summaries", () => {
     expect(prettyArguments("{")).toBe("{");
   });
 
-  test("cuts a displayed result without interpreting it", () => {
-    const unsafe = `<b>${"x".repeat(DISPLAY_RESULT_CHARS)}</b>`;
-    const shown = displayResult(result({ content: unsafe }));
+  test("asks for the result once the row is open and the tool ended", () => {
+    expect(wantsResult(true, result(), undefined)).toBeTrue();
+    expect(wantsResult(false, result(), undefined)).toBeFalse();
+    expect(wantsResult(true, null, undefined)).toBeFalse();
+    expect(
+      wantsResult(true, result({ status: "streaming" }), undefined),
+    ).toBeFalse();
+    expect(wantsResult(true, result(), { status: "loading" })).toBeFalse();
+    expect(
+      wantsResult(true, result({ status: "failed" }), undefined),
+    ).toBeTrue();
+  });
 
-    expect(shown.length).toBe(DISPLAY_RESULT_CHARS + 4);
-    expect(shown.endsWith("\n...")).toBeTrue();
+  test("shows the fetched result with its size and the server's cut", () => {
+    expect(displayResult(result(), undefined)).toEqual({
+      label: "result, untrusted",
+      text: "loading",
+      err: false,
+    });
+    expect(
+      displayResult(result(), {
+        status: "done",
+        content: "<b>x</b>",
+        bytes: 8,
+        cut: false,
+      }),
+    ).toEqual({
+      label: "result, untrusted · 8 B",
+      text: "<b>x</b>",
+      err: false,
+    });
+    expect(
+      displayResult(result(), {
+        status: "done",
+        content: "x",
+        bytes: 40_000,
+        cut: true,
+      }),
+    ).toEqual({
+      label: "result, untrusted · 40.0 KB",
+      text: "x\n...",
+      err: false,
+    });
+    expect(
+      displayResult(result(), { status: "failed", error: "not found" }),
+    ).toEqual({ label: "result, untrusted", text: "not found", err: true });
+    expect(displayResult(result({ status: "streaming" }), undefined).text).toBe(
+      "",
+    );
+  });
+
+  test("words a size", () => {
+    expect(bytesWord(812)).toBe("812 B");
+    expect(bytesWord(2_400)).toBe("2.4 KB");
+    expect(bytesWord(1_100_000)).toBe("1.1 MB");
   });
 });

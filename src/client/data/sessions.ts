@@ -19,6 +19,7 @@ import type {
   SendMessageRequest,
   SessionResponse,
   SessionsResponse,
+  ToolResultResponse,
 } from "../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type {
@@ -35,6 +36,7 @@ import {
   liveOf,
   liveOfSnapshot,
 } from "../transcript/stream.ts";
+import type { ToolResult } from "../transcript/Tool.model.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { onSocketEvent, watch } from "./socket.ts";
@@ -51,6 +53,10 @@ export const projectSessions = signal<SessionSummary[] | null>(null);
 export const projectAgents = signal<AgentSummary[] | null>(null);
 // a send the composer asked for and the server has not answered
 export const sending = signal(false);
+
+// the tool results fetched so far, by message id, for the life of the
+// chat on screen
+export const toolResults = signal<ReadonlyMap<string, ToolResult>>(new Map());
 
 type Frame = Extract<SocketEvent, { type: "delta" | "html" }>;
 
@@ -77,6 +83,7 @@ effect(() => {
   session.value = null;
   sessionError.value = null;
   live.value = new Map();
+  toolResults.value = new Map();
   projectSessions.value = null;
   projectAgents.value = null;
   sending.value = false;
@@ -115,9 +122,21 @@ function liveFrom(detail: SessionDetail): Map<string, Live> {
   return map;
 }
 
+// a result held for a row the chat no longer has is dropped with it
+function keepResults(keep: (id: string) => boolean): void {
+  if (toolResults.value.size === 0) return;
+  const next = new Map<string, ToolResult>();
+  for (const [id, value] of toolResults.value) {
+    if (keep(id)) next.set(id, value);
+  }
+  toolResults.value = next;
+}
+
 function show(detail: SessionDetail): void {
   session.value = detail;
   live.value = liveFrom(detail);
+  const ids = new Set(detail.messages.map((m) => m.id));
+  keepResults((id) => ids.has(id));
   stream =
     detail.live === null
       ? null
@@ -131,6 +150,7 @@ export async function loadSession(id: string): Promise<void> {
   if (session.value !== null && session.value.session.id !== id) {
     session.value = null;
     live.value = new Map();
+    toolResults.value = new Map();
   }
   try {
     const detail = await api<SessionResponse>(
@@ -164,7 +184,34 @@ export function leaveSession(): void {
   stream = null;
   session.value = null;
   live.value = new Map();
+  toolResults.value = new Map();
   watch(null);
+}
+
+function setToolResult(messageId: string, value: ToolResult): void {
+  const next = new Map(toolResults.value);
+  next.set(messageId, value);
+  toolResults.value = next;
+}
+
+// once per row: a result already held or in flight is not asked again
+export async function loadToolResult(messageId: string): Promise<void> {
+  const current = session.value;
+  if (current === null || toolResults.value.has(messageId)) return;
+  const id = current.session.id;
+  setToolResult(messageId, { status: "loading" });
+  try {
+    const answer = await api<ToolResultResponse>(
+      `/api/sessions/${encodeURIComponent(id)}/messages/${encodeURIComponent(
+        messageId,
+      )}/result`,
+    );
+    if (session.value?.session.id !== id) return;
+    setToolResult(messageId, { status: "done", ...answer });
+  } catch (err) {
+    if (session.value?.session.id !== id) return;
+    setToolResult(messageId, { status: "failed", error: reason(err) });
+  }
 }
 
 export async function loadProjectSessions(projectId: string): Promise<void> {
@@ -282,6 +329,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   );
   const map = new Map(live.value);
   for (const id of removed) map.delete(id);
+  keepResults((id) => !removed.has(id));
   for (const m of ev.messages) {
     if (m.kind !== "reply") continue;
     if (m.status === "streaming") {
@@ -383,6 +431,7 @@ export function onSocket(ev: SocketEvent): void {
       if (held !== null && held.session.id === ev.sessionId) {
         session.value = null;
         live.value = new Map();
+        toolResults.value = new Map();
         navigate(`/projects/${ev.projectId}`);
       }
       break;
@@ -393,6 +442,7 @@ export function onSocket(ev: SocketEvent): void {
       if (held !== null && held.session.projectId === ev.projectId) {
         session.value = null;
         live.value = new Map();
+        toolResults.value = new Map();
         navigate("/");
       }
       break;

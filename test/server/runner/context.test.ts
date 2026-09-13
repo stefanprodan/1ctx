@@ -69,6 +69,7 @@ const row = (
   createdAt: 0,
   finishedAt: null,
   ...fields,
+  resultBytes: fields.resultBytes ?? null,
 });
 
 const lookups = {

@@ -28,6 +28,7 @@ export type RepairedSession = {
 };
 
 export const STREAM_LIMIT = 100;
+export const RESULT_DISPLAY_CHARS = 20_000;
 
 export type RawSession = {
   id: string;
@@ -114,6 +115,7 @@ export const message = (raw: RawMessage): Message => ({
   userId: raw.user_id,
   agentId: raw.agent_id,
   content: raw.content,
+  resultBytes: null,
   reasoning: raw.reasoning,
   html: raw.html,
   status: raw.status,
@@ -128,6 +130,28 @@ export const message = (raw: RawMessage): Message => ({
   createdAt: raw.created_at,
   finishedAt: raw.finished_at,
 });
+
+// a tool row leaves its result behind: the content, and the error,
+// which is the failed result's text. The size says what the result
+// route will answer
+export function offWire(row: Message): Message {
+  if (row.kind !== "tool") return { ...row, resultBytes: null };
+  return {
+    ...row,
+    content: "",
+    error: null,
+    resultBytes: Buffer.byteLength(row.content, "utf8"),
+  };
+}
+
+// the display cut, in characters, never inside a surrogate pair
+export function cutResult(content: string): { content: string; cut: boolean } {
+  if (content.length <= RESULT_DISPLAY_CHARS) return { content, cut: false };
+  let end = RESULT_DISPLAY_CHARS;
+  const last = content.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end--;
+  return { content: content.slice(0, end), cut: true };
+}
 
 export type RawSend = {
   id: string;

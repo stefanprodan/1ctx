@@ -2,15 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { signal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
+import { loadToolResult, toolResults } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import type { CallNode } from "./rows.ts";
-import { displayResult, prettyArguments, toolSummary } from "./Tool.model.ts";
+import {
+  displayResult,
+  prettyArguments,
+  toolSummary,
+  wantsResult,
+} from "./Tool.model.ts";
 
 const opened = signal<ReadonlySet<string>>(new Set());
 
 export function Tool({ node }: { node: CallNode }) {
   const open = opened.value.has(node.key);
   const summary = toolSummary(node.call, node.result);
+  const held =
+    node.result === null ? undefined : toolResults.value.get(node.result.id);
+  const resultId = node.result?.id ?? null;
+  // the result is off the wire: asked for when the row is open and the
+  // tool has ended, so a row opened while it runs asks once it is done
+  const wanted = resultId !== null && wantsResult(open, node.result, held);
+  useEffect(() => {
+    if (wanted && resultId !== null) void loadToolResult(resultId);
+  }, [wanted, resultId]);
+  const shown = displayResult(node.result, held);
   return (
     <details
       class={`transcript-tool${summary.live ? " transcript-tool-live" : ""}${
@@ -45,8 +62,14 @@ export function Tool({ node }: { node: CallNode }) {
         <div class="transcript-tool-value">
           {prettyArguments(node.call.arguments)}
         </div>
-        <div class="transcript-tool-label">result, untrusted</div>
-        <div class="transcript-tool-value">{displayResult(node.result)}</div>
+        <div class="transcript-tool-label">{shown.label}</div>
+        <div
+          class={`transcript-tool-value${
+            shown.err ? " transcript-tool-failed" : ""
+          }`}
+        >
+          {shown.text}
+        </div>
       </div>
     </details>
   );

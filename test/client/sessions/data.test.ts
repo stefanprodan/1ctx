@@ -16,6 +16,7 @@ import {
   sending,
   session,
   sessionError,
+  toolResults,
 } from "../../../src/client/data/sessions.ts";
 import type {
   Message,
@@ -56,6 +57,7 @@ function message(changes: Partial<Message> = {}): Message {
     userId: null,
     agentId: "a1",
     content: "",
+    resultBytes: null,
     reasoning: "",
     html: "",
     status: "done",
@@ -509,6 +511,39 @@ describe("the sessions entity", () => {
     });
 
     expect(live.value).toBe(before);
+  });
+
+  test("a held tool result goes with its row", () => {
+    session.value = detail("s1", {
+      messages: [
+        message({ id: "m1", seq: 1, kind: "user" }),
+        message({ id: "t1", seq: 2, kind: "tool" }),
+        message({ id: "t2", seq: 3, kind: "tool" }),
+      ],
+    });
+    const held = {
+      status: "done" as const,
+      content: "x",
+      bytes: 1,
+      cut: false,
+    };
+    toolResults.value = new Map([
+      ["t1", held],
+      ["t2", held],
+    ]);
+
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 2 }),
+      messages: [message({ id: "m2", seq: 4, kind: "user" })],
+      removedMessageIds: ["t2"],
+      send: sent,
+    });
+    expect([...toolResults.value.keys()]).toEqual(["t1"]);
+
+    onSocket({ type: "deleted", projectId: "p1", sessionId: "s1" });
+    expect(toolResults.value.size).toBe(0);
   });
 
   test("deleting the session on screen clears it and opens its project", () => {

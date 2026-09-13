@@ -14,6 +14,13 @@ export type SessionsResponse = { sessions: SessionSummary[] };
 // GET /api/sessions/:id, and the answer of POST /api/sessions
 export type SessionResponse = SessionDetail;
 
+// GET /api/sessions/:id/messages/:messageId/result
+export type ToolResultResponse = {
+  content: string;
+  bytes: number;
+  cut: boolean;
+};
+
 // POST /api/sessions: a chat in a project with an agent, and its first
 // message
 export type CreateSessionRequest = {

@@ -23,7 +23,7 @@ import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
-import type { SessionRow } from "../sessions/index.ts";
+import { offWire, type SessionRow } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import type { SendPolicy, ToolResult } from "./policy.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
@@ -81,7 +81,7 @@ const envelope = (
   data: {
     projectId: session.projectId,
     session,
-    messages,
+    messages: messages.map(offWire),
     ...(removedMessageIds.length > 0 ? { removedMessageIds } : {}),
     send,
   },

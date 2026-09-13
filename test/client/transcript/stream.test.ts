@@ -47,6 +47,7 @@ const message = (fields: Partial<Message> = {}): Message => ({
   createdAt: 1_000,
   finishedAt: null,
   ...fields,
+  resultBytes: fields.resultBytes ?? null,
 });
 
 const live = (fields: Partial<Live> = {}): Live => ({

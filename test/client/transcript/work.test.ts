@@ -25,6 +25,7 @@ function message(changes: Partial<Message> = {}): Message {
     userId: null,
     agentId: "agent-1",
     content: "",
+    resultBytes: null,
     reasoning: "",
     html: "",
     status: "done",

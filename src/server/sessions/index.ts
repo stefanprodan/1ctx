@@ -12,19 +12,23 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
-import type { SessionRow, UsagePort } from "./rows.ts";
+import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 
 export {
   MAX_SESSION_BODY,
   parseCreateSession,
   parseMessage,
+  parseMessageId,
   parseSendMessage,
   parseStreamQuery,
   titleFrom,
 } from "./parse.ts";
 export { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 export {
+  cutResult,
+  offWire,
+  RESULT_DISPLAY_CHARS,
   type RepairedSession,
   type ReplyFinish,
   type SessionRow,
@@ -93,7 +97,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
             data: {
               projectId: repaired.session.projectId,
               session: repaired.session,
-              messages: repaired.messages,
+              messages: repaired.messages.map(offWire),
               send: repaired.send,
             },
           })),
