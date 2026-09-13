@@ -12,10 +12,11 @@
     border-right: 1px solid var(--line);
     background: var(--rail);
   }
+  /* over the view's stuck head and foot and the floating button */
   .rail-drawer {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 4;
     width: 100%;
     border-right: 0;
   }

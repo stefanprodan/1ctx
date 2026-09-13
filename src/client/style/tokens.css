@@ -27,6 +27,8 @@
     --inset: #0f1216;
     --line: #2a2b2d;
     --line-strong: #35363a;
+    /* under a head the content scrolls behind */
+    --shadow-head: 0 1px 6px rgba(0, 0, 0, 0.55);
     --fg: #e7e7e9;
     --dim: #b3b3b8;
     --faint: #8b8b91;

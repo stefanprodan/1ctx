@@ -9,6 +9,14 @@
     box-sizing: border-box;
   }
 
+  /* the attribute hides whatever display an owner gave the element:
+     an important declaration in this layer beats a normal one in the
+     owners layer, which is the one place the cascade is turned */
+  [hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: the layer order puts owners above base, and important is how base's hidden wins */
+    display: none !important;
+  }
+
   html,
   body {
     margin: 0;

@@ -1,16 +1,25 @@
-/* The transcript: the scroll box, a user row (author line and card), a
-   reply (agent line, the reasoning fold, the rendered body, the tail
-   with its cursor, the line under it) and Jump to latest. */
+/* The transcript: the rows, a user row (author line and card), a reply
+   (agent line, the reasoning fold, the rendered body, the tail with
+   its cursor, the line under it), and the foot stuck to the bottom of
+   the shell's scroll box with the composer and Jump to latest. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .transcript-scroll {
-    position: relative;
+  .transcript-rows {
     flex-grow: 1;
-    min-height: 0;
-    overflow-y: auto;
     padding: var(--space-2) 0 var(--space-4);
+  }
+
+  /* stuck to the window's edge, in the page colour so the rows scroll
+     under it; the bottom inset is its own padding, since the chat page
+     is flush */
+  .transcript-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding-bottom: var(--shell-inset, 0px);
+    background: var(--page);
   }
 
   .transcript {
@@ -182,18 +191,26 @@
     color: var(--fg);
   }
 
+  /* the arrow above the composer, see-through so the text under it
+     still reads */
   .transcript-jump {
-    position: sticky;
-    bottom: var(--space-2);
+    position: absolute;
+    bottom: calc(100% + var(--space-2));
     left: 50%;
     transform: translateX(-50%);
-    height: 28px;
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-card);
+    /* no display of its own, so base's [hidden] rule hides it */
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    line-height: 0;
+    border-radius: 50%;
     border: 1px solid var(--line-strong);
     background: var(--card);
-    color: var(--dim);
-    font-size: var(--text-small);
+    color: var(--fg);
+    opacity: 0.7;
     cursor: pointer;
+  }
+  .transcript-jump:hover {
+    opacity: 1;
   }
 }

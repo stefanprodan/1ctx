@@ -7,7 +7,10 @@
 // line, an empty line or an error. A view composes this, never
 // restyles it.
 
+import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
+import { useEffect, useRef } from "preact/hooks";
+import { scrollParent } from "../lib/scroll.ts";
 import "./page.css";
 
 export function Page({
@@ -20,6 +23,7 @@ export function Page({
   loading,
   empty,
   error,
+  flush,
   children,
 }: {
   label?: string;
@@ -34,11 +38,30 @@ export function Page({
   loading?: boolean;
   empty?: string;
   error?: string | null;
+  // the view has a foot stuck to the bottom and spends the inset there
+  flush?: boolean;
   children?: ComponentChildren;
 }) {
+  const head = useRef<HTMLDivElement>(null);
+  // content has scrolled under the head: it casts its shadow
+  const stuck = useSignal(false);
+  useEffect(() => {
+    const el = head.current;
+    const scroller = el ? scrollParent(el) : null;
+    if (!scroller) return;
+    const onScroll = () => {
+      stuck.value = scroller.scrollTop > 0;
+    };
+    onScroll();
+    scroller.addEventListener("scroll", onScroll);
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, [stuck]);
   return (
-    <div class="page">
-      <div class="page-head">
+    <div class={`page${flush ? " page-flush" : ""}`}>
+      <div
+        class={`page-head${stuck.value ? " page-head-stuck" : ""}`}
+        ref={head}
+      >
         {crumb !== undefined ? (
           <h1 class="page-crumb label">
             {crumb !== "" && (
