@@ -232,6 +232,20 @@ export async function sendMessage(id: string, message: string): Promise<void> {
   }
 }
 
+// the last turn goes and its user message is sent again
+export async function regenerateSession(id: string): Promise<void> {
+  sending.value = true;
+  try {
+    const detail = await api<SessionResponse>(
+      `/api/sessions/${encodeURIComponent(id)}/regenerate`,
+      "POST",
+    );
+    take(detail);
+  } finally {
+    sending.value = false;
+  }
+}
+
 // the answer is empty: the end of the send arrives as an envelope
 export async function stopSession(id: string): Promise<void> {
   await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
@@ -261,8 +275,13 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   const held = session.value;
   if (held === null || held.session.id !== ev.session.id) return;
   if (ev.session.revision <= held.session.revision) return;
-  const messages = upsert(held.messages, ev.messages);
+  const removed = new Set(ev.removedMessageIds ?? []);
+  const messages = upsert(
+    held.messages.filter((message) => !removed.has(message.id)),
+    ev.messages,
+  );
   const map = new Map(live.value);
+  for (const id of removed) map.delete(id);
   for (const m of ev.messages) {
     if (m.kind !== "reply") continue;
     if (m.status === "streaming") {

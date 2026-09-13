@@ -1,19 +1,21 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The agent's turn: its line, the work fold when the send called
-// tools, the reasoning fold for a plain reply, then the server's HTML
+// The agent's turn: its line, the work fold (the reasoning and the
+// tool calls, if any), then the server's HTML
 // plus the text received after it as a plain tail while it streams,
 // so a code block in progress never breaks out of its element. Under
-// a finished turn, why it was cut when it was, and Copy.
+// a finished turn, why it was cut when it was, Copy, Regenerate on
+// the last turn, and when it was.
 
+import { useEffect, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { clock } from "../lib/format.ts";
+import { stamp } from "../lib/format.ts";
+import { Icon } from "../lib/icons.tsx";
 import { endedBy, type ReplyNode, type WorkNode } from "./rows.ts";
 import { type Live, tail } from "./stream.ts";
-import { Think } from "./Think.tsx";
 import { Work } from "./Work.tsx";
 
 export type Agent = { name: string; avatar: Avatar };
@@ -41,22 +43,49 @@ export function cutReason(m: Message): { text: string; err: boolean } | null {
   return null;
 }
 
-async function copy(text: string): Promise<void> {
+async function copy(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
     // a page without clipboard access: the button does nothing
+    return false;
   }
+}
+
+// the copy icon, a check for a moment after a copy
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1200);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      class={`transcript-act${copied ? " transcript-act-done" : ""}`}
+      title="Copy"
+      aria-label="Copy"
+      onClick={() => void copy(text).then((ok) => ok && setCopied(true))}
+    >
+      <Icon name={copied ? "check" : "copy"} size={14} />
+    </button>
+  );
 }
 
 export function Reply({
   node,
   live,
   agent,
+  onRegenerate,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
   agent: Agent | null;
+  // set on the last turn alone: regenerate drops it and sends its
+  // user message again
+  onRegenerate?: () => void;
 }) {
   const m = node.message;
   const running = replyRunning(node, live);
@@ -65,26 +94,25 @@ export function Reply({
   const content = current?.content ?? m?.content ?? "";
   const ended = running ? null : endedBy(node);
   const cut = ended === null ? null : cutReason(ended);
-  const at =
-    m?.createdAt ?? node.rows[0]?.createdAt ?? node.send?.startedAt ?? 0;
-  // before the first token the fold stands for the send, so the line
-  // is never bare; the text may still turn out to be a step, and then
-  // the server's slot moves the row into the fold
-  const work: WorkNode | null =
-    node.work ??
-    (running && content === ""
-      ? {
-          sendId: node.sendId,
-          rows: [],
-          rounds: [],
-          answer: null,
-          send: node.send,
-        }
-      : null);
-  const think =
-    work === null &&
-    m !== null &&
-    ((current?.reasoning ?? "") !== "" || m.reasoning !== "");
+  // the stamp is when the turn ended: the answer's end, else the last
+  // row's, a stopped work round included
+  const last = node.rows[node.rows.length - 1];
+  const endedAt =
+    m?.finishedAt ??
+    node.send?.finishedAt ??
+    last?.finishedAt ??
+    last?.createdAt ??
+    0;
+  // every turn has the fold: the reasoning is always inside it, and
+  // before the first token it stands for the send, so the line is
+  // never bare
+  const work: WorkNode = node.work ?? {
+    sendId: node.sendId,
+    rows: [],
+    rounds: [],
+    answer: m,
+    send: node.send,
+  };
   return (
     <div class="transcript-reply">
       <div class="transcript-author">
@@ -92,13 +120,9 @@ export function Reply({
           <AvatarIcon name={agent?.avatar ?? "bot"} size={14} />
         </span>
         <span class="transcript-name">{agent?.name ?? "agent"}</span>
-        <span class="transcript-when">{clock(at)}</span>
       </div>
       <div class="transcript-body">
-        {work !== null && (
-          <Work node={work} reply={m} live={live} running={running} />
-        )}
-        {think && m !== null && <Think message={m} live={current} />}
+        <Work node={work} reply={m} live={live} running={running} />
         {html !== "" && (
           // the server renders the markdown with raw HTML off: render/
           // is the safety boundary
@@ -107,12 +131,7 @@ export function Reply({
             dangerouslySetInnerHTML={{ __html: html }}
           />
         )}
-        {current !== null && (
-          <div class="transcript-tail">
-            {tail(current)}
-            <span class="transcript-cursor" aria-hidden="true" />
-          </div>
-        )}
+        {current !== null && <div class="transcript-tail">{tail(current)}</div>}
         {!running && (
           <div class="transcript-after">
             {cut && (
@@ -122,15 +141,20 @@ export function Reply({
                 {cut.text}
               </span>
             )}
-            {content !== "" && (
+            {content !== "" && <CopyButton text={content} />}
+            {onRegenerate !== undefined && (
               <button
                 type="button"
                 class="transcript-act"
-                onClick={() => void copy(content)}
+                title="Regenerate"
+                aria-label="Regenerate"
+                onClick={onRegenerate}
               >
-                Copy
+                <Icon name="redo" size={14} />
               </button>
             )}
+            <span class="transcript-sep" aria-hidden="true" />
+            <span class="transcript-when">{stamp(endedAt)}</span>
           </div>
         )}
       </div>

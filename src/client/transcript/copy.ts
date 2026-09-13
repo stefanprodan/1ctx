@@ -13,9 +13,9 @@ export async function copyCode(ev: MouseEvent): Promise<void> {
   if (!code) return;
   try {
     await navigator.clipboard.writeText(code.textContent ?? "");
-    b.textContent = "Copied";
+    b.classList.add("md-copy-copied");
     setTimeout(() => {
-      if (b.isConnected) b.textContent = "Copy";
+      if (b.isConnected) b.classList.remove("md-copy-copied");
     }, 1200);
   } catch {
     // no clipboard: the button stays as it is

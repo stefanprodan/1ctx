@@ -29,6 +29,7 @@ export function Transcript({
   live,
   agent,
   authorOf,
+  onRegenerate,
   foot,
 }: {
   sessionId: string;
@@ -37,6 +38,8 @@ export function Transcript({
   agent: Agent | null;
   // the name of a user row's author
   authorOf: (userId: string | null) => string;
+  // the last turn's Regenerate; absent while a send runs
+  onRegenerate?: () => void;
   foot?: ComponentChildren;
 }) {
   const rows = useRef<HTMLDivElement>(null);
@@ -115,7 +118,8 @@ export function Transcript({
     <>
       <div class="transcript-rows" ref={rows}>
         <div class="transcript">
-          {nodes.map((node) => {
+          {nodes.map((node, index) => {
+            const last = index === nodes.length - 1;
             if (node.kind === "user") {
               return (
                 <UserRow
@@ -131,6 +135,7 @@ export function Transcript({
                 node={node}
                 live={live}
                 agent={agent}
+                onRegenerate={last ? onRegenerate : undefined}
               />
             );
           })}

@@ -131,6 +131,13 @@ export class UsageStore {
       .map(row);
   }
 
+  deleteSend(sendId: string): boolean {
+    return (
+      this.db.query("delete from usage where send_id = ?").run(sendId).changes >
+      0
+    );
+  }
+
   // the last round the provider counted for a session
   latest(sessionId: string): RoundUsage | null {
     const raw = this.db

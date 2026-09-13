@@ -102,13 +102,21 @@ export function applyHtml(live: Live, frame: HtmlFrame): Live {
 
 export const tail = (live: Live): string => live.content.slice(live.htmlAt);
 
-export function thinkLabel(live: Live, done: boolean, now: number): string {
-  if (done && live.thinkMs !== null) {
-    return `Thought for ${secs(live.thinkMs)}`;
-  }
-  // a round with words but no reasoning: the model talking to itself
-  if (live.thinkStart === null) return done ? "Thought" : "Thinking";
+// the word and the time apart: the row shows them at its two ends. The
+// word never changes, like a tool's name; the time tells the state
+export function thinkParts(
+  live: Live,
+  done: boolean,
+  now: number,
+): { word: string; time: string | null } {
+  const word = "thinking";
+  if (done && live.thinkMs !== null) return { word, time: secs(live.thinkMs) };
+  if (live.thinkStart === null) return { word, time: null };
   const end = live.thinkEnd ?? now;
-  const word = done || live.thinkEnd !== null ? "Thought" : "Thinking";
-  return `${word} for ${secs(end - live.thinkStart)}`;
+  return { word, time: secs(end - live.thinkStart) };
+}
+
+export function thinkLabel(live: Live, done: boolean, now: number): string {
+  const { word, time } = thinkParts(live, done, now);
+  return time === null ? word : `${word} for ${time}`;
 }

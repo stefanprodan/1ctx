@@ -10,6 +10,7 @@ import type {
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
+import { replaceSendRows } from "./regenerate.ts";
 import {
   MESSAGE_COLUMNS,
   message,
@@ -179,6 +180,9 @@ export class SessionStore {
     return this.message(id)!;
   }
 
+  replaceSend(user: Message, newSendId: string) {
+    return replaceSendRows(this.db, user, newSendId);
+  }
   // a streaming reply for a round: a null slot until it is placed. The
   // first round of a send is round 1; startRound bumps it
   addReply(fields: {

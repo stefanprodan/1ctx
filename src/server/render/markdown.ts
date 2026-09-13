@@ -27,8 +27,13 @@ function unescapeHtml(value: string): string {
 }
 
 const SAFE_HREF = /^(https?:|mailto:)/i;
-const COPY_BLOCK =
-  '<button type="button" class="md-copy" title="Copy" aria-label="Copy block">Copy</button>';
+// the same strokes as the client's copy and check icons; the button
+// carries both and the client shows the check for a moment after a copy
+const ICON =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="';
+const COPY_ICON = `${ICON}md-copy-icon"><path class="md-icon-path" d="M6 6h7a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3.5 10.5h-.5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6.5a1 1 0 0 1 1 1v.5"/></svg>`;
+const CHECK_ICON = `${ICON}md-copy-done"><path class="md-icon-path" d="M3 8.5l3 3 7-7"/></svg>`;
+const COPY_BLOCK = `<button type="button" class="md-copy" title="Copy" aria-label="Copy block">${COPY_ICON}${CHECK_ICON}</button>`;
 
 // Info strings may contain attributes after the first word, but only a plain
 // language token is safe and useful in a data attribute.

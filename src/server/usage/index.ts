@@ -17,6 +17,7 @@ export type UsageDeps = { db: Db };
 export type Usage = {
   store: UsageStore;
   record(fields: UsageFields): UsageRow;
+  deleteSend(sendId: string): boolean;
   // the last round counted for a session, or for many at once
   latest(sessionId: string): RoundUsage | null;
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
@@ -28,6 +29,7 @@ export function usageArea(deps: UsageDeps): Usage {
   return {
     store,
     record: (fields) => store.record(fields),
+    deleteSend: (sendId) => store.deleteSend(sendId),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
     routes: [],

@@ -100,13 +100,32 @@ describe("work summaries", () => {
   test("says how long the work took and counts the launched calls", () => {
     const summary = workSummary(node(), false);
 
+    // the answer's wait for its first token counts as work
     expect(summary).toMatchObject({
       toolCalls: 1,
       failed: 0,
-      durationMs: 51_000,
+      durationMs: 51_010,
       live: false,
     });
-    expect(summary.text).toBe("Worked for 51 s · 1 tool call");
+    expect(summary.text).toBe("Worked for 51 s · 1 tool");
+  });
+
+  test("a send without tools worked until its answer began", () => {
+    const answer = message({
+      id: "answer-1",
+      slot: "answer",
+      toolCalls: null,
+      createdAt: 10_000,
+      ttftMs: 300,
+      thinkingMs: 4_000,
+    });
+    const summary = workSummary(
+      node({ rows: [], rounds: [], answer, send: null }),
+      false,
+    );
+
+    expect(summary.durationMs).toBe(4_300);
+    expect(summary.text).toBe("Worked for 4.3 s");
   });
 
   test("counts the answer's thinking into the time", () => {
@@ -133,11 +152,13 @@ describe("work summaries", () => {
     expect(summary.durationMs).toBe(51_000);
   });
 
-  test("is one word while it runs, with the calls finished so far", () => {
+  test("runs a clock while it works, with the calls finished so far", () => {
     const running = node({
       send: send({ status: "running", finishedAt: null }),
     });
-    expect(workSummary(running, true).text).toBe("Working");
+    expect(workSummary(running, true, 10_400).text).toBe("Working 0 s");
+    expect(workSummary(running, true, 13_900).text).toBe("Working 3 s");
+    expect(workSummary(running, true, 75_000).text).toBe("Working 1 min 5 s");
 
     const tool = message({
       id: "call-1",
@@ -152,7 +173,9 @@ describe("work summaries", () => {
       rows: [message(), tool],
       send: send({ status: "running", finishedAt: null }),
     });
-    expect(workSummary(withRow, true).text).toBe("Working · 1 tool call");
+    expect(workSummary(withRow, true, 40_000).text).toBe(
+      "Working 30 s · 1 tool",
+    );
   });
 
   test("names the failures and the cap that ended the loop", () => {
@@ -205,10 +228,10 @@ describe("work summaries", () => {
 
     expect(capWord(rows)).toBeNull();
     expect(workSummary(capped, false).text).toBe(
-      "Worked for 51 s · 2 tool calls, 1 failed, tool limit",
+      "Worked for 51 s · 2 tools, 1 failed, tool limit",
     );
     expect(
       workSummary(node({ rows, send: null, answer: null }), false).text,
-    ).toBe("Worked for 10 s · 2 tool calls, 1 failed");
+    ).toBe("Worked for 10 s · 2 tools, 1 failed");
   });
 });

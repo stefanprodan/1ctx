@@ -15,7 +15,7 @@ import type {
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -24,12 +24,13 @@ export type SocketCommand =
 export type SocketEvent =
   | { type: "hello"; protocol: number }
   // one envelope per session transaction: the summary with its
-  // revision, the rows the transaction wrote, the send row or null
+  // revision, the rows written, the ids removed, and the send row
   | {
       type: "session";
       projectId: string;
       session: SessionSummary;
       messages: Message[];
+      removedMessageIds?: string[];
       send: SendSummary | null;
     }
   | { type: "deleted"; projectId: string; sessionId: string }

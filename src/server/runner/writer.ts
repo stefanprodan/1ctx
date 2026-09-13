@@ -42,7 +42,10 @@ export type WriterDeps = {
   db: Db;
   clock: Clock;
   sessions: SessionsPort;
-  usage: { record(fields: UsageFields): unknown };
+  usage: {
+    record(fields: UsageFields): unknown;
+    deleteSend(sendId: string): boolean;
+  };
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
@@ -72,23 +75,31 @@ const envelope = (
   session: SessionSummary,
   messages: Message[],
   send: SendSummary | null,
+  removedMessageIds: string[] = [],
 ): BusEvent => ({
   type: "session.changed",
-  data: { projectId: session.projectId, session, messages, send },
+  data: {
+    projectId: session.projectId,
+    session,
+    messages,
+    ...(removedMessageIds.length > 0 ? { removedMessageIds } : {}),
+    send,
+  },
 });
 
 export class Writer {
   constructor(private readonly deps: WriterDeps) {}
 
-  // with the lock already held: the session when it is new, the user
-  // message, the reply row that streams, the send row, the running
-  // state. One transaction, one envelope
+  // with the lock already held: the send row, its user row, the reply
+  // that streams, and the running state. Regeneration reuses its user
+  // row while the same transaction removes the send it replaces.
   startSend(fields: {
     sendId: string;
     replyId: string;
     userId: string;
     sessionId: string;
     session: SessionRow | null;
+    existingUser?: Message;
     title: string;
     policy: SendPolicy;
     text: string;
@@ -116,14 +127,24 @@ export class Writer {
         firstMessageId: fields.userId,
         now,
       });
-      const user = this.deps.sessions.addUserMessage({
-        id: fields.userId,
-        sessionId: base.id,
-        sendId: send.id,
-        userId: policy.userId,
-        content: fields.text,
-        now,
-      });
+      let removedMessageIds: string[] = [];
+      let user: Message;
+      if (fields.existingUser === undefined) {
+        user = this.deps.sessions.addUserMessage({
+          id: fields.userId,
+          sessionId: base.id,
+          sendId: send.id,
+          userId: policy.userId,
+          content: fields.text,
+          now,
+        });
+      } else {
+        const existing = fields.existingUser;
+        this.deps.usage.deleteSend(existing.sendId);
+        const replacement = this.deps.sessions.replaceSend(existing, send.id);
+        user = replacement.user;
+        removedMessageIds = replacement.removedMessageIds;
+      }
       const reply = this.deps.sessions.addReply({
         id: fields.replyId,
         sessionId: base.id,
@@ -139,7 +160,7 @@ export class Writer {
       })!;
       return {
         result: { session, user, reply, send },
-        events: [envelope(session, [user, reply], send)],
+        events: [envelope(session, [user, reply], send, removedMessageIds)],
       };
     });
   }

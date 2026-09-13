@@ -14,7 +14,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
-import { type Live, liveOf, thinkLabel } from "./stream.ts";
+import { type Live, liveOf, thinkParts } from "./stream.ts";
 
 const opened = signal<ReadonlySet<string>>(new Set());
 
@@ -35,11 +35,15 @@ export function Think({
   }, [live]);
   const v = live ?? liveOf(message);
   const reasoning = live?.reasoning ?? message.reasoning;
-  const streaming = live !== null && live.content === "";
+  const streaming = live !== null;
+  const open = opened.value.has(message.id);
+  const { word, time } = thinkParts(v, live === null, Date.now());
   return (
     <details
-      class={`transcript-think${streaming ? " transcript-think-live" : ""}`}
-      open={opened.value.has(message.id)}
+      class={`transcript-think${streaming ? " transcript-think-live" : ""}${
+        open ? " transcript-think-open" : ""
+      }`}
+      open={open}
       onToggle={(e) => {
         const next = new Set(opened.value);
         if (e.currentTarget.open) next.add(message.id);
@@ -48,12 +52,17 @@ export function Think({
       }}
     >
       <summary class="transcript-think-head">
-        <span class="transcript-spin" aria-hidden="true" />
+        <Icon name="spinner" size={12} class="transcript-think-spin" />
         <Icon name="chevron-right" size={12} class="transcript-think-chevron" />
-        <span>{thinkLabel(v, live === null, Date.now())}</span>
+        <span class="transcript-think-word">{word}</span>
+        {time !== null && <span class="transcript-think-time">{time}</span>}
       </summary>
-      {reasoning !== "" && <div class="transcript-reasoning">{reasoning}</div>}
-      {children}
+      <div class="transcript-think-body">
+        {reasoning !== "" && (
+          <div class="transcript-reasoning">{reasoning}</div>
+        )}
+        {children}
+      </div>
     </details>
   );
 }

@@ -60,7 +60,8 @@ export function toolSummary(
   let state = result?.status ?? "not run";
   if (live) state = "running";
   if (result?.status === "done" && result.finishedAt !== null) {
-    state = secs(Math.max(0, result.finishedAt - result.createdAt));
+    const ms = Math.max(0, result.finishedAt - result.createdAt);
+    state = ms < 100 ? "instant" : secs(ms);
   }
   return {
     argument: shortArg(call.name, call.arguments),

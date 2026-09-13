@@ -10,12 +10,12 @@
 // the lock is let go after both the provider iteration and the round's
 // tools have settled.
 
-import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest } from "../lib/errors.ts";
+import { BadRequest, Conflict } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
@@ -76,6 +76,7 @@ export type Runner = {
     fields: { projectId: string; agentId: string; message: string },
   ): SessionDetail;
   send(principal: Principal, sessionId: string, message: string): SessionDetail;
+  regenerate(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string): void;
   live: (sessionId: string) => ReturnType<typeof live> | null;
   // every send terminated with cause shutdown and its stream let go,
@@ -208,6 +209,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     user: UserRow,
     agent: AgentRow,
     text: string,
+    existingUser: Message | null = null,
   ): SessionDetail => {
     const now = deps.clock();
     const offeredTools = agent.model.tools ? deps.tools : null;
@@ -221,7 +223,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     });
     registry.admit(sessionId, user.id);
     const sendId = newId();
-    const userId = newId();
+    const userId = existingUser?.id ?? newId();
     const replyId = newId();
     const send = newSend({
       id: sendId,
@@ -241,6 +243,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         userId,
         sessionId,
         session,
+        ...(existingUser === null ? {} : { existingUser }),
         title: titleFrom(text),
         policy,
         text,
@@ -274,6 +277,40 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const agent = agentOf(session.agentId);
       return begin(session.id, session, project, user, agent, message);
     },
+    regenerate(principal, sessionId) {
+      const session = deps.visible(principal, sessionId);
+      const active = registry.get(session.id);
+      if (active !== null) registry.admit(session.id, principal.userId);
+      if (session.status === "running") {
+        throw new Conflict("the chat is running");
+      }
+      const messages = deps.sessions.messages(session.id);
+      if (messages.length === 0 || messages.at(-1)?.kind === "user") {
+        throw new BadRequest("nothing to regenerate");
+      }
+      let existingUser: Message | null = null;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i]?.kind === "user") {
+          existingUser = messages[i]!;
+          break;
+        }
+      }
+      if (existingUser === null) {
+        throw new BadRequest("nothing to regenerate");
+      }
+      const project = deps.access.project(principal, session.projectId);
+      const user = author(principal);
+      const agent = agentOf(session.agentId);
+      return begin(
+        session.id,
+        session,
+        project,
+        user,
+        agent,
+        existingUser.content,
+        existingUser,
+      );
+    },
     stop(principal, sessionId) {
       const session = deps.visible(principal, sessionId);
       const send = registry.get(session.id);
@@ -297,6 +334,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),
     send: (principal, id, message) => runner.send(principal, id, message),
+    regenerate: (principal, id) => runner.regenerate(principal, id),
     stop: (principal, id) => runner.stop(principal, id),
   });
   return runner;

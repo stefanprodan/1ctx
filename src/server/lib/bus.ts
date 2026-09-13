@@ -19,11 +19,12 @@ export type BusEvents = {
   // or every connection of the user when the login id is null
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its
-  // revision, the rows the transaction wrote, the send row or null
+  // revision, the rows written, the ids removed, and the send row
   "session.changed": {
     projectId: string;
     session: SessionSummary;
     messages: Message[];
+    removedMessageIds?: string[];
     send: SendSummary | null;
   };
   "session.deleted": { projectId: string; sessionId: string };

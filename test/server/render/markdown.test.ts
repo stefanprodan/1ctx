@@ -59,8 +59,10 @@ describe("renderMarkdown", () => {
     expect(html).toContain('<div class="md-block" data-lang="json">');
     expect(html).toContain('<span class="md-block-lang">json</span>');
     expect(html).toContain(
-      '<button type="button" class="md-copy" title="Copy" aria-label="Copy block">Copy</button>',
+      '<button type="button" class="md-copy" title="Copy" aria-label="Copy block"><svg',
     );
+    expect(html).toContain('class="md-copy-icon"');
+    expect(html).toContain('class="md-copy-done"');
     expect(html).toContain(
       '<span class="hljs-attr">&quot;description&quot;</span>',
     );

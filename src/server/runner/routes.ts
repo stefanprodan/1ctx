@@ -20,6 +20,7 @@ export type RoutesDeps = {
     fields: { projectId: string; agentId: string; message: string },
   ): SessionDetail;
   send(principal: Principal, sessionId: string, message: string): SessionDetail;
+  regenerate(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string): void;
 };
 
@@ -45,6 +46,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           await jsonBody(req, MAX_SESSION_BODY),
         );
         return json(deps.send(ctx.principal!, ctx.params.id, message), 201);
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/sessions/:id/regenerate",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        return json(deps.regenerate(ctx.principal!, ctx.params.id), 201);
       },
     },
     {

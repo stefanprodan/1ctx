@@ -202,6 +202,11 @@ violation, and every rule has a rejected fixture under
   running with cause `restart`. Shutdown terminates every send, waits
   for the streams, closes the sockets with 1012, then stops the
   listener. An agent a session references is a 409 to delete.
+  Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
+  reuses the last user message: inside `startSend`'s transaction the
+  rows after it, their send and its usage go, and the envelope names
+  them in `removedMessageIds`; 409 while the session runs, 400 when
+  the last message is the user's.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
   bytes) and the per-tool caps have their defaults, floors and
