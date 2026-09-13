@@ -105,7 +105,8 @@ export const ROUTES: Route[] = [
     title: () => "Agents",
     role: "admin",
     load: async () => {
-      await Promise.all([loadAgents(), loadProviders()]);
+      // the limits too: the agents page shows where each model compacts
+      await Promise.all([loadAgents(), loadProviders(), loadTools()]);
     },
     nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
   },

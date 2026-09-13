@@ -390,7 +390,9 @@ describe("0005-agent-thinking", () => {
         values ('a', 'agent', 'pr', 'm', 'Model', 0);
     `);
 
-    expect(migrate(db)).toEqual(["0005-agent-thinking"]);
+    expect(migrate(db, MIGRATIONS.slice(0, 5))).toEqual([
+      "0005-agent-thinking",
+    ]);
     expect(
       db.query("select thinking, effort from agents where id = 'a'").get(),
     ).toEqual({ thinking: null, effort: null });
@@ -405,6 +407,82 @@ describe("0005-agent-thinking", () => {
     expect(() =>
       db.query("update agents set effort = 'extreme'").run(),
     ).toThrow();
+    db.close();
+  });
+});
+
+describe("0006-compaction", () => {
+  test("widens kinds without losing sends, messages or usage", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 5));
+    db.exec(`
+      insert into users
+        (id, username, full_name, role, password_hash, created_at)
+        values ('u', 'user', 'User', 'member', 'x', 0);
+      insert into providers (id, name, wire, base_url, created_at)
+        values ('p', 'provider', 'openrouter', 'http://router.test', 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a', 'agent', 'p', 'model', 'Model', 0);
+      insert into projects (id, kind, name, owner_id, created_at)
+        values ('project', 'personal', 'project', 'u', 0);
+      insert into sessions
+        (id, project_id, owner_id, agent_id, origin, title, status,
+         created_at, last_activity_at)
+        values ('session', 'project', 'u', 'a', 'chat', 'title', 'done', 0, 0);
+      insert into sends
+        (id, session_id, kind, user_id, agent_id, provider_id, model,
+         status, cause, first_message_id, started_at, finished_at)
+        values
+          ('send', 'session', 'chat', 'u', 'a', 'p', 'model',
+           'done', 'finish', 'user-message', 0, 1);
+      insert into messages
+        (id, session_id, seq, kind, send_id, round, user_id, content,
+         status, created_at, finished_at)
+        values
+          ('user-message', 'session', 1, 'user', 'send', 1, 'u', 'hi',
+           'done', 0, 0);
+      insert into messages
+        (id, session_id, seq, kind, send_id, round, slot, agent_id,
+         content, status, created_at, finished_at)
+        values
+          ('reply', 'session', 2, 'reply', 'send', 1, 'answer', 'a',
+           'hello', 'done', 0, 1);
+      insert into usage
+        (id, send_id, session_id, project_id, user_id, agent_id,
+         provider_id, model, round, prompt_tokens, completion_tokens,
+         context_length, created_at, seq)
+        values
+          ('usage', 'send', 'session', 'project', 'u', 'a', 'p', 'model',
+           1, 10, 5, 100, 1, 1);
+    `);
+
+    expect(migrate(db)).toEqual(["0006-compaction"]);
+    expect(db.query("select content from messages order by seq").all()).toEqual(
+      [{ content: "hi" }, { content: "hello" }],
+    );
+    expect(db.query("select id, kind from sends").all()).toEqual([
+      { id: "send", kind: "chat" },
+    ]);
+    expect(db.query("select prompt_tokens from usage").get()).toEqual({
+      prompt_tokens: 10,
+    });
+    db.exec(`
+      insert into sends
+        (id, session_id, kind, user_id, agent_id, provider_id, model,
+         status, first_message_id, started_at)
+        values
+          ('compact', 'session', 'compact', 'u', 'a', 'p', 'model',
+           'running', 'user-message', 2);
+      insert into messages
+        (id, session_id, seq, kind, send_id, round, agent_id, model,
+         status, created_at)
+        values
+          ('summary', 'session', 3, 'summary', 'compact', 1, 'a', 'model',
+           'streaming', 2);
+    `);
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     db.close();
   });
 });

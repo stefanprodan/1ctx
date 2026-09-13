@@ -21,6 +21,7 @@ import {
   type ContextLookups,
   history,
   request,
+  summaryRequest,
   withExhausted,
 } from "./context.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
@@ -78,6 +79,9 @@ export function buildRequest(
   now: number,
 ): ChatRequest {
   const messages = history(rows, send.policy, lookups, now);
+  if (send.summarizing) {
+    return summaryRequest(send.policy, send.sessionId, messages, send.used);
+  }
   const req = request(
     send.policy,
     send.sessionId,
@@ -112,6 +116,13 @@ export async function runRound(
     if (send.terminal !== null) return;
     switch (event.kind) {
       case "reasoning":
+        if (send.summarizing) break;
+        replyBytes += bytes(event.text);
+        if (replyBytes > MAX_REPLY_BYTES) {
+          throw new Error("the reply exceeded 1 MB");
+        }
+        deps.writer.delta(send, event);
+        break;
       case "content": {
         replyBytes += bytes(event.text);
         if (replyBytes > MAX_REPLY_BYTES) {
@@ -121,18 +132,20 @@ export async function runRound(
         break;
       }
       case "reasoningDetail":
+        if (send.summarizing) break;
         round.reasoningDetails = mergeReasoningDetail(
           round.reasoningDetails,
           event.item,
         );
         break;
       case "toolCallDelta":
+        if (send.summarizing) break;
         // the server's earliest certain knowledge that this is a work
         // round: move the row into the fold once, guarded by the round
         markWork(deps, send, round);
         break;
       case "toolCalls":
-        round.calls = event.calls;
+        if (!send.summarizing) round.calls = event.calls;
         break;
       case "finish":
         round.finishReason = event.details

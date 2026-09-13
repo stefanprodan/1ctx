@@ -113,6 +113,9 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   delete body.stream_options;
   if (req.cacheKey) body.session_id = req.cacheKey;
   body.usage = { include: true };
+  // no middle-out: OpenRouter would cut a long prompt to the window on
+  // its own, silently, and the runner compacts from the usage it counts
+  body.transforms = [];
   let messages = body.messages as Record<string, unknown>[];
   if (takesCacheBreakpoints(req.model)) {
     messages = withCacheBreakpoints(messages);

@@ -46,6 +46,30 @@ describe("limits area", () => {
     db.close();
   });
 
+  test("round-trips both compaction limits", () => {
+    const db = memoryDb();
+    const area = limitsArea({ db, clock: () => 100 });
+    area.set(
+      {
+        ...DEFAULT_LIMITS,
+        contextReserve: 30_000,
+        summaryMaxTokens: 8192,
+      },
+      100,
+    );
+    expect(area.current()).toMatchObject({
+      contextReserve: 30_000,
+      summaryMaxTokens: 8192,
+    });
+    expect(area.rows()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "contextReserve", value: 30_000 }),
+        expect.objectContaining({ name: "summaryMaxTokens", value: 8192 }),
+      ]),
+    );
+    db.close();
+  });
+
   test("reset removes every override", () => {
     const db = memoryDb();
     const area = limitsArea({ db, clock: () => 100 });
@@ -83,6 +107,17 @@ describe("parseLimits", () => {
   ])("refuses an invalid rounds value %p", (rounds) => {
     expect(() =>
       parseLimits({ values: { ...DEFAULT_LIMITS, rounds } }),
+    ).toThrow(BadRequest);
+  });
+
+  test("refuses a compaction limit below its floor", () => {
+    expect(() =>
+      parseLimits({
+        values: {
+          ...DEFAULT_LIMITS,
+          contextReserve: LIMIT_DEFINITIONS.contextReserve.min - 1,
+        },
+      }),
     ).toThrow(BadRequest);
   });
 

@@ -22,7 +22,9 @@ import {
   providersError,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
+import { limits } from "../../../src/client/data/tools.ts";
 import {
+  compactLine,
   defaultThinking,
   effortApplies,
   effortChoices,
@@ -30,6 +32,7 @@ import {
   nameProblem,
   preset,
   priceLine,
+  reserveOf,
   sentEffort,
   thinkingChoices,
   thinkingLine,
@@ -149,6 +152,28 @@ describe("the words", () => {
       "thinking on · effort high",
     );
     expect(thinkingLine({ thinking: null, effort: "low" })).toBe("effort low");
+  });
+
+  test("where a model compacts, by the runner's formula", () => {
+    expect(reserveOf(null)).toBeNull();
+    const rows = [
+      {
+        name: "contextReserve" as const,
+        value: 20_000,
+        default: 20_000,
+        min: 1000,
+        max: 200_000,
+        unit: "tokens" as const,
+        scope: "send" as const,
+        changedAt: null,
+      },
+    ];
+    expect(reserveOf(rows)).toBe(20_000);
+    expect(compactLine(128000, 20_000)).toBe("auto compaction at 108k");
+    // a small window keeps a quarter, not the whole reserve
+    expect(compactLine(16000, 20_000)).toBe("auto compaction at 12k");
+    expect(compactLine(null, 20_000)).toBe("no auto compaction");
+    expect(compactLine(128000, null)).toBe("");
   });
 
   test("the effort sent follows the choices and the wire", () => {
@@ -273,13 +298,30 @@ describe("the page", () => {
     agents.value = [coder];
     const html = render(<Agents />);
     expect(html).toContain("coder");
-    expect(html).toContain("DeepSeek: V4 Flash");
+    // the row names the model by its id, never the alias
+    expect(html).toContain("deepseek/deepseek-v4-flash");
+    expect(html).not.toContain("DeepSeek: V4 Flash");
     expect(html).toContain("router · 128k · $0.14 / $0.28 · tools · reasoning");
     expect(html).toContain("router.key missing");
     agents.value = [{ ...coder, thinking: "on", effort: "xhigh" }];
     expect(render(<Agents />)).toContain(
       "reasoning · thinking on · effort xhigh",
     );
+    limits.value = [
+      {
+        name: "contextReserve",
+        value: 20_000,
+        default: 20_000,
+        min: 1000,
+        max: 200_000,
+        unit: "tokens",
+        scope: "send",
+        changedAt: null,
+      },
+    ];
+    // where the model compacts is the form's line, not the row's
+    expect(render(<Agents />)).not.toContain("auto compaction");
+    limits.value = null;
     expect(html).toContain("New agent");
     expect(html).toContain("New provider");
   });

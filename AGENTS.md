@@ -209,6 +209,12 @@ violation, and every rule has a rejected fixture under
   rows after it, their send and its usage go, and the envelope names
   them in `removedMessageIds`; 409 while the session runs, 400 when
   the last message is the user's.
+- **Compaction is a final provider round.** A summary is a message of
+  kind `summary`, triggered from an answer round's usage at
+  `contextLength - min(contextReserve, contextLength / 4)` through
+  `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
+  send limits. History starts from the last done summary. Compact on
+  demand is a send of kind `compact` under the same runner lock.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
   bytes) and the per-tool caps have their defaults, floors and

@@ -126,7 +126,13 @@ export const SEND_CAUSES = [
 ] as const;
 export type SendCause = (typeof SEND_CAUSES)[number];
 
-export const MESSAGE_KINDS = ["user", "reply", "tool"] as const;
+export const SEND_KINDS = ["chat", "compact"] as const;
+export type SendKind = (typeof SEND_KINDS)[number];
+export function isSendKind(value: unknown): value is SendKind {
+  return SEND_KINDS.includes(value as SendKind);
+}
+
+export const MESSAGE_KINDS = ["user", "reply", "tool", "summary"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
 export const MESSAGE_STATUSES = [
@@ -170,6 +176,8 @@ export const LIMIT_NAMES = [
   "callsPerSend",
   "toolMs",
   "resultBytes",
+  "contextReserve",
+  "summaryMaxTokens",
   "callTimeoutMs",
   "resultCut",
   "maxFetches",
@@ -185,7 +193,7 @@ export function isLimitName(value: unknown): value is LimitName {
 }
 
 // what a limit's number counts; the page turns ms and bytes into words
-export const LIMIT_UNITS = ["count", "ms", "bytes", "chars"] as const;
+export const LIMIT_UNITS = ["count", "ms", "bytes", "chars", "tokens"] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
 // where a limit applies: over the whole send, or to one tool call

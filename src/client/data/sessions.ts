@@ -104,6 +104,9 @@ export function ordered(rows: SessionSummary[]): SessionSummary[] {
   });
 }
 
+// the rows whose text streams: a reply, and the summary round's row
+const streams = (m: Message) => m.kind === "reply" || m.kind === "summary";
+
 // the live map from a detail: the streaming rows, the runner's
 // snapshot for the one it is about. The "tools" phase has no row, so
 // every streaming row starts from itself
@@ -111,7 +114,7 @@ function liveFrom(detail: SessionDetail): Map<string, Live> {
   const map = new Map<string, Live>();
   const snap = detail.live?.phase === "reply" ? detail.live : null;
   for (const m of detail.messages) {
-    if (m.kind !== "reply" || m.status !== "streaming") continue;
+    if (!streams(m) || m.status !== "streaming") continue;
     map.set(
       m.id,
       snap !== null && snap.messageId === m.id
@@ -293,6 +296,20 @@ export async function regenerateSession(id: string): Promise<void> {
   }
 }
 
+// a summary round on its own; the next reply starts from the summary
+export async function compactSession(id: string): Promise<void> {
+  sending.value = true;
+  try {
+    const detail = await api<SessionResponse>(
+      `/api/sessions/${encodeURIComponent(id)}/compact`,
+      "POST",
+    );
+    take(detail);
+  } finally {
+    sending.value = false;
+  }
+}
+
 // the answer is empty: the end of the send arrives as an envelope
 export async function stopSession(id: string): Promise<void> {
   await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
@@ -331,7 +348,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   for (const id of removed) map.delete(id);
   keepResults((id) => !removed.has(id));
   for (const m of ev.messages) {
-    if (m.kind !== "reply") continue;
+    if (!streams(m)) continue;
     if (m.status === "streaming") {
       if (!map.has(m.id)) map.set(m.id, liveOf(m));
     } else map.delete(m.id);

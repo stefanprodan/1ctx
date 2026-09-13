@@ -18,6 +18,7 @@ import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import "./composer.css";
 
 export const MAX_HEIGHT = 160;
+export const COMPACT = "/compact";
 
 export type Scope = { sessionId: string } | { projectId: string };
 
@@ -30,6 +31,7 @@ export function Composer({
   usage,
   onSend,
   onStop,
+  onCompact,
 }: {
   scope: Scope;
   agents: AgentSummary[] | null;
@@ -44,6 +46,9 @@ export function Composer({
   usage?: RoundUsage | null;
   onSend: (text: string, agentId: string) => Promise<void>;
   onStop: () => Promise<void>;
+  // /compact runs a summary round on the chat; a chat not started yet
+  // has nothing to fold, so the command is refused without a call
+  onCompact?: () => Promise<void>;
 }) {
   const key = draftKey(scope);
   const text = useSignal(readDraft(key));
@@ -77,7 +82,12 @@ export function Composer({
     failure.value = null;
     const sent = text.value;
     try {
-      await onSend(content, agent);
+      if (content === COMPACT) {
+        if (onCompact === undefined) {
+          throw new Error("Nothing to compact yet");
+        }
+        await onCompact();
+      } else await onSend(content, agent);
       // what was typed while the send was on its way stays
       if (text.value === sent) {
         text.value = "";

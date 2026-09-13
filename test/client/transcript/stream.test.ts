@@ -48,6 +48,7 @@ const message = (fields: Partial<Message> = {}): Message => ({
   finishedAt: null,
   ...fields,
   resultBytes: fields.resultBytes ?? null,
+  promptTokens: fields.promptTokens ?? null,
 });
 
 const live = (fields: Partial<Live> = {}): Live => ({

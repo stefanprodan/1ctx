@@ -14,6 +14,7 @@
 // of the last tool result, never the stored row. Tested on fixtures,
 // malformed histories among them.
 
+import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type {
   ChatMessageIn,
@@ -23,6 +24,22 @@ import type {
 } from "../providers/index.ts";
 import type { SendPolicy } from "./policy.ts";
 import { systemPrompt } from "./prompt.ts";
+
+export const SUMMARIZE = `Summarize the conversation so far so that it can continue from the summary alone: the messages before this point are dropped and only the summary is kept. Write Markdown with these sections, terse bullets, no prose:
+
+## Goal
+What the user is after.
+
+## Established
+The facts, answers and decisions so far, with exact names, numbers, URLs, commands and code identifiers.
+
+## Open
+What is still unanswered or in progress.
+
+Do not mention the summary process.`;
+
+export const SUMMARY_LEAD =
+  "The conversation so far, summarized; the earlier messages were dropped:";
 
 export type ContextLookups = {
   // the author's username, for the name field on the wire
@@ -88,8 +105,22 @@ export function history(
   const out: ChatMessageIn[] = [
     { role: "system", content: systemPrompt(policy, now) },
   ];
-  const byRound = toolRowsByRound(rows);
-  for (const row of rows) {
+  let start = 0;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]!;
+    if (row.kind === "summary" && row.status === "done") {
+      out.push({
+        role: "user",
+        content: `${SUMMARY_LEAD}\n\n${row.content}`,
+      });
+      start = i + 1;
+      break;
+    }
+  }
+  const active = rows.slice(start);
+  const byRound = toolRowsByRound(active);
+  for (const row of active) {
+    if (row.kind === "summary") continue;
     if (row.kind === "user") {
       out.push(userMessage(row, policy, lookups));
       continue;
@@ -153,6 +184,46 @@ export function request(
     reasoningEffort: policy.effort,
     cacheKey: sessionId,
     ...(policy.offered.tools.length > 0 ? { tools: policy.offered.tools } : {}),
+  };
+}
+
+// what the instruction and the lead line add to the request, and the
+// least a summary is asked for when the answer left little room: a
+// short summary beats none, and a provider that cannot fit even that
+// refuses the round, which ends failed and is tried again next time
+export const SUMMARY_MARGIN = 256;
+export const SUMMARY_MIN_TOKENS = 128;
+
+// the summary round: the history plus the instruction, no tools and no
+// thinking. Its answer is capped by the limit and the reserve, then by
+// the room the answer round actually left (its prompt plus completion,
+// `used`): a strict provider refuses a request whose prompt and
+// max_tokens together pass the window
+export function summaryRequest(
+  policy: SendPolicy,
+  sessionId: string,
+  messages: ChatMessageIn[],
+  used: number | null = null,
+): ChatRequest {
+  const window = policy.contextLength;
+  const reserve =
+    window === null
+      ? policy.limits.summaryMaxTokens
+      : contextReserve(window, policy.limits.contextReserve);
+  let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
+  if (window !== null && used !== null) {
+    maxTokens = Math.max(
+      SUMMARY_MIN_TOKENS,
+      Math.min(maxTokens, window - used - SUMMARY_MARGIN),
+    );
+  }
+  return {
+    model: policy.model,
+    messages: [...messages, { role: "user", content: SUMMARIZE }],
+    thinking: false,
+    reasoningEffort: null,
+    cacheKey: sessionId,
+    maxTokens,
   };
 }
 

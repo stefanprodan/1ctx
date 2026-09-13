@@ -10,6 +10,9 @@ import {
   EXHAUSTED_LINE,
   history,
   request,
+  SUMMARIZE,
+  SUMMARY_LEAD,
+  summaryRequest,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
 import { LOOP_LIMITS } from "../../../src/server/runner/limits.ts";
@@ -20,6 +23,7 @@ import {
   systemPrompt,
 } from "../../../src/server/runner/prompt.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/index.ts";
+import { compactsAt, contextReserve } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 
 const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
@@ -71,6 +75,7 @@ const row = (
   finishedAt: null,
   ...fields,
   resultBytes: fields.resultBytes ?? null,
+  promptTokens: fields.promptTokens ?? null,
 });
 
 const lookups = {
@@ -78,6 +83,19 @@ const lookups = {
   reasoningDetailsOf: (id: string) =>
     id === "r2" ? [{ type: "reasoning.text", text: "t" }] : null,
 };
+
+describe("compaction threshold", () => {
+  test("caps the reserve at a quarter of the context", () => {
+    expect(contextReserve(40_000, 20_000)).toBe(10_000);
+    expect(contextReserve(100_000, 20_000)).toBe(20_000);
+  });
+
+  test("has no threshold without a usable context window", () => {
+    expect(compactsAt(null, 20_000)).toBeNull();
+    expect(compactsAt(1000, 1000)).toBe(750);
+    expect(compactsAt(0, 1000)).toBeNull();
+  });
+});
 
 describe("systemPrompt", () => {
   test("joins the agent's prompt, the about text and the date", () => {
@@ -298,6 +316,73 @@ describe("history", () => {
       { role: "user", content: "hi", name: "oana" },
       { role: "assistant", content: "hello" },
     ]);
+  });
+
+  test("history starts after the last done summary", () => {
+    const rows = [
+      row({ id: "u1", kind: "user", content: "old", userId: "u1" }),
+      row({ id: "s1", kind: "summary", content: "first summary" }),
+      row({ id: "u2", kind: "user", content: "middle", userId: "u1" }),
+      row({
+        id: "sf",
+        kind: "summary",
+        content: "failed summary",
+        status: "failed",
+      }),
+      row({ id: "s2", kind: "summary", content: "latest summary" }),
+      row({
+        id: "ss",
+        kind: "summary",
+        content: "streaming summary",
+        status: "streaming",
+      }),
+      row({ id: "u3", kind: "user", content: "new", userId: "u1" }),
+      row({ id: "r3", kind: "reply", content: "answer", slot: "answer" }),
+    ];
+    expect(history(rows, policy, lookups, NOW).slice(1)).toEqual([
+      { role: "user", content: `${SUMMARY_LEAD}\n\nlatest summary` },
+      { role: "user", content: "new", name: "oana" },
+      { role: "assistant", content: "answer" },
+    ]);
+  });
+
+  test("the summary request has no tools and uses the smaller token cap", () => {
+    const withTools: SendPolicy = {
+      ...policy,
+      contextLength: 8000,
+      limits: {
+        ...policy.limits,
+        contextReserve: 3000,
+        summaryMaxTokens: 4096,
+      },
+      offered: {
+        tools: [{ name: "time", description: "d", parameters: {} }],
+        search: null,
+      },
+    };
+    const req = summaryRequest(withTools, "s1", [
+      { role: "system", content: "system" },
+    ]);
+    expect(req).toEqual({
+      model: "org/model",
+      messages: [
+        { role: "system", content: "system" },
+        { role: "user", content: SUMMARIZE },
+      ],
+      thinking: false,
+      reasoningEffort: null,
+      cacheKey: "s1",
+      maxTokens: 2000,
+    });
+    // the answer left less room than the reserve: the summary fits it
+    expect(summaryRequest(withTools, "s1", [], 6500).maxTokens).toBe(1244);
+    // and never asks for less than the floor
+    expect(summaryRequest(withTools, "s1", [], 7900).maxTokens).toBe(128);
+    // a model with no window is capped by the limit alone
+    expect(
+      summaryRequest({ ...withTools, contextLength: null }, "s1", [], 6500)
+        .maxTokens,
+    ).toBe(4096);
   });
 
   test("the request carries the model, the thinking flag and the session as the cache key", () => {

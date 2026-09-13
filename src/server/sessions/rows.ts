@@ -15,6 +15,7 @@ import type {
   MessageKind,
   MessageStatus,
   SendCause,
+  SendKind,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
@@ -87,12 +88,21 @@ export type RawMessage = {
   model: string | null;
   ttft_ms: number | null;
   thinking_ms: number | null;
+  prompt_tokens: number | null;
   created_at: number;
   finished_at: number | null;
 };
 
-export const MESSAGE_COLUMNS =
-  "id, session_id, seq, kind, send_id, round, slot, user_id, agent_id, content, reasoning, html, status, error, finish_reason, tool_calls, tool_call_id, tool_name, model, ttft_ms, thinking_ms, created_at, finished_at";
+export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, messages.kind,
+   messages.send_id, messages.round, messages.slot, messages.user_id,
+   messages.agent_id, messages.content, messages.reasoning, messages.html,
+   messages.status, messages.error, messages.finish_reason,
+   messages.tool_calls, messages.tool_call_id, messages.tool_name,
+   messages.model, messages.ttft_ms, messages.thinking_ms,
+   (select usage.prompt_tokens from usage
+    where usage.send_id = messages.send_id and usage.round = messages.round)
+    as prompt_tokens,
+   messages.created_at, messages.finished_at`;
 
 const toolCalls = (raw: string | null): ToolCall[] | null => {
   if (!raw) return null;
@@ -116,6 +126,8 @@ export const message = (raw: RawMessage): Message => ({
   agentId: raw.agent_id,
   content: raw.content,
   resultBytes: null,
+  promptTokens:
+    raw.kind === "summary" && raw.status === "done" ? raw.prompt_tokens : null,
   reasoning: raw.reasoning,
   html: raw.html,
   status: raw.status,
@@ -156,7 +168,7 @@ export function cutResult(content: string): { content: string; cut: boolean } {
 export type RawSend = {
   id: string;
   session_id: string;
-  kind: "chat";
+  kind: SendKind;
   user_id: string;
   agent_id: string;
   provider_id: string;
@@ -197,7 +209,7 @@ export type ReplyFinish = {
   status: Exclude<MessageStatus, "streaming">;
   error: string | null;
   finishReason: string | null;
-  slot: "work" | "answer";
+  slot: "work" | "answer" | null;
   toolCalls: ToolCall[] | null;
   ttftMs: number | null;
   thinkingMs: number | null;

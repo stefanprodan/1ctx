@@ -6,7 +6,7 @@
 // single row write the writer wraps in one transact() with a touch().
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
-import type { SendCause, SessionStatus } from "../../shared/words.ts";
+import type { SendCause, SendKind, SessionStatus } from "../../shared/words.ts";
 import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
@@ -34,8 +34,21 @@ export type SessionsPort = {
   replaceSend(
     user: Message,
     newSendId: string,
-  ): { user: Message; removedMessageIds: string[] };
+  ): {
+    user: Message;
+    removedMessageIds: string[];
+    removedSendIds: string[];
+  };
   addReply(fields: {
+    id?: string;
+    sessionId: string;
+    sendId: string;
+    round: number;
+    agentId: string;
+    model: string;
+    now: number;
+  }): Message;
+  addSummary(fields: {
     id?: string;
     sessionId: string;
     sendId: string;
@@ -79,6 +92,7 @@ export type SessionsPort = {
   ): Message | null;
   createSend(fields: {
     id?: string;
+    kind?: SendKind;
     sessionId: string;
     userId: string;
     agentId: string;

@@ -21,6 +21,7 @@ export type RoutesDeps = {
   ): SessionDetail;
   send(principal: Principal, sessionId: string, message: string): SessionDetail;
   regenerate(principal: Principal, sessionId: string): SessionDetail;
+  compact(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string): void;
 };
 
@@ -54,6 +55,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         return json(deps.regenerate(ctx.principal!, ctx.params.id), 201);
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/sessions/:id/compact",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        return json(deps.compact(ctx.principal!, ctx.params.id));
       },
     },
     {

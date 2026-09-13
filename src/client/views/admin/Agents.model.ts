@@ -5,7 +5,9 @@
 // rules the server applies, the presets a provider is made from, and
 // the words a row shows for a window, a price and a key.
 
+import { compactsAt } from "../../../shared/compaction.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import {
   EFFORTS,
@@ -114,6 +116,25 @@ export function modelMeta(m: CatalogMatch): string {
   ]
     .filter((s) => s !== "")
     .join(" · ");
+}
+
+// the reserve the runner keeps, from the limits the tools page holds;
+// null until they are loaded
+export function reserveOf(rows: LimitRow[] | null): number | null {
+  return rows?.find((row) => row.name === "contextReserve")?.value ?? null;
+}
+
+// where the runner compacts a chat on this model, by the formula it
+// uses: "auto compaction at 236k", or that a model with no window is
+// never compacted on its own
+export function compactLine(
+  contextLength: number | null,
+  reserve: number | null,
+): string {
+  if (reserve === null) return "";
+  const at = compactsAt(contextLength, reserve);
+  if (at === null) return "no auto compaction";
+  return `auto compaction at ${windowLine(at)}`;
 }
 
 // what the provider's default resolves to for this model: the runner

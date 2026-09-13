@@ -9,6 +9,7 @@
 // send's signal, their ends written one by one, and the next round
 // begins. Every exit goes through terminate(), never finalizeSend.
 
+import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -83,9 +84,40 @@ export async function toolLoop(
     if (round === null) return finish();
     const calls = round.calls;
 
-    // a round that ends with no calls is the answer, whatever its finish
-    // reason; the reason shows on the row
-    if (calls.length === 0) return finish();
+    if (send.summarizing) {
+      return round.content.trim() === ""
+        ? {
+            cause: "failure",
+            finishReason: round.finishReason,
+            error: "the summary came back empty",
+          }
+        : finish();
+    }
+
+    // an answer round can open the one final summary round, the capped
+    // answer round included: it is the request the tool results filled
+    if (calls.length === 0) {
+      const threshold = compactsAt(
+        send.policy.contextLength,
+        limits.contextReserve,
+      );
+      const usage = round.usage;
+      if (
+        send.kind === "chat" &&
+        usage !== null &&
+        threshold !== null &&
+        usage.promptTokens + usage.completionTokens >= threshold
+      ) {
+        const summary = deps.writer.startSummary(send);
+        send.summarizing = true;
+        send.used = usage.promptTokens + usage.completionTokens;
+        send.roundNo += 1;
+        send.phase = "provider";
+        send.round = newRound(summary.id, summary.createdAt);
+        continue;
+      }
+      return finish();
+    }
 
     // calls in the answer round: keep work, record them not run, end
     if (send.answering) {

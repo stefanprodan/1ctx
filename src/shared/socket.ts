@@ -15,7 +15,7 @@ import type {
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }

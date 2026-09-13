@@ -17,6 +17,8 @@ export type LoopLimits = {
   callsPerSend: number;
   toolMs: number;
   resultBytes: number;
+  contextReserve: number;
+  summaryMaxTokens: number;
 };
 
 export type ToolCaps = {
@@ -68,6 +70,20 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     min: 64 * 1024,
     max: 32 * 1024 * 1024,
     unit: "bytes",
+    scope: "send",
+  },
+  contextReserve: {
+    default: 20_000,
+    min: 1000,
+    max: 200_000,
+    unit: "tokens",
+    scope: "send",
+  },
+  summaryMaxTokens: {
+    default: 4096,
+    min: 256,
+    max: 32_768,
+    unit: "tokens",
     scope: "send",
   },
   callTimeoutMs: {
@@ -141,6 +157,8 @@ export const LOOP_LIMITS: LoopLimits = {
   callsPerSend: DEFAULT_LIMITS.callsPerSend,
   toolMs: DEFAULT_LIMITS.toolMs,
   resultBytes: DEFAULT_LIMITS.resultBytes,
+  contextReserve: DEFAULT_LIMITS.contextReserve,
+  summaryMaxTokens: DEFAULT_LIMITS.summaryMaxTokens,
 };
 
 export const TOOL_CAPS: ToolCaps = {

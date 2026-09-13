@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Persistence and the socket frames of a send. Each durable change is
-// one transact() over the db: one touch() that bumps the revision once,
-// and one envelope after commit carrying exactly the rows it changed.
-// startSend opens the send; delta streams the reply in flight without a
-// revision, checkpointed every 250 ms or 2 KB; markRoundWork moves a
+// one transaction with one revision and one envelope after commit.
+// startSend opens the send; delta streams without a revision,
+// checkpointed every 250 ms or 2 KB; markRoundWork moves a
 // reply into the fold at the first tool call; finishRound ends a work
 // round and launches its tool rows; finishTool ends one tool; recordUnrun
 // writes a round's calls as not run when a cap or the loop cut them;
@@ -28,6 +27,12 @@ import type { UsageFields } from "../usage/index.ts";
 import type { SendPolicy, ToolResult } from "./policy.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import { streamDelta } from "./stream.ts";
+import {
+  type CompactFields,
+  type StartedCompact,
+  startCompact as startCompactRows,
+  startSummary as startSummaryRows,
+} from "./summary.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
 export { HTML_EVERY_MS, WRITE_EVERY_BYTES, WRITE_EVERY_MS } from "./stream.ts";
@@ -90,6 +95,14 @@ const envelope = (
 export class Writer {
   constructor(private readonly deps: WriterDeps) {}
 
+  startSummary(send: ActiveSend): Message {
+    return startSummaryRows(this.deps, send);
+  }
+
+  startCompact(fields: CompactFields): StartedCompact {
+    return startCompactRows(this.deps, fields);
+  }
+
   // with the lock already held: the send row, its user row, the reply
   // that streams, and the running state. Regeneration reuses its user
   // row while the same transaction removes the send it replaces.
@@ -119,6 +132,7 @@ export class Writer {
         });
       const send = this.deps.sessions.createSend({
         id: fields.sendId,
+        kind: "chat",
         sessionId: base.id,
         userId: policy.userId,
         agentId: policy.agentId,
@@ -140,8 +154,10 @@ export class Writer {
         });
       } else {
         const existing = fields.existingUser;
-        this.deps.usage.deleteSend(existing.sendId);
         const replacement = this.deps.sessions.replaceSend(existing, send.id);
+        for (const sendId of replacement.removedSendIds) {
+          this.deps.usage.deleteSend(sendId);
+        }
         user = replacement.user;
         removedMessageIds = replacement.removedMessageIds;
       }
@@ -197,7 +213,7 @@ export class Writer {
     round: RoundState,
     status: Exclude<SessionStatus, "running">,
     error: string | null,
-    slot: "work" | "answer",
+    slot: "work" | "answer" | null,
     toolCalls: ToolCall[] | null,
     now: number,
     finishReason = round.finishReason,
@@ -424,10 +440,9 @@ export class Writer {
     if (round === null) return null;
     // a round cut after its first call delta keeps work; otherwise the
     // reply is the answer, an empty stopped row included
-    const slot = round.slotMarked ? "work" : "answer";
-    const message = this.finishReplyRow(round, status, error, slot, null, now);
+    const slot = send.summarizing ? null : round.slotMarked ? "work" : "answer";
     this.recordUsage(send, round, now);
-    return message;
+    return this.finishReplyRow(round, status, error, slot, null, now);
   }
 
   // called exactly once per send, by the winner of the terminal

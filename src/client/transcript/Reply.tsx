@@ -4,9 +4,10 @@
 // The agent's turn: its line, the work fold (the reasoning and the
 // tool calls, if any), then the server's HTML
 // plus the text received after it as a plain tail while it streams,
-// so a code block in progress never breaks out of its element. Under
-// a finished turn, why it was cut when it was, Copy, Regenerate on
-// the last turn, and when it was.
+// so a code block in progress never breaks out of its element, then
+// the summary fold when the window filled. A compact turn is the
+// summary fold alone. Under a finished turn, why it was cut when it
+// was, Copy, Regenerate on the last turn, and when it was.
 
 import { useEffect, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
@@ -15,6 +16,7 @@ import { AvatarIcon } from "../lib/avatars.tsx";
 import { stamp } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { endedBy, type ReplyNode, type WorkNode } from "./rows.ts";
+import { Summary } from "./Summary.tsx";
 import { type Live, tail } from "./stream.ts";
 import { Work } from "./Work.tsx";
 
@@ -122,7 +124,9 @@ export function Reply({
         <span class="transcript-name">{agent?.name ?? "agent"}</span>
       </div>
       <div class="transcript-body">
-        <Work node={work} reply={m} live={live} running={running} />
+        {!node.compact && (
+          <Work node={work} reply={m} live={live} running={running} />
+        )}
         {html !== "" && (
           // the server renders the markdown with raw HTML off: render/
           // is the safety boundary
@@ -132,6 +136,9 @@ export function Reply({
           />
         )}
         {current !== null && <div class="transcript-tail">{tail(current)}</div>}
+        {node.summary !== null && (
+          <Summary message={node.summary} live={live} />
+        )}
         {!running && (
           <div class="transcript-after">
             {cut && (

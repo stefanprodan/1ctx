@@ -69,6 +69,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Search deadline",
     text: "How long one search request may take.",
   },
+  contextReserve: {
+    label: "Context reserve",
+    text: "Room kept in the window; a reply that leaves less is followed by a summary.",
+  },
+  summaryMaxTokens: {
+    label: "Summary tokens",
+    text: "Tokens a summary may run to, the reserve at most.",
+  },
 };
 
 export const TOOL_WORDS: Record<BuiltinTool, string> = {
@@ -93,6 +101,8 @@ export function displayOf(row: LimitRow): Display {
         : { word: "KB", factor: KB };
     case "chars":
       return { word: "chars", factor: 1 };
+    case "tokens":
+      return { word: "tokens", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

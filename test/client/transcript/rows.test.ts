@@ -91,8 +91,25 @@ function invariant(name: string, step: number): void {
     );
     const expectedReply = answer ?? streaming;
     const expectedUser = rows.find((row) => row.kind === "user");
+    const summary = rows.find((row) => row.kind === "summary");
+    // a compact send has no user row: its turn is the summary alone
     if (expectedUser === undefined) {
-      throw new Error(`${name}:${step}:${sendId}: no user row`);
+      if (summary === undefined) {
+        throw new Error(`${name}:${step}:${sendId}: no user row`);
+      }
+      expect(rows.map((row) => row.kind)).toEqual(["summary"]);
+      expect(sendNodes.map((node) => node.kind)).toEqual(["reply"]);
+      const node = sendNodes[0];
+      if (node?.kind !== "reply") throw new Error("expected reply node");
+      expect(node.compact).toBeTrue();
+      expect(node.summary?.id).toBe(summary.id);
+      expect(node.message).toBeNull();
+      expect(node.work).toBeNull();
+      expect(endedBy(node)).toBeNull();
+      if (summary.status === "streaming") {
+        expect(live.value.has(summary.id)).toBeTrue();
+      } else expect(live.value.has(summary.id)).toBeFalse();
+      continue;
     }
     // the agent's turn holds the work and the answer; a send with
     // neither has only its user row
@@ -113,6 +130,14 @@ function invariant(name: string, step: number): void {
       expect(reply.rows.map((row) => row.id)).toEqual(
         rows.map((row) => row.id),
       );
+      expect(reply.compact).toBeFalse();
+      // the summary sits on the turn after its answer, and streams
+      // like a reply
+      expect(reply.summary?.id ?? null).toBe(summary?.id ?? null);
+      if (summary !== undefined) {
+        expect(summary.seq).toBeGreaterThan(answer?.seq ?? 0);
+        expect(live.value.has(summary.id)).toBe(summary.status === "streaming");
+      }
     }
     if (expectedReply === undefined) {
       expect(reply?.message ?? null).toBeNull();
@@ -165,7 +190,7 @@ function invariant(name: string, step: number): void {
 const message = (
   id: string,
   seq: number,
-  kind: "user" | "reply" | "tool",
+  kind: "user" | "reply" | "tool" | "summary",
   fields: Partial<Message> = {},
 ): Message => ({
   id,
@@ -179,11 +204,12 @@ const message = (
   toolCallId: null,
   toolName: null,
   userId: kind === "user" ? "u1" : null,
-  agentId: kind === "reply" ? "a1" : null,
+  agentId: kind === "user" || kind === "tool" ? null : "a1",
   content: id,
   resultBytes: null,
+  promptTokens: null,
   reasoning: "",
-  html: kind === "reply" ? `<p>${id}</p>` : "",
+  html: kind === "user" || kind === "tool" ? "" : `<p>${id}</p>`,
   status: "done",
   error: null,
   finishReason: null,
@@ -296,6 +322,33 @@ describe("transcript rows", () => {
     expect(reply.work).not.toBeNull();
     expect(reply.work?.rows.map((row) => row.id)).toEqual(["work"]);
     expect(reply.work?.rounds[0]?.calls[0]?.result).toBeNull();
+  });
+
+  test("puts the summary after the answer and a compact send on its own", () => {
+    const nodes = groupRows([
+      message("user", 1, "user"),
+      message("answer", 2, "reply"),
+      message("summary", 3, "summary", { round: 2, promptTokens: 41_000 }),
+      message("compacted", 4, "summary", {
+        sendId: "send2",
+        status: "failed",
+        error: "the summary came back empty",
+      }),
+    ]);
+    expect(nodes.map((node) => node.kind)).toEqual(["user", "reply", "reply"]);
+    const turn = replyNode(nodes);
+    expect(turn.message?.id).toBe("answer");
+    expect(turn.summary?.id).toBe("summary");
+    expect(turn.compact).toBeFalse();
+    const compact = nodes[2];
+    if (compact?.kind !== "reply") throw new Error("expected reply node");
+    expect(compact.compact).toBeTrue();
+    expect(compact.message).toBeNull();
+    expect(compact.work).toBeNull();
+    expect(compact.summary?.id).toBe("compacted");
+    // a failed summary shows in its fold, never as the turn's cut line
+    expect(endedBy(compact)).toBeNull();
+    expect(endedBy(turn)?.id).toBe("answer");
   });
 
   test("takes a stopped work turn's ending from its tool row", () => {
