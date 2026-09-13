@@ -3,7 +3,7 @@
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
-import type { Avatar } from "../../shared/words.ts";
+import type { Avatar, Effort } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
@@ -21,6 +21,8 @@ type Raw = {
   completion_price: number | null;
   tools: number;
   reasoning: number;
+  thinking: "on" | "off" | null;
+  effort: Effort | null;
   prompt: string;
   created_at: number;
 };
@@ -39,6 +41,8 @@ const row = (raw: Raw): AgentRow => ({
     tools: raw.tools === 1,
     reasoning: raw.reasoning === 1,
   },
+  thinking: raw.thinking,
+  effort: raw.effort,
   prompt: raw.prompt,
   createdAt: raw.created_at,
 });
@@ -51,6 +55,8 @@ export type AgentFields = {
   providerId: string;
   // what the catalog said about the model when it was picked
   model: CatalogMatch;
+  thinking: "on" | "off" | null;
+  effort: Effort | null;
   prompt: string;
 };
 
@@ -95,8 +101,8 @@ export class AgentStore {
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           prompt, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           thinking, effort, prompt, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -110,6 +116,8 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        fields.thinking,
+        fields.effort,
         fields.prompt,
         fields.now,
       );
@@ -122,7 +130,7 @@ export class AgentStore {
       .query(
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
-           tools = ?, reasoning = ?, prompt = ?
+           tools = ?, reasoning = ?, thinking = ?, effort = ?, prompt = ?
          where id = ?`,
       )
       .run(
@@ -136,6 +144,8 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        fields.thinking,
+        fields.effort,
         fields.prompt,
         id,
       );

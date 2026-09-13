@@ -285,6 +285,25 @@
     position: relative;
     display: flex;
   }
+  /* a dropdown: the field with the chevron drawn over its right edge */
+  .agents-select {
+    position: relative;
+    display: flex;
+  }
+  .agents-select-input {
+    flex: 1;
+    padding-right: 36px;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .agents-select-chevron {
+    position: absolute;
+    top: 50%;
+    right: var(--space-3);
+    transform: translateY(-50%);
+    color: var(--faint);
+    pointer-events: none;
+  }
   .agents-search-icon {
     position: absolute;
     top: 50%;

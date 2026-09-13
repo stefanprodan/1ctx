@@ -128,16 +128,27 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 200 },
   },
   {
-    // admin: the parser passes and the handler finds no such provider
     method: "POST",
     path: "/api/agents",
-    body: { name: "coder", providerId: "none", model: "x" },
+    body: {
+      name: "coder",
+      providerId: "none",
+      model: "x",
+      thinking: null,
+      effort: null,
+    },
     expect: { anonymous: 401, member: 403, admin: 400 },
   },
   {
     method: "PATCH",
     path: "/api/agents/:id",
-    body: { name: "coder", providerId: "none", model: "x" },
+    body: {
+      name: "coder",
+      providerId: "none",
+      model: "x",
+      thinking: null,
+      effort: null,
+    },
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {

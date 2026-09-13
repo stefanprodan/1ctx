@@ -95,6 +95,15 @@ export function isWire(value: unknown): value is Wire {
   );
 }
 
+export const EFFORTS = {
+  openrouter: ["minimal", "low", "medium", "high", "xhigh"],
+  "openai-compatible": ["low", "medium", "high"],
+} as const satisfies Record<Wire, readonly string[]>;
+export type Effort = (typeof EFFORTS)[Wire][number];
+export function isEffort(wire: Wire, value: unknown): value is Effort {
+  return EFFORTS[wire].includes(value as never);
+}
+
 // a session's, and a send's, status: running while a send holds the
 // lock, then how the last send ended
 export const SESSION_STATUSES = [

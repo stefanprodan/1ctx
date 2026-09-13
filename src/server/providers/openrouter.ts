@@ -109,6 +109,7 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
     includeThinkingFlag: false,
   });
   delete body.prompt_cache_key;
+  delete body.reasoning_effort;
   delete body.stream_options;
   if (req.cacheKey) body.session_id = req.cacheKey;
   body.usage = { include: true };
@@ -120,8 +121,8 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
     messages = withEmptyReasoning(messages);
   }
   body.messages = messages;
-  // "none" is an effort OpenRouter knows (an explicit off), so every set
-  // effort goes through as is
+  // a set effort goes through as is: the policy already dropped it when
+  // thinking is off, and off is the exclude below, never an effort word
   body.reasoning = req.thinking
     ? req.reasoningEffort
       ? { effort: req.reasoningEffort }

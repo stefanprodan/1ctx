@@ -102,6 +102,9 @@ export function buildChatBody(
   if (options.includeThinkingFlag ?? true) {
     body.enable_thinking = req.thinking;
   }
+  if (req.thinking && req.reasoningEffort) {
+    body.reasoning_effort = req.reasoningEffort;
+  }
   if (req.tools && req.tools.length > 0) {
     body.tools = req.tools.map((tool) => ({
       type: "function",

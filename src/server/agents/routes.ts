@@ -5,20 +5,17 @@
 // model must be in that provider's catalog, and what the catalog says
 // about it is kept on the row so a list never asks again.
 
-import type {
-  AgentResponse,
-  AgentsResponse,
-  SaveAgentRequest,
-} from "../../shared/api/agents.ts";
+import type { AgentResponse, AgentsResponse } from "../../shared/api/agents.ts";
 import type { ProjectAgentsResponse } from "../../shared/api/sessions.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ProviderRow } from "../providers/index.ts";
-import { parseAgent } from "./parse.ts";
+import { type ParsedAgent, parseAgent } from "./parse.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
 
 export type ProvidersPort = {
@@ -51,24 +48,31 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
   // catalog is asked, so a bad body costs no fetch, and again in the
   // same turn as the write, since the world may have moved while the
   // catalog answered
-  const check = (body: SaveAgentRequest, except: string | null) => {
+  const check = (body: ParsedAgent, except: string | null) => {
     const other = deps.store.byName(body.name);
     if (other && other.id !== except) {
       throw new Conflict(`an agent named ${body.name} exists`);
     }
     const provider = deps.providers.byId(body.providerId);
     if (!provider) throw new BadRequest("no such provider");
-    return provider;
+    const effort = body.effort;
+    if (effort !== null && !isEffort(provider.wire, effort)) {
+      throw new BadRequest(
+        `effort must be one of ${EFFORTS[provider.wire].join(", ")}`,
+      );
+    }
+    return { provider, effort };
   };
   const resolve = async (
     req: Request,
     except: string | null,
   ): Promise<() => AgentFields> => {
     const body = parseAgent(await jsonBody(req));
-    const model = await deps.providers.model(check(body, except), body.model);
+    const checked = check(body, except);
+    const model = await deps.providers.model(checked.provider, body.model);
     // called by the handler right before its write, with no await between
     return () => {
-      const provider = check(body, except);
+      const { provider, effort } = check(body, except);
       if (!model) {
         throw new BadRequest(`${provider.name} does not list ${body.model}`);
       }
@@ -77,6 +81,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         avatar: body.avatar,
         providerId: provider.id,
         model,
+        thinking: body.thinking,
+        effort,
         prompt: body.prompt,
       };
     };

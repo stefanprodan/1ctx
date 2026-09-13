@@ -23,7 +23,7 @@ import { Icon } from "../../lib/icons.tsx";
 import { WireMark } from "../../lib/marks.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AgentForm } from "./AgentForm.tsx";
-import { keyLine, modelMeta } from "./Agents.model.ts";
+import { keyLine, modelMeta, thinkingLine } from "./Agents.model.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
 import "./agents.css";
 
@@ -66,7 +66,11 @@ function AgentRow({
   onToggle: () => void;
 }) {
   const provider = providers.find((p) => p.id === agent.providerId);
-  const meta = [provider?.name ?? "?", modelMeta(agent.model)]
+  const meta = [
+    provider?.name ?? "?",
+    modelMeta(agent.model),
+    thinkingLine(agent),
+  ]
     .filter((s) => s !== "")
     .join(" · ");
   return (

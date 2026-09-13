@@ -168,7 +168,9 @@ violation, and every rule has a rejected fixture under
   what the tests and the fake fetch answer with. An agent
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider an agent runs on is a 409 to
-  delete.
+  delete. An agent carries `thinking` and `effort`, null for the provider's
+  default; the levels per wire are `EFFORTS` in `shared/words.ts`, and the
+  policy resolves both once per send.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

@@ -8,6 +8,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { migrate, open } from "../../src/server/db/index.ts";
 import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
+import { EFFORTS } from "../../src/shared/words.ts";
 import { fileDb } from "../helpers/db.ts";
 
 describe("migrations", () => {
@@ -337,7 +338,7 @@ describe("0004-tools-page", () => {
        values ('kept', 'kept', 'Kept', 'member', 'x', 7)`,
     ).run();
 
-    expect(migrate(db)).toEqual(["0004-tools-page"]);
+    expect(migrate(db, MIGRATIONS.slice(0, 4))).toEqual(["0004-tools-page"]);
     expect(
       db
         .query(
@@ -372,6 +373,37 @@ describe("0004-tools-page", () => {
       db
         .query("update tools set provider = 'other' where name = 'websearch'")
         .run(),
+    ).toThrow();
+    db.close();
+  });
+});
+
+describe("0005-agent-thinking", () => {
+  test("adds nullable checked settings without losing agent rows", () => {
+    const db = new Database(":memory:");
+    migrate(db, MIGRATIONS.slice(0, 4));
+    db.exec(`
+      insert into providers (id, name, wire, base_url, created_at)
+        values ('pr', 'prov', 'openrouter', 'http://router.test', 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a', 'agent', 'pr', 'm', 'Model', 0);
+    `);
+
+    expect(migrate(db)).toEqual(["0005-agent-thinking"]);
+    expect(
+      db.query("select thinking, effort from agents where id = 'a'").get(),
+    ).toEqual({ thinking: null, effort: null });
+    // the check must know every level a wire offers: a level added to
+    // EFFORTS without a migration fails here
+    for (const level of new Set(Object.values(EFFORTS).flat())) {
+      db.query("update agents set thinking = 'on', effort = ?").run(level);
+    }
+    expect(() =>
+      db.query("update agents set thinking = 'maybe'").run(),
+    ).toThrow();
+    expect(() =>
+      db.query("update agents set effort = 'extreme'").run(),
     ).toThrow();
     db.close();
   });
