@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
@@ -18,11 +19,15 @@ export type UsageFields = {
   cachedTokens: number | null;
   reasoningTokens: number | null;
   cost: number | null;
+  // the model's window as the policy saw it
+  contextLength: number | null;
   now: number;
 };
 
 export type UsageRow = Omit<UsageFields, "now"> & {
   id: string;
+  // the order within the session, from 1
+  seq: number;
   createdAt: number;
 };
 
@@ -41,6 +46,8 @@ type Raw = {
   cached_tokens: number | null;
   reasoning_tokens: number | null;
   cost: number | null;
+  context_length: number | null;
+  seq: number;
   created_at: number;
 };
 
@@ -59,7 +66,18 @@ const row = (raw: Raw): UsageRow => ({
   cachedTokens: raw.cached_tokens,
   reasoningTokens: raw.reasoning_tokens,
   cost: raw.cost,
+  contextLength: raw.context_length,
+  seq: raw.seq,
   createdAt: raw.created_at,
+});
+
+const usageOf = (raw: Raw): RoundUsage => ({
+  promptTokens: raw.prompt_tokens,
+  completionTokens: raw.completion_tokens,
+  cachedTokens: raw.cached_tokens,
+  reasoningTokens: raw.reasoning_tokens,
+  cost: raw.cost,
+  contextLength: raw.context_length,
 });
 
 export class UsageStore {
@@ -71,8 +89,9 @@ export class UsageStore {
       .query(
         `insert into usage (id, send_id, session_id, project_id, user_id, agent_id,
            provider_id, model, round, prompt_tokens, completion_tokens,
-           cached_tokens, reasoning_tokens, cost, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           cached_tokens, reasoning_tokens, cost, context_length, created_at, seq)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+           (select coalesce(max(seq), 0) + 1 from usage where session_id = ?))`,
       )
       .run(
         id,
@@ -89,7 +108,9 @@ export class UsageStore {
         fields.cachedTokens,
         fields.reasoningTokens,
         fields.cost,
+        fields.contextLength,
         fields.now,
+        fields.sessionId,
       );
     return this.byId(id)!;
   }
@@ -104,9 +125,36 @@ export class UsageStore {
   forSession(sessionId: string): UsageRow[] {
     return this.db
       .query<Raw, [string]>(
-        "select * from usage where session_id = ? order by created_at, round",
+        "select * from usage where session_id = ? order by seq",
       )
       .all(sessionId)
       .map(row);
+  }
+
+  // the last round the provider counted for a session
+  latest(sessionId: string): RoundUsage | null {
+    const raw = this.db
+      .query<Raw, [string]>(
+        "select * from usage where session_id = ? order by seq desc limit 1",
+      )
+      .get(sessionId);
+    return raw ? usageOf(raw) : null;
+  }
+
+  // the same for many sessions in one query, for a list
+  latestFor(sessionIds: string[]): Map<string, RoundUsage> {
+    const out = new Map<string, RoundUsage>();
+    if (sessionIds.length === 0) return out;
+    const marks = sessionIds.map(() => "?").join(", ");
+    const rows = this.db
+      .query<Raw, string[]>(
+        `select u.* from usage u
+         join (select session_id, max(seq) as seq from usage
+               where session_id in (${marks}) group by session_id) last
+           on last.session_id = u.session_id and last.seq = u.seq`,
+      )
+      .all(...sessionIds);
+    for (const raw of rows) out.set(raw.session_id, usageOf(raw));
+    return out;
   }
 }

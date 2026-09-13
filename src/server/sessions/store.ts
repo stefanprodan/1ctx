@@ -7,6 +7,7 @@
 
 import type {
   Message,
+  RoundUsage,
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
@@ -37,7 +38,14 @@ type RawSession = {
   last_activity_at: number;
 };
 
-const session = (raw: RawSession): SessionRow => ({
+// what the sessions area asks of the usage area: the last round the
+// provider counted, for the summary every envelope and list carries
+export type UsagePort = {
+  latest(sessionId: string): RoundUsage | null;
+  latestFor(sessionIds: string[]): Map<string, RoundUsage>;
+};
+
+const session = (raw: RawSession, usage: RoundUsage | null): SessionRow => ({
   id: raw.id,
   projectId: raw.project_id,
   ownerId: raw.owner_id,
@@ -48,6 +56,7 @@ const session = (raw: RawSession): SessionRow => ({
   revision: raw.revision,
   createdAt: raw.created_at,
   lastActivityAt: raw.last_activity_at,
+  usage,
 });
 
 type RawMessage = {
@@ -139,13 +148,16 @@ export type ReplyFinish = {
 };
 
 export class SessionStore {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly usage: UsagePort,
+  ) {}
 
   byId(id: string): SessionRow | null {
     const raw = this.db
       .query<RawSession, [string]>("select * from sessions where id = ?")
       .get(id);
-    return raw ? session(raw) : null;
+    return raw ? session(raw, this.usage.latest(raw.id)) : null;
   }
 
   // the stream: the sessions of the given projects, running first, then
@@ -154,7 +166,7 @@ export class SessionStore {
     if (projectIds.length === 0) return [];
     const marks = projectIds.map(() => "?").join(", ");
     const needle = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
-    return this.db
+    const rows = this.db
       .query<RawSession, (string | number)[]>(
         `select * from sessions
          where project_id in (${marks})
@@ -162,8 +174,9 @@ export class SessionStore {
          order by status = 'running' desc, last_activity_at desc, id
          limit ?`,
       )
-      .all(...projectIds, q, needle, limit)
-      .map(session);
+      .all(...projectIds, q, needle, limit);
+    const usage = this.usage.latestFor(rows.map((r) => r.id));
+    return rows.map((raw) => session(raw, usage.get(raw.id) ?? null));
   }
 
   // the id may come from the caller: the runner admits a new session

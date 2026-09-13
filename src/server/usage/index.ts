@@ -5,6 +5,7 @@
 // runner in the round's transaction. The sums for a dashboard come
 // later; the rows are here from the first send so nothing is lost.
 
+import type { RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
@@ -16,6 +17,9 @@ export type UsageDeps = { db: Db };
 export type Usage = {
   store: UsageStore;
   record(fields: UsageFields): UsageRow;
+  // the last round counted for a session, or for many at once
+  latest(sessionId: string): RoundUsage | null;
+  latestFor(sessionIds: string[]): Map<string, RoundUsage>;
   routes: RouteDescriptor[];
 };
 
@@ -24,6 +28,8 @@ export function usageArea(deps: UsageDeps): Usage {
   return {
     store,
     record: (fields) => store.record(fields),
+    latest: (sessionId) => store.latest(sessionId),
+    latestFor: (sessionIds) => store.latestFor(sessionIds),
     routes: [],
   };
 }

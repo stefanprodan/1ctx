@@ -36,6 +36,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
     revision: 1,
     createdAt: 10,
     lastActivityAt: 20,
+    usage: null,
     ...changes,
   };
 }

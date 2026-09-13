@@ -115,6 +115,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: options.log("sessions"),
     access,
     live: (sessionId) => runner.live(sessionId),
+    usage,
   });
   const socket = socketArea({
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),

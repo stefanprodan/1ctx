@@ -2,16 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The card the user writes in: the text that grows with it, the agent
-// chip, and Send, which is Stop while the reply runs. Enter sends,
-// Shift+Enter breaks a line. Two modes: a chat, where the message goes
+// chip, the context readout, and Send, which is Stop while the reply
+// runs. Enter sends, Shift+Enter breaks a line. Two modes: a chat, where the message goes
 // into it, and a project, where it starts one. The draft survives a
 // navigation; a refusal shows under the box until the next keystroke.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import type { RoundUsage } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
+import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import "./composer.css";
 
@@ -25,6 +27,7 @@ export function Composer({
   agentId,
   running,
   busy,
+  usage,
   onSend,
   onStop,
 }: {
@@ -36,6 +39,9 @@ export function Composer({
   running: boolean;
   // a send is on its way to the server
   busy: boolean;
+  // the session's last counted round, for the context readout; none
+  // for a chat not started yet
+  usage?: RoundUsage | null;
   onSend: (text: string, agentId: string) => Promise<void>;
   onStop: () => Promise<void>;
 }) {
@@ -81,12 +87,13 @@ export function Composer({
       failure.value = err instanceof Error ? err.message : String(err);
     }
   };
+  const context = readout(usage);
   const placeholder =
     agents !== null && list.length === 0
       ? "No agent yet: an admin adds one first"
       : running
         ? "Replying"
-        : "Message";
+        : "Send a message";
   return (
     <div class="composer">
       <textarea
@@ -123,7 +130,17 @@ export function Composer({
                 }
           }
         />
-        <span class="composer-hint">Enter to send, Shift+Enter for a line</span>
+        {context && (
+          <span class="composer-ctx" title={context.title}>
+            <span class="composer-ctx-n">{context.text}</span>
+            <span class="composer-ctx-track">
+              <span
+                class="composer-ctx-fill"
+                style={{ width: `${context.percent}%` }}
+              />
+            </span>
+          </span>
+        )}
         <button
           type="button"
           class={`composer-send${running ? " composer-stop" : ""}`}
