@@ -1,29 +1,26 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A team project in place: the name, the members with Add as the list's
-// last line, and one foot for the whole row. Only the name is saved by
-// the foot; a member is added or removed at once, so Add answers Enter
-// itself and never submits the name.
+// A team project in place: the name, the members with the picker as
+// the list's last line, and one foot for the whole row. Only the name
+// is saved by the foot; a member is added or removed at once.
 
 import { useSignal } from "@preact/signals";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import {
-  addProjectMember,
   createProject,
   deleteProject,
   removeProjectMember,
   renameProject,
 } from "../../data/admin-projects.ts";
-import { initials } from "../../lib/format.ts";
+import { initials, reason } from "../../lib/format.ts";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
+import { RowsAvatar } from "../../ui/Rows.tsx";
 import { deleteLabel, nameProblem } from "./AdminProjects.model.ts";
+import { MemberPicker } from "./MemberPicker.tsx";
 import "./admin-projects.css";
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 function MemberRow({
   project,
@@ -53,7 +50,7 @@ function MemberRow({
   };
   return (
     <div class="admin-projects-member">
-      <span class="admin-projects-avatar">{initials(fullName)}</span>
+      <RowsAvatar>{initials(fullName)}</RowsAvatar>
       <span class="admin-projects-person">
         <span class="admin-projects-person-name">{fullName}</span>
         <span class="admin-projects-person-user">@{username}</span>
@@ -63,90 +60,12 @@ function MemberRow({
       )}
       <button
         type="button"
-        class="btn admin-projects-small"
+        class="btn btn-small"
         disabled={disabled || busy.value}
         onClick={() => void remove()}
       >
         Remove
       </button>
-    </div>
-  );
-}
-
-function AddMember({
-  project,
-  users,
-  disabled,
-}: {
-  project: ProjectDetail;
-  users: UserAccount[];
-  disabled: boolean;
-}) {
-  const username = useSignal("");
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
-  const memberIds = new Set(project.members.map((member) => member.id));
-  const choices = users.filter((user) => !memberIds.has(user.id));
-  const add = async () => {
-    if (disabled || busy.value) return;
-    failure.value = null;
-    const value = username.value.trim();
-    const user = choices.find((choice) => choice.username === value);
-    if (user === undefined) {
-      failure.value = "Pick a user";
-      return;
-    }
-    busy.value = true;
-    try {
-      await addProjectMember(project.id, { userId: user.id });
-      username.value = "";
-    } catch (err) {
-      failure.value = reason(err);
-    }
-    busy.value = false;
-  };
-  return (
-    <div class="admin-projects-add">
-      <input
-        name="member"
-        class="admin-projects-add-input"
-        aria-label="Add by username"
-        list="admin-projects-users"
-        autocomplete="off"
-        spellcheck={false}
-        placeholder={
-          choices.length === 0 ? "Everyone is in" : "Add by username"
-        }
-        disabled={disabled || busy.value || choices.length === 0}
-        value={username.value}
-        onInput={(event) => {
-          username.value = (event.currentTarget as HTMLInputElement).value;
-          failure.value = null;
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
-          event.preventDefault();
-          void add();
-        }}
-      />
-      <datalist id="admin-projects-users">
-        {choices.map((user) => (
-          <option key={user.id} value={user.username}>
-            {user.fullName}
-          </option>
-        ))}
-      </datalist>
-      <button
-        type="button"
-        class="btn admin-projects-add-button"
-        disabled={disabled || busy.value || choices.length === 0}
-        onClick={() => void add()}
-      >
-        Add
-      </button>
-      {failure.value !== null && (
-        <span class="admin-projects-note error">{failure.value}</span>
-      )}
     </div>
   );
 }
@@ -207,9 +126,7 @@ export function ProjectForm({
             save.touch();
           }}
         />
-        <span class="admin-projects-hint">
-          Lowercase letters, digits and dashes.
-        </span>
+        <span class="hint">Lowercase letters, digits and dashes.</span>
       </label>
       {project !== null && (
         <section class="admin-projects-members">
@@ -229,11 +146,11 @@ export function ProjectForm({
                 />
               ))
             )}
-            <AddMember project={project} users={users} disabled={busy} />
+            <MemberPicker project={project} users={users} disabled={busy} />
           </div>
         </section>
       )}
-      <div class="admin-projects-foot">
+      <div class={project === null ? undefined : "admin-projects-foot"}>
         <Foot
           status={deleting.value ? "busy" : save.status.value}
           dirty={dirty}
@@ -245,7 +162,7 @@ export function ProjectForm({
               <>
                 <button
                   type="button"
-                  class="btn admin-projects-danger"
+                  class="btn btn-danger"
                   disabled={busy}
                   onClick={() => void remove()}
                 >

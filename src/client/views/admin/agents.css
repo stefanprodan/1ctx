@@ -1,96 +1,10 @@
-/* Agents: two cards, the agents and the providers, a row each with a
-   tile, a name, a description and faint meta; an open row's form sits
-   under it on the page's ground. The model lines share one shape. */
+/* Agents: a provider row's name, address and Delete question, and the
+   form an open agent row holds: the presets, the avatar and provider
+   pickers, and the model search. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .agents {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    width: 960px;
-    max-width: 100%;
-  }
-
-  .agents-card {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
-    overflow: hidden;
-  }
-  .agents-card-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 44px;
-    padding: 0 var(--space-4);
-    border-bottom: 1px solid var(--line);
-  }
-  .agents-card-act {
-    margin-left: auto;
-  }
-
-  .agents-item {
-    border-bottom: 1px solid var(--line);
-  }
-  .agents-item:last-child {
-    border-bottom: 0;
-  }
-  .agents-item-open {
-    background: var(--page);
-  }
-
-  .agents-row,
-  .agents-provider {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    min-height: 52px;
-    padding: var(--space-2) var(--space-4);
-  }
-  .agents-row {
-    border: 0;
-    background: transparent;
-    color: var(--dim);
-    text-align: left;
-    cursor: pointer;
-  }
-  .agents-row:hover {
-    color: var(--fg);
-  }
-  /* the provider row starts where the agent row's tile is */
-  .agents-provider {
-    padding-left: calc(var(--space-4) + 14px + var(--space-3));
-    color: var(--dim);
-  }
-
-  .agents-chevron {
-    flex-shrink: 0;
-    color: var(--faint);
-    transform: rotate(-90deg);
-    transition: transform 120ms;
-  }
-  .agents-chevron-open {
-    transform: rotate(0);
-  }
-
-  .agents-tile {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    color: var(--dim);
-  }
   .agents-name {
     flex-shrink: 0;
     width: 140px;
@@ -102,65 +16,29 @@
     font-weight: 500;
     color: var(--fg);
   }
-
   .agents-desc {
     flex-grow: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--text-ui);
-    color: var(--dim);
-  }
-  .agents-url {
     font-family: var(--mono);
     font-size: var(--text-small);
+    color: var(--dim);
   }
 
-  .agents-meta {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    white-space: nowrap;
-  }
-  .agents-meta-bad {
-    color: var(--failed);
-  }
-
-  .agents-provider-ask {
+  .agents-ask {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     flex-shrink: 0;
   }
-  .agents-ask {
+  .agents-ask-words {
     font-size: var(--text-ui);
     color: var(--dim);
   }
-
-  .agents-small {
-    height: 28px;
-    padding: 0 var(--space-2);
-    font-size: var(--text-small);
-  }
-  .agents-danger {
-    color: var(--failed);
-    border-color: var(--failed);
-  }
   .agents-note {
     font-size: var(--text-small);
-  }
-
-  /* the open form, indented under the row's tile */
-  .agents-body {
-    padding: var(--space-3) var(--space-4) var(--space-4)
-      calc(var(--space-4) + 14px + var(--space-3) + 28px + var(--space-3));
-    border-top: 1px solid var(--line);
-  }
-  .agents-body-new {
-    padding: var(--space-4);
-    border-top: 0;
   }
 
   .agents-form {
@@ -269,11 +147,6 @@
   .agents-prompt {
     font-family: var(--mono);
     font-size: var(--text-small);
-  }
-
-  .agents-hint {
-    font-size: var(--text-small);
-    color: var(--faint);
   }
 
   /* the model field: the glass at the left end of the search */
@@ -407,15 +280,6 @@
   }
 
   @media (max-width: 719px) {
-    .agents-row,
-    .agents-provider {
-      flex-wrap: wrap;
-      padding: var(--space-3) var(--space-4);
-      row-gap: var(--space-1);
-    }
-    .agents-provider {
-      padding-left: var(--space-4);
-    }
     .agents-name {
       width: auto;
       flex-grow: 1;
@@ -423,25 +287,12 @@
     .agents-desc {
       flex-basis: 100%;
       order: 5;
-    }
-    .agents-provider .agents-desc {
       padding-left: calc(28px + var(--space-3));
     }
-    .agents-meta {
-      flex-basis: 100%;
-      order: 6;
-      white-space: normal;
-    }
-    .agents-provider .agents-meta {
-      padding-left: calc(28px + var(--space-3));
-    }
-    .agents-provider-ask {
+    .agents-ask {
       flex-basis: 100%;
       order: 7;
       justify-content: flex-end;
-    }
-    .agents-body {
-      padding: var(--space-4);
     }
     .agents-presets,
     .agents-fields {

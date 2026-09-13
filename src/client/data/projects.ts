@@ -19,6 +19,7 @@ import type {
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
+import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { onSocketEvent } from "./socket.ts";
@@ -43,9 +44,6 @@ effect(() => {
   project.value = null;
   projectError.value = null;
 });
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 export async function loadProjects(): Promise<void> {
   const forUser = owner;

@@ -79,3 +79,8 @@ export function count(n: number): string {
 export function elapsed(ms: number): string {
   return span(Math.max(0, ms));
 }
+
+// the words of a thrown value, for a failure line
+export function reason(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

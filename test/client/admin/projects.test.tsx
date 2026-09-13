@@ -25,11 +25,15 @@ import { projects } from "../../../src/client/data/projects.ts";
 import { startSocket, type Wire } from "../../../src/client/data/socket.ts";
 import { users, usersError } from "../../../src/client/data/users.ts";
 import {
+  candidateNote,
+  candidates,
+  countLine,
   deleteLabel,
   mark,
-  metaLine,
   nameProblem,
   plural,
+  sinceLine,
+  step,
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectForm } from "../../../src/client/views/admin/ProjectForm.tsx";
@@ -123,16 +127,50 @@ describe("the words", () => {
   test("writes the member, date, and delete counts", () => {
     expect(plural(1, "member")).toBe("1 member");
     expect(plural(2, "member")).toBe("2 members");
-    expect(metaLine(detail)).toBe("1 member · since 14 September 2026");
+    expect(countLine(detail)).toBe("1 member");
+    expect(sinceLine(detail)).toBe("since 14 September 2026");
     expect(deleteLabel(3)).toBe("Delete with 3 chats");
     expect(deleteLabel(1)).toBe("Delete with 1 chat");
     expect(deleteLabel(0)).toBe("Delete");
   });
 
-  test("marks a tile with the first letters of the name", () => {
+  test("marks an avatar with the first letters of the name", () => {
     expect(mark("on-call")).toBe("OC");
     expect(mark("research")).toBe("RE");
     expect(mark("a-b-c")).toBe("AB");
+  });
+
+  test("offers the people not in the project, by any of their names", () => {
+    const mira: UserAccount = {
+      ...oana,
+      id: "u3",
+      username: "mira",
+      fullName: "Mira Pop",
+      email: "mira@corp.dev",
+      disabled: true,
+    };
+    const all = [oana, root, mira];
+    const none = new Set<string>();
+    expect(candidates(all, none, "").map((u) => u.username)).toEqual([
+      "admin",
+      "mira",
+      "oana",
+    ]);
+    expect(candidates(all, new Set(["u2"]), "")).not.toContain(oana);
+    expect(candidates(all, none, "PELL")).toEqual([oana]);
+    expect(candidates(all, none, "@mira")).toEqual([mira]);
+    expect(candidates(all, none, "corp.dev")).toEqual([mira]);
+    expect(candidates(all, none, " nobody ")).toEqual([]);
+    expect(candidateNote(mira)).toBe("disabled");
+    expect(candidateNote(root)).toBe("admin");
+    expect(candidateNote(oana)).toBe("");
+  });
+
+  test("the arrows wrap at either end of the list", () => {
+    expect(step(0, 1, 3)).toBe(1);
+    expect(step(2, 1, 3)).toBe(0);
+    expect(step(0, -1, 3)).toBe(2);
+    expect(step(0, 1, 0)).toBe(0);
   });
 });
 
@@ -277,9 +315,10 @@ describe("the page", () => {
     adminProjects.value = [{ ...team, memberCount: 3 }];
     const html = render(<AdminProjects />);
     expect(html).toContain("New project");
-    expect(html).toContain('class="admin-projects-name">platform<');
+    expect(html).toContain('class="rows-name rows-name-mono">platform<');
     expect(html).toContain(">PL<");
-    expect(html).toContain("3 members · since");
+    expect(html).toContain('class="rows-sub">3 members<');
+    expect(html).toContain(">since 14 September 2026<");
     expect(html).not.toContain("Oana Pellea");
     expect(html).not.toContain(">Members<");
   });
@@ -291,9 +330,8 @@ describe("the page", () => {
     expect(html).toContain("Oana Pellea");
     expect(html).toContain("@oana");
     expect(html).toContain(">Remove<");
-    expect(html).toContain('value="admin"');
-    expect(html).toContain('placeholder="Add by username"');
-    expect(html).toContain(">Add<");
+    expect(html).toContain("Add member");
+    expect(html).not.toContain("Search people");
     expect(html).toContain(">Delete<");
   });
 });

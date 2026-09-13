@@ -25,6 +25,7 @@ import {
 import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import "./composer.css";
+import { reason } from "../lib/format.ts";
 
 export const MAX_HEIGHT = 160;
 
@@ -112,7 +113,7 @@ export function Composer({
         writeDraft(key, "");
       }
     } catch (err) {
-      failure.value = err instanceof Error ? err.message : String(err);
+      failure.value = reason(err);
     }
   };
   const context = readout(usage);
@@ -219,8 +220,7 @@ export function Composer({
           onClick={() => {
             if (running) {
               onStop().catch((err) => {
-                failure.value =
-                  err instanceof Error ? err.message : String(err);
+                failure.value = reason(err);
               });
             } else void submit();
           }}

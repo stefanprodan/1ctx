@@ -331,6 +331,13 @@ violation, and every rule has a rejected fixture under
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
   ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
+- **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
+  column: `RowsOpen` for a row that opens in place, `RowsLine` for one
+  that does not, `RowsAvatar`, `RowsTitle` (mono for an identifier) and
+  `RowsMeta` for its head. The page's stylesheet holds only what it
+  puts inside a row. Small and danger buttons are `.btn-small` and
+  `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
+  failure's words come from `reason()` in `lib/format.ts`.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

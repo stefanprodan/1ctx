@@ -246,7 +246,7 @@ describe("the page", () => {
       "member · password to change · since 13 September 2026",
     );
     users.value = [root, { ...oana, disabled: true }];
-    expect(render(<Users />)).toContain("users-item-off");
+    expect(render(<Users />)).toContain("rows-item-off");
     expect(html).toContain(">you<");
     expect(html).toContain("New user");
     expect(html).not.toContain("passwordHash");

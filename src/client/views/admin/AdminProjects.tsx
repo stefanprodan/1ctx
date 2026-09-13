@@ -1,10 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Team projects follow the users page's one-card shape. A collapsed row
-// holds the tile, the name and, faint, the member count and since when,
-// all from the list; opening it asks for the detail and draws the form
-// in place.
+// Team projects: a row each, the name over the member count and since
+// when, all from the list. Opening a row loads the detail for its form.
 
 import { useSignal } from "@preact/signals";
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
@@ -16,9 +14,19 @@ import {
   loadAdminProject,
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
-import { Icon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { mark, metaLine } from "./AdminProjects.model.ts";
+import {
+  Rows,
+  RowsAdd,
+  RowsAvatar,
+  RowsCard,
+  RowsMeta,
+  RowsNew,
+  RowsNote,
+  RowsOpen,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
+import { countLine, mark, sinceLine } from "./AdminProjects.model.ts";
 import { ProjectForm } from "./ProjectForm.tsx";
 import "./admin-projects.css";
 
@@ -33,46 +41,29 @@ function ProjectRow({
 }) {
   const detail = adminProject.value;
   return (
-    <div
-      class={`admin-projects-item${open ? " admin-projects-item-open" : ""}`}
+    <RowsOpen
+      open={open}
+      onToggle={onToggle}
+      head={
+        <>
+          <RowsAvatar lit={open}>{mark(project.name)}</RowsAvatar>
+          <RowsTitle name={project.name} sub={countLine(project)} mono />
+          <RowsMeta>{sinceLine(project)}</RowsMeta>
+        </>
+      }
     >
-      <button
-        type="button"
-        class="admin-projects-row"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <Icon
-          name="chevron"
-          size={14}
-          class={`admin-projects-chevron${
-            open ? " admin-projects-chevron-open" : ""
-          }`}
+      {detail?.id === project.id ? (
+        <ProjectForm
+          project={detail}
+          users={users.value ?? []}
+          onDone={onToggle}
         />
-        <span
-          class={`admin-projects-tile${open ? " admin-projects-tile-lit" : ""}`}
-        >
-          {mark(project.name)}
-        </span>
-        <span class="admin-projects-name">{project.name}</span>
-        <span class="admin-projects-meta">{metaLine(project)}</span>
-      </button>
-      {open && (
-        <div class="admin-projects-body">
-          {detail?.id === project.id ? (
-            <ProjectForm
-              project={detail}
-              users={users.value ?? []}
-              onDone={onToggle}
-            />
-          ) : adminProjectError.value !== null ? (
-            <p class="admin-projects-note error">{adminProjectError.value}</p>
-          ) : (
-            <p class="admin-projects-note">Loading</p>
-          )}
-        </div>
+      ) : adminProjectError.value !== null ? (
+        <p class="admin-projects-note error">{adminProjectError.value}</p>
+      ) : (
+        <p class="admin-projects-note">Loading</p>
       )}
-    </div>
+    </RowsOpen>
   );
 }
 
@@ -88,38 +79,33 @@ export function AdminProjects() {
       loading={(list === null || users.value === null) && error === null}
       error={error}
     >
-      <div class="admin-projects">
-        <section class="admin-projects-card">
-          <div class="admin-projects-card-head">
-            <span class="label">Projects</span>
-            <button
-              type="button"
-              class="btn admin-projects-small admin-projects-card-act"
+      <Rows>
+        <RowsCard
+          label="Projects"
+          action={
+            <RowsAdd
+              label="New project"
               disabled={adding.value}
               onClick={() => {
                 adding.value = true;
                 open.value = null;
               }}
-            >
-              <Icon name="plus" size={14} />
-              New project
-            </button>
-          </div>
+            />
+          }
+        >
           {adding.value && (
-            <div class="admin-projects-item admin-projects-item-open">
-              <div class="admin-projects-body admin-projects-body-new">
-                <ProjectForm
-                  project={null}
-                  users={users.value ?? []}
-                  onDone={() => {
-                    adding.value = false;
-                  }}
-                />
-              </div>
-            </div>
+            <RowsNew>
+              <ProjectForm
+                project={null}
+                users={users.value ?? []}
+                onDone={() => {
+                  adding.value = false;
+                }}
+              />
+            </RowsNew>
           )}
           {list?.length === 0 && !adding.value && (
-            <p class="admin-projects-empty">No team projects yet.</p>
+            <RowsNote>No team projects yet.</RowsNote>
           )}
           {(list ?? []).map((project) => (
             <ProjectRow
@@ -134,8 +120,8 @@ export function AdminProjects() {
               }}
             />
           ))}
-        </section>
-      </div>
+        </RowsCard>
+      </Rows>
     </Page>
   );
 }

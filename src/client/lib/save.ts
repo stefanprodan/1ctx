@@ -8,6 +8,7 @@
 
 import { signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { reason } from "./format.ts";
 
 export type Status = "idle" | "busy" | "done" | { error: string };
 
@@ -42,7 +43,7 @@ export class Save {
     try {
       await this.call();
     } catch (err) {
-      failed = err instanceof Error ? err.message : String(err);
+      failed = reason(err);
     }
     if (!this.live) return;
     if (failed !== null) {

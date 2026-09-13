@@ -261,7 +261,7 @@ describe("the pages", () => {
     expect(html).toContain(
       'class="agent-row-meta">128k · $0.14 / $0.28 · tools · reasoning<',
     );
-    expect(html).not.toContain("agents-row");
+    expect(html).not.toContain("rows-toggle");
     projectAgents.value = [];
     expect(render(<Members params={{ id: "p1" }} />)).toContain(
       "No agents yet",

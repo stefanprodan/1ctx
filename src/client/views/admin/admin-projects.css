@@ -1,137 +1,9 @@
-/* Team projects: the users page's card, a row per project with a square
-   tile, the name and faint meta; an open row sits on the page's ground
-   with the name, the members as one bordered list whose last line adds,
-   and one foot under a rule. */
+/* Team projects: the form an open row holds, the members as one
+   bordered list whose last line is the picker, and one foot. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .admin-projects {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    width: 960px;
-    max-width: 100%;
-  }
-
-  .admin-projects-card {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
-    overflow: hidden;
-  }
-  .admin-projects-card-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 44px;
-    padding: 0 var(--space-4);
-    border-bottom: 1px solid var(--line);
-  }
-  .admin-projects-card-act {
-    margin-left: auto;
-  }
-  .admin-projects-empty {
-    margin: 0;
-    padding: var(--space-4);
-    color: var(--faint);
-  }
-
-  .admin-projects-item {
-    border-bottom: 1px solid var(--line);
-  }
-  .admin-projects-item:last-child {
-    border-bottom: 0;
-  }
-  .admin-projects-item-open {
-    background: var(--page);
-  }
-
-  .admin-projects-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    min-height: 56px;
-    padding: var(--space-2) var(--space-4);
-    border: 0;
-    background: transparent;
-    color: var(--dim);
-    text-align: left;
-    cursor: pointer;
-  }
-  .admin-projects-row:hover {
-    color: var(--fg);
-  }
-  .admin-projects-chevron {
-    flex-shrink: 0;
-    color: var(--faint);
-    transform: rotate(-90deg);
-    transition: transform 120ms;
-  }
-  .admin-projects-chevron-open {
-    transform: rotate(0);
-  }
-
-  /* square where a person's avatar is round, so the two pages never
-     read as one list */
-  .admin-projects-tile {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius);
-    background: var(--inset);
-    border: 1px solid var(--line);
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    font-weight: 600;
-    color: var(--dim);
-  }
-  .admin-projects-tile-lit {
-    border-color: var(--line-strong);
-    color: var(--fg);
-  }
-  .admin-projects-name {
-    flex-grow: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-ui);
-    font-weight: 500;
-    color: var(--fg);
-  }
-  .admin-projects-meta {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    white-space: nowrap;
-  }
-
-  .admin-projects-small {
-    height: 28px;
-    padding: 0 var(--space-2);
-    font-size: var(--text-small);
-  }
-
-  /* the open row, indented under the tile */
-  .admin-projects-body {
-    padding: var(--space-4) var(--space-4) var(--space-4)
-      calc(var(--space-4) + 14px + var(--space-3) + 28px + var(--space-3));
-    border-top: 1px solid var(--line);
-  }
-  .admin-projects-body-new {
-    padding: var(--space-4);
-    border-top: 0;
-  }
-
   .admin-projects-form {
     display: flex;
     flex-direction: column;
@@ -140,10 +12,6 @@
   .admin-projects-name-field {
     width: 360px;
     max-width: 100%;
-  }
-  .admin-projects-hint {
-    font-size: var(--text-small);
-    color: var(--faint);
   }
   .admin-projects-note {
     margin: 0;
@@ -177,21 +45,6 @@
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--line);
   }
-  .admin-projects-avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    font-weight: 600;
-    color: var(--dim);
-  }
   .admin-projects-person {
     display: flex;
     flex-direction: column;
@@ -214,67 +67,122 @@
     color: var(--faint);
   }
 
-  /* the list's last line: a quiet input on the inset, Add at its end */
-  .admin-projects-add {
+  /* the list's last line: Add member, which opens the picker in place */
+  .admin-projects-pick-open {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+    width: 100%;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-bottom-left-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+  .admin-projects-pick-open:hover {
+    background: var(--inset);
+    color: var(--fg);
+  }
+  .admin-projects-pick-open:disabled {
+    color: var(--faint);
+    background: transparent;
+    cursor: default;
+  }
+
+  .admin-projects-pick {
+    display: flex;
+    flex-direction: column;
     border-bottom-left-radius: var(--radius);
     border-bottom-right-radius: var(--radius);
     background: var(--inset);
   }
-  .admin-projects-add-input {
-    flex: 1 1 200px;
+  .admin-projects-pick-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-2) 0 var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-projects-pick-glass {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .admin-projects-pick-input {
+    flex-grow: 1;
     min-width: 0;
-    height: 28px;
+    height: 32px;
     padding: 0;
     border: 0;
     background: transparent;
     font-size: var(--text-ui);
   }
-  .admin-projects-add-input:focus-visible {
+  .admin-projects-pick-input:focus-visible {
     outline: 0;
   }
-  .admin-projects-add:focus-within {
-    box-shadow: inset 0 0 0 1px var(--brand);
-  }
-  .admin-projects-add-button {
+  .admin-projects-pick-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
     height: 28px;
-    padding: 0 var(--space-3);
-    font-size: var(--text-small);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
   }
-  .admin-projects-add .admin-projects-note {
-    flex-basis: 100%;
+  .admin-projects-pick-close:hover {
+    color: var(--fg);
+  }
+
+  /* about six people in sight, the rest a scroll away */
+  .admin-projects-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 290px;
+    padding: var(--space-1);
+    overflow-y: auto;
+  }
+  .admin-projects-pick-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .admin-projects-pick-option-on {
+    background: var(--line);
+  }
+  .admin-projects-pick-note {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .admin-projects-pick-none {
+    margin: 0;
+    padding: var(--space-3);
+    font-size: var(--text-small);
+    color: var(--faint);
   }
 
   .admin-projects-foot {
     padding-top: var(--space-4);
     border-top: 1px solid var(--line);
   }
-  .admin-projects-body-new .admin-projects-foot {
-    padding-top: 0;
-    border-top: 0;
-  }
-  .admin-projects-danger {
-    color: var(--failed);
-    border-color: var(--failed);
-  }
 
   @media (max-width: 719px) {
-    .admin-projects-row {
-      flex-wrap: wrap;
-      padding: var(--space-3) var(--space-4);
-      row-gap: var(--space-1);
-    }
-    .admin-projects-meta {
-      flex-basis: 100%;
-      padding-left: calc(14px + var(--space-3) + 28px + var(--space-3));
-    }
-    .admin-projects-body {
-      padding: var(--space-4);
-    }
     .admin-projects-name-field {
       width: 100%;
     }

@@ -8,6 +8,7 @@
 
 import { signal } from "@preact/signals";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
+import { reason } from "../../lib/format.ts";
 
 export const SEARCH_DELAY_MS = 250;
 
@@ -61,7 +62,7 @@ export class CatalogSearch {
     try {
       matches = await this.ask(q);
     } catch (err) {
-      failed = err instanceof Error ? err.message : String(err);
+      failed = reason(err);
     }
     if (!this.live || turn !== this.turn) return;
     this.busy.value = false;

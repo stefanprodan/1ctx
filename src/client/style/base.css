@@ -91,9 +91,24 @@
     border-color: var(--line-strong);
     color: var(--fg);
   }
+  .btn-small {
+    height: 28px;
+    padding: 0 var(--space-2);
+    font-size: var(--text-small);
+  }
+  .btn-danger {
+    color: var(--failed);
+    border-color: var(--failed);
+  }
   .btn:disabled {
     opacity: 0.6;
     cursor: default;
+  }
+
+  /* the faint line under a field */
+  .hint {
+    font-size: var(--text-small);
+    color: var(--faint);
   }
 
   .field {

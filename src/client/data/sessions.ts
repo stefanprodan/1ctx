@@ -26,6 +26,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
+import { reason } from "../lib/format.ts";
 import {
   applyDelta,
   applyHtml,
@@ -69,9 +70,6 @@ let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
 let stream: { sendId: string; seq: number } | null = null;
 let agentsTurn = 0;
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 const clock = () => Date.now();
 

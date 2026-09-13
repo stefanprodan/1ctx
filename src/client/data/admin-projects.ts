@@ -19,6 +19,7 @@ import type {
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
+import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { loadProjects } from "./projects.ts";
@@ -44,9 +45,6 @@ effect(() => {
   adminProject.value = null;
   adminProjectError.value = null;
 });
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 const byName = (a: ProjectSummary, b: ProjectSummary) =>
   a.name < b.name ? -1 : a.name > b.name ? 1 : 0;

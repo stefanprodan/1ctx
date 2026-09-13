@@ -16,7 +16,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
-import { initials } from "../lib/format.ts";
+import { initials, reason } from "../lib/format.ts";
 import { Icon, type IconName, Logo } from "../lib/icons.tsx";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
@@ -188,8 +188,7 @@ export function Rail({
                 try {
                   await logout();
                 } catch (err) {
-                  failure.value =
-                    err instanceof Error ? err.message : String(err);
+                  failure.value = reason(err);
                   return;
                 }
                 open.value = false;

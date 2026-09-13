@@ -3,11 +3,13 @@
 @layer tokens, base, owners;
 
 @layer owners {
+  /* a zero basis, so a long model id never wraps the row off the
+     chevron's line */
   .agent-row {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    flex-grow: 1;
+    flex: 1 1 0;
     min-width: 0;
   }
 

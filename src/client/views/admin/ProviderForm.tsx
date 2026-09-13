@@ -110,7 +110,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             value={keyName.value}
             onInput={bind(keyName)}
           />
-          <span class="agents-hint">
+          <span class="hint">
             {keyName.value.trim() === ""
               ? "Leave it empty for a server without a key."
               : `${keyName.value.trim()}.key in the secrets directory.`}
@@ -128,7 +128,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
               value={baseUrl.value}
               onInput={bind(baseUrl)}
             />
-            <span class="agents-hint">
+            <span class="hint">
               /models and /chat/completions are under it.
             </span>
           </label>

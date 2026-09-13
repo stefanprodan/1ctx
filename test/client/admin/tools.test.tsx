@@ -303,7 +303,7 @@ describe("the page", () => {
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain("exa.key present");
     expect(html).toContain("firecrawl.key keyless");
-    expect(html).not.toContain("tools-meta-bad");
+    expect(html).not.toContain("rows-meta-bad");
     expect(html).toContain("websearch runs on exa.");
     expect(html).toContain("Per send");
     expect(html).toContain("Per call");
