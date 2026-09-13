@@ -108,6 +108,7 @@ describe("OpenRouter chat body", () => {
     expect(body.prompt_cache_key).toBeUndefined();
     expect(body.stream_options).toBeUndefined();
     expect(body).not.toHaveProperty("enable_thinking");
+    expect(body).not.toHaveProperty("reasoning_effort");
     expect(body.stream).toBe(true);
     expect(body.tools).toHaveLength(1);
     // earlier reasoning goes back as OpenRouter's field
@@ -120,8 +121,9 @@ describe("OpenRouter chat body", () => {
       (buildChatBody({ ...request, reasoningEffort: "high" }) as any).reasoning,
     ).toEqual({ effort: "high" });
     expect(
-      (buildChatBody({ ...request, reasoningEffort: "none" }) as any).reasoning,
-    ).toEqual({ effort: "none" });
+      (buildChatBody({ ...request, reasoningEffort: "minimal" }) as any)
+        .reasoning,
+    ).toEqual({ effort: "minimal" });
     expect(
       (buildChatBody({ ...request, thinking: false }) as any).reasoning,
     ).toEqual({ exclude: true, enabled: false });

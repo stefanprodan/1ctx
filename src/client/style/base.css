@@ -43,6 +43,7 @@
 
   input,
   textarea,
+  select,
   button {
     font: inherit;
     color: inherit;
@@ -101,15 +102,22 @@
     gap: 6px;
   }
   .field input,
-  .field textarea {
+  .field textarea,
+  .field select {
     padding: 0 var(--space-3);
     border-radius: var(--radius);
     background: var(--inset);
     border: 1px solid var(--line);
     font-size: var(--text-input);
   }
-  .field input {
+  .field input,
+  .field select {
     height: 36px;
+  }
+  /* the native arrow goes; the owner draws its own beside the field */
+  .field select {
+    appearance: none;
+    cursor: pointer;
   }
   .field textarea {
     padding: var(--space-2) var(--space-3);

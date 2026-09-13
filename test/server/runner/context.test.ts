@@ -39,6 +39,7 @@ const policy: SendPolicy = {
   contextLength: 1000,
   prompt: "You write Go.",
   thinking: true,
+  effort: "high",
   offered: NONE,
   limits: LOOP_LIMITS,
   toolCaps: TOOL_CAPS,
@@ -305,6 +306,7 @@ describe("history", () => {
       model: "org/model",
       messages: [],
       thinking: true,
+      reasoningEffort: "high",
       cacheKey: "s1",
     });
   });

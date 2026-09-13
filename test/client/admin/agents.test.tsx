@@ -23,10 +23,16 @@ import {
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
 import {
+  defaultThinking,
+  effortApplies,
+  effortChoices,
   keyLine,
   nameProblem,
   preset,
   priceLine,
+  sentEffort,
+  thinkingChoices,
+  thinkingLine,
   windowLine,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
@@ -68,6 +74,8 @@ const coder: AgentSummary = {
   avatar: "bot",
   providerId: "pr1",
   model: flash,
+  thinking: null,
+  effort: null,
   prompt: "",
   createdAt: 0,
 };
@@ -105,6 +113,54 @@ describe("the words", () => {
     expect(nameProblem("coder")).toBeNull();
     expect(preset("openrouter").baseUrl).toContain("/api/v1");
     expect(preset("openai-compatible").baseUrl).toBeNull();
+  });
+
+  test("thinking and effort: the default and the wire's levels", () => {
+    expect(defaultThinking(flash)).toBe("on");
+    expect(defaultThinking({ ...flash, reasoning: false })).toBe("off");
+    expect(defaultThinking(null)).toBe("off");
+    expect(thinkingChoices(flash)[0]).toEqual({
+      value: null,
+      label: "Default (on)",
+    });
+    expect(effortChoices("openrouter").map((c) => c.value)).toEqual([
+      null,
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+    expect(effortChoices("openai-compatible").map((c) => c.value)).toEqual([
+      null,
+      "low",
+      "medium",
+      "high",
+    ]);
+    expect(effortApplies(flash, null)).toBe(true);
+    expect(effortApplies({ ...flash, reasoning: false }, null)).toBe(false);
+    expect(effortApplies({ ...flash, reasoning: false }, "on")).toBe(true);
+    expect(effortApplies(flash, "off")).toBe(false);
+    expect(thinkingLine({ thinking: null, effort: null })).toBe("");
+    expect(thinkingLine({ thinking: "off", effort: "high" })).toBe(
+      "thinking off",
+    );
+    expect(thinkingLine({ thinking: "on", effort: "high" })).toBe(
+      "thinking on · effort high",
+    );
+    expect(thinkingLine({ thinking: null, effort: "low" })).toBe("effort low");
+  });
+
+  test("the effort sent follows the choices and the wire", () => {
+    expect(sentEffort(flash, null, "high", "openrouter")).toBe("high");
+    expect(sentEffort(flash, "off", "high", "openrouter")).toBeNull();
+    expect(
+      sentEffort({ ...flash, reasoning: false }, null, "high", "openrouter"),
+    ).toBeNull();
+    // a level picked on OpenRouter does not survive a move to a plain server
+    expect(sentEffort(flash, "on", "xhigh", "openai-compatible")).toBeNull();
+    expect(sentEffort(flash, "on", "high", "openai-compatible")).toBe("high");
+    expect(sentEffort(flash, "on", "high", undefined)).toBeNull();
   });
 });
 
@@ -220,6 +276,10 @@ describe("the page", () => {
     expect(html).toContain("DeepSeek: V4 Flash");
     expect(html).toContain("router · 128k · $0.14 / $0.28 · tools · reasoning");
     expect(html).toContain("router.key missing");
+    agents.value = [{ ...coder, thinking: "on", effort: "xhigh" }];
+    expect(render(<Agents />)).toContain(
+      "reasoning · thinking on · effort xhigh",
+    );
     expect(html).toContain("New agent");
     expect(html).toContain("New provider");
   });

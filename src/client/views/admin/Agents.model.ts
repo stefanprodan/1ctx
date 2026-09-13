@@ -5,8 +5,12 @@
 // rules the server applies, the presets a provider is made from, and
 // the words a row shows for a window, a price and a key.
 
+import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import {
+  EFFORTS,
+  type Effort,
+  isEffort,
   isName,
   MAX_NAME,
   MIN_NAME,
@@ -107,6 +111,71 @@ export function modelMeta(m: CatalogMatch): string {
     priceLine(m.promptPrice, m.completionPrice),
     m.tools ? "tools" : "",
     m.reasoning ? "reasoning" : "",
+  ]
+    .filter((s) => s !== "")
+    .join(" · ");
+}
+
+// what the provider's default resolves to for this model: the runner
+// follows the catalog's reasoning flag when the agent says nothing
+export function defaultThinking(model: CatalogMatch | null): "on" | "off" {
+  return model?.reasoning ? "on" : "off";
+}
+
+export type Choice<T> = { value: T; label: string };
+
+export function thinkingChoices(
+  model: CatalogMatch | null,
+): Choice<"on" | "off" | null>[] {
+  return [
+    { value: null, label: `Default (${defaultThinking(model)})` },
+    { value: "on", label: "On" },
+    { value: "off", label: "Off" },
+  ];
+}
+
+// the levels are the wire's: OpenRouter knows more words than a plain
+// server does
+export function effortChoices(wire: Wire): Choice<Effort | null>[] {
+  return [
+    { value: null, label: "Default" },
+    ...EFFORTS[wire].map((level) => ({ value: level, label: level })),
+  ];
+}
+
+// effort has no meaning without thinking, and no choice without a
+// model that reasons
+export function effortApplies(
+  model: CatalogMatch | null,
+  thinking: "on" | "off" | null,
+): boolean {
+  if (thinking === "off") return false;
+  if (thinking === "on") return true;
+  return model?.reasoning === true;
+}
+
+// what the form sends: an effort hidden by the choices is not sent, so
+// the row keeps no word the runner would ignore and no level the
+// provider's wire would refuse
+export function sentEffort(
+  model: CatalogMatch | null,
+  thinking: "on" | "off" | null,
+  effort: Effort | null,
+  wire: Wire | undefined,
+): Effort | null {
+  if (wire === undefined || !effortApplies(model, thinking)) return null;
+  return effort !== null && isEffort(wire, effort) ? effort : null;
+}
+
+// "thinking off", "effort high": only what is off the default
+export function thinkingLine(
+  agent: Pick<AgentSummary, "thinking" | "effort">,
+): string {
+  return [
+    agent.thinking === null ? "" : `thinking ${agent.thinking}`,
+    agent.effort === null || agent.thinking === "off"
+      ? ""
+      : `effort ${agent.effort}`,
   ]
     .filter((s) => s !== "")
     .join(" · ");

@@ -261,7 +261,13 @@ export async function chatApp(
   ).json();
   const makeAgent = async (fields: { name: string; model: string }) => {
     const res = await admin.call("POST", "/api/agents", {
-      body: { name: fields.name, providerId: provider.id, model: fields.model },
+      body: {
+        name: fields.name,
+        providerId: provider.id,
+        model: fields.model,
+        thinking: null,
+        effort: null,
+      },
     });
     if (res.status !== 201) {
       throw new Error(

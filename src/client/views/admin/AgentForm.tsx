@@ -4,7 +4,9 @@
 // An agent's form: the name, the provider it runs on, the model, found
 // by typing part of its name or id into that provider's catalog, and
 // the system prompt. The pick shows its window and prices when the
-// catalog has them. Delete asks once in place.
+// catalog has them. Under the pick, thinking and effort: the default
+// is the provider's, and the levels are the wire's. Delete asks once
+// in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -13,14 +15,22 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../shared/contracts/provider.ts";
-import { AVATARS, type Avatar } from "../../../shared/words.ts";
+import { AVATARS, type Avatar, type Effort } from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import { searchCatalog } from "../../data/providers.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
-import { modelMeta, nameProblem } from "./Agents.model.ts";
+import {
+  type Choice,
+  effortApplies,
+  effortChoices,
+  modelMeta,
+  nameProblem,
+  sentEffort,
+  thinkingChoices,
+} from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import "./agents.css";
 
@@ -40,6 +50,38 @@ function Line({ model }: { model: CatalogMatch }) {
   );
 }
 
+// one row of chips, the chosen one lit, as the provider picker
+function Picks<T extends string | null>({
+  choices,
+  value,
+  busy,
+  onPick,
+}: {
+  choices: Choice<T>[];
+  value: T;
+  busy: boolean;
+  onPick: (value: T) => void;
+}) {
+  return (
+    <div class="agents-picks">
+      {choices.map((choice) => (
+        <button
+          key={choice.value ?? "default"}
+          type="button"
+          aria-pressed={value === choice.value}
+          disabled={busy}
+          class={`agents-pick${
+            value === choice.value ? " agents-pick-on" : ""
+          }`}
+          onClick={() => onPick(choice.value)}
+        >
+          {choice.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function AgentForm({
   agent,
   providers,
@@ -53,6 +95,8 @@ export function AgentForm({
   const providerId = useSignal(agent?.providerId ?? providers[0]?.id ?? "");
   const model = useSignal<CatalogMatch | null>(agent?.model ?? null);
   const prompt = useSignal(agent?.prompt ?? "");
+  const thinking = useSignal<"on" | "off" | null>(agent?.thinking ?? null);
+  const effort = useSignal<Effort | null>(agent?.effort ?? null);
   const avatar = useSignal<Avatar>(agent?.avatar ?? "bot");
   const asking = useSignal(false);
   const failure = useSignal<string | null>(null);
@@ -75,6 +119,20 @@ export function AgentForm({
       s.clear();
     }
   }, [providers]);
+  // the save call is made once, with the form, so it reads the signals
+  // and the latest providers when it runs, never a render's copy
+  const latest = useRef(providers);
+  latest.current = providers;
+  const wireOf = (id: string) => latest.current.find((p) => p.id === id)?.wire;
+  const wire = wireOf(providerId.value);
+  const effortShown =
+    wire !== undefined && effortApplies(model.value, thinking.value);
+  const effortSent = sentEffort(
+    model.value,
+    thinking.value,
+    effort.value,
+    wire,
+  );
   const save = useSave(async () => {
     const body = {
       name: name.value.trim(),
@@ -82,6 +140,13 @@ export function AgentForm({
       providerId: providerId.value,
       model: model.value?.id ?? "",
       prompt: prompt.value.trim(),
+      thinking: thinking.value,
+      effort: sentEffort(
+        model.value,
+        thinking.value,
+        effort.value,
+        wireOf(providerId.value),
+      ),
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -92,11 +157,13 @@ export function AgentForm({
     s.clear();
     save.touch();
   };
-  // another provider means another catalog: the pick goes with it
+  // another provider means another catalog and another set of levels:
+  // the pick and the effort go with it
   const chooseProvider = (id: string) => {
     if (id === providerId.value) return;
     providerId.value = id;
     model.value = null;
+    effort.value = null;
     s.clear();
     save.touch();
   };
@@ -106,7 +173,9 @@ export function AgentForm({
     avatar.value !== agent.avatar ||
     providerId.value !== agent.providerId ||
     model.value?.id !== agent.model.id ||
-    prompt.value.trim() !== agent.prompt;
+    prompt.value.trim() !== agent.prompt ||
+    thinking.value !== agent.thinking ||
+    effortSent !== agent.effort;
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -239,6 +308,50 @@ export function AgentForm({
             </div>
           )}
         </div>
+        {picked && (
+          <div class="field">
+            <span class="label">Thinking</span>
+            <Picks
+              choices={thinkingChoices(picked)}
+              value={thinking.value}
+              busy={busy}
+              onPick={(value) => {
+                thinking.value = value;
+                save.touch();
+              }}
+            />
+          </div>
+        )}
+        {picked && effortShown && wire !== undefined && (
+          <label class="field">
+            <span class="label">Effort</span>
+            <span class="agents-select">
+              <select
+                name="effort"
+                class="agents-select-input"
+                disabled={busy}
+                onChange={(e) => {
+                  const value = (e.currentTarget as HTMLSelectElement).value;
+                  effort.value = value === "" ? null : (value as Effort);
+                  save.touch();
+                }}
+              >
+                {effortChoices(wire).map((choice) => (
+                  // Preact sets no default on a select, so the option
+                  // carries the selection
+                  <option
+                    key={choice.value ?? ""}
+                    value={choice.value ?? ""}
+                    selected={effort.value === choice.value}
+                  >
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+              <Icon name="chevron" size={14} class="agents-select-chevron" />
+            </span>
+          </label>
+        )}
         <label class="field agents-field-wide">
           <span class="label">System prompt</span>
           <textarea

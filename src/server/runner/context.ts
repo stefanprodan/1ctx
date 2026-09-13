@@ -150,6 +150,7 @@ export function request(
     model: policy.model,
     messages,
     thinking: policy.thinking,
+    reasoningEffort: policy.effort,
     cacheKey: sessionId,
     ...(policy.offered.tools.length > 0 ? { tools: policy.offered.tools } : {}),
   };

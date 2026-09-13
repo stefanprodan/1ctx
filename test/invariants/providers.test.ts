@@ -137,6 +137,8 @@ describe("the providers", () => {
         name: "coder",
         providerId: provider.id,
         model: "deepseek/deepseek-chat",
+        thinking: null,
+        effort: null,
       },
     });
     expect(agent.status).toBe(201);

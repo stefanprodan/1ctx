@@ -10,5 +10,6 @@ import { m0001 } from "./0001-init.ts";
 import { m0002 } from "./0002-usage-seq.ts";
 import { m0003 } from "./0003-tools.ts";
 import { m0004 } from "./0004-tools-page.ts";
+import { m0005 } from "./0005-agent-thinking.ts";
 
-export const MIGRATIONS: Migration[] = [m0001, m0002, m0003, m0004];
+export const MIGRATIONS: Migration[] = [m0001, m0002, m0003, m0004, m0005];

@@ -13,8 +13,20 @@ import { BadRequest } from "../lib/errors.ts";
 export const MAX_MODEL = 200;
 export const MAX_PROMPT = 16_000;
 
-export function parseAgent(body: unknown): SaveAgentRequest {
-  const b = fields(body, ["name", "avatar", "providerId", "model", "prompt"]);
+export type ParsedAgent = Omit<SaveAgentRequest, "effort"> & {
+  effort: string | null;
+};
+
+export function parseAgent(body: unknown): ParsedAgent {
+  const b = fields(body, [
+    "name",
+    "avatar",
+    "providerId",
+    "model",
+    "thinking",
+    "effort",
+    "prompt",
+  ]);
   if (!isName(b.name)) {
     throw new BadRequest(
       `name must be ${MIN_NAME} to ${MAX_NAME} lowercase letters, digits and dashes`,
@@ -30,6 +42,12 @@ export function parseAgent(body: unknown): SaveAgentRequest {
   ) {
     throw new BadRequest("model must be a model id");
   }
+  if (b.thinking !== null && b.thinking !== "on" && b.thinking !== "off") {
+    throw new BadRequest("thinking must be on, off or null");
+  }
+  if (b.effort !== null && typeof b.effort !== "string") {
+    throw new BadRequest("effort must be text or null");
+  }
   const avatar = b.avatar ?? "bot";
   if (!isAvatar(avatar)) throw new BadRequest("avatar must be a known one");
   const prompt = b.prompt ?? "";
@@ -43,6 +61,8 @@ export function parseAgent(body: unknown): SaveAgentRequest {
     avatar,
     providerId: b.providerId,
     model: b.model,
+    thinking: b.thinking,
+    effort: b.effort,
     prompt: prompt.trim(),
   };
 }

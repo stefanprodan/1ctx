@@ -6,7 +6,7 @@
 // picked, so a list shows the window and the prices without asking;
 // and the system prompt every session of it starts from.
 
-import type { Avatar } from "../words.ts";
+import type { Avatar, Effort } from "../words.ts";
 import type { CatalogMatch } from "./provider.ts";
 
 export type AgentSummary = {
@@ -15,6 +15,10 @@ export type AgentSummary = {
   avatar: Avatar;
   providerId: string;
   model: CatalogMatch;
+  // null follows the catalog's reasoning flag
+  thinking: "on" | "off" | null;
+  // null sends no effort and leaves the provider's default in place
+  effort: Effort | null;
   // empty for an agent that runs on the model's own defaults
   prompt: string;
   createdAt: number;

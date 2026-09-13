@@ -40,6 +40,8 @@ const flash = {
   reasoning: true,
 };
 
+const defaults = { thinking: null, effort: null } as const;
+
 describe("parseAgent", () => {
   refuses(
     [
@@ -62,19 +64,39 @@ describe("parseAgent", () => {
     ],
     parseAgent,
   );
+
+  test("accepts null, on and off thinking and rejects bad values", () => {
+    const body = { ...defaults, name: "coder", providerId: "p", model: "m" };
+    expect(parseAgent(body)).toMatchObject(defaults);
+    expect(parseAgent({ ...body, thinking: "on" }).thinking).toBe("on");
+    expect(parseAgent({ ...body, thinking: "off" }).thinking).toBe("off");
+    expect(() => parseAgent({ ...body, thinking: "maybe" })).toThrow();
+    expect(() => parseAgent({ ...body, effort: 1 })).toThrow();
+  });
 });
 
 describe("the agents", () => {
   test("the prompt is optional and trimmed, the avatar a bot by default", () => {
-    const bare = parseAgent({ name: "coder", providerId: "p", model: "m" });
+    const bare = parseAgent({
+      ...defaults,
+      name: "coder",
+      providerId: "p",
+      model: "m",
+    });
     expect(bare.prompt).toBe("");
     expect(bare.avatar).toBe("bot");
     expect(
-      parseAgent({ name: "coder", providerId: "p", model: "m", avatar: "dome" })
-        .avatar,
+      parseAgent({
+        ...defaults,
+        name: "coder",
+        providerId: "p",
+        model: "m",
+        avatar: "dome",
+      }).avatar,
     ).toBe("dome");
     expect(
       parseAgent({
+        ...defaults,
         name: "coder",
         providerId: "p",
         model: "m",
@@ -91,6 +113,8 @@ describe("the agents", () => {
         providerId: provider.id,
         model: flash.id,
         avatar: "boxy",
+        thinking: "on",
+        effort: "xhigh",
         prompt: "You write Go.",
       },
     });
@@ -102,6 +126,8 @@ describe("the agents", () => {
       avatar: "boxy",
       providerId: provider.id,
       model: flash,
+      thinking: "on",
+      effort: "xhigh",
       prompt: "You write Go.",
       createdAt: app.now.value,
     });
@@ -113,16 +139,72 @@ describe("the agents", () => {
   test("a model the catalog does not list, or a provider that is not there, is refused", async () => {
     const { client, provider } = await setup();
     const unknown = await client.call("POST", "/api/agents", {
-      body: { name: "coder", providerId: provider.id, model: "nobody/nothing" },
+      body: {
+        ...defaults,
+        name: "coder",
+        providerId: provider.id,
+        model: "nobody/nothing",
+      },
     });
     expect(unknown.status).toBe(400);
     expect(await unknown.json()).toEqual({
       error: "router does not list nobody/nothing",
     });
     const gone = await client.call("POST", "/api/agents", {
-      body: { name: "coder", providerId: "none", model: flash.id },
+      body: { ...defaults, name: "coder", providerId: "none", model: flash.id },
     });
     expect(gone.status).toBe(400);
+  });
+
+  test("refuses effort outside the provider wire table", async () => {
+    const { client, provider } = await setup();
+    const invalid = await client.call("POST", "/api/agents", {
+      body: {
+        ...defaults,
+        name: "coder",
+        providerId: provider.id,
+        model: flash.id,
+        effort: "extreme",
+      },
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toEqual({
+      error: "effort must be one of minimal, low, medium, high, xhigh",
+    });
+
+    const { agent } = await (
+      await client.call("POST", "/api/agents", {
+        body: {
+          ...defaults,
+          name: "coder",
+          providerId: provider.id,
+          model: flash.id,
+        },
+      })
+    ).json();
+    const { provider: plain } = await (
+      await client.call("POST", "/api/providers", {
+        body: {
+          name: "plain",
+          wire: "openai-compatible",
+          baseUrl: "http://plain.test/v1",
+          keyName: null,
+        },
+      })
+    ).json();
+    const patch = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: {
+        ...defaults,
+        name: "coder",
+        providerId: plain.id,
+        model: flash.id,
+        effort: "minimal",
+      },
+    });
+    expect(patch.status).toBe(400);
+    expect(await patch.json()).toEqual({
+      error: "effort must be one of low, medium, high",
+    });
   });
 
   test("a dead provider is a 502", async () => {
@@ -138,7 +220,7 @@ describe("the agents", () => {
       })
     ).json();
     const res = await client.call("POST", "/api/agents", {
-      body: { name: "coder", providerId: provider.id, model: "x" },
+      body: { ...defaults, name: "coder", providerId: provider.id, model: "x" },
     });
     expect(res.status).toBe(502);
   });
@@ -147,14 +229,14 @@ describe("the agents", () => {
     const { client, provider } = await setup();
     const make = (name: string) =>
       client.call("POST", "/api/agents", {
-        body: { name, providerId: provider.id, model: flash.id },
+        body: { ...defaults, name, providerId: provider.id, model: flash.id },
       });
     const { agent } = await (await make("coder")).json();
     expect((await make("coder")).status).toBe(409);
     const { agent: other } = await (await make("other")).json();
     const patch = (id: string, name: string, model = flash.id) =>
       client.call("PATCH", `/api/agents/${id}`, {
-        body: { name, providerId: provider.id, model },
+        body: { ...defaults, name, providerId: provider.id, model },
       });
     expect((await patch(other.id, "coder")).status).toBe(409);
     const same = await patch(agent.id, "coder", "deepseek/deepseek-chat");
@@ -185,7 +267,12 @@ describe("the agents", () => {
     Object.assign(app.catalogs, {
       models: (p: ProviderRow) => catalogs.models(p),
     });
-    const body = { name: "coder", providerId: provider.id, model: flash.id };
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: flash.id,
+    };
     const a = client.call("POST", "/api/agents", { body });
     await new Promise((r) => setTimeout(r, 5));
     const twin = client.call("POST", "/api/agents", { body });
@@ -220,7 +307,12 @@ describe("the agents", () => {
     const { app, client, provider } = await setup();
     const { agent } = await (
       await client.call("POST", "/api/agents", {
-        body: { name: "coder", providerId: provider.id, model: flash.id },
+        body: {
+          ...defaults,
+          name: "coder",
+          providerId: provider.id,
+          model: flash.id,
+        },
       })
     ).json();
     expect(

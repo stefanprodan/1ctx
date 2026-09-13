@@ -6,7 +6,7 @@
 // its server's names into these and nothing else crosses.
 
 import type { ToolCall } from "../../shared/contracts/tool.ts";
-import type { Wire } from "../../shared/words.ts";
+import type { Effort, Wire } from "../../shared/words.ts";
 
 // the browser and the runner name one shape; the wire re-exports it
 export type { ToolCall };
@@ -45,7 +45,7 @@ export type ChatRequest = {
   model: string;
   messages: ChatMessageIn[];
   thinking: boolean;
-  reasoningEffort?: string | null;
+  reasoningEffort?: Effort | null;
   temperature?: number | null;
   topP?: number | null;
   maxTokens?: number | null;

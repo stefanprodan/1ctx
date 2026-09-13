@@ -144,6 +144,24 @@ describe("OpenAI chat body", () => {
     );
   });
 
+  test("sends reasoning effort only while thinking", () => {
+    expect(
+      buildChatBody({
+        ...request,
+        thinking: true,
+        reasoningEffort: "high",
+      }).reasoning_effort,
+    ).toBe("high");
+    expect(buildChatBody(request)).not.toHaveProperty("reasoning_effort");
+    expect(
+      buildChatBody({
+        ...request,
+        thinking: false,
+        reasoningEffort: "high",
+      }),
+    ).not.toHaveProperty("reasoning_effort");
+  });
+
   test("a user message without an author has no name field", () => {
     expect(buildChatBody(request).messages).toEqual([
       { role: "user", content: "hello" },
