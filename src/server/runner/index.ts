@@ -77,6 +77,7 @@ export type Runner = {
   ): SessionDetail;
   send(principal: Principal, sessionId: string, message: string): SessionDetail;
   regenerate(principal: Principal, sessionId: string): SessionDetail;
+  compact(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string): void;
   live: (sessionId: string) => ReturnType<typeof live> | null;
   // every send terminated with cause shutdown and its stream let go,
@@ -187,6 +188,16 @@ export function runnerArea(deps: RunnerDeps): Runner {
     }
   };
 
+  const policyFor = (project: ProjectRow, user: UserRow, agent: AgentRow) =>
+    buildPolicy({
+      projectId: project.id,
+      user,
+      agent,
+      now: deps.clock(),
+      tools: agent.model.tools ? deps.tools : null,
+      limits: deps.limits.current(),
+    });
+
   const author = (principal: Principal): UserRow => {
     const user = deps.users.byId(principal.userId);
     if (user === null) throw new BadRequest("the user is gone");
@@ -212,15 +223,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     existingUser: Message | null = null,
   ): SessionDetail => {
     const now = deps.clock();
-    const offeredTools = agent.model.tools ? deps.tools : null;
-    const policy = buildPolicy({
-      projectId: project.id,
-      user,
-      agent,
-      now,
-      tools: offeredTools,
-      limits: deps.limits.current(),
-    });
+    const policy = policyFor(project, user, agent);
     registry.admit(sessionId, user.id);
     const sendId = newId();
     const userId = existingUser?.id ?? newId();
@@ -311,6 +314,75 @@ export function runnerArea(deps: RunnerDeps): Runner {
         existingUser,
       );
     },
+    compact(principal, sessionId) {
+      const session = deps.visible(principal, sessionId);
+      const active = registry.get(session.id);
+      if (active !== null) registry.admit(session.id, principal.userId);
+      if (session.status === "running") {
+        throw new Conflict("the chat is running");
+      }
+      const messages = deps.sessions.messages(session.id);
+      let lastSummarySeq = 0;
+      let lastUser: Message | null = null;
+      let hasAnswer = false;
+      for (const message of messages) {
+        if (message.kind === "summary" && message.status === "done") {
+          lastSummarySeq = message.seq;
+          hasAnswer = false;
+        } else if (
+          message.kind === "reply" &&
+          message.status === "done" &&
+          message.slot === "answer" &&
+          message.seq > lastSummarySeq
+        ) {
+          hasAnswer = true;
+        }
+        if (message.kind === "user") lastUser = message;
+      }
+      if (!hasAnswer || lastUser === null) {
+        throw new BadRequest("nothing to compact");
+      }
+      const project = deps.access.project(principal, session.projectId);
+      const user = author(principal);
+      const agent = agentOf(session.agentId);
+      const policy = policyFor(project, user, agent);
+      registry.admit(session.id, user.id);
+      const sendId = newId();
+      const summaryId = newId();
+      const send = newSend({
+        id: sendId,
+        sessionId: session.id,
+        projectId: project.id,
+        kind: "compact",
+        summarizing: true,
+        // the last counted round is the size the history has now
+        used:
+          session.usage === null
+            ? null
+            : session.usage.promptTokens + session.usage.completionTokens,
+        policy,
+        firstMessageId: lastUser.id,
+        replyId: summaryId,
+        now: deps.clock(),
+      });
+      registry.set(send);
+      let started: ReturnType<Writer["startCompact"]>;
+      try {
+        started = writer.startCompact({
+          sendId,
+          summaryId,
+          firstMessageId: lastUser.id,
+          session,
+          policy,
+        });
+      } catch (err) {
+        registry.free(send);
+        throw err;
+      }
+      deps.log(`chat ${session.id} compacted on ${policy.model}`);
+      void run(send);
+      return sessionDetail(deps.sessions, started.session, live(send));
+    },
     stop(principal, sessionId) {
       const session = deps.visible(principal, sessionId);
       const send = registry.get(session.id);
@@ -335,6 +407,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     start: (principal, fields) => runner.start(principal, fields),
     send: (principal, id, message) => runner.send(principal, id, message),
     regenerate: (principal, id) => runner.regenerate(principal, id),
+    compact: (principal, id) => runner.compact(principal, id),
     stop: (principal, id) => runner.stop(principal, id),
   });
   return runner;

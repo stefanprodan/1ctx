@@ -32,6 +32,7 @@ function result(changes: Partial<Message> = {}): Message {
     agentId: null,
     content: "result",
     resultBytes: 6,
+    promptTokens: null,
     reasoning: "",
     html: "",
     status: "done",

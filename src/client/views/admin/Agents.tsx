@@ -87,8 +87,10 @@ function AgentRow({
           class={`agents-chevron${open ? " agents-chevron-open" : ""}`}
         />
         <Tile avatar={agent.avatar} lit={open} />
-        <span class="agents-name">{agent.name}</span>
-        <span class="agents-desc">{agent.model.name}</span>
+        <span class="agents-title">
+          <span class="agents-name">{agent.name}</span>
+          <span class="agents-model-id">{agent.model.id}</span>
+        </span>
         <span class="agents-meta">{meta}</span>
       </button>
       {open && (

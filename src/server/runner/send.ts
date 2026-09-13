@@ -9,7 +9,7 @@
 // iteration and the round's tools have let go, which drained says.
 
 import type { LiveSend } from "../../shared/contracts/session.ts";
-import type { SendCause } from "../../shared/words.ts";
+import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
 import type { SendPolicy } from "./policy.ts";
 
@@ -55,6 +55,7 @@ export type ActiveSend = {
   id: string;
   sessionId: string;
   projectId: string;
+  kind: SendKind;
   policy: SendPolicy;
   firstMessageId: string;
   // the round streaming now, or null while its tools run
@@ -69,6 +70,11 @@ export type ActiveSend = {
   signatures: string[];
   // the answer round forbids tools with tool_choice none
   answering: boolean;
+  // summary rounds ignore calls and are always the send's last round
+  summarizing: boolean;
+  // the tokens the last counted round used, prompt plus completion: the
+  // room the summary round has to fit in; null when nothing was counted
+  used: number | null;
   // the current round's launched tool rows still streaming, keyed by
   // the call object so duplicate provider call ids remain distinct
   openTools: Map<ToolCall, string>;
@@ -111,6 +117,9 @@ export function newSend(fields: {
   id: string;
   sessionId: string;
   projectId: string;
+  kind?: SendKind;
+  summarizing?: boolean;
+  used?: number | null;
   policy: SendPolicy;
   firstMessageId: string;
   replyId: string;
@@ -124,6 +133,7 @@ export function newSend(fields: {
     id: fields.id,
     sessionId: fields.sessionId,
     projectId: fields.projectId,
+    kind: fields.kind ?? "chat",
     policy: fields.policy,
     firstMessageId: fields.firstMessageId,
     round: newRound(fields.replyId, fields.now),
@@ -133,6 +143,8 @@ export function newSend(fields: {
     toolBudget: { fetches: 0, searches: 0 },
     signatures: [],
     answering: false,
+    summarizing: fields.summarizing ?? false,
+    used: fields.used ?? null,
     openTools: new Map(),
     tools: null,
     seq: 0,

@@ -36,6 +36,10 @@ export type ReplyNode = {
   // while the send is between rounds or ended without an answer
   message: Message | null;
   work: WorkNode | null;
+  // the summary round's row, after the answer; a compact send's only row
+  summary: Message | null;
+  // a compact send: no user message and no reply of its own
+  compact: boolean;
   rows: Message[];
   send: SendSummary | null;
 };
@@ -85,18 +89,20 @@ function workRounds(rows: Message[]): WorkRound[] {
 }
 
 // a stop during a tool is recorded on the tool row, not the preceding
-// reply; historical sends no longer carry their summary
+// reply; historical sends no longer carry their summary. A summary
+// row's end shows in its own fold, never on the turn's line
 export function endedBy(node: ReplyNode): Message | null {
   if (node.message !== null) return node.message;
+  const rows = node.rows.filter((row) => row.kind !== "summary");
   const status = node.send?.status;
   if (status === "stopped" || status === "failed" || node.send === null) {
-    for (let index = node.rows.length - 1; index >= 0; index--) {
-      const row = node.rows[index];
+    for (let index = rows.length - 1; index >= 0; index--) {
+      const row = rows[index];
       if (row?.status === "stopped" || row?.status === "failed") return row;
     }
   }
-  for (let index = node.rows.length - 1; index >= 0; index--) {
-    const row = node.rows[index];
+  for (let index = rows.length - 1; index >= 0; index--) {
+    const row = rows[index];
     if (row?.kind === "reply") return row;
   }
   return null;
@@ -138,8 +144,18 @@ export function groupRows(
         : null;
 
     const reply = answer ?? rows.find(isMainReply) ?? null;
-    if (reply !== null || work !== null) {
-      nodes.push({ kind: "reply", sendId, message: reply, work, rows, send });
+    const summary = rows.find((row) => row.kind === "summary") ?? null;
+    if (reply !== null || work !== null || summary !== null) {
+      nodes.push({
+        kind: "reply",
+        sendId,
+        message: reply,
+        work,
+        summary,
+        compact: user === undefined && reply === null && work === null,
+        rows,
+        send,
+      });
     }
   }
   return nodes;

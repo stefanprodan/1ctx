@@ -47,11 +47,11 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   maxFetches: {
     label: "Fetches per send",
-    text: "webfetch calls a send may make; zero keeps the tool but spends nothing.",
+    text: "webfetch calls a send may make. Zero keeps the tool but spends nothing.",
   },
   maxSearches: {
     label: "Searches per send",
-    text: "websearch calls a send may make; zero keeps the tool but spends nothing.",
+    text: "websearch calls a send may make. Zero keeps the tool but spends nothing.",
   },
   fetchBodyBytes: {
     label: "Fetch body",
@@ -68,6 +68,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   searchDeadlineMs: {
     label: "Search deadline",
     text: "How long one search request may take.",
+  },
+  contextReserve: {
+    label: "Context reserve",
+    text: "Room kept in the window. A reply that leaves less is followed by a summary.",
+  },
+  summaryMaxTokens: {
+    label: "Summary tokens",
+    text: "Tokens a summary may run to, the reserve at most.",
   },
 };
 
@@ -93,6 +101,8 @@ export function displayOf(row: LimitRow): Display {
         : { word: "KB", factor: KB };
     case "chars":
       return { word: "chars", factor: 1 };
+    case "tokens":
+      return { word: "tokens", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

@@ -295,6 +295,74 @@ describe("socket fixtures", () => {
     chat.app.socket.dispose();
   });
 
+  test("a send that compacts after its answer", async () => {
+    const chat = await chatApp();
+    const conn = await watcher(chat);
+    const { detail, script, sessionId } = await startChat(chat, "long chat");
+    watch(chat, conn, sessionId);
+    script.content("the answer");
+    await tick();
+    script.finish();
+    script.usage({ prompt: 1_040_000, completion: 10 });
+    script.end();
+    const summary = await waitScript(chat.scripted, 2);
+    summary.content("## Goal\n\n- Continue");
+    await tick();
+    summary.finish();
+    summary.usage({ prompt: 41_000, completion: 100 });
+    summary.end();
+    await settle(chat, 10);
+    record("compact-after-answer", detail, conn);
+    expect(chat.app.sessions.send(detail.send.id)!.rounds).toBe(2);
+    chat.app.socket.dispose();
+  });
+
+  test("a stop during the summary round", async () => {
+    const chat = await chatApp();
+    const conn = await watcher(chat);
+    const { detail, script, sessionId } = await startChat(chat, "stop summary");
+    watch(chat, conn, sessionId);
+    script.content("the answer");
+    script.finish();
+    script.usage({ prompt: 1_040_000, completion: 10 });
+    script.end();
+    const summary = await waitScript(chat.scripted, 2);
+    summary.content("partial summary");
+    await tick();
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    await settle(chat, 10);
+    record("stop-during-summary", detail, conn);
+    expect(chat.app.sessions.send(detail.send.id)!.status).toBe("stopped");
+    chat.app.socket.dispose();
+  });
+
+  test("a compact send", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "compact this");
+    started.script.reply("the answer");
+    await settle(chat, 8);
+    const conn = await watcher(chat);
+    watch(chat, conn, started.sessionId);
+    conn.frames = [];
+    const pending = chat.scripted.next();
+    const response = await chat.member.call(
+      "POST",
+      `/api/sessions/${started.sessionId}/compact`,
+    );
+    expect(response.status).toBe(200);
+    const detail = await response.json();
+    const summary = await pending;
+    summary.content("## Goal\n\n- Compact this");
+    await tick();
+    summary.finish();
+    summary.usage({ prompt: 20, completion: 10 });
+    summary.end();
+    await settle(chat, 8);
+    record("compact-send", detail, conn);
+    expect(detail.send.kind).toBe("compact");
+    chat.app.socket.dispose();
+  });
+
   // ----- the tool-round paths, the real writer over a fake tools cap -----
 
   test("one tool round then an answer", async () => {

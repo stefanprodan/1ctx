@@ -969,6 +969,55 @@ describe("the tool-loop store", () => {
     db.close();
   });
 
+  test("repair fails a streaming summary without placing it", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "summary-send",
+      kind: "compact",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "summary-user",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "summary-user",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const summary = store.addSummary({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    store.touch(session.id, { status: "running", now: 0 });
+
+    const repaired = store.repair(1, "restart");
+    expect(repaired[0]!.messages).toEqual([
+      expect.objectContaining({
+        id: summary.id,
+        kind: "summary",
+        status: "failed",
+        slot: null,
+        promptTokens: null,
+      }),
+    ]);
+    expect(repaired[0]!.send).toMatchObject({
+      id: send.id,
+      cause: "restart",
+    });
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+
   test("finishSend records the counters", () => {
     const { db, store, session } = seededStore();
     const send = store.createSend({

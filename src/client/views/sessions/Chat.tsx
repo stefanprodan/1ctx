@@ -12,6 +12,7 @@ import { Composer } from "../../composer/Composer.tsx";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
 import {
+  compactSession,
   leaveSession,
   live,
   projectAgents,
@@ -78,6 +79,7 @@ export function Chat({ params }: { params: Params }) {
                 usage={shown.session.usage}
                 onSend={(text) => sendMessage(shown.session.id, text)}
                 onStop={() => stopSession(shown.session.id)}
+                onCompact={() => compactSession(shown.session.id)}
               />
             }
           />

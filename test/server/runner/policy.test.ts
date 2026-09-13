@@ -66,6 +66,13 @@ function policy(
 }
 
 describe("send policy thinking", () => {
+  test("copies the compaction limits onto the send", () => {
+    expect(policy({}).limits).toMatchObject({
+      contextReserve: 20_000,
+      summaryMaxTokens: 4096,
+    });
+  });
+
   test("null follows the catalog reasoning flag both ways", () => {
     expect(policy({ reasoning: true })).toMatchObject({
       thinking: true,

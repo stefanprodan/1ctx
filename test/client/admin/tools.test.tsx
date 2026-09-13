@@ -107,7 +107,16 @@ const cut = row({
   unit: "chars",
   scope: "call",
 });
-const rows = [rounds, toolMs, resultBytes, timeout, searchBody, cut];
+const reserve = row({
+  name: "contextReserve",
+  value: 20_000,
+  default: 20_000,
+  min: 1000,
+  max: 200_000,
+  unit: "tokens",
+  scope: "send",
+});
+const rows = [rounds, toolMs, resultBytes, timeout, searchBody, cut, reserve];
 
 const time: ToolSummary = {
   name: "get_current_time",
@@ -157,6 +166,7 @@ describe("the limit words and units", () => {
     expect(displayOf(resultBytes).word).toBe("MB");
     expect(displayOf(searchBody).word).toBe("MB");
     expect(displayOf(cut).word).toBe("chars");
+    expect(displayOf(reserve)).toEqual({ word: "tokens", factor: 1 });
     expect(show(toolMs, 600_000)).toBe("600");
     expect(show(timeout, 1500)).toBe("1.5");
     expect(show(resultBytes, 2 * 1024 * 1024)).toBe("2");
@@ -198,6 +208,7 @@ describe("the limit words and units", () => {
         callTimeoutMs: 1500,
         searchBodyBytes: 512 * 1024,
         resultCut: 50_000,
+        contextReserve: 20_000,
       },
     });
     const edited = { ...draft, rounds: "200" };

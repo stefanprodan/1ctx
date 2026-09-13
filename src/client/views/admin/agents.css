@@ -107,6 +107,18 @@
     color: var(--fg);
   }
 
+  /* the agent row: the name over the model id */
+  .agents-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-grow: 1;
+    min-width: 0;
+  }
+  .agents-title .agents-name {
+    width: auto;
+  }
+
   .agents-desc {
     flex-grow: 1;
     min-width: 0;
@@ -382,6 +394,15 @@
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
+  }
+  /* the picked model: its id where a match shows the name */
+  .agents-model-picked {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    color: var(--fg);
   }
   .agents-model-meta {
     flex-shrink: 0;

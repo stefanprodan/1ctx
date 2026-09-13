@@ -10,6 +10,7 @@ import type {
   MessageKind,
   MessageStatus,
   SendCause,
+  SendKind,
   SessionStatus,
 } from "../words.ts";
 import type { ToolCall } from "./tool.ts";
@@ -68,6 +69,8 @@ export type Message = {
   // the UTF-8 byte length of stored tool content on the wire; null on
   // every non-tool row
   resultBytes: number | null;
+  // the context sent to a completed summary round; null otherwise
+  promptTokens: number | null;
   reasoning: string;
   // the rendered content, empty for a user message
   html: string;
@@ -91,7 +94,7 @@ export type Message = {
 export type SendSummary = {
   id: string;
   sessionId: string;
-  kind: "chat";
+  kind: SendKind;
   userId: string;
   agentId: string;
   providerId: string;

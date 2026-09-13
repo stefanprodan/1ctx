@@ -5,11 +5,13 @@ import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type {
   MessageStatus,
   SendCause,
+  SendKind,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
+import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import {
   MESSAGE_COLUMNS,
@@ -194,23 +196,19 @@ export class SessionStore {
     model: string;
     now: number;
   }): Message {
-    const id = fields.id ?? newId();
-    this.db
-      .query(
-        `insert into messages (id, session_id, seq, kind, send_id, round, agent_id, model, status, created_at)
-         values (?, ?, ?, 'reply', ?, ?, ?, ?, 'streaming', ?)`,
-      )
-      .run(
-        id,
-        fields.sessionId,
-        this.nextSeq(fields.sessionId),
-        fields.sendId,
-        fields.round,
-        fields.agentId,
-        fields.model,
-        fields.now,
-      );
-    return this.message(id)!;
+    return addAgentMessage(this.db, "reply", fields);
+  }
+
+  addSummary(fields: {
+    id?: string;
+    sessionId: string;
+    sendId: string;
+    round: number;
+    agentId: string;
+    model: string;
+    now: number;
+  }): Message {
+    return addAgentMessage(this.db, "summary", fields);
   }
 
   // the checkpoint of a reply in flight: what a crash keeps
@@ -352,6 +350,7 @@ export class SessionStore {
 
   createSend(fields: {
     id?: string;
+    kind?: SendKind;
     sessionId: string;
     userId: string;
     agentId: string;
@@ -365,11 +364,12 @@ export class SessionStore {
       .query(
         `insert into sends (id, session_id, kind, user_id, agent_id, provider_id, model,
            status, first_message_id, started_at)
-         values (?, ?, 'chat', ?, ?, ?, ?, 'running', ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, 'running', ?, ?)`,
       )
       .run(
         id,
         fields.sessionId,
+        fields.kind ?? "chat",
         fields.userId,
         fields.agentId,
         fields.providerId,
@@ -390,7 +390,7 @@ export class SessionStore {
   lastSend(sessionId: string): SendSummary | null {
     const raw = this.db
       .query<RawSend, [string]>(
-        "select * from sends where session_id = ? order by started_at desc, id desc limit 1",
+        "select * from sends where session_id = ? order by started_at desc, rowid desc limit 1",
       )
       .get(sessionId);
     return raw ? send(raw) : null;

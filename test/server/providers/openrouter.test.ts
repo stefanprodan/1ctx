@@ -103,6 +103,7 @@ describe("OpenRouter chat body", () => {
   test("asks for usage, maps thinking to the reasoning object and sends the session id", () => {
     const body = buildChatBody(request) as any;
     expect(body.usage).toEqual({ include: true });
+    expect(body.transforms).toEqual([]);
     expect(body.reasoning).toEqual({ enabled: true });
     expect(body.session_id).toBe("session-1");
     expect(body.prompt_cache_key).toBeUndefined();

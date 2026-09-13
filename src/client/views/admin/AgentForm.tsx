@@ -18,16 +18,19 @@ import type {
 import { AVATARS, type Avatar, type Effort } from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import { searchCatalog } from "../../data/providers.ts";
+import { limits } from "../../data/tools.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import {
   type Choice,
+  compactLine,
   effortApplies,
   effortChoices,
   modelMeta,
   nameProblem,
+  reserveOf,
   sentEffort,
   thinkingChoices,
 } from "./Agents.model.ts";
@@ -194,6 +197,10 @@ export function AgentForm({
   };
   const picked = model.value;
   const busy = save.status.value === "busy";
+  const compacts =
+    picked === null
+      ? ""
+      : compactLine(picked.contextLength, reserveOf(limits.value));
   return (
     <form class="agents-form" onSubmit={submit}>
       <div class="agents-fields">
@@ -254,7 +261,13 @@ export function AgentForm({
           <span class="label">Model</span>
           {picked ? (
             <div class="agents-picked">
-              <Line model={picked} />
+              <span class="agents-model">
+                <span class="agents-model-picked">{picked.id}</span>
+                {compacts !== "" && (
+                  <span class="agents-model-id">{compacts}</span>
+                )}
+              </span>
+              <span class="agents-model-meta">{modelMeta(picked)}</span>
               <button
                 type="button"
                 class="btn agents-small"

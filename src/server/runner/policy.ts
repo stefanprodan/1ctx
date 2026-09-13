@@ -100,6 +100,8 @@ export function buildPolicy(input: {
       callsPerSend: input.limits.callsPerSend,
       toolMs: input.limits.toolMs,
       resultBytes: input.limits.resultBytes,
+      contextReserve: input.limits.contextReserve,
+      summaryMaxTokens: input.limits.summaryMaxTokens,
     },
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,

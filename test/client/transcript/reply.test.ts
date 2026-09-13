@@ -26,6 +26,7 @@ function answer(changes: Partial<Message> = {}): Message {
     agentId: "agent-1",
     content: "done",
     resultBytes: null,
+    promptTokens: null,
     reasoning: "",
     html: '<p class="md-p">done</p>',
     status: "done",
@@ -70,6 +71,8 @@ function node(summary: SendSummary | null): ReplyNode {
     sendId: "send-1",
     message,
     work: null,
+    summary: null,
+    compact: false,
     rows: [message],
     send: summary,
   };

@@ -158,6 +158,50 @@ describe("tools administration", () => {
     chat.app.socket.dispose();
   });
 
+  test("the compaction limits round-trip through the admin routes", async () => {
+    const chat = await chatApp();
+    const initial = await (await chat.admin.call("GET", "/api/limits")).json();
+    expect(
+      initial.limits
+        .filter((row: { name: string }) =>
+          ["contextReserve", "summaryMaxTokens"].includes(row.name),
+        )
+        .map((row: { name: string; value: number; unit: string }) => ({
+          name: row.name,
+          value: row.value,
+          unit: row.unit,
+        })),
+    ).toEqual([
+      { name: "contextReserve", value: 20_000, unit: "tokens" },
+      { name: "summaryMaxTokens", value: 4096, unit: "tokens" },
+    ]);
+    const updated = await chat.admin.call("PUT", "/api/limits", {
+      body: {
+        values: {
+          ...DEFAULT_LIMITS,
+          contextReserve: 30_000,
+          summaryMaxTokens: 8192,
+        },
+      },
+    });
+    expect(updated.status).toBe(200);
+    const body = await updated.json();
+    expect(
+      body.limits
+        .filter((row: { name: string }) =>
+          ["contextReserve", "summaryMaxTokens"].includes(row.name),
+        )
+        .map((row: { name: string; value: number }) => ({
+          name: row.name,
+          value: row.value,
+        })),
+    ).toEqual([
+      { name: "contextReserve", value: 30_000 },
+      { name: "summaryMaxTokens", value: 8192 },
+    ]);
+    chat.app.socket.dispose();
+  });
+
   test("the migration seeds exactly the three built-in rows", async () => {
     const chat = await chatApp();
     expect(

@@ -6,6 +6,7 @@ import { path, query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   BUFFER_MAX,
+  compactSession,
   leaveSession,
   live,
   loadProjectSessions,
@@ -58,6 +59,7 @@ function message(changes: Partial<Message> = {}): Message {
     agentId: "a1",
     content: "",
     resultBytes: null,
+    promptTokens: null,
     reasoning: "",
     html: "",
     status: "done",
@@ -128,7 +130,7 @@ const sent: SendSummary = {
 const realFetch = globalThis.fetch;
 const realLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
 const realHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
-let answer: (url: string) => Response | Promise<Response>;
+let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
 let user = 0;
 let pushed: string[] = [];
 
@@ -175,8 +177,8 @@ beforeEach(() => {
   answer = (url) => {
     throw new Error(`unexpected fetch: ${url}`);
   };
-  globalThis.fetch = (async (url: string) =>
-    answer(url)) as unknown as typeof fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) =>
+    answer(url, init)) as unknown as typeof fetch;
 });
 
 afterEach(async () => {
@@ -310,6 +312,77 @@ describe("the sessions entity", () => {
       send: { ...sent, status: "done", cause: "finish", finishedAt: 30 },
     });
     expect(live.value.has(streaming.id)).toBe(false);
+  });
+
+  test("a streaming summary row enters the live map like a reply", () => {
+    session.value = detail();
+    const streaming = message({
+      id: "sum1",
+      kind: "summary",
+      slot: null,
+      round: 2,
+      status: "streaming",
+      finishReason: null,
+    });
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 2, status: "running" }),
+      messages: [streaming],
+      send: sent,
+    });
+    expect(live.value.has("sum1")).toBe(true);
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 3 }),
+      messages: [message({ ...streaming, status: "done", promptTokens: 40 })],
+      send: { ...sent, status: "done", cause: "finish", finishedAt: 30 },
+    });
+    expect(live.value.has("sum1")).toBe(false);
+    expect(session.value?.messages[0]?.promptTokens).toBe(40);
+  });
+
+  test("a detail's streaming summary row seeds live from the snapshot", async () => {
+    const row = message({
+      id: "sum1",
+      kind: "summary",
+      slot: null,
+      status: "streaming",
+      finishReason: null,
+    });
+    answer = () =>
+      Response.json(
+        detail("s1", {
+          session: summary({ status: "running" }),
+          messages: [row],
+          live: {
+            phase: "reply",
+            sendId: "send1",
+            messageId: "sum1",
+            seq: 2,
+            content: "## Goal",
+            reasoning: "",
+            html: "",
+            htmlAt: 0,
+          },
+        }),
+      );
+    await loadSession("s1");
+    expect(live.value.get("sum1")?.content).toBe("## Goal");
+  });
+
+  test("compact posts to the session and takes the detail", async () => {
+    session.value = detail();
+    let hit = "";
+    answer = (url, init) => {
+      hit = `${init?.method ?? "GET"} ${url}`;
+      return Response.json(detail("s1", { session: summary({ revision: 5 }) }));
+    };
+    await compactSession("s1");
+    expect(hit).toBe("POST /api/sessions/s1/compact");
+    expect(session.value?.session.revision).toBe(5);
+    expect(sending.value).toBe(false);
   });
 
   test("a watched snapshot seeds live and applies newer buffered frames", async () => {
