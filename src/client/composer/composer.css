@@ -7,6 +7,7 @@
   /* one line of text at rest, the row right under it; the box grows
      with the draft up to MAX_HEIGHT in Composer.tsx */
   .composer {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 7px;
@@ -122,6 +123,65 @@
   .composer-option:hover,
   .composer-option-on {
     background: var(--line);
+  }
+
+  /* the command menu rises over the card while the draft is a slash
+     word; a blocked command is greyed with its reason at the right */
+  .composer-cmds {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: var(--space-1);
+    list-style: none;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line-strong);
+  }
+  .composer-cmd {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 32px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+  .composer-cmd-on {
+    background: var(--line);
+  }
+  .composer-cmd-name {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--fg);
+  }
+  .composer-cmd-text {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  .composer-cmd-block {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .composer-cmd-blocked .composer-cmd-name {
+    color: var(--faint);
   }
 
   /* the context readout: the number over a thin bar, on Send's axis */

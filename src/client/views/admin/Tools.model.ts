@@ -47,11 +47,11 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   maxFetches: {
     label: "Fetches per send",
-    text: "webfetch calls a send may make; zero keeps the tool but spends nothing.",
+    text: "webfetch calls a send may make. Zero keeps the tool but spends nothing.",
   },
   maxSearches: {
     label: "Searches per send",
-    text: "websearch calls a send may make; zero keeps the tool but spends nothing.",
+    text: "websearch calls a send may make. Zero keeps the tool but spends nothing.",
   },
   fetchBodyBytes: {
     label: "Fetch body",
@@ -71,7 +71,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   contextReserve: {
     label: "Context reserve",
-    text: "Room kept in the window; a reply that leaves less is followed by a summary.",
+    text: "Room kept in the window. A reply that leaves less is followed by a summary.",
   },
   summaryMaxTokens: {
     label: "Summary tokens",

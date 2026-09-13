@@ -13,12 +13,18 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
+import { Commands } from "./Commands.tsx";
+import {
+  commandBlock,
+  commandMatches,
+  commandOf,
+  moveHighlight,
+} from "./commands.ts";
 import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import "./composer.css";
 
 export const MAX_HEIGHT = 160;
-export const COMPACT = "/compact";
 
 export type Scope = { sessionId: string } | { projectId: string };
 
@@ -54,6 +60,9 @@ export function Composer({
   const text = useSignal(readDraft(key));
   const picked = useSignal<string | null>(null);
   const failure = useSignal<string | null>(null);
+  // the menu's highlight, and whether Escape shut it for this draft
+  const highlight = useSignal(0);
+  const shut = useSignal(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const list = agents ?? [];
   const fixed = agentId !== null;
@@ -76,15 +85,21 @@ export function Composer({
   useEffect(grow, [text.value]);
 
   const ready = agent !== null && !busy && !running;
+  const block = commandBlock({ started: onCompact !== undefined, running });
+  const matches = shut.value ? [] : commandMatches(text.value);
+  // the highlight follows the list as it shrinks
+  const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
   const submit = async () => {
     const content = text.value.trim();
-    if (content === "" || agent === null || !ready) return;
+    if (content === "" || agent === null || busy) return;
+    const command = commandOf(content);
+    if (command === null && !ready) return;
     failure.value = null;
     const sent = text.value;
     try {
-      if (content === COMPACT) {
-        if (onCompact === undefined) {
-          throw new Error("Nothing to compact yet");
+      if (command !== null) {
+        if (block !== null || onCompact === undefined) {
+          throw new Error(`/${command.name}: ${block ?? "not now"}`);
         }
         await onCompact();
       } else await onSend(content, agent);
@@ -118,15 +133,54 @@ export function Composer({
         onInput={(ev) => {
           text.value = ev.currentTarget.value;
           failure.value = null;
+          shut.value = false;
+          highlight.value = 0;
           writeDraft(key, ev.currentTarget.value);
         }}
         onKeyDown={(ev) => {
-          if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+          if (ev.isComposing) return;
+          if (matches.length > 0) {
+            const move =
+              ev.key === "ArrowDown" ? 1 : ev.key === "ArrowUp" ? -1 : 0;
+            if (move !== 0) {
+              ev.preventDefault();
+              highlight.value = moveHighlight(chosen, matches.length, move);
+              return;
+            }
+            if (ev.key === "Escape") {
+              ev.preventDefault();
+              shut.value = true;
+              return;
+            }
+            const fill = `/${matches[chosen]!.name}`;
+            if (
+              ev.key === "Tab" ||
+              (ev.key === "Enter" && text.value !== fill)
+            ) {
+              ev.preventDefault();
+              text.value = fill;
+              writeDraft(key, fill);
+              return;
+            }
+          }
+          if (ev.key === "Enter" && !ev.shiftKey) {
             ev.preventDefault();
             void submit();
           }
         }}
       />
+      {matches.length > 0 && (
+        <Commands
+          matches={matches}
+          chosen={chosen}
+          block={block}
+          onPick={(name) => {
+            text.value = `/${name}`;
+            writeDraft(key, text.value);
+            input.current?.focus();
+          }}
+        />
+      )}
       {failure.value && <p class="composer-failure error">{failure.value}</p>}
       <div class="composer-row">
         <AgentPicker
