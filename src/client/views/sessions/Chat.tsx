@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One chat: the crumb is its project, the title its own; the transcript
-// fills the page and the composer sits under it. Leaving the page ends
-// the watch on its session.
+// flows down the page and the composer stays at the bottom of the
+// window in the transcript's foot. Leaving the page ends the watch on
+// its session.
 
 import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
@@ -51,6 +52,7 @@ export function Chat({ params }: { params: Params }) {
       title={shown?.session.title ?? "Chat"}
       loading={shown === null && sessionError.value === null}
       error={sessionError.value}
+      flush
     >
       {shown && (
         <div class="chat">
@@ -59,15 +61,18 @@ export function Chat({ params }: { params: Params }) {
             nodes={groupRows(shown.messages, live.value)}
             agent={agent}
             authorOf={authorOf}
-          />
-          <Composer
-            scope={{ sessionId: shown.session.id }}
-            agents={projectAgents.value}
-            agentId={shown.session.agentId}
-            running={shown.session.status === "running"}
-            busy={sending.value}
-            onSend={(text) => sendMessage(shown.session.id, text)}
-            onStop={() => stopSession(shown.session.id)}
+            foot={
+              <Composer
+                scope={{ sessionId: shown.session.id }}
+                agents={projectAgents.value}
+                agentId={shown.session.agentId}
+                running={shown.session.status === "running"}
+                busy={sending.value}
+                usage={shown.session.usage}
+                onSend={(text) => sendMessage(shown.session.id, text)}
+                onStop={() => stopSession(shown.session.id)}
+              />
+            }
           />
         </div>
       )}

@@ -7,7 +7,8 @@ One continuous context for agents. Domain: 1ctx.dev.
   pins, official npm only, `bun install --ignore-scripts`. A new package
   needs the user's explicit go-ahead.
 - **Status:** alpha. No backwards compatibility, no shims; the schema,
-  the API and the socket may change freely and the preview db is wiped.
+  the API and the socket may change freely; the schema grows by
+  migration and is rewritten, with a wipe, only for a rename.
 
 ## The dev loop
 
@@ -173,11 +174,13 @@ violation, and every rule has a rejected fixture under
   published after the outermost commit and never on a throw, so a
   nested transact() is safe. Bus events are hints; a subscriber reads
   rows for the truth.
-- **One migration until the first release.** `db/migrations/` is the
-  ordered list and a store never creates a table; while alpha the
-  schema is edited in place in `0001-init.ts` and the preview db wiped
-  with `make preview-clean`. After the first release a migration is
-  appended, never edited.
+- **A schema change is a new migration.** `db/migrations/` is the
+  ordered list and a store never creates a table. Adding a table, a
+  column or an index is a file appended to the list; the preview db
+  keeps its rows. Renaming or retyping what exists is not migrated:
+  while alpha there is no backwards compatibility, so the migration
+  that created it is edited in place and the preview db wiped with
+  `make preview-clean`. Say which of the two a PR does.
 - **A send is a row and ends once.** A chat is a session in a project
   with one agent for its life; a user message starts a send under the
   runner's lock, one per session, taken synchronously before anything

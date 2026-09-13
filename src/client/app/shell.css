@@ -12,15 +12,20 @@
     min-height: 0;
   }
 
+  /* the one scroll box: a view scrolls here, never inside itself, so
+     the bar is the browser's at the window's edge. No vertical padding
+     of its own: the page spends --shell-inset at its top and bottom,
+     so a head or a foot stuck to the edge is flush with it */
   .shell-main {
+    --shell-inset: var(--space-5);
     position: relative;
     flex-grow: 1;
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: var(--space-5) 28px;
-    overflow: hidden;
+    padding: 0 28px;
+    overflow-y: auto;
   }
 
   /* the folded rail: its colour and edge, the button and the mark */
@@ -72,18 +77,21 @@
 
   @media (max-width: 719px) {
     .shell-main {
-      padding: var(--space-4);
-      overflow: auto;
+      --shell-inset: var(--space-4);
+      padding: 0 var(--space-4);
     }
     /* the button shares the page head's row: the head moves right by
-       this much, the content under it keeps the full width */
+       this much, the content under it keeps the full width. Fixed,
+       so it stays on the head's row while the page scrolls */
     .shell-main-bare {
       --page-lead: 40px;
     }
     .shell-show-float {
-      position: absolute;
+      position: fixed;
       top: var(--space-4);
       left: var(--space-3);
+      /* over the page's stuck head, under the drawer */
+      z-index: 3;
     }
   }
 }

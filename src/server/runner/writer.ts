@@ -290,6 +290,7 @@ export class Writer {
         cachedTokens: usage.cachedTokens,
         reasoningTokens: usage.reasoningTokens,
         cost: usage.cost,
+        contextLength: send.policy.contextLength,
         now,
       });
     }

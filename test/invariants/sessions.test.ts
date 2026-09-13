@@ -337,3 +337,67 @@ describe("message limits and admission", () => {
     chat.app.socket.dispose();
   });
 });
+
+describe("the usage on the summary", () => {
+  test("the detail and the list carry the last counted round, by order, not by time", async () => {
+    const chat = await chatApp();
+    const first = await startChat(chat, "one");
+    first.script.content("a");
+    first.script.finish();
+    first.script.usage({ prompt: 10, completion: 5 });
+    first.script.end();
+    await tick();
+    await tick();
+    // the fake clock does not move, so the second round has the same
+    // timestamp and the same round number as the first
+    const pending = chat.scripted.next();
+    await chat.member.call(
+      "POST",
+      `/api/sessions/${first.sessionId}/messages`,
+      {
+        body: { message: "two" },
+      },
+    );
+    const second = await pending;
+    second.content("b");
+    second.finish();
+    second.usage({ prompt: 40, completion: 9 });
+    second.end();
+    await tick();
+    await tick();
+    const detail = await (
+      await chat.member.call("GET", `/api/sessions/${first.sessionId}`)
+    ).json();
+    expect(detail.session.usage).toMatchObject({
+      promptTokens: 40,
+      completionTokens: 9,
+      contextLength: 1048576,
+    });
+    const list = await (await chat.member.call("GET", "/api/sessions")).json();
+    expect(list.sessions[0].usage).toMatchObject({ promptTokens: 40 });
+    chat.app.socket.dispose();
+  });
+
+  test("a stopped send after a counted one keeps the counted round", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "one");
+    await finish(started.script);
+    const pending = chat.scripted.next();
+    await chat.member.call(
+      "POST",
+      `/api/sessions/${started.sessionId}/messages`,
+      { body: { message: "two" } },
+    );
+    const second = await pending;
+    second.content("partial");
+    await chat.member.call("POST", `/api/sessions/${started.sessionId}/stop`);
+    await tick();
+    await tick();
+    const detail = await (
+      await chat.member.call("GET", `/api/sessions/${started.sessionId}`)
+    ).json();
+    expect(detail.session.status).toBe("stopped");
+    expect(detail.session.usage).toMatchObject({ promptTokens: 10 });
+    chat.app.socket.dispose();
+  });
+});

@@ -1,15 +1,17 @@
 /* The composer: a card with the text, then a row with the agent chip
-   and its list, the hint and Send. */
+   and its list, and Send. */
 
 @layer tokens, base, owners;
 
 @layer owners {
+  /* one line of text at rest, the row right under it; the box grows
+     with the draft up to MAX_HEIGHT in Composer.tsx */
   .composer {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 7px;
     flex-shrink: 0;
-    padding: var(--space-3) 14px;
+    padding: 10px 14px 10px;
     border-radius: var(--radius-card);
     background: var(--card);
     border: 1px solid var(--line);
@@ -19,7 +21,7 @@
   }
 
   .composer-text {
-    min-height: 44px;
+    min-height: 21px;
     padding: 0;
     border: 0;
     background: transparent;
@@ -38,13 +40,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-  }
-
-  .composer-hint {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
   }
 
   .composer-agent {
@@ -129,7 +124,32 @@
     background: var(--line);
   }
 
+  /* the context readout: the number over a thin bar, on Send's axis */
+  .composer-ctx {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    cursor: default;
+  }
+  .composer-ctx-track {
+    width: 64px;
+    height: 3px;
+    border-radius: var(--radius);
+    background: var(--line);
+    overflow: hidden;
+  }
+  .composer-ctx-fill {
+    display: block;
+    height: 100%;
+    background: var(--faint);
+  }
   .composer-send {
+    margin-left: auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -145,14 +165,14 @@
     color: var(--faint);
     cursor: default;
   }
+  .composer-ctx + .composer-send {
+    margin-left: 0;
+  }
   .composer-stop {
     color: var(--failed);
   }
 
   @media (max-width: 719px) {
-    .composer-hint {
-      display: none;
-    }
     .composer-chip-model {
       max-width: 120px;
     }

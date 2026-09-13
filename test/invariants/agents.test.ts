@@ -6,12 +6,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { parseAgent } from "../../src/server/agents/parse.ts";
-import { BadRequest } from "../../src/server/lib/errors.ts";
 import {
   Catalogs,
   type ProviderRow,
 } from "../../src/server/providers/index.ts";
 import { fakeFetch, PROVIDER_URL, testApp } from "../helpers/app.ts";
+import { refuses } from "../helpers/refuses.ts";
 
 const setup = async () => {
   const app = await testApp();
@@ -41,18 +41,18 @@ const flash = {
 };
 
 describe("parseAgent", () => {
-  test.each([
-    [null],
-    [{}],
-    [{ name: "coder", providerId: "p", model: "m", extra: 1 }],
-    [{ name: "C", providerId: "p", model: "m" }],
-    [{ name: "coder", providerId: "", model: "m" }],
-    [{ name: "coder", providerId: 1, model: "m" }],
-    [{ name: "coder", providerId: "p", model: "" }],
-    [{ name: "coder", providerId: "p", model: "m".repeat(201) }],
-    [{ name: "coder", providerId: "p", model: "m", prompt: 1 }],
-    [{ name: "coder", providerId: "p", model: "m", avatar: "cat" }],
+  refuses(
     [
+      null,
+      {},
+      { name: "coder", providerId: "p", model: "m", extra: 1 },
+      { name: "C", providerId: "p", model: "m" },
+      { name: "coder", providerId: "", model: "m" },
+      { name: "coder", providerId: 1, model: "m" },
+      { name: "coder", providerId: "p", model: "" },
+      { name: "coder", providerId: "p", model: "m".repeat(201) },
+      { name: "coder", providerId: "p", model: "m", prompt: 1 },
+      { name: "coder", providerId: "p", model: "m", avatar: "cat" },
       {
         name: "coder",
         providerId: "p",
@@ -60,9 +60,8 @@ describe("parseAgent", () => {
         prompt: "p".repeat(16_001),
       },
     ],
-  ])("refuses %p", (body) => {
-    expect(() => parseAgent(body)).toThrow(BadRequest);
-  });
+    parseAgent,
+  );
 });
 
 describe("the agents", () => {

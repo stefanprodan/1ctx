@@ -158,6 +158,14 @@ describe("finalizeSend", () => {
         cause: "finish",
         error: null,
       });
+      // the round's usage rides on the session summary, so the envelope
+      // carries the numbers with the reply
+      expect(session.usage).toMatchObject({
+        promptTokens: 12,
+        completionTokens: 7,
+        contextLength: 1048576,
+      });
+      expect(detail.session.usage).toBeNull();
       expect(chat.app.usage.forSession(sessionId)).toMatchObject([
         {
           sendId: detail.send.id,
@@ -170,6 +178,7 @@ describe("finalizeSend", () => {
       expect(seen[1].session.revision).toBe(2);
       expect(seen[1].messages.map((m) => m.id)).toEqual([reply.id]);
       expect(seen[1].send?.status).toBe("done");
+      expect(seen[1].session.usage?.promptTokens).toBe(12);
       expect(chat.app.runner.registry.size).toBe(0);
     } finally {
       stop();

@@ -9,12 +9,6 @@
     flex-direction: column;
     width: 760px;
     max-width: 100%;
-    min-height: 0;
-    overflow-y: auto;
-    /* a scrolling box clips sideways too; the focus outline sits 2px
-       outside a field, so the box is that much wider on each side */
-    padding: 0 var(--space-1);
-    margin: 0 calc(-1 * var(--space-1));
   }
 
   .profile-head {

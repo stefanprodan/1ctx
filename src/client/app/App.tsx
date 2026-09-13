@@ -6,6 +6,7 @@
 // view when nobody is signed in and the route needs someone; otherwise
 // the shell, the rail beside the view.
 
+import { effect } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { UserSummary } from "../../shared/contracts/user.ts";
@@ -56,6 +57,17 @@ function Shell({
   useEffect(() => {
     closeDrawer();
   }, [path.value]);
+  // a new path starts at the top; the signal effect runs before the
+  // render, so a view that opens at its end (a chat) scrolls after
+  const main = useRef<HTMLElement>(null);
+  useEffect(
+    () =>
+      effect(() => {
+        path.value;
+        main.current?.scrollTo(0, 0);
+      }),
+    [],
+  );
   useEffect(() => {
     if (wasCovered.current && !covered) show.current?.focus();
     wasCovered.current = covered;
@@ -86,6 +98,7 @@ function Shell({
         </aside>
       )}
       <main
+        ref={main}
         class={`shell-main${railShown ? "" : " shell-main-bare"}`}
         inert={covered}
       >

@@ -25,6 +25,22 @@ export type SessionSummary = {
   revision: number;
   createdAt: number;
   lastActivityAt: number;
+  // the last round the provider counted; null before the first
+  usage: RoundUsage | null;
+};
+
+// what the provider counted for one round: the prompt is the whole
+// request, so prompt plus completion is the context the session used.
+// The window is the model's as the round saw it, since an agent's
+// model can change under a session
+export type RoundUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number | null;
+  reasoningTokens: number | null;
+  // USD, when the provider states one
+  cost: number | null;
+  contextLength: number | null;
 };
 
 export type Message = {

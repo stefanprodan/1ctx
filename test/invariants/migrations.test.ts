@@ -69,3 +69,41 @@ describe("migrations", () => {
     ).toEqual({ n: 0 });
   });
 });
+
+describe("0002-usage-seq", () => {
+  test("orders the rows a 0001 database holds and indexes them by session", () => {
+    const db = new Database(":memory:");
+    migrate(db, [MIGRATIONS[0]]);
+    const insert = db.query(
+      `insert into usage (id, send_id, session_id, project_id, user_id, agent_id,
+         provider_id, model, round, prompt_tokens, completion_tokens, created_at)
+       values (?, ?, 's1', 'p', 'u', 'a', 'pr', 'm', ?, ?, 1, ?)`,
+    );
+    // two sends at the same time, each starting at round 1: the later
+    // insert is the later row
+    insert.run("u1", "send1", 1, 10, 100);
+    insert.run("u2", "send1", 2, 20, 100);
+    insert.run("u3", "send2", 1, 30, 100);
+    insert.run("u4", "send3", 1, 40, 50);
+    migrate(db);
+    expect(
+      db
+        .query<{ id: string; seq: number }, []>(
+          "select id, seq from usage order by seq",
+        )
+        .all(),
+    ).toEqual([
+      { id: "u4", seq: 1 },
+      { id: "u1", seq: 2 },
+      { id: "u2", seq: 3 },
+      { id: "u3", seq: 4 },
+    ]);
+    expect(
+      db
+        .query("select name from sqlite_master where name = 'usage_session'")
+        .get(),
+    ).toEqual({ name: "usage_session" });
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+});

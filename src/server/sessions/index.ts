@@ -12,7 +12,7 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
-import { type SessionRow, SessionStore } from "./store.ts";
+import { type SessionRow, SessionStore, type UsagePort } from "./store.ts";
 
 export {
   MAX_SESSION_BODY,
@@ -28,6 +28,7 @@ export {
   type SessionRow,
   SessionStore,
   STREAM_LIMIT,
+  type UsagePort,
 } from "./store.ts";
 
 export const RESTART_ERROR = "the server restarted";
@@ -38,6 +39,7 @@ export type SessionsDeps = {
   log: Log;
   access: AccessPort;
   live: LivePort;
+  usage: UsagePort;
 };
 
 export type Sessions = {
@@ -55,7 +57,7 @@ export type Sessions = {
 };
 
 export function sessionsArea(deps: SessionsDeps): Sessions {
-  const store = new SessionStore(deps.db);
+  const store = new SessionStore(deps.db, deps.usage);
   const visible = (principal: Principal, id: string): SessionRow => {
     const session = store.byId(id);
     if (session === null) throw new NotFound("no such chat");

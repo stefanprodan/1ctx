@@ -11,10 +11,6 @@
     gap: var(--space-4);
     width: 960px;
     max-width: 100%;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 0 var(--space-1) var(--space-4);
-    margin: 0 calc(-1 * var(--space-1));
   }
 
   .agents-card {
