@@ -1,15 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The three transactions of a send: startSend writes the session, the
-// user message, the streaming reply, the send row and the running
-// state together, or nothing; finalizeSend writes the reply's end, its
-// usage and the send's end together; each bumps the revision once and
-// publishes one envelope after commit, and a checkpoint in between
-// bumps nothing.
+// The send transactions: each writes one coherent durable change,
+// bumps the revision once and publishes one envelope after commit. A
+// failure injected into every tool-loop transaction rolls it all back;
+// checkpoints remain outside revisions.
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import { FINALIZE_RETRY_MS } from "../../src/server/runner/index.ts";
+import type { Tools } from "../../src/server/tools/index.ts";
 import { chatApp, startChat, tick } from "../helpers/chat.ts";
 
 function envelopes() {
@@ -210,5 +210,320 @@ describe("finalizeSend", () => {
     );
     expect(roles).toEqual(["system", "user", "assistant", "user"]);
     second.reply("two");
+  });
+});
+
+describe("markRoundWork", () => {
+  test("the first tool call delta moves the reply into the fold in one revision", async () => {
+    const chat = await chatApp();
+    const { seen, stop } = envelopes();
+    try {
+      const { detail, script, sessionId } = await startChat(chat, "when");
+      // the first call delta marks the reply work, guarded by its null
+      // slot, in its own transaction: one revision, one envelope
+      script.toolCall({
+        id: "c1",
+        name: "get_current_time",
+        arguments: '{"timezone":"UTC"}',
+      });
+      await tick();
+      const reply = chat.app.sessions.message(detail.messages[1].id)!;
+      expect(reply.slot).toBe("work");
+      expect(chat.app.sessions.byId(sessionId)!.revision).toBe(2);
+      const work = seen.find((e) => e.session.revision === 2);
+      expect(work).toBeDefined();
+      expect(work!.messages.map((m) => m.id)).toEqual([detail.messages[1].id]);
+      expect(work!.messages[0]!.slot).toBe("work");
+      // stop the send so the test does not leave a stream open
+      await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+      await tick();
+      await tick();
+    } finally {
+      stop();
+    }
+    chat.app.socket.dispose();
+  });
+});
+
+describe("finishTool rollback", () => {
+  test("a failed finish keeps every tool tracked and aborts its siblings", async () => {
+    let release: ((value: { content: string; error: boolean }) => void) | null =
+      null;
+    let siblingAborted = false;
+    const tools: Tools = {
+      offered: () => ({
+        search: null,
+        tools: [
+          {
+            name: "get_current_time",
+            description: "time",
+            parameters: { type: "object" },
+          },
+        ],
+      }),
+      run: async (_offered, call, ctx) => {
+        if (call.id === "first") {
+          return new Promise((resolve) => {
+            release = resolve;
+          });
+        }
+        return new Promise((resolve) => {
+          const timer = setTimeout(
+            () => resolve({ content: "did not abort", error: false }),
+            1000,
+          );
+          ctx.signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              siblingAborted = true;
+              resolve({ content: "aborted", error: true });
+            },
+            { once: true },
+          );
+        });
+      },
+    };
+    const chat = await chatApp({ tools });
+    const { seen, stop } = envelopes();
+    try {
+      const { detail, script, sessionId } = await startChat(chat, "two tools");
+      script.toolRound([
+        {
+          id: "first",
+          name: "get_current_time",
+          arguments: '{"timezone":"UTC"}',
+        },
+        {
+          id: "second",
+          name: "get_current_time",
+          arguments: '{"timezone":"Asia/Tokyo"}',
+        },
+      ]);
+      script.end();
+      for (let i = 0; i < 50 && release === null; i++) await tick();
+      expect(release).not.toBeNull();
+      expect(
+        chat.app.sessions
+          .messages(sessionId)
+          .filter((row) => row.kind === "tool" && row.status === "streaming"),
+      ).toHaveLength(2);
+
+      const store = chat.app.sessions;
+      const original = store.touch.bind(store);
+      store.touch = (id, fields) => {
+        original(id, fields);
+        store.touch = original;
+        throw new Error("touch failed after the tool update");
+      };
+      release!({ content: "first result", error: false });
+
+      for (let i = 0; i < 50; i++) {
+        if (chat.app.runner.registry.get(sessionId) === null) break;
+        await tick();
+      }
+      const rows = chat.app.sessions
+        .messages(sessionId)
+        .filter((row) => row.kind === "tool");
+      expect(siblingAborted).toBe(true);
+      expect(rows.map((row) => row.status)).toEqual(["stopped", "stopped"]);
+      expect(rows.map((row) => row.content)).toEqual([
+        "stopped before it finished",
+        "stopped before it finished",
+      ]);
+      expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+        status: "failed",
+        cause: "failure",
+        error: "touch failed after the tool update",
+      });
+      expect(
+        seen.filter(
+          (event) =>
+            event.send?.id === detail.send.id &&
+            event.send?.status === "failed",
+        ),
+      ).toHaveLength(1);
+      expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+    } finally {
+      stop();
+      chat.app.socket.dispose();
+    }
+  });
+});
+
+describe("finalizeSend rollback", () => {
+  test("a retry still stops tool rows rolled back by the first attempt", async () => {
+    const tools: Tools = {
+      offered: () => ({
+        search: null,
+        tools: [
+          {
+            name: "get_current_time",
+            description: "time",
+            parameters: { type: "object" },
+          },
+        ],
+      }),
+      run: async (_offered, _call, ctx) =>
+        new Promise((resolve) => {
+          ctx.signal.addEventListener(
+            "abort",
+            () => resolve({ content: "aborted", error: true }),
+            { once: true },
+          );
+        }),
+    };
+    const chat = await chatApp({ tools });
+    const { detail, script, sessionId } = await startChat(chat, "stop tool");
+    script.toolRound([
+      {
+        id: "call",
+        name: "get_current_time",
+        arguments: '{"timezone":"UTC"}',
+      },
+    ]);
+    script.end();
+    for (let i = 0; i < 50; i++) {
+      const tool = chat.app.sessions
+        .messages(sessionId)
+        .find((row) => row.kind === "tool");
+      if (tool?.status === "streaming") break;
+      await tick();
+    }
+
+    const store = chat.app.sessions;
+    const original = store.finishSend.bind(store);
+    let attempts = 0;
+    store.finishSend = (id, fields) => {
+      attempts++;
+      if (attempts === 1) throw new Error("first finalize failed");
+      return original(id, fields);
+    };
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    chat.app.now.value += FINALIZE_RETRY_MS;
+    await tick();
+    await tick();
+    store.finishSend = original;
+
+    expect(attempts).toBe(2);
+    expect(
+      chat.app.sessions.messages(sessionId).find((row) => row.kind === "tool"),
+    ).toMatchObject({
+      status: "stopped",
+      content: "stopped before it finished",
+    });
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "stopped",
+      cause: "stop",
+    });
+    expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+    chat.app.socket.dispose();
+  });
+});
+
+describe("new tool transaction rollback", () => {
+  test("markRoundWork rolls back its slot and revision before failure ends the send", async () => {
+    const chat = await chatApp();
+    const { detail, script, sessionId } = await startChat(chat, "mark");
+    const store = chat.app.sessions;
+    const original = store.markRoundWork.bind(store);
+    store.markRoundWork = (id) => {
+      original(id);
+      store.markRoundWork = original;
+      throw new Error("mark failed");
+    };
+
+    script.toolCall({
+      id: "call",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    for (let i = 0; i < 20; i++) await tick();
+
+    expect(chat.app.sessions.byId(sessionId)?.revision).toBe(2);
+    expect(chat.app.sessions.message(detail.messages[1].id)).toMatchObject({
+      status: "failed",
+      slot: "work",
+      error: "mark failed",
+    });
+    expect(chat.app.sessions.messages(sessionId)).toHaveLength(2);
+    chat.app.socket.dispose();
+  });
+
+  test("finishRound rolls back its reply, usage and tool rows", async () => {
+    const chat = await chatApp();
+    const { detail, script, sessionId } = await startChat(chat, "finish round");
+    script.toolCall({
+      id: "call",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    await tick();
+    const store = chat.app.sessions;
+    const original = store.addToolRows.bind(store);
+    store.addToolRows = (calls) => {
+      original(calls);
+      store.addToolRows = original;
+      throw new Error("tool rows failed");
+    };
+
+    script.finish("tool_calls");
+    script.usage({ prompt: 12, completion: 3 });
+    script.end();
+    for (let i = 0; i < 20; i++) await tick();
+
+    const rows = chat.app.sessions.messages(sessionId);
+    expect(rows.filter((row) => row.kind === "tool")).toEqual([]);
+    expect(rows[1]).toMatchObject({
+      status: "failed",
+      slot: "work",
+      error: "tool rows failed",
+    });
+    expect(chat.app.sessions.byId(sessionId)?.revision).toBe(3);
+    expect(chat.app.usage.forSession(sessionId)).toHaveLength(1);
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "failed",
+      rounds: 1,
+      toolCalls: 0,
+    });
+    chat.app.socket.dispose();
+  });
+
+  test("startRound rolls back the new reply and round counter", async () => {
+    const chat = await chatApp();
+    const { detail, script, sessionId } = await startChat(chat, "next round");
+    script.toolCall({
+      id: "call",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    await tick();
+    const store = chat.app.sessions;
+    const original = store.addReply.bind(store);
+    store.addReply = (fields) => {
+      if (fields.round !== 2) return original(fields);
+      original(fields);
+      store.addReply = original;
+      throw new Error("next reply failed");
+    };
+
+    script.finish("tool_calls");
+    script.usage();
+    script.end();
+    for (let i = 0; i < 30; i++) await tick();
+
+    const replies = chat.app.sessions
+      .messages(sessionId)
+      .filter((row) => row.kind === "reply");
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ status: "done", slot: "work" });
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "failed",
+      error: "next reply failed",
+      rounds: 1,
+      toolCalls: 1,
+    });
+    expect(chat.app.sessions.byId(sessionId)?.revision).toBe(5);
+    chat.app.socket.dispose();
   });
 });

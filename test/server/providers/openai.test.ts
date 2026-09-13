@@ -127,11 +127,21 @@ describe("OpenAI chat body", () => {
       ],
       stream: true,
       stream_options: { include_usage: true },
+      enable_thinking: false,
       temperature: 0,
       top_p: 0.8,
       max_tokens: 100,
     });
     expect(body).not.toHaveProperty("tools");
+  });
+
+  test("sends the thinking switch on every request", () => {
+    expect(buildChatBody({ ...request, thinking: true }).enable_thinking).toBe(
+      true,
+    );
+    expect(buildChatBody({ ...request, thinking: false }).enable_thinking).toBe(
+      false,
+    );
   });
 
   test("a user message without an author has no name field", () => {

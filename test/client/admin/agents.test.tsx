@@ -205,6 +205,7 @@ describe("the rail", () => {
     expect(group?.kind === "group" && group.name).toBe("Admin");
     expect(group?.kind === "group" && group.routes.map((r) => r.path)).toEqual([
       "/admin/agents",
+      "/admin/tools",
     ]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });

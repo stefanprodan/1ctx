@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One provider round: the request from the context, the stream, every
-// delta to the writer, the finish and the usage kept on the round. A
-// provider failure is an error event on the stream and becomes a throw
-// here, so the send ends through its one terminal transition. Once the
-// send is terminated the rest of the stream is dropped: the rows are
-// already final.
+// delta to the writer, the finish and the usage kept on the round. The
+// first tool call delta of a round marks the reply work at once, in its
+// own transaction, so the row moves into the fold with its reasoning;
+// the assembled calls land on round.calls when the stream ends. A
+// provider failure is an error event and becomes a throw here, so the
+// send ends through its one terminal transition. Once terminated the
+// rest of the stream is dropped: the rows are already final.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -15,8 +17,13 @@ import {
   type ChatRequest,
   mergeReasoningDetail,
 } from "../providers/index.ts";
-import { type ContextLookups, history, request } from "./context.ts";
-import type { ActiveSend } from "./send.ts";
+import {
+  type ContextLookups,
+  history,
+  request,
+  withExhausted,
+} from "./context.ts";
+import type { ActiveSend, RoundState } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
 export type RoundDeps = {
@@ -70,11 +77,20 @@ export function buildRequest(
   lookups: ContextLookups,
   now: number,
 ): ChatRequest {
-  return request(
+  const messages = history(rows, send.policy, lookups, now);
+  const req = request(
     send.policy,
     send.sessionId,
-    history(rows, send.policy, lookups, now),
+    // the answer round appends the exhausted line to a request-local
+    // copy, never the stored rows
+    send.answering ? withExhausted(messages) : messages,
   );
+  // the answer round keeps the schemas so the cached prefix holds and
+  // forbids a call with tool_choice none (decision 10)
+  if (send.answering && req.tools && req.tools.length > 0) {
+    req.toolChoice = "none";
+  }
+  return req;
 }
 
 export async function runRound(
@@ -83,6 +99,7 @@ export async function runRound(
   rows: Message[],
 ): Promise<void> {
   const round = send.round;
+  if (round === null) return;
   const req = buildRequest(send, rows, deps.lookups, deps.clock());
   const events = deps.chat(send.policy.providerId, req, send.controller.signal);
   const iterator = events[Symbol.asyncIterator]();
@@ -109,6 +126,14 @@ export async function runRound(
           event.item,
         );
         break;
+      case "toolCallDelta":
+        // the server's earliest certain knowledge that this is a work
+        // round: move the row into the fold once, guarded by the round
+        markWork(deps, send, round);
+        break;
+      case "toolCalls":
+        round.calls = event.calls;
+        break;
       case "finish":
         round.finishReason = event.details
           ? `${event.reason}/${event.details}`
@@ -120,12 +145,20 @@ export async function runRound(
       case "error":
         throw new Error(event.message);
       default:
-        // tool calls wait for the tools slice; a model that calls one
-        // anyway ends the round on its finish reason
         break;
     }
   }
   if (send.terminal === null && round.finishReason === null) {
     throw new Error("the stream ended early");
   }
+}
+
+// the first tool call delta of a round marks it work, once; the round
+// remembers, so a later delta writes nothing
+function markWork(deps: RoundDeps, send: ActiveSend, round: RoundState): void {
+  if (round.slotMarked) return;
+  round.slotMarked = true;
+  // a call delta is the first token when no text came before it
+  if (round.ttftMs === null) round.ttftMs = deps.clock() - round.startedAt;
+  deps.writer.markRoundWork(send);
 }

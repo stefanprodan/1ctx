@@ -54,6 +54,8 @@ export const FORBIDDEN_HOSTS = [
   "api.openai.com",
   "api.anthropic.com",
   "generativelanguage.googleapis.com",
+  "exa.ai",
+  "firecrawl.dev",
 ];
 
 // the two files at the server root, the composition; anything else

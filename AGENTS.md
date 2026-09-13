@@ -202,6 +202,37 @@ violation, and every rule has a rejected fixture under
   running with cause `restart`. Shutdown terminates every send, waits
   for the streams, closes the sockets with 1012, then stops the
   listener. An agent a session references is a 409 to delete.
+  Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
+  reuses the last user message: inside `startSend`'s transaction the
+  rows after it, their send and its usage go, and the envelope names
+  them in `removedMessageIds`; 409 while the session runs, 400 when
+  the last message is the user's.
+- **The tool loop is bounded, and the server places every row.** The
+  loop caps (rounds, calls per round and per send, tool time, result
+  bytes) and the per-tool caps have their defaults, floors and
+  ceilings in one table, `limits/defaults.ts`; an admin's override is
+  a row in `limits`, `limits.current()` merges them, and
+  `runner/limits.ts` and `tools/limits.ts` re-export the types and
+  the defaults; `tools/` never imports `runner/`. The offered set is
+  decided once per send in `runner/policy.ts` from the `tools` rows:
+  every tool of the model accepts tools that an admin has not
+  switched off, and websearch only once a search provider is chosen;
+  both providers answer keyless, a key file raises the rate, and the
+  runner never holds a key. A change on the
+  Tools page applies to the next send; a send in flight keeps the
+  caps and the set it started on. A round's calls run in parallel
+  under the call timeout and the send's signal. A tool row is a message
+  of kind `tool`, and each tool's end is one transaction, one revision,
+  one envelope; only the reply text streams. Every message carries its
+  `send_id` and `round`, and a reply row its `slot`, `work` or `answer`,
+  written by the server: at the first call delta, or when the round
+  ends. The client groups by send and slot and never infers placement
+  from the call arrays, the finish reason or the live map. A tool row
+  travels without its result; detail and envelopes carry `resultBytes`,
+  and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
+  at the display cap. The runner reads the full row from the store.
+  Widening a table check is an appended migration that rebuilds the
+  table in place (create, copy, drop, rename) and keeps the rows.
 - **The socket is per connection, never a topic.** `web/socket.ts`
   keeps every connection by user with the project ids the user may see,
   from `access.visibleProjectIds()` (memberships, plus every team

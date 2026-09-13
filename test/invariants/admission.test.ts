@@ -82,6 +82,32 @@ describe("admission", () => {
     expect(chat.app.runner.registry.size).toBe(0);
   });
 
+  test("a second message during a work round is refused while the lock is held", async () => {
+    const chat = await chatApp();
+    const { script, sessionId } = await startChat(chat, "when");
+    // the reply moves into the fold at the first call delta; the send is
+    // still running, so a second message is refused
+    script.content("checking");
+    script.toolCall({
+      id: "c1",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    await tick();
+    const res = await chat.member.call(
+      "POST",
+      `/api/sessions/${sessionId}/messages`,
+      { body: { message: "again" } },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Oana Pellea is sending" });
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    await tick();
+    await tick();
+    expect(script.aborted).toBe(true);
+    chat.app.socket.dispose();
+  });
+
   test("after shutdown nothing is admitted", async () => {
     const chat = await chatApp();
     await chat.app.shutdown();

@@ -14,8 +14,10 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
+import { copyCode } from "./copy.ts";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
+import type { Live } from "./stream.ts";
 import { UserRow } from "./UserRow.tsx";
 import "./transcript.css";
 import "./md.css";
@@ -24,15 +26,20 @@ import "./hljs.css";
 export function Transcript({
   sessionId,
   nodes,
+  live,
   agent,
   authorOf,
+  onRegenerate,
   foot,
 }: {
   sessionId: string;
   nodes: Node[];
+  live: ReadonlyMap<string, Live>;
   agent: Agent | null;
   // the name of a user row's author
   authorOf: (userId: string | null) => string;
+  // the last turn's Regenerate; absent while a send runs
+  onRegenerate?: () => void;
   foot?: ComponentChildren;
 }) {
   const rows = useRef<HTMLDivElement>(null);
@@ -73,22 +80,7 @@ export function Transcript({
       } else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
-    const onClick = async (ev: MouseEvent) => {
-      if (!(ev.target instanceof Element)) return;
-      const b = ev.target.closest(".md-copy");
-      if (!b) return;
-      const code = b.closest(".md-block")?.querySelector(".md-block-code");
-      if (!code) return;
-      try {
-        await navigator.clipboard.writeText(code.textContent ?? "");
-        b.textContent = "Copied";
-        setTimeout(() => {
-          if (b.isConnected) b.textContent = "Copy";
-        }, 1200);
-      } catch {
-        // no clipboard: the button stays as it is
-      }
-    };
+    const onClick = (ev: MouseEvent) => void copyCode(ev);
     scroller.addEventListener("scroll", onScroll);
     el.addEventListener("click", onClick);
     return () => {
@@ -126,23 +118,27 @@ export function Transcript({
     <>
       <div class="transcript-rows" ref={rows}>
         <div class="transcript">
-          {nodes.map((n) =>
-            n.kind === "user" ? (
-              <UserRow
-                key={n.message.id}
-                message={n.message}
-                author={authorOf(n.message.userId)}
-              />
-            ) : (
+          {nodes.map((node, index) => {
+            const last = index === nodes.length - 1;
+            if (node.kind === "user") {
+              return (
+                <UserRow
+                  key={node.message.id}
+                  message={node.message}
+                  author={authorOf(node.message.userId)}
+                />
+              );
+            }
+            return (
               <Reply
-                key={n.message.id}
-                message={n.message}
-                live={n.live}
-                think={n.think}
+                key={`reply:${node.sendId}`}
+                node={node}
+                live={live}
                 agent={agent}
+                onRegenerate={last ? onRegenerate : undefined}
               />
-            ),
-          )}
+            );
+          })}
         </div>
       </div>
       <div class="transcript-foot" ref={footEl}>

@@ -11,6 +11,7 @@ import {
   secs,
   tail,
   thinkLabel,
+  thinkParts,
 } from "../../../src/client/transcript/stream.ts";
 import type {
   LiveSend,
@@ -26,6 +27,12 @@ const message = (fields: Partial<Message> = {}): Message => ({
   sessionId: "s1",
   seq: 2,
   kind: "reply",
+  sendId: "send1",
+  round: 1,
+  slot: null,
+  toolCalls: null,
+  toolCallId: null,
+  toolName: null,
   userId: null,
   agentId: "a1",
   content: "",
@@ -40,6 +47,7 @@ const message = (fields: Partial<Message> = {}): Message => ({
   createdAt: 1_000,
   finishedAt: null,
   ...fields,
+  resultBytes: fields.resultBytes ?? null,
 });
 
 const live = (fields: Partial<Live> = {}): Live => ({
@@ -79,18 +87,19 @@ describe("live transcript buffers", () => {
   test("starts from a message or runner snapshot", () => {
     const row = message({
       content: "answer",
-      reasoning: "thought",
+      reasoning: "thinking",
       html: "<p>answer</p>",
       ttftMs: 25,
     });
     expect(liveOf(row)).toMatchObject({
       content: "answer",
-      reasoning: "thought",
+      reasoning: "thinking",
       htmlAt: 6,
       thinkStart: null,
     });
 
-    const snapshot: LiveSend = {
+    const snapshot: Extract<LiveSend, { phase: "reply" }> = {
+      phase: "reply",
       sendId: "send1",
       messageId: "m1",
       seq: 4,
@@ -172,16 +181,39 @@ describe("live transcript buffers", () => {
 
 describe("thinking labels", () => {
   test("formats each clock state", () => {
-    expect(thinkLabel(live(), false, 3_200)).toBe("Thinking");
+    expect(thinkLabel(live(), false, 3_200)).toBe("thinking");
+    expect(thinkLabel(live(), true, 3_200)).toBe("thinking");
     expect(thinkLabel(live({ thinkStart: 0 }), false, 3_200)).toBe(
-      "Thinking for 3.2 s",
+      "thinking for 3.2 s",
     );
     expect(
       thinkLabel(live({ thinkStart: 0, thinkEnd: 12_000 }), false, 20_000),
-    ).toBe("Thought for 12 s");
+    ).toBe("thinking for 12 s");
     expect(thinkLabel(live({ thinkMs: 65_000 }), true, 100_000)).toBe(
-      "Thought for 1 min 5 s",
+      "thinking for 1 min 5 s",
     );
+  });
+
+  test("returns each clock state as separate parts", () => {
+    expect(thinkParts(live(), false, 3_200)).toEqual({
+      word: "thinking",
+      time: null,
+    });
+    expect(thinkParts(live({ thinkStart: 0 }), false, 3_200)).toEqual({
+      word: "thinking",
+      time: "3.2 s",
+    });
+    expect(
+      thinkParts(live({ thinkStart: 0, thinkEnd: 12_000 }), false, 20_000),
+    ).toEqual({ word: "thinking", time: "12 s" });
+    expect(thinkParts(live({ thinkMs: 65_000 }), true, 100_000)).toEqual({
+      word: "thinking",
+      time: "1 min 5 s",
+    });
+    expect(thinkParts(live(), true, 3_200)).toEqual({
+      word: "thinking",
+      time: null,
+    });
   });
 
   test("formats seconds and minutes", () => {

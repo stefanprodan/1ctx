@@ -78,6 +78,7 @@ const PATHS: Record<string, string> = {
   chevron: "M5 6.5l3 3 3-3",
   "chevron-right": "M6.5 5l3 3-3 3",
   check: "M3 8.5l3 3 7-7",
+  copy: "M6 6h7a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3.5 10.5h-.5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6.5a1 1 0 0 1 1 1v.5",
   "sign-out": "M6.5 3H3v10h3.5M10 5l3 3-3 3M13 8H6",
   sidebar:
     "M3.5 3h9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM6 3v10",
@@ -94,6 +95,10 @@ const PATHS: Record<string, string> = {
   chat: "M3 3.5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-3 2.5v-2.5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z",
   agents:
     "M4 6.5h8a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 12 12.5H4A1.5 1.5 0 0 1 2.5 11V8A1.5 1.5 0 0 1 4 6.5zM8 6.5V4M6 9.5h.01M10 9.5h.01",
+  spinner: "M13 8a5 5 0 1 1-2-4",
+  redo: "M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5",
+  tools:
+    "M10 2.5a3.5 3.5 0 0 0-4.2 4.6L2.5 10.4l3.1 3.1 3.3-3.3a3.5 3.5 0 0 0 4.6-4.2L11.3 8.2 7.8 4.7z",
 };
 
 export type IconName = keyof typeof PATHS;

@@ -132,6 +132,45 @@ describe("the terminal transition", () => {
     expect(script.aborted).toBe(true);
   });
 
+  test("a stop during a work round ends the send once, work reply and any tool row stopped", async () => {
+    const chat = await chatApp();
+    const { detail, script, sessionId } = await startChat(chat, "when");
+    const store = chat.app.sessions;
+    let finalized = 0;
+    const original = store.finishSend.bind(store);
+    store.finishSend = (id, fields) => {
+      finalized++;
+      return original(id, fields);
+    };
+    try {
+      // narration then the first call delta moves the reply into the
+      // fold; the stop lands before the calls assemble
+      script.content("let me check the clock");
+      script.toolCall({
+        id: "c1",
+        name: "get_current_time",
+        arguments: '{"timezone":"UTC"}',
+      });
+      await tick();
+      await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+      await tick();
+      await tick();
+    } finally {
+      store.finishSend = original;
+    }
+    expect(finalized).toBe(1);
+    const send = chat.app.sessions.send(detail.send.id)!;
+    expect(send).toMatchObject({ status: "stopped", cause: "stop" });
+    expect(chat.app.sessions.byId(sessionId)!.status).toBe("stopped");
+    // the work reply it ended keeps the work slot (marked before the stop)
+    const reply = chat.app.sessions.message(detail.messages[1].id)!;
+    expect(reply.slot).toBe("work");
+    expect(reply.status).toBe("stopped");
+    expect(chat.app.runner.registry.size).toBe(0);
+    expect(script.aborted).toBe(true);
+    chat.app.socket.dispose();
+  });
+
   test("a failed finalize keeps the running rows locked", async () => {
     const chat = await chatApp();
     const { script, sessionId } = await startChat(chat);

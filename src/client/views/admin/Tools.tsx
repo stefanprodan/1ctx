@@ -1,0 +1,342 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The tools: three cards. The built-ins, a row each with its switch,
+// opening in place to the text and the parameters the model gets,
+// read-only. The search provider, one of two, with whether its key
+// file is there. The limits, per send and per call, each typed in the
+// page's unit with the default beside a changed one; Save and Reset
+// to defaults at the foot. A change applies to the next send.
+
+import { useSignal } from "@preact/signals";
+import { useEffect, useRef } from "preact/hooks";
+import type { LimitRow } from "../../../shared/contracts/limit.ts";
+import type { ToolSummary } from "../../../shared/contracts/tool.ts";
+import {
+  type LimitScope,
+  SEARCH_PROVIDERS,
+  type SearchProvider,
+} from "../../../shared/words.ts";
+import {
+  limits,
+  patchTool,
+  resetLimits,
+  saveLimits,
+  tools,
+  toolsError,
+} from "../../data/tools.ts";
+import { Icon } from "../../lib/icons.tsx";
+import { useSave } from "../../lib/save.ts";
+import { copyCode } from "../../transcript/copy.ts";
+import { Foot } from "../../ui/Foot.tsx";
+import { Page } from "../../ui/Page.tsx";
+import {
+  collect,
+  defaultLine,
+  dirty,
+  displayOf,
+  draftOf,
+  firstSentence,
+  keyLine,
+  LIMIT_WORDS,
+  searchLine,
+  TOOL_WORDS,
+} from "./Tools.model.ts";
+import "../../transcript/hljs.css";
+import "../../transcript/md.css";
+import "./tools.css";
+
+const reason = (err: unknown) =>
+  err instanceof Error ? err.message : String(err);
+
+// a built-in: the row with its switch, the schema under it when open
+function ToolRow({
+  tool,
+  open,
+  onToggle,
+}: {
+  tool: ToolSummary;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const busy = useSignal(false);
+  const failure = useSignal<string | null>(null);
+  // the block's Copy is a button inside rendered HTML, so the click is
+  // delegated the way the transcript does it
+  const json = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = json.current;
+    if (!el) return;
+    const on = (ev: MouseEvent) => void copyCode(ev);
+    el.addEventListener("click", on);
+    return () => el.removeEventListener("click", on);
+  }, [open]);
+  const flip = async () => {
+    busy.value = true;
+    failure.value = null;
+    try {
+      await patchTool(tool.name, { enabled: !tool.enabled });
+    } catch (err) {
+      failure.value = reason(err);
+    }
+    busy.value = false;
+  };
+  return (
+    <div class={`tools-item${open ? " tools-item-open" : ""}`}>
+      <div class="tools-row">
+        <button
+          type="button"
+          class="tools-open"
+          aria-expanded={open}
+          onClick={onToggle}
+        >
+          <Icon
+            name="chevron"
+            size={14}
+            class={`tools-chevron${open ? " tools-chevron-open" : ""}`}
+          />
+          <span class="tools-name">{tool.name}</span>
+          <span class="tools-desc">
+            {firstSentence(tool.description) || TOOL_WORDS[tool.name]}
+          </span>
+        </button>
+        {failure.value && <span class="tools-note error">{failure.value}</span>}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={tool.enabled}
+          aria-label={`${tool.name} ${tool.enabled ? "on" : "off"}`}
+          class={`tools-switch${tool.enabled ? " tools-switch-on" : ""}`}
+          disabled={busy.value}
+          onClick={() => void flip()}
+        >
+          <span class="tools-switch-knob" />
+        </button>
+      </div>
+      {open && (
+        <div class="tools-body">
+          <div class="tools-label">Description for agents</div>
+          <div class="tools-text">{tool.description}</div>
+          <div class="tools-label">Parameters</div>
+          {/* Server rendering keeps the Markdown parser out of the browser. */}
+          <div
+            class="tools-json"
+            ref={json}
+            dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// the two providers as radio rows; a pick writes at once
+function SearchCard() {
+  const state = tools.value?.search;
+  const busy = useSignal(false);
+  const failure = useSignal<string | null>(null);
+  if (!state) return null;
+  const choose = async (provider: SearchProvider) => {
+    if (provider === state.provider || busy.value) return;
+    busy.value = true;
+    failure.value = null;
+    try {
+      await patchTool("websearch", { provider });
+    } catch (err) {
+      failure.value = reason(err);
+    }
+    busy.value = false;
+  };
+  return (
+    <section class="tools-card">
+      <div class="tools-card-head">
+        <span class="label">Web search</span>
+      </div>
+      {SEARCH_PROVIDERS.map((provider) => (
+        <label key={provider} class="tools-item tools-radio">
+          <input
+            class="tools-radio-input"
+            type="radio"
+            name="search"
+            value={provider}
+            checked={state.provider === provider}
+            disabled={busy.value}
+            onChange={() => void choose(provider)}
+          />
+          <span class="tools-name">{provider}</span>
+          <span class="tools-meta">
+            {keyLine(provider, state.keys[provider])}
+          </span>
+        </label>
+      ))}
+      <p class="tools-state">
+        {failure.value ? (
+          <span class="error">{failure.value}</span>
+        ) : (
+          searchLine(state)
+        )}
+      </p>
+    </section>
+  );
+}
+
+function LimitField({
+  row,
+  text,
+  busy,
+  onInput,
+}: {
+  row: LimitRow;
+  text: string;
+  busy: boolean;
+  onInput: (text: string) => void;
+}) {
+  const { word } = displayOf(row);
+  const words = LIMIT_WORDS[row.name];
+  return (
+    <label class="tools-limit">
+      <span class="tools-limit-words">
+        <span class="tools-limit-label">{words.label}</span>
+        <span class="tools-limit-text">{words.text}</span>
+      </span>
+      <span class="tools-limit-field">
+        <input
+          class="tools-input"
+          name={row.name}
+          type="number"
+          step="any"
+          inputMode="decimal"
+          autocomplete="off"
+          spellcheck={false}
+          disabled={busy}
+          value={text}
+          onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)}
+        />
+        <span class="tools-unit">{word}</span>
+      </span>
+      {row.changedAt !== null && (
+        <span class="tools-default">{defaultLine(row)}</span>
+      )}
+    </label>
+  );
+}
+
+// the limits form: two groups, the fields seeded from the rows and
+// re-seeded when a save or a reset answers new rows
+function LimitsCard({ rows }: { rows: LimitRow[] }) {
+  const draft = useSignal(draftOf(rows));
+  const resetting = useSignal(false);
+  const failure = useSignal<string | null>(null);
+  useEffect(() => {
+    draft.value = draftOf(rows);
+  }, [rows]);
+  const save = useSave(async () => {
+    const got = collect(rows, draft.value);
+    if ("problem" in got) throw new Error(got.problem);
+    await saveLimits({ values: got.values });
+  });
+  const submit = (event: Event) => {
+    event.preventDefault();
+    const got = collect(rows, draft.value);
+    void save.run("problem" in got ? got.problem : null);
+  };
+  const reset = async () => {
+    resetting.value = true;
+    failure.value = null;
+    try {
+      await resetLimits();
+    } catch (err) {
+      failure.value = reason(err);
+    }
+    resetting.value = false;
+  };
+  const busy = save.status.value === "busy" || resetting.value;
+  const group = (scope: LimitScope, title: string) => (
+    <div class="tools-group">
+      <span class="label">{title}</span>
+      {rows
+        .filter((row) => row.scope === scope)
+        .map((row) => (
+          <LimitField
+            key={row.name}
+            row={row}
+            text={draft.value[row.name] ?? ""}
+            busy={busy}
+            onInput={(text) => {
+              draft.value = { ...draft.value, [row.name]: text };
+              save.touch();
+            }}
+          />
+        ))}
+    </div>
+  );
+  const changed = rows.some((row) => row.changedAt !== null);
+  return (
+    <section class="tools-card">
+      <div class="tools-card-head">
+        <span class="label">Limits</span>
+        <span class="tools-hint">applies to the next send</span>
+      </div>
+      <form class="tools-form" onSubmit={submit}>
+        {group("send", "Per send")}
+        {group("call", "Per call")}
+        <Foot
+          status={save.status.value}
+          dirty={dirty(rows, draft.value)}
+          label="Save"
+          start={
+            <>
+              <button
+                type="button"
+                class="btn"
+                disabled={busy || !changed}
+                onClick={() => void reset()}
+              >
+                {resetting.value ? "Resetting" : "Reset to defaults"}
+              </button>
+              {failure.value && (
+                <span class="tools-note error">{failure.value}</span>
+              )}
+            </>
+          }
+        />
+      </form>
+    </section>
+  );
+}
+
+export function Tools() {
+  const state = tools.value;
+  const rows = limits.value;
+  const open = useSignal<string | null>(null);
+  const error = toolsError.value;
+  return (
+    <Page
+      crumb="Admin"
+      title="Tools"
+      loading={(state === null || rows === null) && error === null}
+      error={error}
+    >
+      <div class="tools">
+        <section class="tools-card">
+          <div class="tools-card-head">
+            <span class="label">Built-in tools</span>
+            <span class="tools-hint">a switch applies to the next send</span>
+          </div>
+          {(state?.tools ?? []).map((tool) => (
+            <ToolRow
+              key={tool.name}
+              tool={tool}
+              open={open.value === tool.name}
+              onToggle={() => {
+                open.value = open.value === tool.name ? null : tool.name;
+              }}
+            />
+          ))}
+        </section>
+        <SearchCard />
+        {rows && <LimitsCard rows={rows} />}
+      </div>
+    </Page>
+  );
+}

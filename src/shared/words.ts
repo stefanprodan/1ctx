@@ -117,7 +117,7 @@ export const SEND_CAUSES = [
 ] as const;
 export type SendCause = (typeof SEND_CAUSES)[number];
 
-export const MESSAGE_KINDS = ["user", "reply"] as const;
+export const MESSAGE_KINDS = ["user", "reply", "tool"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
 export const MESSAGE_STATUSES = [
@@ -133,3 +133,52 @@ export const MAX_MESSAGE_BYTES = 256 * 1024;
 export const MAX_TITLE = 80;
 // the stream's search box
 export const MAX_SEARCH = 100;
+
+// the built-in tools, each with a server-wide switch on the tools page
+export const BUILTIN_TOOLS = [
+  "get_current_time",
+  "webfetch",
+  "websearch",
+] as const;
+export type BuiltinTool = (typeof BUILTIN_TOOLS)[number];
+export function isBuiltinTool(value: unknown): value is BuiltinTool {
+  return BUILTIN_TOOLS.includes(value as BuiltinTool);
+}
+
+// the services websearch can run on; the key file carries the name
+export const SEARCH_PROVIDERS = ["exa", "firecrawl"] as const;
+export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
+export function isSearchProvider(value: unknown): value is SearchProvider {
+  return SEARCH_PROVIDERS.includes(value as SearchProvider);
+}
+
+// the limits an admin may override: the loop caps of a send, then the
+// caps a single tool call runs under. The names are the keys the
+// runner and the tools read, so a row maps to a cap without a table.
+export const LIMIT_NAMES = [
+  "rounds",
+  "callsPerRound",
+  "callsPerSend",
+  "toolMs",
+  "resultBytes",
+  "callTimeoutMs",
+  "resultCut",
+  "maxFetches",
+  "maxSearches",
+  "fetchBodyBytes",
+  "searchBodyBytes",
+  "fetchDeadlineMs",
+  "searchDeadlineMs",
+] as const;
+export type LimitName = (typeof LIMIT_NAMES)[number];
+export function isLimitName(value: unknown): value is LimitName {
+  return LIMIT_NAMES.includes(value as LimitName);
+}
+
+// what a limit's number counts; the page turns ms and bytes into words
+export const LIMIT_UNITS = ["count", "ms", "bytes", "chars"] as const;
+export type LimitUnit = (typeof LIMIT_UNITS)[number];
+
+// where a limit applies: over the whole send, or to one tool call
+export const LIMIT_SCOPES = ["send", "call"] as const;
+export type LimitScope = (typeof LIMIT_SCOPES)[number];

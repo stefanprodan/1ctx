@@ -1,18 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The session, message and send rows. Every write that changes what a
-// session is goes with a touch() that bumps the revision; a checkpoint
-// of a reply in flight does not, since it is for a crash, not a reader.
 
+import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type {
-  Message,
-  RoundUsage,
-  SendSummary,
-  SessionSummary,
-} from "../../shared/contracts/session.ts";
-import type {
-  MessageKind,
   MessageStatus,
   SendCause,
   SessionStatus,
@@ -20,132 +10,21 @@ import type {
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
-
-export type SessionRow = SessionSummary;
-
-export const STREAM_LIMIT = 100;
-
-type RawSession = {
-  id: string;
-  project_id: string;
-  owner_id: string;
-  agent_id: string;
-  origin: "chat";
-  title: string;
-  status: SessionStatus;
-  revision: number;
-  created_at: number;
-  last_activity_at: number;
-};
-
-// what the sessions area asks of the usage area: the last round the
-// provider counted, for the summary every envelope and list carries
-export type UsagePort = {
-  latest(sessionId: string): RoundUsage | null;
-  latestFor(sessionIds: string[]): Map<string, RoundUsage>;
-};
-
-const session = (raw: RawSession, usage: RoundUsage | null): SessionRow => ({
-  id: raw.id,
-  projectId: raw.project_id,
-  ownerId: raw.owner_id,
-  agentId: raw.agent_id,
-  origin: raw.origin,
-  title: raw.title,
-  status: raw.status,
-  revision: raw.revision,
-  createdAt: raw.created_at,
-  lastActivityAt: raw.last_activity_at,
-  usage,
-});
-
-type RawMessage = {
-  id: string;
-  session_id: string;
-  seq: number;
-  kind: MessageKind;
-  user_id: string | null;
-  agent_id: string | null;
-  content: string;
-  reasoning: string;
-  html: string;
-  status: MessageStatus;
-  error: string | null;
-  finish_reason: string | null;
-  model: string | null;
-  ttft_ms: number | null;
-  thinking_ms: number | null;
-  created_at: number;
-  finished_at: number | null;
-};
-
-const MESSAGE_COLUMNS =
-  "id, session_id, seq, kind, user_id, agent_id, content, reasoning, html, status, error, finish_reason, model, ttft_ms, thinking_ms, created_at, finished_at";
-
-const message = (raw: RawMessage): Message => ({
-  id: raw.id,
-  sessionId: raw.session_id,
-  seq: raw.seq,
-  kind: raw.kind,
-  userId: raw.user_id,
-  agentId: raw.agent_id,
-  content: raw.content,
-  reasoning: raw.reasoning,
-  html: raw.html,
-  status: raw.status,
-  error: raw.error,
-  finishReason: raw.finish_reason,
-  model: raw.model,
-  ttftMs: raw.ttft_ms,
-  thinkingMs: raw.thinking_ms,
-  createdAt: raw.created_at,
-  finishedAt: raw.finished_at,
-});
-
-type RawSend = {
-  id: string;
-  session_id: string;
-  kind: "chat";
-  user_id: string;
-  agent_id: string;
-  provider_id: string;
-  model: string;
-  status: SessionStatus;
-  cause: SendCause | null;
-  error: string | null;
-  first_message_id: string;
-  started_at: number;
-  finished_at: number | null;
-};
-
-const send = (raw: RawSend): SendSummary => ({
-  id: raw.id,
-  sessionId: raw.session_id,
-  kind: raw.kind,
-  userId: raw.user_id,
-  agentId: raw.agent_id,
-  providerId: raw.provider_id,
-  model: raw.model,
-  status: raw.status,
-  cause: raw.cause,
-  error: raw.error,
-  firstMessageId: raw.first_message_id,
-  startedAt: raw.started_at,
-  finishedAt: raw.finished_at,
-});
-
-export type ReplyFinish = {
-  content: string;
-  reasoning: string;
-  reasoningDetails: ReasoningDetail[];
-  html: string;
-  status: Exclude<MessageStatus, "streaming">;
-  error: string | null;
-  finishReason: string | null;
-  ttftMs: number | null;
-  thinkingMs: number | null;
-  finishedAt: number;
-};
+import { replaceSendRows } from "./regenerate.ts";
+import {
+  MESSAGE_COLUMNS,
+  message,
+  type RawMessage,
+  type RawSend,
+  type RawSession,
+  type RepairedSession,
+  type ReplyFinish,
+  type SessionRow,
+  STREAM_LIMIT,
+  send,
+  session,
+  type UsagePort,
+} from "./rows.ts";
 
 export class SessionStore {
   constructor(
@@ -271,22 +150,28 @@ export class SessionStore {
     }
   }
 
+  // the runner generates the ids before any insert and writes the send
+  // row first, so send_id holds without a deferred foreign key. round
+  // is the provider round the message belongs to, from 1
   addUserMessage(fields: {
+    id?: string;
     sessionId: string;
+    sendId: string;
     userId: string;
     content: string;
     now: number;
   }): Message {
-    const id = newId();
+    const id = fields.id ?? newId();
     this.db
       .query(
-        `insert into messages (id, session_id, seq, kind, user_id, content, status, created_at, finished_at)
-         values (?, ?, ?, 'user', ?, ?, 'done', ?, ?)`,
+        `insert into messages (id, session_id, seq, kind, send_id, round, user_id, content, status, created_at, finished_at)
+         values (?, ?, ?, 'user', ?, 1, ?, ?, 'done', ?, ?)`,
       )
       .run(
         id,
         fields.sessionId,
         this.nextSeq(fields.sessionId),
+        fields.sendId,
         fields.userId,
         fields.content,
         fields.now,
@@ -295,22 +180,32 @@ export class SessionStore {
     return this.message(id)!;
   }
 
+  replaceSend(user: Message, newSendId: string) {
+    return replaceSendRows(this.db, user, newSendId);
+  }
+  // a streaming reply for a round: a null slot until it is placed. The
+  // first round of a send is round 1; startRound bumps it
   addReply(fields: {
+    id?: string;
     sessionId: string;
+    sendId: string;
+    round: number;
     agentId: string;
     model: string;
     now: number;
   }): Message {
-    const id = newId();
+    const id = fields.id ?? newId();
     this.db
       .query(
-        `insert into messages (id, session_id, seq, kind, agent_id, model, status, created_at)
-         values (?, ?, ?, 'reply', ?, ?, 'streaming', ?)`,
+        `insert into messages (id, session_id, seq, kind, send_id, round, agent_id, model, status, created_at)
+         values (?, ?, ?, 'reply', ?, ?, ?, ?, 'streaming', ?)`,
       )
       .run(
         id,
         fields.sessionId,
         this.nextSeq(fields.sessionId),
+        fields.sendId,
+        fields.round,
         fields.agentId,
         fields.model,
         fields.now,
@@ -344,32 +239,119 @@ export class SessionStore {
   }
 
   finishReply(id: string, fields: ReplyFinish): Message | null {
-    this.db
-      .query(
-        `update messages set content = ?, reasoning = ?, reasoning_details = ?, html = ?,
-           status = ?, error = ?, finish_reason = ?, ttft_ms = ?, thinking_ms = ?,
-           finished_at = ?
+    const changed =
+      this.db
+        .query(
+          `update messages set content = ?, reasoning = ?, reasoning_details = ?, html = ?,
+           status = ?, error = ?, finish_reason = ?, slot = ?, tool_calls = ?,
+           ttft_ms = ?, thinking_ms = ?, finished_at = ?
          where id = ? and status = 'streaming'`,
-      )
-      .run(
-        fields.content,
-        fields.reasoning,
-        fields.reasoningDetails.length > 0
-          ? JSON.stringify(fields.reasoningDetails)
-          : null,
-        fields.html,
-        fields.status,
-        fields.error,
-        fields.finishReason,
-        fields.ttftMs,
-        fields.thinkingMs,
-        fields.finishedAt,
-        id,
-      );
-    return this.message(id);
+        )
+        .run(
+          fields.content,
+          fields.reasoning,
+          fields.reasoningDetails.length > 0
+            ? JSON.stringify(fields.reasoningDetails)
+            : null,
+          fields.html,
+          fields.status,
+          fields.error,
+          fields.finishReason,
+          fields.slot,
+          fields.toolCalls && fields.toolCalls.length > 0
+            ? JSON.stringify(fields.toolCalls)
+            : null,
+          fields.ttftMs,
+          fields.thinkingMs,
+          fields.finishedAt,
+          id,
+        ).changes > 0;
+    return changed ? this.message(id) : null;
+  }
+
+  // the row moves into the fold at the first call delta of a round: a
+  // streaming reply with a null slot becomes "work". Guarded by the
+  // null slot, so a second delta writes nothing and answers null
+  markRoundWork(id: string): Message | null {
+    const sql =
+      "update messages set slot = 'work' where id = ? and kind = 'reply' and status = 'streaming' and slot is null";
+    const changed = this.db.query(sql).run(id).changes > 0;
+    return changed ? this.message(id) : null;
+  }
+
+  // place a reply's slot without ending it; the repair uses it to make
+  // a null-slot reply it ends an "answer"
+  markSlot(id: string, slot: "work" | "answer"): Message | null {
+    const changed =
+      this.db
+        .query(
+          "update messages set slot = ? where id = ? and kind = 'reply' and slot is null",
+        )
+        .run(slot, id).changes > 0;
+    return changed ? this.message(id) : null;
+  }
+
+  // one streaming tool row per launched call: the call id and tool name
+  // the row answers, the content filled when the tool ends. The ids and
+  // seqs come in order from the caller so a batch is one statement's
+  // worth of rows
+  addToolRows(
+    calls: {
+      id?: string;
+      sessionId: string;
+      sendId: string;
+      round: number;
+      toolCallId: string;
+      toolName: string;
+      now: number;
+    }[],
+  ): Message[] {
+    return calls.map((call) => {
+      const id = call.id ?? newId();
+      this.db
+        .query(
+          `insert into messages (id, session_id, seq, kind, send_id, round, tool_call_id, tool_name, status, created_at)
+           values (?, ?, ?, 'tool', ?, ?, ?, ?, 'streaming', ?)`,
+        )
+        .run(
+          id,
+          call.sessionId,
+          this.nextSeq(call.sessionId),
+          call.sendId,
+          call.round,
+          call.toolCallId,
+          call.toolName,
+          call.now,
+        );
+      return this.message(id)!;
+    });
+  }
+
+  // a tool row ends: the result text the model gets and its status,
+  // guarded by status = 'streaming', so a late tool after a terminal
+  // cleanup writes nothing. The updated row, or null when the guard
+  // caught it
+  finishTool(
+    id: string,
+    fields: {
+      content: string;
+      status: Exclude<MessageStatus, "streaming">;
+      error: string | null;
+      finishedAt: number;
+    },
+  ): Message | null {
+    const changed =
+      this.db
+        .query(
+          "update messages set content = ?, status = ?, error = ?, finished_at = ? where id = ? and kind = 'tool' and status = 'streaming'",
+        )
+        .run(fields.content, fields.status, fields.error, fields.finishedAt, id)
+        .changes > 0;
+    return changed ? this.message(id) : null;
   }
 
   createSend(fields: {
+    id?: string;
     sessionId: string;
     userId: string;
     agentId: string;
@@ -378,7 +360,7 @@ export class SessionStore {
     firstMessageId: string;
     now: number;
   }): SendSummary {
-    const id = newId();
+    const id = fields.id ?? newId();
     this.db
       .query(
         `insert into sends (id, session_id, kind, user_id, agent_id, provider_id, model,
@@ -420,27 +402,69 @@ export class SessionStore {
       status: Exclude<SessionStatus, "running">;
       cause: SendCause;
       error: string | null;
+      // the send's final counters: provider rounds and calls launched
+      rounds: number;
+      toolCalls: number;
       finishedAt: number;
     },
   ): SendSummary | null {
     this.db
       .query(
-        "update sends set status = ?, cause = ?, error = ?, finished_at = ? where id = ? and status = 'running'",
+        "update sends set status = ?, cause = ?, error = ?, rounds = ?, tool_calls = ?, finished_at = ? where id = ? and status = 'running'",
       )
-      .run(fields.status, fields.cause, fields.error, fields.finishedAt, id);
+      .run(
+        fields.status,
+        fields.cause,
+        fields.error,
+        fields.rounds,
+        fields.toolCalls,
+        fields.finishedAt,
+        id,
+      );
     return this.send(id);
   }
 
-  // the rows a crash left running: every send, reply and session still
-  // marked so, ended as failed with the one error, in the caller's
-  // transaction; the sessions touched
-  repair(now: number, error: string): SessionRow[] {
+  // the running counters as the loop advances, without ending the send:
+  // startRound bumps rounds, a round's launched calls bump tool_calls
+  bumpCounters(
+    id: string,
+    fields: { rounds: number; toolCalls: number },
+  ): SendSummary | null {
+    this.db
+      .query(
+        "update sends set rounds = ?, tool_calls = ? where id = ? and status = 'running'",
+      )
+      .run(fields.rounds, fields.toolCalls, id);
+    return this.send(id);
+  }
+
+  // Repair every session named by a running session/send or streaming
+  // message. Inconsistent crash rows still need a revision and envelope,
+  // rather than being changed globally without notifying their session.
+  repair(now: number, error: string): RepairedSession[] {
     const ids = this.db
       .query<{ id: string }, []>(
-        "select id from sessions where status = 'running'",
+        `select id from sessions where status = 'running'
+         union select session_id from sends where status = 'running'
+         union select session_id from messages where status = 'streaming'`,
       )
       .all()
       .map((r) => r.id);
+    if (ids.length === 0) return [];
+    // the reply rows about to end need a slot; a null one becomes an
+    // answer before its status moves, so the not-streaming check holds
+    this.db
+      .query(
+        "update messages set slot = 'answer' where kind = 'reply' and status = 'streaming' and slot is null",
+      )
+      .run();
+    // the ids of the rows this repair will end, before they change, so
+    // the envelope can read them back
+    const changedByStatus = this.db
+      .query<{ id: string; session_id: string }, []>(
+        "select id, session_id from messages where status = 'streaming'",
+      )
+      .all();
     this.db
       .query(
         "update sends set status = 'failed', cause = 'restart', error = ?, finished_at = ? where status = 'running'",
@@ -448,10 +472,21 @@ export class SessionStore {
       .run(error, now);
     this.db
       .query(
+        "update messages set status = 'stopped', error = ?, finished_at = ? where kind = 'tool' and status = 'streaming'",
+      )
+      .run(error, now);
+    this.db
+      .query(
         "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",
       )
       .run(error, now);
-    return ids.map((id) => this.touch(id, { status: "failed", now })!);
+    return ids.map((id) => {
+      const session = this.touch(id, { status: "failed", now })!;
+      const messages = changedByStatus
+        .filter((row) => row.session_id === id)
+        .map((row) => this.message(row.id)!);
+      return { session, messages, send: this.lastSend(id) };
+    });
   }
 
   private nextSeq(sessionId: string): number {

@@ -13,6 +13,7 @@ import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
+import { limitsArea } from "./limits/index.ts";
 import { type ProjectStore, projectsArea } from "./projects/index.ts";
 import {
   type Catalogs,
@@ -24,6 +25,7 @@ import {
 import { renderMarkdown } from "./render/index.ts";
 import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
 import { type SessionStore, sessionsArea } from "./sessions/index.ts";
+import { type Tools, toolsArea } from "./tools/index.ts";
 import { type UsageStore, usageArea } from "./usage/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
 import { healthRoute } from "./web/health.ts";
@@ -41,6 +43,8 @@ export type ComposeOptions = {
   version: string;
   secureCookie: boolean;
   trustProxy: boolean;
+  // a test seam for the runner's tool state machine
+  tools?: Tools;
   // a test's registry with its own caps
   registry?: Registry;
 };
@@ -82,6 +86,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
   });
   const usage = usageArea({ db });
+  const limits = limitsArea({ db, clock });
   const providers = providersArea({
     db,
     clock,
@@ -117,6 +122,17 @@ export async function compose(options: ComposeOptions): Promise<App> {
     live: (sessionId) => runner.live(sessionId),
     usage,
   });
+  const tools =
+    options.tools ??
+    toolsArea({
+      db,
+      fetcher: options.fetcher ?? fetch,
+      secret,
+      clock,
+      log: options.log("tools"),
+      version: options.version,
+      render: renderMarkdown,
+    });
   const socket = socketArea({
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
@@ -132,6 +148,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     agents,
     users,
     providers,
+    tools,
+    limits,
     usage,
     render: renderMarkdown,
     stream: (sessionId, frame) => socket.stream(sessionId, frame),
@@ -141,11 +159,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
   sessions.repair();
   const routes: RouteDescriptor[] = [
     ...users.routes,
+    ...limits.routes,
     ...providers.routes,
     ...projects.routes,
     ...access.routes,
     ...agents.routes,
     ...sessions.routes,
+    ...(tools.routes ?? []),
     ...runner.routes,
     socket.route,
     healthRoute(options.version),

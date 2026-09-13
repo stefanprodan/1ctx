@@ -21,6 +21,7 @@ import {
   loadSession,
   session,
 } from "../data/sessions.ts";
+import { loadTools } from "../data/tools.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -107,6 +108,14 @@ export const ROUTES: Route[] = [
       await Promise.all([loadAgents(), loadProviders()]);
     },
     nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
+  },
+  {
+    path: "/admin/tools",
+    view: lazy(() => import("../views/admin/Tools.tsx").then((m) => m.Tools)),
+    title: () => "Tools",
+    role: "admin",
+    load: () => loadTools(),
+    nav: { label: "Tools", icon: "tools", order: 11, group: "Admin" },
   },
   {
     path: "/profile",

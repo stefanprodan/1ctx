@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { ago, clock } from "../../../src/client/lib/format.ts";
+import { ago, clock, stamp } from "../../../src/client/lib/format.ts";
 
 describe("time formatting", () => {
   const now = new Date(2026, 8, 13, 12).getTime();
@@ -24,5 +24,11 @@ describe("time formatting", () => {
     const time = new Date(2026, 8, 13, 8, 41).getTime();
 
     expect(clock(time)).toBe("08:41");
+  });
+
+  test("stamps a turn with its day and time", () => {
+    const time = new Date(2026, 8, 13, 16, 23).getTime();
+
+    expect(stamp(time)).toBe("Sep 13, 16:23");
   });
 });

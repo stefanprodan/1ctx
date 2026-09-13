@@ -8,7 +8,14 @@ import { describe, expect, test } from "bun:test";
 import { compose } from "../../src/server/compose.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
-import { RESTART_ERROR, titleFrom } from "../../src/server/sessions/index.ts";
+import {
+  RESTART_ERROR,
+  RESULT_DISPLAY_CHARS,
+  SessionStore,
+  titleFrom,
+  type UsagePort,
+} from "../../src/server/sessions/index.ts";
+import type { Tools } from "../../src/server/tools/index.ts";
 import { fakeFetch, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -16,13 +23,37 @@ import {
   type Script,
   startChat,
   tick,
+  waitScript,
 } from "../helpers/chat.ts";
+import { memoryDb } from "../helpers/db.ts";
 
 async function finish(script: Script, content = "done") {
   script.reply(content);
   await tick();
   await tick();
 }
+
+function fixedTools(content: string): Tools {
+  return {
+    offered: () => ({
+      tools: [
+        {
+          name: "get_current_time",
+          description: "the current time",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+      search: null,
+    }),
+    run: () => Promise.resolve({ content, error: false }),
+  };
+}
+
+const timeCall = {
+  id: "time-1",
+  name: "get_current_time",
+  arguments: '{"timezone":"UTC"}',
+};
 
 function addTeam(chat: ChatApp, id: string) {
   chat.app.db
@@ -139,6 +170,228 @@ describe("GET /api/sessions/:id", () => {
     await finish(theirs.script);
     chat.app.socket.dispose();
   });
+
+  test("keeps tool results in storage and strips every wire row", async () => {
+    const result = "résultat 🙂";
+    const chat = await chatApp({ tools: fixedTools(result) });
+    const changed: Extract<BusEvent, { type: "session.changed" }>["data"][] =
+      [];
+    const unsubscribe = subscribe((event) => {
+      if (event.type === "session.changed") changed.push(event.data);
+    });
+    const started = await startChat(chat, "use a tool");
+    started.script.toolRound([timeCall]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+
+    const providerTool = (
+      answer.body.messages as { role: string; content: string }[]
+    ).find((message) => message.role === "tool");
+    expect(providerTool?.content).toBe(result);
+
+    const toolEnd = changed.find((event) =>
+      event.messages.some(
+        (message) => message.kind === "tool" && message.status === "done",
+      ),
+    );
+    expect(toolEnd).toBeDefined();
+    expect(
+      toolEnd!.messages.find((message) => message.kind === "tool"),
+    ).toMatchObject({
+      content: "",
+      resultBytes: new TextEncoder().encode(result).length,
+    });
+
+    await finish(answer, "answer");
+    const response = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}`,
+    );
+    const detail = await response.json();
+    const tool = detail.messages.find(
+      (message: { kind: string }) => message.kind === "tool",
+    );
+    expect(tool).toMatchObject({
+      content: "",
+      resultBytes: new TextEncoder().encode(result).length,
+    });
+    expect(
+      detail.messages
+        .filter((message: { kind: string }) => message.kind !== "tool")
+        .every(
+          (message: { resultBytes: number | null }) =>
+            message.resultBytes === null,
+        ),
+    ).toBe(true);
+    expect(detail.messages[0].content).toBe("use a tool");
+    expect(detail.messages.at(-1).content).toBe("answer");
+
+    const stored = chat.app.sessions.message(tool.id)!;
+    expect(stored).toMatchObject({ content: result, resultBytes: null });
+    const resultResponse = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(resultResponse.status).toBe(200);
+    expect(await resultResponse.json()).toEqual({
+      content: result,
+      bytes: new TextEncoder().encode(result).length,
+      cut: false,
+    });
+    unsubscribe();
+    chat.app.socket.dispose();
+  });
+
+  test("a failed tool leaves its error text off the wire too", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "failed tool");
+    const [streaming] = chat.app.sessions.addToolRows([
+      {
+        sessionId: started.sessionId,
+        sendId: started.detail.send.id,
+        round: 1,
+        toolCallId: "failed-call",
+        toolName: "webfetch",
+        now: chat.app.now.value,
+      },
+    ]);
+    const tool = chat.app.sessions.finishTool(streaming!.id, {
+      content: "Error: HTTP status 404",
+      status: "failed",
+      error: "Error: HTTP status 404",
+      finishedAt: chat.app.now.value,
+    })!;
+    const detail = await (
+      await chat.member.call("GET", `/api/sessions/${started.sessionId}`)
+    ).json();
+    expect(
+      detail.messages.find((message: { id: string }) => message.id === tool.id),
+    ).toMatchObject({
+      status: "failed",
+      content: "",
+      error: null,
+      resultBytes: 22,
+    });
+    const result = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(await result.json()).toEqual({
+      content: "Error: HTTP status 404",
+      bytes: 22,
+      cut: false,
+    });
+    await finish(started.script);
+    chat.app.socket.dispose();
+  });
+
+  test("never cuts a result inside a surrogate pair", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "emoji result");
+    const content = `${"a".repeat(RESULT_DISPLAY_CHARS - 1)}\u{1F642}b`;
+    const [streaming] = chat.app.sessions.addToolRows([
+      {
+        sessionId: started.sessionId,
+        sendId: started.detail.send.id,
+        round: 1,
+        toolCallId: "emoji-call",
+        toolName: "webfetch",
+        now: chat.app.now.value,
+      },
+    ]);
+    const tool = chat.app.sessions.finishTool(streaming!.id, {
+      content,
+      status: "done",
+      error: null,
+      finishedAt: chat.app.now.value,
+    })!;
+    const result = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(await result.json()).toEqual({
+      content: "a".repeat(RESULT_DISPLAY_CHARS - 1),
+      bytes: RESULT_DISPLAY_CHARS + 4,
+      cut: true,
+    });
+    await finish(started.script);
+    chat.app.socket.dispose();
+  });
+
+  test("cuts tool result display and rejects unavailable rows", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "long result");
+    const long = "x".repeat(RESULT_DISPLAY_CHARS + 1);
+    const [streaming] = chat.app.sessions.addToolRows([
+      {
+        sessionId: started.sessionId,
+        sendId: started.detail.send.id,
+        round: 1,
+        toolCallId: "long-call",
+        toolName: "webfetch",
+        now: chat.app.now.value,
+      },
+    ]);
+    const tool = chat.app.sessions.finishTool(streaming!.id, {
+      content: long,
+      status: "done",
+      error: null,
+      finishedAt: chat.app.now.value,
+    })!;
+    const response = await chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      content: "x".repeat(RESULT_DISPLAY_CHARS),
+      bytes: long.length,
+      cut: true,
+    });
+
+    const other = chat.app.sessions.create({
+      projectId: chat.projectId,
+      ownerId: chat.memberId,
+      agentId: chat.agentId,
+      title: "other",
+      now: chat.app.now.value,
+    });
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/${other.id}/messages/${tool.id}/result`,
+        )
+      ).status,
+    ).toBe(404);
+    const replyId = started.detail.messages[1].id;
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/${started.sessionId}/messages/${replyId}/result`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/000000000000/messages/${tool.id}/result`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/sessions/${started.sessionId}/messages/bad-id/result`,
+        )
+      ).status,
+    ).toBe(400);
+    await finish(started.script);
+    chat.app.socket.dispose();
+  });
 });
 
 describe("DELETE /api/sessions/:id", () => {
@@ -230,25 +483,32 @@ describe("boot repair", () => {
       title: "interrupted",
       now: chat.app.now.value,
     });
-    const user = store.addUserMessage({
+    // the send row is written first, so the messages' send_id holds
+    const sendId = "repair-send";
+    const send = store.createSend({
+      id: sendId,
       sessionId: session.id,
+      userId: chat.memberId,
+      agentId: chat.agentId,
+      providerId: chat.providerId,
+      model: "model",
+      firstMessageId: "repair-user",
+      now: chat.app.now.value,
+    });
+    store.addUserMessage({
+      id: "repair-user",
+      sessionId: session.id,
+      sendId,
       userId: chat.memberId,
       content: "hello",
       now: chat.app.now.value,
     });
     const reply = store.addReply({
       sessionId: session.id,
+      sendId,
+      round: 1,
       agentId: chat.agentId,
       model: "model",
-      now: chat.app.now.value,
-    });
-    const send = store.createSend({
-      sessionId: session.id,
-      userId: chat.memberId,
-      agentId: chat.agentId,
-      providerId: chat.providerId,
-      model: "model",
-      firstMessageId: user.id,
       now: chat.app.now.value,
     });
     const before = store.touch(session.id, {
@@ -290,9 +550,18 @@ describe("boot repair", () => {
     expect(seen[0]).toMatchObject({
       projectId: chat.projectId,
       session: { id: session.id, revision: before.revision + 1 },
-      messages: [],
       send: { id: send.id, cause: "restart" },
     });
+    // the repair now carries the rows it changed, so the socket can
+    // apply them without a refetch: the reply it ended, placed answer
+    expect(seen[0].messages).toEqual([
+      expect.objectContaining({
+        id: reply.id,
+        status: "failed",
+        slot: "answer",
+        error: RESTART_ERROR,
+      }),
+    ]);
     repaired.socket.dispose();
   });
 });
@@ -399,5 +668,339 @@ describe("the usage on the summary", () => {
     expect(detail.session.status).toBe("stopped");
     expect(detail.session.usage).toMatchObject({ promptTokens: 10 });
     chat.app.socket.dispose();
+  });
+});
+
+// the tool-loop store APIs over a bare db, without the runner: the
+// send row inserted first, the reply placed by slot, tool rows added
+// and finished under the status guard, and repair stopping a partial
+// tool row and placing the reply it ends.
+const noUsage: UsagePort = {
+  latest: () => null,
+  latestFor: () => new Map(),
+};
+
+function seededStore() {
+  const db = memoryDb();
+  db.query(
+    "insert into users (id, username, full_name, role, password_hash, created_at) values ('u', 'user', 'User', 'member', 'x', 0)",
+  ).run();
+  db.query(
+    "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'user', 'u', 0)",
+  ).run();
+  db.query(
+    "insert into providers (id, name, wire, base_url, created_at) values ('pr', 'prov', 'openai-compatible', 'http://x', 0)",
+  ).run();
+  db.query(
+    "insert into agents (id, name, provider_id, model, model_name, created_at) values ('a', 'agent', 'pr', 'm', 'M', 0)",
+  ).run();
+  const store = new SessionStore(db, noUsage);
+  const session = store.create({
+    projectId: "p",
+    ownerId: "u",
+    agentId: "a",
+    title: "chat",
+    now: 0,
+  });
+  return { db, store, session };
+}
+
+describe("the tool-loop store", () => {
+  test("places a reply, adds and finishes tool rows under the guard", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s1",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "user1",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "user1",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const reply = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    // the first call delta moves the row into the fold; a second delta
+    // writes nothing
+    expect(store.markRoundWork(reply.id)!.slot).toBe("work");
+    expect(store.markRoundWork(reply.id)).toBeNull();
+
+    const work = store.finishReply(reply.id, {
+      content: "",
+      reasoning: "",
+      reasoningDetails: [],
+      html: "",
+      status: "done",
+      error: null,
+      finishReason: "tool_calls",
+      slot: "work",
+      toolCalls: [{ id: "c1", name: "get_current_time", arguments: "{}" }],
+      ttftMs: null,
+      thinkingMs: null,
+      finishedAt: 1,
+    })!;
+    expect(work.slot).toBe("work");
+    expect(work.toolCalls).toEqual([
+      { id: "c1", name: "get_current_time", arguments: "{}" },
+    ]);
+
+    const [tool] = store.addToolRows([
+      {
+        sessionId: session.id,
+        sendId: send.id,
+        round: 1,
+        toolCallId: "c1",
+        toolName: "get_current_time",
+        now: 1,
+      },
+    ]);
+    expect(tool.kind).toBe("tool");
+    expect(tool.status).toBe("streaming");
+    expect(tool.toolCallId).toBe("c1");
+
+    const done = store.finishTool(tool.id, {
+      content: "12:00",
+      status: "done",
+      error: null,
+      finishedAt: 2,
+    })!;
+    expect(done.status).toBe("done");
+    expect(done.content).toBe("12:00");
+    // the guard: a second finish after the status moved writes nothing
+    expect(
+      store.finishTool(tool.id, {
+        content: "late",
+        status: "failed",
+        error: "x",
+        finishedAt: 3,
+      }),
+    ).toBeNull();
+    expect(store.message(tool.id)!.content).toBe("12:00");
+    db.close();
+  });
+
+  test("the answer unique index forbids two answers in one send", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s2",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u2",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u2",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const first = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    store.finishReply(first.id, {
+      content: "answer",
+      reasoning: "",
+      reasoningDetails: [],
+      html: "answer",
+      status: "done",
+      error: null,
+      finishReason: "stop",
+      slot: "answer",
+      toolCalls: null,
+      ttftMs: null,
+      thinkingMs: null,
+      finishedAt: 1,
+    });
+    const second = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 2,
+      agentId: "a",
+      model: "m",
+      now: 1,
+    });
+    expect(() =>
+      store.finishReply(second.id, {
+        content: "again",
+        reasoning: "",
+        reasoningDetails: [],
+        html: "again",
+        status: "done",
+        error: null,
+        finishReason: "stop",
+        slot: "answer",
+        toolCalls: null,
+        ttftMs: null,
+        thinkingMs: null,
+        finishedAt: 2,
+      }),
+    ).toThrow();
+    db.close();
+  });
+
+  test("repair stops a partial tool row and answers the reply it ends", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s3",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u3",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u3",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const reply = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    const [tool] = store.addToolRows([
+      {
+        sessionId: session.id,
+        sendId: send.id,
+        round: 1,
+        toolCallId: "c1",
+        toolName: "webfetch",
+        now: 0,
+      },
+    ]);
+    store.touch(session.id, { status: "running", now: 0 });
+
+    const repaired = store.repair(1, "restart");
+    expect(repaired).toHaveLength(1);
+    expect(repaired[0]!.session.status).toBe("failed");
+    expect(repaired[0]!.send).toMatchObject({ cause: "restart" });
+    const byId = new Map(repaired[0]!.messages.map((m) => [m.id, m]));
+    expect(byId.get(reply.id)).toMatchObject({
+      status: "failed",
+      slot: "answer",
+    });
+    expect(byId.get(tool.id)).toMatchObject({
+      status: "stopped",
+      error: "restart",
+    });
+    // nothing streams after a repair, so foreign keys still check
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+
+  test("repair includes rows whose session status was already stale", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "stale-send",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "stale-user",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "stale-user",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const reply = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    store.touch(session.id, { status: "done", now: 0 });
+
+    const repaired = store.repair(1, "restart");
+
+    expect(repaired).toHaveLength(1);
+    expect(repaired[0]!.messages).toEqual([
+      expect.objectContaining({
+        id: reply.id,
+        status: "failed",
+        slot: "answer",
+      }),
+    ]);
+    expect(repaired[0]!.send).toMatchObject({
+      id: send.id,
+      status: "failed",
+      cause: "restart",
+    });
+    expect(repaired[0]!.session.status).toBe("failed");
+    db.close();
+  });
+
+  test("finishSend records the counters", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s4",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u4",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u4",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    expect(
+      store.bumpCounters(send.id, { rounds: 2, toolCalls: 3 }),
+    ).toMatchObject({ rounds: 2, toolCalls: 3 });
+    const ended = store.finishSend(send.id, {
+      status: "done",
+      cause: "finish",
+      error: null,
+      rounds: 2,
+      toolCalls: 3,
+      finishedAt: 5,
+    })!;
+    expect(ended).toMatchObject({ rounds: 2, toolCalls: 3, status: "done" });
+    db.close();
   });
 });

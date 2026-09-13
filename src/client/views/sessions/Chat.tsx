@@ -15,6 +15,7 @@ import {
   leaveSession,
   live,
   projectAgents,
+  regenerateSession,
   sending,
   sendMessage,
   session,
@@ -58,9 +59,15 @@ export function Chat({ params }: { params: Params }) {
         <div class="chat">
           <Transcript
             sessionId={shown.session.id}
-            nodes={groupRows(shown.messages, live.value)}
+            nodes={groupRows(shown.messages, shown.send)}
+            live={live.value}
             agent={agent}
             authorOf={authorOf}
+            onRegenerate={
+              shown.session.status === "running" || sending.value
+                ? undefined
+                : () => void regenerateSession(shown.session.id)
+            }
             foot={
               <Composer
                 scope={{ sessionId: shown.session.id }}

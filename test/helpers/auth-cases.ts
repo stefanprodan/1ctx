@@ -5,6 +5,8 @@
 // of caller gets. The access suite fails when a route has no entry, so a
 // new route cannot land without saying who may call it.
 
+import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
+
 export type Caller = "anonymous" | "member" | "admin";
 
 export type AuthCase = {
@@ -66,6 +68,33 @@ export const AUTH_CASES: AuthCase[] = [
     method: "GET",
     path: "/api/projects/:id",
     expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/tools",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/tools/:name",
+    body: { enabled: true },
+    expect: { anonymous: 401, member: 403, admin: 400 },
+  },
+  {
+    method: "GET",
+    path: "/api/limits",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/limits",
+    body: { values: DEFAULT_LIMITS },
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/limits",
+    expect: { anonymous: 401, member: 403, admin: 204 },
   },
   {
     method: "GET",
@@ -134,6 +163,11 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
+    method: "GET",
+    path: "/api/sessions/:id/messages/:messageId/result",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
     method: "DELETE",
     path: "/api/sessions/:id",
     expect: { anonymous: 401, member: 404, admin: 404 },
@@ -142,6 +176,11 @@ export const AUTH_CASES: AuthCase[] = [
     method: "POST",
     path: "/api/sessions/:id/messages",
     body: { message: "hi" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/sessions/:id/regenerate",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

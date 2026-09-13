@@ -1,7 +1,8 @@
-/* The transcript: the rows, a user row (author line and card), a reply
-   (agent line, the reasoning fold, the rendered body, the tail with
-   its cursor, the line under it), and the foot stuck to the bottom of
-   the shell's scroll box with the composer and Jump to latest. */
+/* The transcript: the rows, a user row (author line and card), the
+   agent's turn (its line, the work fold, the reasoning fold, the
+   rendered body, the streaming tail, the line under it), and the
+   foot stuck to the bottom of the shell's scroll box with the composer
+   and Jump to latest. */
 
 @layer tokens, base, owners;
 
@@ -93,53 +94,39 @@
     min-width: 0;
   }
 
+  /* Matching tool-card geometry keeps mixed work rows aligned. */
   .transcript-think {
-    color: var(--dim);
+    min-width: 0;
   }
   .transcript-think-head {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    min-height: 24px;
     list-style: none;
     cursor: pointer;
     user-select: none;
     font-family: var(--mono);
-    font-size: var(--text-small);
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
+  .transcript-think-word {
+    color: var(--fg);
+  }
+  .transcript-think-time {
+    margin-left: auto;
+    flex-shrink: 0;
     color: var(--faint);
   }
-  .transcript-think-chevron {
-    transition: transform 0.15s;
-  }
-  .transcript-think[open] .transcript-think-chevron {
-    transform: rotate(90deg);
+  .transcript-think-body {
+    padding: var(--space-1) 0 var(--space-2) 20px;
   }
   .transcript-reasoning {
-    margin: var(--space-2) 0 var(--space-1);
     font-size: var(--text-ui);
     line-height: 1.55;
-    color: var(--dim);
+    color: var(--faint);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-  }
-  /* the fold at work: the line in brand, the chevron a spinner */
-  .transcript-spin {
-    display: none;
-  }
-  .transcript-think-live .transcript-think-head {
-    color: var(--brand);
-  }
-  .transcript-think-live .transcript-think-chevron {
-    display: none;
-  }
-  .transcript-think-live .transcript-spin {
-    display: block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    border: 2px solid var(--line);
-    border-top-color: var(--brand);
-    animation: spin 0.8s linear infinite;
-    flex-shrink: 0;
   }
 
   .transcript-md {
@@ -157,20 +144,11 @@
   .transcript-tail:empty {
     display: none;
   }
-  .transcript-cursor {
-    display: inline-block;
-    width: 7px;
-    height: 14px;
-    margin-left: 3px;
-    vertical-align: -2px;
-    background: var(--brand);
-  }
 
   .transcript-after {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    min-height: 20px;
+    margin-left: calc(-1 * var(--space-1));
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
@@ -178,17 +156,32 @@
   .transcript-cut-err {
     color: var(--failed);
   }
+  /* an icon button on the line under a turn */
   .transcript-act {
-    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1);
     border: 0;
     background: transparent;
-    font-family: var(--mono);
-    font-size: var(--text-label);
+    line-height: 0;
     color: var(--faint);
     cursor: pointer;
   }
   .transcript-act:hover {
     color: var(--fg);
+  }
+  .transcript-act-done {
+    color: var(--done);
+  }
+  /* the actions on one side of a hairline, the stamp on the other */
+  .transcript-sep {
+    width: 1px;
+    height: 12px;
+    margin: 0 var(--space-2);
+    background: var(--line-strong);
+  }
+  .transcript-after .transcript-cut {
+    margin-right: var(--space-2);
   }
 
   /* the arrow above the composer, see-through so the text under it
@@ -212,5 +205,141 @@
   }
   .transcript-jump:hover {
     opacity: 1;
+  }
+
+  .transcript-work {
+    min-width: 0;
+    color: var(--dim);
+  }
+  .transcript-work-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 22px;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .transcript-work-chevron,
+  .transcript-tool-chevron,
+  .transcript-think-chevron {
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .transcript-work-open .transcript-work-chevron,
+  .transcript-tool-open .transcript-tool-chevron,
+  .transcript-think-open .transcript-think-chevron {
+    transform: rotate(90deg);
+  }
+  .transcript-work-spin,
+  .transcript-tool-spin,
+  .transcript-think-spin {
+    display: none;
+    flex-shrink: 0;
+  }
+  .transcript-work-live .transcript-work-spin,
+  .transcript-tool-live .transcript-tool-spin,
+  .transcript-think-live .transcript-think-spin {
+    display: block;
+    color: var(--brand);
+    animation: spin 0.8s linear infinite;
+  }
+  .transcript-work-live .transcript-work-chevron,
+  .transcript-tool-live .transcript-tool-chevron,
+  .transcript-think-live .transcript-think-chevron {
+    display: none;
+  }
+  /* one list of lines, a round's think line and its calls alike */
+  .transcript-work-rounds {
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--space-1);
+    padding-left: 20px;
+  }
+  .transcript-work-round {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .transcript-work-plain {
+    margin-top: var(--space-2);
+    font-size: var(--text-ui);
+    line-height: 1.55;
+    color: var(--faint);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .transcript-work-plain:first-child {
+    margin-top: 0;
+  }
+  .transcript-work-calls {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .transcript-tool {
+    min-width: 0;
+  }
+  .transcript-tool-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 24px;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
+  .transcript-tool-name {
+    flex-shrink: 0;
+    color: var(--fg);
+  }
+  .transcript-tool-argument {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--faint);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .transcript-tool-state {
+    margin-left: auto;
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .transcript-tool-failed {
+    color: var(--failed);
+  }
+  /* the result is untrusted text, so it gets a box of its own */
+  .transcript-tool-detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: var(--space-1) 0 var(--space-2) 20px;
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+  }
+  .transcript-tool-label {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .transcript-tool-value {
+    max-height: 240px;
+    overflow: auto;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    line-height: 1.5;
+    color: var(--dim);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 }

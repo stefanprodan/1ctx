@@ -31,6 +31,16 @@ export function clock(ms: number): string {
   });
 }
 
+// the day and the time of day, "Sep 13, 16:23"
+export function stamp(ms: number): string {
+  const date = new Date(ms);
+  const day = date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  return `${day}, ${clock(ms)}`;
+}
+
 // how long ago, at the coarseness a list wants: "40 s ago", "5 min
 // ago", "2 h ago", "yesterday", the weekday within the week, else the
 // day and month
