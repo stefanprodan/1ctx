@@ -85,7 +85,7 @@
   }
   .composer-chip-model {
     color: var(--faint);
-    max-width: 240px;
+    max-width: 160px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -147,6 +147,14 @@
     background: var(--card);
     border: 1px solid var(--line-strong);
   }
+  /* the tall composer is at the top of its page, so its menus drop
+     below the chip instead of rising over the head */
+  .composer-tall .composer-menu,
+  .composer-tall .composer-cmds {
+    bottom: auto;
+    top: calc(100% + 6px);
+  }
+
   .composer-cmd {
     display: flex;
     align-items: center;

@@ -5,7 +5,10 @@
 // line: the browser measures, and the span shows the short form the
 // moment the long one overflows, again on every resize. A model id
 // drops its org this way; what still overflows is cut with an ellipsis
-// by the caller's class.
+// by the caller's class. The caller's class bounds the span, by the
+// line it is in or by a max-width; the probe carries the class in the
+// same place, so it is bounded the same way and the measure never
+// depends on which form the span shows.
 
 import { useSignal } from "@preact/signals";
 import { useLayoutEffect, useRef } from "preact/hooks";
@@ -25,17 +28,15 @@ export function Fit({
     const span = el.current;
     if (!span || long === short) return;
     const measure = () => {
-      // measure the long form in a probe so the shown form never
-      // decides its own fate
+      // a probe next to the span, under the same class in the same
+      // layout, holds the long form: it overflows or it does not,
+      // whatever the span shows at the moment
       const probe = document.createElement("span");
       probe.className = span.className;
-      probe.style.position = "absolute";
       probe.style.visibility = "hidden";
-      probe.style.whiteSpace = "nowrap";
-      probe.style.width = "auto";
       probe.textContent = long;
-      span.parentElement?.appendChild(probe);
-      const wide = probe.offsetWidth > span.clientWidth;
+      span.after(probe);
+      const wide = probe.scrollWidth > probe.clientWidth;
       probe.remove();
       shrunk.value = wide;
     };
