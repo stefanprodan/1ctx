@@ -13,6 +13,7 @@ import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
+import { repairRows } from "./repair.ts";
 import {
   MESSAGE_COLUMNS,
   message,
@@ -100,6 +101,16 @@ export class SessionStore {
         "update sessions set status = ?, last_activity_at = ?, revision = revision + 1 where id = ?",
       )
       .run(fields.status, fields.now, id);
+    return this.byId(id);
+  }
+
+  // the title is the user's word; the revision counts the change
+  rename(id: string, title: string): SessionRow | null {
+    this.db
+      .query(
+        "update sessions set title = ?, revision = revision + 1 where id = ?",
+      )
+      .run(title, id);
     return this.byId(id);
   }
 
@@ -438,54 +449,13 @@ export class SessionStore {
     return this.send(id);
   }
 
-  // Repair every session named by a running session/send or streaming
-  // message. Inconsistent crash rows still need a revision and envelope,
-  // rather than being changed globally without notifying their session.
+  // end what a crash left running; the rows are read back through
+  // this store so the envelope carries them
   repair(now: number, error: string): RepairedSession[] {
-    const ids = this.db
-      .query<{ id: string }, []>(
-        `select id from sessions where status = 'running'
-         union select session_id from sends where status = 'running'
-         union select session_id from messages where status = 'streaming'`,
-      )
-      .all()
-      .map((r) => r.id);
-    if (ids.length === 0) return [];
-    // the reply rows about to end need a slot; a null one becomes an
-    // answer before its status moves, so the not-streaming check holds
-    this.db
-      .query(
-        "update messages set slot = 'answer' where kind = 'reply' and status = 'streaming' and slot is null",
-      )
-      .run();
-    // the ids of the rows this repair will end, before they change, so
-    // the envelope can read them back
-    const changedByStatus = this.db
-      .query<{ id: string; session_id: string }, []>(
-        "select id, session_id from messages where status = 'streaming'",
-      )
-      .all();
-    this.db
-      .query(
-        "update sends set status = 'failed', cause = 'restart', error = ?, finished_at = ? where status = 'running'",
-      )
-      .run(error, now);
-    this.db
-      .query(
-        "update messages set status = 'stopped', error = ?, finished_at = ? where kind = 'tool' and status = 'streaming'",
-      )
-      .run(error, now);
-    this.db
-      .query(
-        "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",
-      )
-      .run(error, now);
-    return ids.map((id) => {
-      const session = this.touch(id, { status: "failed", now })!;
-      const messages = changedByStatus
-        .filter((row) => row.session_id === id)
-        .map((row) => this.message(row.id)!);
-      return { session, messages, send: this.lastSend(id) };
+    return repairRows(this.db, now, error, {
+      touch: (id) => this.touch(id, { status: "failed", now })!,
+      message: (id) => this.message(id)!,
+      lastSend: (id) => this.lastSend(id),
     });
   }
 

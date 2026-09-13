@@ -146,6 +146,8 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 // a message a user writes; the cap is in bytes, the server's
 export const MAX_MESSAGE_BYTES = 256 * 1024;
 export const MAX_TITLE = 80;
+// a title is one line by the same rule as a full name
+export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
 // the stream's search box
 export const MAX_SEARCH = 100;
 

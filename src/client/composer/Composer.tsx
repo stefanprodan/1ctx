@@ -16,9 +16,11 @@ import { AgentPicker } from "./AgentPicker.tsx";
 import { Commands } from "./Commands.tsx";
 import {
   commandBlock,
+  commandFill,
   commandMatches,
   commandOf,
   moveHighlight,
+  runCommand,
 } from "./commands.ts";
 import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
@@ -38,6 +40,7 @@ export function Composer({
   onSend,
   onStop,
   onCompact,
+  onRename,
 }: {
   scope: Scope;
   agents: AgentSummary[] | null;
@@ -55,6 +58,8 @@ export function Composer({
   // /compact runs a summary round on the chat; a chat not started yet
   // has nothing to fold, so the command is refused without a call
   onCompact?: () => Promise<void>;
+  // /rename <title>; a chat not started yet has no row to name
+  onRename?: (title: string) => Promise<void>;
 }) {
   const key = draftKey(scope);
   const text = useSignal(readDraft(key));
@@ -85,23 +90,21 @@ export function Composer({
   useEffect(grow, [text.value]);
 
   const ready = agent !== null && !busy && !running;
-  const block = commandBlock({ started: onCompact !== undefined, running });
+  const started = onCompact !== undefined && onRename !== undefined;
+  const block = commandBlock({ started, running });
   const matches = shut.value ? [] : commandMatches(text.value);
   // the highlight follows the list as it shrinks
   const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
   const submit = async () => {
     const content = text.value.trim();
     if (content === "" || agent === null || busy) return;
-    const command = commandOf(content);
-    if (command === null && !ready) return;
+    const named = commandOf(content);
+    if (named === null && !ready) return;
     failure.value = null;
     const sent = text.value;
     try {
-      if (command !== null) {
-        if (block !== null || onCompact === undefined) {
-          throw new Error(`/${command.name}: ${block ?? "not now"}`);
-        }
-        await onCompact();
+      if (named !== null) {
+        await runCommand(named, block, { onCompact, onRename });
       } else await onSend(content, agent);
       // what was typed while the send was on its way stays
       if (text.value === sent) {
@@ -152,7 +155,7 @@ export function Composer({
               shut.value = true;
               return;
             }
-            const fill = `/${matches[chosen]!.name}`;
+            const fill = commandFill(matches[chosen]!);
             if (
               ev.key === "Tab" ||
               (ev.key === "Enter" && text.value !== fill)
@@ -174,8 +177,8 @@ export function Composer({
           matches={matches}
           chosen={chosen}
           block={block}
-          onPick={(name) => {
-            text.value = `/${name}`;
+          onPick={(command) => {
+            text.value = commandFill(command);
             writeDraft(key, text.value);
             input.current?.focus();
           }}

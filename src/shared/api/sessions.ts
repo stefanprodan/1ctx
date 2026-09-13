@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Request and response bodies of the session routes: the stream, one
-// session, a new chat, a message into it, a stop.
+// session, a new chat, a message into it, a rename, a stop.
 
 import type { AgentSummary } from "../contracts/agent.ts";
 import type { SessionDetail, SessionSummary } from "../contracts/session.ts";
@@ -31,6 +31,9 @@ export type CreateSessionRequest = {
 
 // POST /api/sessions/:id/messages
 export type SendMessageRequest = { message: string };
+
+// PATCH /api/sessions/:id: a new title, one line up to the title cap
+export type RenameSessionRequest = { title: string };
 
 // GET /api/projects/:id/agents: the agents the composer offers
 export type ProjectAgentsResponse = { agents: AgentSummary[] };

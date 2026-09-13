@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Sessions: the session, message and send rows, their reads, the
-// deletion, and the boot repair of rows a crash left running. The
+// rename, the deletion, and the boot repair of rows a crash left running. The
 // runner below writes them through the store this area builds.
 
 import type { Db } from "../db/index.ts";
@@ -20,6 +20,7 @@ export {
   parseCreateSession,
   parseMessage,
   parseMessageId,
+  parseRenameSession,
   parseSendMessage,
   parseStreamQuery,
   titleFrom,

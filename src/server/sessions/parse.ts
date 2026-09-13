@@ -1,14 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The session request parsers: a new chat, a message, and the stream's
-// filters. A message is any text up to the byte cap, not blank.
+// The session request parsers: a new chat, a message, a rename, and the
+// stream's filters. A message is any text up to the byte cap, not
+// blank; a title is one line up to the title cap.
 
 import type {
   CreateSessionRequest,
+  RenameSessionRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
 import {
+  hasLineBreak,
   MAX_MESSAGE_BYTES,
   MAX_SEARCH,
   MAX_TITLE,
@@ -55,6 +58,20 @@ export function parseCreateSession(body: unknown): CreateSessionRequest {
 export function parseSendMessage(body: unknown): SendMessageRequest {
   const b = fields(body, ["message"]);
   return { message: parseMessage(b.message) };
+}
+
+// the title as the user typed it, trimmed at the ends; blank, a line
+// break or a length past the cap is refused
+export function parseRenameSession(body: unknown): RenameSessionRequest {
+  const b = fields(body, ["title"]);
+  if (typeof b.title !== "string") throw new BadRequest("title must be text");
+  const title = b.title.trim();
+  if (title === "") throw new BadRequest("title must not be blank");
+  if (hasLineBreak(title)) throw new BadRequest("title must be one line");
+  if (title.length > MAX_TITLE) {
+    throw new BadRequest(`title must be at most ${MAX_TITLE} characters`);
+  }
+  return { title };
 }
 
 // ?project=&q=: an optional project id and an optional search

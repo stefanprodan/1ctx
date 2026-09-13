@@ -16,6 +16,7 @@ import { effect, signal } from "@preact/signals";
 import type {
   CreateSessionRequest,
   ProjectAgentsResponse,
+  RenameSessionRequest,
   SendMessageRequest,
   SessionResponse,
   SessionsResponse,
@@ -23,7 +24,6 @@ import type {
 } from "../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type {
-  Message,
   SessionDetail,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
@@ -39,7 +39,10 @@ import {
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { liveFrom, ordered, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
+
+export { ordered } from "./sessions-rows.ts";
 
 // frames kept while the watch is being answered; past this the
 // snapshot is refetched instead
@@ -90,40 +93,6 @@ effect(() => {
   pending = null;
   stream = null;
 });
-
-// the stream's order: running first, then by last activity, newest first
-export function ordered(rows: SessionSummary[]): SessionSummary[] {
-  return [...rows].sort((a, b) => {
-    const ra = a.status === "running" ? 1 : 0;
-    const rb = b.status === "running" ? 1 : 0;
-    if (ra !== rb) return rb - ra;
-    if (a.lastActivityAt !== b.lastActivityAt) {
-      return b.lastActivityAt - a.lastActivityAt;
-    }
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  });
-}
-
-// the rows whose text streams: a reply, and the summary round's row
-const streams = (m: Message) => m.kind === "reply" || m.kind === "summary";
-
-// the live map from a detail: the streaming rows, the runner's
-// snapshot for the one it is about. The "tools" phase has no row, so
-// every streaming row starts from itself
-function liveFrom(detail: SessionDetail): Map<string, Live> {
-  const map = new Map<string, Live>();
-  const snap = detail.live?.phase === "reply" ? detail.live : null;
-  for (const m of detail.messages) {
-    if (!streams(m) || m.status !== "streaming") continue;
-    map.set(
-      m.id,
-      snap !== null && snap.messageId === m.id
-        ? liveOfSnapshot(snap, m)
-        : liveOf(m),
-    );
-  }
-  return map;
-}
 
 // a result held for a row the chat no longer has is dropped with it
 function keepResults(keep: (id: string) => boolean): void {
@@ -315,14 +284,46 @@ export async function stopSession(id: string): Promise<void> {
   await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
 }
 
-function upsert(rows: Message[], next: Message[]): Message[] {
-  const out = rows.slice();
-  for (const m of next) {
-    const i = out.findIndex((x) => x.id === m.id);
-    if (i === -1) out.push(m);
-    else out[i] = m;
+// one at a time, as a send: the composer is busy until the answer
+export async function renameSession(id: string, title: string): Promise<void> {
+  sending.value = true;
+  try {
+    const body: RenameSessionRequest = { title };
+    const detail = await api<SessionResponse>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      "PATCH",
+      body,
+    );
+    take(detail);
+  } finally {
+    sending.value = false;
   }
-  return out.sort((a, b) => a.seq - b.seq);
+}
+
+// the row goes from the list and, when it is the chat on screen or
+// the one being loaded, the page leaves it and opens its project. An
+// answer in flight may still hold the row: the detail's is dropped
+// with the watch, the list's is superseded by a load run again. The
+// socket's deleted frame after a local delete then finds nothing
+function drop(sessionId: string, projectId: string): void {
+  const list = projectSessions.value;
+  if (list !== null) {
+    projectSessions.value = list.filter((s) => s.id !== sessionId);
+  }
+  if (wanted.id === sessionId || session.value?.session.id === sessionId) {
+    leaveSession();
+    navigate(`/projects/${projectId}`);
+  } else if (listFor.projectId === projectId) {
+    void loadProjectSessions(projectId);
+  }
+}
+
+export async function deleteSession(
+  id: string,
+  projectId: string,
+): Promise<void> {
+  await api(`/api/sessions/${encodeURIComponent(id)}`, "DELETE");
+  drop(id, projectId);
 }
 
 function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
@@ -439,20 +440,9 @@ export function onSocket(ev: SocketEvent): void {
     case "session":
       onEnvelope(ev);
       break;
-    case "deleted": {
-      const list = projectSessions.value;
-      if (list !== null) {
-        projectSessions.value = list.filter((s) => s.id !== ev.sessionId);
-      }
-      const held = session.value;
-      if (held !== null && held.session.id === ev.sessionId) {
-        session.value = null;
-        live.value = new Map();
-        toolResults.value = new Map();
-        navigate(`/projects/${ev.projectId}`);
-      }
+    case "deleted":
+      drop(ev.sessionId, ev.projectId);
       break;
-    }
     case "revoked": {
       if (listFor.projectId === ev.projectId) projectSessions.value = null;
       const held = session.value;
