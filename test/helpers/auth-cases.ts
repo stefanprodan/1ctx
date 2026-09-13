@@ -59,6 +59,35 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/users",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/users",
+    body: {
+      username: "maria",
+      fullName: "Maria",
+      email: "maria@example.com",
+      role: "member",
+      password: "longenough",
+    },
+    expect: { anonymous: 401, member: 403, admin: 201 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/users/:id",
+    body: { fullName: "Maria" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/users/:id/password",
+    body: { password: "longenough" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/projects",
     expect: { anonymous: 401, member: 200, admin: 200 },
   },

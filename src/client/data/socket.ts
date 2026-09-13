@@ -10,7 +10,7 @@
 
 import { effect } from "@preact/signals";
 import { PROTOCOL, type SocketEvent } from "../../shared/socket.ts";
-import { me } from "./me.ts";
+import { me, setMe } from "./me.ts";
 
 // the connection's access is gone: no reconnect
 export const CLOSE_REVOKED = 4001;
@@ -134,7 +134,14 @@ function connect(): void {
   ws.onclose = (ev) => {
     if (wire !== ws) return;
     wire = null;
-    if (stopped || ev.code === CLOSE_REVOKED) return;
+    if (stopped) return;
+    // the login behind the tab is gone: a reset, a disable, a sign out
+    // elsewhere. Drop the user now rather than at the next 401, so the
+    // tab shows the sign-in form and not a page it may no longer see
+    if (ev.code === CLOSE_REVOKED) {
+      if (me.value) setMe(null);
+      return;
+    }
     if (ev.code === CLOSE_RESTARTING && attempt === 0) {
       attempt = 1;
       schedule(RESTART_RETRY_MS);

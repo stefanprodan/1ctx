@@ -142,8 +142,22 @@ violation, and every rule has a rejected fixture under
   a hash of the token; expired rows are swept at start and hourly.
   Passwords are argon2id through `Bun.password`, at most 1024 bytes,
   the same cap for `admin.key`. The first admin comes from `admin.key`
-  in the secrets directory, read once when there are no users. Session
-  is the domain noun and never means a cookie.
+  in the secrets directory, read once when there are no users, with
+  `admin@1ctx.dev` as its email. Every user has an email, unique and
+  lowercased; an admin sets it with the username and the role on
+  `/admin/users` (the routes in `access/users.ts`, since a reset needs
+  the login store), and the profile shows it. A reset deletes every
+  login of the user; a role change publishes `access.changed`; the
+  admin's own row, and the last enabled admin, are 409s to demote,
+  disable or reset. A disabled user gets the login's 401, no
+  principal and no socket, and keeps every row. A password an admin
+  set (create, reset) sets `mustChangePassword`; until the profile's
+  password change clears it the router answers 403 on every
+  authenticated route not marked `passwordChange` (logout, the
+  profile, the socket), and the client shows only the profile.
+  `UserSummary` never carries the email or the flags; `Me` carries
+  the flag, `UserAccount` and `Profile` carry all. Session is the
+  domain noun and never means a cookie.
 - **Everything is in a project.** A user is made with its personal
   project, named after the username, in one transaction through
   `createUser()` in `users/`; nothing else creates a user, tests

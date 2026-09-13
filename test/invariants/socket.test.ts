@@ -183,6 +183,22 @@ describe("the socket", () => {
     close(chat, watching, idle);
   });
 
+  test("a locked connection cannot watch a session", async () => {
+    const chat = await chatApp();
+    const { script, sessionId } = await startChat(chat);
+    chat.app.users.setMustChangePassword(chat.memberId, true);
+    const conn = await connection(chat, chat.member);
+    chat.app.socket.open(conn);
+
+    chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
+
+    expect(conn.data.watching).toBeNull();
+    expect(frames(conn, "watched")).toEqual([]);
+    await finish(script);
+    expect(frames(conn, "session")).toEqual([]);
+    close(chat, conn);
+  });
+
   test("content is rendered after the HTML clock interval", async () => {
     const chat = await chatApp();
     const conn = await connection(chat, chat.member);

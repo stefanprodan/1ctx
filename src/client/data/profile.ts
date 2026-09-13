@@ -29,8 +29,13 @@ function settle(user: Profile): void {
   if (me.value?.id !== user.id) return;
   turn++;
   profile.value = user;
-  const { createdAt: _, about: __, ...summary } = user;
-  setMe(summary);
+  setMe({
+    id: user.id,
+    username: user.username,
+    fullName: user.fullName,
+    role: user.role,
+    mustChangePassword: user.mustChangePassword,
+  });
 }
 
 export async function loadProfile(): Promise<void> {

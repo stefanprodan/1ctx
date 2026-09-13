@@ -91,6 +91,11 @@ export class LoginStore {
       .run(userId, keepId).changes;
   }
 
+  deleteForUser(userId: string): number {
+    return this.db.query("delete from logins where user_id = ?").run(userId)
+      .changes;
+  }
+
   // the rows whose expiry passed, dropped, and who they belonged to,
   // so the sockets behind them can be closed
   deleteExpired(now: number): { id: string; userId: string }[] {

@@ -13,8 +13,10 @@ const member = async (app: Awaited<ReturnType<typeof testApp>>) =>
   app.createUser({
     username: "oana",
     fullName: "Oana Pellea",
+    email: "oana@example.com",
     role: "member",
     passwordHash: await hashPassword("hunter2-test"),
+    mustChangePassword: false,
     now: app.now.value,
   });
 
@@ -59,8 +61,10 @@ describe("the personal project", () => {
         app.createUser({
           username: "ghost",
           fullName: "Ghost",
+          email: "ghost@example.com",
           role: "member",
           passwordHash: "x",
+          mustChangePassword: false,
           now: 0,
         }),
       ).toThrow("no project");

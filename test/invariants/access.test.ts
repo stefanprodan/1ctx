@@ -35,8 +35,10 @@ describe("the authorization matrix", () => {
         app.createUser({
           username: "oana",
           fullName: "Oana",
+          email: "oana@example.com",
           role: "member",
           passwordHash: await hashPassword("pw"),
+          mustChangePassword: false,
           now: app.now.value,
         });
         const client = app.client();
@@ -51,4 +53,23 @@ describe("the authorization matrix", () => {
       });
     }
   }
+});
+
+describe("required password route reachability", () => {
+  test("marks exactly the routes needed to change or leave", async () => {
+    const app = await testApp();
+    const marked = app.routes
+      .filter((route) => route.passwordChange === true)
+      .map((route) => `${route.method} ${route.path}`)
+      .sort();
+    expect(marked).toEqual(
+      [
+        "POST /api/logout",
+        "GET /api/profile",
+        "PATCH /api/profile",
+        "POST /api/profile/password",
+        "GET /api/socket",
+      ].sort(),
+    );
+  });
 });

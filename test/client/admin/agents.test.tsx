@@ -46,13 +46,14 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../src/shared/contracts/provider.ts";
-import type { UserSummary } from "../../../src/shared/contracts/user.ts";
+import type { Me } from "../../../src/shared/contracts/user.ts";
 
-const admin: UserSummary = {
+const admin: Me = {
   id: "u1",
   username: "admin",
   fullName: "Administrator",
   role: "admin",
+  mustChangePassword: false,
 };
 const router: ProviderSummary = {
   id: "pr1",
@@ -294,6 +295,7 @@ describe("the rail", () => {
     const group = rows.find((r) => r.kind === "group");
     expect(group?.kind === "group" && group.name).toBe("Admin");
     expect(group?.kind === "group" && group.routes.map((r) => r.path)).toEqual([
+      "/admin/users",
       "/admin/agents",
       "/admin/tools",
     ]);

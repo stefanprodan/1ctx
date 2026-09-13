@@ -1,7 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Profile, UserSummary } from "../../shared/contracts/user.ts";
+import type {
+  Me,
+  Profile,
+  UserAccount,
+  UserSummary,
+} from "../../shared/contracts/user.ts";
 import type { Role } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -15,20 +20,26 @@ type Raw = {
   id: string;
   username: string;
   full_name: string;
+  email: string;
   about: string;
   role: Role;
   password_hash: string;
   created_at: number;
+  disabled: number;
+  must_change_password: number;
 };
 
 const row = (raw: Raw): UserRow => ({
   id: raw.id,
   username: raw.username,
   fullName: raw.full_name,
+  email: raw.email,
   about: raw.about,
   role: raw.role,
   passwordHash: raw.password_hash,
   createdAt: raw.created_at,
+  disabled: raw.disabled !== 0,
+  mustChangePassword: raw.must_change_password !== 0,
 });
 
 export const summary = (user: UserRow): UserSummary => ({
@@ -38,10 +49,22 @@ export const summary = (user: UserRow): UserSummary => ({
   role: user.role,
 });
 
-export const profile = (user: UserRow): Profile => ({
+export const meOf = (user: UserRow): Me => ({
   ...summary(user),
-  about: user.about,
+  mustChangePassword: user.mustChangePassword,
+});
+
+export const account = (user: UserRow): UserAccount => ({
+  ...summary(user),
+  email: user.email,
   createdAt: user.createdAt,
+  disabled: user.disabled,
+  mustChangePassword: user.mustChangePassword,
+});
+
+export const profile = (user: UserRow): Profile => ({
+  ...account(user),
+  about: user.about,
 });
 
 export class UserStore {
@@ -51,6 +74,21 @@ export class UserStore {
     return this.db
       .query<{ n: number }, []>("select count(*) as n from users")
       .get()!.n;
+  }
+
+  countAdmins(): number {
+    return this.db
+      .query<{ n: number }, []>(
+        "select count(*) as n from users where role = 'admin' and disabled = 0",
+      )
+      .get()!.n;
+  }
+
+  list(): UserRow[] {
+    return this.db
+      .query<Raw, []>("select * from users order by username")
+      .all()
+      .map(row);
   }
 
   byId(id: string): UserRow | null {
@@ -67,24 +105,38 @@ export class UserStore {
     return raw ? row(raw) : null;
   }
 
+  byEmail(email: string): UserRow | null {
+    const raw = this.db
+      .query<Raw, [string]>("select * from users where email = ?")
+      .get(email);
+    return raw ? row(raw) : null;
+  }
+
   create(fields: {
     username: string;
     fullName: string;
+    email: string;
     role: Role;
     passwordHash: string;
+    mustChangePassword: boolean;
     now: number;
   }): UserRow {
     const id = newId();
     this.db
       .query(
-        "insert into users (id, username, full_name, role, password_hash, created_at) values (?, ?, ?, ?, ?, ?)",
+        `insert into users
+          (id, username, full_name, email, role, password_hash,
+           must_change_password, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         fields.username,
         fields.fullName,
+        fields.email,
         fields.role,
         fields.passwordHash,
+        fields.mustChangePassword ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;
@@ -94,6 +146,32 @@ export class UserStore {
     this.db
       .query("update users set full_name = ?, about = ? where id = ?")
       .run(fields.fullName, fields.about, id);
+  }
+
+  setUsername(id: string, username: string): void {
+    this.db
+      .query("update users set username = ? where id = ?")
+      .run(username, id);
+  }
+
+  setEmail(id: string, email: string): void {
+    this.db.query("update users set email = ? where id = ?").run(email, id);
+  }
+
+  setRole(id: string, role: Role): void {
+    this.db.query("update users set role = ? where id = ?").run(role, id);
+  }
+
+  setDisabled(id: string, disabled: boolean): void {
+    this.db
+      .query("update users set disabled = ? where id = ?")
+      .run(disabled ? 1 : 0, id);
+  }
+
+  setMustChangePassword(id: string, required: boolean): void {
+    this.db
+      .query("update users set must_change_password = ? where id = ?")
+      .run(required ? 1 : 0, id);
   }
 
   setPasswordHash(id: string, passwordHash: string): void {

@@ -13,7 +13,7 @@
 import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import type { UserSummary } from "../../shared/contracts/user.ts";
+import type { Me } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
 import { initials } from "../lib/format.ts";
@@ -99,7 +99,7 @@ export function Rail({
   narrow,
   onHide,
 }: {
-  user: UserSummary;
+  user: Me;
   narrow: boolean;
   onHide: () => void;
 }) {

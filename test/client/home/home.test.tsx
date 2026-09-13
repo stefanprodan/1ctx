@@ -31,7 +31,13 @@ describe("Home.model", () => {
 
 describe("Home", () => {
   beforeEach(() => {
-    me.value = { id: "u1", username: "oana", fullName: "Oana", role: "member" };
+    me.value = {
+      id: "u1",
+      username: "oana",
+      fullName: "Oana",
+      role: "member",
+      mustChangePassword: false,
+    };
     query.value = "";
     projects.value = [{ id: "p1", kind: "personal", name: "oana" }];
     projectAgents.value = [

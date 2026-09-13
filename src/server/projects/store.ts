@@ -103,6 +103,25 @@ export class ProjectStore {
       .map((r) => r.user_id);
   }
 
+  nameTaken(name: string): boolean {
+    return (
+      this.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from projects where name = ?",
+        )
+        .get(name)!.n > 0
+    );
+  }
+
+  // the caller owns the surrounding user rename transaction
+  renamePersonal(userId: string, name: string): void {
+    this.db
+      .query(
+        "update projects set name = ? where owner_id = ? and kind = 'personal'",
+      )
+      .run(name, userId);
+  }
+
   // the personal project of a user, with the user as its one member;
   // called inside the transaction that creates the user
   createPersonal(fields: { userId: string; name: string; now: number }) {

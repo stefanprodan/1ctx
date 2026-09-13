@@ -34,6 +34,7 @@ export type UsersPort = {
   byId(id: string): UserRow | null;
   setDetails(id: string, fields: { fullName: string; about: string }): void;
   setPasswordHash(id: string, hash: string): void;
+  setMustChangePassword(id: string, required: boolean): void;
 };
 
 export type ProfileDeps = {
@@ -57,6 +58,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
       method: "GET",
       path: "/api/profile",
       policy: "authenticated",
+      passwordChange: true,
       handle(_req, ctx) {
         const body: ProfileResponse = {
           user: profile(self(ctx.principal!.userId)),
@@ -68,6 +70,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
       method: "PATCH",
       path: "/api/profile",
       policy: "authenticated",
+      passwordChange: true,
       async handle(req, ctx) {
         const details = parseProfile(await jsonBody(req));
         const id = ctx.principal!.userId;
@@ -83,6 +86,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
       method: "POST",
       path: "/api/profile/password",
       policy: "authenticated",
+      passwordChange: true,
       async handle(req, ctx) {
         const principal = ctx.principal!;
         if (!limit.hit(principal.userId, deps.clock())) {
@@ -99,6 +103,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           // both pass, and the second would revoke the first tab's login
           if (self(user.id).passwordHash !== user.passwordHash) throw wrong;
           deps.users.setPasswordHash(user.id, hash);
+          deps.users.setMustChangePassword(user.id, false);
           const revoked = deps.logins.deleteOthers(user.id, principal.loginId);
           return {
             result: self(user.id),

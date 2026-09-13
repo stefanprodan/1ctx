@@ -18,6 +18,7 @@ const oana = {
   username: "oana",
   fullName: "Oana",
   role: "member" as const,
+  mustChangePassword: false,
 };
 
 class FakeWire implements Wire {
@@ -139,13 +140,14 @@ describe("the tab socket", () => {
     expect(reloads).toBe(0);
   });
 
-  test("a revoked close never reconnects", () => {
+  test("a revoked close never reconnects and drops the user", () => {
     start();
 
     wires[0].fireClose(CLOSE_REVOKED);
 
     expect(timers).toEqual([]);
     expect(wires).toHaveLength(1);
+    expect(me.value).toBeNull();
   });
 
   test("a restarting close schedules one retry at 2000 ms", () => {

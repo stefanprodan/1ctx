@@ -11,6 +11,16 @@
     max-width: 100%;
   }
 
+  /* the one line a person who must change their password sees first */
+  .profile-notice {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--brand);
+    border-radius: var(--radius);
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+
   .profile-head {
     display: flex;
     align-items: center;

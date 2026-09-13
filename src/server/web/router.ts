@@ -128,6 +128,9 @@ async function dispatch(
     if (route.policy === "admin" && principal.role !== "admin") {
       return json({ error: "forbidden" }, 403);
     }
+    if (principal.mustChangePassword && route.passwordChange !== true) {
+      return json({ error: "change your password first" }, 403);
+    }
   }
   try {
     const params: Record<string, string> = {};

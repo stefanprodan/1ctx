@@ -40,14 +40,15 @@ import type {
   SearchState,
   ToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
-import type { UserSummary } from "../../../src/shared/contracts/user.ts";
+import type { Me } from "../../../src/shared/contracts/user.ts";
 import { LIMIT_NAMES } from "../../../src/shared/words.ts";
 
-const admin: UserSummary = {
+const admin: Me = {
   id: "u1",
   username: "admin",
   fullName: "Administrator",
   role: "admin",
+  mustChangePassword: false,
 };
 
 const row = (changes: Partial<LimitRow>): LimitRow => ({
@@ -288,7 +289,7 @@ describe("the page", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual(["Agents", "Tools"]);
+    expect(labels).toEqual(["Users", "Agents", "Tools"]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });
 

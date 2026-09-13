@@ -865,7 +865,7 @@ const noUsage: UsagePort = {
 function seededStore() {
   const db = memoryDb();
   db.query(
-    "insert into users (id, username, full_name, role, password_hash, created_at) values ('u', 'user', 'User', 'member', 'x', 0)",
+    "insert into users (id, username, full_name, email, role, password_hash, created_at) values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0)",
   ).run();
   db.query(
     "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'user', 'u', 0)",

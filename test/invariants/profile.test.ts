@@ -21,9 +21,12 @@ describe("GET /api/profile", () => {
         id: expect.any(String),
         username: "admin",
         fullName: "Administrator",
+        email: "admin@1ctx.dev",
         about: "",
         role: "admin",
         createdAt: app.now.value,
+        disabled: false,
+        mustChangePassword: false,
       },
     });
   });

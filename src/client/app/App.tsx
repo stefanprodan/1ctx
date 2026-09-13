@@ -9,7 +9,7 @@
 import { effect } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import type { UserSummary } from "../../shared/contracts/user.ts";
+import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
 import { Icon, Mark } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
@@ -32,13 +32,7 @@ import "./shell.css";
 // the rail is a full screen over the view, opened by the same button
 // floating at the top left of the view; while it is open the view under
 // it is inert, and when it closes the focus comes back to that button.
-function Shell({
-  user,
-  children,
-}: {
-  user: UserSummary;
-  children: ComponentChildren;
-}) {
+function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
   const phone = narrow.value;
   const railShown = phone ? drawerOpen.value : !railHidden.value;
   const covered = phone && drawerOpen.value;
@@ -134,9 +128,16 @@ export function App() {
     document.title = title ? `1ctx · ${title}` : "1ctx";
   }, [user, needsUser, m]);
 
-  // a signed-in user on /login, or on a path with no route, lands on Home
+  // a signed-in user on /login, or on a path with no route, lands on
+  // Home; one who must change the password they were handed lands on
+  // the profile, where the server lets them go
   useEffect(() => {
-    if (user && (m === null || m.route.path === "/login")) navigate("/", true);
+    if (!user) return;
+    if (user.mustChangePassword) {
+      if (m?.route.path !== "/profile") navigate("/profile", true);
+      return;
+    }
+    if (m === null || m.route.path === "/login") navigate("/", true);
   }, [user, m]);
 
   if (user === undefined) {
@@ -162,6 +163,7 @@ export function App() {
     return <View params={m.params} />;
   }
   if (m === null || m.route.path === "/login") return null;
+  if (user.mustChangePassword && m.route.path !== "/profile") return null;
   if (m.route.role === "admin" && user.role !== "admin") {
     return (
       <Shell user={user}>

@@ -13,6 +13,7 @@ const oana = {
   username: "oana",
   fullName: "Oana",
   role: "member" as const,
+  mustChangePassword: false,
 };
 
 const realFetch = globalThis.fetch;

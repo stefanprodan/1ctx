@@ -23,8 +23,10 @@ function build(secureCookie: boolean) {
   const user = users.createUser({
     username: "u",
     fullName: "U",
+    email: "u@example.com",
     role: "member",
     passwordHash: "x",
+    mustChangePassword: false,
     now: 0,
   });
   const access = accessArea({
@@ -38,9 +40,11 @@ function build(secureCookie: boolean) {
       isMember: () => false,
       memberProjectIds: () => [],
       teamProjectIds: () => [],
+      nameTaken: () => false,
+      renamePersonal: () => {},
     },
   });
-  return { db, user, access };
+  return { db, user, users, access };
 }
 
 describe("cookieValue", () => {
@@ -74,6 +78,55 @@ describe("access", () => {
     expect(access.resolve(req()).principal?.username).toBe("u");
     db.query("delete from users where id = ?").run(user.id);
     expect(access.resolve(req()).principal).toBeNull();
+  });
+
+  test("a disabled user resolves and refreshes to nobody", () => {
+    const { user, users, access } = build(false);
+    const { setCookie } = access.open(user);
+    const req = new Request("http://x", {
+      headers: { cookie: setCookie.split(";")[0] },
+    });
+    const principal = access.resolve(req).principal!;
+    users.setDisabled(user.id, true);
+    expect(access.resolve(req).principal).toBeNull();
+    expect(access.refresh(principal)).toBeNull();
+  });
+
+  test("login cannot outlive a disable during password verification", async () => {
+    const { db, user, users, access } = build(false);
+    users.setPasswordHash(
+      user.id,
+      await Bun.password.hash("longenough", { algorithm: "argon2id" }),
+    );
+    const byUsername = users.byUsername;
+    let first = true;
+    users.byUsername = (username) => {
+      const found = byUsername(username);
+      if (first) {
+        first = false;
+        queueMicrotask(() => users.setDisabled(user.id, true));
+      }
+      return found;
+    };
+    const route = access.routes.find(
+      (item) => item.method === "POST" && item.path === "/api/login",
+    )!;
+    const req = new Request("http://x/api/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "u", password: "longenough" }),
+    });
+    await expect(
+      route.handle(req, {
+        principal: null,
+        params: {},
+        url: new URL(req.url),
+        address: "127.0.0.1",
+      }),
+    ).rejects.toThrow("wrong username or password");
+    expect(db.query("select count(*) as n from logins").get()).toEqual({
+      n: 0,
+    });
   });
 
   test("resolving an expired login publishes its revocation", () => {

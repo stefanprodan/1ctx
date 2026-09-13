@@ -17,10 +17,13 @@ const user: UserRow = {
   id: "u1",
   username: "ana",
   fullName: "Ana",
+  email: "ana@example.com",
   about: "",
   role: "member",
   passwordHash: "hash",
   createdAt: 1,
+  disabled: false,
+  mustChangePassword: false,
 };
 
 const agent: AgentRow = {
