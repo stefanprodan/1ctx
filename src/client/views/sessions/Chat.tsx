@@ -58,7 +58,8 @@ export function Chat({ params }: { params: Params }) {
         <div class="chat">
           <Transcript
             sessionId={shown.session.id}
-            nodes={groupRows(shown.messages, live.value)}
+            nodes={groupRows(shown.messages, shown.send)}
+            live={live.value}
             agent={agent}
             authorOf={authorOf}
             foot={

@@ -16,7 +16,10 @@ import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
+import type { Live } from "./stream.ts";
 import { UserRow } from "./UserRow.tsx";
+import { sendCounters } from "./Work.model.ts";
+import { Work } from "./Work.tsx";
 import "./transcript.css";
 import "./md.css";
 import "./hljs.css";
@@ -24,12 +27,14 @@ import "./hljs.css";
 export function Transcript({
   sessionId,
   nodes,
+  live,
   agent,
   authorOf,
   foot,
 }: {
   sessionId: string;
   nodes: Node[];
+  live: ReadonlyMap<string, Live>;
   agent: Agent | null;
   // the name of a user row's author
   authorOf: (userId: string | null) => string;
@@ -126,23 +131,36 @@ export function Transcript({
     <>
       <div class="transcript-rows" ref={rows}>
         <div class="transcript">
-          {nodes.map((n) =>
-            n.kind === "user" ? (
-              <UserRow
-                key={n.message.id}
-                message={n.message}
-                author={authorOf(n.message.userId)}
-              />
-            ) : (
+          {nodes.map((node) => {
+            if (node.kind === "user") {
+              return (
+                <UserRow
+                  key={node.message.id}
+                  message={node.message}
+                  author={authorOf(node.message.userId)}
+                />
+              );
+            }
+            if (node.kind === "work") {
+              return (
+                <Work key={`work:${node.sendId}`} node={node} live={live} />
+              );
+            }
+            const current = live.get(node.message.id) ?? null;
+            return (
               <Reply
-                key={n.message.id}
-                message={n.message}
-                live={n.live}
-                think={n.think}
+                key={node.message.id}
+                message={node.message}
+                live={current}
+                think={
+                  (current?.reasoning ?? "") !== "" ||
+                  node.message.reasoning !== ""
+                }
+                counters={sendCounters(node.rows, node.send)}
                 agent={agent}
               />
-            ),
-          )}
+            );
+          })}
         </div>
       </div>
       <div class="transcript-foot" ref={footEl}>

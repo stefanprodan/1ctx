@@ -94,6 +94,7 @@ const PATHS: Record<string, string> = {
   chat: "M3 3.5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-3 2.5v-2.5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z",
   agents:
     "M4 6.5h8a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 12 12.5H4A1.5 1.5 0 0 1 2.5 11V8A1.5 1.5 0 0 1 4 6.5zM8 6.5V4M6 9.5h.01M10 9.5h.01",
+  spinner: "M13 8a5 5 0 1 1-2-4",
 };
 
 export type IconName = keyof typeof PATHS;

@@ -13,6 +13,7 @@ import { AvatarIcon } from "../lib/avatars.tsx";
 import { clock } from "../lib/format.ts";
 import { type Live, tail } from "./stream.ts";
 import { Think } from "./Think.tsx";
+import { counterText, type SendCounters } from "./Work.model.ts";
 
 export type Agent = { name: string; avatar: Avatar };
 
@@ -40,11 +41,13 @@ export function Reply({
   message: m,
   live,
   think,
+  counters,
   agent,
 }: {
   message: Message;
   live: Live | null;
   think: boolean;
+  counters: SendCounters | null;
   agent: Agent | null;
 }) {
   const html = live ? live.html : m.html;
@@ -83,6 +86,9 @@ export function Reply({
               >
                 {cut.text}
               </span>
+            )}
+            {counters !== null && (
+              <span class="transcript-counters">{counterText(counters)}</span>
             )}
             {content !== "" && (
               <button

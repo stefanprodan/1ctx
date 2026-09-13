@@ -348,6 +348,7 @@ describe("the sessions entity", () => {
     if (base.live?.phase === "reply") base.live.content = "streaming text";
     answer = () => Response.json(base);
     await loadSession("s1");
+    onSocket({ type: "watched", sessionId: "s1", live: base.live });
 
     onSocket({
       type: "session",
@@ -358,9 +359,19 @@ describe("the sessions entity", () => {
       ],
       send: sent,
     });
+    onSocket({
+      type: "delta",
+      sessionId: "s1",
+      sendId: "send1",
+      messageId: "m1",
+      seq: 1,
+      content: " continues",
+      contentAt: "streaming text".length,
+      reasoningAt: 0,
+    });
 
     expect(session.value?.messages[0]?.slot).toBe("work");
-    expect(live.value.get("m1")?.content).toBe("streaming text");
+    expect(live.value.get("m1")?.content).toBe("streaming text continues");
   });
 
   test("a watched tools phase neither seeds live nor refetches", async () => {
