@@ -13,6 +13,7 @@ import {
   parseQuery,
 } from "../../src/server/providers/parse.ts";
 import { PROVIDER_URL, testApp } from "../helpers/app.ts";
+import { refuses } from "../helpers/refuses.ts";
 
 const admin = async (options?: Parameters<typeof testApp>[0]) => {
   const app = await testApp(options);
@@ -36,28 +37,29 @@ describe("parseProvider", () => {
     expect(parseProvider({ ...router, keyName: null }).keyName).toBeNull();
   });
 
-  test.each([
-    [null],
-    [{}],
-    [{ ...router, extra: 1 }],
-    [{ ...router, name: "R" }],
-    [{ ...router, name: "a" }],
-    [{ ...router, wire: "anthropic" }],
-    [{ ...router, wire: "openai" }],
-    [{ ...router, baseUrl: "models.test/v1" }],
-    [{ ...router, baseUrl: "ftp://models.test/v1" }],
-    [{ ...router, baseUrl: "http://models.test/v1?x=1" }],
-    [{ ...router, baseUrl: "http://user@models.test/v1" }],
-    [{ ...router, baseUrl: `http://${"a".repeat(300)}/v1` }],
-    [{ ...router, keyName: "" }],
-    [{ ...router, keyName: "Router" }],
-    [{ ...router, keyName: "../admin" }],
-    [{ ...router, keyName: "admin" }],
-    [{ ...router, baseUrl: "http://:secret@models.test/v1" }],
-    [{ ...router, keyName: "sk-".padEnd(65, "a") }],
-  ])("refuses %p", (body) => {
-    expect(() => parseProvider(body)).toThrow(BadRequest);
-  });
+  refuses(
+    [
+      null,
+      {},
+      { ...router, extra: 1 },
+      { ...router, name: "R" },
+      { ...router, name: "a" },
+      { ...router, wire: "anthropic" },
+      { ...router, wire: "openai" },
+      { ...router, baseUrl: "models.test/v1" },
+      { ...router, baseUrl: "ftp://models.test/v1" },
+      { ...router, baseUrl: "http://models.test/v1?x=1" },
+      { ...router, baseUrl: "http://user@models.test/v1" },
+      { ...router, baseUrl: `http://${"a".repeat(300)}/v1` },
+      { ...router, keyName: "" },
+      { ...router, keyName: "Router" },
+      { ...router, keyName: "../admin" },
+      { ...router, keyName: "admin" },
+      { ...router, baseUrl: "http://:secret@models.test/v1" },
+      { ...router, keyName: "sk-".padEnd(65, "a") },
+    ],
+    parseProvider,
+  );
 
   test("the query is trimmed and capped", () => {
     expect(parseQuery(new URL("http://x/?q=%20deep%20"))).toBe("deep");

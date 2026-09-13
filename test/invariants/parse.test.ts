@@ -23,6 +23,7 @@ import {
   MAX_TITLE,
 } from "../../src/shared/words.ts";
 import { testApp } from "../helpers/app.ts";
+import { refuses } from "../helpers/refuses.ts";
 
 describe("parseLogin", () => {
   test("accepts a username and a password", () => {
@@ -32,23 +33,24 @@ describe("parseLogin", () => {
     });
   });
 
-  test.each([
-    [null],
-    ["string"],
-    [[]],
-    [{}],
-    [{ username: "oana" }],
-    [{ password: "pw" }],
-    [{ username: "", password: "pw" }],
-    [{ username: "oana", password: "" }],
-    [{ username: 1, password: "pw" }],
-    [{ username: "oana", password: { $ne: "" } }],
-    [{ username: "oana", password: "pw", role: "admin" }],
-    [{ username: "a".repeat(33), password: "pw" }],
-    [{ username: "oana", password: "p".repeat(1025) }],
-  ])("refuses %p", (body) => {
-    expect(() => parseLogin(body)).toThrow(BadRequest);
-  });
+  refuses(
+    [
+      null,
+      "string",
+      [],
+      {},
+      { username: "oana" },
+      { password: "pw" },
+      { username: "", password: "pw" },
+      { username: "oana", password: "" },
+      { username: 1, password: "pw" },
+      { username: "oana", password: { $ne: "" } },
+      { username: "oana", password: "pw", role: "admin" },
+      { username: "a".repeat(33), password: "pw" },
+      { username: "oana", password: "p".repeat(1025) },
+    ],
+    parseLogin,
+  );
 });
 
 describe("parseUsername", () => {
@@ -56,11 +58,9 @@ describe("parseUsername", () => {
     expect(parseUsername(v)).toBe(v);
   });
 
-  test.each(["", "ab", "Oana", "oa na", ".oana", "oana@x", "a".repeat(33), 1])(
-    "refuses %p",
-    (v) => {
-      expect(() => parseUsername(v)).toThrow(BadRequest);
-    },
+  refuses(
+    ["", "ab", "Oana", "oa na", ".oana", "oana@x", "a".repeat(33), 1],
+    parseUsername,
   );
 });
 
@@ -71,21 +71,22 @@ describe("parseProfile", () => {
     ).toEqual({ fullName: "Oana Pellea", about: "Actor.\nBucharest." });
   });
 
-  test.each([
-    [{}],
-    [{ fullName: "Oana" }],
-    [{ fullName: "", about: "" }],
-    [{ fullName: " Oana", about: "" }],
-    [{ fullName: "Oana\nP", about: "" }],
-    [{ fullName: "Oana\u2028P", about: "" }],
-    [{ fullName: "a".repeat(65), about: "" }],
-    [{ fullName: "Oana", about: "", username: "oana" }],
-    [{ fullName: 1, about: "" }],
-    [{ fullName: "Oana", about: 1 }],
-    [{ fullName: "Oana", about: "a".repeat(2001) }],
-  ])("refuses %p", (body) => {
-    expect(() => parseProfile(body)).toThrow(BadRequest);
-  });
+  refuses(
+    [
+      {},
+      { fullName: "Oana" },
+      { fullName: "", about: "" },
+      { fullName: " Oana", about: "" },
+      { fullName: "Oana\nP", about: "" },
+      { fullName: "Oana\u2028P", about: "" },
+      { fullName: "a".repeat(65), about: "" },
+      { fullName: "Oana", about: "", username: "oana" },
+      { fullName: 1, about: "" },
+      { fullName: "Oana", about: 1 },
+      { fullName: "Oana", about: "a".repeat(2001) },
+    ],
+    parseProfile,
+  );
 });
 
 describe("parsePasswordChange", () => {
@@ -96,17 +97,18 @@ describe("parsePasswordChange", () => {
     });
   });
 
-  test.each([
-    [{}],
-    [{ current: "pw" }],
-    [{ next: "longenough" }],
-    [{ current: "", next: "longenough" }],
-    [{ current: "pw", next: "short" }],
-    [{ current: "pw", next: "x".repeat(1025) }],
-    [{ current: "pw", next: "longenough", again: "longenough" }],
-  ])("refuses %p", (body) => {
-    expect(() => parsePasswordChange(body)).toThrow(BadRequest);
-  });
+  refuses(
+    [
+      {},
+      { current: "pw" },
+      { next: "longenough" },
+      { current: "", next: "longenough" },
+      { current: "pw", next: "short" },
+      { current: "pw", next: "x".repeat(1025) },
+      { current: "pw", next: "longenough", again: "longenough" },
+    ],
+    parsePasswordChange,
+  );
 });
 
 describe("over the wire", () => {
@@ -143,32 +145,31 @@ describe("parseCreateSession", () => {
     ).toEqual({ projectId: "p1", agentId: "a1", message: " hi " });
   });
 
-  test.each([
-    [null],
-    ["string"],
-    [[]],
-    [{}],
-    [{ projectId: "p1", agentId: "a1" }],
-    [{ projectId: "p1", message: "hi" }],
-    [{ agentId: "a1", message: "hi" }],
-    [{ projectId: "", agentId: "a1", message: "hi" }],
-    [{ projectId: 1, agentId: "a1", message: "hi" }],
-    [{ projectId: "p1", agentId: "", message: "hi" }],
-    [{ projectId: "p1", agentId: 1, message: "hi" }],
-    [{ projectId: "p1", agentId: "a1", message: "" }],
-    [{ projectId: "p1", agentId: "a1", message: "  \n " }],
-    [{ projectId: "p1", agentId: "a1", message: 1 }],
-    [{ projectId: "p1", agentId: "a1", message: "hi", extra: true }],
+  refuses(
     [
+      null,
+      "string",
+      [],
+      {},
+      { projectId: "p1", agentId: "a1" },
+      { projectId: "p1", message: "hi" },
+      { agentId: "a1", message: "hi" },
+      { projectId: "", agentId: "a1", message: "hi" },
+      { projectId: 1, agentId: "a1", message: "hi" },
+      { projectId: "p1", agentId: "", message: "hi" },
+      { projectId: "p1", agentId: 1, message: "hi" },
+      { projectId: "p1", agentId: "a1", message: "" },
+      { projectId: "p1", agentId: "a1", message: "  \n " },
+      { projectId: "p1", agentId: "a1", message: 1 },
+      { projectId: "p1", agentId: "a1", message: "hi", extra: true },
       {
         projectId: "p1",
         agentId: "a1",
         message: "x".repeat(MAX_MESSAGE_BYTES + 1),
       },
     ],
-  ])("refuses %p", (body) => {
-    expect(() => parseCreateSession(body)).toThrow(BadRequest);
-  });
+    parseCreateSession,
+  );
 });
 
 describe("parseSendMessage", () => {
@@ -176,19 +177,20 @@ describe("parseSendMessage", () => {
     expect(parseSendMessage({ message: " hi " })).toEqual({ message: " hi " });
   });
 
-  test.each([
-    [null],
-    ["string"],
-    [[]],
-    [{}],
-    [{ message: "" }],
-    [{ message: " \t\n" }],
-    [{ message: 1 }],
-    [{ message: "hi", extra: true }],
-    [{ message: "x".repeat(MAX_MESSAGE_BYTES + 1) }],
-  ])("refuses %p", (body) => {
-    expect(() => parseSendMessage(body)).toThrow(BadRequest);
-  });
+  refuses(
+    [
+      null,
+      "string",
+      [],
+      {},
+      { message: "" },
+      { message: " \t\n" },
+      { message: 1 },
+      { message: "hi", extra: true },
+      { message: "x".repeat(MAX_MESSAGE_BYTES + 1) },
+    ],
+    parseSendMessage,
+  );
 });
 
 describe("parseStreamQuery", () => {
