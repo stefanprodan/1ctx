@@ -7,7 +7,10 @@
 // tool reads only its ToolContext; the key it needs is read by the area
 // from the secrets port, never carried here.
 
+import type { ToolCaps } from "../limits/index.ts";
 import type { ChatTool } from "../providers/index.ts";
+
+export type { ToolCaps } from "../limits/index.ts";
 
 // what a send may spend across its tools, mutated in place as the send
 // runs so a cap holds across parallel calls in one round
@@ -16,24 +19,6 @@ export type ToolBudget = {
   fetches: number;
   // websearch calls this send
   searches: number;
-};
-
-// the tool caps a send runs under; the runner passes a copy so tools/
-// never imports runner/
-export type ToolCaps = {
-  // the per-call wall clock, on top of the send's own signal
-  callTimeoutMs: number;
-  // the characters a result is cut to before it reaches the model
-  resultCut: number;
-  // the fetch and search budgets per send
-  maxFetches: number;
-  maxSearches: number;
-  // the byte caps a fetch and a search body are read to
-  fetchBodyBytes: number;
-  searchBodyBytes: number;
-  // the per-request deadlines the two tools reach under
-  fetchDeadlineMs: number;
-  searchDeadlineMs: number;
 };
 
 export type ToolContext = {
@@ -57,8 +42,8 @@ export type Tool = {
 };
 
 // what a send is offered once, on the policy: the schemas the model gets
-// and the search provider chosen for its life, or null when no key was
-// found and websearch is not offered
+// and the search provider chosen for its life, or null when no chosen
+// provider has a key
 export type Offered = {
   tools: ChatTool[];
   search: "exa" | "firecrawl" | null;

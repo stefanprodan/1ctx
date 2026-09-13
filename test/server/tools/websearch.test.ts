@@ -33,6 +33,7 @@ import type {
   ToolBudget,
   ToolContext,
 } from "../../../src/server/tools/types.ts";
+import { memoryDb } from "../../helpers/db.ts";
 
 const exaFixture = await Bun.file(
   new URL("../../fixtures/tools/exa-search.txt", import.meta.url),
@@ -676,14 +677,18 @@ describe("websearch limits and cancellation", () => {
 
 describe("the area reads the key at each call", () => {
   function areaWith(secrets: Record<string, string>, fetcher: typeof fetch) {
-    return toolsArea({
+    const area = toolsArea({
+      db: memoryDb(),
       fetcher,
       secret: (name) => secrets[name] ?? null,
       clock: Date.now,
       log: silent,
       version: "vtest",
+      render: (md) => md,
       searchDeps: dependencies(fetcher as never),
     });
+    area.store.setProvider("exa", Date.now());
+    return area;
   }
 
   test("runs websearch with the exa key read from secrets", async () => {
@@ -721,7 +726,7 @@ describe("the area reads the key at each call", () => {
     expect(result.content).toContain("[key]");
     expect(result.content).not.toContain("exa-key");
   });
-  test("a key removed since offered() is a failed result, never a switch", async () => {
+  test("a key removed since offered() runs keyless, never a switch", async () => {
     const secrets: Record<string, string> = { exa: "exa-key" };
     let sentKey: string | null | undefined;
     const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -751,10 +756,11 @@ describe("the area reads the key at each call", () => {
       { id: "s", name: "websearch", arguments: '{"query":"find"}' },
       context(),
     );
-    // the provider snapshot stays Exa, but a missing selected key fails
-    // before any request and never switches to Firecrawl
-    expect(sentKey).toBeUndefined();
+    // the provider snapshot stays Exa and the call runs keyless: no key
+    // header, never a switch to Firecrawl; this fake provider refuses
+    // the keyless call, which is the tool's failed result
+    expect(sentKey).toBeNull();
     expect(result.error).toBe(true);
-    expect(result.content).toContain("exa.key is missing");
+    expect(result.content).toContain("401");
   });
 });

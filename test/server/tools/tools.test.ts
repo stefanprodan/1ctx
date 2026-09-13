@@ -12,12 +12,17 @@ import {
   dateLine,
   formatCurrentTime,
 } from "../../../src/server/tools/builtin/time.ts";
-import { type Tools, toolsArea } from "../../../src/server/tools/index.ts";
+import { type ToolsArea, toolsArea } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type {
   ToolBudget,
   ToolContext,
 } from "../../../src/server/tools/types.ts";
+import {
+  BUILTIN_TOOLS,
+  type SearchProvider,
+} from "../../../src/shared/words.ts";
+import { memoryDb } from "../../helpers/db.ts";
 
 const now = Date.UTC(2026, 8, 8, 14, 42, 10);
 
@@ -34,8 +39,12 @@ function context(shared: ToolBudget = budget()): ToolContext {
   };
 }
 
-function area(secrets: Record<string, string> = {}): Tools {
-  return toolsArea({
+function area(
+  secrets: Record<string, string> = {},
+  provider: SearchProvider | null = null,
+): ToolsArea {
+  const tools = toolsArea({
+    db: memoryDb(),
     fetcher: (async () => {
       throw new Error("no network in this test");
     }) as unknown as typeof fetch,
@@ -43,7 +52,10 @@ function area(secrets: Record<string, string> = {}): Tools {
     clock: () => now,
     log: silent,
     version: "vtest",
+    render: (md) => md,
   });
+  if (provider !== null) tools.store.setProvider(provider, now);
+  return tools;
 }
 
 describe("formatCurrentTime", () => {
@@ -75,7 +87,7 @@ describe("formatCurrentTime", () => {
 });
 
 describe("offered", () => {
-  test("offers time and webfetch always, websearch only with a key", () => {
+  test("offers time and webfetch always, websearch once chosen", () => {
     expect(
       area()
         .offered(now)
@@ -83,22 +95,40 @@ describe("offered", () => {
     ).toEqual(["get_current_time", "webfetch"]);
     expect(area().offered(now).search).toBeNull();
 
-    const withExa = area({ exa: "exa-key" }).offered(now);
+    const withExa = area({ exa: "exa-key" }, "exa").offered(now);
     expect(withExa.tools.map((tool) => tool.name)).toEqual([
       "get_current_time",
       "webfetch",
       "websearch",
     ]);
     expect(withExa.search).toBe("exa");
+    // a chosen provider without its key file still answers, keyless
+    expect(area({}, "exa").offered(now).search).toBe("exa");
   });
 
-  test("prefers exa over firecrawl, falls back to firecrawl", () => {
-    expect(area({ exa: "e", firecrawl: "f" }).offered(now).search).toBe("exa");
-    expect(area({ firecrawl: "f" }).offered(now).search).toBe("firecrawl");
+  test.each([...BUILTIN_TOOLS])(
+    "does not offer %s when its switch is off",
+    (name) => {
+      const tools = area({ exa: "e" }, "exa");
+      tools.store.setEnabled(name, false, now);
+      expect(tools.offered(now).tools.map((tool) => tool.name)).not.toContain(
+        name,
+      );
+    },
+  );
+
+  test("uses only the chosen provider, whichever keys exist", () => {
+    expect(
+      area({ exa: "e", firecrawl: "f" }, "firecrawl").offered(now).search,
+    ).toBe("firecrawl");
+    expect(area({ exa: "e" }, "firecrawl").offered(now).search).toBe(
+      "firecrawl",
+    );
+    expect(area({ exa: "e" }).offered(now).search).toBeNull();
   });
 
   test("fills {{year}} in the websearch description in the host zone", () => {
-    const websearch = area({ exa: "e" })
+    const websearch = area({ exa: "e" }, "exa")
       .offered(now)
       .tools.find((tool) => tool.name === "websearch");
     // the host timezone decides the year; both are plausible around the
@@ -199,6 +229,21 @@ describe("run", () => {
     ).toMatchObject({
       error: true,
       content: 'Error: arguments for tool "get_current_time" must be an object',
+    });
+  });
+
+  test("a switched-off tool named by the model is not run", async () => {
+    const tools = area();
+    tools.store.setEnabled("webfetch", false, now);
+    const offered = tools.offered(now);
+    const result = await tools.run(
+      offered,
+      { id: "x", name: "webfetch", arguments: '{"url":"https://x.test"}' },
+      context(),
+    );
+    expect(result).toEqual({
+      error: true,
+      content: 'Error: tool "webfetch" not found.',
     });
   });
 

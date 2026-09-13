@@ -95,6 +95,8 @@ const PATHS: Record<string, string> = {
   agents:
     "M4 6.5h8a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 12 12.5H4A1.5 1.5 0 0 1 2.5 11V8A1.5 1.5 0 0 1 4 6.5zM8 6.5V4M6 9.5h.01M10 9.5h.01",
   spinner: "M13 8a5 5 0 1 1-2-4",
+  tools:
+    "M10 2.5a3.5 3.5 0 0 0-4.2 4.6L2.5 10.4l3.1 3.1 3.3-3.3a3.5 3.5 0 0 0 4.6-4.2L11.3 8.2 7.8 4.7z",
 };
 
 export type IconName = keyof typeof PATHS;

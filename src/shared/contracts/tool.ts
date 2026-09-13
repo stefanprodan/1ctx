@@ -8,6 +8,8 @@
 // providers type re-exports ToolCall, so the runner and the browser
 // name one shape.
 
+import type { BuiltinTool, SearchProvider } from "../words.ts";
+
 export type ToolCall = {
   // the id the model gave the call, echoed on the tool result
   id: string;
@@ -16,4 +18,24 @@ export type ToolCall = {
   name: string;
   // the arguments as the provider's JSON string, kept as received
   arguments: string;
+};
+
+// a built-in as the tools page shows it: the schema the model gets,
+// with the year already filled, and the server-wide switch. The text
+// is read-only: the built-ins' words are the code's.
+export type ToolSummary = {
+  name: BuiltinTool;
+  description: string;
+  parameters: object;
+  // Server-rendered so the browser does not ship a Markdown parser.
+  parametersHtml: string;
+  enabled: boolean;
+  updatedAt: number;
+};
+
+// the search provider an admin chose, null when never chosen, and
+// whether each provider's key file is there; the value never rides
+export type SearchState = {
+  provider: SearchProvider | null;
+  keys: Record<SearchProvider, boolean>;
 };

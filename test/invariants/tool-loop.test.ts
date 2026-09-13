@@ -82,6 +82,13 @@ const time = (id: string, tz = "UTC") => ({
   arguments: JSON.stringify({ timezone: tz }),
 });
 
+async function chooseSearch(chat: ChatApp, provider: "exa" | "firecrawl") {
+  const res = await chat.admin.call("PATCH", "/api/tools/websearch", {
+    body: { provider },
+  });
+  expect(res.status).toBe(200);
+}
+
 describe("the tool loop", () => {
   test("a plain reply on a tools model runs no round", async () => {
     const chat = await chatApp();
@@ -553,7 +560,7 @@ describe("the tool loop", () => {
     answerNodes(chat, sessionId);
   });
 
-  test("websearch is not offered without a key (decision 3)", async () => {
+  test("websearch is not offered without a chosen provider", async () => {
     const chat = await chatApp({ secrets: {} });
     const { script } = await startChat(chat, "search");
     const tools = (script.body.tools as { function: { name: string } }[]).map(
@@ -567,22 +574,20 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
-  test("the search provider is chosen once per send, from the key present when it began", async () => {
-    // exa.key exists when the send begins, so websearch is offered and
-    // the provider is chosen exa for the send's life (decision 3); the
-    // snapshot rides on the policy, so removing the key afterwards does
-    // not change what was offered. The per-call failure a removed key
-    // causes is exercised by the tools unit suite, which threads a fake
-    // fetch; here the request the send carries proves the snapshot.
+  test("the chosen search provider is snapshotted once per send", async () => {
     const chat = await chatApp({ secrets: { exa: "exa-key" } });
+    await chooseSearch(chat, "exa");
     const { script } = await startChat(chat, "search please");
     const offered = (script.body.tools as { function: { name: string } }[]).map(
       (t) => t.function.name,
     );
     expect(offered).toContain("websearch");
-    // the key is gone now, but the send already holds its snapshot
-    delete chat.secrets.exa;
-    // a fresh send, begun after the removal, is offered no websearch
+    // the provider is unchosen now, but the send already holds its
+    // snapshot; a fresh send, begun after, is offered no websearch
+    const cleared = await chat.admin.call("PATCH", "/api/tools/websearch", {
+      body: { provider: null },
+    });
+    expect(cleared.status).toBe(200);
     script.reply("ok");
     await settle(chat);
     const again = await startChat(chat, "search again");
@@ -595,8 +600,9 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
-  test("with a search key websearch is offered", async () => {
+  test("with a chosen provider websearch is offered", async () => {
     const chat = await chatApp({ secrets: { exa: "exa-key" } });
+    await chooseSearch(chat, "exa");
     const { script } = await startChat(chat, "search please");
     const tools = (script.body.tools as { function: { name: string } }[]).map(
       (t) => t.function.name,

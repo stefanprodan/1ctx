@@ -53,6 +53,21 @@ describe("renderMarkdown", () => {
     expect(html).toContain('<span class="hljs-keyword">const</span>');
   });
 
+  test("highlights JSON and escapes its string content", () => {
+    const json = JSON.stringify({ description: "a < b & c" }, null, 2);
+    const html = renderMarkdown(`\`\`\`json\n${json}\n\`\`\``);
+    expect(html).toContain('<div class="md-block" data-lang="json">');
+    expect(html).toContain('<span class="md-block-lang">json</span>');
+    expect(html).toContain(
+      '<button type="button" class="md-copy" title="Copy" aria-label="Copy block">Copy</button>',
+    );
+    expect(html).toContain(
+      '<span class="hljs-attr">&quot;description&quot;</span>',
+    );
+    expect(html).toContain("a &lt; b &amp; c");
+    expect(html).not.toContain("a < b & c");
+  });
+
   test("leaves an unknown fenced language escaped", () => {
     const html = renderMarkdown("```unknown\nvalue < tag\n```");
     expect(html).toContain('data-lang="unknown"');

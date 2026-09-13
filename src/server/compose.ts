@@ -13,6 +13,7 @@ import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
+import { limitsArea } from "./limits/index.ts";
 import { type ProjectStore, projectsArea } from "./projects/index.ts";
 import {
   type Catalogs,
@@ -85,6 +86,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
   });
   const usage = usageArea({ db });
+  const limits = limitsArea({ db, clock });
   const providers = providersArea({
     db,
     clock,
@@ -123,11 +125,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const tools =
     options.tools ??
     toolsArea({
+      db,
       fetcher: options.fetcher ?? fetch,
       secret,
       clock,
       log: options.log("tools"),
       version: options.version,
+      render: renderMarkdown,
     });
   const socket = socketArea({
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
@@ -145,6 +149,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     providers,
     tools,
+    limits,
     usage,
     render: renderMarkdown,
     stream: (sessionId, frame) => socket.stream(sessionId, frame),
@@ -154,11 +159,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
   sessions.repair();
   const routes: RouteDescriptor[] = [
     ...users.routes,
+    ...limits.routes,
     ...providers.routes,
     ...projects.routes,
     ...access.routes,
     ...agents.routes,
     ...sessions.routes,
+    ...(tools.routes ?? []),
     ...runner.routes,
     socket.route,
     healthRoute(options.version),

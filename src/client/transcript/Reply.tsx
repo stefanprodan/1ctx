@@ -26,6 +26,14 @@ export function cutReason(m: Message): { text: string; err: boolean } | null {
   if (m.finishReason === "length") {
     return { text: "cut at max tokens", err: false };
   }
+  // the runner's own reasons: a cap ended the loop, or the same calls
+  // came three rounds running
+  if (m.finishReason === "tool_limit") {
+    return { text: "tool cap reached", err: false };
+  }
+  if (m.finishReason === "tool_loop") {
+    return { text: "tool loop cut", err: false };
+  }
   return null;
 }
 

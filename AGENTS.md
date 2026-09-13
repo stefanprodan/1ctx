@@ -204,11 +204,18 @@ violation, and every rule has a rejected fixture under
   listener. An agent a session references is a 409 to delete.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
-  bytes) are constants in `runner/limits.ts`, the per-tool caps in
-  `tools/limits.ts`; `tools/` never imports `runner/`. The offered set
-  is decided once per send in `runner/policy.ts`, every tool of the
-  model accepts tools, and the search provider is the key file that
-  exists; the runner never holds a key. A round's calls run in parallel
+  bytes) and the per-tool caps have their defaults, floors and
+  ceilings in one table, `limits/defaults.ts`; an admin's override is
+  a row in `limits`, `limits.current()` merges them, and
+  `runner/limits.ts` and `tools/limits.ts` re-export the types and
+  the defaults; `tools/` never imports `runner/`. The offered set is
+  decided once per send in `runner/policy.ts` from the `tools` rows:
+  every tool of the model accepts tools that an admin has not
+  switched off, and websearch only once a search provider is chosen;
+  both providers answer keyless, a key file raises the rate, and the
+  runner never holds a key. A change on the
+  Tools page applies to the next send; a send in flight keeps the
+  caps and the set it started on. A round's calls run in parallel
   under the call timeout and the send's signal. A tool row is a message
   of kind `tool`, and each tool's end is one transaction, one revision,
   one envelope; only the reply text streams. Every message carries its

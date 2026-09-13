@@ -283,7 +283,7 @@ export async function searchWeb(
 }
 
 const DESCRIPTION =
-  "Search the web. Describe the page you want in a sentence rather than keywords; set domain to limit the results to one site. Returns titles, URLs and excerpts; call webfetch on a result's URL to read the whole page. You get at most three searches per send, so make each one count and do not repeat a query in other words. The current year is {{year}}. You MUST use this year when searching for recent information.";
+  "Search the web. Describe the page you want in a sentence rather than keywords; set domain to limit the results to one site. Returns titles, URLs and excerpts; call webfetch on a result's URL to read the whole page. Searches have a per-send budget, so make each one count and do not repeat a query in other words. The current year is {{year}}. You MUST use this year when searching for recent information.";
 
 // the tool the area builds per send, with the provider chosen and the
 // version bound; the key is passed in per call by the area
@@ -314,10 +314,9 @@ export function makeWebsearchTool(
       additionalProperties: false,
     },
     async run(args, ctx) {
+      // both providers answer without a key, at their keyless rate; a
+      // key file that appears or goes between calls is read each time
       const value = key();
-      if (value === null) {
-        throw new Error(`websearch key file ${provider}.key is missing`);
-      }
       try {
         return await searchWeb(
           args,
@@ -328,7 +327,9 @@ export function makeWebsearchTool(
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(message.replaceAll(value, "[key]"));
+        throw new Error(
+          value === null ? message : message.replaceAll(value, "[key]"),
+        );
       }
     },
   };

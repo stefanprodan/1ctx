@@ -19,6 +19,7 @@ import { BadRequest } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
+import type { Limits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
   type SessionRow,
@@ -61,6 +62,7 @@ export type RunnerDeps = {
   users: { byId(id: string): UserRow | null };
   providers: { chat: RoundDeps["chat"] };
   tools: ToolsPort;
+  limits: { current(): Limits };
   usage: WriterDeps["usage"];
   render: WriterDeps["render"];
   stream: WriterDeps["stream"];
@@ -215,6 +217,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       agent,
       now,
       tools: offeredTools,
+      limits: deps.limits.current(),
     });
     registry.admit(sessionId, user.id);
     const sendId = newId();

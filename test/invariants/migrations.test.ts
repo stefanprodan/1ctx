@@ -326,3 +326,53 @@ describe("0003-tools", () => {
     db.close();
   });
 });
+
+describe("0004-tools-page", () => {
+  test("adds the three enabled tool rows and empty limit overrides", () => {
+    const db = new Database(":memory:");
+    migrate(db, MIGRATIONS.slice(0, 3));
+    db.query(
+      `insert into users
+        (id, username, full_name, role, password_hash, created_at)
+       values ('kept', 'kept', 'Kept', 'member', 'x', 7)`,
+    ).run();
+
+    expect(migrate(db)).toEqual(["0004-tools-page"]);
+    expect(
+      db
+        .query(
+          `select name, enabled, provider, updated_at
+           from tools order by rowid`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        name: "get_current_time",
+        enabled: 1,
+        provider: null,
+        updated_at: 0,
+      },
+      { name: "webfetch", enabled: 1, provider: null, updated_at: 0 },
+      { name: "websearch", enabled: 1, provider: null, updated_at: 0 },
+    ]);
+    expect(db.query("select count(*) as n from limits").get()).toEqual({
+      n: 0,
+    });
+    expect(
+      db.query("select username from users where id = 'kept'").get(),
+    ).toEqual({ username: "kept" });
+    expect(() =>
+      db
+        .query(
+          "insert into tools (name, enabled, updated_at) values ('other', 1, 0)",
+        )
+        .run(),
+    ).toThrow();
+    expect(() =>
+      db
+        .query("update tools set provider = 'other' where name = 'websearch'")
+        .run(),
+    ).toThrow();
+    db.close();
+  });
+});

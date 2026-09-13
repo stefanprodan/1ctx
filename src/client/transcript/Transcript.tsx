@@ -14,6 +14,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
+import { copyCode } from "./copy.ts";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
@@ -78,22 +79,7 @@ export function Transcript({
       } else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
-    const onClick = async (ev: MouseEvent) => {
-      if (!(ev.target instanceof Element)) return;
-      const b = ev.target.closest(".md-copy");
-      if (!b) return;
-      const code = b.closest(".md-block")?.querySelector(".md-block-code");
-      if (!code) return;
-      try {
-        await navigator.clipboard.writeText(code.textContent ?? "");
-        b.textContent = "Copied";
-        setTimeout(() => {
-          if (b.isConnected) b.textContent = "Copy";
-        }, 1200);
-      } catch {
-        // no clipboard: the button stays as it is
-      }
-    };
+    const onClick = (ev: MouseEvent) => void copyCode(ev);
     scroller.addEventListener("scroll", onScroll);
     el.addEventListener("click", onClick);
     return () => {
