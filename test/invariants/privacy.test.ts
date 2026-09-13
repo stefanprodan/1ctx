@@ -55,6 +55,13 @@ describe("privacy", () => {
       (await admin.call("POST", `/api/sessions/${sessionId}/stop`)).status,
     ).toBe(404);
     expect(
+      (
+        await admin.call("PATCH", `/api/sessions/${sessionId}`, {
+          body: { title: "renamed" },
+        })
+      ).status,
+    ).toBe(404);
+    expect(
       (await admin.call("DELETE", `/api/sessions/${sessionId}`)).status,
     ).toBe(404);
     expect(

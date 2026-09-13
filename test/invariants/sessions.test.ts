@@ -394,6 +394,54 @@ describe("GET /api/sessions/:id", () => {
   });
 });
 
+describe("PATCH /api/sessions/:id", () => {
+  test("refuses a running chat, then renames with a revision and an envelope", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat);
+    const running = await chat.member.call(
+      "PATCH",
+      `/api/sessions/${started.sessionId}`,
+      { body: { title: "Too Soon" } },
+    );
+    expect(running.status).toBe(409);
+    await finish(started.script);
+    const before = chat.app.sessions.byId(started.sessionId)!.revision;
+    const events: BusEvent[] = [];
+    const off = subscribe((event) => events.push(event));
+    const renamed = await chat.member.call(
+      "PATCH",
+      `/api/sessions/${started.sessionId}`,
+      { body: { title: " Kept As Typed " } },
+    );
+    expect(renamed.status).toBe(200);
+    const detail = await renamed.json();
+    expect(detail.session.title).toBe("Kept As Typed");
+    expect(detail.session.revision).toBe(before + 1);
+    expect(detail.session.status).toBe("done");
+    expect(detail.messages.length).toBe(2);
+    expect(events).toEqual([
+      {
+        type: "session.changed",
+        data: {
+          projectId: chat.projectId,
+          session: detail.session,
+          messages: [],
+          send: detail.send,
+        },
+      },
+    ]);
+    off();
+    expect(
+      (
+        await chat.member.call("PATCH", `/api/sessions/${started.sessionId}`, {
+          body: { title: "" },
+        })
+      ).status,
+    ).toBe(400);
+    chat.app.socket.dispose();
+  });
+});
+
 describe("DELETE /api/sessions/:id", () => {
   test("refuses a running chat and deletes its rows after it finishes", async () => {
     const chat = await chatApp();
@@ -412,6 +460,29 @@ describe("DELETE /api/sessions/:id", () => {
     expect(chat.app.sessions.byId(started.sessionId)).toBeNull();
     expect(chat.app.sessions.messages(started.sessionId)).toEqual([]);
     expect(chat.app.sessions.lastSend(started.sessionId)).toBeNull();
+    chat.app.socket.dispose();
+  });
+
+  test("refuses a chat in a team project until its rule is decided", async () => {
+    const chat = await chatApp();
+    chat.app.db
+      .query(
+        "insert into projects (id, kind, name, owner_id, created_at) values ('t1', 'team', 'ops', ?, 0)",
+      )
+      .run(chat.memberId);
+    chat.app.db
+      .query(
+        "insert into memberships (project_id, user_id, created_at) values ('t1', ?, 0)",
+      )
+      .run(chat.memberId);
+    const started = await startChat(chat, "hello", chat.member, "t1");
+    await finish(started.script);
+    const refused = await chat.member.call(
+      "DELETE",
+      `/api/sessions/${started.sessionId}`,
+    );
+    expect(refused.status).toBe(403);
+    expect(chat.app.sessions.byId(started.sessionId)).not.toBeNull();
     chat.app.socket.dispose();
   });
 

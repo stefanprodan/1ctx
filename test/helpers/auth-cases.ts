@@ -179,6 +179,12 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
+    method: "PATCH",
+    path: "/api/sessions/:id",
+    body: { title: "renamed" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
     method: "DELETE",
     path: "/api/sessions/:id",
     expect: { anonymous: 401, member: 404, admin: 404 },

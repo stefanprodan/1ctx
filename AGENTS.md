@@ -209,6 +209,10 @@ violation, and every rule has a rejected fixture under
   rows after it, their send and its usage go, and the envelope names
   them in `removedMessageIds`; 409 while the session runs, 400 when
   the last message is the user's.
+  Rename (`PATCH /api/sessions/:id`, the composer's `/rename <title>`)
+  and delete are the owner's, 409 while the session runs; a rename is
+  one revision and one envelope without rows, and a delete is refused
+  in a team project until its rule is decided.
 - **Compaction is a final provider round.** A summary is a message of
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through

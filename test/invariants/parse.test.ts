@@ -13,6 +13,7 @@ import {
 import { BadRequest } from "../../src/server/lib/errors.ts";
 import {
   parseCreateSession,
+  parseRenameSession,
   parseSendMessage,
   parseStreamQuery,
   titleFrom,
@@ -190,6 +191,33 @@ describe("parseSendMessage", () => {
       { message: "x".repeat(MAX_MESSAGE_BYTES + 1) },
     ],
     parseSendMessage,
+  );
+});
+
+describe("parseRenameSession", () => {
+  test("keeps the title as typed, trimmed at the ends", () => {
+    expect(parseRenameSession({ title: "  My Chat, As Typed  " })).toEqual({
+      title: "My Chat, As Typed",
+    });
+    expect(parseRenameSession({ title: "x".repeat(MAX_TITLE) })).toEqual({
+      title: "x".repeat(MAX_TITLE),
+    });
+  });
+
+  refuses(
+    [
+      null,
+      {},
+      { title: "" },
+      { title: "  \n " },
+      { title: 1 },
+      { title: "two\nlines" },
+      { title: "two\vlines" },
+      { title: "two\u2028lines" },
+      { title: "x".repeat(MAX_TITLE + 1) },
+      { title: "ok", extra: true },
+    ],
+    parseRenameSession,
   );
 });
 
