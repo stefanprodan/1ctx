@@ -7,6 +7,7 @@
 // publisher of durable changes; it publishes after commit.
 
 import type {
+  LastLine,
   Message,
   SendSummary,
   SessionSummary,
@@ -19,13 +20,15 @@ export type BusEvents = {
   // or every connection of the user when the login id is null
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its
-  // revision, the rows written, the ids removed, and the send row
+  // revision, the rows written, the ids removed, the send row, and
+  // the stream's last line when the transaction wrote one
   "session.changed": {
     projectId: string;
     session: SessionSummary;
     messages: Message[];
     removedMessageIds?: string[];
     send: SendSummary | null;
+    last?: LastLine;
   };
   "session.deleted": { projectId: string; sessionId: string };
   // what these users may see changed (a membership, a role, a team

@@ -1,0 +1,123 @@
+/* The stream: a card with the search in its head band, then rows with
+   a hairline between them. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .stream {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+
+  /* the head band is the search: the glass, then the text, no box of
+     its own inside the card */
+  .stream-head {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stream-state {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    color: var(--faint);
+  }
+
+  .stream-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 7px var(--space-4) 7px 14px;
+    border-bottom: 1px solid var(--line);
+    color: var(--dim);
+    text-decoration: none;
+  }
+  .stream-row:last-child {
+    border-bottom: 0;
+  }
+  .stream-row:hover {
+    background: var(--line);
+    color: var(--fg);
+  }
+
+  /* the icon says chat; its colour says the status */
+  .stream-icon {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .stream-icon-running {
+    color: var(--running);
+  }
+  .stream-icon-done {
+    color: var(--done);
+  }
+  .stream-icon-failed {
+    color: var(--failed);
+  }
+
+  .stream-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .stream-title {
+    font-size: var(--text-input);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stream-line {
+    font-size: var(--text-small);
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stream-project {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
+
+  .stream-when {
+    width: 64px;
+    flex-shrink: 0;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  .stream-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-grow: 1;
+    height: 40px;
+    padding: 0 var(--space-4) 0 15px;
+    color: var(--faint);
+    cursor: text;
+  }
+  .stream-search:focus-within {
+    color: var(--dim);
+  }
+  .stream-search-input {
+    flex-grow: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    outline: none;
+    color: var(--fg);
+  }
+}

@@ -1,0 +1,39 @@
+[
+  {
+    "name": "heading stripped",
+    "input": "  ### Heading text  \nsecond",
+    "expected": "Heading text"
+  },
+  {
+    "name": "list marker stripped",
+    "input": "* List item",
+    "expected": "List item"
+  },
+  {
+    "name": "blank first line skipped",
+    "input": " \n\r\n> Quoted line\nlater",
+    "expected": "Quoted line"
+  },
+  {
+    "name": "cut at the cap",
+    "input": "x",
+    "repeat": 161,
+    "expectedRepeat": 159,
+    "suffix": "…"
+  },
+  {
+    "name": "a marker without a space is text",
+    "input": "1.23 release, #hashtag and +1",
+    "expected": "1.23 release, #hashtag and +1"
+  },
+  {
+    "name": "bold and code marks stripped",
+    "input": "It is **9:28 PM** in `Tokyo`, __late__.",
+    "expected": "It is 9:28 PM in Tokyo, late."
+  },
+  {
+    "name": "empty content",
+    "input": "",
+    "expected": ""
+  }
+]

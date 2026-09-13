@@ -1,0 +1,134 @@
+/* Two columns: the content, and a quiet aside of sections at its
+   right: a small heading, plain lines, a hairline between sections,
+   no box, as a repository's About column reads. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .split {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-6);
+    flex-grow: 1;
+  }
+
+  .split-main {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-grow: 1;
+    min-width: 0;
+    max-width: 900px;
+  }
+
+  .split-aside {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 280px;
+    min-width: 0;
+  }
+
+  .split-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) 0 var(--space-4);
+  }
+  .split-section:first-child {
+    padding-top: 2px;
+  }
+  .split-section + .split-section {
+    border-top: 1px solid var(--line);
+  }
+  .split-section-head {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+  }
+  .split-section-act {
+    margin-left: auto;
+    font-size: var(--text-small);
+  }
+
+  /* a line of the section: text in the dim colour, what matters in
+     the foreground */
+  .split-line {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 24px;
+    color: var(--dim);
+    font-size: var(--text-ui);
+  }
+  .split-strong {
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .split-link {
+    color: var(--dim);
+  }
+  .split-link:hover {
+    color: var(--fg);
+  }
+
+  /* an agent: a small tile, the name over the model in faint mono */
+  .split-stack {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+    padding: 2px 0;
+  }
+  .split-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    color: var(--dim);
+  }
+  .split-name {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    color: var(--fg);
+  }
+  .split-faint {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  /* a number and its word: "14 sessions" */
+  .split-value {
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    font-weight: 500;
+    color: var(--fg);
+  }
+
+  .split-empty {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  @media (max-width: 1099px) {
+    .split-main {
+      max-width: none;
+    }
+    .split-aside {
+      display: none;
+    }
+  }
+}

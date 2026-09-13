@@ -68,10 +68,8 @@ describe("privacy", () => {
       (await admin.call("GET", `/api/sessions?project=${chat.projectId}`))
         .status,
     ).toBe(404);
-    const { sessions } = await (
-      await admin.call("GET", "/api/sessions")
-    ).json();
-    expect(sessions).toEqual([]);
+    const { rows } = await (await admin.call("GET", "/api/sessions")).json();
+    expect(rows).toEqual([]);
     expect(
       (await admin.call("GET", `/api/projects/${chat.projectId}/agents`))
         .status,
@@ -153,7 +151,7 @@ describe("privacy", () => {
         "insert into memberships (project_id, user_id, created_at) values ('t1', ?, 0)",
       )
       .run(chat.memberId);
-    const { sessions: adminSees } = await (
+    const { rows: adminSees } = await (
       await chat.admin.call("GET", "/api/sessions?project=t1")
     ).json();
     expect(adminSees).toEqual([]);
@@ -161,9 +159,11 @@ describe("privacy", () => {
     team.script.reply("ok");
     await tick();
     await tick();
-    const { sessions } = await (
+    const { rows } = await (
       await chat.admin.call("GET", "/api/sessions")
     ).json();
-    expect(sessions.map((s: { id: string }) => s.id)).toEqual([team.sessionId]);
+    expect(
+      rows.map((row: { session: { id: string } }) => row.session.id),
+    ).toEqual([team.sessionId]);
   });
 });

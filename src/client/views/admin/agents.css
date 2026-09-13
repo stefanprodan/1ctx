@@ -91,10 +91,6 @@
     border: 1px solid var(--line);
     color: var(--dim);
   }
-  .agents-tile-lit {
-    color: var(--fg);
-  }
-
   .agents-name {
     flex-shrink: 0;
     width: 140px;
@@ -105,18 +101,6 @@
     font-size: var(--text-mono);
     font-weight: 500;
     color: var(--fg);
-  }
-
-  /* the agent row: the name over the model id */
-  .agents-title {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex-grow: 1;
-    min-width: 0;
-  }
-  .agents-title .agents-name {
-    width: auto;
   }
 
   .agents-desc {
@@ -440,9 +424,6 @@
       flex-basis: 100%;
       order: 5;
     }
-    .agents-row .agents-desc {
-      padding-left: calc(14px + var(--space-3) + 28px + var(--space-3));
-    }
     .agents-provider .agents-desc {
       padding-left: calc(28px + var(--space-3));
     }
@@ -450,9 +431,6 @@
       flex-basis: 100%;
       order: 6;
       white-space: normal;
-    }
-    .agents-row .agents-meta {
-      padding-left: calc(14px + var(--space-3) + 28px + var(--space-3));
     }
     .agents-provider .agents-meta {
       padding-left: calc(28px + var(--space-3));

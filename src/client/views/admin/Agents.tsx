@@ -11,41 +11,31 @@
 import { useSignal } from "@preact/signals";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
-import type { Avatar, Wire } from "../../../shared/words.ts";
+import type { Wire } from "../../../shared/words.ts";
+import { AgentRow as Head } from "../../agents/AgentRow.tsx";
 import { agents, agentsError } from "../../data/agents.ts";
 import {
   deleteProvider,
   providers,
   providersError,
 } from "../../data/providers.ts";
-import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
 import { WireMark } from "../../lib/marks.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AgentForm } from "./AgentForm.tsx";
-import { keyLine, modelMeta, thinkingLine } from "./Agents.model.ts";
+import { keyLine } from "./Agents.model.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
 import "./agents.css";
 
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
-// an agent shows its avatar; a provider its service's mark, or a
-// cloud for a server without one
-function Tile({
-  avatar,
-  wire,
-  lit,
-}: {
-  avatar?: Avatar;
-  wire?: Wire;
-  lit: boolean;
-}) {
+// a provider shows its service's mark, or a cloud for a server
+// without one; an agent's tile is the shared row's
+function Tile({ wire }: { wire: Wire }) {
   return (
-    <span class={`agents-tile${lit ? " agents-tile-lit" : ""}`}>
-      {avatar ? (
-        <AvatarIcon name={avatar} size={15} />
-      ) : wire === "openrouter" ? (
+    <span class="agents-tile">
+      {wire === "openrouter" ? (
         <WireMark wire={wire} size={15} />
       ) : (
         <Icon name="providers" size={15} />
@@ -66,13 +56,6 @@ function AgentRow({
   onToggle: () => void;
 }) {
   const provider = providers.find((p) => p.id === agent.providerId);
-  const meta = [
-    provider?.name ?? "?",
-    modelMeta(agent.model),
-    thinkingLine(agent),
-  ]
-    .filter((s) => s !== "")
-    .join(" · ");
   return (
     <div class={`agents-item${open ? " agents-item-open" : ""}`}>
       <button
@@ -86,12 +69,7 @@ function AgentRow({
           size={14}
           class={`agents-chevron${open ? " agents-chevron-open" : ""}`}
         />
-        <Tile avatar={agent.avatar} lit={open} />
-        <span class="agents-title">
-          <span class="agents-name">{agent.name}</span>
-          <span class="agents-model-id">{agent.model.id}</span>
-        </span>
-        <span class="agents-meta">{meta}</span>
+        <Head agent={agent} providerName={provider?.name ?? "?"} lit={open} />
       </button>
       {open && (
         <div class="agents-body">
@@ -121,7 +99,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
   return (
     <div class="agents-item">
       <div class="agents-provider">
-        <Tile wire={provider.wire} lit={false} />
+        <Tile wire={provider.wire} />
         <span class="agents-name">{provider.name}</span>
         <span class="agents-desc agents-url">{provider.baseUrl}</span>
         <span class={`agents-meta${keyMissing ? " agents-meta-bad" : ""}`}>

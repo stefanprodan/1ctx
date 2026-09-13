@@ -1,5 +1,6 @@
-/* Projects: the list, a row per project; and one project: the kind
-   line under the head, then its members. */
+/* Projects: the list, a row per project; and one project: the tabs,
+   then the tab's content: the feed, or the cards of users and agents.
+   The kind and the dates are in the About card at the right. */
 
 @layer tokens, base, owners;
 
@@ -42,46 +43,39 @@
     color: var(--faint);
   }
 
-  .projects-one {
+  .projects-card {
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
-    width: 760px;
-    max-width: 100%;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+    overflow: hidden;
   }
-
-  .projects-kind-text {
-    margin: 0;
-    color: var(--dim);
-  }
-
-  .projects-section {
+  .projects-card-head {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--line);
   }
-
-  .projects-section-title {
+  .projects-card-state {
     margin: 0;
-    font-size: var(--text-body);
-    font-weight: 600;
+    padding: var(--space-3) var(--space-4);
+    color: var(--faint);
   }
 
-  .projects-members {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--line);
-  }
-
-  .projects-member {
+  .projects-member,
+  .projects-agent {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    height: 48px;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--line);
+  }
+  .projects-member:last-child,
+  .projects-agent:last-child {
+    border-bottom: 0;
   }
 
   .projects-avatar {
@@ -101,64 +95,6 @@
 
   .projects-member-name {
     font-weight: 500;
-  }
-
-  .projects-empty {
-    margin: 0;
-    color: var(--faint);
-  }
-
-  .projects-chats {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--line);
-  }
-
-  .projects-chat {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    height: 44px;
-    border-bottom: 1px solid var(--line);
-    color: var(--fg);
-    text-decoration: none;
-  }
-  .projects-chat:hover {
-    color: var(--brand-hover);
-  }
-
-  .projects-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: var(--faint);
-  }
-  .projects-dot-running {
-    background: var(--running);
-  }
-  .projects-dot-done {
-    background: var(--done);
-  }
-  .projects-dot-failed {
-    background: var(--failed);
-  }
-
-  .projects-chat-title {
-    flex-grow: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .projects-chat-when {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
   }
 
   .projects-member-meta {

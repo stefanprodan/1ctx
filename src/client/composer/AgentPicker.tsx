@@ -8,8 +8,10 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { Icon } from "../lib/icons.tsx";
+import { Fit } from "../ui/Fit.tsx";
 
 export function AgentPicker({
   agents,
@@ -56,7 +58,13 @@ export function AgentPicker({
           <AvatarIcon name={picked?.avatar ?? "bot"} size={12} />
         </span>
         <span class="composer-chip-name">{picked?.name ?? "no agent"}</span>
-        {picked && <span class="composer-chip-model">{picked.model.id}</span>}
+        {picked && (
+          <Fit
+            class="composer-chip-model"
+            long={picked.model.id}
+            short={shortModel(picked.model.id)}
+          />
+        )}
         {!fixed && <Icon name="chevron" size={12} />}
       </button>
       {open.value && (
@@ -75,7 +83,11 @@ export function AgentPicker({
                   <AvatarIcon name={a.avatar} size={12} />
                 </span>
                 <span class="composer-chip-name">{a.name}</span>
-                <span class="composer-chip-model">{a.model.id}</span>
+                <Fit
+                  class="composer-chip-model"
+                  long={a.model.id}
+                  short={shortModel(a.model.id)}
+                />
               </button>
             </li>
           ))}

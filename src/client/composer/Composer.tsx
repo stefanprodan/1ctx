@@ -116,6 +116,9 @@ export function Composer({
     }
   };
   const context = readout(usage);
+  // a chat not started yet has the page to itself, so the box shows
+  // two lines at rest; in a chat the transcript needs the room
+  const tall = !("sessionId" in scope);
   const placeholder =
     agents !== null && list.length === 0
       ? "No agent yet: an admin adds one first"
@@ -123,12 +126,12 @@ export function Composer({
         ? "Replying"
         : "Send a message";
   return (
-    <div class="composer">
+    <div class={`composer${tall ? " composer-tall" : ""}`}>
       <textarea
         ref={input}
         class="composer-text"
         name="message"
-        rows={1}
+        rows={tall ? 2 : 1}
         placeholder={placeholder}
         aria-label="Message"
         disabled={agents !== null && list.length === 0}

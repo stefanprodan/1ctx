@@ -1,9 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { projects } from "../../../src/client/data/projects.ts";
+import { list, projectAgents } from "../../../src/client/data/sessions.ts";
+import { week } from "../../../src/client/data/usage.ts";
 import {
   dateLine,
   greeting,
@@ -26,12 +30,103 @@ describe("Home.model", () => {
 });
 
 describe("Home", () => {
-  test("renders the head with the classes home.css and page.css depend on", () => {
+  beforeEach(() => {
     me.value = { id: "u1", username: "oana", fullName: "Oana", role: "member" };
+    query.value = "";
+    projects.value = [{ id: "p1", kind: "personal", name: "oana" }];
+    projectAgents.value = [
+      {
+        id: "a1",
+        name: "assistant",
+        avatar: "bot",
+        providerId: "pr1",
+        model: {
+          id: "acme/small",
+          name: "Small",
+          contextLength: null,
+          promptPrice: null,
+          completionPrice: null,
+          tools: false,
+          reasoning: false,
+        },
+        thinking: null,
+        effort: null,
+        prompt: "",
+        createdAt: 1_756_684_800_000,
+      },
+    ];
+    list.value = null;
+    week.value = null;
+  });
+
+  test("renders the head, the composer and the search", () => {
     const html = render(<Home />);
     expect(html).toContain('class="page-title"');
     expect(html).toContain(", Oana</h1>");
-    expect(html).toContain('class="home-stream"');
+    expect(html).toContain('class="composer composer-tall"');
+    expect(html).toContain('rows="2"');
+    expect(html).toContain('placeholder="Search sessions"');
+    expect(html).toContain("Loading");
+    // the aside: the agents, and the week once it answers
+    expect(html).toContain('class="split-name">assistant<');
+    expect(html).toContain('class="split-faint">acme/small<');
+    expect(html).not.toContain("Manage");
+    week.value = {
+      since: 0,
+      sessions: 637,
+      promptTokens: 2_130_000,
+      completionTokens: 12_400,
+    };
+    const again = render(<Home />);
+    expect(again).toContain('class="split-value">637<');
+    // prompt and completion tokens as one number
+    expect(again).toContain('class="split-value">2.14M<');
+  });
+
+  test("renders the rows with the project name and the state line", () => {
+    list.value = [
+      {
+        session: {
+          id: "s1",
+          projectId: "p1",
+          ownerId: "u1",
+          agentId: "a1",
+          origin: "chat",
+          title: "Which pods restarted",
+          status: "done",
+          revision: 2,
+          createdAt: 0,
+          lastActivityAt: Date.now() - 120_000,
+          usage: null,
+        },
+        send: null,
+        last: { seq: 2, author: "assistant", text: "nine pods" },
+      },
+    ];
+    const html = render(<Home />);
+    expect(html).toContain('href="/chat/s1"');
+    expect(html).toContain("stream-icon-done");
+    expect(html).toContain("Which pods restarted");
+    expect(html).toContain('<span class="stream-project">oana</span>');
+    expect(html).toContain("assistant: nine pods");
+    expect(html).toContain("2m ago");
+  });
+
+  test("the search box carries the address's query and the empty line says so", () => {
+    query.value = "?q=pods";
+    list.value = [];
+    const html = render(<Home />);
+    expect(html).toContain('value="pods"');
+    expect(html).toContain("Nothing matches.");
+    query.value = "";
+    expect(render(<Home />)).toContain("No chats yet. Start one above.");
+  });
+
+  test("without the personal project the composer waits", () => {
+    projects.value = null;
+    const html = render(<Home />);
+    expect(html).not.toContain('class="composer');
+    expect(html).toContain('placeholder="Search sessions"');
   });
 });
 

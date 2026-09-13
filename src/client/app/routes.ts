@@ -13,15 +13,21 @@
 
 import { loadAgents } from "../data/agents.ts";
 import { loadProfile } from "../data/profile.ts";
-import { loadProject, loadProjects, project } from "../data/projects.ts";
+import {
+  loadProject,
+  loadProjects,
+  project,
+  projects,
+} from "../data/projects.ts";
 import { loadProviders } from "../data/providers.ts";
 import {
+  loadList,
   loadProjectAgents,
-  loadProjectSessions,
   loadSession,
   session,
 } from "../data/sessions.ts";
 import { loadTools } from "../data/tools.ts";
+import { loadWeek } from "../data/usage.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -56,6 +62,22 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/home/Home.tsx").then((m) => m.Home)),
     title: () => "Home",
     role: "authenticated",
+    // the stream for the query, and the personal project's agents for
+    // the composer; the project comes from the rail's list
+    load: async (_params, query) => {
+      const q = query.get("q")?.trim() ?? "";
+      const rows = loadList({ project: null, q });
+      const spent = loadWeek();
+      await loadProjects();
+      const personal = projects.value?.find((p) => p.kind === "personal");
+      await Promise.all([
+        rows,
+        spent,
+        personal === undefined
+          ? Promise.resolve()
+          : loadProjectAgents(personal.id),
+      ]);
+    },
     nav: { label: "Home", icon: "home", order: 1 },
   },
   {
@@ -75,12 +97,23 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Project",
     role: "authenticated",
-    load: async (params) => {
+    load: async (params, query) => {
       await Promise.all([
         loadProject(params.id),
-        loadProjectSessions(params.id),
+        loadList({ project: params.id, q: query.get("q")?.trim() ?? "" }),
         loadProjectAgents(params.id),
       ]);
+    },
+  },
+  {
+    path: "/projects/:id/members",
+    view: lazy(() =>
+      import("../views/projects/Members.tsx").then((m) => m.Members),
+    ),
+    title: () => "Members",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([loadProject(params.id), loadProjectAgents(params.id)]);
     },
   },
   {

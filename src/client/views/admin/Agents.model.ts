@@ -6,7 +6,15 @@
 // the words a row shows for a window, a price and a key.
 
 import { compactsAt } from "../../../shared/compaction.ts";
-import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import { windowLine } from "../../agents/meta.ts";
+
+export {
+  modelMeta,
+  priceLine,
+  thinkingLine,
+  windowLine,
+} from "../../agents/meta.ts";
+
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import {
@@ -83,41 +91,6 @@ export function keyNameProblem(value: string): string | null {
   return null;
 }
 
-// "128k", "1M"; empty when the catalog did not say
-export function windowLine(contextLength: number | null): string {
-  if (contextLength === null) return "";
-  if (contextLength >= 1_000_000) {
-    return `${Math.round(contextLength / 100_000) / 10}M`;
-  }
-  return `${Math.round(contextLength / 1000)}k`;
-}
-
-const money = (n: number) => `$${Number(n.toPrecision(3))}`;
-
-// "$0.14 / $0.28" per million tokens, "free" when both are zero, empty
-// when the catalog did not say
-export function priceLine(
-  promptPrice: number | null,
-  completionPrice: number | null,
-): string {
-  if (promptPrice === null || completionPrice === null) return "";
-  if (promptPrice === 0 && completionPrice === 0) return "free";
-  return `${money(promptPrice)} / ${money(completionPrice)}`;
-}
-
-// "1M · $0.15 / $0.6 · tools · reasoning": what a row says about a
-// model, only the parts the catalog gave
-export function modelMeta(m: CatalogMatch): string {
-  return [
-    windowLine(m.contextLength),
-    priceLine(m.promptPrice, m.completionPrice),
-    m.tools ? "tools" : "",
-    m.reasoning ? "reasoning" : "",
-  ]
-    .filter((s) => s !== "")
-    .join(" · ");
-}
-
 // the reserve the runner keeps, from the limits the tools page holds;
 // null until they are loaded
 export function reserveOf(rows: LimitRow[] | null): number | null {
@@ -186,20 +159,6 @@ export function sentEffort(
 ): Effort | null {
   if (wire === undefined || !effortApplies(model, thinking)) return null;
   return effort !== null && isEffort(wire, effort) ? effort : null;
-}
-
-// "thinking off", "effort high": only what is off the default
-export function thinkingLine(
-  agent: Pick<AgentSummary, "thinking" | "effort">,
-): string {
-  return [
-    agent.thinking === null ? "" : `thinking ${agent.thinking}`,
-    agent.effort === null || agent.thinking === "off"
-      ? ""
-      : `effort ${agent.effort}`,
-  ]
-    .filter((s) => s !== "")
-    .join(" · ");
 }
 
 export function keyLine(keyName: string | null, hasKey: boolean): string {

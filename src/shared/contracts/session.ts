@@ -91,6 +91,19 @@ export type Message = {
   finishedAt: number | null;
 };
 
+// the last row a person or the agent wrote to a chat, as the stream
+// shows it: a user message, or an answer reply that is done. The
+// author is the username or the agent's name; the text is the first
+// non-empty line of the content with its leading markers stripped,
+// cut to the cap
+export type LastLine = {
+  seq: number;
+  author: string;
+  text: string;
+};
+
+export const MAX_LAST_LINE = 160;
+
 export type SendSummary = {
   id: string;
   sessionId: string;

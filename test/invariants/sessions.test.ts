@@ -16,6 +16,7 @@ import {
   type UsagePort,
 } from "../../src/server/sessions/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
+import type { StreamRow } from "../../src/shared/api/sessions.ts";
 import { fakeFetch, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -31,6 +32,28 @@ async function finish(script: Script, content = "done") {
   script.reply(content);
   await tick();
   await tick();
+}
+
+function finishStoredReply(
+  store: SessionStore,
+  id: string,
+  content: string,
+  slot: "work" | "answer" | null,
+) {
+  return store.finishReply(id, {
+    content,
+    reasoning: "",
+    reasoningDetails: [],
+    html: content,
+    status: "done",
+    error: null,
+    finishReason: "stop",
+    slot,
+    toolCalls: null,
+    ttftMs: null,
+    thinkingMs: null,
+    finishedAt: 1,
+  });
 }
 
 function fixedTools(content: string): Tools {
@@ -84,17 +107,15 @@ describe("GET /api/sessions", () => {
     const memberBody = await (
       await chat.member.call("GET", "/api/sessions")
     ).json();
-    expect(memberBody.sessions.map((s: { id: string }) => s.id)).toEqual([
-      running.sessionId,
-      recent.sessionId,
-      old.sessionId,
-    ]);
+    expect(
+      memberBody.rows.map((row: { session: { id: string } }) => row.session.id),
+    ).toEqual([running.sessionId, recent.sessionId, old.sessionId]);
     const adminBody = await (
       await chat.admin.call("GET", "/api/sessions")
     ).json();
-    expect(adminBody.sessions.map((s: { id: string }) => s.id)).toEqual([
-      admin.sessionId,
-    ]);
+    expect(
+      adminBody.rows.map((row: { session: { id: string } }) => row.session.id),
+    ).toEqual([admin.sessionId]);
 
     await finish(running.script);
     await finish(admin.script);
@@ -117,13 +138,13 @@ describe("GET /api/sessions", () => {
     const searched = await (
       await chat.member.call("GET", "/api/sessions?q=pHa")
     ).json();
-    expect(searched.sessions.map((s: { id: string }) => s.id)).toEqual([
+    expect(searched.rows.map((row: StreamRow) => row.session.id)).toEqual([
       personal.sessionId,
     ]);
     const narrowed = await (
       await chat.member.call("GET", "/api/sessions?project=sessions-team")
     ).json();
-    expect(narrowed.sessions.map((s: { id: string }) => s.id)).toEqual([
+    expect(narrowed.rows.map((row: StreamRow) => row.session.id)).toEqual([
       team.sessionId,
     ]);
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
@@ -131,6 +152,95 @@ describe("GET /api/sessions", () => {
       (await chat.member.call("GET", `/api/sessions?project=${adminProject}`))
         .status,
     ).toBe(404);
+    chat.app.socket.dispose();
+  });
+
+  test("answers the last send and the last eligible line", async () => {
+    const chat = await chatApp();
+    const completed = await startChat(chat, "# question");
+    await finish(completed.script, "\n## Final answer\nsecond line");
+    const store = chat.app.sessions;
+    const answer = store.message(completed.detail.messages[1].id)!;
+
+    const summary = store.addSummary({
+      sessionId: completed.sessionId,
+      sendId: completed.detail.send.id,
+      round: 2,
+      agentId: chat.agentId,
+      model: "model",
+      now: chat.app.now.value,
+    });
+    finishStoredReply(store, summary.id, "summary ignored", null);
+    const work = store.addReply({
+      sessionId: completed.sessionId,
+      sendId: completed.detail.send.id,
+      round: 3,
+      agentId: chat.agentId,
+      model: "model",
+      now: chat.app.now.value,
+    });
+    finishStoredReply(store, work.id, "work ignored", "work");
+    const streaming = store.addReply({
+      sessionId: completed.sessionId,
+      sendId: completed.detail.send.id,
+      round: 4,
+      agentId: chat.agentId,
+      model: "model",
+      now: chat.app.now.value,
+    });
+    store.writeReply(streaming.id, {
+      content: "streaming ignored",
+      reasoning: "",
+      reasoningDetails: [],
+    });
+
+    chat.app.now.value += 1;
+    const failed = store.create({
+      projectId: chat.projectId,
+      ownerId: chat.memberId,
+      agentId: chat.agentId,
+      title: "failed",
+      now: chat.app.now.value,
+    });
+    const failedSend = store.createSend({
+      sessionId: failed.id,
+      userId: chat.memberId,
+      agentId: chat.agentId,
+      providerId: chat.providerId,
+      model: "model",
+      firstMessageId: "failed-user",
+      now: chat.app.now.value,
+    });
+    const failedUser = store.addUserMessage({
+      id: "failed-user",
+      sessionId: failed.id,
+      sendId: failedSend.id,
+      userId: chat.memberId,
+      content: "- User line\nmore",
+      now: chat.app.now.value,
+    });
+    store.finishSend(failedSend.id, {
+      status: "failed",
+      cause: "failure",
+      error: "failed before a reply",
+      rounds: 0,
+      toolCalls: 0,
+      finishedAt: chat.app.now.value,
+    });
+    store.touch(failed.id, { status: "failed", now: chat.app.now.value });
+
+    const body = await (await chat.member.call("GET", "/api/sessions")).json();
+    const rows = new Map<string, StreamRow>(
+      body.rows.map((row: StreamRow) => [row.session.id, row]),
+    );
+    expect(rows.get(completed.sessionId)).toMatchObject({
+      send: { id: completed.detail.send.id },
+      last: { seq: answer.seq, author: "coder", text: "Final answer" },
+    });
+    expect(rows.get(failed.id)).toMatchObject({
+      send: { id: failedSend.id },
+      last: { seq: failedUser.seq, author: "oana", text: "User line" },
+    });
     chat.app.socket.dispose();
   });
 });
@@ -195,6 +305,7 @@ describe("GET /api/sessions/:id", () => {
       ),
     );
     expect(toolEnd).toBeDefined();
+    expect(toolEnd!.last).toBeUndefined();
     expect(
       toolEnd!.messages.find((message) => message.kind === "tool"),
     ).toMatchObject({
@@ -714,7 +825,7 @@ describe("the usage on the summary", () => {
       contextLength: 1048576,
     });
     const list = await (await chat.member.call("GET", "/api/sessions")).json();
-    expect(list.sessions[0].usage).toMatchObject({ promptTokens: 40 });
+    expect(list.rows[0].session.usage).toMatchObject({ promptTokens: 40 });
     chat.app.socket.dispose();
   });
 

@@ -52,8 +52,10 @@ src/server/     the binary. main.ts parses the flags, opens the db and the
 src/client/     the Preact app, bundled by Bun from client/index.html.
                 app/ (routes.ts, router.ts, lazy.ts, App, Rail), data/
                 (api, the entity cache), lib/, ui/ (the primitives, each
-                with its stylesheet), transcript/, composer/, views/<area>/,
-                style/ (tokens.css, base.css only).
+                with its stylesheet), transcript/, composer/, stream/ (the
+                session row Home and the project page draw), agents/ (the
+                agent row the admin page and the project page draw),
+                views/<area>/, style/ (tokens.css, base.css only).
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
                 tests, helpers/ (app.ts wires the server over a test db
@@ -277,6 +279,16 @@ violation, and every rule has a rejected fixture under
   `watched` refetch the detail. The reducers are pure and tested on
   fixtures; the transcript, the composer and the chat view render
   what the entity holds.
+- **The stream row is the server's word.** `GET /api/sessions` answers
+  `{session, send, last}` per row: the last send, and the last line a
+  person or the agent wrote (a user message or an answer reply, the
+  author's username or the agent's name, the first line cut at
+  `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only
+  when its transaction wrote such a row. `stream/Row.model.ts`
+  composes the state line and the time from those and never reads a
+  transcript; `data/stream.ts` holds the rows for one filter, the
+  query on the URL, and adds a row from an envelope only when no
+  query is set.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
   reads signals and renders with the primitives under `ui/`. A route
   entry names its `load` in `app/routes.ts`, and `app/loading.ts`
@@ -291,6 +303,16 @@ violation, and every rule has a rejected fixture under
   `app/routes.ts` wrapped in `lazy()`; the rail is computed from it.
   Bun does not yet split the HTML bundle, so the views still ship in one
   chunk; the table stays lazy so they will not the day it does.
+- **A page with an aside is `ui/Split.tsx`.** Home and the project
+  pages put their content in the main column, 900px at most, and
+  sections of plain lines in the 280px aside at the right, no boxes;
+  under 1100, a tablet or a phone, the aside is hidden. The aside holds only honest numbers: the agents and the past
+  seven days from `GET /api/usage/week` on Home, the About facts on a
+  project, an agent as its name over its model, through `ui/Fit.tsx`, which
+  shows the short form of a text (the model without its org) when the
+  long one overflows its line. Times in a list are `ago()` and `elapsed()` in
+  `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
+  ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

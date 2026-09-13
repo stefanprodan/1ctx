@@ -1,20 +1,145 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Home: the greeting. The composer, the filter bar and the stream land
-// with sessions; until then the head stands alone.
+// Home: the greeting, the composer that starts a chat in the personal
+// project, then every session the user may see as one stream, with
+// the search in its head. At the right, the agents the composer can
+// pick and what the week spent. The query is the address; the route's
+// load fetches the rows, and a clock moves the times without a fetch.
 
+import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
+import { shortModel } from "../../agents/meta.ts";
+import { navigate, query } from "../../app/router.ts";
+import { Composer } from "../../composer/Composer.tsx";
 import { me } from "../../data/me.ts";
+import { projects } from "../../data/projects.ts";
+import {
+  createSession,
+  list,
+  projectAgents,
+  sending,
+} from "../../data/sessions.ts";
+import { week } from "../../data/usage.ts";
+import { AvatarIcon } from "../../lib/avatars.tsx";
+import { count } from "../../lib/format.ts";
+import { tickMs } from "../../stream/Row.model.ts";
+import { Stream } from "../../stream/Stream.tsx";
+import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { dateLine, greeting } from "./Home.model.ts";
-import "./home.css";
+import { AsideSection, Split } from "../../ui/Split.tsx";
+import {
+  dateLine,
+  greeting,
+  personalOf,
+  searchHref,
+  searchOf,
+} from "./Home.model.ts";
 
 export function Home() {
   const user = me.value!;
-  const now = new Date();
+  const now = useSignal(Date.now());
+  const rows = list.value;
+  const tick = tickMs(rows);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      now.value = Date.now();
+    }, tick);
+    return () => clearInterval(timer);
+  }, [tick, now]);
+  const personal = personalOf(projects.value);
+  const q = searchOf(query.value);
+  const projectName = (id: string) =>
+    projects.value?.find((p) => p.id === id)?.name ?? null;
+  const agents = projectAgents.value;
+  const spent = week.value;
   return (
-    <Page label={dateLine(now)} title={greeting(now, user.fullName)}>
-      <div class="home-stream" />
+    <Page
+      label={dateLine(new Date())}
+      title={greeting(new Date(), user.fullName)}
+    >
+      <Split
+        aside={
+          <>
+            <AsideSection label="This week">
+              {spent === null ? (
+                <p class="split-empty">Loading</p>
+              ) : (
+                <>
+                  <div class="split-line">
+                    <span class="split-value">{count(spent.sessions)}</span>
+                    sessions
+                  </div>
+                  <div class="split-line">
+                    <span class="split-value">
+                      {count(spent.promptTokens + spent.completionTokens)}
+                    </span>
+                    tokens
+                  </div>
+                </>
+              )}
+            </AsideSection>
+            <AsideSection
+              label="Agents"
+              action={
+                user.role === "admin" ? (
+                  <a class="split-link" href="/admin/agents">
+                    Manage
+                  </a>
+                ) : undefined
+              }
+            >
+              {agents === null ? (
+                <p class="split-empty">Loading</p>
+              ) : agents.length === 0 ? (
+                <p class="split-empty">No agents yet.</p>
+              ) : (
+                agents.map((a) => (
+                  <div key={a.id} class="split-line">
+                    <span class="split-tile">
+                      <AvatarIcon name={a.avatar} size={13} />
+                    </span>
+                    <span class="split-stack">
+                      <span class="split-name">{a.name}</span>
+                      <Fit
+                        class="split-faint"
+                        long={a.model.id}
+                        short={shortModel(a.model.id)}
+                      />
+                    </span>
+                  </div>
+                ))
+              )}
+            </AsideSection>
+          </>
+        }
+      >
+        {personal !== null && (
+          <Composer
+            scope={{ projectId: personal.id }}
+            agents={agents}
+            agentId={null}
+            running={false}
+            busy={sending.value}
+            onSend={async (message, agentId) => {
+              await createSession({ projectId: personal.id, agentId, message });
+            }}
+            onStop={async () => {}}
+          />
+        )}
+        <Stream
+          rows={rows}
+          projectName={projectName}
+          search={{
+            value: q,
+            onChange: (next) => navigate(searchHref("/", next), true),
+          }}
+          empty={
+            q === "" ? "No chats yet. Start one above." : "Nothing matches."
+          }
+          now={now.value}
+        />
+      </Split>
     </Page>
   );
 }

@@ -1,9 +1,0 @@
-/* Home: the stream takes the rest of the page. */
-
-@layer tokens, base, owners;
-
-@layer owners {
-  .home-stream {
-    flex-grow: 1;
-  }
-}

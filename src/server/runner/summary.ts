@@ -8,10 +8,10 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { offWire, type SessionRow } from "../sessions/index.ts";
+import type { SessionRow } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
+import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { SessionsPort } from "./writer-port.ts";
@@ -24,20 +24,6 @@ type SummaryDeps = {
   render: (markdown: string, streaming: boolean) => string;
   stream: (sessionId: string, frame: SocketEvent) => void;
 };
-
-const envelope = (
-  session: SessionSummary,
-  messages: Message[],
-  send: SendSummary,
-): BusEvent => ({
-  type: "session.changed",
-  data: {
-    projectId: session.projectId,
-    session,
-    messages: messages.map(offWire),
-    send,
-  },
-});
 
 function recordUsage(
   deps: SummaryDeps,
@@ -114,10 +100,22 @@ export function startSummary(deps: SummaryDeps, send: ActiveSend): Message {
       status: "running",
       now,
     })!;
+    // the answer this transaction finished is the chat's last line, as
+    // it would be from finalizeSend
+    const last =
+      answer?.status === "done" && answer.slot === "answer"
+        ? lastLine(answer, send.policy.agentName)
+        : undefined;
     return {
       result: summary,
       events: [
-        envelope(session, answer ? [answer, summary] : [summary], sendRow),
+        envelope(
+          session,
+          answer ? [answer, summary] : [summary],
+          sendRow,
+          [],
+          last,
+        ),
       ],
     };
   });

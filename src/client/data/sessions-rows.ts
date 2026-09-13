@@ -4,16 +4,13 @@
 // The pure half of the sessions entity: the stream's order, the merge
 // of rows an envelope carries, and the live map a detail seeds.
 
-import type {
-  Message,
-  SessionDetail,
-  SessionSummary,
-} from "../../shared/contracts/session.ts";
+import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import { type Live, liveOf, liveOfSnapshot } from "../transcript/stream.ts";
 
 // the stream's order: running first, then by last activity, newest first
-export function ordered(rows: SessionSummary[]): SessionSummary[] {
-  return [...rows].sort((a, b) => {
+export function ordered(rows: StreamRow[]): StreamRow[] {
+  return [...rows].sort(({ session: a }, { session: b }) => {
     const ra = a.status === "running" ? 1 : 0;
     const rb = b.status === "running" ? 1 : 0;
     if (ra !== rb) return rb - ra;

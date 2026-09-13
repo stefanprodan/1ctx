@@ -41,17 +41,41 @@ export function stamp(ms: number): string {
   return `${day}, ${clock(ms)}`;
 }
 
-// how long ago, at the coarseness a list wants: "40 s ago", "5 min
-// ago", "2 h ago", "yesterday", the weekday within the week, else the
-// day and month
+const DAY = 86_400_000;
+
+// a span in the compact units a feed uses, one letter and no space:
+// "40s", "23m", "6h", "2d", "3w"
+function span(ms: number): string {
+  if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+  if (ms < DAY) return `${Math.floor(ms / 3_600_000)}h`;
+  if (ms < 7 * DAY) return `${Math.floor(ms / DAY)}d`;
+  return `${Math.floor(ms / (7 * DAY))}w`;
+}
+
+// how long ago, at the coarseness a list wants: "40s ago" up to
+// "3w ago", then the day and month, with the year once it is a year
+// back
 export function ago(ms: number, now: number): string {
   const delta = Math.max(0, now - ms);
-  if (delta < 60_000) return `${Math.floor(delta / 1000)} s ago`;
-  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} min ago`;
-  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} h ago`;
-  const days = Math.floor(delta / 86_400_000);
-  if (days === 1) return "yesterday";
+  if (delta < 28 * DAY) return `${span(delta)} ago`;
   const date = new Date(ms);
-  if (days < 7) return date.toLocaleDateString("en-GB", { weekday: "short" });
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const year = date.getFullYear() !== new Date(now).getFullYear();
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    ...(year ? { year: "numeric" } : {}),
+  });
+}
+
+// a count the eye can take in: "637", "12.4k", "2.1M"
+export function count(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return `${Number((n / 1000).toPrecision(3))}k`;
+  return `${Number((n / 1_000_000).toPrecision(3))}M`;
+}
+
+// how long something has run, in the same units: "40s", "2m", "1h"
+export function elapsed(ms: number): string {
+  return span(Math.max(0, ms));
 }

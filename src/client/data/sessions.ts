@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sessions entity: the chat on screen with the reply in flight,
-// the list of one project, and the agents its composer offers. The
+// The sessions entity: the chat on screen with the reply in flight
+// and the agents a composer offers; the stream's rows are data/stream.ts,
+// handed the frames from here. The
 // rows come from the routes; the socket keeps them current. A durable
 // envelope counts when its revision is above the one held, so the
 // answer of a write and the event of the same commit are one change
@@ -19,14 +20,10 @@ import type {
   RenameSessionRequest,
   SendMessageRequest,
   SessionResponse,
-  SessionsResponse,
   ToolResultResponse,
 } from "../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import type {
-  SessionDetail,
-  SessionSummary,
-} from "../../shared/contracts/session.ts";
+import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
 import {
@@ -39,10 +36,11 @@ import {
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
-import { liveFrom, ordered, streams, upsert } from "./sessions-rows.ts";
+import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
+import { applyEnvelope, dropRow, revokeRows } from "./stream.ts";
 
-export { ordered } from "./sessions-rows.ts";
+export { type ListFilter, list, loadList } from "./stream.ts";
 
 // frames kept while the watch is being answered; past this the
 // snapshot is refetched instead
@@ -52,7 +50,8 @@ export const session = signal<SessionDetail | null>(null);
 export const sessionError = signal<string | null>(null);
 // the replies streaming on the chat on screen, by message id
 export const live = signal<ReadonlyMap<string, Live>>(new Map());
-export const projectSessions = signal<SessionSummary[] | null>(null);
+// the stream's rows for the filter last asked for: Home's, every
+// project with a query, or one project's
 export const projectAgents = signal<AgentSummary[] | null>(null);
 // a send the composer asked for and the server has not answered
 export const sending = signal(false);
@@ -65,7 +64,6 @@ type Frame = Extract<SocketEvent, { type: "delta" | "html" }>;
 
 let owner: string | null = null;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
-let listFor: { projectId: string; turn: number } = { projectId: "", turn: 0 };
 // the watch in flight: the frames before its answer, and the sequence
 // the next frame must follow once answered
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
@@ -82,12 +80,10 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   wanted = { id: "", turn: wanted.turn + 1 };
-  listFor = { projectId: "", turn: listFor.turn + 1 };
   session.value = null;
   sessionError.value = null;
   live.value = new Map();
   toolResults.value = new Map();
-  projectSessions.value = null;
   projectAgents.value = null;
   sending.value = false;
   pending = null;
@@ -183,20 +179,6 @@ export async function loadToolResult(messageId: string): Promise<void> {
   } catch (err) {
     if (session.value?.session.id !== id) return;
     setToolResult(messageId, { status: "failed", error: reason(err) });
-  }
-}
-
-export async function loadProjectSessions(projectId: string): Promise<void> {
-  const turn = listFor.turn + 1;
-  if (listFor.projectId !== projectId) projectSessions.value = null;
-  listFor = { projectId, turn };
-  try {
-    const body = await api<SessionsResponse>(
-      `/api/sessions?project=${encodeURIComponent(projectId)}`,
-    );
-    if (listFor.turn === turn) projectSessions.value = ordered(body.sessions);
-  } catch {
-    if (listFor.turn === turn) projectSessions.value = null;
   }
 }
 
@@ -306,15 +288,10 @@ export async function renameSession(id: string, title: string): Promise<void> {
 // with the watch, the list's is superseded by a load run again. The
 // socket's deleted frame after a local delete then finds nothing
 function drop(sessionId: string, projectId: string): void {
-  const list = projectSessions.value;
-  if (list !== null) {
-    projectSessions.value = list.filter((s) => s.id !== sessionId);
-  }
+  dropRow(sessionId, projectId);
   if (wanted.id === sessionId || session.value?.session.id === sessionId) {
     leaveSession();
     navigate(`/projects/${projectId}`);
-  } else if (listFor.projectId === projectId) {
-    void loadProjectSessions(projectId);
   }
 }
 
@@ -327,16 +304,7 @@ export async function deleteSession(
 }
 
 function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
-  const list = projectSessions.value;
-  if (list !== null && listFor.projectId === ev.projectId) {
-    const held = list.find((s) => s.id === ev.session.id);
-    if (held === undefined || held.revision < ev.session.revision) {
-      projectSessions.value = ordered([
-        ...list.filter((s) => s.id !== ev.session.id),
-        ev.session,
-      ]);
-    }
-  }
+  applyEnvelope(ev);
   const held = session.value;
   if (held === null || held.session.id !== ev.session.id) return;
   if (ev.session.revision <= held.session.revision) return;
@@ -444,12 +412,12 @@ export function onSocket(ev: SocketEvent): void {
       drop(ev.sessionId, ev.projectId);
       break;
     case "revoked": {
-      if (listFor.projectId === ev.projectId) projectSessions.value = null;
+      revokeRows(ev.projectId);
       const held = session.value;
+      // the page leaves the chat as a navigation would, so an answer
+      // in flight for it and its watch are dropped too
       if (held !== null && held.session.projectId === ev.projectId) {
-        session.value = null;
-        live.value = new Map();
-        toolResults.value = new Map();
+        leaveSession();
         navigate("/");
       }
       break;

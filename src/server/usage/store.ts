@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { WeekUsageResponse } from "../../shared/api/usage.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -30,6 +31,14 @@ export type UsageRow = Omit<UsageFields, "now"> & {
   seq: number;
   createdAt: number;
 };
+
+type WeekRaw = {
+  sessions: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+};
+
+type WeekTotals = Omit<WeekUsageResponse, "since">;
 
 type Raw = {
   id: string;
@@ -129,6 +138,27 @@ export class UsageStore {
       )
       .all(sessionId)
       .map(row);
+  }
+
+  week(projectIds: string[], since: number): WeekTotals {
+    if (projectIds.length === 0) {
+      return { sessions: 0, promptTokens: 0, completionTokens: 0 };
+    }
+    const marks = projectIds.map(() => "?").join(", ");
+    const raw = this.db
+      .query<WeekRaw, (string | number)[]>(
+        `select count(distinct session_id) as sessions,
+                coalesce(sum(prompt_tokens), 0) as prompt_tokens,
+                coalesce(sum(completion_tokens), 0) as completion_tokens
+           from usage
+          where project_id in (${marks}) and created_at >= ?`,
+      )
+      .get(...projectIds, since)!;
+    return {
+      sessions: raw.sessions,
+      promptTokens: raw.prompt_tokens,
+      completionTokens: raw.completion_tokens,
+    };
   }
 
   deleteSend(sendId: string): boolean {

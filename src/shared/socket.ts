@@ -7,6 +7,7 @@
 // sequence per send. A command is what the client sends.
 
 import type {
+  LastLine,
   LiveSend,
   Message,
   SendSummary,
@@ -15,7 +16,7 @@ import type {
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -24,7 +25,8 @@ export type SocketCommand =
 export type SocketEvent =
   | { type: "hello"; protocol: number }
   // one envelope per session transaction: the summary with its
-  // revision, the rows written, the ids removed, and the send row
+  // revision, the rows written, the ids removed, the send row, and
+  // the stream's last line when the transaction wrote one
   | {
       type: "session";
       projectId: string;
@@ -32,6 +34,7 @@ export type SocketEvent =
       messages: Message[];
       removedMessageIds?: string[];
       send: SendSummary | null;
+      last?: LastLine;
     }
   | { type: "deleted"; projectId: string; sessionId: string }
   // the connection may no longer see the project
