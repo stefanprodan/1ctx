@@ -58,7 +58,7 @@ describe("Home", () => {
     expect(html).toContain('placeholder="Search sessions"');
     expect(html).toContain("Loading");
     // the aside: the agents, and the week once it answers
-    expect(html).toContain('class="split-row-name">assistant<');
+    expect(html).toContain('class="split-name">assistant<');
     expect(html).not.toContain("Manage");
     week.value = {
       since: 0,
@@ -67,9 +67,9 @@ describe("Home", () => {
       completionTokens: 12_400,
     };
     const again = render(<Home />);
-    expect(again).toContain('class="split-stat-value">637<');
-    expect(again).toContain('class="split-stat-value">2.13M<');
-    expect(again).toContain('class="split-stat-value">12.4k<');
+    expect(again).toContain('class="split-value">637<');
+    // prompt and completion tokens as one number
+    expect(again).toContain('class="split-value">2.14M<');
   });
 
   test("renders the rows with the project name and the state line", () => {

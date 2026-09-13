@@ -11,10 +11,11 @@ import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { initials, longDate } from "../../lib/format.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { AsideCard, Split } from "../../ui/Split.tsx";
+import { AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
-import { kindLine, plural, tabsOf } from "./Project.model.ts";
+import { kindText, plural, tabsOf } from "./Project.model.ts";
 import "./projects.css";
 
 export function Frame({
@@ -44,36 +45,33 @@ export function Frame({
       {shown && (
         <Split
           aside={
-            <AsideCard label="About">
-              <div class="split-fact">
-                <span>Kind</span>
-                <span class="split-fact-value">{kindLine(shown.kind)}</span>
-              </div>
-              <div class="split-fact">
-                <span>Created</span>
-                <span class="split-fact-value">
-                  {longDate(shown.createdAt)}
-                </span>
-              </div>
-              <div class="split-fact">
-                <span class="split-faces">
-                  {shown.members.slice(0, 5).map((m) => (
-                    <span key={m.id} class="split-face" title={m.fullName}>
-                      {initials(m.fullName)}
-                    </span>
-                  ))}
-                </span>
-                <a class="split-fact-link" href={tabs[1].href}>
+            <>
+              <AsideSection label="About">
+                <div class="split-line">{kindText(shown.kind)}</div>
+                <div class="split-line">
+                  Created
+                  <span class="split-strong">{longDate(shown.createdAt)}</span>
+                </div>
+              </AsideSection>
+              <AsideSection label="Members">
+                <a class="split-line split-link" href={tabs[1].href}>
+                  <span class="split-faces">
+                    {shown.members.slice(0, 5).map((m) => (
+                      <span key={m.id} class="split-face" title={m.fullName}>
+                        {initials(m.fullName)}
+                      </span>
+                    ))}
+                  </span>
                   {plural(shown.members.length, "member")}
                 </a>
-              </div>
-              <div class="split-fact">
-                <span>Agents</span>
-                <a class="split-fact-link" href={tabs[1].href}>
+                <a class="split-line split-link" href={tabs[1].href}>
+                  <span class="split-tile">
+                    <Icon name="agents" size={13} />
+                  </span>
                   {agents === null ? "" : plural(agents.length, "agent")}
                 </a>
-              </div>
-            </AsideCard>
+              </AsideSection>
+            </>
           }
         >
           <Tabs tabs={tabs} active={tabs[tab === "feed" ? 0 : 1].href} />

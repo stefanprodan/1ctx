@@ -305,8 +305,8 @@ violation, and every rule has a rejected fixture under
   chunk; the table stays lazy so they will not the day it does.
 - **A page with an aside is `ui/Split.tsx`.** Home and the project
   pages put their content in the main column, 900px at most, and
-  cards in the 280px aside at the right; under 1100 the aside drops
-  below. The cards hold only honest numbers: the agents and the past
+  sections of plain lines in the 280px aside at the right, no boxes;
+  under 1100 the aside drops below. The aside holds only honest numbers: the agents and the past
   seven days from `GET /api/usage/week` on Home, the About facts on a
   project. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w

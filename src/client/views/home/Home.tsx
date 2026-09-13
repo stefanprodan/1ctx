@@ -25,7 +25,7 @@ import { count } from "../../lib/format.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { AsideCard, Split } from "../../ui/Split.tsx";
+import { AsideSection, Split } from "../../ui/Split.tsx";
 import {
   dateLine,
   greeting,
@@ -59,11 +59,31 @@ export function Home() {
       <Split
         aside={
           <>
-            <AsideCard
+            <AsideSection label="This week">
+              {spent === null ? (
+                <p class="split-empty">Loading</p>
+              ) : (
+                <>
+                  <div class="split-line">
+                    <span class="split-value">{count(spent.sessions)}</span>
+                    sessions
+                  </div>
+                  <div class="split-line">
+                    <span class="split-value">
+                      {count(spent.promptTokens + spent.completionTokens)}
+                    </span>
+                    tokens
+                  </div>
+                </>
+              )}
+            </AsideSection>
+            <AsideSection
               label="Agents"
               action={
                 user.role === "admin" ? (
-                  <a href="/admin/agents">Manage</a>
+                  <a class="split-link" href="/admin/agents">
+                    Manage
+                  </a>
                 ) : undefined
               }
             >
@@ -73,44 +93,16 @@ export function Home() {
                 <p class="split-empty">No agents yet.</p>
               ) : (
                 agents.map((a) => (
-                  <div key={a.id} class="split-row">
+                  <div key={a.id} class="split-line">
                     <span class="split-tile">
-                      <AvatarIcon name={a.avatar} size={14} />
+                      <AvatarIcon name={a.avatar} size={13} />
                     </span>
-                    <span class="split-row-text">
-                      <span class="split-row-name">{a.name}</span>
-                      <span class="split-row-line">{a.model.id}</span>
-                    </span>
+                    <span class="split-name">{a.name}</span>
+                    <span class="split-faint">{a.model.id}</span>
                   </div>
                 ))
               )}
-            </AsideCard>
-            <AsideCard label="This week">
-              {spent === null ? (
-                <p class="split-empty">Loading</p>
-              ) : (
-                <div class="split-stats">
-                  <span class="split-stat">
-                    <span class="split-stat-value">
-                      {count(spent.sessions)}
-                    </span>
-                    <span class="split-stat-word">sessions</span>
-                  </span>
-                  <span class="split-stat">
-                    <span class="split-stat-value">
-                      {count(spent.promptTokens)}
-                    </span>
-                    <span class="split-stat-word">prompt tokens</span>
-                  </span>
-                  <span class="split-stat">
-                    <span class="split-stat-value">
-                      {count(spent.completionTokens)}
-                    </span>
-                    <span class="split-stat-word">completion</span>
-                  </span>
-                </div>
-              )}
-            </AsideCard>
+            </AsideSection>
           </>
         }
       >

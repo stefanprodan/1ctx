@@ -1,10 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A page in two columns: the content, and an aside of cards at its
-// right, as a repository page has its About column. Wide screens get
-// structure instead of rows stretched across them; under 1100 the
-// aside drops below the content.
+// A page in two columns: the content, and a quiet aside at its right
+// with a few sections of plain lines, as a repository page has its
+// About column. Wide screens get structure instead of rows stretched
+// across them; under 1100 the aside drops below the content.
 
 import type { ComponentChildren } from "preact";
 import "./split.css";
@@ -24,9 +24,9 @@ export function Split({
   );
 }
 
-// a card in the aside: a label, an optional action at its right, then
-// whatever rows or lines the page puts in it
-export function AsideCard({
+// a section of the aside: a label, an optional action at its right,
+// then the lines the page puts under it
+export function AsideSection({
   label,
   action,
   children,
@@ -36,10 +36,10 @@ export function AsideCard({
   children: ComponentChildren;
 }) {
   return (
-    <section class="split-card">
-      <div class="split-card-head">
+    <section class="split-section">
+      <div class="split-section-head">
         <span class="label">{label}</span>
-        {action && <span class="split-card-act">{action}</span>}
+        {action && <span class="split-section-act">{action}</span>}
       </div>
       {children}
     </section>
