@@ -55,3 +55,12 @@ export function ago(ms: number, now: number): string {
   if (days < 7) return date.toLocaleDateString("en-GB", { weekday: "short" });
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
+
+// how long something has run, at the coarseness a list wants: "40 s",
+// "2 min", "1 h"
+export function elapsed(ms: number): string {
+  const delta = Math.max(0, ms);
+  if (delta < 60_000) return `${Math.floor(delta / 1000)} s`;
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} min`;
+  return `${Math.floor(delta / 3_600_000)} h`;
+}

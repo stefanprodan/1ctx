@@ -1,9 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { projects } from "../../../src/client/data/projects.ts";
+import { list, projectAgents } from "../../../src/client/data/sessions.ts";
 import {
   dateLine,
   greeting,
@@ -26,12 +29,77 @@ describe("Home.model", () => {
 });
 
 describe("Home", () => {
-  test("renders the head with the classes home.css and page.css depend on", () => {
+  beforeEach(() => {
     me.value = { id: "u1", username: "oana", fullName: "Oana", role: "member" };
+    query.value = "";
+    projects.value = [{ id: "p1", kind: "personal", name: "oana" }];
+    projectAgents.value = [
+      {
+        id: "a1",
+        name: "assistant",
+        avatar: "bot",
+        providerId: "pr1",
+        model: "small",
+        thinking: null,
+        effort: null,
+      } as never,
+    ];
+    list.value = null;
+  });
+
+  test("renders the head, the composer and the search", () => {
     const html = render(<Home />);
     expect(html).toContain('class="page-title"');
     expect(html).toContain(", Oana</h1>");
-    expect(html).toContain('class="home-stream"');
+    expect(html).toContain('class="composer"');
+    expect(html).toContain('placeholder="Search sessions"');
+    expect(html).toContain("Loading");
+  });
+
+  test("renders the rows with the project name and the state line", () => {
+    list.value = [
+      {
+        session: {
+          id: "s1",
+          projectId: "p1",
+          ownerId: "u1",
+          agentId: "a1",
+          origin: "chat",
+          title: "Which pods restarted",
+          status: "done",
+          revision: 2,
+          createdAt: 0,
+          lastActivityAt: Date.now() - 120_000,
+          usage: null,
+        },
+        send: null,
+        last: { seq: 2, author: "assistant", text: "nine pods" },
+      },
+    ];
+    const html = render(<Home />);
+    expect(html).toContain('href="/chat/s1"');
+    expect(html).toContain("stream-icon-done");
+    expect(html).toContain("Which pods restarted");
+    expect(html).toContain('<span class="stream-project">oana</span>');
+    expect(html).toContain("assistant: nine pods");
+    expect(html).toContain("2 min ago");
+  });
+
+  test("the search box carries the address's query and the empty line says so", () => {
+    query.value = "?q=pods";
+    list.value = [];
+    const html = render(<Home />);
+    expect(html).toContain('value="pods"');
+    expect(html).toContain("Nothing matches.");
+    query.value = "";
+    expect(render(<Home />)).toContain("No chats yet. Start one above.");
+  });
+
+  test("without the personal project the composer waits", () => {
+    projects.value = null;
+    const html = render(<Home />);
+    expect(html).not.toContain('class="composer"');
+    expect(html).toContain('placeholder="Search sessions"');
   });
 });
 

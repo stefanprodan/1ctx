@@ -9,18 +9,19 @@ import {
   compactSession,
   deleteSession,
   leaveSession,
+  list,
   live,
-  loadProjectSessions,
+  loadList,
   loadSession,
   onSocket,
   projectAgents,
-  projectSessions,
   renameSession,
   sending,
   session,
   sessionError,
   toolResults,
 } from "../../../src/client/data/sessions.ts";
+import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type {
   Message,
   SendSummary,
@@ -44,6 +45,12 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
     ...changes,
   };
 }
+
+function row(changes: Partial<SessionSummary> = {}): StreamRow {
+  return { session: summary(changes), send: null, last: null };
+}
+
+const ids = (rows: StreamRow[] | null) => rows?.map((r) => r.session.id);
 
 function message(changes: Partial<Message> = {}): Message {
   return {
@@ -220,22 +227,42 @@ describe("the sessions entity", () => {
   });
 
   test("loads running sessions first, then newest activity", async () => {
-    answer = () =>
-      Response.json({
-        sessions: [
-          summary({ id: "old", lastActivityAt: 10 }),
-          summary({ id: "running", status: "running", lastActivityAt: 1 }),
-          summary({ id: "new", lastActivityAt: 30 }),
+    const urls: string[] = [];
+    answer = (url) => {
+      urls.push(url);
+      return Response.json({
+        rows: [
+          row({ id: "old", lastActivityAt: 10 }),
+          row({ id: "running", status: "running", lastActivityAt: 1 }),
+          row({ id: "new", lastActivityAt: 30 }),
         ],
       });
+    };
 
-    await loadProjectSessions("p1");
+    await loadList({ project: "p1", q: "" });
 
-    expect(projectSessions.value?.map((row) => row.id)).toEqual([
-      "running",
-      "new",
-      "old",
-    ]);
+    expect(urls).toEqual(["/api/sessions?project=p1"]);
+    expect(ids(list.value)).toEqual(["running", "new", "old"]);
+  });
+
+  test("the stream's filter is the query, and a new filter drops the rows", async () => {
+    const urls: string[] = [];
+    answer = (url) => {
+      urls.push(url);
+      return Response.json({ rows: [row()] });
+    };
+    await loadList({ project: null, q: "" });
+    expect(list.value).toHaveLength(1);
+    let seen: StreamRow[] | null | undefined;
+    answer = (url) => {
+      urls.push(url);
+      seen = list.value;
+      return Response.json({ rows: [] });
+    };
+    await loadList({ project: null, q: "pods & co" });
+    expect(seen).toBeNull();
+    expect(list.value).toEqual([]);
+    expect(urls).toEqual(["/api/sessions", "/api/sessions?q=pods+%26+co"]);
   });
 
   test("a newer envelope replaces rows and older revisions are ignored", () => {
@@ -279,8 +306,8 @@ describe("the sessions entity", () => {
   });
 
   test("an envelope updates the loaded project's list", async () => {
-    answer = () => Response.json({ sessions: [summary()] });
-    await loadProjectSessions("p1");
+    answer = () => Response.json({ rows: [row()] });
+    await loadList({ project: "p1", q: "" });
 
     onSocket({
       type: "session",
@@ -290,7 +317,129 @@ describe("the sessions entity", () => {
       send: null,
     });
 
-    expect(projectSessions.value?.[0].title).toBe("Changed");
+    expect(list.value?.[0].session.title).toBe("Changed");
+  });
+
+  test("an envelope keeps the row's send and last line unless it carries them", async () => {
+    const last = { seq: 2, author: "assistant", text: "nine pods" };
+    answer = () => Response.json({ rows: [{ ...row(), send: sent, last }] });
+    await loadList({ project: null, q: "" });
+
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 2, status: "running" }),
+      messages: [],
+      send: null,
+    });
+    expect(list.value?.[0].send).toEqual(sent);
+    expect(list.value?.[0].last).toEqual(last);
+
+    const done = { ...sent, status: "done" as const, cause: "finish" as const };
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 3 }),
+      messages: [],
+      send: done,
+      last: { seq: 4, author: "assistant", text: "all expected" },
+    });
+    expect(list.value?.[0].send).toEqual(done);
+    expect(list.value?.[0].last?.text).toBe("all expected");
+    expect(list.value?.[0].session.revision).toBe(3);
+
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 2, title: "Old" }),
+      messages: [],
+      send: null,
+      last: { seq: 1, author: "ana", text: "stale" },
+    });
+    expect(list.value?.[0].session.revision).toBe(3);
+    expect(list.value?.[0].last?.text).toBe("all expected");
+  });
+
+  test("a row not held reloads the list unless a query or another project filters it", async () => {
+    const calls: string[] = [];
+    answer = (url) => {
+      calls.push(url);
+      return Response.json({ rows: [] });
+    };
+    await loadList({ project: null, q: "" });
+    onSocket({
+      type: "session",
+      projectId: "p2",
+      session: summary({ id: "s2", projectId: "p2" }),
+      messages: [],
+      send: sent,
+    });
+    await settle();
+    expect(calls).toEqual(["/api/sessions", "/api/sessions"]);
+
+    await loadList({ project: null, q: "pods" });
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ id: "s3" }),
+      messages: [],
+      send: null,
+    });
+    await loadList({ project: "p1", q: "" });
+    onSocket({
+      type: "session",
+      projectId: "p2",
+      session: summary({ id: "s4", projectId: "p2" }),
+      messages: [],
+      send: null,
+    });
+    await settle();
+    expect(calls).toEqual([
+      "/api/sessions",
+      "/api/sessions",
+      "/api/sessions?q=pods",
+      "/api/sessions?project=p1",
+    ]);
+  });
+
+  test("a list answer in flight keeps a row an envelope moved past it", async () => {
+    let release: (r: Response) => void = () => {};
+    answer = () => new Promise((r) => (release = r));
+    const load = loadList({ project: null, q: "" });
+    // nothing is held yet, so the envelope has nothing to update
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 3, title: "Newer" }),
+      messages: [],
+      send: null,
+    });
+    release(Response.json({ rows: [row({ revision: 2, title: "Older" })] }));
+    await load;
+    expect(list.value?.[0].session.title).toBe("Older");
+
+    answer = () => new Promise((r) => (release = r));
+    const again = loadList({ project: null, q: "" });
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 3, title: "Newer" }),
+      messages: [],
+      send: null,
+    });
+    release(Response.json({ rows: [row({ revision: 2, title: "Older" })] }));
+    await again;
+    expect(list.value?.[0].session.title).toBe("Newer");
+  });
+
+  test("a revocation drops a list answer in flight", async () => {
+    let release: (r: Response) => void = () => {};
+    answer = () => new Promise((r) => (release = r));
+    const load = loadList({ project: "p2", q: "" });
+    onSocket({ type: "revoked", projectId: "p2" });
+    release(Response.json({ rows: [row({ id: "s2", projectId: "p2" })] }));
+    await load;
+    expect(list.value).toBeNull();
   });
 
   test("streaming replies enter the live map and done replies leave", () => {
@@ -389,7 +538,7 @@ describe("the sessions entity", () => {
 
   test("rename patches the title and takes the detail", async () => {
     session.value = detail();
-    projectSessions.value = [summary()];
+    list.value = [row()];
     let hit = "";
     let sent: unknown = null;
     let busy = false;
@@ -415,7 +564,7 @@ describe("the sessions entity", () => {
 
   test("delete drops the row, leaves the chat and opens its project", async () => {
     session.value = liveDetail();
-    projectSessions.value = [summary(), summary({ id: "s2" })];
+    list.value = [row(), row({ id: "s2" })];
     path.value = "/chat/s1";
     let hit = "";
     answer = (url, init) => {
@@ -426,7 +575,7 @@ describe("the sessions entity", () => {
     expect(hit).toBe("DELETE /api/sessions/s1");
     expect(session.value).toBeNull();
     expect(live.value.size).toBe(0);
-    expect(projectSessions.value?.map((s) => s.id)).toEqual(["s2"]);
+    expect(ids(list.value)).toEqual(["s2"]);
     expect(pushed).toEqual(["/projects/p1"]);
     // the socket's frame for the same delete finds nothing to do
     onSocket({ type: "deleted", projectId: "p1", sessionId: "s1" });
@@ -447,13 +596,13 @@ describe("the sessions entity", () => {
   });
 
   test("a deletion off screen loads the project's list again", async () => {
-    projectSessions.value = null;
+    list.value = null;
     const calls: string[] = [];
     answer = (url) => {
       calls.push(url);
-      return Response.json({ sessions: [summary({ id: "s2" })] });
+      return Response.json({ rows: [row({ id: "s2" })] });
     };
-    await loadProjectSessions("p1");
+    await loadList({ project: "p1", q: "" });
     onSocket({ type: "deleted", projectId: "p1", sessionId: "s2" });
     await settle();
     expect(calls).toEqual([
@@ -708,15 +857,36 @@ describe("the sessions entity", () => {
     expect(path.value).toBe("/projects/p1");
   });
 
-  test("revoking the project on screen clears its session", () => {
+  test("revoking the project on screen clears its session", async () => {
     session.value = liveDetail();
     path.value = "/chat/s1";
+    let release: (r: Response) => void = () => {};
+    answer = () => new Promise((r) => (release = r));
+    const load = loadSession("s1");
 
     onSocket({ type: "revoked", projectId: "p1" });
 
     expect(session.value).toBeNull();
     expect(live.value.size).toBe(0);
     expect(path.value).toBe("/");
+    // the answer still in flight for the revoked chat is dropped too
+    release(Response.json(liveDetail()));
+    await load;
+    expect(session.value).toBeNull();
+  });
+
+  test("revoking a project drops its rows from the stream", async () => {
+    answer = () =>
+      Response.json({
+        rows: [row({ id: "s1" }), row({ id: "s2", projectId: "p2" })],
+      });
+    await loadList({ project: null, q: "" });
+    onSocket({ type: "revoked", projectId: "p2" });
+    expect(ids(list.value)).toEqual(["s1"]);
+
+    await loadList({ project: "p1", q: "" });
+    onSocket({ type: "revoked", projectId: "p1" });
+    expect(list.value).toBeNull();
   });
 
   test("drops every session entity when the signed-in user changes", () => {
@@ -736,7 +906,7 @@ describe("the sessions entity", () => {
         },
       ],
     ]);
-    projectSessions.value = [summary()];
+    list.value = [row()];
     projectAgents.value = [];
     sending.value = true;
 
@@ -750,7 +920,7 @@ describe("the sessions entity", () => {
     expect(session.value).toBeNull();
     expect(sessionError.value).toBeNull();
     expect(live.value.size).toBe(0);
-    expect(projectSessions.value).toBeNull();
+    expect(list.value).toBeNull();
     expect(projectAgents.value).toBeNull();
     expect(sending.value).toBe(false);
   });

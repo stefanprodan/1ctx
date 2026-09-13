@@ -1,9 +1,18 @@
-/* Home: the stream takes the rest of the page. */
+/* Home: the composer, the search and the stream in one column. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .home-stream {
+  .home {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     flex-grow: 1;
+  }
+
+  .home-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 }

@@ -13,11 +13,16 @@
 
 import { loadAgents } from "../data/agents.ts";
 import { loadProfile } from "../data/profile.ts";
-import { loadProject, loadProjects, project } from "../data/projects.ts";
+import {
+  loadProject,
+  loadProjects,
+  project,
+  projects,
+} from "../data/projects.ts";
 import { loadProviders } from "../data/providers.ts";
 import {
+  loadList,
   loadProjectAgents,
-  loadProjectSessions,
   loadSession,
   session,
 } from "../data/sessions.ts";
@@ -56,6 +61,20 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/home/Home.tsx").then((m) => m.Home)),
     title: () => "Home",
     role: "authenticated",
+    // the stream for the query, and the personal project's agents for
+    // the composer; the project comes from the rail's list
+    load: async (_params, query) => {
+      const q = query.get("q")?.trim() ?? "";
+      const rows = loadList({ project: null, q });
+      await loadProjects();
+      const personal = projects.value?.find((p) => p.kind === "personal");
+      await Promise.all([
+        rows,
+        personal === undefined
+          ? Promise.resolve()
+          : loadProjectAgents(personal.id),
+      ]);
+    },
     nav: { label: "Home", icon: "home", order: 1 },
   },
   {
@@ -78,7 +97,7 @@ export const ROUTES: Route[] = [
     load: async (params) => {
       await Promise.all([
         loadProject(params.id),
-        loadProjectSessions(params.id),
+        loadList({ project: params.id, q: "" }),
         loadProjectAgents(params.id),
       ]);
     },

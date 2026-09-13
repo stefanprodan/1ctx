@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { ago, clock, stamp } from "../../../src/client/lib/format.ts";
+import { ago, clock, elapsed, stamp } from "../../../src/client/lib/format.ts";
 
 describe("time formatting", () => {
   const now = new Date(2026, 8, 13, 12).getTime();
@@ -18,6 +18,15 @@ describe("time formatting", () => {
     ["a date beyond the week", 7 * 24 * 60 * 60_000, "6 Sep"],
   ])("formats %s", (_name, delta, expected) => {
     expect(ago(now - delta, now)).toBe(expected);
+  });
+
+  test.each([
+    ["seconds", 40_000, "40 s"],
+    ["minutes", 2 * 60_000 + 5_000, "2 min"],
+    ["hours", 60 * 60_000 + 4 * 60_000, "1 h"],
+    ["a negative span as zero", -5_000, "0 s"],
+  ])("formats an elapsed span in %s", (_name, ms, expected) => {
+    expect(elapsed(ms)).toBe(expected);
   });
 
   test("formats the clock in hours and minutes", () => {

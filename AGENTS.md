@@ -52,7 +52,8 @@ src/server/     the binary. main.ts parses the flags, opens the db and the
 src/client/     the Preact app, bundled by Bun from client/index.html.
                 app/ (routes.ts, router.ts, lazy.ts, App, Rail), data/
                 (api, the entity cache), lib/, ui/ (the primitives, each
-                with its stylesheet), transcript/, composer/, views/<area>/,
+                with its stylesheet), transcript/, composer/, stream/ (the
+                session row Home and the project page draw), views/<area>/,
                 style/ (tokens.css, base.css only).
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
@@ -277,6 +278,16 @@ violation, and every rule has a rejected fixture under
   `watched` refetch the detail. The reducers are pure and tested on
   fixtures; the transcript, the composer and the chat view render
   what the entity holds.
+- **The stream row is the server's word.** `GET /api/sessions` answers
+  `{session, send, last}` per row: the last send, and the last line a
+  person or the agent wrote (a user message or an answer reply, the
+  author's username or the agent's name, the first line cut at
+  `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only
+  when its transaction wrote such a row. `stream/Row.model.ts`
+  composes the state line and the time from those and never reads a
+  transcript; `data/stream.ts` holds the rows for one filter, the
+  query on the URL, and adds a row from an envelope only when no
+  query is set.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
   reads signals and renders with the primitives under `ui/`. A route
   entry names its `load` in `app/routes.ts`, and `app/loading.ts`

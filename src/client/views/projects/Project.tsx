@@ -5,16 +5,20 @@
 // a chat in it, its chats, then its members. Automations and knowledge
 // land here with their areas.
 
+import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { project, projectError, projects } from "../../data/projects.ts";
 import {
   createSession,
+  list,
   projectAgents,
-  projectSessions,
   sending,
 } from "../../data/sessions.ts";
-import { ago, initials } from "../../lib/format.ts";
+import { initials } from "../../lib/format.ts";
+import { tickMs } from "../../stream/Row.model.ts";
+import { Stream } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { kindText } from "./Project.model.ts";
 import "./projects.css";
@@ -25,7 +29,15 @@ export function Project({ params }: { params: Params }) {
   const shown = row !== null && row.id === id ? row : null;
   // the name is in the rail's list before the page's row arrives
   const listed = projects.value?.find((p) => p.id === id);
-  const now = Date.now();
+  const rows = list.value;
+  const now = useSignal(Date.now());
+  const tick = tickMs(rows);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      now.value = Date.now();
+    }, tick);
+    return () => clearInterval(timer);
+  }, [tick, now]);
   return (
     <Page
       crumb="Projects"
@@ -50,27 +62,12 @@ export function Project({ params }: { params: Params }) {
           />
           <section class="projects-section">
             <h2 class="projects-section-title">Chats</h2>
-            {projectSessions.value !== null &&
-            projectSessions.value.length === 0 ? (
-              <p class="projects-empty">No chats yet.</p>
-            ) : (
-              <ul class="projects-chats">
-                {(projectSessions.value ?? []).map((s) => (
-                  <li key={s.id}>
-                    <a class="projects-chat" href={`/chat/${s.id}`}>
-                      <span
-                        class={`projects-dot projects-dot-${s.status}`}
-                        title={s.status}
-                      />
-                      <span class="projects-chat-title">{s.title}</span>
-                      <span class="projects-chat-when">
-                        {ago(s.lastActivityAt, now)}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <Stream
+              rows={rows}
+              projectName={() => null}
+              empty="No chats yet."
+              now={now.value}
+            />
           </section>
           <section class="projects-section">
             <h2 class="projects-section-title">Members</h2>

@@ -1,7 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the Home head says: the date line and the greeting by the hour.
+// What the Home head says, and what the page reads from the address
+// and the rail's list.
+
+import type { ProjectSummary } from "../../../shared/contracts/project.ts";
 
 export function dateLine(now: Date): string {
   return now.toLocaleDateString("en-GB", {
@@ -22,4 +25,17 @@ export function greeting(now: Date, name: string): string {
           ? "Good afternoon"
           : "Good evening";
   return `${word}, ${name}`;
+}
+
+// the composer starts a chat in the personal project: the one of its
+// kind a user sees, since another's is never listed
+export function personalOf(
+  rows: ProjectSummary[] | null,
+): ProjectSummary | null {
+  return rows?.find((p) => p.kind === "personal") ?? null;
+}
+
+// the search as the address carries it
+export function searchOf(search: string): string {
+  return new URLSearchParams(search).get("q")?.trim() ?? "";
 }
