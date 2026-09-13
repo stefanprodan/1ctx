@@ -7,6 +7,7 @@ import { me } from "../../../src/client/data/me.ts";
 import {
   BUFFER_MAX,
   compactSession,
+  deleteSession,
   leaveSession,
   live,
   loadProjectSessions,
@@ -14,6 +15,7 @@ import {
   onSocket,
   projectAgents,
   projectSessions,
+  renameSession,
   sending,
   session,
   sessionError,
@@ -383,6 +385,81 @@ describe("the sessions entity", () => {
     expect(hit).toBe("POST /api/sessions/s1/compact");
     expect(session.value?.session.revision).toBe(5);
     expect(sending.value).toBe(false);
+  });
+
+  test("rename patches the title and takes the detail", async () => {
+    session.value = detail();
+    projectSessions.value = [summary()];
+    let hit = "";
+    let sent: unknown = null;
+    let busy = false;
+    answer = (url, init) => {
+      hit = `${init?.method ?? "GET"} ${url}`;
+      sent = JSON.parse(String(init?.body));
+      busy = sending.value;
+      return Response.json(
+        detail("s1", {
+          session: summary({ title: "Kept As Typed", revision: 5 }),
+        }),
+      );
+    };
+    await renameSession("s1", "Kept As Typed");
+    expect(hit).toBe("PATCH /api/sessions/s1");
+    // the composer is busy for the call, as for a send
+    expect(busy).toBe(true);
+    expect(sending.value).toBe(false);
+    expect(sent).toEqual({ title: "Kept As Typed" });
+    expect(session.value?.session.title).toBe("Kept As Typed");
+    expect(session.value?.session.revision).toBe(5);
+  });
+
+  test("delete drops the row, leaves the chat and opens its project", async () => {
+    session.value = liveDetail();
+    projectSessions.value = [summary(), summary({ id: "s2" })];
+    path.value = "/chat/s1";
+    let hit = "";
+    answer = (url, init) => {
+      hit = `${init?.method ?? "GET"} ${url}`;
+      return Response.json({});
+    };
+    await deleteSession("s1", "p1");
+    expect(hit).toBe("DELETE /api/sessions/s1");
+    expect(session.value).toBeNull();
+    expect(live.value.size).toBe(0);
+    expect(projectSessions.value?.map((s) => s.id)).toEqual(["s2"]);
+    expect(pushed).toEqual(["/projects/p1"]);
+    // the socket's frame for the same delete finds nothing to do
+    onSocket({ type: "deleted", projectId: "p1", sessionId: "s1" });
+    expect(pushed).toEqual(["/projects/p1"]);
+  });
+
+  test("a deletion drops a detail answer still in flight", async () => {
+    path.value = "/chat/s1";
+    let release: (r: Response) => void = () => {};
+    answer = () => new Promise((r) => (release = r));
+    const load = loadSession("s1");
+    onSocket({ type: "deleted", projectId: "p1", sessionId: "s1" });
+    expect(pushed).toEqual(["/projects/p1"]);
+    release(Response.json(detail()));
+    await load;
+    expect(session.value).toBeNull();
+    expect(live.value.size).toBe(0);
+  });
+
+  test("a deletion off screen loads the project's list again", async () => {
+    projectSessions.value = null;
+    const calls: string[] = [];
+    answer = (url) => {
+      calls.push(url);
+      return Response.json({ sessions: [summary({ id: "s2" })] });
+    };
+    await loadProjectSessions("p1");
+    onSocket({ type: "deleted", projectId: "p1", sessionId: "s2" });
+    await settle();
+    expect(calls).toEqual([
+      "/api/sessions?project=p1",
+      "/api/sessions?project=p1",
+    ]);
   });
 
   test("a watched snapshot seeds live and applies newer buffered frames", async () => {

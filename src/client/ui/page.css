@@ -19,10 +19,11 @@
     padding-bottom: 0;
   }
 
-  /* stuck to the top of the shell's scroll box, flush with the edge;
-     the top inset is its own padding, in the page colour, so the rows
-     scroll under it. The bottom padding covers the 14px gap's first
-     part without moving the content */
+  /* stuck to the top of the shell's scroll box, flush with its edges:
+     it bleeds across the shell's side gutter and spends it as padding,
+     so the rows scroll under a band as wide as the box. The top inset
+     is its own padding, in the page colour. The bottom padding covers
+     the 14px gap's first part without moving the content */
   .page-head {
     position: sticky;
     top: 0;
@@ -30,9 +31,13 @@
     display: flex;
     align-items: flex-end;
     gap: var(--space-4);
+    margin-left: calc(-1 * var(--shell-gutter, 0px));
+    margin-right: calc(-1 * var(--shell-gutter, 0px));
     padding-top: var(--shell-inset, 0px);
-    /* room the shell asks for when its button sits on this row */
-    padding-left: var(--page-lead, 0);
+    padding-right: var(--shell-gutter, 0px);
+    /* the gutter, plus the room the shell asks for when its button
+       sits on this row */
+    padding-left: calc(var(--shell-gutter, 0px) + var(--page-lead, 0px));
     padding-bottom: var(--space-2);
     margin-bottom: calc(-1 * var(--space-2));
     background: var(--page);
@@ -80,12 +85,26 @@
   .page-crumb-sep {
     color: var(--line-strong);
   }
+  /* the noun as written, never in the label's caps: a chat's title
+     keeps the user's casing */
   .page-crumb-on {
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
     color: var(--fg);
+    font-family: var(--sans);
+    font-size: var(--text-ui);
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* a view's control in the title's place: it cuts its own text, and
+     what it opens must show past the edge */
+  .page-crumb-menu {
+    display: flex;
+    overflow: visible;
   }
 
   .page-aside {

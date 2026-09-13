@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The command menu over the composer: the commands the draft names,
-// the highlighted one lit, a blocked one greyed with its reason. The
-// keyboard is the box's; a click picks like Tab does.
+// the highlighted one lit, a blocked one greyed with its reason, an
+// argument named after the word. The keyboard is the box's; a click
+// picks like Tab does.
 
-import type { Command, CommandName } from "./commands.ts";
+import type { Command } from "./commands.ts";
 
 export function Commands({
   matches,
@@ -16,7 +17,7 @@ export function Commands({
   matches: Command[];
   chosen: number;
   block: string | null;
-  onPick: (name: CommandName) => void;
+  onPick: (command: Command) => void;
 }) {
   return (
     <ul class="composer-cmds" aria-label="Commands">
@@ -29,9 +30,12 @@ export function Commands({
             }`}
             // mousedown would blur the box before the click lands
             onMouseDown={(ev) => ev.preventDefault()}
-            onClick={() => onPick(command.name)}
+            onClick={() => onPick(command)}
           >
             <span class="composer-cmd-name">/{command.name}</span>
+            {command.arg !== null && (
+              <span class="composer-cmd-arg">{command.arg}</span>
+            )}
             <span class="composer-cmd-text">{command.text}</span>
             {block !== null && <span class="composer-cmd-block">{block}</span>}
           </button>

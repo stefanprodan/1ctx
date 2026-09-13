@@ -18,6 +18,7 @@ export function Page({
   crumb,
   crumbHref,
   title,
+  menu,
   aside,
   actions,
   loading,
@@ -33,6 +34,9 @@ export function Page({
   // where the crumb's parent leads, when it is a page
   crumbHref?: string;
   title: string;
+  // the title's node when the view wraps it in a control: a chat's
+  // menu, opened by the title itself. The view renders the title text
+  menu?: ComponentChildren;
   aside?: ComponentChildren;
   actions?: ComponentChildren;
   loading?: boolean;
@@ -76,7 +80,11 @@ export function Page({
                 <span class="page-crumb-sep">/</span>
               </>
             )}
-            <span class="page-crumb-on">{title}</span>
+            {menu === undefined ? (
+              <span class="page-crumb-on">{title}</span>
+            ) : (
+              <span class="page-crumb-on page-crumb-menu">{menu}</span>
+            )}
           </h1>
         ) : (
           <div class="page-heading">
