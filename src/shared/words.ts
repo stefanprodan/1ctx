@@ -117,7 +117,7 @@ export const SEND_CAUSES = [
 ] as const;
 export type SendCause = (typeof SEND_CAUSES)[number];
 
-export const MESSAGE_KINDS = ["user", "reply"] as const;
+export const MESSAGE_KINDS = ["user", "reply", "tool"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
 export const MESSAGE_STATUSES = [

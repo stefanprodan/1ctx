@@ -24,6 +24,7 @@ import {
 import { renderMarkdown } from "./render/index.ts";
 import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
 import { type SessionStore, sessionsArea } from "./sessions/index.ts";
+import { type Tools, toolsArea } from "./tools/index.ts";
 import { type UsageStore, usageArea } from "./usage/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
 import { healthRoute } from "./web/health.ts";
@@ -41,6 +42,8 @@ export type ComposeOptions = {
   version: string;
   secureCookie: boolean;
   trustProxy: boolean;
+  // a test seam for the runner's tool state machine
+  tools?: Tools;
   // a test's registry with its own caps
   registry?: Registry;
 };
@@ -117,6 +120,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     live: (sessionId) => runner.live(sessionId),
     usage,
   });
+  const tools =
+    options.tools ??
+    toolsArea({
+      fetcher: options.fetcher ?? fetch,
+      secret,
+      clock,
+      log: options.log("tools"),
+      version: options.version,
+    });
   const socket = socketArea({
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
@@ -132,6 +144,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     agents,
     users,
     providers,
+    tools,
     usage,
     render: renderMarkdown,
     stream: (sessionId, frame) => socket.stream(sessionId, frame),

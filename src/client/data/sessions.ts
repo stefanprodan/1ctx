@@ -98,15 +98,17 @@ export function ordered(rows: SessionSummary[]): SessionSummary[] {
 }
 
 // the live map from a detail: the streaming rows, the runner's
-// snapshot for the one it is about
+// snapshot for the one it is about. The "tools" phase has no row, so
+// every streaming row starts from itself
 function liveFrom(detail: SessionDetail): Map<string, Live> {
   const map = new Map<string, Live>();
+  const snap = detail.live?.phase === "reply" ? detail.live : null;
   for (const m of detail.messages) {
-    if (m.status !== "streaming") continue;
+    if (m.kind !== "reply" || m.status !== "streaming") continue;
     map.set(
       m.id,
-      detail.live !== null && detail.live.messageId === m.id
-        ? liveOfSnapshot(detail.live, m)
+      snap !== null && snap.messageId === m.id
+        ? liveOfSnapshot(snap, m)
         : liveOf(m),
     );
   }
@@ -321,16 +323,21 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     // the rows say running and the runner has nothing: the end went by
     // before this connection heard it
     if (held.session.status === "running") refetch();
+  } else if (ev.live.phase === "tools") {
+    // a round's tools run: nothing streams, so no live entry and no
+    // refetch; the sequence still tracks the send for buffered frames
+    stream = { sendId: ev.live.sendId, seq: ev.live.seq };
   } else {
-    const m = held.messages.find((x) => x.id === ev.live?.messageId);
+    const snap = ev.live;
+    const m = held.messages.find((x) => x.id === snap.messageId);
     if (m === undefined) {
       refetch();
       return;
     }
     const map = new Map(live.value);
-    map.set(m.id, liveOfSnapshot(ev.live, m));
+    map.set(m.id, liveOfSnapshot(snap, m));
     live.value = map;
-    stream = { sendId: ev.live.sendId, seq: ev.live.seq };
+    stream = { sendId: snap.sendId, seq: snap.seq };
   }
   for (const frame of buffered.buffer) {
     if (stream !== null && frame.sendId === stream.sendId) {

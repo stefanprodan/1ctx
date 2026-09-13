@@ -12,7 +12,8 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
-import { type SessionRow, SessionStore, type UsagePort } from "./store.ts";
+import type { SessionRow, UsagePort } from "./rows.ts";
+import { SessionStore } from "./store.ts";
 
 export {
   MAX_SESSION_BODY,
@@ -24,12 +25,13 @@ export {
 } from "./parse.ts";
 export { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 export {
+  type RepairedSession,
   type ReplyFinish,
   type SessionRow,
-  SessionStore,
   STREAM_LIMIT,
   type UsagePort,
-} from "./store.ts";
+} from "./rows.ts";
+export { SessionStore } from "./store.ts";
 
 export const RESTART_ERROR = "the server restarted";
 
@@ -86,13 +88,13 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         const rows = store.repair(deps.clock(), RESTART_ERROR);
         return {
           result: rows,
-          events: rows.map((session) => ({
+          events: rows.map((repaired) => ({
             type: "session.changed" as const,
             data: {
-              projectId: session.projectId,
-              session,
-              messages: [],
-              send: store.lastSend(session.id),
+              projectId: repaired.session.projectId,
+              session: repaired.session,
+              messages: repaired.messages,
+              send: repaired.send,
             },
           })),
         };

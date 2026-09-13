@@ -26,6 +26,12 @@ const message = (fields: Partial<Message> = {}): Message => ({
   sessionId: "s1",
   seq: 2,
   kind: "reply",
+  sendId: "send1",
+  round: 1,
+  slot: null,
+  toolCalls: null,
+  toolCallId: null,
+  toolName: null,
   userId: null,
   agentId: "a1",
   content: "",
@@ -90,7 +96,8 @@ describe("live transcript buffers", () => {
       thinkStart: null,
     });
 
-    const snapshot: LiveSend = {
+    const snapshot: Extract<LiveSend, { phase: "reply" }> = {
+      phase: "reply",
       sendId: "send1",
       messageId: "m1",
       seq: 4,

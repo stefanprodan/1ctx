@@ -71,4 +71,62 @@ describe("the chat wire through the app", () => {
       app.chat("nope", request, new AbortController().signal),
     ).toThrow("no such provider");
   });
+
+  test("a tool round on the wire: null assistant content with calls, role tool, tool_choice none", async () => {
+    const { app, fake } = await build({ local: "k" });
+    const row = app.providers.create({
+      name: "local",
+      wire: "openai-compatible",
+      baseUrl: PROVIDER_URL,
+      keyName: "local",
+      now: 0,
+    });
+    const calls = [
+      { id: "c1", name: "get_current_time", arguments: '{"timezone":"UTC"}' },
+    ];
+    const toolRequest = {
+      model: "org/model",
+      messages: [
+        { role: "user" as const, content: "when" },
+        // a work reply with no text goes back with null content and its
+        // calls
+        { role: "assistant" as const, content: "", toolCalls: calls },
+        { role: "tool" as const, toolCallId: "c1", content: "2026-09-13" },
+      ],
+      thinking: false,
+      tools: [{ name: "get_current_time", description: "d", parameters: {} }],
+      // the answer round forbids a call
+      toolChoice: "none" as const,
+    };
+    for await (const _ of app.chat(
+      row.id,
+      toolRequest,
+      new AbortController().signal,
+    )) {
+      // drain
+    }
+    const call = fake.calls.find((c) => c.url.endsWith("/chat/completions"))!;
+    const body = JSON.parse(call.body ?? "{}");
+    // the schemas stay, the choice forbids a call
+    expect(body.tools).toHaveLength(1);
+    expect(body.tool_choice).toBe("none");
+    const assistant = body.messages.find(
+      (m: { role: string }) => m.role === "assistant",
+    );
+    // null content when a work reply has calls but no text
+    expect(assistant.content).toBeNull();
+    expect(assistant.tool_calls).toEqual([
+      {
+        id: "c1",
+        type: "function",
+        function: { name: "get_current_time", arguments: '{"timezone":"UTC"}' },
+      },
+    ]);
+    const tool = body.messages.find((m: { role: string }) => m.role === "tool");
+    expect(tool).toEqual({
+      role: "tool",
+      tool_call_id: "c1",
+      content: "2026-09-13",
+    });
+  });
 });

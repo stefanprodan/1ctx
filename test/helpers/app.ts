@@ -11,6 +11,7 @@ import { type App, compose } from "../../src/server/compose.ts";
 import type { Db } from "../../src/server/db/index.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
+import type { Tools } from "../../src/server/tools/index.ts";
 import { clientAddress } from "../../src/server/web/serve.ts";
 import { memoryDb } from "./db.ts";
 
@@ -103,6 +104,8 @@ export async function testApp(
     fetcher?: typeof fetch;
     // the secrets beside admin.key
     secrets?: Record<string, string>;
+    // a fake tools capability for runner state-machine tests
+    tools?: Tools;
     // a runner registry with its own caps
     registry?: Registry;
   } = {},
@@ -145,6 +148,7 @@ export async function testApp(
     version: VERSION,
     secureCookie: false,
     trustProxy,
+    tools: options.tools,
     registry: options.registry,
   });
   return {

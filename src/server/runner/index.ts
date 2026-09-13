@@ -4,9 +4,11 @@
 // The runner: a send from admission to its end. start() opens a chat
 // with its first send, send() adds one to a chat, stop() ends the one
 // holding the lock, and every one of them goes through the same
-// registry, the same writer and the same terminal transition. The
-// areas it needs come as ports from compose.ts; the stream frames go
-// out through the socket port.
+// registry, the same writer, the same tool loop and the same terminal
+// transition. The areas it needs come as ports from compose.ts; the
+// stream frames go out through the socket port. run() drives the loop;
+// the lock is let go after both the provider iteration and the round's
+// tools have settled.
 
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
@@ -25,12 +27,12 @@ import {
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
-import { buildPolicy } from "./policy.ts";
+import { buildPolicy, type ToolsPort } from "./policy.ts";
 import { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
-import { runRound } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, newSend } from "./send.ts";
+import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { Writer, type WriterDeps } from "./writer.ts";
 
 export { MAX_RUNNING, MAX_RUNNING_PER_USER, Registry } from "./registry.ts";
@@ -58,6 +60,7 @@ export type RunnerDeps = {
   agents: { byId(id: string): AgentRow | null };
   users: { byId(id: string): UserRow | null };
   providers: { chat: RoundDeps["chat"] };
+  tools: ToolsPort;
   usage: WriterDeps["usage"];
   render: WriterDeps["render"];
   stream: WriterDeps["stream"];
@@ -99,7 +102,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     clock: deps.clock,
   };
-
   const pause =
     deps.clock.sleep ??
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
@@ -145,15 +147,29 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return task;
   };
 
+  const loopDeps: LoopDeps = {
+    round: roundDeps,
+    writer,
+    tools: deps.tools,
+    clock: deps.clock,
+    // the reply row in flight is the last one; everything before it is
+    // history the wire takes
+    historyOf: (send) =>
+      deps.sessions
+        .messages(send.sessionId)
+        .filter((row) => row.id !== send.round?.messageId),
+    // Claim failure before waiting for sibling tools, so their shared
+    // signal aborts while allSettled still holds the session lock.
+    fail: (send, error) => {
+      void terminate(send, "failure", error);
+    },
+  };
+
   const run = async (send: ActiveSend): Promise<void> => {
     let finalized = false;
     try {
-      // the reply row is the last one; everything before it is history
-      const rows = deps.sessions
-        .messages(send.sessionId)
-        .filter((row) => row.id !== send.round.messageId);
-      await runRound(roundDeps, send, rows);
-      finalized = await terminate(send, "finish");
+      const end = await toolLoop(loopDeps, send);
+      finalized = await terminate(send, end.cause, end.error);
     } catch (err) {
       finalized = await terminate(
         send,
@@ -161,6 +177,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
         err instanceof Error ? err.message : String(err),
       );
     } finally {
+      // the lock is let go only after the round's tools have settled too
+      if (send.tools !== null) await send.tools.catch(() => {});
       send.letGo();
       if (finalized) registry.free(send);
     }
@@ -179,7 +197,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
 
   // admission and startSend in one turn, with no await between: the
-  // lock is taken, the rows are written, the run begins
+  // lock is taken, the ids are generated, the rows are written, the run
+  // begins
   const begin = (
     sessionId: string,
     session: SessionRow | null,
@@ -188,22 +207,35 @@ export function runnerArea(deps: RunnerDeps): Runner {
     agent: AgentRow,
     text: string,
   ): SessionDetail => {
-    const policy = buildPolicy({ projectId: project.id, user, agent });
-    registry.admit(sessionId, user.id);
     const now = deps.clock();
-    let started: ReturnType<Writer["startSend"]>;
-    const placeholder = newSend({
-      id: newId(),
+    const offeredTools = agent.model.tools ? deps.tools : null;
+    const policy = buildPolicy({
+      projectId: project.id,
+      user,
+      agent,
+      now,
+      tools: offeredTools,
+    });
+    registry.admit(sessionId, user.id);
+    const sendId = newId();
+    const userId = newId();
+    const replyId = newId();
+    const send = newSend({
+      id: sendId,
       sessionId,
       projectId: project.id,
       policy,
-      firstMessageId: "",
-      replyId: "",
+      firstMessageId: userId,
+      replyId,
       now,
     });
-    registry.set(placeholder);
+    registry.set(send);
+    let started: ReturnType<Writer["startSend"]>;
     try {
       started = writer.startSend({
+        sendId,
+        replyId,
+        userId,
         sessionId,
         session,
         title: titleFrom(text),
@@ -211,16 +243,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
         text,
       });
     } catch (err) {
-      registry.free(placeholder);
+      registry.free(send);
       throw err;
     }
-    const send: ActiveSend = {
-      ...placeholder,
-      id: started.send.id,
-      firstMessageId: started.user.id,
-      round: { ...placeholder.round, messageId: started.reply.id },
-    };
-    registry.set(send);
     deps.log(`chat ${sessionId} sent to ${agent.name} on ${policy.model}`);
     void run(send);
     return sessionDetail(deps.sessions, started.session, live(send));

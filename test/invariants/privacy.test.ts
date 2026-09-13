@@ -104,6 +104,33 @@ describe("privacy", () => {
     chat.app.socket.close(theirs);
   });
 
+  test("a work envelope stays project-scoped: the owner sees it, an admin does not", async () => {
+    const chat = await chatApp();
+    const mine = conn(chat, false);
+    const theirs = conn(chat, true);
+    chat.app.socket.open(mine);
+    chat.app.socket.open(theirs);
+    const { script, sessionId } = await startChat(chat, "when");
+    // the first call delta marks the reply work and publishes a durable
+    // envelope; it reaches the owner's connection and no one else's
+    script.toolCall({
+      id: "c1",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    await tick();
+    const durable = (c: typeof mine) =>
+      c.frames.filter((f) => f.type === "session");
+    expect(durable(mine).length).toBeGreaterThanOrEqual(1);
+    expect(durable(theirs)).toEqual([]);
+    expect(JSON.stringify(theirs.frames)).not.toContain("get_current_time");
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    await tick();
+    await tick();
+    chat.app.socket.close(mine);
+    chat.app.socket.close(theirs);
+  });
+
   test("the visible set is the memberships, plus every team project for an admin", async () => {
     const chat = await chatApp();
     expect(chat.app.projects.memberProjectIds(chat.memberId)).toEqual([

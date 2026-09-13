@@ -5,15 +5,17 @@
 // stream out, whatever the provider behind it. A wire adapter translates
 // its server's names into these and nothing else crosses.
 
+import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { Wire } from "../../shared/words.ts";
+
+// the browser and the runner name one shape; the wire re-exports it
+export type { ToolCall };
 
 export type ChatTool = {
   name: string;
   description: string;
   parameters: object;
 };
-
-export type ToolCall = { id: string; name: string; arguments: string };
 
 // One item of OpenRouter's reasoning_details: reasoning.text (with the
 // signature an Anthropic upstream needs back), reasoning.summary or
@@ -48,6 +50,9 @@ export type ChatRequest = {
   topP?: number | null;
   maxTokens?: number | null;
   tools?: ChatTool[];
+  // the answer round keeps the schemas so the cached prefix holds but
+  // forbids a call: the wire sends tool_choice none (decision 10)
+  toolChoice?: "none";
   // the session id, so a provider that routes or caches by conversation
   // keeps one session's turns together; omitted when not set
   cacheKey?: string | null;

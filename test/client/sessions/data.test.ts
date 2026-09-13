@@ -47,6 +47,12 @@ function message(changes: Partial<Message> = {}): Message {
     sessionId: "s1",
     seq: 1,
     kind: "reply",
+    sendId: "send1",
+    round: 1,
+    slot: "answer",
+    toolCalls: null,
+    toolCallId: null,
+    toolName: null,
     userId: null,
     agentId: "a1",
     content: "",
@@ -78,11 +84,16 @@ function detail(
 }
 
 function liveDetail(): SessionDetail {
-  const reply = message({ status: "streaming", finishReason: null });
+  const reply = message({
+    status: "streaming",
+    slot: null,
+    finishReason: null,
+  });
   return detail("s1", {
     session: summary({ status: "running" }),
     messages: [reply],
     live: {
+      phase: "reply",
       sendId: "send1",
       messageId: reply.id,
       seq: 0,
@@ -106,6 +117,8 @@ const sent: SendSummary = {
   cause: null,
   error: null,
   firstMessageId: "m0",
+  rounds: 1,
+  toolCalls: 0,
   startedAt: 10,
   finishedAt: null,
 };
@@ -316,6 +329,7 @@ describe("the sessions entity", () => {
       type: "watched",
       sessionId: "s1",
       live: {
+        phase: "reply",
         sendId: "send1",
         messageId: "m1",
         seq: 1,
@@ -327,6 +341,68 @@ describe("the sessions entity", () => {
     });
 
     expect(live.value.get("m1")?.content).toBe("AB");
+  });
+
+  test("a work-slot envelope keeps the reply's live buffer", async () => {
+    const base = liveDetail();
+    if (base.live?.phase === "reply") base.live.content = "streaming text";
+    answer = () => Response.json(base);
+    await loadSession("s1");
+
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ revision: 2, status: "running" }),
+      messages: [
+        message({ status: "streaming", slot: "work", finishReason: null }),
+      ],
+      send: sent,
+    });
+
+    expect(session.value?.messages[0]?.slot).toBe("work");
+    expect(live.value.get("m1")?.content).toBe("streaming text");
+  });
+
+  test("a watched tools phase neither seeds live nor refetches", async () => {
+    let fetches = 0;
+    const base = detail("s1", {
+      session: summary({ status: "running" }),
+      messages: [
+        message({
+          slot: "work",
+          status: "done",
+          finishReason: "tool_calls",
+        }),
+        message({
+          id: "tool1",
+          seq: 2,
+          kind: "tool",
+          slot: null,
+          status: "streaming",
+          finishReason: null,
+          agentId: null,
+          toolCallId: "c1",
+          toolName: "get_current_time",
+        }),
+      ],
+      send: sent,
+      live: { phase: "tools", sendId: "send1", seq: 3 },
+    });
+    answer = () => {
+      fetches++;
+      return Response.json(base);
+    };
+    await loadSession("s1");
+
+    onSocket({
+      type: "watched",
+      sessionId: "s1",
+      live: { phase: "tools", sendId: "send1", seq: 3 },
+    });
+    await settle();
+
+    expect(fetches).toBe(1);
+    expect(live.value.size).toBe(0);
   });
 
   test("a delta before watched is buffered", async () => {

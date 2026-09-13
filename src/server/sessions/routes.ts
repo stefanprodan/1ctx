@@ -16,7 +16,8 @@ import { Conflict, Forbidden } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseStreamQuery } from "./parse.ts";
-import type { SessionRow, SessionStore } from "./store.ts";
+import type { SessionRow } from "./rows.ts";
+import type { SessionStore } from "./store.ts";
 
 export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;

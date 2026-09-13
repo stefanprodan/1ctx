@@ -8,7 +8,12 @@ import { describe, expect, test } from "bun:test";
 import { compose } from "../../src/server/compose.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
-import { RESTART_ERROR, titleFrom } from "../../src/server/sessions/index.ts";
+import {
+  RESTART_ERROR,
+  SessionStore,
+  titleFrom,
+  type UsagePort,
+} from "../../src/server/sessions/index.ts";
 import { fakeFetch, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -17,6 +22,7 @@ import {
   startChat,
   tick,
 } from "../helpers/chat.ts";
+import { memoryDb } from "../helpers/db.ts";
 
 async function finish(script: Script, content = "done") {
   script.reply(content);
@@ -230,25 +236,32 @@ describe("boot repair", () => {
       title: "interrupted",
       now: chat.app.now.value,
     });
-    const user = store.addUserMessage({
+    // the send row is written first, so the messages' send_id holds
+    const sendId = "repair-send";
+    const send = store.createSend({
+      id: sendId,
       sessionId: session.id,
+      userId: chat.memberId,
+      agentId: chat.agentId,
+      providerId: chat.providerId,
+      model: "model",
+      firstMessageId: "repair-user",
+      now: chat.app.now.value,
+    });
+    store.addUserMessage({
+      id: "repair-user",
+      sessionId: session.id,
+      sendId,
       userId: chat.memberId,
       content: "hello",
       now: chat.app.now.value,
     });
     const reply = store.addReply({
       sessionId: session.id,
+      sendId,
+      round: 1,
       agentId: chat.agentId,
       model: "model",
-      now: chat.app.now.value,
-    });
-    const send = store.createSend({
-      sessionId: session.id,
-      userId: chat.memberId,
-      agentId: chat.agentId,
-      providerId: chat.providerId,
-      model: "model",
-      firstMessageId: user.id,
       now: chat.app.now.value,
     });
     const before = store.touch(session.id, {
@@ -290,9 +303,18 @@ describe("boot repair", () => {
     expect(seen[0]).toMatchObject({
       projectId: chat.projectId,
       session: { id: session.id, revision: before.revision + 1 },
-      messages: [],
       send: { id: send.id, cause: "restart" },
     });
+    // the repair now carries the rows it changed, so the socket can
+    // apply them without a refetch: the reply it ended, placed answer
+    expect(seen[0].messages).toEqual([
+      expect.objectContaining({
+        id: reply.id,
+        status: "failed",
+        slot: "answer",
+        error: RESTART_ERROR,
+      }),
+    ]);
     repaired.socket.dispose();
   });
 });
@@ -399,5 +421,339 @@ describe("the usage on the summary", () => {
     expect(detail.session.status).toBe("stopped");
     expect(detail.session.usage).toMatchObject({ promptTokens: 10 });
     chat.app.socket.dispose();
+  });
+});
+
+// the tool-loop store APIs over a bare db, without the runner: the
+// send row inserted first, the reply placed by slot, tool rows added
+// and finished under the status guard, and repair stopping a partial
+// tool row and placing the reply it ends.
+const noUsage: UsagePort = {
+  latest: () => null,
+  latestFor: () => new Map(),
+};
+
+function seededStore() {
+  const db = memoryDb();
+  db.query(
+    "insert into users (id, username, full_name, role, password_hash, created_at) values ('u', 'user', 'User', 'member', 'x', 0)",
+  ).run();
+  db.query(
+    "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'user', 'u', 0)",
+  ).run();
+  db.query(
+    "insert into providers (id, name, wire, base_url, created_at) values ('pr', 'prov', 'openai-compatible', 'http://x', 0)",
+  ).run();
+  db.query(
+    "insert into agents (id, name, provider_id, model, model_name, created_at) values ('a', 'agent', 'pr', 'm', 'M', 0)",
+  ).run();
+  const store = new SessionStore(db, noUsage);
+  const session = store.create({
+    projectId: "p",
+    ownerId: "u",
+    agentId: "a",
+    title: "chat",
+    now: 0,
+  });
+  return { db, store, session };
+}
+
+describe("the tool-loop store", () => {
+  test("places a reply, adds and finishes tool rows under the guard", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s1",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "user1",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "user1",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const reply = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    // the first call delta moves the row into the fold; a second delta
+    // writes nothing
+    expect(store.markRoundWork(reply.id)!.slot).toBe("work");
+    expect(store.markRoundWork(reply.id)).toBeNull();
+
+    const work = store.finishReply(reply.id, {
+      content: "",
+      reasoning: "",
+      reasoningDetails: [],
+      html: "",
+      status: "done",
+      error: null,
+      finishReason: "tool_calls",
+      slot: "work",
+      toolCalls: [{ id: "c1", name: "get_current_time", arguments: "{}" }],
+      ttftMs: null,
+      thinkingMs: null,
+      finishedAt: 1,
+    })!;
+    expect(work.slot).toBe("work");
+    expect(work.toolCalls).toEqual([
+      { id: "c1", name: "get_current_time", arguments: "{}" },
+    ]);
+
+    const [tool] = store.addToolRows([
+      {
+        sessionId: session.id,
+        sendId: send.id,
+        round: 1,
+        toolCallId: "c1",
+        toolName: "get_current_time",
+        now: 1,
+      },
+    ]);
+    expect(tool.kind).toBe("tool");
+    expect(tool.status).toBe("streaming");
+    expect(tool.toolCallId).toBe("c1");
+
+    const done = store.finishTool(tool.id, {
+      content: "12:00",
+      status: "done",
+      error: null,
+      finishedAt: 2,
+    })!;
+    expect(done.status).toBe("done");
+    expect(done.content).toBe("12:00");
+    // the guard: a second finish after the status moved writes nothing
+    expect(
+      store.finishTool(tool.id, {
+        content: "late",
+        status: "failed",
+        error: "x",
+        finishedAt: 3,
+      }),
+    ).toBeNull();
+    expect(store.message(tool.id)!.content).toBe("12:00");
+    db.close();
+  });
+
+  test("the answer unique index forbids two answers in one send", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s2",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u2",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u2",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const first = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    store.finishReply(first.id, {
+      content: "answer",
+      reasoning: "",
+      reasoningDetails: [],
+      html: "answer",
+      status: "done",
+      error: null,
+      finishReason: "stop",
+      slot: "answer",
+      toolCalls: null,
+      ttftMs: null,
+      thinkingMs: null,
+      finishedAt: 1,
+    });
+    const second = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 2,
+      agentId: "a",
+      model: "m",
+      now: 1,
+    });
+    expect(() =>
+      store.finishReply(second.id, {
+        content: "again",
+        reasoning: "",
+        reasoningDetails: [],
+        html: "again",
+        status: "done",
+        error: null,
+        finishReason: "stop",
+        slot: "answer",
+        toolCalls: null,
+        ttftMs: null,
+        thinkingMs: null,
+        finishedAt: 2,
+      }),
+    ).toThrow();
+    db.close();
+  });
+
+  test("repair stops a partial tool row and answers the reply it ends", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s3",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u3",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u3",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const reply = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    const [tool] = store.addToolRows([
+      {
+        sessionId: session.id,
+        sendId: send.id,
+        round: 1,
+        toolCallId: "c1",
+        toolName: "webfetch",
+        now: 0,
+      },
+    ]);
+    store.touch(session.id, { status: "running", now: 0 });
+
+    const repaired = store.repair(1, "restart");
+    expect(repaired).toHaveLength(1);
+    expect(repaired[0]!.session.status).toBe("failed");
+    expect(repaired[0]!.send).toMatchObject({ cause: "restart" });
+    const byId = new Map(repaired[0]!.messages.map((m) => [m.id, m]));
+    expect(byId.get(reply.id)).toMatchObject({
+      status: "failed",
+      slot: "answer",
+    });
+    expect(byId.get(tool.id)).toMatchObject({
+      status: "stopped",
+      error: "restart",
+    });
+    // nothing streams after a repair, so foreign keys still check
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+
+  test("repair includes rows whose session status was already stale", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "stale-send",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "stale-user",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "stale-user",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const reply = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    store.touch(session.id, { status: "done", now: 0 });
+
+    const repaired = store.repair(1, "restart");
+
+    expect(repaired).toHaveLength(1);
+    expect(repaired[0]!.messages).toEqual([
+      expect.objectContaining({
+        id: reply.id,
+        status: "failed",
+        slot: "answer",
+      }),
+    ]);
+    expect(repaired[0]!.send).toMatchObject({
+      id: send.id,
+      status: "failed",
+      cause: "restart",
+    });
+    expect(repaired[0]!.session.status).toBe("failed");
+    db.close();
+  });
+
+  test("finishSend records the counters", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s4",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u4",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u4",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    expect(
+      store.bumpCounters(send.id, { rounds: 2, toolCalls: 3 }),
+    ).toMatchObject({ rounds: 2, toolCalls: 3 });
+    const ended = store.finishSend(send.id, {
+      status: "done",
+      cause: "finish",
+      error: null,
+      rounds: 2,
+      toolCalls: 3,
+      finishedAt: 5,
+    })!;
+    expect(ended).toMatchObject({ rounds: 2, toolCalls: 3, status: "done" });
+    db.close();
   });
 });

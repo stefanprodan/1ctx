@@ -101,6 +101,8 @@ export function buildChatBody(
       type: "function",
       function: tool,
     }));
+    // the answer round keeps the schemas but forbids a call
+    if (req.toolChoice === "none") body.tool_choice = "none";
   }
   if (req.temperature != null) body.temperature = req.temperature;
   if (req.topP != null) body.top_p = req.topP;
@@ -239,7 +241,9 @@ export class ToolCallTracker {
   push(delta: Extract<ChatEvent, { kind: "toolCallDelta" }>): void {
     let call: TrackedCall | undefined;
     if (delta.index !== undefined) call = this.byIndex.get(delta.index);
-    if (!call && delta.id !== undefined) call = this.byId.get(delta.id);
+    if (!call && delta.index === undefined && delta.id !== undefined) {
+      call = this.byId.get(delta.id);
+    }
     if (!call && this.latest) {
       const latestCanAcceptIndex =
         delta.index === undefined ||

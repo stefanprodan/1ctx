@@ -12,6 +12,7 @@ import type {
   SendCause,
   SessionStatus,
 } from "../words.ts";
+import type { ToolCall } from "./tool.ts";
 
 export type SessionSummary = {
   id: string;
@@ -49,6 +50,15 @@ export type Message = {
   // the order within the session
   seq: number;
   kind: MessageKind;
+  // the send this row belongs to; every message row carries it, so the
+  // client groups a send's rows without reading the call arrays
+  sendId: string;
+  // the provider round within the send, from 1; the answer round included
+  round: number;
+  // the server's word on where a reply row shows: "answer" in the main
+  // column, "work" inside the fold; null while a reply streams and on
+  // every non-reply row
+  slot: "work" | "answer" | null;
   // who wrote it: a user for a user message, an agent for a reply
   userId: string | null;
   agentId: string | null;
@@ -59,6 +69,13 @@ export type Message = {
   status: MessageStatus;
   error: string | null;
   finishReason: string | null;
+  // the calls a reply row asked for, null on every other row; read for
+  // rendering the fold, never for placement
+  toolCalls: ToolCall[] | null;
+  // the call a tool row answers and the tool that ran, both null on
+  // every other row
+  toolCallId: string | null;
+  toolName: string | null;
   model: string | null;
   ttftMs: number | null;
   thinkingMs: number | null;
@@ -79,21 +96,35 @@ export type SendSummary = {
   error: string | null;
   // the user message the send answers
   firstMessageId: string;
+  // provider rounds so far, the answer round included; from 1
+  rounds: number;
+  // tool calls launched, not calls a cap cut
+  toolCalls: number;
   startedAt: number;
   finishedAt: number | null;
 };
 
-// the runner's snapshot of a send in flight: the reply as far as it
-// got, and the stream sequence the next frame follows
-export type LiveSend = {
-  sendId: string;
-  messageId: string;
-  seq: number;
-  content: string;
-  reasoning: string;
-  html: string;
-  htmlAt: number;
-};
+// the runner's snapshot of a send in flight. Between rounds, while a
+// round's tools run, nothing streams: the "tools" variant carries the
+// send and the stream sequence but no row, and the client must accept
+// that without seeding a live row and without a refetch. The "reply"
+// variant is a reply streaming, as before
+export type LiveSend =
+  | {
+      phase: "reply";
+      sendId: string;
+      messageId: string;
+      seq: number;
+      content: string;
+      reasoning: string;
+      html: string;
+      htmlAt: number;
+    }
+  | {
+      phase: "tools";
+      sendId: string;
+      seq: number;
+    };
 
 export type SessionDetail = {
   session: SessionSummary;

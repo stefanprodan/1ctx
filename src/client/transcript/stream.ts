@@ -37,7 +37,12 @@ export function liveOf(message: Message): Live {
   };
 }
 
-export function liveOfSnapshot(snapshot: LiveSend, message: Message): Live {
+// only a streaming reply seeds a live buffer; the "tools" phase has no
+// row and is handled by the caller without a live entry
+export function liveOfSnapshot(
+  snapshot: Extract<LiveSend, { phase: "reply" }>,
+  message: Message,
+): Live {
   return {
     content: snapshot.content,
     reasoning: snapshot.reasoning,

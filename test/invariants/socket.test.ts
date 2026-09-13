@@ -101,11 +101,11 @@ function addTeam(chat: ChatApp, id: string) {
 }
 
 describe("the socket", () => {
-  test("open sends hello with protocol 1", async () => {
+  test("open sends hello with protocol 2", async () => {
     const chat = await chatApp();
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
-    expect(conn.frames).toEqual([{ type: "hello", protocol: 1 }]);
+    expect(conn.frames).toEqual([{ type: "hello", protocol: 2 }]);
     close(chat, conn);
   });
 
@@ -395,6 +395,37 @@ describe("the socket", () => {
     expect(member.closed).toEqual([{ code: 1012, reason: "restart" }]);
     expect(admin.closed).toEqual([{ code: 1012, reason: "restart" }]);
     close(chat, member, admin);
+  });
+
+  test("a work round's reply streams to the watcher and its slot moves to work", async () => {
+    const chat = await chatApp();
+    const conn = await connection(chat, chat.member);
+    chat.app.socket.open(conn);
+    const { detail, script, sessionId } = await startChat(chat, "when");
+    chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
+    // narration streams as a delta, then the first call delta moves the
+    // reply into the fold: a durable session envelope with slot work
+    script.content("checking");
+    await tick();
+    script.toolCall({
+      id: "c1",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    await tick();
+    expect(frames(conn, "delta").length).toBeGreaterThanOrEqual(1);
+    const work = frames(conn, "session").find((f) =>
+      f.messages.some(
+        (m) => m.id === detail.messages[1].id && m.slot === "work",
+      ),
+    );
+    expect(work).toBeDefined();
+    // the work reply moved inside the fold; the tool row travels durably,
+    // never as a stream frame
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    await tick();
+    await tick();
+    close(chat, conn);
   });
 
   test("size counts opens and close forgets a connection", async () => {

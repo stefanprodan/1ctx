@@ -94,6 +94,39 @@ describe("drain", () => {
     expect(chat.app.sessions.byId(sessionId)!.status).toBe("done");
   });
 
+  test("a stop during a work round holds the lock until the stream lets go", async () => {
+    const chat = await chatApp();
+    const { detail, script, sessionId } = await startChat(chat, "when");
+    script.content("checking");
+    script.toolCall({
+      id: "c1",
+      name: "get_current_time",
+      arguments: '{"timezone":"UTC"}',
+    });
+    await tick();
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    // the rows are final at once
+    const reply = chat.app.sessions.message(detail.messages[1].id)!;
+    expect(reply.status).toBe("stopped");
+    expect(reply.slot).toBe("work");
+    expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
+    expect(script.aborted).toBe(true);
+    // once the stream lets go the lock is free and a new send goes
+    await tick();
+    await tick();
+    expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+    const next = chat.scripted.next();
+    const res = await chat.member.call(
+      "POST",
+      `/api/sessions/${sessionId}/messages`,
+      { body: { message: "again" } },
+    );
+    expect(res.status).toBe(201);
+    (await next).reply("ok");
+    await tick();
+    chat.app.socket.dispose();
+  });
+
   test("an old send's cleanup never frees its replacement", async () => {
     const chat = await chatApp();
     const first = await startChat(chat);
