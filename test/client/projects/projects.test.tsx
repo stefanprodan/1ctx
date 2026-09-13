@@ -186,8 +186,8 @@ describe("the pages", () => {
     project.value = { ...personal, createdAt: 0, members: [oana] };
     const html = render(<Project params={{ id: "p1" }} />);
     expect(html).toContain("yours alone");
-    expect(html).toContain("1 member</a>");
-    expect(html).toContain('class="split-face" title="Oana Pellea">OP<');
+    expect(html).toContain("1 user</a>");
+    expect(html).not.toContain("Oana Pellea");
     expect(html).toContain('href="/projects/p1/members"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
     expect(html).toContain('placeholder="Search sessions"');

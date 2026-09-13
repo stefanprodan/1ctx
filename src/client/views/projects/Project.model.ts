@@ -6,7 +6,7 @@
 import type { ProjectKind } from "../../../shared/words.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 
-// "1 member", "2 agents"
+// "1 user", "2 agents"
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }

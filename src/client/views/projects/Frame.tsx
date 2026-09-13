@@ -10,7 +10,7 @@ import type { ComponentChildren } from "preact";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
-import { initials, longDate } from "../../lib/format.ts";
+import { longDate } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
@@ -55,14 +55,10 @@ export function Frame({
               </AsideSection>
               <AsideSection label="Members">
                 <a class="split-line split-link" href={tabs[1].href}>
-                  <span class="split-faces">
-                    {shown.members.slice(0, 5).map((m) => (
-                      <span key={m.id} class="split-face" title={m.fullName}>
-                        {initials(m.fullName)}
-                      </span>
-                    ))}
+                  <span class="split-tile">
+                    <Icon name="user" size={13} />
                   </span>
-                  {plural(shown.members.length, "member")}
+                  {plural(shown.members.length, "user")}
                 </a>
                 <a class="split-line split-link" href={tabs[1].href}>
                   <span class="split-tile">

@@ -123,29 +123,6 @@
     color: var(--faint);
   }
 
-  /* the members' faces, overlapping */
-  .split-faces {
-    display: flex;
-    align-items: center;
-  }
-  .split-face {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    font-family: var(--mono);
-    font-size: var(--text-tiny);
-    font-weight: 600;
-    color: var(--dim);
-  }
-  .split-face + .split-face {
-    margin-left: -6px;
-  }
-
   @media (max-width: 1099px) {
     .split {
       flex-direction: column;
