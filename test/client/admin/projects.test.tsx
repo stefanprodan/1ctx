@@ -25,6 +25,7 @@ import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import { startSocket, type Wire } from "../../../src/client/data/socket.ts";
 import { users, usersError } from "../../../src/client/data/users.ts";
+import { Save } from "../../../src/client/lib/save.ts";
 import {
   candidateNote,
   candidates,
@@ -70,7 +71,7 @@ const caelea: UserAccount = {
 const personal: ProjectSummary = {
   id: "p1",
   kind: "personal",
-  name: "admin",
+  name: "personal",
   createdAt: 0,
   memberCount: 1,
 };
@@ -116,14 +117,13 @@ const rail = (rows: ProjectSummary[]) => Response.json({ projects: rows });
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("the words", () => {
-  test("checks the shared name rule", () => {
+  test("leaves the name rule to the server and catches an empty name", () => {
     expect(nameProblem("platform")).toBeNull();
     expect(nameProblem(" platform ")).toBeNull();
+    expect(nameProblem("a")).toBeNull();
+    expect(nameProblem("platform.team")).toBeNull();
     expect(nameProblem("")).toBe("Enter a name");
-    expect(nameProblem("a")).toContain("2 to 32");
-    expect(nameProblem("a".repeat(33))).toContain("2 to 32");
-    expect(nameProblem("Platform")).toContain("Lowercase");
-    expect(nameProblem("platform_team")).toContain("Lowercase");
+    expect(nameProblem("  ")).toBe("Enter a name");
   });
 
   test("writes the member, date, and delete counts", () => {
@@ -206,6 +206,25 @@ describe("the entity", () => {
     expect(adminProject.value).toEqual(detail);
     expect(adminProjects.value).toEqual([team]);
     expect(projects.value).toEqual([personal, team]);
+  });
+
+  test.serial("a refused name shows the server's words on save", async () => {
+    for (const [status, error] of [
+      [409, "name is taken"],
+      [
+        400,
+        "name must be 2 to 80 lowercase letters, digits, dashes and underscores",
+      ],
+    ] as const) {
+      answer = () => Response.json({ error }, { status });
+      const save = new Save(async () => {
+        await createProject({ name: "personal" });
+      });
+      await save.run(nameProblem("personal"));
+      expect(save.status.value).toEqual({ error });
+      save.dispose();
+    }
+    expect(adminProject.value).toBeNull();
   });
 
   test("update puts the detail in place and reloads the rail", async () => {

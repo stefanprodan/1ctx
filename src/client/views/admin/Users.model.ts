@@ -2,18 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the users page shows and what its forms check before they call:
-// the same rules the server applies, so a slip is caught without a
-// round trip, and the server's word is still the last.
+// an empty field, a malformed email and a mistyped password, caught
+// without a round trip. The username rule is the server's alone.
 
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import {
   isEmail,
-  isUsername,
   MAX_EMAIL,
   MAX_PASSWORD_BYTES,
-  MAX_USERNAME,
   MIN_PASSWORD,
-  MIN_USERNAME,
   type Role,
 } from "../../../shared/words.ts";
 import { longDate } from "../../lib/format.ts";
@@ -25,14 +22,10 @@ export const ROLE_CHOICES: { value: Role; label: string; text: string }[] = [
   { value: "admin", label: "Admin", text: "Runs the server." },
 ];
 
+// the field shapes the username as it is typed and the server holds
+// the rule, so the one slip worth catching here is an empty field
 export function usernameProblem(value: string): string | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return "Enter a username";
-  if (trimmed.length < MIN_USERNAME || trimmed.length > MAX_USERNAME)
-    return `${MIN_USERNAME} to ${MAX_USERNAME} characters`;
-  if (!isUsername(trimmed))
-    return "Lowercase letters, digits, dots, dashes and underscores";
-  return null;
+  return value.trim() === "" ? "Enter a username" : null;
 }
 
 export function emailProblem(value: string): string | null {

@@ -45,7 +45,7 @@ export const ADMIN_SECRET = "admin";
 // the projects port: the personal project a user is made with, inside
 // the same transaction, so a user never exists without it
 export type ProjectsPort = {
-  createPersonal(fields: { userId: string; name: string; now: number }): void;
+  createPersonal(fields: { userId: string; now: number }): void;
 };
 
 export type UserDeps = {
@@ -64,11 +64,7 @@ export type BootstrapDeps = UserDeps & {
 export function createUser(deps: UserDeps, fields: UserFields): UserRow {
   return transact(deps.db, () => {
     const user = deps.store.create(fields);
-    deps.projects.createPersonal({
-      userId: user.id,
-      name: user.username,
-      now: user.createdAt,
-    });
+    deps.projects.createPersonal({ userId: user.id, now: user.createdAt });
     return { result: user };
   });
 }

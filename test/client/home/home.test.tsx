@@ -43,7 +43,7 @@ describe("Home", () => {
       {
         id: "p1",
         kind: "personal",
-        name: "caelea",
+        name: "personal",
         createdAt: 0,
         memberCount: 1,
       },
@@ -121,7 +121,7 @@ describe("Home", () => {
     expect(html).toContain('href="/chat/s1"');
     expect(html).toContain("stream-icon-done");
     expect(html).toContain("Which pods restarted");
-    expect(html).toContain('<span class="stream-project">caelea</span>');
+    expect(html).toContain('<span class="stream-project">personal</span>');
     expect(html).toContain("assistant: nine pods");
     expect(html).toContain("2m ago");
   });

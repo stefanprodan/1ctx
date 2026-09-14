@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
-import type { ProjectKind } from "../../shared/words.ts";
+import { PERSONAL_PROJECT_NAME, type ProjectKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
@@ -117,17 +117,18 @@ export class ProjectStore {
       .map((r) => r.user_id);
   }
 
+  // among team projects: every personal project shares one name
   nameTaken(name: string, exceptId?: string): boolean {
     const found =
       exceptId === undefined
         ? this.db
             .query<{ n: number }, [string]>(
-              "select count(*) as n from projects where name = ?",
+              "select count(*) as n from projects where kind = 'team' and name = ?",
             )
             .get(name)!.n
         : this.db
             .query<{ n: number }, [string, string]>(
-              "select count(*) as n from projects where name = ? and id != ?",
+              "select count(*) as n from projects where kind = 'team' and name = ? and id != ?",
             )
             .get(name, exceptId)!.n;
     return found > 0;
@@ -184,36 +185,23 @@ export class ProjectStore {
     );
   }
 
-  // the caller owns the surrounding user rename transaction; a name the
-  // owner picked stays
-  renamePersonal(userId: string, from: string, to: string): void {
+  describePersonal(userId: string, description: string): ProjectRow | null {
     this.db
       .query(
-        "update projects set name = ? where owner_id = ? and kind = 'personal' and name = ?",
+        "update projects set description = ? where owner_id = ? and kind = 'personal'",
       )
-      .run(to, userId, from);
-  }
-
-  updatePersonal(
-    userId: string,
-    fields: { name: string; description: string },
-  ): ProjectRow | null {
-    this.db
-      .query(
-        "update projects set name = ?, description = ? where owner_id = ? and kind = 'personal'",
-      )
-      .run(fields.name, fields.description, userId);
+      .run(description, userId);
     return this.personal(userId);
   }
 
   // the user and their project must either both exist or neither does
-  createPersonal(fields: { userId: string; name: string; now: number }) {
+  createPersonal(fields: { userId: string; now: number }) {
     const id = newId();
     this.db
       .query(
         "insert into projects (id, kind, name, owner_id, created_at) values (?, 'personal', ?, ?, ?)",
       )
-      .run(id, fields.name, fields.userId, fields.now);
+      .run(id, PERSONAL_PROJECT_NAME, fields.userId, fields.now);
     this.db
       .query(
         "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",

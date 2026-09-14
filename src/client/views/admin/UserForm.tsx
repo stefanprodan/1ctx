@@ -28,6 +28,7 @@ import {
 } from "./Users.model.ts";
 import "./users.css";
 import { reason } from "../../lib/format.ts";
+import { shapedInput } from "../../lib/names.ts";
 
 function RolePick({
   value,
@@ -240,12 +241,12 @@ export function UserForm({
               placeholder="oana"
               disabled={busy}
               value={username.value}
-              onInput={bind(username)}
+              onInput={(e) => {
+                username.value = shapedInput(e);
+                save.touch();
+              }}
             />
-            <span class="hint">
-              The sign-in name and the handle. Their personal project follows
-              it.
-            </span>
+            <span class="hint">The sign-in name and the handle.</span>
           </label>
           <label class="field">
             <span class="label">Full name</span>

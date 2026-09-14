@@ -37,17 +37,10 @@ export type UsersPort = {
   createUser(fields: UserFields): UserRow;
 };
 
-export type ProjectsPort = {
-  nameTaken(name: string, exceptId?: string): boolean;
-  personal(userId: string): { id: string } | null;
-  renamePersonal(userId: string, from: string, to: string): void;
-};
-
 export type UsersRoutesDeps = {
   db: Db;
   logins: LoginStore;
   users: UsersPort;
-  projects: ProjectsPort;
   clock: Clock;
 };
 
@@ -90,9 +83,6 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         const passwordHash = await hashPassword(parsed.password);
         const user = transact(deps.db, () => {
           usernameAvailable(parsed.username, null);
-          if (deps.projects.nameTaken(parsed.username)) {
-            throw new Conflict("project name is taken");
-          }
           emailAvailable(parsed.email, null);
           return {
             result: deps.users.createUser({
@@ -124,17 +114,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             patch.username !== user.username
           ) {
             usernameAvailable(patch.username, user.id);
-            // the user's own project may already carry the name they take
-            const own = deps.projects.personal(user.id)?.id;
-            if (deps.projects.nameTaken(patch.username, own)) {
-              throw new Conflict("project name is taken");
-            }
             deps.users.setUsername(user.id, patch.username);
-            deps.projects.renamePersonal(
-              user.id,
-              user.username,
-              patch.username,
-            );
           }
           if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);

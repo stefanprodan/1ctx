@@ -4,6 +4,7 @@
 import type {
   AddMemberRequest,
   CreateProjectRequest,
+  UpdatePersonalProjectRequest,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import {
@@ -12,6 +13,7 @@ import {
   MAX_DESCRIPTION,
   MAX_NAME,
   MIN_NAME,
+  NAME_CHARACTERS,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -19,7 +21,7 @@ import { BadRequest } from "../lib/errors.ts";
 function parseName(value: unknown): string {
   if (!isName(value)) {
     throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} lowercase letters, digits and dashes`,
+      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
     );
   }
   return value;
@@ -56,6 +58,14 @@ export function parseUpdateProject(body: unknown): UpdateProjectRequest {
       ? {}
       : { description: parseDescription(b.description) }),
   };
+}
+
+// a personal project is always named personal; its owner describes it
+export function parseUpdatePersonalProject(
+  body: unknown,
+): UpdatePersonalProjectRequest {
+  const b = fields(body, ["description"]);
+  return { description: parseDescription(b.description) };
 }
 
 export function parseAddMember(body: unknown): AddMemberRequest {

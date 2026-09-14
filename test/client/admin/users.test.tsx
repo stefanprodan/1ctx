@@ -115,14 +115,12 @@ describe("the words", () => {
 });
 
 describe("the checks", () => {
-  test("the username rule", () => {
+  test("leaves the username rule to the server and catches an empty one", () => {
     expect(usernameProblem("caelea")).toBeNull();
-    expect(usernameProblem(" caelea ")).toBeNull();
+    expect(usernameProblem("ab")).toBeNull();
+    expect(usernameProblem("-caelea")).toBeNull();
     expect(usernameProblem("")).toBe("Enter a username");
-    expect(usernameProblem("ab")).toContain("3 to 32");
-    expect(usernameProblem("a".repeat(33))).toContain("3 to 32");
-    expect(usernameProblem("Oana")).toContain("Lowercase");
-    expect(usernameProblem("-caelea")).toContain("Lowercase");
+    expect(usernameProblem("  ")).toBe("Enter a username");
   });
 
   test("the email rule", () => {

@@ -14,5 +14,7 @@ export type ProjectResponse = { project: ProjectDetail };
 export type CreateProjectRequest = { name: string; description?: string };
 // at least one of the two
 export type UpdateProjectRequest = { name?: string; description?: string };
+// PATCH /api/profile/project: the name is always personal
+export type UpdatePersonalProjectRequest = { description: string };
 export type AddMemberRequest = { userId: string };
 export type DeleteProjectResponse = { deleted: number };

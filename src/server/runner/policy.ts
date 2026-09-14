@@ -10,7 +10,7 @@
 // same moment, copied onto the policy so a send runs under the caps it
 // started on whatever an admin changes later.
 
-import type { Effort } from "../../shared/words.ts";
+import type { Effort, ProjectKind } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -43,6 +43,7 @@ export type ToolsPort = {
 export type SendPolicy = {
   projectId: string;
   projectName: string;
+  projectKind: ProjectKind;
   projectDescription: string;
   userId: string;
   username: string;
@@ -66,7 +67,7 @@ export type SendPolicy = {
 const NONE: Offered = { tools: [], search: null };
 
 export function buildPolicy(input: {
-  project: Pick<ProjectRow, "id" | "name" | "description">;
+  project: Pick<ProjectRow, "id" | "kind" | "name" | "description">;
   user: UserRow;
   agent: AgentRow;
   now: number;
@@ -85,6 +86,7 @@ export function buildPolicy(input: {
   return {
     projectId: input.project.id,
     projectName: input.project.name,
+    projectKind: input.project.kind,
     projectDescription: input.project.description,
     userId: user.id,
     username: user.username,

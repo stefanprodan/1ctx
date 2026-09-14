@@ -28,6 +28,7 @@ import {
   MAX_USERNAME,
   MIN_PASSWORD,
   MIN_USERNAME,
+  NAME_CHARACTERS,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -68,7 +69,7 @@ export function parseLogin(body: unknown): LoginRequest {
 export function parseUsername(value: unknown): string {
   if (!isUsername(value)) {
     throw new BadRequest(
-      `username must be ${MIN_USERNAME} to ${MAX_USERNAME} lowercase letters, digits, dots, dashes or underscores`,
+      `username must be ${MIN_USERNAME} to ${MAX_USERNAME} ${NAME_CHARACTERS}`,
     );
   }
   return value;

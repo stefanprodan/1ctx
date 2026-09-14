@@ -41,7 +41,7 @@ const caelea: Me = {
 const personal = {
   id: "p1",
   kind: "personal" as const,
-  name: "caelea",
+  name: "personal",
   createdAt: 0,
   memberCount: 1,
 };
@@ -67,15 +67,14 @@ describe("the projects entity", () => {
     async () => {
       const saved = {
         ...personal,
-        name: "notes",
         description: "Scratch work",
         chats: 0,
         members: [caelea],
       };
-      project.value = { ...saved, name: "caelea", description: "" };
+      project.value = { ...saved, description: "" };
       projectError.value = "stale failure";
       answer = () => ({ project: saved, projects: [saved] });
-      await savePersonalProject({ name: "notes" });
+      await savePersonalProject({ description: "Scratch work" });
       expect(project.value).toEqual(saved);
       expect(projectError.value).toBeNull();
     },
@@ -219,7 +218,7 @@ describe("the rail", () => {
     expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
       html.indexOf('href="/projects/p2"'),
     );
-    expect(html).toContain('href="/projects/p1" class="rail-sub">caelea<');
+    expect(html).toContain('href="/projects/p1" class="rail-sub">personal<');
   });
 
   test("marks the project on screen as the current page", () => {
@@ -286,7 +285,7 @@ describe("the pages", () => {
     projects.value = [personal];
     const html = render(<Projects />);
     expect(html).toContain('class="projects-row" href="/projects/p1"');
-    expect(html).toContain(">caelea<");
+    expect(html).toContain(">personal<");
     expect(html).toContain(">personal<");
   });
 
@@ -312,7 +311,7 @@ describe("the pages", () => {
     expect(html).not.toContain("@caelea");
     projectAgents.value = null;
     expect(render(<Project params={{ id: "p1" }} />)).toContain(
-      'placeholder="Start a chat in caelea"',
+      'placeholder="Start a chat in personal"',
     );
     expect(render(<Project params={{ id: "p9" }} />)).toContain("Loading");
   });
@@ -334,7 +333,7 @@ describe("the pages", () => {
     expect(html).not.toContain("personal project");
   });
 
-  test("Settings is a form for a personal project, a note for a team", () => {
+  test("Settings describes a personal project, a note for a team", () => {
     project.value = {
       ...personal,
       description: "Scratch work",
@@ -345,8 +344,8 @@ describe("the pages", () => {
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/projects/p1/settings"',
     );
-    expect(html).toContain('name="name"');
-    expect(html).toContain('value="caelea"');
+    // a personal project is always named personal, so no name field
+    expect(html).not.toContain('name="name"');
     expect(html).toContain(">Scratch work</textarea>");
     expect(html).toContain("What agents should know about it.");
     expect(html).toContain('class="section-form"');
@@ -354,7 +353,7 @@ describe("the pages", () => {
     html = render(<Settings params={{ id: "p1" }} />);
     // a team has no Settings tab, and Members is not the page shown
     expect(html).not.toContain("tabs-tab-on");
-    expect(html).not.toContain('name="name"');
+    expect(html).not.toContain('name="description"');
     expect(html).toContain("An admin manages a team project.");
   });
 

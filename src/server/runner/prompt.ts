@@ -15,9 +15,20 @@ export function dateLine(now: number): string {
   return `Today is ${new Date(now).toISOString().slice(0, 10)}.`;
 }
 
-function projectLine(name: string, description: string): string {
-  const about = description.trim();
-  return `You work in the ${name} project${about === "" ? "." : `: ${about}`}`;
+// a personal project is only ever its owner's, who is the one talking,
+// and every one is named personal, so the owner names it
+function projectLine(
+  policy: Pick<
+    SendPolicy,
+    "projectName" | "projectKind" | "projectDescription" | "username"
+  >,
+): string {
+  const about = policy.projectDescription.trim();
+  const where =
+    policy.projectKind === "personal"
+      ? `@${policy.username}'s personal project`
+      : `the ${policy.projectName} project`;
+  return `You work in ${where}${about === "" ? "." : `: ${about}`}`;
 }
 
 function userLine(fullName: string, username: string, about: string): string {
@@ -30,6 +41,7 @@ export function systemPrompt(
     SendPolicy,
     | "prompt"
     | "projectName"
+    | "projectKind"
     | "projectDescription"
     | "fullName"
     | "username"
@@ -40,7 +52,7 @@ export function systemPrompt(
   const parts: string[] = [];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
   parts.push(
-    `${projectLine(policy.projectName, policy.projectDescription)}\n${userLine(
+    `${projectLine(policy)}\n${userLine(
       policy.fullName,
       policy.username,
       policy.about,

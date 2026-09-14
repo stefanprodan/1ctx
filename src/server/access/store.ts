@@ -83,8 +83,7 @@ export class LoginStore {
     this.db.query("delete from logins where id = ?").run(id);
   }
 
-  // every login of a user but one: a password change keeps the tab
-  // that changed it
+  // a password change keeps the tab that changed it
   deleteOthers(userId: string, keepId: string): number {
     return this.db
       .query("delete from logins where user_id = ? and id != ?")
@@ -96,8 +95,7 @@ export class LoginStore {
       .changes;
   }
 
-  // the rows whose expiry passed, dropped, and who they belonged to,
-  // so the sockets behind them can be closed
+  // the owners come back so the sockets behind them can be closed
   deleteExpired(now: number): { id: string; userId: string }[] {
     const rows = this.db
       .query<{ id: string; user_id: string }, [number]>(

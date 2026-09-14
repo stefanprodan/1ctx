@@ -4,12 +4,7 @@
 // The words for a project, its tabs, and the check of its name.
 
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
-import {
-  isName,
-  MAX_NAME,
-  MIN_NAME,
-  type ProjectKind,
-} from "../../../shared/words.ts";
+import type { ProjectKind } from "../../../shared/words.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 
 // "1 user", "2 agents"
@@ -18,7 +13,7 @@ export function plural(n: number, word: string): string {
 }
 
 // a team's people are its Members; a personal project has one person,
-// who names and describes it in Settings
+// who describes it in Settings
 export function tabsOf(id: string, kind: ProjectKind): Tab[] {
   return [
     { label: "Feed", href: `/projects/${id}` },
@@ -40,12 +35,8 @@ export function aboutLine(
   return project.kind === "personal" ? "Your personal project" : null;
 }
 
+// the field shapes the name as it is typed and the server holds the
+// rule, so the one slip worth catching here is an empty field
 export function nameProblem(value: string): string | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return "Enter a name";
-  if (trimmed.length < MIN_NAME || trimmed.length > MAX_NAME) {
-    return `${MIN_NAME} to ${MAX_NAME} characters`;
-  }
-  if (!isName(trimmed)) return "Lowercase letters, digits and dashes";
-  return null;
+  return value.trim() === "" ? "Enter a name" : null;
 }

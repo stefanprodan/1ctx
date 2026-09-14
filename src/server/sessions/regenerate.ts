@@ -1,9 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regeneration keeps the last user row, removes every row after it and
-// assigns that row to the replacement send. Later rows may belong to
-// compact sends, so every send represented by the replaced tail goes.
+// The rows after the last user message may belong to compact sends, so
+// every send in the replaced tail goes, not only the user message's.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";

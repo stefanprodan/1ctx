@@ -40,10 +40,8 @@ export type Projects = {
   isMember(projectId: string, userId: string): boolean;
   memberProjectIds(userId: string): string[];
   teamProjectIds(): string[];
-  nameTaken(name: string, exceptId?: string): boolean;
   personal(userId: string): ProjectRow | null;
-  renamePersonal(userId: string, from: string, to: string): void;
-  createPersonal(fields: { userId: string; name: string; now: number }): void;
+  createPersonal(fields: { userId: string; now: number }): void;
   routes: RouteDescriptor[];
 };
 
@@ -55,10 +53,7 @@ export function projectsArea(deps: ProjectsDeps): Projects {
     isMember: (projectId, userId) => store.isMember(projectId, userId),
     memberProjectIds: (userId) => store.memberProjectIds(userId),
     teamProjectIds: () => store.teamProjectIds(),
-    nameTaken: (name, exceptId) => store.nameTaken(name, exceptId),
     personal: (userId) => store.personal(userId),
-    renamePersonal: (userId, from, to) =>
-      store.renamePersonal(userId, from, to),
     createPersonal: (fields) => {
       store.createPersonal(fields);
     },

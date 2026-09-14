@@ -33,6 +33,7 @@ const policy: SendPolicy = {
   fullName: "Oana Mangiurea",
   about: "I run clusters.",
   projectName: "ops",
+  projectKind: "team",
   projectDescription: "Incidents and pages.",
   agentId: "a",
   agentName: "coder",
@@ -110,6 +111,22 @@ describe("systemPrompt", () => {
       ),
     ).toBe(
       `You work in the ops project.\nYou talk to @caelea (Oana Mangiurea).\n\n${dateLine(NOW)}`,
+    );
+  });
+
+  test("names a personal project by its owner, not by its name", () => {
+    expect(
+      systemPrompt(
+        {
+          ...policy,
+          prompt: "",
+          projectKind: "personal",
+          projectName: "personal",
+        },
+        NOW,
+      ),
+    ).toBe(
+      `You work in @caelea's personal project: Incidents and pages.\nYou talk to @caelea (Oana Mangiurea): I run clusters.\n\n${dateLine(NOW)}`,
     );
   });
 });

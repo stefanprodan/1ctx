@@ -102,6 +102,7 @@ export function history(
     SendPolicy,
     | "prompt"
     | "projectName"
+    | "projectKind"
     | "projectDescription"
     | "fullName"
     | "about"

@@ -158,15 +158,23 @@ violation, and every rule has a rejected fixture under
   `UserSummary` never carries the email or the flags; `Me` carries
   the flag, `UserAccount` and `Profile` carry all. Session is the
   domain noun and never means a cookie.
+- **Names follow Slack's channel rule.** A project, an agent and a
+  provider name is `isName` in `shared/words.ts`: 2 to 80 lowercase
+  ASCII letters, digits, dashes and underscores, starting with a letter
+  or a digit; a username is the same characters, 3 to 32. A name field
+  runs `shapeName()` on input (lowercase, a space or a dot becomes a
+  dash), shows no rule hint and checks only that it is not empty; the
+  server's 400 is the rule's only words.
 - **Everything is in a project.** A user is made with its personal
-  project, named after the username, in one transaction through
-  `createUser()` in `users/`; nothing else creates a user, tests
-  included. A personal project is its owner's alone, an admin
-  included; its owner names and describes it through `PATCH
-  /api/profile/project`, and a username rename renames it only while
-  it still has the old username. Admins make, rename, describe, fill
-  and delete team projects; names are unique across personal and team
-  projects. A project's description is one trimmed line
+  project in one transaction through `createUser()` in `users/`;
+  nothing else creates a user, tests included. Every personal project
+  is named `personal` (a table check holds it), and the name is
+  reserved: a team project named `personal` is a 409. A personal
+  project is its owner's alone, an admin included; its owner only
+  describes it, through `PATCH /api/profile/project`, and a username
+  rename leaves it alone. The system prompt names it by its owner.
+  Admins make, rename, describe, fill and delete team projects; team
+  project names are unique. A project's description is one trimmed line
   (`isDescription`) that goes into the system prompt after the agent's
   prompt, only when set. A team project is open to its members and to
   admins. Deleting one takes its chats and their

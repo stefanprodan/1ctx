@@ -8,6 +8,7 @@ import type {
 } from "../../shared/api/projects.ts";
 import type { ProjectDetail } from "../../shared/contracts/project.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
+import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -17,6 +18,7 @@ import { type UserRow, summary as userSummary } from "../users/index.ts";
 import {
   parseAddMember,
   parseCreateProject,
+  parseUpdatePersonalProject,
   parseUpdateProject,
 } from "./parse.ts";
 import { type ProjectRow, type ProjectStore, summary } from "./store.ts";
@@ -75,6 +77,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       chats: deps.sessions.count(project.id),
     };
   };
+  // a reserved name reads as taken, since a personal project holds it
+  const nameAvailable = (name: string, exceptId?: string) => {
+    if (
+      RESERVED_PROJECT_NAMES.includes(name) ||
+      deps.store.nameTaken(name, exceptId)
+    ) {
+      throw new Conflict("name is taken");
+    }
+  };
   function writeName<T>(write: () => T): T {
     try {
       return write();
@@ -106,9 +117,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const { name, description } = parseCreateProject(await jsonBody(req));
         const project = transact(deps.db, () => {
-          if (deps.store.nameTaken(name)) {
-            throw new Conflict("name is taken");
-          }
+          nameAvailable(name);
           const created = writeName(() =>
             deps.store.createTeam({
               ownerId: ctx.principal!.userId,
@@ -151,9 +160,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const project = transact(deps.db, () => {
           const current = findTeam(ctx.params.id);
           const name = change.name ?? current.name;
-          if (deps.store.nameTaken(name, current.id)) {
-            throw new Conflict("name is taken");
-          }
+          nameAvailable(name, current.id);
           const updated = writeName(() =>
             deps.store.update(current.id, {
               name,
@@ -168,27 +175,16 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
-      // the caller's own personal project, the one project a member names
-      // and describes
+      // the caller's own personal project, the one project a member
+      // describes
       method: "PATCH",
       path: "/api/profile/project",
       policy: "authenticated",
       async handle(req, ctx) {
-        const change = parseUpdateProject(await jsonBody(req));
+        const { description } = parseUpdatePersonalProject(await jsonBody(req));
         const userId = ctx.principal!.userId;
         const project = transact(deps.db, () => {
-          const current = deps.store.personal(userId);
-          if (current === null) throw new NotFound("no such project");
-          const name = change.name ?? current.name;
-          if (deps.store.nameTaken(name, current.id)) {
-            throw new Conflict("name is taken");
-          }
-          const updated = writeName(() =>
-            deps.store.updatePersonal(userId, {
-              name,
-              description: change.description ?? current.description,
-            }),
-          );
+          const updated = deps.store.describePersonal(userId, description);
           if (updated === null) throw new NotFound("no such project");
           return { result: detail(updated) };
         });

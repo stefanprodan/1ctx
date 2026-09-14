@@ -37,6 +37,15 @@ describe("parseProvider", () => {
     expect(parseProvider({ ...router, keyName: null }).keyName).toBeNull();
   });
 
+  test("takes the shared name rule, underscores and 80 characters", () => {
+    expect(parseProvider({ ...router, name: "mlx_serve" }).name).toBe(
+      "mlx_serve",
+    );
+    expect(
+      parseProvider({ ...router, name: "a".repeat(80) }).name,
+    ).toHaveLength(80);
+  });
+
   refuses(
     [
       null,
@@ -44,6 +53,8 @@ describe("parseProvider", () => {
       { ...router, extra: 1 },
       { ...router, name: "R" },
       { ...router, name: "a" },
+      { ...router, name: "mlx.serve" },
+      { ...router, name: "a".repeat(81) },
       { ...router, wire: "anthropic" },
       { ...router, wire: "openai" },
       { ...router, baseUrl: "models.test/v1" },

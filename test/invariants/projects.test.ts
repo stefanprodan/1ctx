@@ -21,19 +21,19 @@ const member = async (app: Awaited<ReturnType<typeof testApp>>) =>
   });
 
 describe("the personal project", () => {
-  test("is made with the user, named after them, with them as the member", async () => {
+  test("is made with the user, named personal, with them as the member", async () => {
     const app = await testApp();
     const admin = app.users.byUsername("admin")!;
     const project = app.projects.personal(admin.id);
     expect(project).toMatchObject({
       kind: "personal",
-      name: "admin",
+      name: "personal",
       ownerId: admin.id,
       createdAt: admin.createdAt,
     });
     expect(app.projects.isMember(project!.id, admin.id)).toBe(true);
     const caelea = await member(app);
-    expect(app.projects.personal(caelea.id)?.name).toBe("caelea");
+    expect(app.projects.personal(caelea.id)?.name).toBe("personal");
   });
 
   test("a user is never made without it", async () => {
@@ -43,11 +43,7 @@ describe("the personal project", () => {
     const admin = app.users.byUsername("admin")!;
     expect(() =>
       app.db.transaction(() => {
-        app.projects.createPersonal({
-          userId: admin.id,
-          name: "again",
-          now: 0,
-        });
+        app.projects.createPersonal({ userId: admin.id, now: 0 });
       })(),
     ).toThrow();
     const before = app.users.count();
@@ -115,7 +111,7 @@ describe("GET /api/projects", () => {
         {
           id: expect.any(String),
           kind: "personal",
-          name: "admin",
+          name: "personal",
           createdAt: expect.any(Number),
           memberCount: 1,
         },
@@ -145,7 +141,7 @@ describe("GET /api/projects/:id", () => {
       project: {
         id: project.id,
         kind: "personal",
-        name: "admin",
+        name: "personal",
         createdAt: admin.createdAt,
         memberCount: 1,
         description: "",

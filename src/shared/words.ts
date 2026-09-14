@@ -12,17 +12,30 @@ export function isRole(value: unknown): value is Role {
   );
 }
 
-// a username: the sign-in name and the handle. Lowercase, starts with
-// a letter or digit, then letters, digits, dot, dash and underscore
+// a name on the server, the way Slack names a channel: lowercase letters,
+// digits, dashes and underscores, starting with a letter or a digit.
+// ASCII only, so lowercasing needs no locale and no lookalike slips past
+// a uniqueness check. Projects, agents and providers take it as it is;
+// a username takes it with its own length
+const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
+export const NAME_CHARACTERS =
+  "lowercase letters, digits, dashes and underscores";
+
+// what a name field does as it is typed: lowercase, and a space or a dot
+// becomes a dash. Anything else stays for the server to refuse
+export function shapeName(value: string): string {
+  return value.toLowerCase().replace(/[ .]/g, "-");
+}
+
+// a username: the sign-in name and the handle
 export const MIN_USERNAME = 3;
 export const MAX_USERNAME = 32;
-export const USERNAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
 export function isUsername(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length >= MIN_USERNAME &&
     value.length <= MAX_USERNAME &&
-    USERNAME_RE.test(value)
+    NAME_RE.test(value)
   );
 }
 
@@ -96,12 +109,10 @@ export function isProjectKind(value: unknown): value is ProjectKind {
   );
 }
 
-// a name an admin gives a thing on the server: a provider, an agent,
-// an automation. Lowercase letters, digits and dashes, short enough for
-// a rail row
+// a name an admin gives a thing on the server: a project, a provider, an
+// agent
 export const MIN_NAME = 2;
-export const MAX_NAME = 32;
-export const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+export const MAX_NAME = 80;
 export function isName(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -110,6 +121,12 @@ export function isName(value: unknown): value is string {
     NAME_RE.test(value)
   );
 }
+
+// every personal project is named this, so a team project may not be
+export const PERSONAL_PROJECT_NAME = "personal";
+export const RESERVED_PROJECT_NAMES: readonly string[] = [
+  PERSONAL_PROJECT_NAME,
+];
 
 // the wire a provider speaks: OpenRouter, with its catalog, prices and
 // reasoning object, or any server speaking the OpenAI chat completions

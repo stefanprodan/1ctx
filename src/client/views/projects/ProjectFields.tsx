@@ -6,6 +6,7 @@
 // lines and is one line on the wire.
 
 import { MAX_DESCRIPTION } from "../../../shared/words.ts";
+import { shapedInput } from "../../lib/names.ts";
 
 const LINE_BREAKS = /[\n\r\v\f\u0085\u2028\u2029]+/g;
 
@@ -34,11 +35,8 @@ export function NameField({
         placeholder={placeholder}
         disabled={disabled}
         value={value}
-        onInput={(event) =>
-          onInput((event.currentTarget as HTMLInputElement).value)
-        }
+        onInput={(event) => onInput(shapedInput(event))}
       />
-      <span class="hint">Lowercase letters, digits and dashes.</span>
     </label>
   );
 }
