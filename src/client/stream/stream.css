@@ -44,7 +44,7 @@
     color: var(--fg);
   }
 
-  /* the icon says chat; its colour says the status */
+  /* the icon says chat or run; its colour says the status */
   .stream-icon {
     flex-shrink: 0;
     color: var(--faint);
@@ -90,15 +90,6 @@
 
   .stream-author {
     color: var(--brand);
-  }
-
-  /* a run is under its automation, the clock before the name */
-  .stream-run {
-    color: var(--brand);
-  }
-  .stream-run-icon {
-    margin-right: 3px;
-    vertical-align: -2px;
   }
 
   /* the head's filter beside the search: Runs, on or off */

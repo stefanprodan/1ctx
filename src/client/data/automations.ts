@@ -28,6 +28,8 @@ import { applyAutomationFrame } from "./stream.ts";
 
 export const automations = signal<AutomationSummary[] | null>(null);
 export const automationsError = signal<string | null>(null);
+// the run deadline limit a row with no deadline runs under, in ms
+export const runDeadlineMs = signal<number | null>(null);
 // the open row's runs, newest first; null while they load
 export const runs = signal<{ id: string; rows: StreamRow[] | null } | null>(
   null,
@@ -47,8 +49,17 @@ effect(() => {
   runsTurn++;
   automations.value = null;
   automationsError.value = null;
+  runDeadlineMs.value = null;
   runs.value = null;
 });
+
+// how many automations the project has, null while its list is not the
+// one held; the list goes to null whenever the project changes, so a
+// reader of this follows the signal
+export function automationCount(projectId: string): number | null {
+  const list = automations.value;
+  return list === null || projectFor !== projectId ? null : list.length;
+}
 
 const byName = (a: AutomationSummary, b: AutomationSummary) =>
   a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
@@ -89,6 +100,7 @@ export async function loadAutomations(projectId: string): Promise<void> {
   const turn = ++listTurn;
   if (projectFor !== projectId) {
     automations.value = null;
+    runDeadlineMs.value = null;
     runs.value = null;
     runsTurn++;
   }
@@ -99,6 +111,7 @@ export async function loadAutomations(projectId: string): Promise<void> {
       `/api/projects/${encodeURIComponent(projectId)}/automations`,
     );
     if (owner === forUser && listTurn === turn) {
+      runDeadlineMs.value = body.runDeadlineMs;
       // a frame that landed while the answer was in flight keeps its word
       const held = automations.value ?? [];
       automations.value = body.automations.reduce(

@@ -119,6 +119,7 @@ export const ROUTES: Route[] = [
         loadProject(params.id),
         loadList({ project: params.id, q: query.get("q")?.trim() ?? "" }),
         loadProjectAgents(params.id),
+        loadAutomations(params.id),
         loadRecentDays(),
       ]);
     },
@@ -150,6 +151,7 @@ export const ROUTES: Route[] = [
       await Promise.all([
         loadProject(params.id),
         loadProjectAgents(params.id),
+        loadAutomations(params.id),
         loadRecentDays(),
       ]);
     },
@@ -165,6 +167,7 @@ export const ROUTES: Route[] = [
       await Promise.all([
         loadProject(params.id),
         loadProjectAgents(params.id),
+        loadAutomations(params.id),
         loadRecentDays(),
       ]);
     },

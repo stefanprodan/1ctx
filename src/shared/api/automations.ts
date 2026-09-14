@@ -8,8 +8,12 @@
 import type { AutomationSummary } from "../contracts/automation.ts";
 import type { StreamRow } from "./sessions.ts";
 
-// GET /api/projects/:id/automations: the project's rows, by name
-export type AutomationsResponse = { automations: AutomationSummary[] };
+// GET /api/projects/:id/automations: the project's rows, by name, and
+// the run deadline limit, the deadline a row with none runs under
+export type AutomationsResponse = {
+  automations: AutomationSummary[];
+  runDeadlineMs: number;
+};
 
 // POST /api/projects/:id/automations (201), GET, PATCH and
 // POST /api/automations/:id/suspend|resume answer the row

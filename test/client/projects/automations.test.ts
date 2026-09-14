@@ -3,26 +3,32 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  automationCount,
   automations,
   loadAutomations,
   loadRuns,
   onAutomationsSocket,
+  runDeadlineMs,
   runs,
   upsertAutomation,
   upsertRun,
 } from "../../../src/client/data/automations.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { placeOf } from "../../../src/client/lib/places.ts";
+import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import {
   canChange,
   type Draft,
   dirtyOf,
   draftOf,
   eventNote,
+  followDeadlineLimit,
   lastLine,
   metaLine,
   requestOf,
   scheduleLine,
   scheduleWords,
+  zoneOptions,
 } from "../../../src/client/views/projects/Automations.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
@@ -191,29 +197,31 @@ describe("the row's words", () => {
   });
 });
 
+const LIMIT = 600_000;
+
 describe("the form", () => {
   const filled = (changes: Partial<Draft> = {}): Draft => ({
-    ...draftOf(null, "a1", "UTC"),
+    ...draftOf(null, "a1", "UTC", LIMIT),
     name: "nightly",
     instructions: "Check the clusters",
     ...changes,
   });
 
-  test("a new draft starts on weekdays at nine in the given zone", () => {
-    expect(draftOf(null, "a1", "Europe/Bucharest")).toEqual({
+  test("a new draft starts on weekdays at nine, at the deadline limit", () => {
+    expect(draftOf(null, "a1", "Europe/Bucharest", LIMIT)).toEqual({
       name: "",
       agentId: "a1",
       instructions: "",
       schedule: "0 9 * * MON-FRI",
       tz: "Europe/Bucharest",
-      deadline: "",
+      deadline: "10",
       retention: "30",
     });
   });
 
   test("the body trims, turns minutes into ms and leaves the rest to the server", () => {
     expect(
-      requestOf(filled({ deadline: " 5 ", schedule: " * * * * * " })),
+      requestOf(filled({ deadline: " 5 ", schedule: " * * * * * " }), LIMIT),
     ).toEqual({
       body: {
         name: "nightly",
@@ -225,37 +233,95 @@ describe("the form", () => {
         retentionDays: 30,
       },
     });
-    const empty = requestOf(filled({ deadline: "" }));
+    const empty = requestOf(filled({ deadline: "" }), LIMIT);
     expect("body" in empty && empty.body.deadlineMs).toBeNull();
+    // the limit itself goes as none, so the row follows the limit
+    const atLimit = requestOf(filled({ deadline: "10" }), LIMIT);
+    expect("body" in atLimit && atLimit.body.deadlineMs).toBeNull();
+    const part = requestOf(filled({ deadline: "1.5" }), LIMIT);
+    expect("body" in part && part.body.deadlineMs).toBe(90_000);
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {
-    expect(requestOf(filled({ name: " " }))).toEqual({
+    expect(requestOf(filled({ name: " " }), LIMIT)).toEqual({
       problem: "Name is empty",
     });
-    expect(requestOf(filled({ agentId: "" }))).toEqual({
+    expect(requestOf(filled({ agentId: "" }), LIMIT)).toEqual({
       problem: "Pick an agent",
     });
-    expect(requestOf(filled({ schedule: "" }))).toEqual({
+    expect(requestOf(filled({ schedule: "" }), LIMIT)).toEqual({
       problem: "Schedule is empty",
     });
-    expect(requestOf(filled({ deadline: "1.5" }))).toEqual({
-      problem: "Deadline needs whole minutes",
+    expect(requestOf(filled({ deadline: "ten" }), LIMIT)).toEqual({
+      problem: "Deadline needs a number of minutes",
     });
-    expect(requestOf(filled({ retention: "" }))).toEqual({
-      problem: "Keep runs needs whole days",
+    expect(requestOf(filled({ retention: "" }), LIMIT)).toEqual({
+      problem: "History retention needs whole days",
     });
     // out of range is the server's word
-    expect("body" in requestOf(filled({ retention: "9999" }))).toBe(true);
+    expect("body" in requestOf(filled({ retention: "9999" }), LIMIT)).toBe(
+      true,
+    );
   });
 
   test("a draft is dirty when a field moved off the row", () => {
     const row = automation({ deadlineMs: 120_000 });
-    const same = draftOf(row, "ignored", "ignored");
+    const same = draftOf(row, "ignored", "ignored", LIMIT);
     expect(same.deadline).toBe("2");
-    expect(dirtyOf(same, row)).toBe(false);
-    expect(dirtyOf({ ...same, schedule: "0 10 * * *" }, row)).toBe(true);
-    expect(dirtyOf(same, null)).toBe(true);
+    expect(dirtyOf(same, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...same, schedule: "0 10 * * *" }, row, LIMIT)).toBe(true);
+    expect(dirtyOf(same, null, LIMIT)).toBe(true);
+    // a row with no deadline shows the limit and is not dirty for it
+    const none = automation({ deadlineMs: null });
+    const shown = draftOf(none, "ignored", "ignored", LIMIT);
+    expect(shown.deadline).toBe("10");
+    expect(dirtyOf(shown, none, LIMIT)).toBe(false);
+  });
+
+  test("an untouched deadline follows a limit changed under the form", () => {
+    const row = automation({ deadlineMs: null });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    const lowered = followDeadlineLimit(shown, false, row, 300_000);
+    expect(lowered.deadline).toBe("5");
+    expect(requestOf(lowered, 300_000)).toMatchObject({
+      body: { deadlineMs: null },
+    });
+    expect(followDeadlineLimit(shown, true, row, 300_000)).toBe(shown);
+    const fixed = automation({ deadlineMs: 120_000 });
+    expect(followDeadlineLimit(shown, false, fixed, 300_000)).toBe(shown);
+  });
+});
+
+describe("the pickers", () => {
+  test("a zone is found by its city or its country, accents folded", () => {
+    const at = Date.UTC(2026, 0, 15, 12);
+    const zones = zoneOptions(Intl.supportedValuesOf("timeZone"), "", at);
+    const find = (q: string) => filterOptions(zones, q).map((z) => z.value);
+    expect(find("cluj")).toEqual(["Europe/Bucharest"]);
+    expect(find("romania")).toEqual(["Europe/Bucharest"]);
+    expect(find("san francisco")).toEqual(["America/Los_Angeles"]);
+    expect(find("munich")).toEqual(["Europe/Berlin"]);
+    expect(find("Zürich")).toEqual(["Europe/Zurich"]);
+    expect(find("bangalore")).toHaveLength(1);
+    expect(find("london")).toContain("Europe/London");
+    expect(placeOf("Asia/Calcutta")).toEqual(placeOf("Asia/Kolkata"));
+  });
+
+  test("a zone carries its offset, and a link the list leaves out stays", () => {
+    const at = Date.UTC(2026, 0, 15, 12);
+    const zones = zoneOptions(
+      ["Europe/Bucharest", "America/New_York"],
+      "UTC",
+      at,
+    );
+    expect(zones.map((z) => [z.label, z.detail])).toEqual([
+      ["UTC", "GMT"],
+      ["Europe/Bucharest", "GMT+2 · Romania"],
+      ["America/New_York", "GMT-5 · United States"],
+    ]);
+    expect(
+      zoneOptions(["Europe/Bucharest"], "Europe/Bucharest", at).length,
+    ).toBe(1);
   });
 });
 
@@ -299,9 +365,13 @@ describe("the entity over the socket", () => {
     globalThis.fetch = (async () =>
       Response.json({
         automations: [automation()],
+        runDeadlineMs: LIMIT,
       })) as unknown as typeof fetch;
     await loadAutomations("p1");
     expect(automations.value?.map((a) => a.revision)).toEqual([1]);
+    expect(automationCount("p1")).toBe(1);
+    expect(automationCount("p2")).toBeNull();
+    expect(runDeadlineMs.value).toBe(LIMIT);
 
     onAutomationsSocket({
       type: "automation",
@@ -321,7 +391,9 @@ describe("the entity over the socket", () => {
       projectId: "p1",
       automation: automation({ id: "au2", name: "added", revision: 1 }),
     });
-    release(Response.json({ automations: [automation()] }));
+    release(
+      Response.json({ automations: [automation()], runDeadlineMs: LIMIT }),
+    );
     await stale;
     expect(automations.value?.map((a) => a.id)).toEqual(["au2", "au1"]);
 
@@ -341,6 +413,7 @@ describe("the entity over the socket", () => {
           automation(),
           automation({ id: "au2", name: "added", revision: 1 }),
         ],
+        runDeadlineMs: LIMIT,
       }),
     );
     await staleDelete;

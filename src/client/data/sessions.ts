@@ -73,6 +73,7 @@ let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
 let stream: { sendId: string; seq: number } | null = null;
 let agentsTurn = 0;
+let agentsFor: string | null = null;
 
 const clock = () => Date.now();
 
@@ -86,6 +87,7 @@ effect(() => {
   live.value = new Map();
   toolResults.value = new Map();
   projectAgents.value = null;
+  agentsFor = null;
   homeProjectId.value = null;
   sending.value = false;
   pending = null;
@@ -184,9 +186,16 @@ export async function loadToolResult(messageId: string): Promise<void> {
   }
 }
 
+export function projectAgentCount(projectId: string): number | null {
+  const list = projectAgents.value;
+  return list === null || agentsFor !== projectId ? null : list.length;
+}
+
 export async function loadProjectAgents(projectId: string): Promise<void> {
   const forUser = owner;
   const turn = ++agentsTurn;
+  if (agentsFor !== projectId) projectAgents.value = null;
+  agentsFor = projectId;
   const current = () => owner === forUser && turn === agentsTurn;
   try {
     const body = await api<ProjectAgentsResponse>(

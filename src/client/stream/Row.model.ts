@@ -19,11 +19,10 @@ export type StateLine = { author: string | null; text: string };
 
 const plain = (text: string): StateLine => ({ author: null, text });
 
-// the name a run is drawn under in the author's place: its automation's,
-// or a plain word once the automation is gone; null for a chat
-export function runOf(row: StreamRow): string | null {
-  if (row.session.origin !== "automation") return null;
-  return row.automation?.name ?? "automation";
+// the row's icon: the clock for an automation's run, the bubble for a
+// chat
+export function iconOf(row: StreamRow): "clock" | "chat" {
+  return row.session.origin === "automation" ? "clock" : "chat";
 }
 
 export function stateLine(row: StreamRow): StateLine {

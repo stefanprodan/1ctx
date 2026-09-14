@@ -129,6 +129,75 @@
     background: var(--line);
   }
 
+  /* in a form the picker is a field: full width, the height and the
+     ground of an input, the model filling the line, the list under it
+     as wide as the field */
+  /* the field is the container the model is sized against */
+  .composer-agent-field {
+    display: flex;
+    min-width: 0;
+    container-type: inline-size;
+  }
+  .composer-chip-field {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    height: 36px;
+    gap: var(--space-2);
+    padding: 0 var(--space-3) 0 var(--space-2);
+    background: var(--inset);
+    font-family: var(--sans);
+    font-size: var(--text-input);
+  }
+  .composer-chip-field:disabled {
+    color: var(--dim);
+  }
+  .composer-chip-field .composer-chip-tile {
+    width: 22px;
+    height: 22px;
+  }
+  .composer-chip-field .composer-chip-name {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  /* Fit measures a probe beside the model, so the model is bounded by
+     the field's width, never by its neighbours, or the forms flip */
+  .composer-chip-field .composer-chip-model {
+    flex-shrink: 0;
+    max-width: calc(100cqw - 160px);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    text-align: left;
+  }
+  .composer-chip-field .composer-chip-chevron {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--faint);
+  }
+  .composer-menu-field {
+    top: calc(100% + 4px);
+    bottom: auto;
+    right: 0;
+    z-index: 3;
+    min-width: 0;
+    max-width: none;
+  }
+  .composer-menu-field .composer-option {
+    overflow: hidden;
+    height: 32px;
+    gap: var(--space-2);
+    font-family: var(--sans);
+    font-size: var(--text-ui);
+  }
+  .composer-menu-field .composer-chip-model {
+    flex-shrink: 0;
+    max-width: calc(100cqw - 150px);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+
   /* the command menu rises over the card while the draft is a slash
      word; a blocked command is greyed with its reason at the right */
   .composer-cmds {

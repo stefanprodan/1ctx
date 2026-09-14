@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  runOf,
+  iconOf,
   stateLine,
   tickMs,
   whenText,
@@ -220,21 +220,18 @@ describe("Home.model", () => {
   });
 });
 
-describe("runOf", () => {
-  test("a run is under its automation, a chat under nobody", () => {
-    expect(runOf(row())).toBeNull();
+describe("a run's row", () => {
+  test("wears the clock, and its line is the agent's like a chat's", () => {
+    expect(iconOf(row())).toBe("chat");
     const ran = row({
       session: session({ origin: "automation", automationId: "au1" }),
       automation: { id: "au1", name: "nightly" },
     });
-    expect(runOf(ran)).toBe("nightly");
-    // the automation was deleted and its run stayed
-    expect(
-      runOf({
-        ...ran,
-        session: { ...ran.session, automationId: null },
-        automation: null,
-      }),
-    ).toBe("automation");
+    expect(iconOf(ran)).toBe("clock");
+    // the title is the automation already, so the line names the agent
+    expect(stateLine(ran)).toEqual({
+      author: "assistant",
+      text: "nine pods, all expected",
+    });
   });
 });

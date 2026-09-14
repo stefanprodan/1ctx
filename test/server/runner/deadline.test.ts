@@ -33,9 +33,13 @@ describe("automation run deadlines", () => {
     const script = await pending;
     const messages = script.body.messages as { content: string }[];
     expect(messages[0]?.content).toContain(
-      "daily-run automation from its manual event",
+      "This is a manual run of the daily-run automation, started at ",
     );
-    expect(messages[0]?.content).toContain("Nobody is typing back.");
+    expect(messages[0]?.content).toContain(
+      "You run autonomously. Do not ask questions. Do the task and stop.",
+    );
+    // a run belongs to its project, so no person is named
+    expect(messages[0]?.content).not.toContain("You talk to");
 
     chat.app.now.value += 600_000;
     const ended = await settle(chat.app, detail.session.id);

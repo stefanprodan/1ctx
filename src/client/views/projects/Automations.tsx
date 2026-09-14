@@ -20,6 +20,7 @@ import {
   closeRuns,
   loadRuns,
   runAutomation,
+  runDeadlineMs,
   runs,
   suspendAutomation,
 } from "../../data/automations.ts";
@@ -142,6 +143,7 @@ function AutomationRow({
           automation={automation}
           projectId={automation.projectId}
           agents={agents}
+          limitMs={runDeadlineMs.value ?? 0}
           editable={canChange(automation, me.value ?? null, kind)}
           onDone={onToggle}
         />
@@ -200,12 +202,13 @@ export function Automations({ params }: { params: Params }) {
             />
           }
         >
-          {adding.value && agents !== null && (
+          {adding.value && agents !== null && runDeadlineMs.value !== null && (
             <RowsNew>
               <AutomationForm
                 automation={null}
                 projectId={shown.id}
                 agents={agents}
+                limitMs={runDeadlineMs.value ?? 0}
                 editable
                 onDone={() => {
                   adding.value = false;
@@ -215,7 +218,9 @@ export function Automations({ params }: { params: Params }) {
           )}
           {automationsError.value !== null ? (
             <RowsNote>{automationsError.value}</RowsNote>
-          ) : list === null || agents === null ? (
+          ) : list === null ||
+            agents === null ||
+            runDeadlineMs.value === null ? (
             <RowsNote>Loading</RowsNote>
           ) : list.length === 0 && !adding.value ? (
             <RowsNote>

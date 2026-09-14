@@ -365,9 +365,9 @@ violation, and every rule has a rejected fixture under
   what the entity holds.
 - **The stream row is the server's word.** `GET /api/sessions` answers
   `{session, send, last, automation}` per row (`?origin=chat|automation`
-  narrows it, Home's Runs filter): the automation a run belongs to,
-  drawn with the clock in the author's place, the last send, and the
-  last line a
+  narrows it, Home's Runs filter): the automation a run belongs to (a
+  run wears the clock where a chat wears the bubble, and its title is
+  the automation), the last send, and the last line a
   person or the agent wrote (a user message or an answer reply, the
   author's username or the agent's name, the first line cut at
   `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only
@@ -419,8 +419,10 @@ violation, and every rule has a rejected fixture under
   is one card of `RowsOpen` rows, the schedule in words from
   `Automations.model.ts` (the expression when the shape is unknown); an
   open row holds Run now and Suspend or Resume, the form (read-only for
-  whoever may not edit) and its runs as stream rows, kept current by
-  `data/automations.ts`. A run's chat page names its automation over
+  whoever may not edit; the agent and the time zone are `ui/Select.tsx`,
+  the searchable select; the deadline starts at the limit, which
+  `GET /api/projects/:id/automations` answers beside the rows) and its
+  runs as stream rows, kept current by `data/automations.ts`. A run's chat page names its automation over
   the transcript and has no composer, no Regenerate and no `/compact`;
   its foot is the state with Stop while it runs (`RunFoot.tsx`).
   A settings page (the profile, a project's Settings) stacks

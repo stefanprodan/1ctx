@@ -33,6 +33,16 @@ describe("automations", () => {
     });
     expect(automation.nextAt).toBeGreaterThan(chat.app.now.value);
 
+    const listed = await chat.member.call(
+      "GET",
+      `/api/projects/${chat.projectId}/automations`,
+    );
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toMatchObject({
+      automations: [{ id: automation.id }],
+      runDeadlineMs: expect.any(Number),
+    });
+
     const pending = chat.scripted.next();
     const response = await chat.member.call(
       "POST",

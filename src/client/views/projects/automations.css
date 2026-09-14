@@ -31,7 +31,7 @@
 
   .automations-pair {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-4);
     max-width: 640px;
   }
@@ -43,24 +43,6 @@
   }
   .automations-instructions {
     max-width: 640px;
-  }
-
-  .automations-select {
-    position: relative;
-    display: flex;
-  }
-  .automations-select-input {
-    flex: 1;
-    min-width: 0;
-    padding-right: 36px;
-  }
-  .automations-select-chevron {
-    position: absolute;
-    top: 50%;
-    right: var(--space-3);
-    transform: translateY(-50%);
-    color: var(--faint);
-    pointer-events: none;
   }
 
   .automations-foot {

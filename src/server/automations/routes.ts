@@ -82,6 +82,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
         const body: AutomationsResponse = {
           automations: deps.store.byProject(project.id),
+          runDeadlineMs: deps.limits.current().runDeadlineMs,
         };
         return json(body);
       },

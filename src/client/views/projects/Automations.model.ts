@@ -11,6 +11,8 @@ import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
+import { placeOf } from "../../lib/places.ts";
+import type { Option } from "../../ui/Select.model.ts";
 
 const DAYS = [
   "Sunday",
@@ -159,13 +161,53 @@ export function canChange(
   return a.ownerId === user.id || (kind === "team" && user.role === "admin");
 }
 
+// the offset a zone is at now, "GMT+3", "GMT-4", "GMT"; empty when the
+// runtime cannot say
+export function offsetOf(tz: string, now: number): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(now);
+    const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+    // runtimes differ on zero: Bun says GMT+0 where Chrome says GMT
+    return name === "GMT+0" ? "GMT" : name;
+  } catch {
+    return "";
+  }
+}
+
+// the zone picker's options: every zone the runtime lists with its
+// offset now and its country, matched by its cities too, and the row's
+// own zone when the list leaves it out, since the server takes links
+// such as UTC
+export function zoneOptions(
+  zones: string[],
+  current: string,
+  now: number,
+): Option[] {
+  const names =
+    zones.includes(current) || current === "" ? zones : [current, ...zones];
+  return names.map((tz) => {
+    const place = placeOf(tz);
+    const country = place?.countries.join(", ") ?? "";
+    return {
+      value: tz,
+      label: tz,
+      detail: [offsetOf(tz, now), country].filter(Boolean).join(" · "),
+      keywords: place?.cities ?? "",
+    };
+  });
+}
+
 export type Draft = {
   name: string;
   agentId: string;
   instructions: string;
   schedule: string;
   tz: string;
-  // minutes as typed; empty for the limit's value
+  // minutes as typed, the limit's to begin with; empty or the limit
+  // itself follows the limit
   deadline: string;
   // days as typed
   retention: string;
@@ -173,10 +215,14 @@ export type Draft = {
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
 
+// minutes as the field shows them: whole when they are, else exact
+const minutesOf = (ms: number) => String(ms / 60_000);
+
 export function draftOf(
   a: AutomationSummary | null,
   agentId: string,
   tz: string,
+  limitMs: number,
 ): Draft {
   if (a === null) {
     return {
@@ -185,7 +231,7 @@ export function draftOf(
       instructions: "",
       schedule: DEFAULT_SCHEDULE,
       tz,
-      deadline: "",
+      deadline: minutesOf(limitMs),
       retention: "30",
     };
   }
@@ -195,15 +241,29 @@ export function draftOf(
     instructions: a.instructions,
     schedule: a.schedule,
     tz: a.tz,
-    deadline: a.deadlineMs === null ? "" : String(a.deadlineMs / 60_000),
+    deadline: minutesOf(a.deadlineMs ?? limitMs),
     retention: String(a.retentionDays),
   };
+}
+
+// A draft that still follows the limit moves with it. A deadline the
+// user typed, or a fixed deadline on the row, keeps its own value.
+export function followDeadlineLimit(
+  d: Draft,
+  touched: boolean,
+  a: AutomationSummary | null,
+  limitMs: number,
+): Draft {
+  if (touched || (a !== null && a.deadlineMs !== null)) return d;
+  const deadline = minutesOf(limitMs);
+  return d.deadline === deadline ? d : { ...d, deadline };
 }
 
 // the body a save sends, or the first problem. Only emptiness and the
 // numbers' shape are checked here; every rule is the server's
 export function requestOf(
   d: Draft,
+  limitMs: number,
 ): { body: SaveAutomationRequest } | { problem: string } {
   const name = d.name.trim();
   const instructions = d.instructions.trim();
@@ -215,11 +275,14 @@ export function requestOf(
   if (schedule === "") return { problem: "Schedule is empty" };
   if (tz === "") return { problem: "Zone is empty" };
   const minutes = d.deadline.trim();
-  if (minutes !== "" && !/^\d+$/.test(minutes)) {
-    return { problem: "Deadline needs whole minutes" };
+  if (minutes !== "" && !/^\d+(\.\d+)?$/.test(minutes)) {
+    return { problem: "Deadline needs a number of minutes" };
   }
+  const ms = minutes === "" ? null : Math.round(Number(minutes) * 60_000);
   const days = d.retention.trim();
-  if (!/^\d+$/.test(days)) return { problem: "Keep runs needs whole days" };
+  if (!/^\d+$/.test(days)) {
+    return { problem: "History retention needs whole days" };
+  }
   return {
     body: {
       name,
@@ -227,16 +290,22 @@ export function requestOf(
       instructions,
       schedule,
       tz,
-      deadlineMs: minutes === "" ? null : Number(minutes) * 60_000,
+      // the limit's own value goes as none, so the row keeps following
+      // the limit when an admin moves it
+      deadlineMs: ms === limitMs ? null : ms,
       retentionDays: Number(days),
     },
   };
 }
 
 // whether the draft differs from the row
-export function dirtyOf(d: Draft, a: AutomationSummary | null): boolean {
+export function dirtyOf(
+  d: Draft,
+  a: AutomationSummary | null,
+  limitMs: number,
+): boolean {
   if (a === null) return true;
-  const base = draftOf(a, a.agentId, a.tz);
+  const base = draftOf(a, a.agentId, a.tz, limitMs);
   return (Object.keys(base) as (keyof Draft)[]).some(
     (k) => d[k].trim() !== base[k].trim(),
   );

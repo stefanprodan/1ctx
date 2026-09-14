@@ -5,33 +5,38 @@
 // schedule and its zone, the deadline and how long runs are kept. The
 // owner, or an admin in a team project, saves and deletes; anyone else
 // reads the fields. The schedule's words under the field are only a
-// reading of it; the server's 400 is the rule.
+// reading of it; the server's 400 is the rule. The deadline starts at
+// the server's limit, the value a run is held to when none is set.
 
 import { useSignal } from "@preact/signals";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import { MAX_SCHEDULE, MAX_TZ, RETENTION_DAYS } from "../../../shared/words.ts";
+import { MAX_SCHEDULE, RETENTION_DAYS } from "../../../shared/words.ts";
+import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import {
   createAutomation,
   deleteAutomation,
   updateAutomation,
 } from "../../data/automations.ts";
 import { reason } from "../../lib/format.ts";
-import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
+import { Select } from "../../ui/Select.tsx";
 import {
   type Draft,
   dirtyOf,
   draftOf,
+  followDeadlineLimit,
   requestOf,
   scheduleWords,
+  zoneOptions,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import "./automations.css";
 
-// the zones the runtime knows, for the field's suggestions; the server
-// also takes the links this list leaves out
+// the zones the runtime knows; the server also takes the links this
+// list leaves out
 const ZONES: string[] = (() => {
   try {
     return Intl.supportedValuesOf("timeZone");
@@ -47,27 +52,42 @@ export function AutomationForm({
   automation,
   projectId,
   agents,
+  limitMs,
   editable,
   onDone,
 }: {
   automation: AutomationSummary | null;
   projectId: string;
   agents: AgentSummary[];
+  // the run deadline limit, in ms
+  limitMs: number;
   // false shows the fields to read, with no foot
   editable: boolean;
   onDone: () => void;
 }) {
   const draft = useSignal<Draft>(
-    draftOf(automation, agents[0]?.id ?? "", browserZone()),
+    draftOf(automation, agents[0]?.id ?? "", browserZone(), limitMs),
   );
   const asking = useSignal(false);
   const deleting = useSignal(false);
+  const deadlineTouched = useSignal(false);
   const failure = useSignal<string | null>(null);
-  const request = requestOf(draft.value);
+  const limitRef = useRef(limitMs);
+  limitRef.current = limitMs;
+  useEffect(() => {
+    const next = followDeadlineLimit(
+      draft.value,
+      deadlineTouched.value,
+      automation,
+      limitMs,
+    );
+    if (next !== draft.value) draft.value = next;
+  }, [automation?.deadlineMs, limitMs]);
+  const request = requestOf(draft.value, limitMs);
   // the call is kept from the first render, so it reads the draft's
   // signal when it runs rather than this render's request
   const save = useSave(async () => {
-    const current = requestOf(draft.value);
+    const current = requestOf(draft.value, limitRef.current);
     if (!("body" in current)) throw new Error(current.problem);
     if (automation === null) {
       await createAutomation(projectId, current.body);
@@ -98,7 +118,8 @@ export function AutomationForm({
   const off = busy || !editable;
   const d = draft.value;
   const words = scheduleWords(d.schedule);
-  const agentGone = d.agentId !== "" && !agents.some((a) => a.id === d.agentId);
+  // the offsets are read when the zone moves, not on every keystroke
+  const zones = useMemo(() => zoneOptions(ZONES, d.tz, Date.now()), [d.tz]);
   return (
     <form class="automations-form" onSubmit={submit}>
       <div class="automations-pair">
@@ -108,33 +129,15 @@ export function AutomationForm({
           value={d.name}
           onInput={(name) => set({ name })}
         />
-        <label class="field">
+        <div class="field">
           <span class="label">Agent</span>
-          <span class="automations-select">
-            <select
-              name="agent"
-              class="automations-select-input"
-              disabled={off}
-              onChange={(e) =>
-                set({ agentId: (e.currentTarget as HTMLSelectElement).value })
-              }
-            >
-              {agentGone && (
-                <option value={d.agentId} selected>
-                  an agent that is gone
-                </option>
-              )}
-              {agents.map((a) => (
-                // Preact sets no default on a select, so the option
-                // carries the selection
-                <option key={a.id} value={a.id} selected={d.agentId === a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <Icon name="chevron" size={14} class="automations-select-chevron" />
-          </span>
-        </label>
+          <AgentPicker
+            agents={agents}
+            agentId={d.agentId}
+            field
+            onPick={off ? undefined : (agentId) => set({ agentId })}
+          />
+        </div>
       </div>
       <label class="field">
         <span class="label">Instructions</span>
@@ -172,46 +175,35 @@ export function AutomationForm({
             {words === null ? "A cron expression" : `Runs ${words}`}
           </span>
         </label>
-        <label class="field">
-          <span class="label">Zone</span>
-          <input
-            name="tz"
-            class="automations-mono"
-            autocomplete="off"
-            spellcheck={false}
-            maxLength={MAX_TZ}
-            list="automations-zones"
-            disabled={off}
+        <div class="field">
+          <span class="label">Time zone</span>
+          <Select
+            label="Time zone"
             value={d.tz}
-            onInput={(e) =>
-              set({ tz: (e.currentTarget as HTMLInputElement).value })
-            }
+            options={zones}
+            disabled={off}
+            search
+            onChange={(tz) => set({ tz })}
           />
-          <datalist id="automations-zones">
-            {ZONES.map((zone) => (
-              <option key={zone} value={zone} />
-            ))}
-          </datalist>
-        </label>
+        </div>
       </div>
       <div class="automations-pair">
         <label class="field">
-          <span class="label">Deadline</span>
+          <span class="label">Deadline (in minutes)</span>
           <input
             name="deadline"
-            inputMode="numeric"
+            inputMode="decimal"
             autocomplete="off"
-            placeholder="The server's limit"
             disabled={off}
             value={d.deadline}
-            onInput={(e) =>
-              set({ deadline: (e.currentTarget as HTMLInputElement).value })
-            }
+            onInput={(e) => {
+              deadlineTouched.value = true;
+              set({ deadline: (e.currentTarget as HTMLInputElement).value });
+            }}
           />
-          <span class="hint">Minutes a run may take</span>
         </label>
         <label class="field">
-          <span class="label">Keep runs</span>
+          <span class="label">History retention (in days)</span>
           <input
             name="retention"
             inputMode="numeric"
@@ -223,14 +215,13 @@ export function AutomationForm({
               set({ retention: (e.currentTarget as HTMLInputElement).value })
             }
           />
-          <span class="hint">Days, then a run is deleted</span>
         </label>
       </div>
       {editable ? (
         <div class={automation === null ? undefined : "automations-foot"}>
           <Foot
             status={deleting.value ? "busy" : save.status.value}
-            dirty={dirtyOf(d, automation)}
+            dirty={dirtyOf(d, automation, limitMs)}
             label={automation === null ? "New automation" : "Save"}
             start={
               automation === null ? (
