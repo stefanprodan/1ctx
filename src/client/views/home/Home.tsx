@@ -30,6 +30,7 @@ import {
   composeProjectOf,
   dateLine,
   greeting,
+  runsOf,
   searchHref,
   searchOf,
 } from "./Home.model.ts";
@@ -48,6 +49,7 @@ export function Home() {
   }, [tick, now]);
   const target = composeProjectOf(projects.value, homeProjectId.value);
   const q = searchOf(query.value);
+  const runs = runsOf(query.value);
   const projectName = (id: string) =>
     projects.value?.find((p) => p.id === id)?.name ?? null;
   const agents = projectAgents.value;
@@ -88,9 +90,19 @@ export function Home() {
           projectName={projectName}
           search={{
             value: q,
-            onChange: (next) => navigate(searchHref("/", next), true),
+            onChange: (next) => navigate(searchHref("/", next, runs), true),
           }}
-          empty={q === "" ? "No sessions found" : "No sessions match"}
+          runs={{
+            on: runs,
+            onToggle: () => navigate(searchHref("/", q, !runs), true),
+          }}
+          empty={
+            q !== ""
+              ? "No sessions match"
+              : runs
+                ? "No runs yet"
+                : "No sessions found"
+          }
           now={now.value}
         />
       </Split>

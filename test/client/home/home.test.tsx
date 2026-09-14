@@ -116,6 +116,7 @@ describe("Home", () => {
           ownerId: "u1",
           agentId: "a1",
           origin: "chat",
+          automationId: null,
           title: "Which pods restarted",
           status: "done",
           revision: 2,
@@ -125,6 +126,7 @@ describe("Home", () => {
         },
         send: null,
         last: { seq: 2, author: "assistant", text: "nine pods" },
+        automation: null,
       },
     ];
     const html = render(<Home />);

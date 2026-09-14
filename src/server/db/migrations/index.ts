@@ -8,5 +8,6 @@
 import type { Migration } from "../migration.ts";
 import { m0001 } from "./0001-init.ts";
 import { m0002 } from "./0002-usage-activity.ts";
+import { m0003 } from "./0003-automations.ts";
 
-export const MIGRATIONS: Migration[] = [m0001, m0002];
+export const MIGRATIONS: Migration[] = [m0001, m0002, m0003];

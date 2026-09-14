@@ -77,6 +77,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Summary tokens",
     text: "Tokens a summary may run to, the reserve at most.",
   },
+  runDeadlineMs: {
+    label: "Run deadline",
+    text: "How long an automation's run may take. An automation may set less.",
+  },
 };
 
 export const TOOL_WORDS: Record<BuiltinTool, string> = {

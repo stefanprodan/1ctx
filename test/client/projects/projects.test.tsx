@@ -274,9 +274,14 @@ describe("Project.model", () => {
   test("a personal project has Settings where a team has Members", () => {
     expect(tabsOf("p1", "team").map((t) => t.label)).toEqual([
       "Feed",
+      "Automations",
       "Members",
     ]);
     expect(tabsOf("p1", "personal")[1]).toEqual({
+      label: "Automations",
+      href: "/projects/p1/automations",
+    });
+    expect(tabsOf("p1", "personal")[2]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });

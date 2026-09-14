@@ -12,18 +12,20 @@ import type {
   SessionSummary,
 } from "../contracts/session.ts";
 
-// GET /api/sessions?project=&q=: every session the caller may see,
+// GET /api/sessions?project=&q=&origin=: every session the caller may see,
 // running first, then by last activity, each with what its row in
 // the stream shows
 export type SessionsResponse = { rows: StreamRow[] };
 
 // one row of the stream: the session, its last send (the counters,
 // the cause and the error while it is not running) and the last line
-// the row shows for a session that is done
+// the row shows for a session that is done, and the automation a run
+// belongs to, drawn in the author's place; null for a chat
 export type StreamRow = {
   session: SessionSummary;
   send: SendSummary | null;
   last: LastLine | null;
+  automation: { id: string; name: string } | null;
 };
 
 // GET /api/sessions/:id, and the answer of POST /api/sessions

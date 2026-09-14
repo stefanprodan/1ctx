@@ -33,11 +33,16 @@ export type SessionsPort = {
   usesAgent(agentId: string): boolean;
 };
 
+export type AutomationsPort = {
+  usesAgent(agentId: string): boolean;
+};
+
 export type RoutesDeps = {
   store: AgentStore;
   providers: ProvidersPort;
   access: AccessPort;
   sessions: SessionsPort;
+  automations: AutomationsPort;
   clock: Clock;
 };
 
@@ -135,6 +140,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const agent = find(ctx.params.id);
         if (deps.sessions.usesAgent(agent.id)) {
           throw new Conflict(`a chat runs on ${agent.name}`);
+        }
+        if (deps.automations.usesAgent(agent.id)) {
+          throw new Conflict(`an automation runs on ${agent.name}`);
         }
         deps.store.delete(agent.id);
         return json({});

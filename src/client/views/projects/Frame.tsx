@@ -24,7 +24,7 @@ export function Frame({
   children,
 }: {
   id: string;
-  tab: "feed" | "members" | "settings";
+  tab: "feed" | "automations" | "members" | "settings";
   children: (shown: ProjectDetail) => ComponentChildren;
 }) {
   const row = project.value;

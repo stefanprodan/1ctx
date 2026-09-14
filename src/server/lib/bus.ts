@@ -6,6 +6,7 @@
 // durable is maintained from a listener. transact() is the only
 // publisher of durable changes; it publishes after commit.
 
+import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type {
   LastLine,
   Message,
@@ -31,6 +32,11 @@ export type BusEvents = {
     last?: LastLine;
   };
   "session.deleted": { projectId: string; sessionId: string };
+  "automation.changed": {
+    projectId: string;
+    automation: AutomationSummary;
+  };
+  "automation.deleted": { projectId: string; automationId: string };
   // what these users may see changed (a membership, a role, a team
   // project made or gone); null means everyone recomputes
   "access.changed": { userIds: string[] | null };

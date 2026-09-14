@@ -13,6 +13,64 @@
     max-width: 100%;
     margin: 0 auto;
   }
+
+  /* a run: whose it is over the transcript, its state in the foot */
+  .chat-run {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .chat-run-link {
+    color: var(--brand);
+    text-decoration: none;
+  }
+  .chat-run-link:hover {
+    text-decoration: underline;
+  }
+  .chat-run-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 52px;
+    padding: var(--space-2) 14px;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--dim);
+  }
+  .chat-run-icon {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .chat-run-icon-running {
+    color: var(--running);
+  }
+  .chat-run-icon-done {
+    color: var(--done);
+  }
+  .chat-run-icon-failed {
+    color: var(--failed);
+  }
+  .chat-run-state {
+    flex-grow: 1;
+    min-width: 0;
+    font-size: var(--text-ui);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .chat-run-failure {
+    flex-basis: 100%;
+    order: 5;
+    font-size: var(--text-small);
+  }
+  .chat-run-stop {
+    color: var(--failed);
+  }
 }
 
 @layer owners {

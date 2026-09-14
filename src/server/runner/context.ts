@@ -108,6 +108,7 @@ export function history(
     | "about"
     | "username"
     | "userId"
+    | "automation"
   >,
   lookups: ContextLookups,
   now: number,

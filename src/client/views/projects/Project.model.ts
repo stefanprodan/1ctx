@@ -15,11 +15,12 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-// a team's people are its Members; a personal project has one person,
-// who describes it in Settings
+// every project has automations; a team's people are its Members, and
+// a personal project has one person, who describes it in Settings
 export function tabsOf(id: string, kind: ProjectKind): Tab[] {
   return [
     { label: "Feed", href: `/projects/${id}` },
+    { label: "Automations", href: `/projects/${id}/automations` },
     kind === "team"
       ? { label: "Members", href: `/projects/${id}/members` }
       : { label: "Settings", href: `/projects/${id}/settings` },

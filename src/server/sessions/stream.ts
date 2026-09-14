@@ -78,6 +78,20 @@ function lastLines(db: Db, sessionIds: string[]) {
   return out;
 }
 
+function automations(db: Db, sessionIds: string[]) {
+  const marks = sessionIds.map(() => "?").join(", ");
+  const rows = db
+    .query<{ session_id: string; id: string; name: string }, string[]>(
+      `select sessions.id as session_id, automations.id, automations.name
+       from sessions join automations on automations.id = sessions.automation_id
+       where sessions.id in (${marks})`,
+    )
+    .all(...sessionIds);
+  return new Map(
+    rows.map((raw) => [raw.session_id, { id: raw.id, name: raw.name }]),
+  );
+}
+
 export function streamRows(
   db: Db,
   raws: RawSession[],
@@ -87,9 +101,11 @@ export function streamRows(
   const ids = raws.map((raw) => raw.id);
   const sends = lastSends(db, ids);
   const lines = lastLines(db, ids);
+  const automationRows = automations(db, ids);
   return raws.map((raw) => ({
     session: session(raw, usage.get(raw.id) ?? null),
     send: sends.get(raw.id) ?? null,
     last: lines.get(raw.id) ?? null,
+    automation: automationRows.get(raw.id) ?? null,
   }));
 }

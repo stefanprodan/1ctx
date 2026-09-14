@@ -11,6 +11,7 @@ import type {
   MessageStatus,
   SendCause,
   SendKind,
+  SessionOrigin,
   SessionStatus,
 } from "../words.ts";
 import type { ToolCall } from "./tool.ts";
@@ -20,8 +21,12 @@ export type SessionSummary = {
   projectId: string;
   ownerId: string;
   agentId: string;
-  origin: "chat";
-  // the first line of the first message, cut to 80 characters
+  origin: SessionOrigin;
+  // the automation a run belongs to; null for a chat, and for a run
+  // whose automation was deleted
+  automationId: string | null;
+  // the first line of the first message, cut to 80 characters; a
+  // run's is its automation's name
   title: string;
   status: SessionStatus;
   revision: number;

@@ -15,6 +15,7 @@ import {
 } from "../../src/server/web/socket.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
 import { ORIGIN, type TestClient } from "../helpers/app.ts";
+import { createAutomation } from "../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
@@ -101,11 +102,11 @@ function addTeam(chat: ChatApp, id: string) {
 }
 
 describe("the socket", () => {
-  test("open sends hello with protocol 7", async () => {
+  test("open sends hello with protocol 8", async () => {
     const chat = await chatApp();
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
-    expect(conn.frames).toEqual([{ type: "hello", protocol: 7 }]);
+    expect(conn.frames).toEqual([{ type: "hello", protocol: 8 }]);
     close(chat, conn);
   });
 
@@ -454,5 +455,36 @@ describe("the socket", () => {
     chat.app.socket.close(first);
     expect(chat.app.socket.size()).toBe(1);
     close(chat, second);
+  });
+});
+
+describe("automation socket events", () => {
+  test("changes and deletions reach connections holding the project", async () => {
+    const chat = await chatApp();
+    const member = await connection(chat, chat.member);
+    const admin = await connection(chat, chat.admin);
+    chat.app.socket.open(member);
+    chat.app.socket.open(admin);
+    const automation = await createAutomation(chat);
+    expect(frames(member, "automation")).toEqual([
+      {
+        type: "automation",
+        projectId: chat.projectId,
+        automation,
+      },
+    ]);
+    expect(frames(admin, "automation")).toEqual([]);
+
+    await chat.member.call("DELETE", `/api/automations/${automation.id}`);
+    expect(frames(member, "automationDeleted")).toEqual([
+      {
+        type: "automationDeleted",
+        projectId: chat.projectId,
+        automationId: automation.id,
+      },
+    ]);
+    expect(frames(admin, "automationDeleted")).toEqual([]);
+    close(chat, member, admin);
+    await chat.app.shutdown();
   });
 });

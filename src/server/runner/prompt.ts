@@ -31,6 +31,17 @@ function projectLine(
   return `You work in ${where}${about === "" ? "." : `: ${about}`}`;
 }
 
+function automationLine(
+  automation: NonNullable<SendPolicy["automation"]>,
+): string {
+  const at = new Intl.DateTimeFormat("en-GB", {
+    timeZone: automation.tz,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(automation.dueAt);
+  return `This session was opened by the ${automation.name} automation from its ${automation.source} event at ${at} in ${automation.tz}. Nobody is typing back.`;
+}
+
 function userLine(fullName: string, username: string, about: string): string {
   const said = about.trim();
   return `You talk to @${username} (${fullName})${said === "" ? "." : `: ${said}`}`;
@@ -46,18 +57,18 @@ export function systemPrompt(
     | "fullName"
     | "username"
     | "about"
+    | "automation"
   >,
   now: number,
 ): string {
   const parts: string[] = [];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
-  parts.push(
-    `${projectLine(policy)}\n${userLine(
-      policy.fullName,
-      policy.username,
-      policy.about,
-    )}`,
-  );
+  const context = [projectLine(policy)];
+  if (policy.automation !== null) {
+    context.push(automationLine(policy.automation));
+  }
+  context.push(userLine(policy.fullName, policy.username, policy.about));
+  parts.push(context.join("\n"));
   parts.push(dateLine(now));
   return parts.join("\n\n");
 }

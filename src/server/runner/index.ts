@@ -28,7 +28,9 @@ import {
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import type { Event } from "./event.ts";
 import { buildPolicy, type ToolsPort } from "./policy.ts";
+import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
@@ -36,6 +38,8 @@ import { type ActiveSend, claim, live, newSend } from "./send.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { Writer, type WriterDeps } from "./writer.ts";
 
+export type { Event } from "./event.ts";
+export type { PreparedRun } from "./prepare.ts";
 export { MAX_RUNNING, MAX_RUNNING_PER_USER, Registry } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
 export {
@@ -78,6 +82,7 @@ export type Runner = {
   send(principal: Principal, sessionId: string, message: string): SessionDetail;
   regenerate(principal: Principal, sessionId: string): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
+  startRun(event: Event): PreparedRun;
   stop(principal: Principal, sessionId: string): void;
   live: (sessionId: string) => ReturnType<typeof live> | null;
   // every send terminated with cause shutdown and its stream let go,
@@ -171,6 +176,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
 
   const run = async (send: ActiveSend): Promise<void> => {
     let finalized = false;
+    if (send.policy.deadlineMs !== null) {
+      void pause(send.policy.deadlineMs).then(() => {
+        void terminate(send, "deadline");
+      });
+    }
     try {
       const end = await toolLoop(loopDeps, send);
       finalized = await terminate(send, end.cause, end.error);
@@ -188,15 +198,37 @@ export function runnerArea(deps: RunnerDeps): Runner {
     }
   };
 
-  const policyFor = (project: ProjectRow, user: UserRow, agent: AgentRow) =>
-    buildPolicy({
+  const policyFor = (
+    project: ProjectRow,
+    user: UserRow,
+    agent: AgentRow,
+    event: Event | null = null,
+  ) => {
+    const limits = deps.limits.current();
+    return buildPolicy({
       project,
       user,
       agent,
       now: deps.clock(),
       tools: agent.model.tools ? deps.tools : null,
-      limits: deps.limits.current(),
+      limits,
+      automation:
+        event === null
+          ? null
+          : {
+              ...event.automation,
+              source: event.source,
+              dueAt: event.dueAt,
+            },
+      deadlineMs:
+        event === null
+          ? null
+          : Math.min(
+              event.deadlineMs ?? limits.runDeadlineMs,
+              limits.runDeadlineMs,
+            ),
     });
+  };
 
   const author = (principal: Principal): UserRow => {
     const user = deps.users.byId(principal.userId);
@@ -210,9 +242,35 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return agent;
   };
 
-  // admission and startSend in one turn, with no await between: the
-  // lock is taken, the ids are generated, the rows are written, the run
-  // begins
+  const prepare = (
+    sessionId: string,
+    session: SessionRow | null,
+    project: ProjectRow,
+    user: UserRow,
+    agent: AgentRow,
+    text: string,
+    title: string,
+    event: Event | null = null,
+    existingUser: Message | null = null,
+  ): PreparedRun =>
+    prepareSend({
+      registry,
+      writer,
+      sessions: deps.sessions,
+      log: deps.log,
+      run: (send) => void run(send),
+      sessionId,
+      session,
+      policy: policyFor(project, user, agent, event),
+      text,
+      title,
+      kind: event === null ? "chat" : "run",
+      origin: event === null ? "chat" : "automation",
+      automationId: event?.automation.id ?? null,
+      existingUser,
+      now: deps.clock(),
+    });
+
   const begin = (
     sessionId: string,
     session: SessionRow | null,
@@ -220,44 +278,22 @@ export function runnerArea(deps: RunnerDeps): Runner {
     user: UserRow,
     agent: AgentRow,
     text: string,
+    title: string,
     existingUser: Message | null = null,
   ): SessionDetail => {
-    const now = deps.clock();
-    const policy = policyFor(project, user, agent);
-    registry.admit(sessionId, user.id);
-    const sendId = newId();
-    const userId = existingUser?.id ?? newId();
-    const replyId = newId();
-    const send = newSend({
-      id: sendId,
+    const prepared = prepare(
       sessionId,
-      projectId: project.id,
-      policy,
-      firstMessageId: userId,
-      replyId,
-      now,
-    });
-    registry.set(send);
-    let started: ReturnType<Writer["startSend"]>;
-    try {
-      started = writer.startSend({
-        sendId,
-        replyId,
-        userId,
-        sessionId,
-        session,
-        ...(existingUser === null ? {} : { existingUser }),
-        title: titleFrom(text),
-        policy,
-        text,
-      });
-    } catch (err) {
-      registry.free(send);
-      throw err;
-    }
-    deps.log(`chat ${sessionId} sent to ${agent.name} on ${policy.model}`);
-    void run(send);
-    return sessionDetail(deps.sessions, started.session, live(send));
+      session,
+      project,
+      user,
+      agent,
+      text,
+      title,
+      null,
+      existingUser,
+    );
+    prepared.launch();
+    return prepared.detail;
   };
 
   const liveOf = (sessionId: string) => {
@@ -271,17 +307,39 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const project = deps.access.project(principal, fields.projectId);
       const user = author(principal);
       const agent = agentOf(fields.agentId);
-      return begin(newId(), null, project, user, agent, fields.message);
+      return begin(
+        newId(),
+        null,
+        project,
+        user,
+        agent,
+        fields.message,
+        titleFrom(fields.message),
+      );
     },
     send(principal, sessionId, message) {
       const session = deps.visible(principal, sessionId);
+      if (session.origin === "automation") {
+        throw new Conflict("a run cannot continue");
+      }
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
-      return begin(session.id, session, project, user, agent, message);
+      return begin(
+        session.id,
+        session,
+        project,
+        user,
+        agent,
+        message,
+        session.title,
+      );
     },
     regenerate(principal, sessionId) {
       const session = deps.visible(principal, sessionId);
+      if (session.origin === "automation") {
+        throw new Conflict("a run cannot regenerate");
+      }
       const active = registry.get(session.id);
       if (active !== null) registry.admit(session.id, principal.userId);
       if (session.status === "running") {
@@ -311,11 +369,15 @@ export function runnerArea(deps: RunnerDeps): Runner {
         user,
         agent,
         existingUser.content,
+        session.title,
         existingUser,
       );
     },
     compact(principal, sessionId) {
       const session = deps.visible(principal, sessionId);
+      if (session.origin === "automation") {
+        throw new Conflict("a run cannot compact");
+      }
       const active = registry.get(session.id);
       if (active !== null) registry.admit(session.id, principal.userId);
       if (session.status === "running") {
@@ -382,6 +444,18 @@ export function runnerArea(deps: RunnerDeps): Runner {
       deps.log(`chat ${session.id} compacted on ${policy.model}`);
       void run(send);
       return sessionDetail(deps.sessions, started.session, live(send));
+    },
+    startRun(event) {
+      return prepare(
+        newId(),
+        null,
+        event.project,
+        event.user,
+        event.agent,
+        event.instructions,
+        event.automation.name,
+        event,
+      );
     },
     stop(principal, sessionId) {
       const session = deps.visible(principal, sessionId);

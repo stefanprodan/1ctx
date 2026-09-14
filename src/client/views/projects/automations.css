@@ -1,0 +1,82 @@
+/* The Automations tab: what an open row holds, the actions, the
+   fields in pairs, the foot and the runs under them. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .automations-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .automations-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .automations-note {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  .automations-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .automations-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    max-width: 640px;
+  }
+
+  .automations-instructions,
+  .automations-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .automations-instructions {
+    max-width: 640px;
+  }
+
+  .automations-select {
+    position: relative;
+    display: flex;
+  }
+  .automations-select-input {
+    flex: 1;
+    min-width: 0;
+    padding-right: 36px;
+  }
+  .automations-select-chevron {
+    position: absolute;
+    top: 50%;
+    right: var(--space-3);
+    transform: translateY(-50%);
+    color: var(--faint);
+    pointer-events: none;
+  }
+
+  .automations-foot {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+
+  .automations-runs {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  @media (max-width: 719px) {
+    .automations-pair {
+      grid-template-columns: 1fr;
+    }
+  }
+}

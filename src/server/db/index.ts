@@ -35,13 +35,22 @@ export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {
   const ran: string[] = [];
   for (const migration of list) {
     if (applied.has(migration.id)) continue;
-    db.transaction(() => {
-      migration.up(db);
-      db.query("insert into migrations (id, applied_at) values (?, ?)").run(
-        migration.id,
-        Date.now(),
-      );
-    })();
+    if (migration.rebuild) db.exec("pragma foreign_keys = off");
+    try {
+      db.transaction(() => {
+        migration.up(db);
+        if (migration.rebuild) {
+          const broken = db.query("pragma foreign_key_check").get();
+          if (broken !== null) throw new Error("foreign key check failed");
+        }
+        db.query("insert into migrations (id, applied_at) values (?, ?)").run(
+          migration.id,
+          Date.now(),
+        );
+      })();
+    } finally {
+      if (migration.rebuild) db.exec("pragma foreign_keys = on");
+    }
     ran.push(migration.id);
   }
   return ran;

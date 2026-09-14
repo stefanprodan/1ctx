@@ -1,0 +1,364 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
+import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import type {
+  EventOutcome,
+  EventSource,
+  SessionStatus,
+} from "../../shared/words.ts";
+import type { Db } from "../db/index.ts";
+import { newId } from "../lib/ids.ts";
+
+export const MAX_AUTOMATIONS_PER_PROJECT = 20;
+
+type Raw = {
+  id: string;
+  project_id: string;
+  owner_id: string;
+  agent_id: string;
+  name: string;
+  instructions: string;
+  schedule: string;
+  tz: string;
+  deadline_ms: number | null;
+  retention_days: number;
+  suspended_at: number | null;
+  next_at: number | null;
+  last_event_at: number | null;
+  last_event_due_at: number | null;
+  last_event_source: EventSource | null;
+  last_event_outcome: EventOutcome | null;
+  last_event_reason: string | null;
+  last_run_session_id: string | null;
+  last_run_status: SessionStatus | null;
+  revision: number;
+  created_at: number;
+  updated_at: number;
+};
+
+const row = (raw: Raw): AutomationSummary => ({
+  id: raw.id,
+  projectId: raw.project_id,
+  ownerId: raw.owner_id,
+  agentId: raw.agent_id,
+  name: raw.name,
+  instructions: raw.instructions,
+  schedule: raw.schedule,
+  tz: raw.tz,
+  deadlineMs: raw.deadline_ms,
+  retentionDays: raw.retention_days,
+  suspendedAt: raw.suspended_at,
+  nextAt: raw.next_at,
+  lastEventAt: raw.last_event_at,
+  lastEventDueAt: raw.last_event_due_at,
+  lastEventSource: raw.last_event_source,
+  lastEventOutcome: raw.last_event_outcome,
+  lastEventReason: raw.last_event_reason,
+  lastRunSessionId: raw.last_run_session_id,
+  lastRunStatus: raw.last_run_status,
+  revision: raw.revision,
+  createdAt: raw.created_at,
+  updatedAt: raw.updated_at,
+});
+
+export type AutomationFields = Pick<
+  AutomationSummary,
+  | "projectId"
+  | "ownerId"
+  | "agentId"
+  | "name"
+  | "instructions"
+  | "schedule"
+  | "tz"
+  | "deadlineMs"
+  | "retentionDays"
+>;
+
+export class AutomationStore {
+  private wakeup: () => void = () => {};
+
+  constructor(private readonly db: Db) {}
+
+  setWake(wake: () => void): void {
+    this.wakeup = wake;
+  }
+
+  wake(): void {
+    this.wakeup();
+  }
+
+  byId(id: string): AutomationSummary | null {
+    const raw = this.db
+      .query<Raw, [string]>("select * from automations where id = ?")
+      .get(id);
+    return raw ? row(raw) : null;
+  }
+
+  byProject(projectId: string): AutomationSummary[] {
+    return this.db
+      .query<Raw, [string]>(
+        "select * from automations where project_id = ? order by name",
+      )
+      .all(projectId)
+      .map(row);
+  }
+
+  all(): AutomationSummary[] {
+    return this.db
+      .query<Raw, []>("select * from automations order by id")
+      .all()
+      .map(row);
+  }
+
+  due(now: number): AutomationSummary[] {
+    return this.db
+      .query<Raw, [number]>(
+        "select * from automations where suspended_at is null and next_at <= ? order by next_at, id",
+      )
+      .all(now)
+      .map(row);
+  }
+
+  earliest(): number | null {
+    return this.db
+      .query<{ next_at: number | null }, []>(
+        "select min(next_at) as next_at from automations where suspended_at is null",
+      )
+      .get()!.next_at;
+  }
+
+  count(projectId: string): number {
+    return this.db
+      .query<{ n: number }, [string]>(
+        "select count(*) as n from automations where project_id = ?",
+      )
+      .get(projectId)!.n;
+  }
+
+  nameTaken(projectId: string, name: string, exceptId?: string): boolean {
+    const raw =
+      exceptId === undefined
+        ? this.db
+            .query<{ n: number }, [string, string]>(
+              "select count(*) as n from automations where project_id = ? and name = ?",
+            )
+            .get(projectId, name)!
+        : this.db
+            .query<{ n: number }, [string, string, string]>(
+              "select count(*) as n from automations where project_id = ? and name = ? and id != ?",
+            )
+            .get(projectId, name, exceptId)!;
+    return raw.n > 0;
+  }
+
+  create(
+    fields: AutomationFields & { nextAt: number; now: number },
+  ): AutomationSummary {
+    const id = newId();
+    this.db
+      .query(
+        `insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, deadline_ms, retention_days, next_at, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        fields.projectId,
+        fields.ownerId,
+        fields.agentId,
+        fields.name,
+        fields.instructions,
+        fields.schedule,
+        fields.tz,
+        fields.deadlineMs,
+        fields.retentionDays,
+        fields.nextAt,
+        fields.now,
+        fields.now,
+      );
+    return this.byId(id)!;
+  }
+
+  update(
+    id: string,
+    fields: Pick<
+      AutomationSummary,
+      | "agentId"
+      | "name"
+      | "instructions"
+      | "schedule"
+      | "tz"
+      | "deadlineMs"
+      | "retentionDays"
+      | "nextAt"
+    > & { now: number },
+  ): AutomationSummary | null {
+    this.db
+      .query(
+        `update automations set agent_id = ?, name = ?, instructions = ?,
+           schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
+           next_at = ?, revision = revision + 1, updated_at = ? where id = ?`,
+      )
+      .run(
+        fields.agentId,
+        fields.name,
+        fields.instructions,
+        fields.schedule,
+        fields.tz,
+        fields.deadlineMs,
+        fields.retentionDays,
+        fields.nextAt,
+        fields.now,
+        id,
+      );
+    return this.byId(id);
+  }
+
+  suspend(id: string, now: number): AutomationSummary | null {
+    this.db
+      .query(
+        `update automations set suspended_at = ?, next_at = null,
+           revision = revision + 1, updated_at = ?
+         where id = ? and suspended_at is null`,
+      )
+      .run(now, now, id);
+    return this.byId(id);
+  }
+
+  resume(id: string, nextAt: number, now: number): AutomationSummary | null {
+    this.db
+      .query(
+        `update automations set suspended_at = null, next_at = ?,
+           revision = revision + 1, updated_at = ?
+         where id = ? and suspended_at is not null`,
+      )
+      .run(nextAt, now, id);
+    return this.byId(id);
+  }
+
+  recordEvent(
+    id: string,
+    fields: {
+      at: number;
+      dueAt: number;
+      source: EventSource;
+      outcome: EventOutcome;
+      reason: string | null;
+      nextAt?: number | null;
+      runSessionId?: string;
+    },
+  ): AutomationSummary | null {
+    if (fields.runSessionId === undefined) {
+      if (fields.nextAt === undefined) {
+        this.db
+          .query(
+            `update automations set last_event_at = ?, last_event_due_at = ?,
+               last_event_source = ?, last_event_outcome = ?,
+               last_event_reason = ?, revision = revision + 1,
+               updated_at = ? where id = ?`,
+          )
+          .run(
+            fields.at,
+            fields.dueAt,
+            fields.source,
+            fields.outcome,
+            fields.reason,
+            fields.at,
+            id,
+          );
+      } else {
+        this.db
+          .query(
+            `update automations set last_event_at = ?, last_event_due_at = ?,
+               last_event_source = ?, last_event_outcome = ?,
+               last_event_reason = ?, next_at = ?, revision = revision + 1,
+               updated_at = ? where id = ?`,
+          )
+          .run(
+            fields.at,
+            fields.dueAt,
+            fields.source,
+            fields.outcome,
+            fields.reason,
+            fields.nextAt,
+            fields.at,
+            id,
+          );
+      }
+    } else if (fields.nextAt === undefined) {
+      this.db
+        .query(
+          `update automations set last_event_at = ?, last_event_due_at = ?,
+             last_event_source = ?, last_event_outcome = ?,
+             last_event_reason = ?, last_run_session_id = ?,
+             last_run_status = 'running', revision = revision + 1,
+             updated_at = ? where id = ?`,
+        )
+        .run(
+          fields.at,
+          fields.dueAt,
+          fields.source,
+          fields.outcome,
+          fields.reason,
+          fields.runSessionId,
+          fields.at,
+          id,
+        );
+    } else {
+      this.db
+        .query(
+          `update automations set last_event_at = ?, last_event_due_at = ?,
+             last_event_source = ?, last_event_outcome = ?,
+             last_event_reason = ?, next_at = ?, last_run_session_id = ?,
+             last_run_status = 'running', revision = revision + 1,
+             updated_at = ? where id = ?`,
+        )
+        .run(
+          fields.at,
+          fields.dueAt,
+          fields.source,
+          fields.outcome,
+          fields.reason,
+          fields.nextAt,
+          fields.runSessionId,
+          fields.at,
+          id,
+        );
+    }
+    return this.byId(id);
+  }
+
+  recordRunEnd(
+    id: string,
+    sessionId: string,
+    status: SessionStatus,
+    now: number,
+  ): AutomationSummary | null {
+    const changed = this.db
+      .query(
+        `update automations set last_run_status = ?, revision = revision + 1,
+           updated_at = ? where id = ? and last_run_session_id = ?
+             and last_run_status = 'running'`,
+      )
+      .run(status, now, id, sessionId).changes;
+    return changed > 0 ? this.byId(id) : null;
+  }
+
+  delete(id: string): boolean {
+    return (
+      this.db.query("delete from automations where id = ?").run(id).changes > 0
+    );
+  }
+
+  usesAgent(agentId: string): boolean {
+    return (
+      this.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from automations where agent_id = ?",
+        )
+        .get(agentId)!.n > 0
+    );
+  }
+}

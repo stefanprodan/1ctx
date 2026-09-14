@@ -92,6 +92,39 @@
     color: var(--brand);
   }
 
+  /* a run is under its automation, the clock before the name */
+  .stream-run {
+    color: var(--brand);
+  }
+  .stream-run-icon {
+    margin-right: 3px;
+    vertical-align: -2px;
+  }
+
+  /* the head's filter beside the search: Runs, on or off */
+  .stream-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    height: 26px;
+    margin-right: var(--space-2);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .stream-filter:hover {
+    color: var(--fg);
+  }
+  .stream-filter-on {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
   .stream-when {
     width: 64px;
     flex-shrink: 0;

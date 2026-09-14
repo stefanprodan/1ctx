@@ -9,6 +9,7 @@
 
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, agentsArea } from "./agents/index.ts";
+import { type Automations, automationsArea } from "./automations/index.ts";
 import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
@@ -59,6 +60,8 @@ export type App = {
   providers: ProviderStore;
   agents: AgentStore;
   sessions: SessionStore;
+  automations: Automations["store"];
+  automationScheduler: Automations["scheduler"];
   usage: UsageStore;
   catalogs: Catalogs;
   chat: Providers["chat"];
@@ -85,6 +88,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // flight.
   let usage!: Usage;
   let sessions!: Sessions;
+  let automations!: Automations;
   const users = usersArea({
     db,
     secret,
@@ -134,6 +138,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
+    automations: {
+      usesAgent: (agentId) => automations.usesAgent(agentId),
+    },
   });
   sessions = sessionsArea({
     db,
@@ -177,8 +184,22 @@ export async function compose(options: ComposeOptions): Promise<App> {
     stream: (sessionId, frame) => socket.stream(sessionId, frame),
     registry: options.registry,
   });
+  automations = automationsArea({
+    db,
+    clock,
+    log: options.log("automations"),
+    access,
+    users,
+    projects,
+    agents,
+    limits,
+    sessions: sessions.store,
+    usage,
+    runner,
+  });
   await users.bootstrap();
   sessions.repair();
+  automations.start();
   const routes: RouteDescriptor[] = [
     ...users.routes,
     ...usage.routes,
@@ -190,6 +211,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...sessions.routes,
     ...(tools.routes ?? []),
     ...runner.routes,
+    ...automations.routes,
     socket.route,
     healthRoute(options.version),
   ];
@@ -204,6 +226,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers: providers.store,
     agents: agents.store,
     sessions: sessions.store,
+    automations: automations.store,
+    automationScheduler: automations.scheduler,
     usage: usage.store,
     catalogs: providers.catalogs,
     chat: providers.chat,
@@ -214,7 +238,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     handle,
     sweep: () => access.sweep(),
     async shutdown() {
+      automations.stop();
       await runner.shutdown();
+      automations.dispose();
       socket.dispose();
     },
   };

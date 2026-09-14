@@ -44,6 +44,8 @@ const policy: SendPolicy = {
   thinking: true,
   effort: "high",
   offered: NONE,
+  automation: null,
+  deadlineMs: null,
   limits: LOOP_LIMITS,
   toolCaps: TOOL_CAPS,
 };

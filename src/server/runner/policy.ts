@@ -10,7 +10,7 @@
 // same moment, copied onto the policy so a send runs under the caps it
 // started on whatever an admin changes later.
 
-import type { Effort, ProjectKind } from "../../shared/words.ts";
+import type { Effort, EventSource, ProjectKind } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -59,6 +59,14 @@ export type SendPolicy = {
   effort: Effort | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
+  automation: {
+    id: string;
+    name: string;
+    source: EventSource;
+    dueAt: number;
+    tz: string;
+  } | null;
+  deadlineMs: number | null;
   // the caps the send started on, the limits area's word at that moment
   limits: LoopLimits;
   toolCaps: ToolCaps;
@@ -75,6 +83,8 @@ export function buildPolicy(input: {
   // one place the set is decided
   tools: ToolsPort | null;
   limits: Limits;
+  automation?: SendPolicy["automation"];
+  deadlineMs?: number | null;
 }): SendPolicy {
   const { user, agent } = input;
   const offered =
@@ -101,6 +111,8 @@ export function buildPolicy(input: {
     thinking,
     effort: thinking ? agent.effort : null,
     offered,
+    automation: input.automation ?? null,
+    deadlineMs: input.deadlineMs ?? null,
     limits: {
       rounds: input.limits.rounds,
       callsPerRound: input.limits.callsPerRound,

@@ -19,6 +19,13 @@ export type StateLine = { author: string | null; text: string };
 
 const plain = (text: string): StateLine => ({ author: null, text });
 
+// the name a run is drawn under in the author's place: its automation's,
+// or a plain word once the automation is gone; null for a chat
+export function runOf(row: StreamRow): string | null {
+  if (row.session.origin !== "automation") return null;
+  return row.automation?.name ?? "automation";
+}
+
 export function stateLine(row: StreamRow): StateLine {
   const { session, send, last } = row;
   switch (session.status) {
@@ -35,7 +42,9 @@ export function stateLine(row: StreamRow): StateLine {
       return plain(
         send?.cause === "shutdown" || send?.cause === "restart"
           ? "stopped · the server restarted"
-          : "stopped",
+          : send?.cause === "deadline"
+            ? "stopped · past its deadline"
+            : "stopped",
       );
     default:
       return last === null

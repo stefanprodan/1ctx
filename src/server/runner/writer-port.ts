@@ -16,6 +16,8 @@ export type SessionsPort = {
     projectId: string;
     ownerId: string;
     agentId: string;
+    origin?: "chat" | "automation";
+    automationId?: string | null;
     title: string;
     now: number;
   }): SessionRow;

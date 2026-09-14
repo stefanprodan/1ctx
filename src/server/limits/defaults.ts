@@ -32,7 +32,7 @@ export type ToolCaps = {
   searchDeadlineMs: number;
 };
 
-export type Limits = LoopLimits & ToolCaps;
+export type Limits = LoopLimits & ToolCaps & { runDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -141,6 +141,13 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     max: 600_000,
     unit: "ms",
     scope: "call",
+  },
+  runDeadlineMs: {
+    default: 600_000,
+    min: 60_000,
+    max: 3_600_000,
+    unit: "ms",
+    scope: "send",
   },
 };
 

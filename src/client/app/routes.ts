@@ -13,6 +13,7 @@
 
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
+import { loadAutomations } from "../data/automations.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -71,7 +72,8 @@ export const ROUTES: Route[] = [
     // from the rail's list
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
-      const rows = loadList({ project: null, q });
+      const origin = query.get("origin") === "automation" ? "automation" : null;
+      const rows = loadList({ project: null, q, origin });
       const spent = loadWeek();
       await loadProjects();
       const target = composeProjectOf(projects.value, homeProjectId.value);
@@ -122,6 +124,22 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/projects/:id/automations",
+    view: lazy(() =>
+      import("../views/projects/Automations.tsx").then((m) => m.Automations),
+    ),
+    title: () => "Automations",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+        loadRecentDays(),
+      ]);
+    },
+  },
+  {
     path: "/projects/:id/members",
     view: lazy(() =>
       import("../views/projects/Members.tsx").then((m) => m.Members),
@@ -164,7 +182,13 @@ export const ROUTES: Route[] = [
       if (detail === null || detail.session.id !== params.id) return;
       const projectId = detail.session.projectId;
       if (project.value?.id !== projectId) await loadProject(projectId);
-      await loadProjectAgents(projectId);
+      // a run names its automation under the title
+      await Promise.all([
+        loadProjectAgents(projectId),
+        detail.session.automationId === null
+          ? undefined
+          : loadAutomations(projectId),
+      ]);
     },
   },
   {

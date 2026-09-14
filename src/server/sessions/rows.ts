@@ -16,6 +16,7 @@ import type {
   MessageStatus,
   SendCause,
   SendKind,
+  SessionOrigin,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
@@ -36,7 +37,8 @@ export type RawSession = {
   project_id: string;
   owner_id: string;
   agent_id: string;
-  origin: "chat";
+  origin: SessionOrigin;
+  automation_id: string | null;
   title: string;
   status: SessionStatus;
   revision: number;
@@ -59,6 +61,7 @@ export const session = (
   ownerId: raw.owner_id,
   agentId: raw.agent_id,
   origin: raw.origin,
+  automationId: raw.automation_id,
   title: raw.title,
   status: raw.status,
   revision: raw.revision,

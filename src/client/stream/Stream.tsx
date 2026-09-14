@@ -7,6 +7,7 @@
 // is the page's.
 
 import type { StreamRow } from "../../shared/api/sessions.ts";
+import { Icon } from "../lib/icons.tsx";
 import { Row } from "./Row.tsx";
 import { Search } from "./Search.tsx";
 import "./stream.css";
@@ -17,22 +18,39 @@ export function Stream({
   // project already
   projectName,
   search,
+  runs,
   empty,
   now,
 }: {
   rows: StreamRow[] | null;
   projectName: (projectId: string) => string | null;
-  // the query as the address has it, and where a new one goes
-  search: { value: string; onChange: (q: string) => void };
+  // the query as the address has it, and where a new one goes; a list
+  // without a head, the runs of an automation, has none
+  search?: { value: string; onChange: (q: string) => void };
+  // the Runs filter beside the search, on a page that offers it
+  runs?: { on: boolean; onToggle: () => void };
   // what the card says with no rows
   empty: string;
   now: number;
 }) {
   return (
     <section class="stream">
-      <div class="stream-head">
-        <Search value={search.value} onChange={search.onChange} />
-      </div>
+      {(search || runs) && (
+        <div class="stream-head">
+          {search && <Search value={search.value} onChange={search.onChange} />}
+          {runs && (
+            <button
+              type="button"
+              class={`stream-filter${runs.on ? " stream-filter-on" : ""}`}
+              aria-pressed={runs.on}
+              onClick={runs.onToggle}
+            >
+              <Icon name="clock" size={12} />
+              Runs
+            </button>
+          )}
+        </div>
+      )}
       {rows === null ? (
         <p class="stream-state">Loading</p>
       ) : rows.length === 0 ? (

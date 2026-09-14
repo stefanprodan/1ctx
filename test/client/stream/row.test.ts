@@ -6,12 +6,15 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  runOf,
   stateLine,
   tickMs,
   whenText,
 } from "../../../src/client/stream/Row.model.ts";
 import {
   composeProjectOf,
+  runsOf,
+  searchHref,
   searchOf,
 } from "../../../src/client/views/home/Home.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
@@ -28,6 +31,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   ownerId: "u1",
   agentId: "a1",
   origin: "chat",
+  automationId: null,
   title: "Which pods restarted",
   status: "done",
   revision: 3,
@@ -60,6 +64,7 @@ const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   session: session(),
   send: send(),
   last: { seq: 2, author: "assistant", text: "nine pods, all expected" },
+  automation: null,
   ...changes,
 });
 
@@ -139,6 +144,14 @@ describe("stateLine", () => {
         ),
       ).toEqual(plain("stopped · the server restarted"));
     }
+    expect(
+      stateLine(
+        row({
+          session: stopped,
+          send: send({ status: "stopped", cause: "deadline" }),
+        }),
+      ),
+    ).toEqual(plain("stopped · past its deadline"));
   });
 });
 
@@ -195,5 +208,33 @@ describe("Home.model", () => {
     expect(searchOf("")).toBe("");
     expect(searchOf("?q=+pods+")).toBe("pods");
     expect(searchOf("?q=pods+%26+co")).toBe("pods & co");
+  });
+
+  test("the Runs filter rides on the address beside the query", () => {
+    expect(runsOf("")).toBe(false);
+    expect(runsOf("?origin=automation")).toBe(true);
+    expect(runsOf("?origin=chat")).toBe(false);
+    expect(searchHref("/", "")).toBe("/");
+    expect(searchHref("/", " pods ", true)).toBe("/?q=pods&origin=automation");
+    expect(searchHref("/", "", true)).toBe("/?origin=automation");
+  });
+});
+
+describe("runOf", () => {
+  test("a run is under its automation, a chat under nobody", () => {
+    expect(runOf(row())).toBeNull();
+    const ran = row({
+      session: session({ origin: "automation", automationId: "au1" }),
+      automation: { id: "au1", name: "nightly" },
+    });
+    expect(runOf(ran)).toBe("nightly");
+    // the automation was deleted and its run stayed
+    expect(
+      runOf({
+        ...ran,
+        session: { ...ran.session, automationId: null },
+        automation: null,
+      }),
+    ).toBe("automation");
   });
 });
