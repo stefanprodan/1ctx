@@ -5,13 +5,12 @@
 // faint text. For a chat not started yet it opens the list of the
 // project's agents; a session's agent is fixed, so the chip is static.
 
-import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { Icon } from "../lib/icons.tsx";
 import { Fit } from "../ui/Fit.tsx";
+import { useMenu } from "./menu.ts";
 
 export function AgentPicker({
   agents,
@@ -23,25 +22,8 @@ export function AgentPicker({
   // absent for a fixed agent
   onPick?: (id: string) => void;
 }) {
-  const open = useSignal(false);
-  const root = useRef<HTMLDivElement>(null);
+  const { open, root } = useMenu();
   const picked = agents.find((a) => a.id === agentId) ?? null;
-  // a click outside or Escape closes the list
-  useEffect(() => {
-    if (!open.value) return;
-    const onClick = (ev: MouseEvent) => {
-      if (!root.current?.contains(ev.target as Node)) open.value = false;
-    };
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") open.value = false;
-    };
-    document.addEventListener("click", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open.value, open]);
   const fixed = onPick === undefined;
   return (
     <div class="composer-agent" ref={root}>

@@ -73,6 +73,8 @@ const PATHS: Record<string, string> = {
   home: "M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5",
   projects:
     "M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z",
+  lock: "M4.5 7.5h7a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1zM5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2",
+  hash: "M6.5 2.5 5 13.5M11 2.5 9.5 13.5M3 6h10.5M2.5 10h10.5",
   settings: "M2.5 4.5h11M2.5 8h11M2.5 11.5h11",
   plus: "M8 3v10M3 8h10",
   chevron: "M5 6.5l3 3 3-3",
@@ -105,6 +107,10 @@ const PATHS: Record<string, string> = {
 };
 
 export type IconName = keyof typeof PATHS;
+
+// a personal project is its owner's alone, so it wears the lock
+export const projectIcon = (kind: "personal" | "team"): IconName =>
+  kind === "personal" ? "lock" : "hash";
 
 export function Icon({
   name,

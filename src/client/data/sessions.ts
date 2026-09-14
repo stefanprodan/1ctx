@@ -54,6 +54,9 @@ export const live = signal<ReadonlyMap<string, Live>>(new Map());
 // the stream's rows for the filter last asked for: Home's, every
 // project with a query, or one project's
 export const projectAgents = signal<AgentSummary[] | null>(null);
+// the project Home's composer starts a chat in, as the user picked it
+// for the life of the tab; null for the personal project
+export const homeProjectId = signal<string | null>(null);
 // a send the composer asked for and the server has not answered
 export const sending = signal(false);
 
@@ -83,6 +86,7 @@ effect(() => {
   live.value = new Map();
   toolResults.value = new Map();
   projectAgents.value = null;
+  homeProjectId.value = null;
   sending.value = false;
   pending = null;
   stream = null;
@@ -192,6 +196,15 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
   } catch {
     if (current()) projectAgents.value = null;
   }
+}
+
+// Home's composer moves to another project: its agents replace the
+// last project's, none until they answer, so a send never pairs an
+// agent with a project it is not in
+export async function pickHomeProject(projectId: string): Promise<void> {
+  homeProjectId.value = projectId;
+  projectAgents.value = null;
+  await loadProjectAgents(projectId);
 }
 
 // a write's answer is the detail: applied like an envelope, so the

@@ -218,7 +218,13 @@ describe("the rail", () => {
     expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
       html.indexOf('href="/projects/p2"'),
     );
-    expect(html).toContain('href="/projects/p1" class="rail-sub">personal<');
+    expect(html).toContain(
+      'href="/projects/p1" class="rail-sub rail-sub-icon">',
+    );
+    expect(html).toContain('class="rail-sub-name">personal<');
+    // the personal project wears the lock, a team one the hash
+    expect(html).toContain('d="M4.5 7.5h7');
+    expect(html).toContain('d="M6.5 2.5 5 13.5');
   });
 
   test("marks the project on screen as the current page", () => {
@@ -227,7 +233,9 @@ describe("the rail", () => {
     const html = render(
       <Rail user={caelea} narrow={false} onHide={() => {}} />,
     );
-    expect(html).toContain('class="rail-sub rail-sub-on" aria-current="page"');
+    expect(html).toContain(
+      'class="rail-sub rail-sub-icon rail-sub-on" aria-current="page"',
+    );
     path.value = "/";
   });
 
@@ -237,7 +245,9 @@ describe("the rail", () => {
     const html = render(
       <Rail user={caelea} narrow={false} onHide={() => {}} />,
     );
-    expect(html).toContain('href="/projects/p1" class="rail-sub rail-sub-on">');
+    expect(html).toContain(
+      'href="/projects/p1" class="rail-sub rail-sub-icon rail-sub-on">',
+    );
     path.value = "/";
   });
 

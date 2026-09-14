@@ -18,7 +18,7 @@ import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, reason } from "../lib/format.ts";
-import { Icon, type IconName, Logo } from "../lib/icons.tsx";
+import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
 import { projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
@@ -28,6 +28,7 @@ function Sub({
   href,
   here,
   on = here === href,
+  icon,
   follow,
   children,
 }: {
@@ -35,17 +36,26 @@ function Sub({
   here: string;
   // inside the link's page, not only on it
   on?: boolean;
+  // a project's kind; a group's pages have none
+  icon?: IconName;
   follow?: () => void;
   children: string;
 }) {
   return (
     <a
       href={href}
-      class={`rail-sub${on ? " rail-sub-on" : ""}`}
+      class={`rail-sub${icon ? " rail-sub-icon" : ""}${on ? " rail-sub-on" : ""}`}
       aria-current={here === href ? "page" : undefined}
       onClick={follow}
     >
-      {children}
+      {icon ? (
+        <>
+          <Icon name={icon} size={14} class="rail-sub-glyph" />
+          <span class="rail-sub-name">{children}</span>
+        </>
+      ) : (
+        children
+      )}
     </a>
   );
 }
@@ -162,6 +172,7 @@ export function Rail({
                       href={`/projects/${p.id}`}
                       here={here}
                       on={p.id === inProject}
+                      icon={projectIcon(p.kind)}
                       follow={follow}
                     >
                       {p.name}

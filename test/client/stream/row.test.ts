@@ -11,7 +11,7 @@ import {
   whenText,
 } from "../../../src/client/stream/Row.model.ts";
 import {
-  personalOf,
+  composeProjectOf,
   searchOf,
 } from "../../../src/client/views/home/Home.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
@@ -63,27 +63,36 @@ const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   ...changes,
 });
 
+const plain = (text: string) => ({ author: null, text });
+
 describe("stateLine", () => {
   test("a done chat shows its last line with the author", () => {
-    expect(stateLine(row())).toBe("assistant: nine pods, all expected");
+    expect(stateLine(row())).toEqual({
+      author: "assistant",
+      text: "nine pods, all expected",
+    });
     expect(
       stateLine(row({ last: { seq: 1, author: "ana", text: "bump prod?" } })),
-    ).toBe("ana: bump prod?");
-    expect(stateLine(row({ last: null }))).toBe("");
+    ).toEqual({ author: "ana", text: "bump prod?" });
+    expect(stateLine(row({ last: null }))).toEqual({ author: null, text: "" });
   });
 
   test("a running chat shows the work and its calls", () => {
     const running = session({ status: "running" });
     const active = send({ status: "running", cause: null, finishedAt: null });
-    expect(stateLine(row({ session: running, send: active }))).toBe("working");
+    expect(stateLine(row({ session: running, send: active }))).toEqual(
+      plain("working"),
+    );
     expect(
       stateLine(row({ session: running, send: { ...active, toolCalls: 1 } })),
-    ).toBe("working · 1 tool call");
+    ).toEqual(plain("working · 1 tool call"));
     expect(
       stateLine(row({ session: running, send: { ...active, toolCalls: 3 } })),
-    ).toBe("working · 3 tool calls");
+    ).toEqual(plain("working · 3 tool calls"));
     // the runner has not written the send yet
-    expect(stateLine(row({ session: running, send: null }))).toBe("working");
+    expect(stateLine(row({ session: running, send: null }))).toEqual(
+      plain("working"),
+    );
   });
 
   test("a failed chat shows the first line of the error", () => {
@@ -99,7 +108,7 @@ describe("stateLine", () => {
           }),
         }),
       ),
-    ).toBe("failed · openrouter returned 429");
+    ).toEqual(plain("failed · openrouter returned 429"));
     expect(
       stateLine(
         row({
@@ -107,8 +116,10 @@ describe("stateLine", () => {
           send: send({ status: "failed", cause: "failure", error: "" }),
         }),
       ),
-    ).toBe("failed");
-    expect(stateLine(row({ session: failed, send: null }))).toBe("failed");
+    ).toEqual(plain("failed"));
+    expect(stateLine(row({ session: failed, send: null }))).toEqual(
+      plain("failed"),
+    );
   });
 
   test("a stopped chat says who, the person or the server", () => {
@@ -120,13 +131,13 @@ describe("stateLine", () => {
           send: send({ status: "stopped", cause: "stop" }),
         }),
       ),
-    ).toBe("stopped");
+    ).toEqual(plain("stopped"));
     for (const cause of ["shutdown", "restart"] as const) {
       expect(
         stateLine(
           row({ session: stopped, send: send({ status: "stopped", cause }) }),
         ),
-      ).toBe("stopped · the server restarted");
+      ).toEqual(plain("stopped · the server restarted"));
     }
   });
 });
@@ -155,26 +166,29 @@ describe("whenText", () => {
 });
 
 describe("Home.model", () => {
-  test("the personal project is the one of its kind in the list", () => {
-    expect(personalOf(null)).toBeNull();
-    expect(
-      personalOf([
-        {
-          id: "p2",
-          kind: "team",
-          name: "platform",
-          createdAt: 0,
-          memberCount: 1,
-        },
-        {
-          id: "p1",
-          kind: "personal",
-          name: "personal",
-          createdAt: 0,
-          memberCount: 1,
-        },
-      ])?.id,
-    ).toBe("p1");
+  test("the composer's project is the pick while listed, else the personal", () => {
+    const rows = [
+      {
+        id: "p2",
+        kind: "team" as const,
+        name: "platform",
+        createdAt: 0,
+        memberCount: 1,
+      },
+      {
+        id: "p1",
+        kind: "personal" as const,
+        name: "personal",
+        createdAt: 0,
+        memberCount: 1,
+      },
+    ];
+    expect(composeProjectOf(null, null)).toBeNull();
+    expect(composeProjectOf(null, "p2")).toBeNull();
+    expect(composeProjectOf(rows, null)?.id).toBe("p1");
+    expect(composeProjectOf(rows, "p2")?.id).toBe("p2");
+    // a project the user no longer sees
+    expect(composeProjectOf(rows, "p9")?.id).toBe("p1");
   });
 
   test("the search is read from the address, trimmed", () => {
