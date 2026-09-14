@@ -137,6 +137,7 @@ describe("the agents", () => {
       thinking: "on",
       effort: "xhigh",
       prompt: "You write Go.",
+      skills: [],
       createdAt: app.now.value,
     });
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({

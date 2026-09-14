@@ -32,6 +32,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "thinking",
     "effort",
     "prompt",
+    "skills",
   ]);
   if (!isName(b.name)) {
     throw new BadRequest(
@@ -70,5 +71,6 @@ export function parseAgent(body: unknown): ParsedAgent {
     thinking: b.thinking,
     effort: b.effort,
     prompt: prompt.trim(),
+    skills: [],
   };
 }

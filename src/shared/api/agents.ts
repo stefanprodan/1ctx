@@ -20,4 +20,6 @@ export type SaveAgentRequest = {
   thinking: "on" | "off" | null;
   effort: Effort | null;
   prompt: string;
+  // skill ids, at most MAX_SKILLS_PER_AGENT, empty allowed
+  skills: string[];
 };

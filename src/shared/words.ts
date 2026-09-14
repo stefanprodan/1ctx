@@ -286,3 +286,38 @@ export type LimitUnit = (typeof LIMIT_UNITS)[number];
 // where a limit applies: over the whole send, or to one tool call
 export const LIMIT_SCOPES = ["send", "call"] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
+
+// a skill's name, the Agent Skills rule: lowercase ASCII letters, digits
+// and hyphens, no hyphen at either end and none doubled, 1 to 64.
+// Stricter than isName, since a skill written for any client obeys it
+export const MAX_SKILL_NAME = 64;
+const SKILL_NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export function isSkillName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= MAX_SKILL_NAME &&
+    SKILL_NAME_RE.test(value)
+  );
+}
+// the specification's caps on the fields the catalog shows
+export const MAX_SKILL_DESCRIPTION = 1024;
+export const MAX_SKILL_COMPATIBILITY = 500;
+// the Claude API's cap per request; recall drops past it
+export const MAX_SKILLS_PER_AGENT = 20;
+
+// where a skill came from: a GitHub directory, a tarball with a path
+// inside it, a site's discovery index, or one raw SKILL.md
+export const SKILL_SOURCES = ["github", "archive", "index", "file"] as const;
+export type SkillSource = (typeof SKILL_SOURCES)[number];
+export function isSkillSource(value: unknown): value is SkillSource {
+  return SKILL_SOURCES.includes(value as SkillSource);
+}
+
+// the two tools an agent's skills bring to a send, never on the Tools
+// page: `skill` loads a body, `skill_file` reads one of its files
+export const SKILL_TOOLS = ["skill", "skill_file"] as const;
+export type SkillTool = (typeof SKILL_TOOLS)[number];
+export function isSkillTool(value: unknown): value is SkillTool {
+  return SKILL_TOOLS.includes(value as SkillTool);
+}

@@ -8,7 +8,7 @@
 // so a test exercises the wiring the binary runs.
 
 import { type Access, accessArea } from "./access/index.ts";
-import { type AgentStore, agentsArea } from "./agents/index.ts";
+import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
 import type { Db } from "./db/index.ts";
 import type { Clock } from "./lib/clock.ts";
@@ -30,6 +30,7 @@ import {
   type Sessions,
   sessionsArea,
 } from "./sessions/index.ts";
+import { type SkillStore, type Skills, skillsArea } from "./skills/index.ts";
 import { type Tools, toolsArea } from "./tools/index.ts";
 import { type Usage, type UsageStore, usageArea } from "./usage/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
@@ -58,6 +59,7 @@ export type App = {
   users: UserStore;
   projects: ProjectStore;
   providers: ProviderStore;
+  skills: SkillStore;
   agents: AgentStore;
   sessions: SessionStore;
   automations: Automations["store"];
@@ -89,6 +91,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   let usage!: Usage;
   let sessions!: Sessions;
   let automations!: Automations;
+  let agents!: Agents;
   const users = usersArea({
     db,
     secret,
@@ -103,6 +106,19 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret,
     fetcher: options.fetcher ?? fetch,
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
+  });
+  const skills: Skills = skillsArea({
+    db,
+    clock,
+    log: options.log("skills"),
+    fetcher: options.fetcher ?? fetch,
+    agents: {
+      agentNames: (ids) =>
+        ids.flatMap((id) => {
+          const agent = agents.byId(id);
+          return agent === null ? [] : [agent.name];
+        }),
+    },
   });
   const projects = projectsArea({
     db,
@@ -132,7 +148,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     },
   });
-  const agents = agentsArea({
+  agents = agentsArea({
     db,
     clock,
     providers,
@@ -205,6 +221,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...usage.routes,
     ...limits.routes,
     ...providers.routes,
+    ...skills.routes,
     ...projects.routes,
     ...access.routes,
     ...agents.routes,
@@ -224,6 +241,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users: users.store,
     projects: projects.store,
     providers: providers.store,
+    skills: skills.store,
     agents: agents.store,
     sessions: sessions.store,
     automations: automations.store,
@@ -238,6 +256,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     handle,
     sweep: () => access.sweep(),
     async shutdown() {
+      skills.close();
       automations.stop();
       await runner.shutdown();
       automations.dispose();

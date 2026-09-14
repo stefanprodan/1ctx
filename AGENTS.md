@@ -203,6 +203,12 @@ violation, and every rule has a rejected fixture under
   delete. An agent carries `thinking` and `effort`, null for the provider's
   default; the levels per wire are `EFFORTS` in `shared/words.ts`, and the
   policy resolves both once per send.
+- **A skill is stored text, never executable.** An admin adds a `SKILL.md`
+  and its text files from a GitHub directory, an archive, a discovery
+  index or a raw file through the compose fetcher. An index digest is
+  checked on add and refresh. Refresh is explicit and never renames the
+  skill; deleting one an agent names is a 409. Stored text is cleaned and
+  shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

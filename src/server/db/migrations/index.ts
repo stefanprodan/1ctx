@@ -11,5 +11,13 @@ import { m0002 } from "./0002-usage-activity.ts";
 import { m0003 } from "./0003-automations.ts";
 import { m0004 } from "./0004-run-source.ts";
 import { m0005 } from "./0005-suspended-by.ts";
+import { m0006 } from "./0006-skills.ts";
 
-export const MIGRATIONS: Migration[] = [m0001, m0002, m0003, m0004, m0005];
+export const MIGRATIONS: Migration[] = [
+  m0001,
+  m0002,
+  m0003,
+  m0004,
+  m0005,
+  m0006,
+];

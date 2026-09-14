@@ -149,6 +149,7 @@ export function AgentForm({
         effort.value,
         wireOf(providerId.value),
       ),
+      skills: agent?.skills ?? [],
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);

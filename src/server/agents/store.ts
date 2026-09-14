@@ -44,6 +44,7 @@ const row = (raw: Raw): AgentRow => ({
   thinking: raw.thinking,
   effort: raw.effort,
   prompt: raw.prompt,
+  skills: [],
   createdAt: raw.created_at,
 });
 
