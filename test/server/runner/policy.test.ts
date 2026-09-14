@@ -52,7 +52,7 @@ function policy(
   },
 ): SendPolicy {
   return buildPolicy({
-    project: { id: "project", name: "ops", description: "" },
+    project: { id: "project", kind: "team", name: "ops", description: "" },
     user,
     agent: {
       ...agent,

@@ -4,7 +4,13 @@
 // The provider request parsers: a new provider, and the catalog query.
 
 import type { CreateProviderRequest } from "../../shared/api/providers.ts";
-import { isName, isWire, MAX_NAME, MIN_NAME } from "../../shared/words.ts";
+import {
+  isName,
+  isWire,
+  MAX_NAME,
+  MIN_NAME,
+  NAME_CHARACTERS,
+} from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -19,7 +25,7 @@ export const RESERVED_KEYS = ["admin"];
 export function parseName(value: unknown): string {
   if (!isName(value)) {
     throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} lowercase letters, digits and dashes`,
+      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
     );
   }
   return value;

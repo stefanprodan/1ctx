@@ -164,11 +164,25 @@ describe("team project administration", () => {
   });
   test("names and memberships report their field conflicts", async () => {
     const chat = await chatApp();
-    const username = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "caelea" },
+    // every personal project is named personal, so a team may not be
+    const reserved = await chat.admin.call("POST", "/api/projects", {
+      body: { name: "personal" },
     });
-    expect(username.status).toBe(409);
-    expect(await username.json()).toEqual({ error: "name is taken" });
+    expect(reserved.status).toBe(409);
+    expect(await reserved.json()).toEqual({ error: "name is taken" });
+    // a username names no project any more
+    expect((await createTeam(chat, "caelea")).name).toBe("caelea");
+    expect((await createTeam(chat, "on_call")).name).toBe("on_call");
+    expect((await createTeam(chat, "a".repeat(80))).name).toHaveLength(80);
+    for (const name of ["on.call", "On-call", "a".repeat(81)]) {
+      const refused = await chat.admin.call("POST", "/api/projects", {
+        body: { name },
+      });
+      expect(refused.status).toBe(400);
+      expect((await refused.json()).error).toBe(
+        "name must be 2 to 80 lowercase letters, digits, dashes and underscores",
+      );
+    }
     const ops = await createTeam(chat, "ops");
     expect(
       (
@@ -187,6 +201,13 @@ describe("team project administration", () => {
       (
         await chat.admin.call("PATCH", `/api/projects/${other.id}`, {
           body: { name: "ops" },
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await chat.admin.call("PATCH", `/api/projects/${other.id}`, {
+          body: { name: "personal" },
         })
       ).status,
     ).toBe(409);
@@ -296,7 +317,7 @@ describe("team project administration", () => {
       {
         id: chat.app.projects.personal(second.user.id)!.id,
         kind: "personal",
-        name: "stefan",
+        name: "personal",
         createdAt: expect.any(Number),
         memberCount: 1,
       },
@@ -308,9 +329,10 @@ describe("team project administration", () => {
         memberCount: 0,
       },
     ]);
-    expect(projects.map((item: { name: string }) => item.name)).not.toContain(
-      "caelea",
-    );
+    // the admin sees their own personal project, never the member's
+    expect(
+      projects.filter((item: { kind: string }) => item.kind === "personal"),
+    ).toHaveLength(1);
     const memberList = await (
       await chat.member.call("GET", "/api/projects")
     ).json();
@@ -318,7 +340,7 @@ describe("team project administration", () => {
       {
         id: chat.projectId,
         kind: "personal",
-        name: "caelea",
+        name: "personal",
         createdAt: expect.any(Number),
         memberCount: 1,
       },
@@ -560,51 +582,72 @@ describe("team project chat lifecycle", () => {
 });
 
 describe("the personal project's settings", () => {
-  test("its owner names and describes it, and a taken name is a 409", async () => {
+  test("its owner describes it and cannot name it", async () => {
     const chat = await chatApp();
-    const renamed = await chat.member.call("PATCH", "/api/profile/project", {
-      body: { name: "notes", description: "My scratch work" },
+    const described = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { description: "My scratch work" },
     });
-    expect(renamed.status).toBe(200);
-    expect((await renamed.json()).project).toMatchObject({
+    expect(described.status).toBe(200);
+    expect((await described.json()).project).toMatchObject({
       id: chat.projectId,
       kind: "personal",
-      name: "notes",
+      name: "personal",
       description: "My scratch work",
     });
     // the admin's personal project is untouched
     expect(chat.app.projects.personal(chat.adminId)!.description).toBe("");
-    await createTeam(chat, "ops");
-    const taken = await chat.member.call("PATCH", "/api/profile/project", {
-      body: { name: "ops" },
+    const cleared = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { description: "" },
     });
-    expect(taken.status).toBe(409);
-    const bad = await chat.member.call("PATCH", "/api/profile/project", {
-      body: { description: "two\nlines" },
-    });
-    expect(bad.status).toBe(400);
+    expect(cleared.status).toBe(200);
+    for (const body of [
+      { name: "notes" },
+      { name: "notes", description: "x" },
+      {},
+      { description: "two\nlines" },
+    ]) {
+      expect(
+        (await chat.member.call("PATCH", "/api/profile/project", { body }))
+          .status,
+      ).toBe(400);
+    }
     chat.app.socket.dispose();
   });
 
-  test("a username rename follows only a project still named after it", async () => {
+  test("a username rename leaves the project named personal", async () => {
     const chat = await chatApp();
     const member = chat.app.users.byId(chat.memberId)!;
-    const rename = (username: string) =>
-      chat.admin.call("PATCH", `/api/users/${chat.memberId}`, {
-        body: { username },
-      });
-    expect((await rename(`${member.username}-2`)).status).toBe(200);
-    expect(chat.app.projects.personal(chat.memberId)!.name).toBe(
-      `${member.username}-2`,
+    const renamed = await chat.admin.call(
+      "PATCH",
+      `/api/users/${chat.memberId}`,
+      { body: { username: `${member.username}_2` } },
     );
-    await chat.member.call("PATCH", "/api/profile/project", {
-      body: { name: "notes" },
-    });
-    expect((await rename(`${member.username}-3`)).status).toBe(200);
-    expect(chat.app.projects.personal(chat.memberId)!.name).toBe("notes");
-    // taking the name the project already carries is no conflict
-    expect((await rename("notes")).status).toBe(200);
-    expect(chat.app.projects.personal(chat.memberId)!.name).toBe("notes");
+    expect(renamed.status).toBe(200);
+    expect(chat.app.projects.personal(chat.memberId)!.name).toBe("personal");
+    chat.app.socket.dispose();
+  });
+
+  test("the store refuses a personal project named otherwise and a team named personal", async () => {
+    const chat = await chatApp();
+    const insert = (id: string, kind: string, name: string) =>
+      chat.app.db
+        .query(
+          "insert into projects (id, kind, name, owner_id, created_at) values (?, ?, ?, ?, 0)",
+        )
+        .run(id, kind, name, chat.adminId);
+    expect(() => insert("t1", "team", "personal")).toThrow("CHECK");
+    chat.app.db
+      .query("delete from projects where owner_id = ? and kind = 'personal'")
+      .run(chat.memberId);
+    expect(() =>
+      chat.app.db
+        .query(
+          "insert into projects (id, kind, name, owner_id, created_at) values ('p1', 'personal', 'notes', ?, 0)",
+        )
+        .run(chat.memberId),
+    ).toThrow("CHECK");
+    insert("t2", "team", "ops");
+    expect(() => insert("t3", "team", "ops")).toThrow("UNIQUE");
     chat.app.socket.dispose();
   });
 
@@ -613,8 +656,9 @@ describe("the personal project's settings", () => {
     const first = await startChat(chat, "hi");
     const prompt = (script: Script) =>
       (script.body.messages as { content: string }[])[0]!.content;
+    const username = chat.app.users.byId(chat.memberId)!.username;
     expect(prompt(first.script)).toContain(
-      `You work in the ${chat.app.projects.byId(chat.projectId)!.name} project.\n`,
+      `You work in @${username}'s personal project.\n`,
     );
     await finish(chat, first.script);
     await chat.member.call("PATCH", "/api/profile/project", {

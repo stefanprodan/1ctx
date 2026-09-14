@@ -49,6 +49,8 @@ describe("parseAgent", () => {
       {},
       { name: "coder", providerId: "p", model: "m", extra: 1 },
       { name: "C", providerId: "p", model: "m" },
+      { name: "code.r", providerId: "p", model: "m" },
+      { name: "a".repeat(81), providerId: "p", model: "m" },
       { name: "coder", providerId: "", model: "m" },
       { name: "coder", providerId: 1, model: "m" },
       { name: "coder", providerId: "p", model: "" },
@@ -64,6 +66,12 @@ describe("parseAgent", () => {
     ],
     parseAgent,
   );
+
+  test("takes the shared name rule, underscores and 80 characters", () => {
+    const body = { ...defaults, providerId: "p", model: "m" };
+    expect(parseAgent({ ...body, name: "code_r" }).name).toBe("code_r");
+    expect(parseAgent({ ...body, name: "a".repeat(80) }).name).toHaveLength(80);
+  });
 
   test("accepts null, on and off thinking and rejects bad values", () => {
     const body = { ...defaults, name: "coder", providerId: "p", model: "m" };

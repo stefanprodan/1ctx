@@ -37,6 +37,7 @@ import {
 import { CatalogSearch } from "./Agents.state.ts";
 import "./agents.css";
 import { reason } from "../../lib/format.ts";
+import { shapedInput } from "../../lib/names.ts";
 
 // one catalog line: the name over the id, the rest faint at the right
 function Line({ model }: { model: CatalogMatch }) {
@@ -212,7 +213,7 @@ export function AgentForm({
             disabled={busy}
             value={name.value}
             onInput={(e) => {
-              name.value = (e.currentTarget as HTMLInputElement).value;
+              name.value = shapedInput(e);
               save.touch();
             }}
           />

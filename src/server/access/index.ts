@@ -21,11 +21,7 @@ import {
 } from "./profile.ts";
 import { type UsersPort as LoginUsersPort, routes } from "./routes.ts";
 import { LoginStore } from "./store.ts";
-import {
-  type ProjectsPort as AdminProjectsPort,
-  type UsersPort as AdminUsersPort,
-  usersRoutes,
-} from "./users.ts";
+import { type UsersPort as AdminUsersPort, usersRoutes } from "./users.ts";
 
 export {
   type Auth,
@@ -41,7 +37,6 @@ export { type ProfileDeps, profileRoutes } from "./profile.ts";
 export { type RoutesDeps, routes } from "./routes.ts";
 export { type Login, LoginStore } from "./store.ts";
 export {
-  type ProjectsPort as AdminProjectsPort,
   type UsersPort as AdminUsersPort,
   type UsersRoutesDeps,
   usersRoutes,
@@ -54,7 +49,7 @@ export type AccessDeps = {
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
   users: AuthUsersPort & LoginUsersPort & ProfileUsersPort & AdminUsersPort;
-  projects: AuthProjectsPort & AdminProjectsPort;
+  projects: AuthProjectsPort;
 };
 
 export type Access = Auth & {
@@ -94,7 +89,6 @@ export function accessArea(deps: AccessDeps): Access {
         db: deps.db,
         logins,
         users: deps.users,
-        projects: deps.projects,
         clock: deps.clock,
       }),
     ],

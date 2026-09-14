@@ -877,7 +877,7 @@ function seededStore() {
     "insert into users (id, username, full_name, email, role, password_hash, created_at) values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0)",
   ).run();
   db.query(
-    "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'user', 'u', 0)",
+    "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'personal', 'u', 0)",
   ).run();
   db.query(
     "insert into providers (id, name, wire, base_url, created_at) values ('pr', 'prov', 'openai-compatible', 'http://x', 0)",

@@ -115,7 +115,7 @@ describe("admin users", () => {
     const { user } = await response.json();
     expect(user.email).toBe("caelea@example.com");
     expect(app.users.byId(user.id)?.email).toBe("caelea@example.com");
-    expect(app.projects.personal(user.id)?.name).toBe("caelea");
+    expect(app.projects.personal(user.id)?.name).toBe("personal");
   });
 
   test("create rolls the user back when its personal project fails", async () => {
@@ -148,18 +148,20 @@ describe("admin users", () => {
       "username",
     );
 
+    // a username no longer names a project, so a team's name is free
     const owner = app.users.byUsername("admin")!;
     app.db
       .query(
         "insert into projects (id, kind, name, owner_id, created_at) values ('taken', 'team', 'maria', ?, 0)",
       )
       .run(owner.id);
-    await expectConflict(
-      await client.call("POST", "/api/users", {
-        body: userBody("maria"),
-      }),
-      "project name",
-    );
+    expect(
+      (
+        await client.call("POST", "/api/users", {
+          body: { ...userBody("maria"), email: "maria@example.com" },
+        })
+      ).status,
+    ).toBe(201);
 
     await expectConflict(
       await client.call("POST", "/api/users", {
@@ -178,7 +180,7 @@ describe("admin users", () => {
       await client.call("PATCH", `/api/users/${second.id}`, {
         body: { username: "maria" },
       }),
-      "project name",
+      "username",
     );
     await expectConflict(
       await client.call("PATCH", `/api/users/${second.id}`, {
@@ -188,7 +190,7 @@ describe("admin users", () => {
     );
   });
 
-  test("rename follows the personal project and keeps every login", async () => {
+  test("rename leaves the personal project and keeps every login", async () => {
     const app = await testApp();
     const client = await admin(app);
     const user = await create(client, "caelea");
@@ -206,7 +208,7 @@ describe("admin users", () => {
       body: { username: "maria" },
     });
     expect(response.status).toBe(200);
-    expect(app.projects.personal(user.id)?.name).toBe("maria");
+    expect(app.projects.personal(user.id)?.name).toBe("personal");
     expect(
       app.db
         .query<{ n: number }, [string]>(
@@ -450,7 +452,7 @@ describe("user email projections", () => {
        values ('u', 'caelea', 'Oana', 'member', 'x', 0)`,
     ).run();
     db.query(
-      "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'caelea', 'u', 0)",
+      "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'personal', 'u', 0)",
     ).run();
     expect(migrate(db, MIGRATIONS.slice(0, 7))).toEqual(["0007-users-email"]);
     expect(db.query("select email from users where id = 'u'").get()).toEqual({

@@ -121,7 +121,7 @@ describe("0003-tools", () => {
       insert into users (id, username, full_name, role, password_hash, created_at)
         values ('u', 'user', 'User', 'member', 'x', 0);
       insert into projects (id, kind, name, owner_id, created_at)
-        values ('p', 'personal', 'user', 'u', 0);
+        values ('p', 'personal', 'personal', 'u', 0);
       insert into providers (id, name, wire, base_url, created_at)
         values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
       insert into agents (id, name, provider_id, model, model_name, created_at)
@@ -273,7 +273,7 @@ describe("0003-tools", () => {
       insert into users (id, username, full_name, role, password_hash, created_at)
         values ('u', 'user', 'User', 'member', 'x', 0);
       insert into projects (id, kind, name, owner_id, created_at)
-        values ('p', 'personal', 'user', 'u', 0);
+        values ('p', 'personal', 'personal', 'u', 0);
       insert into providers (id, name, wire, base_url, created_at)
         values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
       insert into agents (id, name, provider_id, model, model_name, created_at)
@@ -307,7 +307,7 @@ describe("0003-tools", () => {
       insert into users (id, username, full_name, role, password_hash, created_at)
         values ('u', 'user', 'User', 'member', 'x', 0);
       insert into projects (id, kind, name, owner_id, created_at)
-        values ('p', 'personal', 'user', 'u', 0);
+        values ('p', 'personal', 'personal', 'u', 0);
       insert into providers (id, name, wire, base_url, created_at)
         values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
       insert into agents (id, name, provider_id, model, model_name, created_at)
@@ -426,7 +426,7 @@ describe("0006-compaction", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a', 'agent', 'p', 'model', 'Model', 0);
       insert into projects (id, kind, name, owner_id, created_at)
-        values ('project', 'personal', 'project', 'u', 0);
+        values ('project', 'personal', 'personal', 'u', 0);
       insert into sessions
         (id, project_id, owner_id, agent_id, origin, title, status,
          created_at, last_activity_at)
@@ -497,7 +497,7 @@ describe("0009-project-description", () => {
         values ('u', 'caelea', 'Oana Mangiurea', 'caelea@example.com',
                 'member', 'x', 0);
       insert into projects (id, kind, name, owner_id, created_at)
-        values ('p1', 'personal', 'caelea', 'u', 0),
+        values ('p1', 'personal', 'personal', 'u', 0),
                ('p2', 'team', 'ops', 'u', 0);
     `);
     expect(migrate(db, MIGRATIONS.slice(0, 9))).toEqual([
@@ -506,7 +506,7 @@ describe("0009-project-description", () => {
     expect(
       db.query("select id, name, description from projects order by id").all(),
     ).toEqual([
-      { id: "p1", name: "caelea", description: "" },
+      { id: "p1", name: "personal", description: "" },
       { id: "p2", name: "ops", description: "" },
     ]);
     db.close();

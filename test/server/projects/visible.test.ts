@@ -11,7 +11,7 @@ import { visible } from "../../../src/server/projects/index.ts";
 const personal: ProjectRow = {
   id: "p1",
   kind: "personal",
-  name: "caelea",
+  name: "personal",
   ownerId: "u1",
   createdAt: 0,
   description: "",

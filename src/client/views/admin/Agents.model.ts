@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the agent and provider forms check before they call, the same
-// rules the server applies, the presets a provider is made from, and
-// the words a row shows for a window, a price and a key.
+// What the agent and provider forms check before they call (an empty
+// name, the base URL and the key file; the name rule is the server's),
+// the presets a provider is made from, and the words a row shows for a
+// window, a price and a key.
 
 import { compactsAt } from "../../../shared/compaction.ts";
 import { windowLine } from "../../agents/meta.ts";
@@ -21,9 +22,6 @@ import {
   EFFORTS,
   type Effort,
   isEffort,
-  isName,
-  MAX_NAME,
-  MIN_NAME,
   type Wire,
 } from "../../../shared/words.ts";
 
@@ -57,13 +55,10 @@ export const PRESETS: Preset[] = [
 export const preset = (wire: Wire): Preset =>
   PRESETS.find((p) => p.wire === wire) ?? PRESETS[0];
 
+// the field shapes the name as it is typed and the server holds the
+// rule, so the one slip worth catching here is an empty field
 export function nameProblem(value: string): string | null {
-  const v = value.trim();
-  if (v === "") return "Enter a name";
-  if (!isName(v)) {
-    return `A name is ${MIN_NAME} to ${MAX_NAME} lowercase letters, digits and dashes`;
-  }
-  return null;
+  return value.trim() === "" ? "Enter a name" : null;
 }
 
 export function baseUrlProblem(value: string): string | null {

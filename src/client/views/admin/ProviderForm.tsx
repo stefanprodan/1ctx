@@ -8,6 +8,7 @@
 import { useSignal } from "@preact/signals";
 import type { Wire } from "../../../shared/words.ts";
 import { createProvider } from "../../data/providers.ts";
+import { shapedInput } from "../../lib/names.ts";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import {
@@ -96,7 +97,10 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             placeholder="openrouter"
             disabled={busy}
             value={name.value}
-            onInput={bind(name)}
+            onInput={(e) => {
+              name.value = shapedInput(e);
+              save.touch();
+            }}
           />
         </label>
         <label class="field">

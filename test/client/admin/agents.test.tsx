@@ -122,7 +122,7 @@ describe("the words", () => {
     expect(keyLine("router", true)).toBe("router.key");
     expect(keyLine("router", false)).toBe("router.key missing");
     expect(nameProblem("")).toBe("Enter a name");
-    expect(nameProblem("Coder")).toContain("lowercase");
+    expect(nameProblem(" ")).toBe("Enter a name");
     expect(nameProblem("coder")).toBeNull();
     expect(preset("openrouter").baseUrl).toContain("/api/v1");
     expect(preset("openai-compatible").baseUrl).toBeNull();

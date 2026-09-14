@@ -6,7 +6,13 @@
 // model is the route's check, not the parser's.
 
 import type { SaveAgentRequest } from "../../shared/api/agents.ts";
-import { isAvatar, isName, MAX_NAME, MIN_NAME } from "../../shared/words.ts";
+import {
+  isAvatar,
+  isName,
+  MAX_NAME,
+  MIN_NAME,
+  NAME_CHARACTERS,
+} from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -29,7 +35,7 @@ export function parseAgent(body: unknown): ParsedAgent {
   ]);
   if (!isName(b.name)) {
     throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} lowercase letters, digits and dashes`,
+      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
     );
   }
   if (typeof b.providerId !== "string" || b.providerId === "") {

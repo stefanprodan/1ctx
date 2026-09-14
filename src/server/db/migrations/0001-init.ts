@@ -6,9 +6,10 @@ import type { Migration } from "../migration.ts";
 // users: identity and the password hash (argon2id, PHC string). logins:
 // the row behind a cookie, holding a hash of the token so a database
 // read never yields a usable cookie. projects: the container everything
-// lives in, personal (one per user, made with the user and gone with
-// the user) or team; memberships: who is in a project. providers: where
-// the models come from, with the name of the key file, never the key;
+// lives in, personal (one per user, named personal, made with the user
+// and gone with the user) or team, whose names are unique; memberships:
+// who is in a project. providers: where the models come from, with the
+// name of the key file, never the key;
 // agents: a name, a provider and a model, with what the catalog said
 // about the model when it was picked, the avatar and the system prompt.
 // sessions: a chat in a project, run by one agent, with a revision that
@@ -41,12 +42,15 @@ export const m0001: Migration = {
       create table projects (
         id text primary key,
         kind text not null check (kind in ('personal', 'team')),
-        name text not null unique,
+        name text not null,
         owner_id text not null references users(id) on delete cascade,
-        created_at integer not null
+        created_at integer not null,
+        check ((kind = 'personal') = (name = 'personal'))
       );
       create unique index projects_personal
         on projects(owner_id) where kind = 'personal';
+      create unique index projects_team_name
+        on projects(name) where kind = 'team';
       create table memberships (
         project_id text not null references projects(id) on delete cascade,
         user_id text not null references users(id) on delete cascade,

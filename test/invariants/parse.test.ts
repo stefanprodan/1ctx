@@ -24,9 +24,12 @@ import {
 } from "../../src/server/sessions/parse.ts";
 import {
   isEmail,
+  isName,
+  isUsername,
   MAX_MESSAGE_BYTES,
   MAX_SEARCH,
   MAX_TITLE,
+  shapeName,
 } from "../../src/shared/words.ts";
 import { testApp } from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
@@ -59,13 +62,62 @@ describe("parseLogin", () => {
   );
 });
 
+describe("the name rule", () => {
+  test.each(["on-call", "on_call", "q3", "1ctx", "a".repeat(80)])(
+    "a name may be %s",
+    (v) => {
+      expect(isName(v)).toBe(true);
+    },
+  );
+
+  test.each([
+    "a",
+    "a".repeat(81),
+    "On-call",
+    "on.call",
+    "on call",
+    "-on-call",
+    "_on-call",
+    "ops\u00e9",
+    "",
+    1,
+  ])("a name may not be %p", (v) => {
+    expect(isName(v)).toBe(false);
+  });
+
+  test("a username is a name with its own length", () => {
+    expect(isUsername("oana_m")).toBe(true);
+    expect(isUsername("a".repeat(32))).toBe(true);
+    expect(isUsername("ab")).toBe(false);
+    expect(isUsername("a".repeat(33))).toBe(false);
+    expect(isUsername("oana.m")).toBe(false);
+  });
+
+  test("a name field lowercases and dashes spaces and dots as typed", () => {
+    expect(shapeName("Q3 Launch")).toBe("q3-launch");
+    expect(shapeName("stefan.prodan")).toBe("stefan-prodan");
+    expect(shapeName("on_call")).toBe("on_call");
+    expect(shapeName("ops@home")).toBe("ops@home");
+  });
+});
+
 describe("parseUsername", () => {
-  test.each(["caelea", "caelea.p", "a-1_2", "123"])("accepts %s", (v) => {
+  test.each(["caelea", "caelea_p", "a-1_2", "123"])("accepts %s", (v) => {
     expect(parseUsername(v)).toBe(v);
   });
 
   refuses(
-    ["", "ab", "Oana", "oa na", ".caelea", "caelea@x", "a".repeat(33), 1],
+    [
+      "",
+      "ab",
+      "Oana",
+      "oa na",
+      "caelea.p",
+      ".caelea",
+      "caelea@x",
+      "a".repeat(33),
+      1,
+    ],
     parseUsername,
   );
 });

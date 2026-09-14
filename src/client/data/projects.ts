@@ -13,7 +13,7 @@ import { effect, signal } from "@preact/signals";
 import type {
   ProjectResponse,
   ProjectsResponse,
-  UpdateProjectRequest,
+  UpdatePersonalProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
   ProjectDetail,
@@ -80,7 +80,7 @@ export async function loadProject(id: string): Promise<void> {
 // the caller's personal project; the page keeps the answer when it
 // still shows that project, and the rail follows the name
 export async function savePersonalProject(
-  body: UpdateProjectRequest,
+  body: UpdatePersonalProjectRequest,
 ): Promise<void> {
   const forUser = owner;
   const { project: saved } = await api<ProjectResponse>(
