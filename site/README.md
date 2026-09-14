@@ -85,6 +85,7 @@ Console greys and one amber.
 | dim | `#b3b3b8` | secondary text, the tagline |
 | faint | `#8b8b91` | labels, hints, placeholders |
 | brand | `#f2c14e` | the sparkle, links, the one accent |
+| brand hover | `#f7d27a` | a link under the pointer, in the UI only |
 | brand on light | `#d9a53a` | the sparkle on a light ground |
 | light ground | `#f4f2ec` | when the mark sits on light |
 | fg on light | `#131314` | text and the mark on a light ground |
