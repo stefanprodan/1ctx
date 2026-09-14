@@ -149,6 +149,25 @@ export function RowsLine({
   );
 }
 
+// a row that leads to its page: the whole line is the link, with the
+// arrow at its end
+export function RowsGo({
+  href,
+  children,
+}: {
+  href: string;
+  children: ComponentChildren;
+}) {
+  return (
+    <div class="rows-item">
+      <a class="rows-line rows-go" href={href}>
+        {children}
+        <Icon name="chevron-right" size={14} class="rows-go-arrow" />
+      </a>
+    </div>
+  );
+}
+
 // the form of a new row, open at the top of the card
 export function RowsNew({ children }: { children: ComponentChildren }) {
   return (

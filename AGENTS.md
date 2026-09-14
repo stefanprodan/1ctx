@@ -334,21 +334,23 @@ violation, and every rule has a rejected fixture under
   `app/routes.ts` wrapped in `lazy()`; the rail is computed from it.
   Bun does not yet split the HTML bundle, so the views still ship in one
   chunk; the table stays lazy so they will not the day it does.
-- **A page with an aside is `ui/Split.tsx`.** Home and the project
-  pages put their content in the main column, 900px at most, and
+- **A page with an aside is `ui/Split.tsx`.** Home, Projects and the
+  project pages put their content in the main column, 900px at most, and
   sections of plain lines in the 280px aside at the right, no boxes;
   under 1100, a tablet or a phone, the aside is hidden. The aside holds only honest numbers: the agents and the past
-  seven days from `GET /api/usage/week` on Home, the About facts on a
+  seven days from `GET /api/usage/week` on Home and Projects, the About facts on a
   project, an agent as its name over its model, through `ui/Fit.tsx`, which
   shows the short form of a text (the model without its org) when the
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
   ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
 - **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
-  column: `RowsOpen` for a row that opens in place, `RowsLine` for one
-  that does not, `RowsAvatar`, `RowsTitle` (mono for an identifier) and
-  `RowsMeta` for its head, `RowsAdd` or `RowsLink` in a card's head.
-  A team project's Members tab is the same rows, linking an admin to
+  column: `RowsOpen` for a row that opens in place, `RowsGo` for one
+  that leads to its page, `RowsLine` for one that does neither,
+  `RowsAvatar`, `RowsTitle` (mono for an identifier) and `RowsMeta`
+  for its head, `RowsAdd` or `RowsLink` in a card's head. The
+  Projects page is the same rows, the personal card over the teams
+  card. A team project's Members tab is the same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`; a personal project
   has Settings in its place and the agents in its aside, as on Home.
   A settings page (the profile, a project's Settings) stacks

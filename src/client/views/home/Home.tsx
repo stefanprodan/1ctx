@@ -22,12 +22,10 @@ import {
   projectAgents,
   sending,
 } from "../../data/sessions.ts";
-import { week } from "../../data/usage.ts";
-import { count } from "../../lib/format.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Split } from "../../ui/Split.tsx";
 import {
   composeProjectOf,
   dateLine,
@@ -35,6 +33,7 @@ import {
   searchHref,
   searchOf,
 } from "./Home.model.ts";
+import { WeekAside } from "./WeekAside.tsx";
 
 export function Home() {
   const user = me.value!;
@@ -52,7 +51,6 @@ export function Home() {
   const projectName = (id: string) =>
     projects.value?.find((p) => p.id === id)?.name ?? null;
   const agents = projectAgents.value;
-  const spent = week.value;
   return (
     <Page
       label={dateLine(new Date())}
@@ -61,24 +59,7 @@ export function Home() {
       <Split
         aside={
           <>
-            <AsideSection label="This week">
-              {spent === null ? (
-                <p class="split-empty">Loading</p>
-              ) : (
-                <>
-                  <div class="split-line">
-                    <span class="split-value">{count(spent.sessions)}</span>
-                    sessions
-                  </div>
-                  <div class="split-line">
-                    <span class="split-value">
-                      {count(spent.promptTokens + spent.completionTokens)}
-                    </span>
-                    tokens
-                  </div>
-                </>
-              )}
-            </AsideSection>
+            <WeekAside />
             <AgentsAside agents={agents} admin={user.role === "admin"} />
           </>
         }

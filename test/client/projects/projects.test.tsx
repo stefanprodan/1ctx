@@ -23,7 +23,8 @@ import { projectAgents } from "../../../src/client/data/sessions.ts";
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
-  kindLine,
+  peopleLine,
+  sinceLine,
   tabsOf,
 } from "../../../src/client/views/projects/Project.model.ts";
 import { Project } from "../../../src/client/views/projects/Project.tsx";
@@ -265,9 +266,13 @@ describe("the rail", () => {
 });
 
 describe("Project.model", () => {
-  test("the words for a kind", () => {
-    expect(kindLine("personal")).toBe("personal");
-    expect(kindLine("team")).toBe("team");
+  test("the words on a project's row", () => {
+    expect(peopleLine({ kind: "personal", memberCount: 1 })).toBe("only you");
+    expect(peopleLine({ kind: "team", memberCount: 1 })).toBe("1 member");
+    expect(peopleLine({ kind: "team", memberCount: 4 })).toBe("4 members");
+    expect(sinceLine({ createdAt: 1_789_387_200_000 })).toBe(
+      "since 14 September 2026",
+    );
   });
 
   test("a personal project has Settings where a team has Members", () => {
@@ -291,12 +296,38 @@ describe("Project.model", () => {
 });
 
 describe("the pages", () => {
-  test("Projects renders a row per project", () => {
+  test.serial(
+    "Projects puts the personal project and the teams in two cards",
+    () => {
+      projects.value = [
+        personal,
+        { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 3 },
+      ];
+      const html = render(<Projects />);
+      expect(html).toContain('class="rows-line rows-go" href="/projects/p1"');
+      expect(html).toContain('class="rows-line rows-go" href="/projects/p2"');
+      expect(html.indexOf(">Personal<")).toBeLessThan(html.indexOf(">Teams<"));
+      expect(html).toContain(">only you<");
+      expect(html).toContain(">3 members<");
+      // a member does not manage teams
+      expect(html).not.toContain('href="/admin/projects"');
+      me.value = { ...caelea, role: "admin" };
+      expect(render(<Projects />)).toContain('href="/admin/projects"');
+    },
+  );
+
+  test.serial("Projects has Home's aside: the week and the agents", () => {
     projects.value = [personal];
+    projectAgents.value = [];
     const html = render(<Projects />);
-    expect(html).toContain('class="projects-row" href="/projects/p1"');
-    expect(html).toContain(">personal<");
-    expect(html).toContain(">personal<");
+    expect(html).toContain('class="split-aside"');
+    expect(html).toContain(">This week<");
+    expect(html).toContain(">Agents<");
+  });
+
+  test.serial("Projects says when there is no team", () => {
+    projects.value = [personal];
+    expect(render(<Projects />)).toContain("No team projects yet");
   });
 
   test("Project renders the feed of the project on screen only", () => {

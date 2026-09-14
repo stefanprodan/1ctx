@@ -90,7 +90,17 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Projects",
     role: "authenticated",
-    load: () => loadProjects(),
+    // the list, and for the aside the week and the agents, which every
+    // project offers alike, read through the personal one
+    load: async () => {
+      const spent = loadWeek();
+      await loadProjects();
+      const personal = composeProjectOf(projects.value, null);
+      await Promise.all([
+        spent,
+        personal === null ? Promise.resolve() : loadProjectAgents(personal.id),
+      ]);
+    },
     nav: { label: "Projects", icon: "projects", order: 2 },
   },
   {
