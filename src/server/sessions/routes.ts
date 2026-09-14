@@ -18,6 +18,8 @@ import { jsonBody } from "../lib/body.ts";
 import { Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
+import { parseZoneQuery } from "../usage/index.ts";
+import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import {
   parseMessageId,
   parseRenameSession,
@@ -86,6 +88,29 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const session = deps.visible(ctx.principal!, ctx.params.id);
         return json(detail(deps.store, session, deps.live(session.id)));
+      },
+    },
+    {
+      // anyone who sees the chat may take it away; a reply in flight
+      // is not in the file until it ends
+      method: "GET",
+      path: "/api/sessions/:id/markdown",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const session = deps.visible(ctx.principal!, ctx.params.id);
+        const timeZone = parseZoneQuery(ctx.url);
+        const body = chatMarkdown(
+          session.title,
+          deps.store.exportRows(session.id),
+          timeZone,
+        );
+        return new Response(body, {
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "text/markdown; charset=utf-8",
+            "content-disposition": `attachment; filename="${markdownFilename(session.title)}"`,
+          },
+        });
       },
     },
     {

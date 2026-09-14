@@ -5,13 +5,13 @@ import { describe, expect, test } from "bun:test";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
   parseDaysUsageQuery,
-  parseWeekUsageQuery,
+  parseZoneQuery,
 } from "../../../src/server/usage/parse.ts";
 
 const url = (path: string, query: string) =>
   new URL(`http://1ctx.test/api/usage/${path}${query}`);
 const days = (query: string) => parseDaysUsageQuery(url("days", query));
-const week = (query: string) => parseWeekUsageQuery(url("week", query));
+const week = (query: string) => parseZoneQuery(url("week", query));
 
 describe("the usage parsers", () => {
   test.each(["UTC", "Europe/Bucharest", "America/St_Johns"])(

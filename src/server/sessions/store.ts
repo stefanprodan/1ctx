@@ -12,6 +12,7 @@ import type {
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
+import type { ExportRow } from "./markdown.ts";
 import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -152,6 +153,29 @@ export class SessionStore {
       )
       .all(sessionId)
       .map(message);
+  }
+
+  // every row the export groups, with its author's name; a work reply
+  // and a tool row travel without content, since only their end matters
+  exportRows(sessionId: string): ExportRow[] {
+    return this.db
+      .query<ExportRow, [string]>(
+        `select messages.send_id as sendId, messages.kind, messages.slot,
+           messages.status, messages.error,
+           messages.finish_reason as finishReason,
+           coalesce(users.username, agents.name) as author,
+           case when messages.kind = 'user'
+               or (messages.kind = 'reply' and messages.slot = 'answer')
+             then messages.content else '' end as content,
+           messages.created_at as createdAt,
+           messages.finished_at as finishedAt
+         from messages
+         left join users on users.id = messages.user_id
+         left join agents on agents.id = messages.agent_id
+         where messages.session_id = ?
+         order by messages.seq`,
+      )
+      .all(sessionId);
   }
 
   message(id: string): Message | null {

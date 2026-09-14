@@ -36,6 +36,7 @@ export function Page({
   title: string;
   // the title's node when the view wraps it in a control: a chat's
   // menu, opened by the title itself. The view renders the title text
+  // and its heading, since what the control opens is no part of it
   menu?: ComponentChildren;
   aside?: ComponentChildren;
   actions?: ComponentChildren;
@@ -47,6 +48,9 @@ export function Page({
   children?: ComponentChildren;
 }) {
   const head = useRef<HTMLDivElement>(null);
+  // with a menu the row is no heading: the menu's items would read as
+  // the page's title
+  const Crumb = menu === undefined ? "h1" : "div";
   // content has scrolled under the head: it casts its shadow
   const stuck = useSignal(false);
   useEffect(() => {
@@ -67,7 +71,7 @@ export function Page({
         ref={head}
       >
         {crumb !== undefined ? (
-          <h1 class="page-crumb label">
+          <Crumb class="page-crumb label">
             {crumb !== "" && (
               <>
                 {crumbHref ? (
@@ -83,9 +87,9 @@ export function Page({
             {menu === undefined ? (
               <span class="page-crumb-on">{title}</span>
             ) : (
-              <span class="page-crumb-on page-crumb-menu">{menu}</span>
+              <div class="page-crumb-on page-crumb-menu">{menu}</div>
             )}
-          </h1>
+          </Crumb>
         ) : (
           <div class="page-heading">
             {label && <span class="label">{label}</span>}

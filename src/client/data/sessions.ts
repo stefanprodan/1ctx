@@ -314,6 +314,14 @@ export async function deleteSession(
   drop(id, projectId);
 }
 
+// the chat as a Markdown file: a link the browser saves, never a fetch,
+// so the cookie and the server's filename do the work. The times are
+// in the browser's zone
+export const markdownHref = (id: string): string =>
+  `/api/sessions/${encodeURIComponent(id)}/markdown?tz=${encodeURIComponent(
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  )}`;
+
 function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   applyEnvelope(ev);
   const held = session.value;

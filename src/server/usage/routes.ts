@@ -11,7 +11,7 @@ import type {
 } from "../../shared/api/usage.ts";
 import type { Clock } from "../lib/clock.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { parseDaysUsageQuery, parseWeekUsageQuery } from "./parse.ts";
+import { parseDaysUsageQuery, parseZoneQuery } from "./parse.ts";
 import type { UsageStore } from "./store.ts";
 import { usageWindow, weekWindow } from "./window.ts";
 
@@ -54,7 +54,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/usage/week",
       policy: "authenticated",
       handle(_req, ctx) {
-        const timeZone = parseWeekUsageQuery(ctx.url);
+        const timeZone = parseZoneQuery(ctx.url);
         const { since, until } = weekWindow(deps.clock(), timeZone);
         const projectIds =
           deps.access.visibleProjectIds(ctx.principal!.userId) ?? [];

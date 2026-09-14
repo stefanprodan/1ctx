@@ -1,0 +1,377 @@
+[
+  {
+    "name": "a turn with work writes the question and the answer only",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "what time is it?",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "work",
+        "status": "done",
+        "author": "coder",
+        "content": "let me check",
+        "createdAt": 1010000,
+        "finishedAt": 1010000,
+        "finishReason": "tool_calls",
+        "error": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "tool",
+        "author": null,
+        "content": "",
+        "status": "done",
+        "createdAt": 1030000,
+        "finishedAt": 1030000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "It is noon.\n",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nwhat time is it?\n\n## @coder 1970-01-01 00:17\n\nIt is noon.\n"
+  },
+  {
+    "name": "a stopped answer keeps its part and says it was stopped",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "write a poem",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "stopped",
+        "author": "coder",
+        "content": "Roses are",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nwrite a poem\n\n## @coder 1970-01-01 00:17\n\nRoses are\n\n_stopped_\n"
+  },
+  {
+    "name": "a failed turn with no answer leaves the error",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "look it up",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "work",
+        "status": "done",
+        "author": "coder",
+        "content": "",
+        "createdAt": 1010000,
+        "finishedAt": 1010000,
+        "finishReason": "tool_calls",
+        "error": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "tool",
+        "author": null,
+        "content": "",
+        "status": "failed",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": "tool timed out",
+        "slot": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nlook it up\n\n## @coder 1970-01-01 00:17\n\n_tool timed out_\n"
+  },
+  {
+    "name": "a failed answer without an error says failed",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "hi",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": null,
+        "status": "failed",
+        "author": "coder",
+        "content": "",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_failed_\n"
+  },
+  {
+    "name": "an answer cut at the token cap says so",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "long",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "and then",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "finishReason": "length",
+        "error": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nand then\n\n_cut at max tokens_\n"
+  },
+  {
+    "name": "a running turn and a summary stay out, a compact send leaves nothing",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "first",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "one",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "summary",
+        "author": "coder",
+        "content": "the summary",
+        "status": "done",
+        "createdAt": 1090000,
+        "finishedAt": 1090000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s2",
+        "kind": "summary",
+        "author": "coder",
+        "content": "the summary",
+        "status": "done",
+        "createdAt": 1090000,
+        "finishedAt": 1090000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s3",
+        "kind": "user",
+        "author": "caelea",
+        "content": "second",
+        "createdAt": 1120000,
+        "finishedAt": 1120000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s3",
+        "kind": "reply",
+        "slot": null,
+        "status": "streaming",
+        "author": "coder",
+        "content": "tw",
+        "createdAt": 1060000,
+        "finishedAt": null,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nfirst\n\n## @coder 1970-01-01 00:17\n\none\n\n## @caelea 1970-01-01 00:18\n\nsecond\n"
+  },
+  {
+    "name": "indentation and hard breaks survive, blank lines around go",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "\n\n    indented code\nline with break  \nend\n\n",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "  - nested\n",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\n    indented code\nline with break  \nend\n\n## @coder 1970-01-01 00:17\n\n  - nested\n"
+  },
+  {
+    "name": "a title and an error are written as plain text",
+    "title": "[x](http://evil) # *bold* <b>&amp;",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "hi",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": null,
+        "status": "failed",
+        "author": "coder",
+        "content": "",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": "bad _thing_\nhappened",
+        "finishReason": null
+      }
+    ],
+    "expected": "# \\[x\\](http://evil) \\# \\*bold\\* \\<b\\>\\&amp;\n\n## @caelea 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_bad \\_thing\\_ happened_\n"
+  },
+  {
+    "name": "times follow the zone across a daylight saving change",
+    "timeZone": "Europe/Bucharest",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "caelea",
+        "content": "before",
+        "createdAt": 1774744200000,
+        "finishedAt": 1774744200000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "after",
+        "createdAt": 1774747800000,
+        "finishedAt": 1774747800000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 2026-03-29 02:30\n\nbefore\n\n## @coder 2026-03-29 04:30\n\nafter\n"
+  },
+  {
+    "name": "a row whose author is gone falls back",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": null,
+        "content": "hi",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": null,
+        "content": "hello",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @someone 1970-01-01 00:16\n\nhi\n\n## @agent 1970-01-01 00:17\n\nhello\n"
+  }
+]
