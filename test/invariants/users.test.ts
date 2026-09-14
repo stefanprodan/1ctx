@@ -274,20 +274,22 @@ describe("admin users", () => {
     ).rejects.toThrow("last admin");
   });
 
-  test("role changes publish access and update the socket project set", async () => {
-    const app = await testApp();
-    const client = await admin(app);
-    const user = await create(client, "caelea");
-    app.users.setMustChangePassword(user.id, false);
-    const member = app.client();
-    await member.login("caelea", "longenough");
-    const owner = app.users.byUsername("admin")!;
-    app.db
-      .query(
-        "insert into projects (id, kind, name, owner_id, created_at) values ('team', 'team', 'team', ?, 0)",
-      )
-      .run(owner.id);
-    app.db.exec(`
+  test.serial(
+    "role changes publish access and update the socket project set",
+    async () => {
+      const app = await testApp();
+      const client = await admin(app);
+      const user = await create(client, "caelea");
+      app.users.setMustChangePassword(user.id, false);
+      const member = app.client();
+      await member.login("caelea", "longenough");
+      const owner = app.users.byUsername("admin")!;
+      app.db
+        .query(
+          "insert into projects (id, kind, name, owner_id, created_at) values ('team', 'team', 'team', ?, 0)",
+        )
+        .run(owner.id);
+      app.db.exec(`
       insert into providers
         (id, name, wire, base_url, key_name, created_at)
       values
@@ -299,56 +301,57 @@ describe("admin users", () => {
         ('agent', 'agent', 'bot', 'provider', 'model', 'Model', null,
          null, null, 0, 0, '', 0);
     `);
-    const chat = app.sessions.create({
-      projectId: "team",
-      ownerId: user.id,
-      agentId: "agent",
-      title: "Chat",
-      now: 0,
-    });
-    const conn = await connection(app, member);
-    app.socket.open(conn);
-    expect(conn.data.projects.has("team")).toBe(false);
-    const seen: BusEvent[] = [];
-    const stop = subscribe((event) => seen.push(event));
-    try {
-      const promoted = await client.call("PATCH", `/api/users/${user.id}`, {
-        body: { role: "admin" },
-      });
-      expect(promoted.status).toBe(200);
-      expect(conn.data.projects.has("team")).toBe(true);
-      expect(conn.data.principal.role).toBe("admin");
-      conn.frames = [];
-      app.socket.message(
-        conn,
-        JSON.stringify({ type: "watch", sessionId: chat.id }),
-      );
-      expect(conn.frames).toContainEqual({
-        type: "watched",
-        sessionId: chat.id,
-        live: null,
-      });
-      expect(seen).toContainEqual({
-        type: "access.changed",
-        data: { userIds: [user.id] },
-      });
-
-      conn.frames = [];
-      const demoted = await client.call("PATCH", `/api/users/${user.id}`, {
-        body: { role: "member" },
-      });
-      expect(demoted.status).toBe(200);
-      expect(conn.data.projects.has("team")).toBe(false);
-      expect(conn.data.principal.role).toBe("member");
-      expect(conn.frames).toContainEqual({
-        type: "revoked",
+      const chat = app.sessions.create({
         projectId: "team",
+        ownerId: user.id,
+        agentId: "agent",
+        title: "Chat",
+        now: 0,
       });
-    } finally {
-      stop();
-      app.socket.close(conn);
-    }
-  });
+      const conn = await connection(app, member);
+      app.socket.open(conn);
+      expect(conn.data.projects.has("team")).toBe(false);
+      const seen: BusEvent[] = [];
+      const stop = subscribe((event) => seen.push(event));
+      try {
+        const promoted = await client.call("PATCH", `/api/users/${user.id}`, {
+          body: { role: "admin" },
+        });
+        expect(promoted.status).toBe(200);
+        expect(conn.data.projects.has("team")).toBe(true);
+        expect(conn.data.principal.role).toBe("admin");
+        conn.frames = [];
+        app.socket.message(
+          conn,
+          JSON.stringify({ type: "watch", sessionId: chat.id }),
+        );
+        expect(conn.frames).toContainEqual({
+          type: "watched",
+          sessionId: chat.id,
+          live: null,
+        });
+        expect(seen).toContainEqual({
+          type: "access.changed",
+          data: { userIds: [user.id] },
+        });
+
+        conn.frames = [];
+        const demoted = await client.call("PATCH", `/api/users/${user.id}`, {
+          body: { role: "member" },
+        });
+        expect(demoted.status).toBe(200);
+        expect(conn.data.projects.has("team")).toBe(false);
+        expect(conn.data.principal.role).toBe("member");
+        expect(conn.frames).toContainEqual({
+          type: "revoked",
+          projectId: "team",
+        });
+      } finally {
+        stop();
+        app.socket.close(conn);
+      }
+    },
+  );
 
   test("reset revokes every login and closes the user's socket", async () => {
     const app = await testApp();

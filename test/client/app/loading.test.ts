@@ -147,32 +147,35 @@ describe("startLoading", () => {
     expect(calls).toEqual(["thing a"]);
   });
 
-  test("a load that throws is reported, not left unhandled", async () => {
-    const { routes } = table();
-    const failing: Route[] = [
-      {
-        ...routes[1],
-        // a synchronous throw, the harder case: no promise to catch on
-        load: () => {
-          throw new Error("boom");
+  test.serial(
+    "a load that throws is reported, not left unhandled",
+    async () => {
+      const { routes } = table();
+      const failing: Route[] = [
+        {
+          ...routes[1],
+          // a synchronous throw, the harder case: no promise to catch on
+          load: () => {
+            throw new Error("boom");
+          },
         },
-      },
-    ];
-    const seen: string[] = [];
-    const real = console.error;
-    console.error = (line: string) => {
-      seen.push(line);
-    };
-    try {
-      me.value = caelea;
-      path.value = "/things/a";
-      stop = startLoading(failing);
-      await new Promise((r) => setTimeout(r, 0));
-    } finally {
-      console.error = real;
-    }
-    expect(seen).toEqual(["load for /things/:id failed: Error: boom"]);
-  });
+      ];
+      const seen: string[] = [];
+      const real = console.error;
+      console.error = (line: string) => {
+        seen.push(line);
+      };
+      try {
+        me.value = caelea;
+        path.value = "/things/a";
+        stop = startLoading(failing);
+        await new Promise((r) => setTimeout(r, 0));
+      } finally {
+        console.error = real;
+      }
+      expect(seen).toEqual(["load for /things/:id failed: Error: boom"]);
+    },
+  );
 
   test("a query change reloads with the query", () => {
     const { routes, calls } = table();

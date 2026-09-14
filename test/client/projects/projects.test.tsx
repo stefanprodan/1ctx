@@ -62,21 +62,24 @@ afterEach(() => {
 });
 
 describe("the projects entity", () => {
-  test("a save replaces the project and clears a stale failure", async () => {
-    const saved = {
-      ...personal,
-      name: "notes",
-      description: "Scratch work",
-      chats: 0,
-      members: [caelea],
-    };
-    project.value = { ...saved, name: "caelea", description: "" };
-    projectError.value = "stale failure";
-    answer = () => ({ project: saved, projects: [saved] });
-    await savePersonalProject({ name: "notes" });
-    expect(project.value).toEqual(saved);
-    expect(projectError.value).toBeNull();
-  });
+  test.serial(
+    "a save replaces the project and clears a stale failure",
+    async () => {
+      const saved = {
+        ...personal,
+        name: "notes",
+        description: "Scratch work",
+        chats: 0,
+        members: [caelea],
+      };
+      project.value = { ...saved, name: "caelea", description: "" };
+      projectError.value = "stale failure";
+      answer = () => ({ project: saved, projects: [saved] });
+      await savePersonalProject({ name: "notes" });
+      expect(project.value).toEqual(saved);
+      expect(projectError.value).toBeNull();
+    },
+  );
 
   test("keeps the list for the user it was loaded for", async () => {
     answer = () => ({ projects: [personal] });
@@ -98,23 +101,29 @@ describe("the projects entity", () => {
     expect(project.value).toBeNull();
   });
 
-  test("drops a list that answers after another user signed in", async () => {
-    answer = () => {
-      me.value = { ...caelea, id: "u2", username: "admin" };
-      return { projects: [personal] };
-    };
-    await loadProjects();
-    expect(projects.value).toBeNull();
-  });
+  test.serial(
+    "drops a list that answers after another user signed in",
+    async () => {
+      answer = () => {
+        me.value = { ...caelea, id: "u2", username: "admin" };
+        return { projects: [personal] };
+      };
+      await loadProjects();
+      expect(projects.value).toBeNull();
+    },
+  );
 
-  test("drops a failure that answers after another user signed in", async () => {
-    globalThis.fetch = (async () => {
-      me.value = { ...caelea, id: "u2", username: "admin" };
-      return Response.json({ error: "gone" }, { status: 500 });
-    }) as unknown as typeof fetch;
-    await loadProjects();
-    expect(projectsError.value).toBeNull();
-  });
+  test.serial(
+    "drops a failure that answers after another user signed in",
+    async () => {
+      globalThis.fetch = (async () => {
+        me.value = { ...caelea, id: "u2", username: "admin" };
+        return Response.json({ error: "gone" }, { status: 500 });
+      }) as unknown as typeof fetch;
+      await loadProjects();
+      expect(projectsError.value).toBeNull();
+    },
+  );
 
   test("an older list answer never overwrites a newer one", async () => {
     const gates: ((rows: (typeof personal)[]) => void)[] = [];
@@ -362,21 +371,24 @@ describe("the pages", () => {
     expect(html).toContain(">Agents<");
   });
 
-  test("Members links each card to its admin page for an admin only", () => {
-    project.value = {
-      ...personal,
-      kind: "team",
-      description: "",
-      chats: 0,
-      members: [caelea],
-    };
-    projectAgents.value = [];
-    expect(render(<Members params={{ id: "p1" }} />)).not.toContain("Manage");
-    me.value = { ...caelea, role: "admin" };
-    const html = render(<Members params={{ id: "p1" }} />);
-    expect(html).toContain('href="/admin/projects?open=p1">Manage<');
-    expect(html).toContain('href="/admin/agents">Manage<');
-  });
+  test.serial(
+    "Members links each card to its admin page for an admin only",
+    () => {
+      project.value = {
+        ...personal,
+        kind: "team",
+        description: "",
+        chats: 0,
+        members: [caelea],
+      };
+      projectAgents.value = [];
+      expect(render(<Members params={{ id: "p1" }} />)).not.toContain("Manage");
+      me.value = { ...caelea, role: "admin" };
+      const html = render(<Members params={{ id: "p1" }} />);
+      expect(html).toContain('href="/admin/projects?open=p1">Manage<');
+      expect(html).toContain('href="/admin/agents">Manage<');
+    },
+  );
 
   test("Members renders the users and the agents of the project", () => {
     project.value = {

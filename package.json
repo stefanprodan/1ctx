@@ -9,7 +9,7 @@
   "scripts": {
     "start": "bun src/server/main.ts",
     "dev": "ONECTX_DEV=1 bun --watch src/server/main.ts",
-    "test": "bun test test/",
+    "test": "bun test --concurrent --max-concurrency 4 test/",
     "lint": "bun biome check --write . && bun tsc --noEmit",
     "build": "mkdir -p bin && bun build src/server/main.ts --compile --define \"process.env.ONECTX_BUILD_VERSION=\\\"${VERSION:-}\\\"\" --outfile bin/1ctx && rm -f .*.bun-build",
     "smoke": "scripts/smoke.sh",

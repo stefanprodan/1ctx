@@ -21,7 +21,7 @@ make preview-stop   # stop it
 make preview-log    # tail its log
 make preview-clean  # stop it and wipe its db, secrets, log and pid
 make lint           # biome check --write, then tsc; run after any code change
-make test           # bun test; run after any code change, before finishing
+make test           # bun test, concurrent; run after any code change, before finishing
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 ```
@@ -360,6 +360,9 @@ violation, and every rule has a rejected fixture under
   row and there is no top bar.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
+- **Tests in a file run concurrently.** A test that sets module state
+  (a signal, `globalThis.fetch`) or counts events from the bus is
+  `test.serial`.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
 - UI copy is short and plain. No em-dashes anywhere. `perl -i -pe` for

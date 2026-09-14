@@ -325,40 +325,43 @@ describe("team project administration", () => {
     ]);
     chat.app.socket.dispose();
   });
-  test("membership changes publish and grant then revoke the project", async () => {
-    const chat = await chatApp();
-    const project = await createTeam(chat, "ops");
-    const conn = await connection(chat, chat.member);
-    chat.app.socket.open(conn);
-    conn.frames = [];
-    const events: BusEvent[] = [];
-    const off = subscribe((event) => events.push(event));
-    const added = await addMember(chat, project.id, chat.memberId);
-    expect(added.members.map((user) => user.id)).toEqual([chat.memberId]);
-    expect(events).toEqual([
-      {
-        type: "access.changed",
-        data: { userIds: [chat.memberId] },
-      },
-    ]);
-    expect(conn.frames).toEqual([{ type: "granted", projectId: project.id }]);
-    events.length = 0;
-    conn.frames = [];
-    const removed = await chat.admin.call(
-      "DELETE",
-      `/api/projects/${project.id}/members/${chat.memberId}`,
-    );
-    expect(removed.status).toBe(200);
-    expect(events).toEqual([
-      {
-        type: "access.changed",
-        data: { userIds: [chat.memberId] },
-      },
-    ]);
-    expect(conn.frames).toEqual([{ type: "revoked", projectId: project.id }]);
-    off();
-    close(chat, conn);
-  });
+  test.serial(
+    "membership changes publish and grant then revoke the project",
+    async () => {
+      const chat = await chatApp();
+      const project = await createTeam(chat, "ops");
+      const conn = await connection(chat, chat.member);
+      chat.app.socket.open(conn);
+      conn.frames = [];
+      const events: BusEvent[] = [];
+      const off = subscribe((event) => events.push(event));
+      const added = await addMember(chat, project.id, chat.memberId);
+      expect(added.members.map((user) => user.id)).toEqual([chat.memberId]);
+      expect(events).toEqual([
+        {
+          type: "access.changed",
+          data: { userIds: [chat.memberId] },
+        },
+      ]);
+      expect(conn.frames).toEqual([{ type: "granted", projectId: project.id }]);
+      events.length = 0;
+      conn.frames = [];
+      const removed = await chat.admin.call(
+        "DELETE",
+        `/api/projects/${project.id}/members/${chat.memberId}`,
+      );
+      expect(removed.status).toBe(200);
+      expect(events).toEqual([
+        {
+          type: "access.changed",
+          data: { userIds: [chat.memberId] },
+        },
+      ]);
+      expect(conn.frames).toEqual([{ type: "revoked", projectId: project.id }]);
+      off();
+      close(chat, conn);
+    },
+  );
   test("create and delete move every admin without membership rows", async () => {
     const chat = await chatApp();
     const second = await makeUser(chat, "stefan", "admin");
@@ -378,7 +381,7 @@ describe("team project administration", () => {
     expect(conn.frames).toEqual([{ type: "revoked", projectId: project.id }]);
     close(chat, conn);
   });
-  test("adding an admin member emits no visibility frame", async () => {
+  test.serial("adding an admin member emits no visibility frame", async () => {
     const chat = await chatApp();
     const second = await makeUser(chat, "stefan", "admin");
     const project = await createTeam(chat, "ops");

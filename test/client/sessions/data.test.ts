@@ -361,47 +361,50 @@ describe("the sessions entity", () => {
     expect(list.value?.[0].last?.text).toBe("all expected");
   });
 
-  test("a row not held reloads the list unless a query or another project filters it", async () => {
-    const calls: string[] = [];
-    answer = (url) => {
-      calls.push(url);
-      return Response.json({ rows: [] });
-    };
-    await loadList({ project: null, q: "" });
-    onSocket({
-      type: "session",
-      projectId: "p2",
-      session: summary({ id: "s2", projectId: "p2" }),
-      messages: [],
-      send: sent,
-    });
-    await settle();
-    expect(calls).toEqual(["/api/sessions", "/api/sessions"]);
+  test.serial(
+    "a row not held reloads the list unless a query or another project filters it",
+    async () => {
+      const calls: string[] = [];
+      answer = (url) => {
+        calls.push(url);
+        return Response.json({ rows: [] });
+      };
+      await loadList({ project: null, q: "" });
+      onSocket({
+        type: "session",
+        projectId: "p2",
+        session: summary({ id: "s2", projectId: "p2" }),
+        messages: [],
+        send: sent,
+      });
+      await settle();
+      expect(calls).toEqual(["/api/sessions", "/api/sessions"]);
 
-    await loadList({ project: null, q: "pods" });
-    onSocket({
-      type: "session",
-      projectId: "p1",
-      session: summary({ id: "s3" }),
-      messages: [],
-      send: null,
-    });
-    await loadList({ project: "p1", q: "" });
-    onSocket({
-      type: "session",
-      projectId: "p2",
-      session: summary({ id: "s4", projectId: "p2" }),
-      messages: [],
-      send: null,
-    });
-    await settle();
-    expect(calls).toEqual([
-      "/api/sessions",
-      "/api/sessions",
-      "/api/sessions?q=pods",
-      "/api/sessions?project=p1",
-    ]);
-  });
+      await loadList({ project: null, q: "pods" });
+      onSocket({
+        type: "session",
+        projectId: "p1",
+        session: summary({ id: "s3" }),
+        messages: [],
+        send: null,
+      });
+      await loadList({ project: "p1", q: "" });
+      onSocket({
+        type: "session",
+        projectId: "p2",
+        session: summary({ id: "s4", projectId: "p2" }),
+        messages: [],
+        send: null,
+      });
+      await settle();
+      expect(calls).toEqual([
+        "/api/sessions",
+        "/api/sessions",
+        "/api/sessions?q=pods",
+        "/api/sessions?project=p1",
+      ]);
+    },
+  );
 
   test("a list answer in flight keeps a row an envelope moved past it", async () => {
     let release: (r: Response) => void = () => {};
@@ -596,21 +599,24 @@ describe("the sessions entity", () => {
     expect(live.value.size).toBe(0);
   });
 
-  test("a deletion off screen loads the project's list again", async () => {
-    list.value = null;
-    const calls: string[] = [];
-    answer = (url) => {
-      calls.push(url);
-      return Response.json({ rows: [row({ id: "s2" })] });
-    };
-    await loadList({ project: "p1", q: "" });
-    onSocket({ type: "deleted", projectId: "p1", sessionId: "s2" });
-    await settle();
-    expect(calls).toEqual([
-      "/api/sessions?project=p1",
-      "/api/sessions?project=p1",
-    ]);
-  });
+  test.serial(
+    "a deletion off screen loads the project's list again",
+    async () => {
+      list.value = null;
+      const calls: string[] = [];
+      answer = (url) => {
+        calls.push(url);
+        return Response.json({ rows: [row({ id: "s2" })] });
+      };
+      await loadList({ project: "p1", q: "" });
+      onSocket({ type: "deleted", projectId: "p1", sessionId: "s2" });
+      await settle();
+      expect(calls).toEqual([
+        "/api/sessions?project=p1",
+        "/api/sessions?project=p1",
+      ]);
+    },
+  );
 
   test("a watched snapshot seeds live and applies newer buffered frames", async () => {
     const base = liveDetail();
@@ -676,47 +682,50 @@ describe("the sessions entity", () => {
     expect(live.value.get("m1")?.content).toBe("streaming text continues");
   });
 
-  test("a watched tools phase neither seeds live nor refetches", async () => {
-    let fetches = 0;
-    const base = detail("s1", {
-      session: summary({ status: "running" }),
-      messages: [
-        message({
-          slot: "work",
-          status: "done",
-          finishReason: "tool_calls",
-        }),
-        message({
-          id: "tool1",
-          seq: 2,
-          kind: "tool",
-          slot: null,
-          status: "streaming",
-          finishReason: null,
-          agentId: null,
-          toolCallId: "c1",
-          toolName: "get_current_time",
-        }),
-      ],
-      send: sent,
-      live: { phase: "tools", sendId: "send1", seq: 3 },
-    });
-    answer = () => {
-      fetches++;
-      return Response.json(base);
-    };
-    await loadSession("s1");
+  test.serial(
+    "a watched tools phase neither seeds live nor refetches",
+    async () => {
+      let fetches = 0;
+      const base = detail("s1", {
+        session: summary({ status: "running" }),
+        messages: [
+          message({
+            slot: "work",
+            status: "done",
+            finishReason: "tool_calls",
+          }),
+          message({
+            id: "tool1",
+            seq: 2,
+            kind: "tool",
+            slot: null,
+            status: "streaming",
+            finishReason: null,
+            agentId: null,
+            toolCallId: "c1",
+            toolName: "get_current_time",
+          }),
+        ],
+        send: sent,
+        live: { phase: "tools", sendId: "send1", seq: 3 },
+      });
+      answer = () => {
+        fetches++;
+        return Response.json(base);
+      };
+      await loadSession("s1");
 
-    onSocket({
-      type: "watched",
-      sessionId: "s1",
-      live: { phase: "tools", sendId: "send1", seq: 3 },
-    });
-    await settle();
+      onSocket({
+        type: "watched",
+        sessionId: "s1",
+        live: { phase: "tools", sendId: "send1", seq: 3 },
+      });
+      await settle();
 
-    expect(fetches).toBe(1);
-    expect(live.value.size).toBe(0);
-  });
+      expect(fetches).toBe(1);
+      expect(live.value.size).toBe(0);
+    },
+  );
 
   test("a delta before watched is buffered", async () => {
     const base = liveDetail();
