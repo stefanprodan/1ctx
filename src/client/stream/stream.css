@@ -88,6 +88,10 @@
     color: var(--dim);
   }
 
+  .stream-author {
+    color: var(--brand);
+  }
+
   .stream-when {
     width: 64px;
     flex-shrink: 0;

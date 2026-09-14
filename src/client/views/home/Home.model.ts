@@ -27,12 +27,18 @@ export function greeting(now: Date, name: string): string {
   return `${word}, ${name}`;
 }
 
-// the composer starts a chat in the personal project: the one of its
-// kind a user sees, since another's is never listed
-export function personalOf(
+// the composer starts a chat in the project the user picked while it
+// is still listed, else in the personal project: the one of its kind a
+// user sees, since another's is never listed
+export function composeProjectOf(
   rows: ProjectSummary[] | null,
+  picked: string | null,
 ): ProjectSummary | null {
-  return rows?.find((p) => p.kind === "personal") ?? null;
+  return (
+    rows?.find((p) => p.id === picked) ??
+    rows?.find((p) => p.kind === "personal") ??
+    null
+  );
 }
 
 // the search as the address carries it

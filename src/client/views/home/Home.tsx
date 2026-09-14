@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Home: the greeting, the composer that starts a chat in the personal
-// project, then every session the user may see as one stream, with
+// Home: the greeting, the composer that starts a chat in the project
+// the user picks, the personal one at first, then every session the user may see as one stream, with
 // the search in its head. At the right, the agents the composer can
 // pick and what the week spent. The query is the address; the route's
 // load fetches the rows, and a clock moves the times without a fetch.
@@ -16,23 +16,24 @@ import { me } from "../../data/me.ts";
 import { projects } from "../../data/projects.ts";
 import {
   createSession,
+  homeProjectId,
   list,
+  pickHomeProject,
   projectAgents,
   sending,
 } from "../../data/sessions.ts";
-import { week } from "../../data/usage.ts";
-import { count } from "../../lib/format.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Split } from "../../ui/Split.tsx";
 import {
+  composeProjectOf,
   dateLine,
   greeting,
-  personalOf,
   searchHref,
   searchOf,
 } from "./Home.model.ts";
+import { WeekAside } from "./WeekAside.tsx";
 
 export function Home() {
   const user = me.value!;
@@ -45,12 +46,11 @@ export function Home() {
     }, tick);
     return () => clearInterval(timer);
   }, [tick, now]);
-  const personal = personalOf(projects.value);
+  const target = composeProjectOf(projects.value, homeProjectId.value);
   const q = searchOf(query.value);
   const projectName = (id: string) =>
     projects.value?.find((p) => p.id === id)?.name ?? null;
   const agents = projectAgents.value;
-  const spent = week.value;
   return (
     <Page
       label={dateLine(new Date())}
@@ -59,37 +59,26 @@ export function Home() {
       <Split
         aside={
           <>
-            <AsideSection label="This week">
-              {spent === null ? (
-                <p class="split-empty">Loading</p>
-              ) : (
-                <>
-                  <div class="split-line">
-                    <span class="split-value">{count(spent.sessions)}</span>
-                    sessions
-                  </div>
-                  <div class="split-line">
-                    <span class="split-value">
-                      {count(spent.promptTokens + spent.completionTokens)}
-                    </span>
-                    tokens
-                  </div>
-                </>
-              )}
-            </AsideSection>
+            <WeekAside />
             <AgentsAside agents={agents} admin={user.role === "admin"} />
           </>
         }
       >
-        {personal !== null && (
+        {target !== null && (
           <Composer
-            scope={{ projectId: personal.id }}
+            scope={{ projectId: "home" }}
+            project={{
+              projects: projects.value ?? [],
+              projectId: target.id,
+              onPick: (id) => void pickHomeProject(id),
+            }}
             agents={agents}
             agentId={null}
+            placeholder={`Send a message to ${target.name}`}
             running={false}
             busy={sending.value}
             onSend={async (message, agentId) => {
-              await createSession({ projectId: personal.id, agentId, message });
+              await createSession({ projectId: target.id, agentId, message });
             }}
             onStop={async () => {}}
           />
@@ -101,9 +90,7 @@ export function Home() {
             value: q,
             onChange: (next) => navigate(searchHref("/", next), true),
           }}
-          empty={
-            q === "" ? "No chats yet. Start one above." : "Nothing matches."
-          }
+          empty={q === "" ? "No sessions found" : "No sessions match"}
           now={now.value}
         />
       </Split>

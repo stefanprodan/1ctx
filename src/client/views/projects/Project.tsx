@@ -57,7 +57,7 @@ export function Project({ params }: { params: Params }) {
               onChange: (next) =>
                 navigate(searchHref(`/projects/${shown.id}`, next), true),
             }}
-            empty={q === "" ? "No chats yet." : "Nothing matches."}
+            empty={q === "" ? "No sessions found" : "No sessions match"}
             now={now.value}
           />
         </>

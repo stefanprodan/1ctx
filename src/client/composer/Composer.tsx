@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The card the user writes in: the text that grows with it, the agent
-// chip, the context readout, and Send, which is Stop while the reply
+// The card the user writes in: the text that grows with it, the
+// project chip on Home, the agent chip, the context readout, and Send, which is Stop while the reply
 // runs. Enter sends, Shift+Enter breaks a line. Two modes: a chat, where the message goes
 // into it, and a project, where it starts one. The draft survives a
 // navigation; a refusal shows under the box until the next keystroke.
@@ -10,6 +10,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
@@ -24,6 +25,7 @@ import {
 } from "./commands.ts";
 import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
+import { ProjectPicker } from "./ProjectPicker.tsx";
 import "./composer.css";
 import { reason } from "../lib/format.ts";
 
@@ -42,6 +44,7 @@ export function Composer({
   onStop,
   onCompact,
   onRename,
+  project,
   placeholder: idle = "Send a message",
 }: {
   scope: Scope;
@@ -62,6 +65,13 @@ export function Composer({
   onCompact?: () => Promise<void>;
   // /rename <title>; a chat not started yet has no row to name
   onRename?: (title: string) => Promise<void>;
+  // Home's pick of the project a new chat starts in; the draft stays
+  // the scope's while the project changes under it
+  project?: {
+    projects: ProjectSummary[];
+    projectId: string;
+    onPick: (id: string) => void;
+  };
   // the box at rest, with an agent to send to
   placeholder?: string;
 }) {
@@ -75,9 +85,13 @@ export function Composer({
   const input = useRef<HTMLTextAreaElement>(null);
   const list = agents ?? [];
   const fixed = agentId !== null;
+  // a pick not in the list, the agents of another project, falls back
+  // to the first
   const agent = fixed
     ? agentId
-    : (picked.value ?? (list.length > 0 ? list[0].id : null));
+    : list.some((a) => a.id === picked.value)
+      ? picked.value
+      : (list[0]?.id ?? null);
 
   const grow = () => {
     const el = input.current;
@@ -193,6 +207,13 @@ export function Composer({
       )}
       {failure.value && <p class="composer-failure error">{failure.value}</p>}
       <div class="composer-row">
+        {project && (
+          <ProjectPicker
+            projects={project.projects}
+            projectId={project.projectId}
+            onPick={project.onPick}
+          />
+        )}
         <AgentPicker
           agents={list}
           agentId={agent}

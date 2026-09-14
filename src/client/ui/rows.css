@@ -87,6 +87,21 @@
     color: var(--dim);
   }
 
+  .rows-go {
+    color: var(--dim);
+    text-decoration: none;
+  }
+  .rows-go:hover {
+    background: var(--page);
+  }
+  .rows-go-arrow {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .rows-go:hover .rows-go-arrow {
+    color: var(--fg);
+  }
+
   .rows-chevron {
     flex-shrink: 0;
     color: var(--faint);
@@ -208,7 +223,8 @@
     .rows-line > .rows-meta {
       padding-left: calc(14px + var(--space-3));
     }
-    .rows-line-static .rows-meta {
+    .rows-line-static .rows-meta,
+    .rows-go > .rows-meta {
       padding-left: calc(28px + var(--space-3));
     }
     .rows-toggle .rows-meta {

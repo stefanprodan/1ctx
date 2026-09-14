@@ -22,6 +22,7 @@ import {
 } from "../data/projects.ts";
 import { loadProviders } from "../data/providers.ts";
 import {
+  homeProjectId,
   loadList,
   loadProjectAgents,
   loadSession,
@@ -31,6 +32,7 @@ import { loadTools } from "../data/tools.ts";
 import { loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
+import { composeProjectOf } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
@@ -64,20 +66,19 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/home/Home.tsx").then((m) => m.Home)),
     title: () => "Home",
     role: "authenticated",
-    // the stream for the query, and the personal project's agents for
-    // the composer; the project comes from the rail's list
+    // the stream for the query, and the agents of the composer's
+    // project, the picked one or the personal; it comes from the rail's
+    // list
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
       const rows = loadList({ project: null, q });
       const spent = loadWeek();
       await loadProjects();
-      const personal = projects.value?.find((p) => p.kind === "personal");
+      const target = composeProjectOf(projects.value, homeProjectId.value);
       await Promise.all([
         rows,
         spent,
-        personal === undefined
-          ? Promise.resolve()
-          : loadProjectAgents(personal.id),
+        target === null ? Promise.resolve() : loadProjectAgents(target.id),
       ]);
     },
     nav: { label: "Home", icon: "home", order: 1 },
@@ -89,7 +90,17 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Projects",
     role: "authenticated",
-    load: () => loadProjects(),
+    // the list, and for the aside the week and the agents, which every
+    // project offers alike, read through the personal one
+    load: async () => {
+      const spent = loadWeek();
+      await loadProjects();
+      const personal = composeProjectOf(projects.value, null);
+      await Promise.all([
+        spent,
+        personal === null ? Promise.resolve() : loadProjectAgents(personal.id),
+      ]);
+    },
     nav: { label: "Projects", icon: "projects", order: 2 },
   },
   {

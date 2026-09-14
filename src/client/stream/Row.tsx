@@ -33,12 +33,16 @@ export function Row({
         <span class="stream-title">{session.title}</span>
         <span class="stream-line">
           {projectName !== null && (
-            <span class="stream-project">{projectName}</span>
+            <span class="stream-project">#{projectName}</span>
           )}
-          {projectName !== null && line !== "" && (
-            <span class="stream-sep"> · </span>
+          {projectName !== null &&
+            (line.author !== null || line.text !== "") && (
+              <span class="stream-sep"> · </span>
+            )}
+          {line.author !== null && (
+            <span class="stream-author">@{line.author} </span>
           )}
-          {line}
+          {line.text}
         </span>
       </span>
       <span class="stream-when">{whenText(row, now)}</span>

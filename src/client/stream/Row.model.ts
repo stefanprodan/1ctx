@@ -13,24 +13,34 @@ import { ago, elapsed } from "../lib/format.ts";
 const firstLine = (text: string): string =>
   text.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
 
-export function stateLine(row: StreamRow): string {
+// the line under the title: the last line with its author, who is
+// drawn apart, or the state of a send that did not finish
+export type StateLine = { author: string | null; text: string };
+
+const plain = (text: string): StateLine => ({ author: null, text });
+
+export function stateLine(row: StreamRow): StateLine {
   const { session, send, last } = row;
   switch (session.status) {
     case "running": {
       const calls = send?.toolCalls ?? 0;
-      if (calls === 0) return "working";
-      return `working · ${calls} tool ${calls === 1 ? "call" : "calls"}`;
+      if (calls === 0) return plain("working");
+      return plain(`working · ${calls} tool ${calls === 1 ? "call" : "calls"}`);
     }
     case "failed": {
       const error = send?.error === null ? "" : firstLine(send?.error ?? "");
-      return error === "" ? "failed" : `failed · ${error}`;
+      return plain(error === "" ? "failed" : `failed · ${error}`);
     }
     case "stopped":
-      return send?.cause === "shutdown" || send?.cause === "restart"
-        ? "stopped · the server restarted"
-        : "stopped";
+      return plain(
+        send?.cause === "shutdown" || send?.cause === "restart"
+          ? "stopped · the server restarted"
+          : "stopped",
+      );
     default:
-      return last === null ? "" : `${last.author}: ${last.text}`;
+      return last === null
+        ? plain("")
+        : { author: last.author, text: last.text };
   }
 }
 

@@ -6,7 +6,11 @@ import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
-import { list, projectAgents } from "../../../src/client/data/sessions.ts";
+import {
+  homeProjectId,
+  list,
+  projectAgents,
+} from "../../../src/client/data/sessions.ts";
 import { week } from "../../../src/client/data/usage.ts";
 import {
   dateLine,
@@ -69,6 +73,7 @@ describe("Home", () => {
         createdAt: 1_756_684_800_000,
       },
     ];
+    homeProjectId.value = null;
     list.value = null;
     week.value = null;
   });
@@ -121,8 +126,10 @@ describe("Home", () => {
     expect(html).toContain('href="/chat/s1"');
     expect(html).toContain("stream-icon-done");
     expect(html).toContain("Which pods restarted");
-    expect(html).toContain('<span class="stream-project">personal</span>');
-    expect(html).toContain("assistant: nine pods");
+    expect(html).toContain('<span class="stream-project">#personal</span>');
+    expect(html).toContain(
+      '<span class="stream-author">@assistant </span>nine pods',
+    );
     expect(html).toContain("2m ago");
   });
 
@@ -131,10 +138,33 @@ describe("Home", () => {
     list.value = [];
     const html = render(<Home />);
     expect(html).toContain('value="pods"');
-    expect(html).toContain("Nothing matches.");
+    expect(html).toContain("No sessions match");
     query.value = "";
-    expect(render(<Home />)).toContain("No chats yet. Start one above.");
+    expect(render(<Home />)).toContain("No sessions found");
   });
+
+  test.serial(
+    "the composer names its project, the personal one at first",
+    () => {
+      projects.value = [
+        ...projects.value!,
+        {
+          id: "p2",
+          kind: "team",
+          name: "platform",
+          createdAt: 0,
+          memberCount: 3,
+        },
+      ];
+      const html = render(<Home />);
+      expect(html).toContain('placeholder="Send a message to personal"');
+      expect(html).toContain('class="composer-chip-name">personal<');
+      homeProjectId.value = "p2";
+      const picked = render(<Home />);
+      expect(picked).toContain('placeholder="Send a message to platform"');
+      expect(picked).toContain('class="composer-chip-name">platform<');
+    },
+  );
 
   test("without the personal project the composer waits", () => {
     projects.value = null;

@@ -122,6 +122,21 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* a project's row puts its kind's icon under the Projects label, so
+     the cut moves to the name */
+  .rail-sub-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rail-sub-glyph {
+    flex-shrink: 0;
+  }
+  .rail-sub-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .rail-sub:hover {
     color: var(--fg);
   }
