@@ -13,6 +13,7 @@ import type {
   SendSummary,
   SessionSummary,
 } from "./contracts/session.ts";
+import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
@@ -41,6 +42,8 @@ export type SocketEvent =
   | { type: "granted"; projectId: string }
   // the connection may no longer see the project
   | { type: "revoked"; projectId: string }
+  // an admin changed the user's role: the tab's user takes it
+  | { type: "role"; role: Role }
   // the answer to a watch: the send in flight as far as it got
   | { type: "watched"; sessionId: string; live: LiveSend | null }
   | {

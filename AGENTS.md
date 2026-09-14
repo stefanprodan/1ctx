@@ -288,7 +288,9 @@ violation, and every rule has a rejected fixture under
   writer through a port. `watch` is authorized through a port to
   sessions and answered with `watched` and the runner's live snapshot.
   `access.changed` recomputes a connection's set and sends `granted`
-  for a project that joined it or `revoked` for one that left it; `login.revoked` closes the login's
+  for a project that joined it or `revoked` for one that left it, and
+  `role` when the user's role moved, which `data/socket.ts` applies to
+  `me`; `login.revoked` closes the login's
   connections, and the expiry sweep publishes it too. Backpressure
   closes a slow connection; a dropped frame closes with 1013; the
   client reloads on every open. The upgrade is `GET /api/socket` with

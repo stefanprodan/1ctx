@@ -150,6 +150,14 @@ describe("the tab socket", () => {
     expect(me.value).toBeNull();
   });
 
+  test("a role frame gives the signed-in user the new role", () => {
+    start();
+
+    wires[0].message(JSON.stringify({ type: "role", role: "admin" }));
+
+    expect(me.value).toEqual({ ...caelea, role: "admin" });
+  });
+
   test("a restarting close schedules one retry at 2000 ms", () => {
     start();
 
