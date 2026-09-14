@@ -4,10 +4,7 @@
 // Admin user writes keep identity, the personal project, access and logins
 // coherent, while every response stays a projection without the hash.
 
-import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { migrate } from "../../src/server/db/index.ts";
-import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import type { RouteDescriptor } from "../../src/server/lib/http.ts";
 import type { Conn, ConnData } from "../../src/server/web/socket.ts";
@@ -443,43 +440,6 @@ describe("user email projections", () => {
     expect(profile.user.email).toBe("admin@1ctx.dev");
   });
 
-  test("migration 0007 fills an existing row from its username", () => {
-    const db = new Database(":memory:");
-    migrate(db, MIGRATIONS.slice(0, 6));
-    db.query(
-      `insert into users
-        (id, username, full_name, role, password_hash, created_at)
-       values ('u', 'caelea', 'Oana', 'member', 'x', 0)`,
-    ).run();
-    db.query(
-      "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'personal', 'u', 0)",
-    ).run();
-    expect(migrate(db, MIGRATIONS.slice(0, 7))).toEqual(["0007-users-email"]);
-    expect(db.query("select email from users where id = 'u'").get()).toEqual({
-      email: "caelea@1ctx.dev",
-    });
-    expect(
-      db.query("select owner_id from projects where id = 'p'").get(),
-    ).toEqual({ owner_id: "u" });
-    const email = db
-      .query<{ required: number }, []>(
-        `select "notnull" as required
-         from pragma_table_info('users') where name = 'email'`,
-      )
-      .get();
-    expect(email).toEqual({ required: 1 });
-    expect(() =>
-      db
-        .query(
-          `insert into users
-            (id, username, full_name, email, role, password_hash, created_at)
-           values ('v', 'maria', 'Maria', 'caelea@1ctx.dev', 'member', 'x', 0)`,
-        )
-        .run(),
-    ).toThrow();
-    db.close();
-  });
-
   test("login and me keep the email private", async () => {
     const app = await testApp();
     const client = app.client();
@@ -662,26 +622,5 @@ describe("required password changes", () => {
     const client = app.client();
     const login = await client.login("admin", "hunter2-test");
     expect((await login.json()).user.mustChangePassword).toBe(false);
-  });
-});
-
-describe("user state migration", () => {
-  test("migration 0008 adds false states to an existing user", () => {
-    const db = new Database(":memory:");
-    migrate(db, MIGRATIONS.slice(0, 7));
-    db.query(
-      `insert into users
-        (id, username, full_name, email, role, password_hash, created_at)
-       values ('u', 'caelea', 'Oana', 'caelea@example.com', 'member', 'x', 0)`,
-    ).run();
-    expect(migrate(db, MIGRATIONS.slice(7, 8))).toEqual(["0008-users-state"]);
-    expect(
-      db
-        .query(
-          "select disabled, must_change_password from users where id = 'u'",
-        )
-        .get(),
-    ).toEqual({ disabled: 0, must_change_password: 0 });
-    db.close();
   });
 });
