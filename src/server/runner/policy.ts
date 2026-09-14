@@ -13,6 +13,7 @@
 import type { Effort } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
+import type { ProjectRow } from "../projects/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type {
   Offered,
@@ -41,6 +42,8 @@ export type ToolsPort = {
 
 export type SendPolicy = {
   projectId: string;
+  projectName: string;
+  projectDescription: string;
   userId: string;
   username: string;
   fullName: string;
@@ -63,7 +66,7 @@ export type SendPolicy = {
 const NONE: Offered = { tools: [], search: null };
 
 export function buildPolicy(input: {
-  projectId: string;
+  project: Pick<ProjectRow, "id" | "name" | "description">;
   user: UserRow;
   agent: AgentRow;
   now: number;
@@ -80,7 +83,9 @@ export function buildPolicy(input: {
   const thinking =
     agent.thinking === null ? agent.model.reasoning : agent.thinking === "on";
   return {
-    projectId: input.projectId,
+    projectId: input.project.id,
+    projectName: input.project.name,
+    projectDescription: input.project.description,
     userId: user.id,
     username: user.username,
     fullName: user.fullName,

@@ -41,6 +41,7 @@ function build(secureCookie: boolean) {
       memberProjectIds: () => [],
       teamProjectIds: () => [],
       nameTaken: () => false,
+      personal: () => null,
       renamePersonal: () => {},
     },
   });
@@ -129,7 +130,7 @@ describe("access", () => {
     });
   });
 
-  test("resolving an expired login publishes its revocation", () => {
+  test.serial("resolving an expired login publishes its revocation", () => {
     const { db, user, access } = build(false);
     const { login, setCookie } = access.open(user);
     db.query("update logins set expires_at = 0 where id = ?").run(login.id);

@@ -35,7 +35,7 @@ beforeEach(() => {
   (globalThis as { localStorage?: unknown }).localStorage = fakeStorage;
   me.value = {
     id: "u1",
-    username: "oana",
+    username: "caelea",
     fullName: "Oana",
     role: "member",
     mustChangePassword: false,

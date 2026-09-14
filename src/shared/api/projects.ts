@@ -8,5 +8,11 @@ import type { ProjectDetail, ProjectSummary } from "../contracts/project.ts";
 // GET /api/projects: the caller's projects, the personal one first
 export type ProjectsResponse = { projects: ProjectSummary[] };
 
-// GET /api/projects/:id
+// GET /api/projects/:id and every project write
 export type ProjectResponse = { project: ProjectDetail };
+
+export type CreateProjectRequest = { name: string; description?: string };
+// at least one of the two
+export type UpdateProjectRequest = { name?: string; description?: string };
+export type AddMemberRequest = { userId: string };
+export type DeleteProjectResponse = { deleted: number };

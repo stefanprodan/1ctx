@@ -38,8 +38,9 @@ export type UsersPort = {
 };
 
 export type ProjectsPort = {
-  nameTaken(name: string): boolean;
-  renamePersonal(userId: string, name: string): void;
+  nameTaken(name: string, exceptId?: string): boolean;
+  personal(userId: string): { id: string } | null;
+  renamePersonal(userId: string, from: string, to: string): void;
 };
 
 export type UsersRoutesDeps = {
@@ -123,11 +124,17 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             patch.username !== user.username
           ) {
             usernameAvailable(patch.username, user.id);
-            if (deps.projects.nameTaken(patch.username)) {
+            // the user's own project may already carry the name they take
+            const own = deps.projects.personal(user.id)?.id;
+            if (deps.projects.nameTaken(patch.username, own)) {
               throw new Conflict("project name is taken");
             }
             deps.users.setUsername(user.id, patch.username);
-            deps.projects.renamePersonal(user.id, patch.username);
+            deps.projects.renamePersonal(
+              user.id,
+              user.username,
+              patch.username,
+            );
           }
           if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);

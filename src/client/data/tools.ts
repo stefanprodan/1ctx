@@ -17,6 +17,7 @@ import type {
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
 import type { BuiltinTool } from "../../shared/words.ts";
+import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
@@ -34,9 +35,6 @@ effect(() => {
   limits.value = null;
   toolsError.value = null;
 });
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 // a load's answer is kept only when it is still the one wanted: for
 // the signed-in user of the moment and the latest word, a failure

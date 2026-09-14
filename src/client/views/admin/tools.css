@@ -1,86 +1,9 @@
-/* Tools: three cards in the agents page's shape. A built-in row with
-   its switch and the schema under it when open; the two search
-   providers as radio rows; the limits in two groups, a field per row
-   typed in the page's unit. */
+/* Tools: a built-in's name, description and switch, the schema its
+   open row shows, the search radio, and the limits form. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .tools {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    width: 960px;
-    max-width: 100%;
-  }
-
-  .tools-card {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
-    overflow: hidden;
-  }
-  .tools-card-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 44px;
-    padding: 0 var(--space-4);
-    border-bottom: 1px solid var(--line);
-  }
-  .tools-hint {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
-
-  .tools-item {
-    border-bottom: 1px solid var(--line);
-  }
-  .tools-item:last-child {
-    border-bottom: 0;
-  }
-  .tools-item-open {
-    background: var(--page);
-  }
-
-  .tools-row,
-  .tools-radio {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 52px;
-    padding: var(--space-2) var(--space-4);
-  }
-  .tools-open {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    flex-grow: 1;
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--dim);
-    text-align: left;
-    cursor: pointer;
-  }
-  .tools-open:hover {
-    color: var(--fg);
-  }
-  .tools-chevron {
-    flex-shrink: 0;
-    color: var(--faint);
-    transform: rotate(-90deg);
-    transition: transform 120ms;
-  }
-  .tools-chevron-open {
-    transform: rotate(0);
-  }
   .tools-name {
     flex-shrink: 0;
     width: 160px;
@@ -100,13 +23,6 @@
     white-space: nowrap;
     font-size: var(--text-ui);
     color: var(--dim);
-  }
-  .tools-meta {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    white-space: nowrap;
   }
   .tools-note {
     font-size: var(--text-small);
@@ -151,13 +67,10 @@
   }
 
   /* the schema, read-only, in the transcript's tool mono */
-  .tools-body {
+  .tools-schema {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-4) var(--space-4)
-      calc(var(--space-4) + 14px + var(--space-3));
-    border-top: 1px solid var(--line);
   }
   .tools-label {
     font-family: var(--mono);
@@ -179,20 +92,10 @@
   }
 
   .tools-radio {
-    cursor: pointer;
-    color: var(--dim);
-  }
-  .tools-radio-input {
-    accent-color: var(--brand);
-  }
-  .tools-radio .tools-meta {
-    margin-left: auto;
-  }
-  .tools-state {
+    flex-shrink: 0;
+    width: 14px;
     margin: 0;
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--text-ui);
-    color: var(--faint);
+    accent-color: var(--brand);
   }
 
   .tools-form {
@@ -272,31 +175,15 @@
   }
 
   @media (max-width: 719px) {
-    /* the row keeps the switch at the right; the words wrap under
-       the name inside the button */
-    .tools-row,
-    .tools-radio {
-      padding: var(--space-3) var(--space-4);
-      row-gap: var(--space-1);
-    }
-    .tools-radio {
-      flex-wrap: wrap;
-    }
     .tools-name {
       width: auto;
       flex: 1 1 auto;
       min-width: 0;
     }
-    .tools-open {
-      flex-wrap: wrap;
-    }
     .tools-desc {
       flex-basis: 100%;
       padding-left: calc(14px + var(--space-3));
       white-space: normal;
-    }
-    .tools-body {
-      padding: var(--space-4);
     }
     .tools-limit {
       grid-template-columns: 1fr auto;

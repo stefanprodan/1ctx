@@ -8,9 +8,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { loadMe, login, logout, me } from "../../../src/client/data/me.ts";
 
-const oana = {
+const caelea = {
   id: "u1",
-  username: "oana",
+  username: "caelea",
   fullName: "Oana",
   role: "member" as const,
   mustChangePassword: false,
@@ -28,7 +28,7 @@ beforeEach(() => {
       await new Promise<void>((r) => gates.push(r));
       return Response.json({ user: null });
     }
-    if (url === "/api/login") return Response.json({ user: oana });
+    if (url === "/api/login") return Response.json({ user: caelea });
     if (url === "/api/logout") return Response.json({ ok: true });
     throw new Error(`unexpected ${url}`);
   }) as unknown as typeof fetch;
@@ -42,19 +42,19 @@ afterEach(() => {
 describe("me", () => {
   test("a late first load does not undo a sign-in", async () => {
     const first = loadMe();
-    await login({ username: "oana", password: "pw" });
-    expect(me.value).toEqual(oana);
+    await login({ username: "caelea", password: "pw" });
+    expect(me.value).toEqual(caelea);
     gates.shift()?.();
     await first;
-    expect(me.value).toEqual(oana);
+    expect(me.value).toEqual(caelea);
   });
 
   test("a late load does not undo a sign-out either", async () => {
-    await login({ username: "oana", password: "pw" });
+    await login({ username: "caelea", password: "pw" });
     globalThis.fetch = (async (url: string) => {
       if (url === "/api/me") {
         await new Promise<void>((r) => gates.push(r));
-        return Response.json({ user: oana });
+        return Response.json({ user: caelea });
       }
       return Response.json({ ok: true });
     }) as unknown as typeof fetch;
@@ -72,9 +72,9 @@ describe("me", () => {
     gates[1]();
     await second;
     expect(me.value).toBeNull();
-    me.value = oana;
+    me.value = caelea;
     gates[0]();
     await first;
-    expect(me.value).toEqual(oana);
+    expect(me.value).toEqual(caelea);
   });
 });

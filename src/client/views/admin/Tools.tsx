@@ -25,11 +25,19 @@ import {
   tools,
   toolsError,
 } from "../../data/tools.ts";
-import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
+import {
+  Rows,
+  RowsCard,
+  RowsLine,
+  RowsMeta,
+  RowsNote,
+  RowsOpen,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import {
   collect,
   defaultLine,
@@ -45,9 +53,7 @@ import {
 import "../../transcript/hljs.css";
 import "../../transcript/md.css";
 import "./tools.css";
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
+import { reason } from "../../lib/format.ts";
 
 // a built-in: the row with its switch, the schema under it when open
 function ToolRow({
@@ -82,51 +88,49 @@ function ToolRow({
     busy.value = false;
   };
   return (
-    <div class={`tools-item${open ? " tools-item-open" : ""}`}>
-      <div class="tools-row">
-        <button
-          type="button"
-          class="tools-open"
-          aria-expanded={open}
-          onClick={onToggle}
-        >
-          <Icon
-            name="chevron"
-            size={14}
-            class={`tools-chevron${open ? " tools-chevron-open" : ""}`}
-          />
+    <RowsOpen
+      open={open}
+      onToggle={onToggle}
+      indent="chevron"
+      head={
+        <>
           <span class="tools-name">{tool.name}</span>
           <span class="tools-desc">
             {firstSentence(tool.description) || TOOL_WORDS[tool.name]}
           </span>
-        </button>
-        {failure.value && <span class="tools-note error">{failure.value}</span>}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={tool.enabled}
-          aria-label={`${tool.name} ${tool.enabled ? "on" : "off"}`}
-          class={`tools-switch${tool.enabled ? " tools-switch-on" : ""}`}
-          disabled={busy.value}
-          onClick={() => void flip()}
-        >
-          <span class="tools-switch-knob" />
-        </button>
+        </>
+      }
+      end={
+        <>
+          {failure.value && (
+            <span class="tools-note error">{failure.value}</span>
+          )}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={tool.enabled}
+            aria-label={`${tool.name} ${tool.enabled ? "on" : "off"}`}
+            class={`tools-switch${tool.enabled ? " tools-switch-on" : ""}`}
+            disabled={busy.value}
+            onClick={() => void flip()}
+          >
+            <span class="tools-switch-knob" />
+          </button>
+        </>
+      }
+    >
+      <div class="tools-schema">
+        <div class="tools-label">Description for agents</div>
+        <div class="tools-text">{tool.description}</div>
+        <div class="tools-label">Parameters</div>
+        {/* Server rendering keeps the Markdown parser out of the browser. */}
+        <div
+          class="tools-json"
+          ref={json}
+          dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
+        />
       </div>
-      {open && (
-        <div class="tools-body">
-          <div class="tools-label">Description for agents</div>
-          <div class="tools-text">{tool.description}</div>
-          <div class="tools-label">Parameters</div>
-          {/* Server rendering keeps the Markdown parser out of the browser. */}
-          <div
-            class="tools-json"
-            ref={json}
-            dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
-          />
-        </div>
-      )}
-    </div>
+    </RowsOpen>
   );
 }
 
@@ -148,14 +152,11 @@ function SearchCard() {
     busy.value = false;
   };
   return (
-    <section class="tools-card">
-      <div class="tools-card-head">
-        <span class="label">Web search</span>
-      </div>
+    <RowsCard label="Web search">
       {SEARCH_PROVIDERS.map((provider) => (
-        <label key={provider} class="tools-item tools-radio">
+        <RowsLine key={provider} as="label" flush>
           <input
-            class="tools-radio-input"
+            class="tools-radio"
             type="radio"
             name="search"
             value={provider}
@@ -163,20 +164,18 @@ function SearchCard() {
             disabled={busy.value}
             onChange={() => void choose(provider)}
           />
-          <span class="tools-name">{provider}</span>
-          <span class="tools-meta">
-            {keyLine(provider, state.keys[provider])}
-          </span>
-        </label>
+          <RowsTitle name={provider} mono />
+          <RowsMeta>{keyLine(provider, state.keys[provider])}</RowsMeta>
+        </RowsLine>
       ))}
-      <p class="tools-state">
+      <RowsNote>
         {failure.value ? (
           <span class="error">{failure.value}</span>
         ) : (
           searchLine(state)
         )}
-      </p>
-    </section>
+      </RowsNote>
+    </RowsCard>
   );
 }
 
@@ -272,11 +271,7 @@ function LimitsCard({ rows }: { rows: LimitRow[] }) {
   );
   const changed = rows.some((row) => row.changedAt !== null);
   return (
-    <section class="tools-card">
-      <div class="tools-card-head">
-        <span class="label">Limits</span>
-        <span class="tools-hint">applies to the next send</span>
-      </div>
+    <RowsCard label="Limits" hint="applies to the next send">
       <form class="tools-form" onSubmit={submit}>
         {group("send", "Per send")}
         {group("call", "Per call")}
@@ -301,7 +296,7 @@ function LimitsCard({ rows }: { rows: LimitRow[] }) {
           }
         />
       </form>
-    </section>
+    </RowsCard>
   );
 }
 
@@ -317,12 +312,11 @@ export function Tools() {
       loading={(state === null || rows === null) && error === null}
       error={error}
     >
-      <div class="tools">
-        <section class="tools-card">
-          <div class="tools-card-head">
-            <span class="label">Built-in tools</span>
-            <span class="tools-hint">a switch applies to the next send</span>
-          </div>
+      <Rows>
+        <RowsCard
+          label="Built-in tools"
+          hint="a switch applies to the next send"
+        >
           {(state?.tools ?? []).map((tool) => (
             <ToolRow
               key={tool.name}
@@ -333,10 +327,10 @@ export function Tools() {
               }}
             />
           ))}
-        </section>
+        </RowsCard>
         <SearchCard />
         {rows && <LimitsCard rows={rows} />}
-      </div>
+      </Rows>
     </Page>
   );
 }

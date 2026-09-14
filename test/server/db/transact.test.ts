@@ -23,7 +23,7 @@ function capture() {
 }
 
 describe("transact", () => {
-  test("publishes after commit, in order", () => {
+  test.serial("publishes after commit, in order", () => {
     const db = memoryDb();
     const { seen, stop } = capture();
     try {
@@ -38,7 +38,7 @@ describe("transact", () => {
     }
   });
 
-  test("publishes nothing when the body throws", () => {
+  test.serial("publishes nothing when the body throws", () => {
     const db = memoryDb();
     const { seen, stop } = capture();
     try {
@@ -53,7 +53,7 @@ describe("transact", () => {
     }
   });
 
-  test("a nested body's events wait for the outermost commit", () => {
+  test.serial("a nested body's events wait for the outermost commit", () => {
     const db = memoryDb();
     const { seen, stop } = capture();
     try {
@@ -68,26 +68,29 @@ describe("transact", () => {
     }
   });
 
-  test("a nested body's events are dropped when the outer throws", () => {
-    const db = memoryDb();
-    const { seen, stop } = capture();
-    try {
-      expect(() =>
-        transact(db, () => {
-          transact(db, () => ({ result: 0, events: [revoked("inner")] }));
-          throw new Error("outer boom");
-        }),
-      ).toThrow("outer boom");
-      expect(seen).toEqual([]);
-      // and the next transaction starts clean
-      transact(db, () => ({ result: 0, events: [revoked("later")] }));
-      expect(seen).toEqual(["later"]);
-    } finally {
-      stop();
-    }
-  });
+  test.serial(
+    "a nested body's events are dropped when the outer throws",
+    () => {
+      const db = memoryDb();
+      const { seen, stop } = capture();
+      try {
+        expect(() =>
+          transact(db, () => {
+            transact(db, () => ({ result: 0, events: [revoked("inner")] }));
+            throw new Error("outer boom");
+          }),
+        ).toThrow("outer boom");
+        expect(seen).toEqual([]);
+        // and the next transaction starts clean
+        transact(db, () => ({ result: 0, events: [revoked("later")] }));
+        expect(seen).toEqual(["later"]);
+      } finally {
+        stop();
+      }
+    },
+  );
 
-  test("a nested body that throws loses only its own events", () => {
+  test.serial("a nested body that throws loses only its own events", () => {
     const db = memoryDb();
     const { seen, stop } = capture();
     try {
@@ -105,23 +108,26 @@ describe("transact", () => {
     }
   });
 
-  test("a rolled-back middle body takes its inner events with it", () => {
-    const db = memoryDb();
-    const { seen, stop } = capture();
-    try {
-      transact(db, () => {
-        try {
-          transact(db, () => {
-            transact(db, () => ({ result: 0, events: [revoked("deep")] }));
-            throw new Error("middle boom");
-          });
-        } catch {}
-        transact(db, () => ({ result: 0, events: [revoked("sibling")] }));
-        return { result: 0, events: [revoked("outer")] };
-      });
-      expect(seen).toEqual(["sibling", "outer"]);
-    } finally {
-      stop();
-    }
-  });
+  test.serial(
+    "a rolled-back middle body takes its inner events with it",
+    () => {
+      const db = memoryDb();
+      const { seen, stop } = capture();
+      try {
+        transact(db, () => {
+          try {
+            transact(db, () => {
+              transact(db, () => ({ result: 0, events: [revoked("deep")] }));
+              throw new Error("middle boom");
+            });
+          } catch {}
+          transact(db, () => ({ result: 0, events: [revoked("sibling")] }));
+          return { result: 0, events: [revoked("outer")] };
+        });
+        expect(seen).toEqual(["sibling", "outer"]);
+      } finally {
+        stop();
+      }
+    },
+  );
 });

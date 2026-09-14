@@ -1,6 +1,5 @@
-/* Projects: the list, a row per project; and one project: the tabs,
-   then the tab's content: the feed, or the cards of users and agents.
-   The kind and the dates are in the About card at the right. */
+/* Projects: the list, a row per project; and the column a project's
+   settings sections stack in. */
 
 @layer tokens, base, owners;
 
@@ -43,63 +42,8 @@
     color: var(--faint);
   }
 
-  .projects-card {
+  .projects-settings {
     display: flex;
     flex-direction: column;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
-    overflow: hidden;
-  }
-  .projects-card-head {
-    display: flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 var(--space-4);
-    border-bottom: 1px solid var(--line);
-  }
-  .projects-card-state {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    color: var(--faint);
-  }
-
-  .projects-member,
-  .projects-agent {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 52px;
-    padding: var(--space-2) var(--space-4);
-    border-bottom: 1px solid var(--line);
-  }
-  .projects-member:last-child,
-  .projects-agent:last-child {
-    border-bottom: 0;
-  }
-
-  .projects-avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    font-family: var(--mono);
-    font-size: var(--text-tiny);
-    font-weight: 600;
-    color: var(--dim);
-  }
-
-  .projects-member-name {
-    font-weight: 500;
-  }
-
-  .projects-member-meta {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
   }
 }

@@ -15,6 +15,7 @@ import type {
   UsersResponse,
 } from "../../shared/api/users.ts";
 import type { UserAccount } from "../../shared/contracts/user.ts";
+import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
@@ -30,9 +31,6 @@ effect(() => {
   users.value = null;
   usersError.value = null;
 });
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 // the list is kept by username, the server's order, so a rename moves
 // the row where a reload would put it

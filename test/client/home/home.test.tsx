@@ -33,13 +33,21 @@ describe("Home", () => {
   beforeEach(() => {
     me.value = {
       id: "u1",
-      username: "oana",
+      username: "caelea",
       fullName: "Oana",
       role: "member",
       mustChangePassword: false,
     };
     query.value = "";
-    projects.value = [{ id: "p1", kind: "personal", name: "oana" }];
+    projects.value = [
+      {
+        id: "p1",
+        kind: "personal",
+        name: "caelea",
+        createdAt: 0,
+        memberCount: 1,
+      },
+    ];
     projectAgents.value = [
       {
         id: "a1",
@@ -113,7 +121,7 @@ describe("Home", () => {
     expect(html).toContain('href="/chat/s1"');
     expect(html).toContain("stream-icon-done");
     expect(html).toContain("Which pods restarted");
-    expect(html).toContain('<span class="stream-project">oana</span>');
+    expect(html).toContain('<span class="stream-project">caelea</span>');
     expect(html).toContain("assistant: nine pods");
     expect(html).toContain("2m ago");
   });

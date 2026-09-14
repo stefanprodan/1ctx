@@ -41,6 +41,7 @@ export function Project({ params }: { params: Params }) {
             scope={{ projectId: shown.id }}
             agents={projectAgents.value}
             agentId={null}
+            placeholder={`Start a chat in ${shown.name}`}
             running={false}
             busy={sending.value}
             onSend={async (message, agentId) => {

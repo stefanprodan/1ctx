@@ -27,6 +27,7 @@ import {
   usernameProblem,
 } from "./Users.model.ts";
 import "./users.css";
+import { reason } from "../../lib/format.ts";
 
 function RolePick({
   value,
@@ -58,7 +59,7 @@ function RolePick({
           </button>
         ))}
       </div>
-      {lock !== null && <span class="users-hint">{lock}</span>}
+      {lock !== null && <span class="hint">{lock}</span>}
     </div>
   );
 }
@@ -74,7 +75,7 @@ function Switch({ user, lock }: { user: UserAccount; lock: string | null }) {
     try {
       await updateUser(user.id, { disabled: !user.disabled });
     } catch (err) {
-      failure.value = err instanceof Error ? err.message : String(err);
+      failure.value = reason(err);
     }
     busy.value = false;
   };
@@ -82,14 +83,14 @@ function Switch({ user, lock }: { user: UserAccount; lock: string | null }) {
     <span class="users-switch">
       <button
         type="button"
-        class={`btn${user.disabled ? "" : " users-danger"}`}
+        class={`btn${user.disabled ? "" : " btn-danger"}`}
         disabled={busy.value || lock !== null}
         title={lock ?? undefined}
         onClick={() => void flip()}
       >
         {user.disabled ? "Enable" : "Disable"}
       </button>
-      <span class="users-hint">
+      <span class="hint">
         {failure.value !== null
           ? failure.value
           : (lock ??
@@ -122,7 +123,7 @@ function ResetForm({ user }: { user: UserAccount }) {
     <form class="users-form users-reset" onSubmit={submit}>
       <div class="users-reset-head">
         <span class="label">Reset password</span>
-        <span class="users-hint">
+        <span class="hint">
           Signs {user.fullName} out everywhere. Hand them the new one.
         </span>
       </div>
@@ -241,7 +242,7 @@ export function UserForm({
               value={username.value}
               onInput={bind(username)}
             />
-            <span class="users-hint">
+            <span class="hint">
               The sign-in name and the handle. Their personal project follows
               it.
             </span>
@@ -293,7 +294,7 @@ export function UserForm({
                   value={password.value}
                   onInput={bind(password)}
                 />
-                <span class="users-hint">
+                <span class="hint">
                   Hand it over. They change it on their profile.
                 </span>
               </label>

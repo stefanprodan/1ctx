@@ -235,28 +235,31 @@ const workNode = (nodes: Node[]): WorkNode => {
 };
 
 describe("transcript rows", () => {
-  test("replays every socket fixture through the session reducers", async () => {
-    const names = readdirSync(FIXTURES)
-      .filter((name) => name.endsWith(".ndjson"))
-      .sort();
-    expect(names.length).toBeGreaterThan(0);
+  test.serial(
+    "replays every socket fixture through the session reducers",
+    async () => {
+      const names = readdirSync(FIXTURES)
+        .filter((name) => name.endsWith(".ndjson"))
+        .sort();
+      expect(names.length).toBeGreaterThan(0);
 
-    for (const name of names) {
-      leaveSession();
-      const lines = (await Bun.file(join(FIXTURES, name)).text())
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line));
-      const start = lines[0] as FixtureStart;
-      initial = start.detail;
-      await loadSession(start.detail.session.id);
-      invariant(name, 0);
-      for (let index = 1; index < lines.length; index++) {
-        onSocket(lines[index] as SocketEvent);
-        invariant(name, index);
+      for (const name of names) {
+        leaveSession();
+        const lines = (await Bun.file(join(FIXTURES, name)).text())
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line));
+        const start = lines[0] as FixtureStart;
+        initial = start.detail;
+        await loadSession(start.detail.session.id);
+        invariant(name, 0);
+        for (let index = 1; index < lines.length; index++) {
+          onSocket(lines[index] as SocketEvent);
+          invariant(name, index);
+        }
       }
-    }
-  });
+    },
+  );
 
   test("puts the work in the agent's turn and pairs duplicate call ids once", () => {
     const messages = [

@@ -22,25 +22,34 @@ import {
 import { Icon } from "../../lib/icons.tsx";
 import { WireMark } from "../../lib/marks.tsx";
 import { Page } from "../../ui/Page.tsx";
+import {
+  Rows,
+  RowsAdd,
+  RowsAvatar,
+  RowsCard,
+  RowsLine,
+  RowsMeta,
+  RowsNew,
+  RowsNote,
+  RowsOpen,
+} from "../../ui/Rows.tsx";
 import { AgentForm } from "./AgentForm.tsx";
 import { keyLine } from "./Agents.model.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
 import "./agents.css";
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
+import { reason } from "../../lib/format.ts";
 
 // a provider shows its service's mark, or a cloud for a server
 // without one; an agent's tile is the shared row's
 function Tile({ wire }: { wire: Wire }) {
   return (
-    <span class="agents-tile">
+    <RowsAvatar>
       {wire === "openrouter" ? (
         <WireMark wire={wire} size={15} />
       ) : (
         <Icon name="providers" size={15} />
       )}
-    </span>
+    </RowsAvatar>
   );
 }
 
@@ -57,26 +66,15 @@ function AgentRow({
 }) {
   const provider = providers.find((p) => p.id === agent.providerId);
   return (
-    <div class={`agents-item${open ? " agents-item-open" : ""}`}>
-      <button
-        type="button"
-        class="agents-row"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <Icon
-          name="chevron"
-          size={14}
-          class={`agents-chevron${open ? " agents-chevron-open" : ""}`}
-        />
+    <RowsOpen
+      open={open}
+      onToggle={onToggle}
+      head={
         <Head agent={agent} providerName={provider?.name ?? "?"} lit={open} />
-      </button>
-      {open && (
-        <div class="agents-body">
-          <AgentForm agent={agent} providers={providers} onDone={onToggle} />
-        </div>
-      )}
-    </div>
+      }
+    >
+      <AgentForm agent={agent} providers={providers} onDone={onToggle} />
+    </RowsOpen>
   );
 }
 
@@ -97,54 +95,52 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
   };
   const keyMissing = provider.keyName !== null && !provider.hasKey;
   return (
-    <div class="agents-item">
-      <div class="agents-provider">
-        <Tile wire={provider.wire} />
-        <span class="agents-name">{provider.name}</span>
-        <span class="agents-desc agents-url">{provider.baseUrl}</span>
-        <span class={`agents-meta${keyMissing ? " agents-meta-bad" : ""}`}>
-          {provider.wire} · {keyLine(provider.keyName, provider.hasKey)}
-        </span>
-        {asking.value ? (
-          <span class="agents-provider-ask">
-            {failure.value ? (
-              <span class="agents-note error">{failure.value}</span>
-            ) : (
-              <span class="agents-ask">Delete {provider.name}?</span>
-            )}
-            <button
-              type="button"
-              class="btn agents-small agents-danger"
-              disabled={busy.value}
-              onClick={() => void remove()}
-            >
-              {busy.value ? "Deleting" : "Delete"}
-            </button>
-            <button
-              type="button"
-              class="btn agents-small"
-              disabled={busy.value}
-              onClick={() => {
-                asking.value = false;
-                failure.value = null;
-              }}
-            >
-              Keep
-            </button>
-          </span>
-        ) : (
+    <RowsLine>
+      <Tile wire={provider.wire} />
+      <span class="agents-name">{provider.name}</span>
+      <span class="agents-desc">{provider.baseUrl}</span>
+      <RowsMeta bad={keyMissing}>
+        {provider.wire} · {keyLine(provider.keyName, provider.hasKey)}
+      </RowsMeta>
+      {asking.value ? (
+        <span class="agents-ask">
+          {failure.value ? (
+            <span class="agents-note error">{failure.value}</span>
+          ) : (
+            <span class="agents-ask-words">Delete {provider.name}?</span>
+          )}
           <button
             type="button"
-            class="btn agents-small"
+            class="btn btn-small btn-danger"
+            disabled={busy.value}
+            onClick={() => void remove()}
+          >
+            {busy.value ? "Deleting" : "Delete"}
+          </button>
+          <button
+            type="button"
+            class="btn btn-small"
+            disabled={busy.value}
             onClick={() => {
-              asking.value = true;
+              asking.value = false;
+              failure.value = null;
             }}
           >
-            Delete
+            Keep
           </button>
-        )}
-      </div>
-    </div>
+        </span>
+      ) : (
+        <button
+          type="button"
+          class="btn btn-small"
+          onClick={() => {
+            asking.value = true;
+          }}
+        >
+          Delete
+        </button>
+      )}
+    </RowsLine>
   );
 }
 
@@ -162,42 +158,37 @@ export function Agents() {
       loading={(list === null || rows === null) && error === null}
       error={error}
     >
-      <div class="agents">
-        <section class="agents-card">
-          <div class="agents-card-head">
-            <span class="label">Agents</span>
-            <button
-              type="button"
-              class="btn agents-small agents-card-act"
+      <Rows>
+        <RowsCard
+          label="Agents"
+          action={
+            <RowsAdd
+              label="New agent"
               disabled={adding.value || !rows || rows.length === 0}
               onClick={() => {
                 adding.value = true;
                 open.value = null;
               }}
-            >
-              <Icon name="plus" size={14} />
-              New agent
-            </button>
-          </div>
+            />
+          }
+        >
           {adding.value && (
-            <div class="agents-item agents-item-open">
-              <div class="agents-body agents-body-new">
-                <AgentForm
-                  agent={null}
-                  providers={rows ?? []}
-                  onDone={() => {
-                    adding.value = false;
-                  }}
-                />
-              </div>
-            </div>
+            <RowsNew>
+              <AgentForm
+                agent={null}
+                providers={rows ?? []}
+                onDone={() => {
+                  adding.value = false;
+                }}
+              />
+            </RowsNew>
           )}
           {list?.length === 0 && !adding.value && (
-            <p class="agents-state">
+            <RowsNote>
               {rows?.length === 0
                 ? "No agents yet. Add a provider below, then make the first agent on one of its models."
                 : "No agents yet. New agent picks a model from a provider below."}
-            </p>
+            </RowsNote>
           )}
           {(list ?? []).map((a) => (
             <AgentRow
@@ -211,43 +202,38 @@ export function Agents() {
               }}
             />
           ))}
-        </section>
-        <section class="agents-card">
-          <div class="agents-card-head">
-            <span class="label">Providers</span>
-            <button
-              type="button"
-              class="btn agents-small agents-card-act"
+        </RowsCard>
+        <RowsCard
+          label="Providers"
+          action={
+            <RowsAdd
+              label="New provider"
               disabled={addingProvider.value}
               onClick={() => {
                 addingProvider.value = true;
               }}
-            >
-              <Icon name="plus" size={14} />
-              New provider
-            </button>
-          </div>
+            />
+          }
+        >
           {addingProvider.value && (
-            <div class="agents-item agents-item-open">
-              <div class="agents-body agents-body-new">
-                <ProviderForm
-                  onDone={() => {
-                    addingProvider.value = false;
-                  }}
-                />
-              </div>
-            </div>
+            <RowsNew>
+              <ProviderForm
+                onDone={() => {
+                  addingProvider.value = false;
+                }}
+              />
+            </RowsNew>
           )}
           {rows?.length === 0 && !addingProvider.value && (
-            <p class="agents-state">
+            <RowsNote>
               No providers yet. Add one so an agent has a model to run on.
-            </p>
+            </RowsNote>
           )}
           {(rows ?? []).map((p) => (
             <ProviderRow key={p.id} provider={p} />
           ))}
-        </section>
-      </div>
+        </RowsCard>
+      </Rows>
     </Page>
   );
 }

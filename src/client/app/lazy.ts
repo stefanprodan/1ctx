@@ -10,6 +10,7 @@
 import { signal } from "@preact/signals";
 import { type Attributes, type ComponentType, h } from "preact";
 import "./lazy.css";
+import { reason } from "../lib/format.ts";
 
 export type Lazy<P> = ComponentType<P> & { load(): Promise<void> };
 
@@ -26,7 +27,7 @@ export function lazy<P>(loader: () => Promise<ComponentType<P>>): Lazy<P> {
         },
         (err) => {
           pending = null;
-          failure.value = err instanceof Error ? err.message : String(err);
+          failure.value = reason(err);
         },
       );
     }

@@ -101,11 +101,11 @@ function addTeam(chat: ChatApp, id: string) {
 }
 
 describe("the socket", () => {
-  test("open sends hello with protocol 6", async () => {
+  test("open sends hello with protocol 7", async () => {
     const chat = await chatApp();
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
-    expect(conn.frames).toEqual([{ type: "hello", protocol: 6 }]);
+    expect(conn.frames).toEqual([{ type: "hello", protocol: 7 }]);
     close(chat, conn);
   });
 

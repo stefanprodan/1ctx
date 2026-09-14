@@ -11,9 +11,9 @@ import { path, query } from "../../../src/client/app/router.ts";
 import type { Route } from "../../../src/client/app/routes.ts";
 import { me } from "../../../src/client/data/me.ts";
 
-const oana = {
+const caelea = {
   id: "u1",
-  username: "oana",
+  username: "caelea",
   fullName: "Oana",
   role: "member" as const,
   mustChangePassword: false,
@@ -71,7 +71,7 @@ afterEach(async () => {
 describe("startLoading", () => {
   test("runs the matched route's load for a signed-in user", () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/things/a";
     stop = startLoading(routes);
     expect(calls).toEqual(["thing a"]);
@@ -84,18 +84,18 @@ describe("startLoading", () => {
     path.value = "/things/a";
     stop = startLoading(routes);
     expect(calls).toEqual([]);
-    me.value = oana;
+    me.value = caelea;
     expect(calls).toEqual(["thing a"]);
   });
 
   test("the same user row replaced does not reload", () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/things/a";
     stop = startLoading(routes);
-    me.value = { ...oana, fullName: "Oana P" };
+    me.value = { ...caelea, fullName: "Oana P" };
     expect(calls).toEqual(["thing a"]);
-    me.value = { ...oana, id: "u2" };
+    me.value = { ...caelea, id: "u2" };
     expect(calls).toEqual(["thing a", "thing a"]);
   });
 
@@ -115,7 +115,7 @@ describe("startLoading", () => {
       projects++;
       return Response.json({ projects: [] });
     }) as unknown as typeof fetch;
-    me.value = { ...oana, mustChangePassword: true };
+    me.value = { ...caelea, mustChangePassword: true };
     path.value = "/things/a";
     stop = startLoading(routes);
     expect(calls).toEqual([]);
@@ -123,60 +123,63 @@ describe("startLoading", () => {
     path.value = "/profile";
     expect(calls).toEqual(["profile"]);
     // the change opens everything: the rail loads and the route again
-    me.value = oana;
+    me.value = caelea;
     expect(projects).toBe(1);
     expect(calls).toEqual(["profile", "profile"]);
   });
 
   test("the same user promoted to admin loads the admin route", () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/admin/x";
     stop = startLoading(routes);
     expect(calls).toEqual([]);
-    me.value = { ...oana, role: "admin" };
+    me.value = { ...caelea, role: "admin" };
     expect(calls).toEqual(["admin"]);
   });
 
   test("the same path twice loads once", () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/things/a";
     stop = startLoading(routes);
     path.value = "/things/a";
     expect(calls).toEqual(["thing a"]);
   });
 
-  test("a load that throws is reported, not left unhandled", async () => {
-    const { routes } = table();
-    const failing: Route[] = [
-      {
-        ...routes[1],
-        // a synchronous throw, the harder case: no promise to catch on
-        load: () => {
-          throw new Error("boom");
+  test.serial(
+    "a load that throws is reported, not left unhandled",
+    async () => {
+      const { routes } = table();
+      const failing: Route[] = [
+        {
+          ...routes[1],
+          // a synchronous throw, the harder case: no promise to catch on
+          load: () => {
+            throw new Error("boom");
+          },
         },
-      },
-    ];
-    const seen: string[] = [];
-    const real = console.error;
-    console.error = (line: string) => {
-      seen.push(line);
-    };
-    try {
-      me.value = oana;
-      path.value = "/things/a";
-      stop = startLoading(failing);
-      await new Promise((r) => setTimeout(r, 0));
-    } finally {
-      console.error = real;
-    }
-    expect(seen).toEqual(["load for /things/:id failed: Error: boom"]);
-  });
+      ];
+      const seen: string[] = [];
+      const real = console.error;
+      console.error = (line: string) => {
+        seen.push(line);
+      };
+      try {
+        me.value = caelea;
+        path.value = "/things/a";
+        stop = startLoading(failing);
+        await new Promise((r) => setTimeout(r, 0));
+      } finally {
+        console.error = real;
+      }
+      expect(seen).toEqual(["load for /things/:id failed: Error: boom"]);
+    },
+  );
 
   test("a query change reloads with the query", () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/things/a";
     stop = startLoading(routes);
     query.value = "?q=pods";
@@ -185,7 +188,7 @@ describe("startLoading", () => {
 
   test("reload runs the current route's load again, or nothing", async () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/things/a";
     stop = startLoading(routes);
     await reload();
@@ -201,7 +204,7 @@ describe("startLoading", () => {
 
   test("a disposed loader does not take the live one's reload", async () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/things/a";
     const first = startLoading(routes);
     stop = startLoading(routes);
@@ -212,11 +215,11 @@ describe("startLoading", () => {
 
   test("a member on an admin route loads nothing; an admin does", () => {
     const { routes, calls } = table();
-    me.value = oana;
+    me.value = caelea;
     path.value = "/admin/x";
     stop = startLoading(routes);
     expect(calls).toEqual([]);
-    me.value = { ...oana, id: "a1", role: "admin" };
+    me.value = { ...caelea, id: "a1", role: "admin" };
     expect(calls).toEqual(["admin"]);
   });
 });

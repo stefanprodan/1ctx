@@ -38,15 +38,15 @@ describe("PATCH /api/profile", () => {
     const client = app.client();
     await client.login("admin", "hunter2-test");
     const res = await client.call("PATCH", "/api/profile", {
-      body: { fullName: "Oana Pellea", about: "Actor." },
+      body: { fullName: "Oana Mangiurea", about: "Actor." },
     });
     expect(res.status).toBe(200);
     const { user } = await res.json();
-    expect(user.fullName).toBe("Oana Pellea");
+    expect(user.fullName).toBe("Oana Mangiurea");
     expect(user.about).toBe("Actor.");
     expect(app.users.byUsername("admin")?.about).toBe("Actor.");
     const me = await (await client.call("GET", "/api/me")).json();
-    expect(me.user.fullName).toBe("Oana Pellea");
+    expect(me.user.fullName).toBe("Oana Mangiurea");
     expect(me.user.about).toBeUndefined();
     expect(me.user.username).toBe("admin");
   });
@@ -83,34 +83,39 @@ describe("POST /api/profile/password", () => {
     );
   });
 
-  test("replaces it, keeps this login and revokes the others", async () => {
-    const app = await testApp();
-    const here = app.client();
-    const elsewhere = app.client();
-    await here.login("admin", "hunter2-test");
-    await elsewhere.login("admin", "hunter2-test");
-    const events: unknown[] = [];
-    const off = subscribe((e) => events.push(e));
-    const res = await here.call("POST", "/api/profile/password", {
-      body: { current: "hunter2-test", next: "longenough" },
-    });
-    off();
-    expect(res.status).toBe(200);
-    expect((await here.call("GET", "/api/me")).status).toBe(200);
-    expect(await (await elsewhere.call("GET", "/api/me")).json()).toEqual({
-      user: null,
-    });
-    expect((await app.client().login("admin", "hunter2-test")).status).toBe(
-      401,
-    );
-    expect((await app.client().login("admin", "longenough")).status).toBe(200);
-    expect(events).toEqual([
-      {
-        type: "login.revoked",
-        data: { userId: expect.any(String), loginId: null },
-      },
-    ]);
-  });
+  test.serial(
+    "replaces it, keeps this login and revokes the others",
+    async () => {
+      const app = await testApp();
+      const here = app.client();
+      const elsewhere = app.client();
+      await here.login("admin", "hunter2-test");
+      await elsewhere.login("admin", "hunter2-test");
+      const events: unknown[] = [];
+      const off = subscribe((e) => events.push(e));
+      const res = await here.call("POST", "/api/profile/password", {
+        body: { current: "hunter2-test", next: "longenough" },
+      });
+      off();
+      expect(res.status).toBe(200);
+      expect((await here.call("GET", "/api/me")).status).toBe(200);
+      expect(await (await elsewhere.call("GET", "/api/me")).json()).toEqual({
+        user: null,
+      });
+      expect((await app.client().login("admin", "hunter2-test")).status).toBe(
+        401,
+      );
+      expect((await app.client().login("admin", "longenough")).status).toBe(
+        200,
+      );
+      expect(events).toEqual([
+        {
+          type: "login.revoked",
+          data: { userId: expect.any(String), loginId: null },
+        },
+      ]);
+    },
+  );
 
   test("two changes racing with the same current password: one wins", async () => {
     const app = await testApp();
@@ -141,7 +146,7 @@ describe("POST /api/profile/password", () => {
     expect((await app.client().login("admin", other)).status).toBe(401);
   });
 
-  test("publishes nothing when there was no other login", async () => {
+  test.serial("publishes nothing when there was no other login", async () => {
     const app = await testApp();
     const client = app.client();
     await client.login("admin", "hunter2-test");

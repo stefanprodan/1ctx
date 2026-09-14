@@ -11,6 +11,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { reason } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { CLOSED, type MenuAction, menuStep } from "./Menu.model.ts";
 
@@ -52,7 +53,7 @@ export function Menu({
     try {
       await onDelete();
     } catch (err) {
-      step({ failed: err instanceof Error ? err.message : String(err) });
+      step({ failed: reason(err) });
     }
   };
   const { asking, busy, failure } = state.value;
@@ -81,7 +82,7 @@ export function Menu({
               <span class="chat-menu-ask-row">
                 <button
                   type="button"
-                  class="btn chat-menu-small chat-menu-danger"
+                  class="btn btn-small btn-danger"
                   disabled={busy || running}
                   title={running ? "Stop the chat first" : undefined}
                   onClick={() => void remove()}
@@ -90,7 +91,7 @@ export function Menu({
                 </button>
                 <button
                   type="button"
-                  class="btn chat-menu-small"
+                  class="btn btn-small"
                   disabled={busy}
                   onClick={() => step("keep")}
                 >

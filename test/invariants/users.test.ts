@@ -26,7 +26,10 @@ type FakeConn = Conn & {
 
 const userBody = (username: string) => ({
   username,
-  fullName: `${username[0].toUpperCase()}${username.slice(1)}`,
+  fullName:
+    username === "caelea"
+      ? "Oana Mangiurea"
+      : `${username[0].toUpperCase()}${username.slice(1)}`,
   email: `${username}@example.com`,
   role: "member" as const,
   password: "longenough",
@@ -104,15 +107,15 @@ describe("admin users", () => {
     const client = await admin(app);
     const response = await client.call("POST", "/api/users", {
       body: {
-        ...userBody("oana"),
-        email: "OANA@EXAMPLE.COM",
+        ...userBody("caelea"),
+        email: "CAELEA@EXAMPLE.COM",
       },
     });
     expect(response.status).toBe(201);
     const { user } = await response.json();
-    expect(user.email).toBe("oana@example.com");
-    expect(app.users.byId(user.id)?.email).toBe("oana@example.com");
-    expect(app.projects.personal(user.id)?.name).toBe("oana");
+    expect(user.email).toBe("caelea@example.com");
+    expect(app.users.byId(user.id)?.email).toBe("caelea@example.com");
+    expect(app.projects.personal(user.id)?.name).toBe("caelea");
   });
 
   test("create rolls the user back when its personal project fails", async () => {
@@ -135,12 +138,12 @@ describe("admin users", () => {
   test("taken identity fields answer field-specific conflicts", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const first = await create(client, "oana");
+    const first = await create(client, "caelea");
     const second = await create(client, "elena");
 
     await expectConflict(
       await client.call("POST", "/api/users", {
-        body: { ...userBody("oana"), email: "other@example.com" },
+        body: { ...userBody("caelea"), email: "other@example.com" },
       }),
       "username",
     );
@@ -188,11 +191,11 @@ describe("admin users", () => {
   test("rename follows the personal project and keeps every login", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "oana");
+    const user = await create(client, "caelea");
     const first = app.client();
     const second = app.client();
-    await first.login("oana", "longenough");
-    await second.login("oana", "longenough");
+    await first.login("caelea", "longenough");
+    await second.login("caelea", "longenough");
     const before = app.db
       .query<{ n: number }, [string]>(
         "select count(*) as n from logins where user_id = ?",
@@ -218,21 +221,21 @@ describe("admin users", () => {
   test("same identity values are accepted and a full name keeps about", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "oana");
+    const user = await create(client, "caelea");
     app.users.setDetails(user.id, { fullName: "Oana", about: "Actor." });
 
     const response = await client.call("PATCH", `/api/users/${user.id}`, {
       body: {
         username: user.username,
-        fullName: "Oana Pellea",
+        fullName: "Oana Mangiurea",
         email: user.email,
       },
     });
     expect(response.status).toBe(200);
     expect(app.users.byId(user.id)).toMatchObject({
-      username: "oana",
-      fullName: "Oana Pellea",
-      email: "oana@example.com",
+      username: "caelea",
+      fullName: "Oana Mangiurea",
+      email: "caelea@example.com",
       about: "Actor.",
     });
   });
@@ -248,7 +251,7 @@ describe("admin users", () => {
       "role",
     );
 
-    const caller = await create(client, "oana");
+    const caller = await create(client, "caelea");
     const route = userRoute(app, "PATCH", "/api/users/:id");
     const request = new Request(`${ORIGIN}/api/users/${adminUser.id}`, {
       method: "PATCH",
@@ -271,20 +274,22 @@ describe("admin users", () => {
     ).rejects.toThrow("last admin");
   });
 
-  test("role changes publish access and update the socket project set", async () => {
-    const app = await testApp();
-    const client = await admin(app);
-    const user = await create(client, "oana");
-    app.users.setMustChangePassword(user.id, false);
-    const member = app.client();
-    await member.login("oana", "longenough");
-    const owner = app.users.byUsername("admin")!;
-    app.db
-      .query(
-        "insert into projects (id, kind, name, owner_id, created_at) values ('team', 'team', 'team', ?, 0)",
-      )
-      .run(owner.id);
-    app.db.exec(`
+  test.serial(
+    "role changes publish access and update the socket project set",
+    async () => {
+      const app = await testApp();
+      const client = await admin(app);
+      const user = await create(client, "caelea");
+      app.users.setMustChangePassword(user.id, false);
+      const member = app.client();
+      await member.login("caelea", "longenough");
+      const owner = app.users.byUsername("admin")!;
+      app.db
+        .query(
+          "insert into projects (id, kind, name, owner_id, created_at) values ('team', 'team', 'team', ?, 0)",
+        )
+        .run(owner.id);
+      app.db.exec(`
       insert into providers
         (id, name, wire, base_url, key_name, created_at)
       values
@@ -296,65 +301,66 @@ describe("admin users", () => {
         ('agent', 'agent', 'bot', 'provider', 'model', 'Model', null,
          null, null, 0, 0, '', 0);
     `);
-    const chat = app.sessions.create({
-      projectId: "team",
-      ownerId: user.id,
-      agentId: "agent",
-      title: "Chat",
-      now: 0,
-    });
-    const conn = await connection(app, member);
-    app.socket.open(conn);
-    expect(conn.data.projects.has("team")).toBe(false);
-    const seen: BusEvent[] = [];
-    const stop = subscribe((event) => seen.push(event));
-    try {
-      const promoted = await client.call("PATCH", `/api/users/${user.id}`, {
-        body: { role: "admin" },
-      });
-      expect(promoted.status).toBe(200);
-      expect(conn.data.projects.has("team")).toBe(true);
-      expect(conn.data.principal.role).toBe("admin");
-      conn.frames = [];
-      app.socket.message(
-        conn,
-        JSON.stringify({ type: "watch", sessionId: chat.id }),
-      );
-      expect(conn.frames).toContainEqual({
-        type: "watched",
-        sessionId: chat.id,
-        live: null,
-      });
-      expect(seen).toContainEqual({
-        type: "access.changed",
-        data: { userIds: [user.id] },
-      });
-
-      conn.frames = [];
-      const demoted = await client.call("PATCH", `/api/users/${user.id}`, {
-        body: { role: "member" },
-      });
-      expect(demoted.status).toBe(200);
-      expect(conn.data.projects.has("team")).toBe(false);
-      expect(conn.data.principal.role).toBe("member");
-      expect(conn.frames).toContainEqual({
-        type: "revoked",
+      const chat = app.sessions.create({
         projectId: "team",
+        ownerId: user.id,
+        agentId: "agent",
+        title: "Chat",
+        now: 0,
       });
-    } finally {
-      stop();
-      app.socket.close(conn);
-    }
-  });
+      const conn = await connection(app, member);
+      app.socket.open(conn);
+      expect(conn.data.projects.has("team")).toBe(false);
+      const seen: BusEvent[] = [];
+      const stop = subscribe((event) => seen.push(event));
+      try {
+        const promoted = await client.call("PATCH", `/api/users/${user.id}`, {
+          body: { role: "admin" },
+        });
+        expect(promoted.status).toBe(200);
+        expect(conn.data.projects.has("team")).toBe(true);
+        expect(conn.data.principal.role).toBe("admin");
+        conn.frames = [];
+        app.socket.message(
+          conn,
+          JSON.stringify({ type: "watch", sessionId: chat.id }),
+        );
+        expect(conn.frames).toContainEqual({
+          type: "watched",
+          sessionId: chat.id,
+          live: null,
+        });
+        expect(seen).toContainEqual({
+          type: "access.changed",
+          data: { userIds: [user.id] },
+        });
+
+        conn.frames = [];
+        const demoted = await client.call("PATCH", `/api/users/${user.id}`, {
+          body: { role: "member" },
+        });
+        expect(demoted.status).toBe(200);
+        expect(conn.data.projects.has("team")).toBe(false);
+        expect(conn.data.principal.role).toBe("member");
+        expect(conn.frames).toContainEqual({
+          type: "revoked",
+          projectId: "team",
+        });
+      } finally {
+        stop();
+        app.socket.close(conn);
+      }
+    },
+  );
 
   test("reset revokes every login and closes the user's socket", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "oana");
+    const user = await create(client, "caelea");
     const first = app.client();
     const second = app.client();
-    await first.login("oana", "longenough");
-    await second.login("oana", "longenough");
+    await first.login("caelea", "longenough");
+    await second.login("caelea", "longenough");
     const conn = await connection(app, first);
     app.socket.open(conn);
 
@@ -374,7 +380,9 @@ describe("admin users", () => {
     expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
     expect((await first.call("GET", "/api/profile")).status).toBe(401);
     expect((await second.call("GET", "/api/profile")).status).toBe(401);
-    expect((await app.client().login("oana", "new-password")).status).toBe(200);
+    expect((await app.client().login("caelea", "new-password")).status).toBe(
+      200,
+    );
   });
 
   test("an admin resets their own password only from the profile", async () => {
@@ -393,14 +401,14 @@ describe("admin users", () => {
     const app = await testApp();
     const client = await admin(app);
     const created = await client.call("POST", "/api/users", {
-      body: userBody("oana"),
+      body: userBody("caelea"),
     });
     const user = (await created.clone().json()).user;
     const responses = [
       created,
       await client.call("GET", "/api/users"),
       await client.call("PATCH", `/api/users/${user.id}`, {
-        body: { fullName: "Oana Pellea" },
+        body: { fullName: "Oana Mangiurea" },
       }),
       await client.call("GET", "/api/profile"),
     ];
@@ -439,14 +447,14 @@ describe("user email projections", () => {
     db.query(
       `insert into users
         (id, username, full_name, role, password_hash, created_at)
-       values ('u', 'oana', 'Oana', 'member', 'x', 0)`,
+       values ('u', 'caelea', 'Oana', 'member', 'x', 0)`,
     ).run();
     db.query(
-      "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'oana', 'u', 0)",
+      "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'caelea', 'u', 0)",
     ).run();
     expect(migrate(db, MIGRATIONS.slice(0, 7))).toEqual(["0007-users-email"]);
     expect(db.query("select email from users where id = 'u'").get()).toEqual({
-      email: "oana@1ctx.dev",
+      email: "caelea@1ctx.dev",
     });
     expect(
       db.query("select owner_id from projects where id = 'p'").get(),
@@ -463,7 +471,7 @@ describe("user email projections", () => {
         .query(
           `insert into users
             (id, username, full_name, email, role, password_hash, created_at)
-           values ('v', 'maria', 'Maria', 'oana@1ctx.dev', 'member', 'x', 0)`,
+           values ('v', 'maria', 'Maria', 'caelea@1ctx.dev', 'member', 'x', 0)`,
         )
         .run(),
     ).toThrow();
@@ -482,18 +490,18 @@ describe("user email projections", () => {
   test("a project member summary carries no email", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "oana");
+    const user = await create(client, "caelea");
     app.users.setMustChangePassword(user.id, false);
     const member = app.client();
-    await member.login("oana", "longenough");
+    await member.login("caelea", "longenough");
     const project = app.projects.personal(user.id)!;
     const response = await member.call("GET", `/api/projects/${project.id}`);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.project.members[0]).toEqual({
       id: user.id,
-      username: "oana",
-      fullName: "Oana",
+      username: "caelea",
+      fullName: "Oana Mangiurea",
       role: "member",
     });
     expect(body.project.members[0]).not.toHaveProperty("email");
@@ -504,11 +512,11 @@ describe("disabled accounts", () => {
   test("disabling revokes open access and enabling restores sign-in", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "oana");
+    const user = await create(client, "caelea");
     const first = app.client();
     const second = app.client();
-    expect((await first.login("oana", "longenough")).status).toBe(200);
-    expect((await second.login("oana", "longenough")).status).toBe(200);
+    expect((await first.login("caelea", "longenough")).status).toBe(200);
+    expect((await second.login("caelea", "longenough")).status).toBe(200);
     const conn = await connection(app, first);
     app.socket.open(conn);
 
@@ -527,7 +535,7 @@ describe("disabled accounts", () => {
     ).toEqual({ n: 0 });
     expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
     expect((await first.call("GET", "/api/profile")).status).toBe(401);
-    const refused = await app.client().login("oana", "longenough");
+    const refused = await app.client().login("caelea", "longenough");
     expect(refused.status).toBe(401);
     expect(await refused.json()).toEqual({
       error: "wrong username or password",
@@ -543,7 +551,7 @@ describe("disabled accounts", () => {
     });
     expect(enabled.status).toBe(200);
     expect((await enabled.json()).user.disabled).toBe(false);
-    expect((await app.client().login("oana", "longenough")).status).toBe(200);
+    expect((await app.client().login("caelea", "longenough")).status).toBe(200);
   });
 
   test("the caller and last enabled admin guards preserve an administrator", async () => {
@@ -588,7 +596,7 @@ describe("disabled accounts", () => {
       "last admin",
     );
 
-    const second = await create(client, "oana");
+    const second = await create(client, "caelea");
     expect(
       (
         await client.call("PATCH", `/api/users/${second.id}`, {
@@ -609,11 +617,11 @@ describe("required password changes", () => {
   test("admin-set passwords restrict the account until profile change", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "oana");
+    const user = await create(client, "caelea");
     expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
 
     const member = app.client();
-    const login = await member.login("oana", "longenough");
+    const login = await member.login("caelea", "longenough");
     expect(login.status).toBe(200);
     expect((await login.json()).user.mustChangePassword).toBe(true);
     const forbidden = await member.call("GET", "/api/projects");
@@ -626,7 +634,7 @@ describe("required password changes", () => {
     expect((await profile.json()).user.mustChangePassword).toBe(true);
     expect((await member.call("POST", "/api/logout")).status).toBe(200);
 
-    expect((await member.login("oana", "longenough")).status).toBe(200);
+    expect((await member.login("caelea", "longenough")).status).toBe(200);
     const changed = await member.call("POST", "/api/profile/password", {
       body: { current: "longenough", next: "changed-password" },
     });
@@ -641,7 +649,7 @@ describe("required password changes", () => {
     });
     expect(reset.status).toBe(204);
     expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
-    const afterReset = await app.client().login("oana", "reset-password");
+    const afterReset = await app.client().login("caelea", "reset-password");
     expect(afterReset.status).toBe(200);
     expect((await afterReset.json()).user.mustChangePassword).toBe(true);
   });
@@ -662,9 +670,9 @@ describe("user state migration", () => {
     db.query(
       `insert into users
         (id, username, full_name, email, role, password_hash, created_at)
-       values ('u', 'oana', 'Oana', 'oana@example.com', 'member', 'x', 0)`,
+       values ('u', 'caelea', 'Oana', 'caelea@example.com', 'member', 'x', 0)`,
     ).run();
-    expect(migrate(db, MIGRATIONS.slice(7))).toEqual(["0008-users-state"]);
+    expect(migrate(db, MIGRATIONS.slice(7, 8))).toEqual(["0008-users-state"]);
     expect(
       db
         .query(

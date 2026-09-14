@@ -33,8 +33,8 @@ import { refuses } from "../helpers/refuses.ts";
 
 describe("parseLogin", () => {
   test("accepts a username and a password", () => {
-    expect(parseLogin({ username: "oana", password: "pw" })).toEqual({
-      username: "oana",
+    expect(parseLogin({ username: "caelea", password: "pw" })).toEqual({
+      username: "caelea",
       password: "pw",
     });
   });
@@ -45,27 +45,27 @@ describe("parseLogin", () => {
       "string",
       [],
       {},
-      { username: "oana" },
+      { username: "caelea" },
       { password: "pw" },
       { username: "", password: "pw" },
-      { username: "oana", password: "" },
+      { username: "caelea", password: "" },
       { username: 1, password: "pw" },
-      { username: "oana", password: { $ne: "" } },
-      { username: "oana", password: "pw", role: "admin" },
+      { username: "caelea", password: { $ne: "" } },
+      { username: "caelea", password: "pw", role: "admin" },
       { username: "a".repeat(33), password: "pw" },
-      { username: "oana", password: "p".repeat(1025) },
+      { username: "caelea", password: "p".repeat(1025) },
     ],
     parseLogin,
   );
 });
 
 describe("parseUsername", () => {
-  test.each(["oana", "oana.p", "a-1_2", "123"])("accepts %s", (v) => {
+  test.each(["caelea", "caelea.p", "a-1_2", "123"])("accepts %s", (v) => {
     expect(parseUsername(v)).toBe(v);
   });
 
   refuses(
-    ["", "ab", "Oana", "oa na", ".oana", "oana@x", "a".repeat(33), 1],
+    ["", "ab", "Oana", "oa na", ".caelea", "caelea@x", "a".repeat(33), 1],
     parseUsername,
   );
 });
@@ -76,7 +76,7 @@ describe("parseEmail", () => {
   });
 
   test("lowercases an accepted address", () => {
-    expect(parseEmail("Oana@Example.COM")).toBe("oana@example.com");
+    expect(parseEmail("Caelea@Example.COM")).toBe("caelea@example.com");
   });
 
   test.each([
@@ -98,8 +98,8 @@ describe("parseEmail", () => {
 describe("parseProfile", () => {
   test("accepts a full name and an about text", () => {
     expect(
-      parseProfile({ fullName: "Oana Pellea", about: "Actor.\nBucharest." }),
-    ).toEqual({ fullName: "Oana Pellea", about: "Actor.\nBucharest." });
+      parseProfile({ fullName: "Oana Mangiurea", about: "Actor.\nBucharest." }),
+    ).toEqual({ fullName: "Oana Mangiurea", about: "Actor.\nBucharest." });
   });
 
   refuses(
@@ -111,7 +111,7 @@ describe("parseProfile", () => {
       { fullName: "Oana\nP", about: "" },
       { fullName: "Oana\u2028P", about: "" },
       { fullName: "a".repeat(65), about: "" },
-      { fullName: "Oana", about: "", username: "oana" },
+      { fullName: "Oana", about: "", username: "caelea" },
       { fullName: 1, about: "" },
       { fullName: "Oana", about: 1 },
       { fullName: "Oana", about: "a".repeat(2001) },
@@ -144,9 +144,9 @@ describe("parsePasswordChange", () => {
 
 describe("parseNewUser", () => {
   const body = {
-    username: "oana",
-    fullName: "Oana Pellea",
-    email: "OANA@EXAMPLE.COM",
+    username: "caelea",
+    fullName: "Oana Mangiurea",
+    email: "CAELEA@EXAMPLE.COM",
     role: "member" as const,
     password: "longenough",
   };
@@ -154,7 +154,7 @@ describe("parseNewUser", () => {
   test("accepts every required field and lowercases the email", () => {
     expect(parseNewUser(body)).toEqual({
       ...body,
-      email: "oana@example.com",
+      email: "caelea@example.com",
     });
   });
 

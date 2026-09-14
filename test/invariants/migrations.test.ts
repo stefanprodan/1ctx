@@ -486,3 +486,29 @@ describe("0006-compaction", () => {
     db.close();
   });
 });
+
+describe("0009-project-description", () => {
+  test("keeps every project and gives each an empty description", () => {
+    const db = new Database(":memory:");
+    migrate(db, MIGRATIONS.slice(0, 8));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+        values ('u', 'caelea', 'Oana Mangiurea', 'caelea@example.com',
+                'member', 'x', 0);
+      insert into projects (id, kind, name, owner_id, created_at)
+        values ('p1', 'personal', 'caelea', 'u', 0),
+               ('p2', 'team', 'ops', 'u', 0);
+    `);
+    expect(migrate(db, MIGRATIONS.slice(0, 9))).toEqual([
+      "0009-project-description",
+    ]);
+    expect(
+      db.query("select id, name, description from projects order by id").all(),
+    ).toEqual([
+      { id: "p1", name: "caelea", description: "" },
+      { id: "p2", name: "ops", description: "" },
+    ]);
+    db.close();
+  });
+});

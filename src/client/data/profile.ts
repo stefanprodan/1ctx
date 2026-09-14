@@ -14,6 +14,7 @@ import type {
   UpdateProfileRequest,
 } from "../../shared/api/profile.ts";
 import type { Profile } from "../../shared/contracts/user.ts";
+import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me, setMe } from "./me.ts";
 
@@ -49,7 +50,7 @@ export async function loadProfile(): Promise<void> {
     if (turn === mine) settle(user);
   } catch (err) {
     if (turn === mine) {
-      profileError.value = err instanceof Error ? err.message : String(err);
+      profileError.value = reason(err);
     }
   }
 }

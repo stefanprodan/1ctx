@@ -11,6 +11,7 @@
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
@@ -118,6 +119,17 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/projects/:id/settings",
+    view: lazy(() =>
+      import("../views/projects/Settings.tsx").then((m) => m.Settings),
+    ),
+    title: () => "Settings",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([loadProject(params.id), loadProjectAgents(params.id)]);
+    },
+  },
+  {
     path: "/chat/:id",
     view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Chat)),
     title: () => "Chat",
@@ -132,6 +144,24 @@ export const ROUTES: Route[] = [
       if (project.value?.id !== projectId) await loadProject(projectId);
       await loadProjectAgents(projectId);
     },
+  },
+  {
+    path: "/admin/projects",
+    view: lazy(() =>
+      import("../views/admin/AdminProjects.tsx").then((m) => m.AdminProjects),
+    ),
+    title: () => "Projects",
+    role: "admin",
+    // ?open=<id> is the project page's Manage: its row opens loaded
+    load: async (_params, query) => {
+      const open = query.get("open");
+      await Promise.all([
+        loadAdminProjects(),
+        loadUsers(),
+        open === null ? undefined : loadAdminProject(open),
+      ]);
+    },
+    nav: { label: "Projects", icon: "projects", order: 8, group: "Admin" },
   },
   {
     path: "/admin/users",

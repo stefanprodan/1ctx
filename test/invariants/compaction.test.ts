@@ -107,7 +107,7 @@ describe("compaction", () => {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue`,
       },
-      { role: "user", content: "the new question", name: "oana" },
+      { role: "user", content: "the new question", name: "caelea" },
     ]);
     expect(JSON.stringify(messages)).not.toContain("the old question");
     expect(JSON.stringify(messages)).not.toContain("the answer");
@@ -318,7 +318,7 @@ describe("compaction", () => {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- First`,
       },
-      { role: "user", content: "next", name: "oana" },
+      { role: "user", content: "next", name: "caelea" },
       { role: "assistant", content: "next answer" },
     ]);
     finish(second.script, "## Goal\n\n- Second");

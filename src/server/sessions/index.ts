@@ -115,6 +115,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       store,
       access: deps.access,
       live: deps.live,
+      usage: deps.usage,
       visible,
     }),
   };

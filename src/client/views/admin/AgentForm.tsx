@@ -36,9 +36,7 @@ import {
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import "./agents.css";
-
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
+import { reason } from "../../lib/format.ts";
 
 // one catalog line: the name over the id, the rest faint at the right
 function Line({ model }: { model: CatalogMatch }) {
@@ -270,7 +268,7 @@ export function AgentForm({
               <span class="agents-model-meta">{modelMeta(picked)}</span>
               <button
                 type="button"
-                class="btn agents-small"
+                class="btn btn-small"
                 disabled={busy}
                 onClick={() => {
                   model.value = null;
@@ -394,7 +392,7 @@ export function AgentForm({
               <span class="agents-ask">Delete {agent.name}?</span>
               <button
                 type="button"
-                class="btn agents-danger"
+                class="btn btn-danger"
                 onClick={() => void remove()}
               >
                 Delete

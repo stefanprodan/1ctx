@@ -46,7 +46,7 @@ import { LIMIT_NAMES } from "../../../src/shared/words.ts";
 const admin: Me = {
   id: "u1",
   username: "admin",
-  fullName: "Administrator",
+  fullName: "Stefan Prodan",
   role: "admin",
   mustChangePassword: false,
 };
@@ -289,7 +289,7 @@ describe("the page", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual(["Users", "Agents", "Tools"]);
+    expect(labels).toEqual(["Projects", "Users", "Agents", "Tools"]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });
 
@@ -303,7 +303,7 @@ describe("the page", () => {
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain("exa.key present");
     expect(html).toContain("firecrawl.key keyless");
-    expect(html).not.toContain("tools-meta-bad");
+    expect(html).not.toContain("rows-meta-bad");
     expect(html).toContain("websearch runs on exa.");
     expect(html).toContain("Per send");
     expect(html).toContain("Per call");

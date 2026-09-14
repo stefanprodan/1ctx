@@ -13,6 +13,7 @@ import type {
   MeResponse,
 } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
+import { reason } from "../lib/format.ts";
 import { api, onUnauthorized } from "./api.ts";
 
 export const me = signal<Me | null | undefined>(undefined);
@@ -44,7 +45,7 @@ export async function loadMe(): Promise<void> {
     if (turn === mine) me.value = user;
   } catch (err) {
     if (turn === mine) {
-      meError.value = err instanceof Error ? err.message : String(err);
+      meError.value = reason(err);
     }
   }
 }

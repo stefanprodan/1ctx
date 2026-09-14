@@ -1,0 +1,50 @@
+/* A settings section: the head at the left, the form at the right, a
+   rule above; one column below 720. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .section {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: var(--space-5);
+    padding: var(--space-5) 0;
+    border-top: 1px solid var(--line);
+  }
+  /* first on its page, under a rule the page already draws: the tabs' */
+  .section:first-child {
+    padding-top: var(--space-2);
+    border-top: 0;
+  }
+
+  .section-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .section-title {
+    margin: 0;
+    font-size: var(--text-ui);
+    font-weight: 600;
+  }
+
+  .section-text {
+    margin: 0;
+    color: var(--faint);
+  }
+
+  .section-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  @media (max-width: 719px) {
+    .section {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+    }
+  }
+}

@@ -25,6 +25,7 @@ import {
 import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import "./composer.css";
+import { reason } from "../lib/format.ts";
 
 export const MAX_HEIGHT = 160;
 
@@ -41,6 +42,7 @@ export function Composer({
   onStop,
   onCompact,
   onRename,
+  placeholder: idle = "Send a message",
 }: {
   scope: Scope;
   agents: AgentSummary[] | null;
@@ -60,6 +62,8 @@ export function Composer({
   onCompact?: () => Promise<void>;
   // /rename <title>; a chat not started yet has no row to name
   onRename?: (title: string) => Promise<void>;
+  // the box at rest, with an agent to send to
+  placeholder?: string;
 }) {
   const key = draftKey(scope);
   const text = useSignal(readDraft(key));
@@ -112,7 +116,7 @@ export function Composer({
         writeDraft(key, "");
       }
     } catch (err) {
-      failure.value = err instanceof Error ? err.message : String(err);
+      failure.value = reason(err);
     }
   };
   const context = readout(usage);
@@ -124,7 +128,7 @@ export function Composer({
       ? "No agent yet: an admin adds one first"
       : running
         ? "Replying"
-        : "Send a message";
+        : idle;
   return (
     <div class={`composer${tall ? " composer-tall" : ""}`}>
       <textarea
@@ -219,8 +223,7 @@ export function Composer({
           onClick={() => {
             if (running) {
               onStop().catch((err) => {
-                failure.value =
-                  err instanceof Error ? err.message : String(err);
+                failure.value = reason(err);
               });
             } else void submit();
           }}

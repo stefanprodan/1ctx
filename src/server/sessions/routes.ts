@@ -4,9 +4,8 @@
 // The stream, one session, its rename and its deletion. The routes that
 // start or stop a send live in the runner, which sits below this area.
 // What may be seen is access's call: a session in a project the caller
-// may not see is the same 404 as one that is not there. A rename and a
-// delete are the owner's, neither while the chat runs, and a delete
-// only in a personal project until a team project's rule is decided.
+// may not see is the same 404 as one that is not there. A team chat's
+// rename and delete belong to its owner or an admin, neither while it runs.
 
 import type {
   SessionResponse,
@@ -24,7 +23,7 @@ import {
   parseRenameSession,
   parseStreamQuery,
 } from "./parse.ts";
-import { cutResult, offWire, type SessionRow } from "./rows.ts";
+import { cutResult, offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
 
 export type AccessPort = {
@@ -45,6 +44,7 @@ export type RoutesDeps = {
   store: SessionStore;
   access: AccessPort;
   live: LivePort;
+  usage: UsagePort;
   // the session when the principal may see it, else the one 404
   visible(principal: Principal, id: string): SessionRow;
 };
@@ -117,8 +117,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
-        if (session.ownerId !== principal.userId) {
-          throw new Forbidden("only the owner renames a chat");
+        if (
+          session.ownerId !== principal.userId &&
+          principal.role !== "admin"
+        ) {
+          throw new Forbidden("only the owner or an admin renames a chat");
         }
         const { title } = parseRenameSession(
           await jsonBody(req, MAX_RENAME_BODY),
@@ -128,7 +131,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const current = deps.store.byId(session.id);
           if (current === null) throw new NotFound("no such chat");
           if (current.status === "running") {
-            throw new Conflict("the chat is running; stop it first");
+            throw new Conflict("the chat is running, stop it first");
           }
           const row = deps.store.rename(session.id, title)!;
           return {
@@ -156,12 +159,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
-        if (session.ownerId !== principal.userId) {
-          throw new Forbidden("only the owner deletes a chat");
-        }
-        const project = deps.access.project(principal, session.projectId);
-        if (project.kind !== "personal") {
-          throw new Forbidden("a team chat cannot be deleted yet");
+        if (
+          session.ownerId !== principal.userId &&
+          principal.role !== "admin"
+        ) {
+          throw new Forbidden("only the owner or an admin deletes a chat");
         }
         transact(deps.db, () => {
           // the row is the truth after repair, and the runner keeps it
@@ -169,8 +171,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const current = deps.store.byId(session.id);
           if (current === null) return { result: undefined };
           if (current.status === "running") {
-            throw new Conflict("the chat is running; stop it first");
+            throw new Conflict("the chat is running, stop it first");
           }
+          deps.usage.deleteSession(session.id);
           deps.store.delete(session.id);
           return {
             result: undefined,

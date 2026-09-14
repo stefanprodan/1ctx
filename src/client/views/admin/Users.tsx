@@ -11,8 +11,17 @@ import type { UserAccount } from "../../../shared/contracts/user.ts";
 import { me } from "../../data/me.ts";
 import { users, usersError } from "../../data/users.ts";
 import { initials } from "../../lib/format.ts";
-import { Icon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
+import {
+  Rows,
+  RowsAdd,
+  RowsAvatar,
+  RowsCard,
+  RowsMeta,
+  RowsNew,
+  RowsOpen,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { UserForm } from "./UserForm.tsx";
 import { adminCount, metaLine, stateLine } from "./Users.model.ts";
 import "./users.css";
@@ -30,42 +39,28 @@ function UserRow({
 }) {
   const self = me.value?.id === user.id;
   return (
-    <div
-      class={`users-item${open ? " users-item-open" : ""}${
-        user.disabled ? " users-item-off" : ""
-      }`}
+    <RowsOpen
+      open={open}
+      onToggle={onToggle}
+      off={user.disabled}
+      head={
+        <>
+          <RowsAvatar lit={open}>{initials(user.fullName)}</RowsAvatar>
+          <RowsTitle
+            name={
+              <>
+                {user.fullName}
+                {self && <span class="users-you">you</span>}
+              </>
+            }
+            sub={metaLine(user)}
+          />
+          <RowsMeta bad={user.disabled}>{stateLine(user)}</RowsMeta>
+        </>
+      }
     >
-      <button
-        type="button"
-        class="users-row"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <Icon
-          name="chevron"
-          size={14}
-          class={`users-chevron${open ? " users-chevron-open" : ""}`}
-        />
-        <span class={`users-avatar${open ? " users-avatar-lit" : ""}`}>
-          {initials(user.fullName)}
-        </span>
-        <span class="users-title">
-          <span class="users-name">
-            {user.fullName}
-            {self && <span class="users-you">you</span>}
-          </span>
-          <span class="users-handle">{metaLine(user)}</span>
-        </span>
-        <span class={`users-meta${user.disabled ? " users-off" : ""}`}>
-          {stateLine(user)}
-        </span>
-      </button>
-      {open && (
-        <div class="users-body">
-          <UserForm user={user} admins={admins} onDone={onToggle} />
-        </div>
-      )}
-    </div>
+      <UserForm user={user} admins={admins} onDone={onToggle} />
+    </RowsOpen>
   );
 }
 
@@ -82,35 +77,30 @@ export function Users() {
       loading={list === null && error === null}
       error={error}
     >
-      <div class="users">
-        <section class="users-card">
-          <div class="users-card-head">
-            <span class="label">Users</span>
-            <button
-              type="button"
-              class="btn users-small users-card-act"
+      <Rows>
+        <RowsCard
+          label="Users"
+          action={
+            <RowsAdd
+              label="New user"
               disabled={adding.value}
               onClick={() => {
                 adding.value = true;
                 open.value = null;
               }}
-            >
-              <Icon name="plus" size={14} />
-              New user
-            </button>
-          </div>
+            />
+          }
+        >
           {adding.value && (
-            <div class="users-item users-item-open">
-              <div class="users-body users-body-new">
-                <UserForm
-                  user={null}
-                  admins={admins}
-                  onDone={() => {
-                    adding.value = false;
-                  }}
-                />
-              </div>
-            </div>
+            <RowsNew>
+              <UserForm
+                user={null}
+                admins={admins}
+                onDone={() => {
+                  adding.value = false;
+                }}
+              />
+            </RowsNew>
           )}
           {(list ?? []).map((u) => (
             <UserRow
@@ -124,8 +114,8 @@ export function Users() {
               }}
             />
           ))}
-        </section>
-      </div>
+        </RowsCard>
+      </Rows>
     </Page>
   );
 }

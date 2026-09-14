@@ -9,7 +9,6 @@
 // next edit; lib/save.ts holds that.
 
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
   changePassword,
@@ -21,33 +20,13 @@ import { initials, longDate } from "../../lib/format.ts";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { Section, SectionForm } from "../../ui/Section.tsx";
 import {
   aboutProblem,
   fullNameProblem,
   passwordProblem,
 } from "./Profile.model.ts";
 import "./profile.css";
-
-// a heading and a line on the left, the form on the right
-function Section({
-  title,
-  text,
-  children,
-}: {
-  title: string;
-  text: string;
-  children: ComponentChildren;
-}) {
-  return (
-    <section class="profile-section">
-      <div class="profile-section-head">
-        <h2 class="profile-section-title">{title}</h2>
-        <p class="profile-section-text">{text}</p>
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function DetailsForm({ user }: { user: ProfileRow }) {
   const fullName = useSignal(user.fullName);
@@ -60,7 +39,7 @@ function DetailsForm({ user }: { user: ProfileRow }) {
     void save.run(fullNameProblem(fullName.value) ?? aboutProblem(about.value));
   };
   return (
-    <form class="profile-form" onSubmit={submit}>
+    <SectionForm onSubmit={submit}>
       <label class="field">
         <span class="label">Full name</span>
         <input
@@ -93,7 +72,7 @@ function DetailsForm({ user }: { user: ProfileRow }) {
         }
         label="Save"
       />
-    </form>
+    </SectionForm>
   );
 }
 
@@ -116,7 +95,7 @@ function PasswordForm() {
     void save.run(passwordProblem(current.value, next.value, again.value));
   };
   return (
-    <form class="profile-form" onSubmit={submit}>
+    <SectionForm onSubmit={submit}>
       <label class="field">
         <span class="label">Current password</span>
         <input
@@ -154,7 +133,7 @@ function PasswordForm() {
         dirty={current.value !== "" && next.value !== "" && again.value !== ""}
         label="Change password"
       />
-    </form>
+    </SectionForm>
   );
 }
 

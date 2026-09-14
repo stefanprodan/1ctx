@@ -21,7 +21,7 @@ make preview-stop   # stop it
 make preview-log    # tail its log
 make preview-clean  # stop it and wipe its db, secrets, log and pid
 make lint           # biome check --write, then tsc; run after any code change
-make test           # bun test; run after any code change, before finishing
+make test           # bun test, concurrent; run after any code change, before finishing
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 ```
@@ -162,10 +162,18 @@ violation, and every rule has a rejected fixture under
   project, named after the username, in one transaction through
   `createUser()` in `users/`; nothing else creates a user, tests
   included. A personal project is its owner's alone, an admin
-  included; a team project is open to its members and to admins. A
-  handler gets a project through `access.project(principal, id)`,
-  which answers the same 404 whether the project is missing or not
-  theirs to see. The rule is `projects/visible.ts`, pure.
+  included; its owner names and describes it through `PATCH
+  /api/profile/project`, and a username rename renames it only while
+  it still has the old username. Admins make, rename, describe, fill
+  and delete team projects; names are unique across personal and team
+  projects. A project's description is one trimmed line
+  (`isDescription`) that goes into the system prompt after the agent's
+  prompt, only when set. A team project is open to its members and to
+  admins. Deleting one takes its chats and their
+  usage and is refused while a chat runs. A handler gets a project
+  through `access.project(principal, id)`, which answers the same 404
+  whether the project is missing or not theirs to see. The rule is
+  `projects/visible.ts`, pure.
 - **Secrets are files.** One bare value per `<name>.key` in the secrets
   directory, read by the holder, never logged, never returned by a
   route, never a database row.
@@ -226,9 +234,10 @@ violation, and every rule has a rejected fixture under
   them in `removedMessageIds`; 409 while the session runs, 400 when
   the last message is the user's.
   Rename (`PATCH /api/sessions/:id`, the composer's `/rename <title>`)
-  and delete are the owner's, 409 while the session runs; a rename is
-  one revision and one envelope without rows, and a delete is refused
-  in a team project until its rule is decided.
+  and delete are the session owner's or, in a team project, an admin's;
+  a member who did not start the chat gets 403. Neither may change a
+  running chat; a rename is one revision and one envelope without rows,
+  and a delete removes its usage rows.
 - **Compaction is a final provider round.** A summary is a message of
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through
@@ -270,8 +279,8 @@ violation, and every rule has a rejected fixture under
   goes to the connections watching its session, straight from the
   writer through a port. `watch` is authorized through a port to
   sessions and answered with `watched` and the runner's live snapshot.
-  `access.changed` recomputes a connection's set and sends `revoked`
-  for a project that left it; `login.revoked` closes the login's
+  `access.changed` recomputes a connection's set and sends `granted`
+  for a project that joined it or `revoked` for one that left it; `login.revoked` closes the login's
   connections, and the expiry sweep publishes it too. Backpressure
   closes a slow connection; a dropped frame closes with 1013; the
   client reloads on every open. The upgrade is `GET /api/socket` with
@@ -327,6 +336,19 @@ violation, and every rule has a rejected fixture under
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
   ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
+- **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
+  column: `RowsOpen` for a row that opens in place, `RowsLine` for one
+  that does not, `RowsAvatar`, `RowsTitle` (mono for an identifier) and
+  `RowsMeta` for its head, `RowsAdd` or `RowsLink` in a card's head.
+  A team project's Members tab is the same rows, linking an admin to
+  `/admin/projects?open=<id>` and `/admin/agents`; a personal project
+  has Settings in its place and the agents in its aside, as on Home.
+  A settings page (the profile, a project's Settings) stacks
+  `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
+  the right. The page's stylesheet holds only what it
+  puts inside a row. Small and danger buttons are `.btn-small` and
+  `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
+  failure's words come from `reason()` in `lib/format.ts`.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the
@@ -338,6 +360,9 @@ violation, and every rule has a rejected fixture under
   row and there is no top bar.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
+- **Tests in a file run concurrently.** A test that sets module state
+  (a signal, `globalThis.fetch`) or counts events from the bus is
+  `test.serial`.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
 - UI copy is short and plain. No em-dashes anywhere. `perl -i -pe` for

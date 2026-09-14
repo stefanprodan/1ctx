@@ -49,6 +49,12 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
+    method: "PATCH",
+    path: "/api/profile/project",
+    body: { description: "" },
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
     method: "POST",
     path: "/api/profile/password",
     // authenticated: the handler then checks the current password,
@@ -90,6 +96,34 @@ export const AUTH_CASES: AuthCase[] = [
     method: "GET",
     path: "/api/projects",
     expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects",
+    body: { name: "matrix-team" },
+    expect: { anonymous: 401, member: 403, admin: 201 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/projects/:id",
+    body: { name: "matrix-team" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/members",
+    body: { userId: "none" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/members/:userId",
+    expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
     // the literal ":id" names no project, and a project the caller may

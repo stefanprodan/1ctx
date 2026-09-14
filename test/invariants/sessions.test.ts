@@ -239,7 +239,7 @@ describe("GET /api/sessions", () => {
     });
     expect(rows.get(failed.id)).toMatchObject({
       send: { id: failedSend.id },
-      last: { seq: failedUser.seq, author: "oana", text: "User line" },
+      last: { seq: failedUser.seq, author: "caelea", text: "User line" },
     });
     chat.app.socket.dispose();
   });
@@ -281,77 +281,80 @@ describe("GET /api/sessions/:id", () => {
     chat.app.socket.dispose();
   });
 
-  test("keeps tool results in storage and strips every wire row", async () => {
-    const result = "résultat 🙂";
-    const chat = await chatApp({ tools: fixedTools(result) });
-    const changed: Extract<BusEvent, { type: "session.changed" }>["data"][] =
-      [];
-    const unsubscribe = subscribe((event) => {
-      if (event.type === "session.changed") changed.push(event.data);
-    });
-    const started = await startChat(chat, "use a tool");
-    started.script.toolRound([timeCall]);
-    started.script.end();
-    const answer = await waitScript(chat.scripted, 2);
+  test.serial(
+    "keeps tool results in storage and strips every wire row",
+    async () => {
+      const result = "résultat 🙂";
+      const chat = await chatApp({ tools: fixedTools(result) });
+      const changed: Extract<BusEvent, { type: "session.changed" }>["data"][] =
+        [];
+      const unsubscribe = subscribe((event) => {
+        if (event.type === "session.changed") changed.push(event.data);
+      });
+      const started = await startChat(chat, "use a tool");
+      started.script.toolRound([timeCall]);
+      started.script.end();
+      const answer = await waitScript(chat.scripted, 2);
 
-    const providerTool = (
-      answer.body.messages as { role: string; content: string }[]
-    ).find((message) => message.role === "tool");
-    expect(providerTool?.content).toBe(result);
+      const providerTool = (
+        answer.body.messages as { role: string; content: string }[]
+      ).find((message) => message.role === "tool");
+      expect(providerTool?.content).toBe(result);
 
-    const toolEnd = changed.find((event) =>
-      event.messages.some(
-        (message) => message.kind === "tool" && message.status === "done",
-      ),
-    );
-    expect(toolEnd).toBeDefined();
-    expect(toolEnd!.last).toBeUndefined();
-    expect(
-      toolEnd!.messages.find((message) => message.kind === "tool"),
-    ).toMatchObject({
-      content: "",
-      resultBytes: new TextEncoder().encode(result).length,
-    });
-
-    await finish(answer, "answer");
-    const response = await chat.member.call(
-      "GET",
-      `/api/sessions/${started.sessionId}`,
-    );
-    const detail = await response.json();
-    const tool = detail.messages.find(
-      (message: { kind: string }) => message.kind === "tool",
-    );
-    expect(tool).toMatchObject({
-      content: "",
-      resultBytes: new TextEncoder().encode(result).length,
-    });
-    expect(
-      detail.messages
-        .filter((message: { kind: string }) => message.kind !== "tool")
-        .every(
-          (message: { resultBytes: number | null }) =>
-            message.resultBytes === null,
+      const toolEnd = changed.find((event) =>
+        event.messages.some(
+          (message) => message.kind === "tool" && message.status === "done",
         ),
-    ).toBe(true);
-    expect(detail.messages[0].content).toBe("use a tool");
-    expect(detail.messages.at(-1).content).toBe("answer");
+      );
+      expect(toolEnd).toBeDefined();
+      expect(toolEnd!.last).toBeUndefined();
+      expect(
+        toolEnd!.messages.find((message) => message.kind === "tool"),
+      ).toMatchObject({
+        content: "",
+        resultBytes: new TextEncoder().encode(result).length,
+      });
 
-    const stored = chat.app.sessions.message(tool.id)!;
-    expect(stored).toMatchObject({ content: result, resultBytes: null });
-    const resultResponse = await chat.member.call(
-      "GET",
-      `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
-    );
-    expect(resultResponse.status).toBe(200);
-    expect(await resultResponse.json()).toEqual({
-      content: result,
-      bytes: new TextEncoder().encode(result).length,
-      cut: false,
-    });
-    unsubscribe();
-    chat.app.socket.dispose();
-  });
+      await finish(answer, "answer");
+      const response = await chat.member.call(
+        "GET",
+        `/api/sessions/${started.sessionId}`,
+      );
+      const detail = await response.json();
+      const tool = detail.messages.find(
+        (message: { kind: string }) => message.kind === "tool",
+      );
+      expect(tool).toMatchObject({
+        content: "",
+        resultBytes: new TextEncoder().encode(result).length,
+      });
+      expect(
+        detail.messages
+          .filter((message: { kind: string }) => message.kind !== "tool")
+          .every(
+            (message: { resultBytes: number | null }) =>
+              message.resultBytes === null,
+          ),
+      ).toBe(true);
+      expect(detail.messages[0].content).toBe("use a tool");
+      expect(detail.messages.at(-1).content).toBe("answer");
+
+      const stored = chat.app.sessions.message(tool.id)!;
+      expect(stored).toMatchObject({ content: result, resultBytes: null });
+      const resultResponse = await chat.member.call(
+        "GET",
+        `/api/sessions/${started.sessionId}/messages/${tool.id}/result`,
+      );
+      expect(resultResponse.status).toBe(200);
+      expect(await resultResponse.json()).toEqual({
+        content: result,
+        bytes: new TextEncoder().encode(result).length,
+        cut: false,
+      });
+      unsubscribe();
+      chat.app.socket.dispose();
+    },
+  );
 
   test("a failed tool leaves its error text off the wire too", async () => {
     const chat = await chatApp();
@@ -506,51 +509,58 @@ describe("GET /api/sessions/:id", () => {
 });
 
 describe("PATCH /api/sessions/:id", () => {
-  test("refuses a running chat, then renames with a revision and an envelope", async () => {
-    const chat = await chatApp();
-    const started = await startChat(chat);
-    const running = await chat.member.call(
-      "PATCH",
-      `/api/sessions/${started.sessionId}`,
-      { body: { title: "Too Soon" } },
-    );
-    expect(running.status).toBe(409);
-    await finish(started.script);
-    const before = chat.app.sessions.byId(started.sessionId)!.revision;
-    const events: BusEvent[] = [];
-    const off = subscribe((event) => events.push(event));
-    const renamed = await chat.member.call(
-      "PATCH",
-      `/api/sessions/${started.sessionId}`,
-      { body: { title: " Kept As Typed " } },
-    );
-    expect(renamed.status).toBe(200);
-    const detail = await renamed.json();
-    expect(detail.session.title).toBe("Kept As Typed");
-    expect(detail.session.revision).toBe(before + 1);
-    expect(detail.session.status).toBe("done");
-    expect(detail.messages.length).toBe(2);
-    expect(events).toEqual([
-      {
-        type: "session.changed",
-        data: {
-          projectId: chat.projectId,
-          session: detail.session,
-          messages: [],
-          send: detail.send,
+  test.serial(
+    "refuses a running chat, then renames with a revision and an envelope",
+    async () => {
+      const chat = await chatApp();
+      const started = await startChat(chat);
+      const running = await chat.member.call(
+        "PATCH",
+        `/api/sessions/${started.sessionId}`,
+        { body: { title: "Too Soon" } },
+      );
+      expect(running.status).toBe(409);
+      await finish(started.script);
+      const before = chat.app.sessions.byId(started.sessionId)!.revision;
+      const events: BusEvent[] = [];
+      const off = subscribe((event) => events.push(event));
+      const renamed = await chat.member.call(
+        "PATCH",
+        `/api/sessions/${started.sessionId}`,
+        { body: { title: " Kept As Typed " } },
+      );
+      expect(renamed.status).toBe(200);
+      const detail = await renamed.json();
+      expect(detail.session.title).toBe("Kept As Typed");
+      expect(detail.session.revision).toBe(before + 1);
+      expect(detail.session.status).toBe("done");
+      expect(detail.messages.length).toBe(2);
+      expect(events).toEqual([
+        {
+          type: "session.changed",
+          data: {
+            projectId: chat.projectId,
+            session: detail.session,
+            messages: [],
+            send: detail.send,
+          },
         },
-      },
-    ]);
-    off();
-    expect(
-      (
-        await chat.member.call("PATCH", `/api/sessions/${started.sessionId}`, {
-          body: { title: "" },
-        })
-      ).status,
-    ).toBe(400);
-    chat.app.socket.dispose();
-  });
+      ]);
+      off();
+      expect(
+        (
+          await chat.member.call(
+            "PATCH",
+            `/api/sessions/${started.sessionId}`,
+            {
+              body: { title: "" },
+            },
+          )
+        ).status,
+      ).toBe(400);
+      chat.app.socket.dispose();
+    },
+  );
 });
 
 describe("DELETE /api/sessions/:id", () => {
@@ -574,7 +584,7 @@ describe("DELETE /api/sessions/:id", () => {
     chat.app.socket.dispose();
   });
 
-  test("refuses a chat in a team project until its rule is decided", async () => {
+  test("the owner deletes a chat in a team project", async () => {
     const chat = await chatApp();
     chat.app.db
       .query(
@@ -588,18 +598,13 @@ describe("DELETE /api/sessions/:id", () => {
       .run(chat.memberId);
     const started = await startChat(chat, "hello", chat.member, "t1");
     await finish(started.script);
-    const refused = await chat.member.call(
+    const deleted = await chat.member.call(
       "DELETE",
       `/api/sessions/${started.sessionId}`,
     );
-    expect(refused.status).toBe(403);
-    expect(chat.app.sessions.byId(started.sessionId)).not.toBeNull();
+    expect(deleted.status).toBe(200);
+    expect(chat.app.sessions.byId(started.sessionId)).toBeNull();
     chat.app.socket.dispose();
-  });
-
-  test.skip("a visible non-owner cannot delete a chat", () => {
-    // Team projects have no route yet, so v0 cannot make another owner
-    // visible through supported application behavior.
   });
 });
 
@@ -655,97 +660,100 @@ describe("agent deletion", () => {
 });
 
 describe("boot repair", () => {
-  test("fails rows left running and publishes their repaired revision", async () => {
-    const chat = await chatApp();
-    const store = chat.app.sessions;
-    const session = store.create({
-      projectId: chat.projectId,
-      ownerId: chat.memberId,
-      agentId: chat.agentId,
-      title: "interrupted",
-      now: chat.app.now.value,
-    });
-    // the send row is written first, so the messages' send_id holds
-    const sendId = "repair-send";
-    const send = store.createSend({
-      id: sendId,
-      sessionId: session.id,
-      userId: chat.memberId,
-      agentId: chat.agentId,
-      providerId: chat.providerId,
-      model: "model",
-      firstMessageId: "repair-user",
-      now: chat.app.now.value,
-    });
-    store.addUserMessage({
-      id: "repair-user",
-      sessionId: session.id,
-      sendId,
-      userId: chat.memberId,
-      content: "hello",
-      now: chat.app.now.value,
-    });
-    const reply = store.addReply({
-      sessionId: session.id,
-      sendId,
-      round: 1,
-      agentId: chat.agentId,
-      model: "model",
-      now: chat.app.now.value,
-    });
-    const before = store.touch(session.id, {
-      status: "running",
-      now: chat.app.now.value,
-    })!;
-    const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
-    const stop = subscribe((event) => {
-      if (event.type === "session.changed") seen.push(event.data);
-    });
-    chat.app.socket.dispose();
-    const fake = fakeFetch();
-    const repaired = await compose({
-      db: chat.app.db,
-      secret: (name) => (name === "admin" ? "hunter2-test" : null),
-      clock: () => chat.app.now.value,
-      fetcher: fake.fetcher,
-      log: () => silent,
-      version: VERSION,
-      secureCookie: false,
-      trustProxy: false,
-    });
-    stop();
+  test.serial(
+    "fails rows left running and publishes their repaired revision",
+    async () => {
+      const chat = await chatApp();
+      const store = chat.app.sessions;
+      const session = store.create({
+        projectId: chat.projectId,
+        ownerId: chat.memberId,
+        agentId: chat.agentId,
+        title: "interrupted",
+        now: chat.app.now.value,
+      });
+      // the send row is written first, so the messages' send_id holds
+      const sendId = "repair-send";
+      const send = store.createSend({
+        id: sendId,
+        sessionId: session.id,
+        userId: chat.memberId,
+        agentId: chat.agentId,
+        providerId: chat.providerId,
+        model: "model",
+        firstMessageId: "repair-user",
+        now: chat.app.now.value,
+      });
+      store.addUserMessage({
+        id: "repair-user",
+        sessionId: session.id,
+        sendId,
+        userId: chat.memberId,
+        content: "hello",
+        now: chat.app.now.value,
+      });
+      const reply = store.addReply({
+        sessionId: session.id,
+        sendId,
+        round: 1,
+        agentId: chat.agentId,
+        model: "model",
+        now: chat.app.now.value,
+      });
+      const before = store.touch(session.id, {
+        status: "running",
+        now: chat.app.now.value,
+      })!;
+      const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
+      const stop = subscribe((event) => {
+        if (event.type === "session.changed") seen.push(event.data);
+      });
+      chat.app.socket.dispose();
+      const fake = fakeFetch();
+      const repaired = await compose({
+        db: chat.app.db,
+        secret: (name) => (name === "admin" ? "hunter2-test" : null),
+        clock: () => chat.app.now.value,
+        fetcher: fake.fetcher,
+        log: () => silent,
+        version: VERSION,
+        secureCookie: false,
+        trustProxy: false,
+      });
+      stop();
 
-    expect(repaired.sessions.byId(session.id)).toMatchObject({
-      status: "failed",
-      revision: before.revision + 1,
-    });
-    expect(repaired.sessions.message(reply.id)).toMatchObject({
-      status: "failed",
-      error: RESTART_ERROR,
-    });
-    expect(repaired.sessions.send(send.id)).toMatchObject({
-      status: "failed",
-      cause: "restart",
-      error: RESTART_ERROR,
-    });
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({
-      projectId: chat.projectId,
-      session: { id: session.id, revision: before.revision + 1 },
-      send: { id: send.id, cause: "restart" },
-    });
-    // the repair now carries the rows it changed, so the socket can
-    // apply them without a refetch: the reply it ended, placed answer
-    expect(seen[0].messages).toEqual([
-      expect.objectContaining({
-        id: reply.id,
+      expect(repaired.sessions.byId(session.id)).toMatchObject({
         status: "failed",
-        slot: "answer",
+        revision: before.revision + 1,
+      });
+      expect(repaired.sessions.message(reply.id)).toMatchObject({
+        status: "failed",
         error: RESTART_ERROR,
-      }),
-    ]);
-    repaired.socket.dispose();
-  });
+      });
+      expect(repaired.sessions.send(send.id)).toMatchObject({
+        status: "failed",
+        cause: "restart",
+        error: RESTART_ERROR,
+      });
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toMatchObject({
+        projectId: chat.projectId,
+        session: { id: session.id, revision: before.revision + 1 },
+        send: { id: send.id, cause: "restart" },
+      });
+      // the repair now carries the rows it changed, so the socket can
+      // apply them without a refetch: the reply it ended, placed answer
+      expect(seen[0].messages).toEqual([
+        expect.objectContaining({
+          id: reply.id,
+          status: "failed",
+          slot: "answer",
+          error: RESTART_ERROR,
+        }),
+      ]);
+      repaired.socket.dispose();
+    },
+  );
 });
 
 describe("message limits and admission", () => {
@@ -783,7 +791,7 @@ describe("message limits and admission", () => {
       { body: { message: "again" } },
     );
     expect(second.status).toBe(409);
-    expect(await second.json()).toEqual({ error: "Oana Pellea is sending" });
+    expect(await second.json()).toEqual({ error: "Oana Mangiurea is sending" });
     await finish(started.script);
     chat.app.socket.dispose();
   });
@@ -860,6 +868,7 @@ describe("the usage on the summary", () => {
 const noUsage: UsagePort = {
   latest: () => null,
   latestFor: () => new Map(),
+  deleteSession: () => 0,
 };
 
 function seededStore() {

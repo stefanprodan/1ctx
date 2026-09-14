@@ -13,13 +13,17 @@ import { effect, signal } from "@preact/signals";
 import type {
   ProjectResponse,
   ProjectsResponse,
+  UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
+import type { SocketEvent } from "../../shared/socket.ts";
+import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { onSocketEvent } from "./socket.ts";
 
 export const projects = signal<ProjectSummary[] | null>(null);
 export const projectsError = signal<string | null>(null);
@@ -27,15 +31,14 @@ export const project = signal<ProjectDetail | null>(null);
 export const projectError = signal<string | null>(null);
 
 let owner: string | null = null;
-let listing: Promise<void> | null = null;
-let marks: object = {};
+let listTurn = 0;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 
 effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
   owner = id;
-  listing = null;
+  listTurn++;
   wanted = { id: "", turn: wanted.turn + 1 };
   projects.value = null;
   projectsError.value = null;
@@ -43,30 +46,20 @@ effect(() => {
   projectError.value = null;
 });
 
-const reason = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
-
-// one request at a time: the rail and the page asking together share it
-export function loadProjects(): Promise<void> {
-  if (listing !== null) return listing;
+export async function loadProjects(): Promise<void> {
   const forUser = owner;
+  const turn = ++listTurn;
   projectsError.value = null;
-  // this request's mark: a later user change replaces the shared
-  // promise, and only the request that still holds it clears it
-  const mark = {};
-  marks = mark;
-  const run = (async () => {
-    try {
-      const body = await api<ProjectsResponse>("/api/projects");
-      if (owner === forUser) projects.value = body.projects;
-    } catch (err) {
-      if (owner === forUser) projectsError.value = reason(err);
-    } finally {
-      if (marks === mark) listing = null;
+  try {
+    const body = await api<ProjectsResponse>("/api/projects");
+    if (owner === forUser && listTurn === turn) {
+      projects.value = body.projects;
     }
-  })();
-  listing = run;
-  return run;
+  } catch (err) {
+    if (owner === forUser && listTurn === turn) {
+      projectsError.value = reason(err);
+    }
+  }
 }
 
 export async function loadProject(id: string): Promise<void> {
@@ -83,3 +76,31 @@ export async function loadProject(id: string): Promise<void> {
     if (wanted.turn === turn) projectError.value = reason(err);
   }
 }
+
+// the caller's personal project; the page keeps the answer when it
+// still shows that project, and the rail follows the name
+export async function savePersonalProject(
+  body: UpdateProjectRequest,
+): Promise<void> {
+  const forUser = owner;
+  const { project: saved } = await api<ProjectResponse>(
+    "/api/profile/project",
+    "PATCH",
+    body,
+  );
+  if (owner !== forUser) return;
+  if (project.value?.id === saved.id) {
+    wanted = { id: saved.id, turn: wanted.turn + 1 };
+    project.value = saved;
+    projectError.value = null;
+  }
+  await loadProjects();
+}
+
+function onAccessChanged(event: SocketEvent): void {
+  if (event.type === "granted" || event.type === "revoked") {
+    void loadProjects();
+  }
+}
+
+onSocketEvent(onAccessChanged);
