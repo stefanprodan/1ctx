@@ -14,18 +14,23 @@ import {
 } from "../../../src/client/data/profile.ts";
 import type { Profile } from "../../../src/shared/contracts/user.ts";
 
-const oana: Profile = {
+const caelea: Profile = {
   id: "u1",
-  username: "oana",
+  username: "caelea",
   fullName: "Oana",
-  email: "oana@example.com",
+  email: "caelea@example.com",
   disabled: false,
   mustChangePassword: false,
   about: "",
   role: "member",
   createdAt: 1,
 };
-const admin: Profile = { ...oana, id: "u2", username: "admin", role: "admin" };
+const admin: Profile = {
+  ...caelea,
+  id: "u2",
+  username: "admin",
+  role: "admin",
+};
 
 let answer: () => Profile;
 const realFetch = globalThis.fetch;
@@ -44,17 +49,17 @@ describe("the profile entity", () => {
   test("keeps the row and updates me for the signed-in user", async () => {
     me.value = {
       id: "u1",
-      username: "oana",
+      username: "caelea",
       fullName: "O",
       role: "member",
       mustChangePassword: false,
     };
-    answer = () => oana;
+    answer = () => caelea;
     await loadProfile();
-    expect(profile.value).toEqual(oana);
+    expect(profile.value).toEqual(caelea);
     expect(me.value).toEqual({
       id: "u1",
-      username: "oana",
+      username: "caelea",
       fullName: "Oana",
       role: "member",
       mustChangePassword: false,
@@ -69,7 +74,7 @@ describe("the profile entity", () => {
       role: "admin",
       mustChangePassword: false,
     };
-    answer = () => oana;
+    answer = () => caelea;
     await saveProfile({ fullName: "Oana", about: "" });
     expect(profile.value).toBeNull();
     expect(me.value?.id).toBe("u2");
@@ -77,14 +82,14 @@ describe("the profile entity", () => {
 
   test("drops a row that answers after the sign out", async () => {
     me.value = null;
-    answer = () => oana;
+    answer = () => caelea;
     await loadProfile();
     expect(profile.value).toBeNull();
     expect(me.value).toBeNull();
   });
 
   test("the previous user's row goes before the next load", async () => {
-    profile.value = oana;
+    profile.value = caelea;
     me.value = {
       id: "u2",
       username: "admin",

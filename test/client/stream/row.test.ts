@@ -169,7 +169,7 @@ describe("Home.model", () => {
         {
           id: "p1",
           kind: "personal",
-          name: "oana",
+          name: "caelea",
           createdAt: 0,
           memberCount: 1,
         },

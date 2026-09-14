@@ -16,8 +16,10 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
+import { session } from "../data/sessions.ts";
 import { initials, reason } from "../lib/format.ts";
 import { Icon, type IconName, Logo } from "../lib/icons.tsx";
+import { projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
 import "./rail.css";
@@ -25,20 +27,22 @@ import "./rail.css";
 function Sub({
   href,
   here,
+  on = here === href,
   follow,
   children,
 }: {
   href: string;
   here: string;
+  // inside the link's page, not only on it
+  on?: boolean;
   follow?: () => void;
   children: string;
 }) {
-  const on = here === href;
   return (
     <a
       href={href}
       class={`rail-sub${on ? " rail-sub-on" : ""}`}
-      aria-current={on ? "page" : undefined}
+      aria-current={here === href ? "page" : undefined}
       onClick={follow}
     >
       {children}
@@ -106,6 +110,7 @@ export function Rail({
   const open = useSignal(false);
   const failure = useSignal<string | null>(null);
   const here = path.value;
+  const inProject = projectHere(here, session.value);
   const hide = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (narrow) hide.current?.focus();
@@ -156,6 +161,7 @@ export function Rail({
                       key={p.id}
                       href={`/projects/${p.id}`}
                       here={here}
+                      on={p.id === inProject}
                       follow={follow}
                     >
                       {p.name}

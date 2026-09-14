@@ -239,7 +239,7 @@ describe("GET /api/sessions", () => {
     });
     expect(rows.get(failed.id)).toMatchObject({
       send: { id: failedSend.id },
-      last: { seq: failedUser.seq, author: "oana", text: "User line" },
+      last: { seq: failedUser.seq, author: "caelea", text: "User line" },
     });
     chat.app.socket.dispose();
   });
@@ -778,7 +778,7 @@ describe("message limits and admission", () => {
       { body: { message: "again" } },
     );
     expect(second.status).toBe(409);
-    expect(await second.json()).toEqual({ error: "Oana Pellea is sending" });
+    expect(await second.json()).toEqual({ error: "Oana Mangiurea is sending" });
     await finish(started.script);
     chat.app.socket.dispose();
   });

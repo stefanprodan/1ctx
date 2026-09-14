@@ -65,6 +65,17 @@ export function isEmail(value: unknown): value is string {
   );
 }
 
+// what a team project is for: one trimmed line, empty for none
+export const MAX_DESCRIPTION = 280;
+export function isDescription(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= MAX_DESCRIPTION &&
+    value === value.trim() &&
+    !LINE_BREAK.test(value)
+  );
+}
+
 // what a user says about themself, for the agents: free text
 export const MAX_ABOUT = 2000;
 export function isAbout(value: unknown): value is string {

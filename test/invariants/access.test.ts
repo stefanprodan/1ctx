@@ -33,9 +33,9 @@ describe("the authorization matrix", () => {
       test(`${c.method} ${c.path} as ${caller} is ${c.expect[caller]}`, async () => {
         const app = await testApp();
         app.createUser({
-          username: "oana",
+          username: "caelea",
           fullName: "Oana",
-          email: "oana@example.com",
+          email: "caelea@example.com",
           role: "member",
           passwordHash: await hashPassword("pw"),
           mustChangePassword: false,
@@ -47,7 +47,7 @@ describe("the authorization matrix", () => {
             200,
           );
         if (caller === "member")
-          expect((await client.login("oana", "pw")).status).toBe(200);
+          expect((await client.login("caelea", "pw")).status).toBe(200);
         const res = await client.call(c.method, c.path, { body: c.body });
         expect(res.status).toBe(c.expect[caller]);
       });

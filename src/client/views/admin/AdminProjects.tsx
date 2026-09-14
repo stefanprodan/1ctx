@@ -5,7 +5,9 @@
 // when, all from the list. Opening a row loads the detail for its form.
 
 import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
+import { query } from "../../app/router.ts";
 import {
   adminProject,
   adminProjectError,
@@ -69,7 +71,12 @@ function ProjectRow({
 
 export function AdminProjects() {
   const list = adminProjects.value;
-  const open = useSignal<string | null>(null);
+  const asked = new URLSearchParams(query.value).get("open");
+  const open = useSignal(asked);
+  // a Manage link followed while the page is up names another row
+  useEffect(() => {
+    if (asked !== null) open.value = asked;
+  }, [asked, open]);
   const adding = useSignal(false);
   const error = adminProjectsError.value ?? usersError.value;
   return (

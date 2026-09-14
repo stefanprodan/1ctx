@@ -190,7 +190,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
 
   const policyFor = (project: ProjectRow, user: UserRow, agent: AgentRow) =>
     buildPolicy({
-      projectId: project.id,
+      project,
       user,
       agent,
       now: deps.clock(),

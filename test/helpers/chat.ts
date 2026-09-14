@@ -282,16 +282,16 @@ export async function chatApp(
     model: options.model ?? FLASH,
   });
   const user = app.createUser({
-    username: "oana",
-    fullName: "Oana Pellea",
-    email: "oana@example.com",
+    username: "caelea",
+    fullName: "Oana Mangiurea",
+    email: "caelea@example.com",
     role: "member",
     passwordHash: await hashPassword("pw"),
     mustChangePassword: false,
     now: app.now.value,
   });
   const member = app.client();
-  await member.login("oana", "pw");
+  await member.login("caelea", "pw");
   return {
     app,
     scripted,

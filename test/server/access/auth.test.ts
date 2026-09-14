@@ -41,6 +41,7 @@ function build(secureCookie: boolean) {
       memberProjectIds: () => [],
       teamProjectIds: () => [],
       nameTaken: () => false,
+      personal: () => null,
       renamePersonal: () => {},
     },
   });

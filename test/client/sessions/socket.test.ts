@@ -13,9 +13,9 @@ import {
 } from "../../../src/client/data/socket.ts";
 import { PROTOCOL, type SocketEvent } from "../../../src/shared/socket.ts";
 
-const oana = {
+const caelea = {
   id: "u1",
-  username: "oana",
+  username: "caelea",
   fullName: "Oana",
   role: "member" as const,
   mustChangePassword: false,
@@ -90,7 +90,7 @@ function runTimer(): void {
 }
 
 beforeEach(() => {
-  me.value = oana;
+  me.value = caelea;
   watch(null);
   wires = [];
   timers = [];

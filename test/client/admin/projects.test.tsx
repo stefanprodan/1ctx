@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { query } from "../../../src/client/app/router.ts";
 import { railRows } from "../../../src/client/app/routes.ts";
 import {
   addProjectMember,
@@ -18,7 +19,7 @@ import {
   loadAdminProject,
   loadAdminProjects,
   removeProjectMember,
-  renameProject,
+  updateProject,
 } from "../../../src/client/data/admin-projects.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
@@ -30,13 +31,13 @@ import {
   countLine,
   deleteLabel,
   mark,
-  nameProblem,
   plural,
   sinceLine,
   step,
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectForm } from "../../../src/client/views/admin/ProjectForm.tsx";
+import { nameProblem } from "../../../src/client/views/projects/Project.model.ts";
 import type {
   ProjectDetail,
   ProjectSummary,
@@ -46,7 +47,7 @@ import type { Me, UserAccount } from "../../../src/shared/contracts/user.ts";
 const admin: Me = {
   id: "u1",
   username: "admin",
-  fullName: "Administrator",
+  fullName: "Stefan Prodan",
   role: "admin",
   mustChangePassword: false,
 };
@@ -56,12 +57,12 @@ const root: UserAccount = {
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
 };
-const oana: UserAccount = {
+const caelea: UserAccount = {
   id: "u2",
-  username: "oana",
-  fullName: "Oana Pellea",
+  username: "caelea",
+  fullName: "Oana Mangiurea",
   role: "member",
-  email: "oana@example.com",
+  email: "caelea@example.com",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: false,
@@ -82,7 +83,8 @@ const team: ProjectSummary = {
 };
 const detail: ProjectDetail = {
   ...team,
-  members: [oana],
+  description: "",
+  members: [caelea],
   chats: 3,
 };
 
@@ -97,7 +99,7 @@ beforeEach(() => {
   adminProject.value = null;
   adminProjectError.value = null;
   projects.value = null;
-  users.value = [root, oana];
+  users.value = [root, caelea];
   usersError.value = null;
   globalThis.fetch = (async (url: string, init?: RequestInit) =>
     answer(url, init)) as unknown as typeof fetch;
@@ -142,28 +144,28 @@ describe("the words", () => {
 
   test("offers the people not in the project, by any of their names", () => {
     const mira: UserAccount = {
-      ...oana,
+      ...caelea,
       id: "u3",
       username: "mira",
       fullName: "Mira Pop",
       email: "mira@corp.dev",
       disabled: true,
     };
-    const all = [oana, root, mira];
+    const all = [caelea, root, mira];
     const none = new Set<string>();
     expect(candidates(all, none, "").map((u) => u.username)).toEqual([
-      "admin",
       "mira",
-      "oana",
+      "caelea",
+      "admin",
     ]);
-    expect(candidates(all, new Set(["u2"]), "")).not.toContain(oana);
-    expect(candidates(all, none, "PELL")).toEqual([oana]);
+    expect(candidates(all, new Set(["u2"]), "")).not.toContain(caelea);
+    expect(candidates(all, none, "MANG")).toEqual([caelea]);
     expect(candidates(all, none, "@mira")).toEqual([mira]);
     expect(candidates(all, none, "corp.dev")).toEqual([mira]);
     expect(candidates(all, none, " nobody ")).toEqual([]);
     expect(candidateNote(mira)).toBe("disabled");
     expect(candidateNote(root)).toBe("admin");
-    expect(candidateNote(oana)).toBe("");
+    expect(candidateNote(caelea)).toBe("");
   });
 
   test("the arrows wrap at either end of the list", () => {
@@ -206,7 +208,7 @@ describe("the entity", () => {
     expect(projects.value).toEqual([personal, team]);
   });
 
-  test("rename puts the detail in place and reloads the rail", async () => {
+  test("update puts the detail in place and reloads the rail", async () => {
     const renamed = { ...detail, name: "applications" };
     adminProjects.value = [team];
     answer = (_url, init) =>
@@ -214,7 +216,7 @@ describe("the entity", () => {
         ? Response.json({ project: renamed })
         : rail([personal, renamed]);
 
-    await renameProject("p2", { name: "applications" });
+    await updateProject("p2", { name: "applications" });
     expect(adminProject.value).toEqual(renamed);
     expect(adminProjects.value).toEqual([
       {
@@ -294,7 +296,7 @@ describe("the entity", () => {
         }
       });
 
-    const stale = renameProject("p2", { name: "platform" });
+    const stale = updateProject("p2", { name: "platform" });
     me.value = { ...admin, id: "u3", username: "next" };
     const list = loadAdminProjects();
     const one = loadAdminProject("p3");
@@ -319,16 +321,32 @@ describe("the page", () => {
     expect(html).toContain(">PL<");
     expect(html).toContain('class="rows-sub">3 members<');
     expect(html).toContain(">since 14 September 2026<");
-    expect(html).not.toContain("Oana Pellea");
+    expect(html).not.toContain("Oana Mangiurea");
     expect(html).not.toContain(">Members<");
   });
 
-  test("an open row shows members, remove, add, and delete", () => {
+  test("a row named in the query opens", () => {
+    adminProjects.value = [team];
+    adminProject.value = detail;
+    query.value = "?open=p2";
+    const html = render(<AdminProjects />);
+    query.value = "";
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("Oana Mangiurea");
+  });
+
+  test("an open row shows the description, members, remove, add, and delete", () => {
     const html = render(
-      <ProjectForm project={detail} users={[root, oana]} onDone={() => {}} />,
+      <ProjectForm
+        project={{ ...detail, description: "Incidents and pages" }}
+        users={[root, caelea]}
+        onDone={() => {}}
+      />,
     );
-    expect(html).toContain("Oana Pellea");
-    expect(html).toContain("@oana");
+    expect(html).toContain('name="description"');
+    expect(html).toContain(">Incidents and pages</textarea>");
+    expect(html).toContain("Oana Mangiurea");
+    expect(html).toContain("@caelea");
     expect(html).toContain(">Remove<");
     expect(html).toContain("Add member");
     expect(html).not.toContain("Search people");

@@ -162,9 +162,14 @@ violation, and every rule has a rejected fixture under
   project, named after the username, in one transaction through
   `createUser()` in `users/`; nothing else creates a user, tests
   included. A personal project is its owner's alone, an admin
-  included. Admins make, rename, fill and delete team projects; names
-  are unique across personal and team projects. A team project is open
-  to its members and to admins. Deleting one takes its chats and their
+  included; its owner names and describes it through `PATCH
+  /api/profile/project`, and a username rename renames it only while
+  it still has the old username. Admins make, rename, describe, fill
+  and delete team projects; names are unique across personal and team
+  projects. A project's description is one trimmed line
+  (`isDescription`) that goes into the system prompt after the agent's
+  prompt, only when set. A team project is open to its members and to
+  admins. Deleting one takes its chats and their
   usage and is refused while a chat runs. A handler gets a project
   through `access.project(principal, id)`, which answers the same 404
   whether the project is missing or not theirs to see. The rule is
@@ -334,7 +339,13 @@ violation, and every rule has a rejected fixture under
 - **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
   column: `RowsOpen` for a row that opens in place, `RowsLine` for one
   that does not, `RowsAvatar`, `RowsTitle` (mono for an identifier) and
-  `RowsMeta` for its head. The page's stylesheet holds only what it
+  `RowsMeta` for its head, `RowsAdd` or `RowsLink` in a card's head.
+  A team project's Members tab is the same rows, linking an admin to
+  `/admin/projects?open=<id>` and `/admin/agents`; a personal project
+  has Settings in its place and the agents in its aside, as on Home.
+  A settings page (the profile, a project's Settings) stacks
+  `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
+  the right. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
   failure's words come from `reason()` in `lib/format.ts`.

@@ -60,6 +60,15 @@ export function RowsAdd({
   );
 }
 
+// the head's link to where the rows are managed
+export function RowsLink({ label, href }: { label: string; href: string }) {
+  return (
+    <a class="btn btn-small rows-add" href={href}>
+      {label}
+    </a>
+  );
+}
+
 // a faint line in the card: an empty list, or what the rows add up to
 export function RowsNote({ children }: { children: ComponentChildren }) {
   return <p class="rows-note">{children}</p>;

@@ -42,6 +42,7 @@ export function Composer({
   onStop,
   onCompact,
   onRename,
+  placeholder: idle = "Send a message",
 }: {
   scope: Scope;
   agents: AgentSummary[] | null;
@@ -61,6 +62,8 @@ export function Composer({
   onCompact?: () => Promise<void>;
   // /rename <title>; a chat not started yet has no row to name
   onRename?: (title: string) => Promise<void>;
+  // the box at rest, with an agent to send to
+  placeholder?: string;
 }) {
   const key = draftKey(scope);
   const text = useSignal(readDraft(key));
@@ -125,7 +128,7 @@ export function Composer({
       ? "No agent yet: an admin adds one first"
       : running
         ? "Replying"
-        : "Send a message";
+        : idle;
   return (
     <div class={`composer${tall ? " composer-tall" : ""}`}>
       <textarea

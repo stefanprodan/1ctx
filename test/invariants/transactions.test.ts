@@ -66,7 +66,7 @@ describe("startSend", () => {
       expect(seen[0].send?.id).toBe(detail.send.id);
       expect(seen[0].last).toEqual({
         seq: 1,
-        author: "oana",
+        author: "caelea",
         text: "Hello there",
       });
     } finally {

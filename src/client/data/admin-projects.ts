@@ -120,7 +120,7 @@ export async function createProject(
   return project;
 }
 
-export async function renameProject(
+export async function updateProject(
   id: string,
   body: UpdateProjectRequest,
 ): Promise<ProjectDetail> {

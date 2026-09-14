@@ -165,7 +165,7 @@ describe("team project administration", () => {
   test("names and memberships report their field conflicts", async () => {
     const chat = await chatApp();
     const username = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "oana" },
+      body: { name: "caelea" },
     });
     expect(username.status).toBe(409);
     expect(await username.json()).toEqual({ error: "name is taken" });
@@ -235,6 +235,56 @@ describe("team project administration", () => {
     });
     chat.app.socket.dispose();
   });
+  test("a description is set on create, changed alone, and checked", async () => {
+    const chat = await chatApp();
+    const made = await chat.admin.call("POST", "/api/projects", {
+      body: { name: "ops", description: "Incidents and pages" },
+    });
+    expect(made.status).toBe(201);
+    const ops: ProjectDetail = (await made.json()).project;
+    expect(ops.description).toBe("Incidents and pages");
+    expect((await createTeam(chat, "other")).description).toBe("");
+    const changed = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+      body: { description: "" },
+    });
+    expect(changed.status).toBe(200);
+    expect((await changed.json()).project).toMatchObject({
+      name: "ops",
+      description: "",
+    });
+    for (const description of [" padded", "two\nlines", "x".repeat(281), 7]) {
+      const bad = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+        body: { description },
+      });
+      expect(bad.status).toBe(400);
+    }
+    const empty = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+      body: {},
+    });
+    expect(empty.status).toBe(400);
+    chat.app.socket.dispose();
+  });
+
+  test("a chat in a team project tells the agent its description", async () => {
+    const chat = await chatApp();
+    const made = await chat.admin.call("POST", "/api/projects", {
+      body: { name: "ops", description: "Incidents and pages" },
+    });
+    const ops: ProjectDetail = (await made.json()).project;
+    await addMember(chat, ops.id, chat.memberId);
+    const { script } = await startChat(chat, "hi", chat.member, ops.id);
+    const messages = script.body.messages as {
+      role: string;
+      content: string;
+    }[];
+    expect(messages[0]!.role).toBe("system");
+    expect(messages[0]!.content).toContain(
+      "You work in the ops project: Incidents and pages",
+    );
+    await finish(chat, script);
+    chat.app.socket.dispose();
+  });
+
   test("the list follows visibility and keeps the personal project first", async () => {
     const chat = await chatApp();
     const second = await makeUser(chat, "stefan", "admin");
@@ -259,7 +309,7 @@ describe("team project administration", () => {
       },
     ]);
     expect(projects.map((item: { name: string }) => item.name)).not.toContain(
-      "oana",
+      "caelea",
     );
     const memberList = await (
       await chat.member.call("GET", "/api/projects")
@@ -268,7 +318,7 @@ describe("team project administration", () => {
       {
         id: chat.projectId,
         kind: "personal",
-        name: "oana",
+        name: "caelea",
         createdAt: expect.any(Number),
         memberCount: 1,
       },
@@ -384,8 +434,8 @@ describe("team project chat lifecycle", () => {
     const detail = chat.app.runner.start(
       {
         userId: chat.memberId,
-        username: "oana",
-        fullName: "Oana Pellea",
+        username: "caelea",
+        fullName: "Oana Mangiurea",
         role: "member",
         mustChangePassword: false,
         loginId: "test",
@@ -502,6 +552,74 @@ describe("team project chat lifecycle", () => {
       (await chat.member.call("DELETE", `/api/sessions/${owned.sessionId}`))
         .status,
     ).toBe(200);
+    chat.app.socket.dispose();
+  });
+});
+
+describe("the personal project's settings", () => {
+  test("its owner names and describes it, and a taken name is a 409", async () => {
+    const chat = await chatApp();
+    const renamed = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { name: "notes", description: "My scratch work" },
+    });
+    expect(renamed.status).toBe(200);
+    expect((await renamed.json()).project).toMatchObject({
+      id: chat.projectId,
+      kind: "personal",
+      name: "notes",
+      description: "My scratch work",
+    });
+    // the admin's personal project is untouched
+    expect(chat.app.projects.personal(chat.adminId)!.description).toBe("");
+    await createTeam(chat, "ops");
+    const taken = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { name: "ops" },
+    });
+    expect(taken.status).toBe(409);
+    const bad = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { description: "two\nlines" },
+    });
+    expect(bad.status).toBe(400);
+    chat.app.socket.dispose();
+  });
+
+  test("a username rename follows only a project still named after it", async () => {
+    const chat = await chatApp();
+    const member = chat.app.users.byId(chat.memberId)!;
+    const rename = (username: string) =>
+      chat.admin.call("PATCH", `/api/users/${chat.memberId}`, {
+        body: { username },
+      });
+    expect((await rename(`${member.username}-2`)).status).toBe(200);
+    expect(chat.app.projects.personal(chat.memberId)!.name).toBe(
+      `${member.username}-2`,
+    );
+    await chat.member.call("PATCH", "/api/profile/project", {
+      body: { name: "notes" },
+    });
+    expect((await rename(`${member.username}-3`)).status).toBe(200);
+    expect(chat.app.projects.personal(chat.memberId)!.name).toBe("notes");
+    // taking the name the project already carries is no conflict
+    expect((await rename("notes")).status).toBe(200);
+    expect(chat.app.projects.personal(chat.memberId)!.name).toBe("notes");
+    chat.app.socket.dispose();
+  });
+
+  test("the agent is told the project, and its description only when set", async () => {
+    const chat = await chatApp();
+    const first = await startChat(chat, "hi");
+    const prompt = (script: Script) =>
+      (script.body.messages as { content: string }[])[0]!.content;
+    expect(prompt(first.script)).toContain(
+      `You work in the ${chat.app.projects.byId(chat.projectId)!.name} project.\n`,
+    );
+    await finish(chat, first.script);
+    await chat.member.call("PATCH", "/api/profile/project", {
+      body: { description: "My scratch work" },
+    });
+    const second = await startChat(chat, "again");
+    expect(prompt(second.script)).toContain(": My scratch work\n");
+    await finish(chat, second.script);
     chat.app.socket.dispose();
   });
 });

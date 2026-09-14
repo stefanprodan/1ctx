@@ -159,7 +159,7 @@ beforeEach(() => {
   user++;
   me.value = {
     id: `u${user}`,
-    username: "oana",
+    username: "caelea",
     fullName: "Oana",
     role: "member",
     mustChangePassword: false,

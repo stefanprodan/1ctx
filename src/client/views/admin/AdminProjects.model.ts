@@ -5,18 +5,7 @@
 
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
-import { isName, MAX_NAME, MIN_NAME } from "../../../shared/words.ts";
 import { longDate } from "../../lib/format.ts";
-
-export function nameProblem(value: string): string | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return "Enter a name";
-  if (trimmed.length < MIN_NAME || trimmed.length > MAX_NAME) {
-    return `${MIN_NAME} to ${MAX_NAME} characters`;
-  }
-  if (!isName(trimmed)) return "Lowercase letters, digits and dashes";
-  return null;
-}
 
 export function plural(value: number, noun: string): string {
   return `${value} ${noun}${value === 1 ? "" : "s"}`;

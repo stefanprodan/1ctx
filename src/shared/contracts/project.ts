@@ -10,7 +10,6 @@ import type { UserSummary } from "./user.ts";
 export type ProjectSummary = {
   id: string;
   kind: ProjectKind;
-  // the personal project is named after its user
   name: string;
   createdAt: number;
   // the membership rows, so a list row counts people without the detail
@@ -18,6 +17,8 @@ export type ProjectSummary = {
 };
 
 export type ProjectDetail = ProjectSummary & {
+  // empty for none
+  description: string;
   members: UserSummary[];
   chats: number;
 };

@@ -71,8 +71,8 @@ describe("the parts", () => {
     expect(render(<RowsTitle name="ops" mono />)).toBe(
       '<span class="rows-title"><span class="rows-name rows-name-mono">ops</span></span>',
     );
-    expect(render(<RowsTitle name="Oana" sub="@oana" />)).toContain(
-      '<span class="rows-sub">@oana</span>',
+    expect(render(<RowsTitle name="Oana" sub="@caelea" />)).toContain(
+      '<span class="rows-sub">@caelea</span>',
     );
   });
 });

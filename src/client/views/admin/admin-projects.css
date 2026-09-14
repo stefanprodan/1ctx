@@ -13,6 +13,10 @@
     width: 360px;
     max-width: 100%;
   }
+  .admin-projects-description-field {
+    width: 640px;
+    max-width: 100%;
+  }
   .admin-projects-note {
     margin: 0;
     font-size: var(--text-small);
@@ -183,7 +187,8 @@
   }
 
   @media (max-width: 719px) {
-    .admin-projects-name-field {
+    .admin-projects-name-field,
+    .admin-projects-description-field {
       width: 100%;
     }
     .admin-projects-member {

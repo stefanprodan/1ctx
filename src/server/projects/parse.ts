@@ -6,7 +6,13 @@ import type {
   CreateProjectRequest,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
-import { isName, MAX_NAME, MIN_NAME } from "../../shared/words.ts";
+import {
+  isDescription,
+  isName,
+  MAX_DESCRIPTION,
+  MAX_NAME,
+  MIN_NAME,
+} from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -19,14 +25,37 @@ function parseName(value: unknown): string {
   return value;
 }
 
-export function parseCreateProject(body: unknown): CreateProjectRequest {
-  const b = fields(body, ["name"]);
-  return { name: parseName(b.name) };
+function parseDescription(value: unknown): string {
+  if (!isDescription(value)) {
+    throw new BadRequest(
+      `description must be one trimmed line of at most ${MAX_DESCRIPTION} characters`,
+    );
+  }
+  return value;
+}
+
+export function parseCreateProject(
+  body: unknown,
+): Required<CreateProjectRequest> {
+  const b = fields(body, ["name", "description"]);
+  return {
+    name: parseName(b.name),
+    description:
+      b.description === undefined ? "" : parseDescription(b.description),
+  };
 }
 
 export function parseUpdateProject(body: unknown): UpdateProjectRequest {
-  const b = fields(body, ["name"]);
-  return { name: parseName(b.name) };
+  const b = fields(body, ["name", "description"]);
+  if (b.name === undefined && b.description === undefined) {
+    throw new BadRequest("name or description is required");
+  }
+  return {
+    ...(b.name === undefined ? {} : { name: parseName(b.name) }),
+    ...(b.description === undefined
+      ? {}
+      : { description: parseDescription(b.description) }),
+  };
 }
 
 export function parseAddMember(body: unknown): AddMemberRequest {

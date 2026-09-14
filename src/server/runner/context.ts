@@ -98,7 +98,16 @@ function workMessage(
 
 export function history(
   rows: Message[],
-  policy: Pick<SendPolicy, "prompt" | "about" | "username" | "userId">,
+  policy: Pick<
+    SendPolicy,
+    | "prompt"
+    | "projectName"
+    | "projectDescription"
+    | "fullName"
+    | "about"
+    | "username"
+    | "userId"
+  >,
   lookups: ContextLookups,
   now: number,
 ): ChatMessageIn[] {

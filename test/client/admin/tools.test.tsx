@@ -46,7 +46,7 @@ import { LIMIT_NAMES } from "../../../src/shared/words.ts";
 const admin: Me = {
   id: "u1",
   username: "admin",
-  fullName: "Administrator",
+  fullName: "Stefan Prodan",
   role: "admin",
   mustChangePassword: false,
 };

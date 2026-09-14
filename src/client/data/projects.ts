@@ -13,6 +13,7 @@ import { effect, signal } from "@preact/signals";
 import type {
   ProjectResponse,
   ProjectsResponse,
+  UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
   ProjectDetail,
@@ -74,6 +75,26 @@ export async function loadProject(id: string): Promise<void> {
   } catch (err) {
     if (wanted.turn === turn) projectError.value = reason(err);
   }
+}
+
+// the caller's personal project; the page keeps the answer when it
+// still shows that project, and the rail follows the name
+export async function savePersonalProject(
+  body: UpdateProjectRequest,
+): Promise<void> {
+  const forUser = owner;
+  const { project: saved } = await api<ProjectResponse>(
+    "/api/profile/project",
+    "PATCH",
+    body,
+  );
+  if (owner !== forUser) return;
+  if (project.value?.id === saved.id) {
+    wanted = { id: saved.id, turn: wanted.turn + 1 };
+    project.value = saved;
+    projectError.value = null;
+  }
+  await loadProjects();
 }
 
 function onAccessChanged(event: SocketEvent): void {

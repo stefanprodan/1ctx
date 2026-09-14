@@ -51,7 +51,7 @@ import type { Me } from "../../../src/shared/contracts/user.ts";
 const admin: Me = {
   id: "u1",
   username: "admin",
-  fullName: "Administrator",
+  fullName: "Stefan Prodan",
   role: "admin",
   mustChangePassword: false,
 };

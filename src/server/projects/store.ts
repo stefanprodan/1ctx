@@ -12,6 +12,7 @@ export type ProjectRow = {
   name: string;
   ownerId: string;
   createdAt: number;
+  description: string;
 };
 
 type Raw = {
@@ -20,6 +21,7 @@ type Raw = {
   name: string;
   owner_id: string;
   created_at: number;
+  description: string;
 };
 
 const row = (raw: Raw): ProjectRow => ({
@@ -28,6 +30,7 @@ const row = (raw: Raw): ProjectRow => ({
   name: raw.name,
   ownerId: raw.owner_id,
   createdAt: raw.created_at,
+  description: raw.description,
 });
 
 export const summary = (
@@ -133,21 +136,27 @@ export class ProjectStore {
   createTeam(fields: {
     ownerId: string;
     name: string;
+    description: string;
     now: number;
   }): ProjectRow {
     const id = newId();
     this.db
       .query(
-        "insert into projects (id, kind, name, owner_id, created_at) values (?, 'team', ?, ?, ?)",
+        "insert into projects (id, kind, name, description, owner_id, created_at) values (?, 'team', ?, ?, ?, ?)",
       )
-      .run(id, fields.name, fields.ownerId, fields.now);
+      .run(id, fields.name, fields.description, fields.ownerId, fields.now);
     return this.byId(id)!;
   }
 
-  rename(id: string, name: string): ProjectRow | null {
+  update(
+    id: string,
+    fields: { name: string; description: string },
+  ): ProjectRow | null {
     this.db
-      .query("update projects set name = ? where id = ? and kind = 'team'")
-      .run(name, id);
+      .query(
+        "update projects set name = ?, description = ? where id = ? and kind = 'team'",
+      )
+      .run(fields.name, fields.description, id);
     return this.byId(id);
   }
 
@@ -175,13 +184,26 @@ export class ProjectStore {
     );
   }
 
-  // the caller owns the surrounding user rename transaction
-  renamePersonal(userId: string, name: string): void {
+  // the caller owns the surrounding user rename transaction; a name the
+  // owner picked stays
+  renamePersonal(userId: string, from: string, to: string): void {
     this.db
       .query(
-        "update projects set name = ? where owner_id = ? and kind = 'personal'",
+        "update projects set name = ? where owner_id = ? and kind = 'personal' and name = ?",
       )
-      .run(name, userId);
+      .run(to, userId, from);
+  }
+
+  updatePersonal(
+    userId: string,
+    fields: { name: string; description: string },
+  ): ProjectRow | null {
+    this.db
+      .query(
+        "update projects set name = ?, description = ? where owner_id = ? and kind = 'personal'",
+      )
+      .run(fields.name, fields.description, userId);
+    return this.personal(userId);
   }
 
   // the user and their project must either both exist or neither does

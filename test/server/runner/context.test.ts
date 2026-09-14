@@ -17,11 +17,7 @@ import {
 } from "../../../src/server/runner/context.ts";
 import { LOOP_LIMITS } from "../../../src/server/runner/limits.ts";
 import type { Offered, SendPolicy } from "../../../src/server/runner/policy.ts";
-import {
-  ABOUT_LEAD,
-  dateLine,
-  systemPrompt,
-} from "../../../src/server/runner/prompt.ts";
+import { dateLine, systemPrompt } from "../../../src/server/runner/prompt.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/index.ts";
 import { compactsAt, contextReserve } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
@@ -33,9 +29,11 @@ const NONE: Offered = { tools: [], search: null };
 const policy: SendPolicy = {
   projectId: "p",
   userId: "u1",
-  username: "oana",
-  fullName: "Oana Pellea",
+  username: "caelea",
+  fullName: "Oana Mangiurea",
   about: "I run clusters.",
+  projectName: "ops",
+  projectDescription: "Incidents and pages.",
   agentId: "a",
   agentName: "coder",
   providerId: "pr",
@@ -100,12 +98,19 @@ describe("compaction threshold", () => {
 describe("systemPrompt", () => {
   test("joins the agent's prompt, the about text and the date", () => {
     expect(systemPrompt(policy, NOW)).toBe(
-      `You write Go.\n\n${ABOUT_LEAD}\nI run clusters.\n\nToday is 2026-09-13.`,
+      "You write Go.\n\nYou work in the ops project: Incidents and pages.\nYou talk to @caelea (Oana Mangiurea): I run clusters.\n\nToday is 2026-09-13.",
     );
   });
 
-  test("leaves out what is empty and always has the date", () => {
-    expect(systemPrompt({ prompt: "", about: " " }, NOW)).toBe(dateLine(NOW));
+  test("names the project and the user even with nothing written", () => {
+    expect(
+      systemPrompt(
+        { ...policy, prompt: " ", projectDescription: "", about: " " },
+        NOW,
+      ),
+    ).toBe(
+      `You work in the ops project.\nYou talk to @caelea (Oana Mangiurea).\n\n${dateLine(NOW)}`,
+    );
   });
 });
 
@@ -129,7 +134,7 @@ describe("history", () => {
     ];
     expect(history(rows, policy, lookups, NOW)).toEqual([
       { role: "system", content: systemPrompt(policy, NOW) },
-      { role: "user", content: "hi", name: "oana" },
+      { role: "user", content: "hi", name: "caelea" },
       { role: "assistant", content: "hello" },
       { role: "user", content: "and me", name: "mihai" },
       {
@@ -190,7 +195,7 @@ describe("history", () => {
     ];
     const out = history(rows, policy, lookups, NOW);
     expect(out.slice(1)).toEqual([
-      { role: "user", content: "when and what", name: "oana" },
+      { role: "user", content: "when and what", name: "caelea" },
       {
         role: "assistant",
         content: "let me check",
@@ -313,7 +318,7 @@ describe("history", () => {
       row({ id: "r1", kind: "reply", agentId: "a", content: "hello" }),
     ];
     expect(history(rows, policy, lookups, NOW).slice(1)).toEqual([
-      { role: "user", content: "hi", name: "oana" },
+      { role: "user", content: "hi", name: "caelea" },
       { role: "assistant", content: "hello" },
     ]);
   });
@@ -341,7 +346,7 @@ describe("history", () => {
     ];
     expect(history(rows, policy, lookups, NOW).slice(1)).toEqual([
       { role: "user", content: `${SUMMARY_LEAD}\n\nlatest summary` },
-      { role: "user", content: "new", name: "oana" },
+      { role: "user", content: "new", name: "caelea" },
       { role: "assistant", content: "answer" },
     ]);
   });

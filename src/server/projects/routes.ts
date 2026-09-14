@@ -70,6 +70,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     }
     return {
       ...summary(project, members.length),
+      description: project.description,
       members,
       chats: deps.sessions.count(project.id),
     };
@@ -103,7 +104,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/projects",
       policy: "admin",
       async handle(req, ctx) {
-        const { name } = parseCreateProject(await jsonBody(req));
+        const { name, description } = parseCreateProject(await jsonBody(req));
         const project = transact(deps.db, () => {
           if (deps.store.nameTaken(name)) {
             throw new Conflict("name is taken");
@@ -112,6 +113,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             deps.store.createTeam({
               ownerId: ctx.principal!.userId,
               name,
+              description,
               now: deps.clock(),
             }),
           );
@@ -145,15 +147,50 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(req, ctx) {
         findTeam(ctx.params.id);
-        const { name } = parseUpdateProject(await jsonBody(req));
+        const change = parseUpdateProject(await jsonBody(req));
         const project = transact(deps.db, () => {
           const current = findTeam(ctx.params.id);
+          const name = change.name ?? current.name;
           if (deps.store.nameTaken(name, current.id)) {
             throw new Conflict("name is taken");
           }
-          const renamed = writeName(() => deps.store.rename(current.id, name));
-          if (renamed === null) throw new NotFound("no such project");
-          return { result: detail(renamed) };
+          const updated = writeName(() =>
+            deps.store.update(current.id, {
+              name,
+              description: change.description ?? current.description,
+            }),
+          );
+          if (updated === null) throw new NotFound("no such project");
+          return { result: detail(updated) };
+        });
+        const body: ProjectResponse = { project };
+        return json(body);
+      },
+    },
+    {
+      // the caller's own personal project, the one project a member names
+      // and describes
+      method: "PATCH",
+      path: "/api/profile/project",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const change = parseUpdateProject(await jsonBody(req));
+        const userId = ctx.principal!.userId;
+        const project = transact(deps.db, () => {
+          const current = deps.store.personal(userId);
+          if (current === null) throw new NotFound("no such project");
+          const name = change.name ?? current.name;
+          if (deps.store.nameTaken(name, current.id)) {
+            throw new Conflict("name is taken");
+          }
+          const updated = writeName(() =>
+            deps.store.updatePersonal(userId, {
+              name,
+              description: change.description ?? current.description,
+            }),
+          );
+          if (updated === null) throw new NotFound("no such project");
+          return { result: detail(updated) };
         });
         const body: ProjectResponse = { project };
         return json(body);

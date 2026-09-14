@@ -49,6 +49,12 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
+    method: "PATCH",
+    path: "/api/profile/project",
+    body: { description: "" },
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
     method: "POST",
     path: "/api/profile/password",
     // authenticated: the handler then checks the current password,

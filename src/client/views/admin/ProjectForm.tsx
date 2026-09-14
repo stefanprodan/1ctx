@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A team project in place: the name, the members with the picker as
-// the list's last line, and one foot for the whole row. Only the name
-// is saved by the foot; a member is added or removed at once.
+// A team project in place: the name and the description, the members
+// with the picker as the list's last line, and one foot for the whole
+// row. The foot saves the two fields; a member is added or removed at
+// once.
 
 import { useSignal } from "@preact/signals";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
@@ -12,13 +13,15 @@ import {
   createProject,
   deleteProject,
   removeProjectMember,
-  renameProject,
+  updateProject,
 } from "../../data/admin-projects.ts";
 import { initials, reason } from "../../lib/format.ts";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { RowsAvatar } from "../../ui/Rows.tsx";
-import { deleteLabel, nameProblem } from "./AdminProjects.model.ts";
+import { nameProblem } from "../projects/Project.model.ts";
+import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
+import { deleteLabel } from "./AdminProjects.model.ts";
 import { MemberPicker } from "./MemberPicker.tsx";
 import "./admin-projects.css";
 
@@ -80,13 +83,17 @@ export function ProjectForm({
   onDone: () => void;
 }) {
   const name = useSignal(project?.name ?? "");
+  const description = useSignal(project?.description ?? "");
   const asking = useSignal(false);
   const deleting = useSignal(false);
   const failure = useSignal<string | null>(null);
   const save = useSave(async () => {
-    const body = { name: name.value.trim() };
+    const body = {
+      name: name.value.trim(),
+      description: description.value.trim(),
+    };
     if (project === null) await createProject(body);
-    else await renameProject(project.id, body);
+    else await updateProject(project.id, body);
     if (project === null) onDone();
   });
   const remove = async () => {
@@ -109,25 +116,31 @@ export function ProjectForm({
     void save.run(nameProblem(name.value));
   };
   const busy = save.status.value === "busy" || deleting.value;
-  const dirty = project === null || name.value.trim() !== project.name;
+  const dirty =
+    project === null ||
+    name.value.trim() !== project.name ||
+    description.value.trim() !== project.description;
   return (
     <form class="admin-projects-form" onSubmit={submit}>
-      <label class="field admin-projects-name-field">
-        <span class="label">Name</span>
-        <input
-          name="name"
-          autocomplete="off"
-          spellcheck={false}
-          placeholder="platform"
-          disabled={busy}
-          value={name.value}
-          onInput={(event) => {
-            name.value = (event.currentTarget as HTMLInputElement).value;
-            save.touch();
-          }}
-        />
-        <span class="hint">Lowercase letters, digits and dashes.</span>
-      </label>
+      <NameField
+        class="admin-projects-name-field"
+        placeholder="platform"
+        disabled={busy}
+        value={name.value}
+        onInput={(value) => {
+          name.value = value;
+          save.touch();
+        }}
+      />
+      <DescriptionField
+        class="admin-projects-description-field"
+        disabled={busy}
+        value={description.value}
+        onInput={(value) => {
+          description.value = value;
+          save.touch();
+        }}
+      />
       {project !== null && (
         <section class="admin-projects-members">
           <span class="label">Members</span>

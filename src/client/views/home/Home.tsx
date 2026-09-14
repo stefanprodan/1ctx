@@ -9,7 +9,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { shortModel } from "../../agents/meta.ts";
+import { AgentsAside } from "../../agents/AgentsAside.tsx";
 import { navigate, query } from "../../app/router.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { me } from "../../data/me.ts";
@@ -21,11 +21,9 @@ import {
   sending,
 } from "../../data/sessions.ts";
 import { week } from "../../data/usage.ts";
-import { AvatarIcon } from "../../lib/avatars.tsx";
 import { count } from "../../lib/format.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
-import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import {
@@ -79,38 +77,7 @@ export function Home() {
                 </>
               )}
             </AsideSection>
-            <AsideSection
-              label="Agents"
-              action={
-                user.role === "admin" ? (
-                  <a class="split-link" href="/admin/agents">
-                    Manage
-                  </a>
-                ) : undefined
-              }
-            >
-              {agents === null ? (
-                <p class="split-empty">Loading</p>
-              ) : agents.length === 0 ? (
-                <p class="split-empty">No agents yet.</p>
-              ) : (
-                agents.map((a) => (
-                  <div key={a.id} class="split-line">
-                    <span class="split-tile">
-                      <AvatarIcon name={a.avatar} size={13} />
-                    </span>
-                    <span class="split-stack">
-                      <span class="split-name">{a.name}</span>
-                      <Fit
-                        class="split-faint"
-                        long={a.model.id}
-                        short={shortModel(a.model.id)}
-                      />
-                    </span>
-                  </div>
-                ))
-              )}
-            </AsideSection>
+            <AgentsAside agents={agents} admin={user.role === "admin"} />
           </>
         }
       >

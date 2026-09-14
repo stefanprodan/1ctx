@@ -36,7 +36,7 @@ describe("the route table", () => {
   test("every view loads and renders against fixture state", async () => {
     me.value = {
       id: "u1",
-      username: "oana",
+      username: "caelea",
       fullName: "Oana",
       role: "member",
       mustChangePassword: false,
