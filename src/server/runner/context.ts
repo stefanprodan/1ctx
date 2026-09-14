@@ -96,6 +96,60 @@ function workMessage(
   };
 }
 
+export const SKILLS_LEAD =
+  "These skills were loaded earlier in this chat and still apply. Load one again with the skill tool before relying on it:";
+
+function loadedSkills(
+  rows: Message[],
+  cut: number,
+  offered: Set<string>,
+): string[] {
+  let start = 0;
+  for (let i = cut - 1; i >= 0; i--) {
+    const row = rows[i]!;
+    if (row.kind === "summary" && row.status === "done") {
+      start = i + 1;
+      break;
+    }
+  }
+  const calls = new Map<string, ToolCall[]>();
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const row of rows.slice(start, cut)) {
+    const key = `${row.sendId}:${row.round}`;
+    if (row.kind === "reply" && row.slot === "work") {
+      calls.set(key, row.toolCalls ?? []);
+      continue;
+    }
+    if (
+      row.kind !== "tool" ||
+      row.status !== "done" ||
+      row.toolName !== "skill"
+    ) {
+      continue;
+    }
+    const call = calls
+      .get(key)
+      ?.find((item) => item.id === row.toolCallId && item.name === "skill");
+    if (call === undefined) continue;
+    try {
+      const args = JSON.parse(call.arguments || "{}") as Record<
+        string,
+        unknown
+      >;
+      if (
+        typeof args.name === "string" &&
+        offered.has(args.name) &&
+        !seen.has(args.name)
+      ) {
+        seen.add(args.name);
+        names.push(args.name);
+      }
+    } catch {}
+  }
+  return names;
+}
+
 export function history(
   rows: Message[],
   policy: Pick<
@@ -109,6 +163,7 @@ export function history(
     | "username"
     | "userId"
     | "automation"
+    | "offered"
   >,
   lookups: ContextLookups,
   now: number,
@@ -120,9 +175,16 @@ export function history(
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i]!;
     if (row.kind === "summary" && row.status === "done") {
+      const names = loadedSkills(
+        rows,
+        i,
+        new Set(policy.offered.skills.skills.map((skill) => skill.name)),
+      );
+      const remembered =
+        names.length === 0 ? "" : `\n\n${SKILLS_LEAD} ${names.join(", ")}`;
       out.push({
         role: "user",
-        content: `${SUMMARY_LEAD}\n\n${row.content}`,
+        content: `${SUMMARY_LEAD}\n\n${row.content}${remembered}`,
       });
       start = i + 1;
       break;

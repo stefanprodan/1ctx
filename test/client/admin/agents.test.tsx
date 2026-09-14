@@ -82,6 +82,7 @@ const coder: AgentSummary = {
   thinking: null,
   effort: null,
   prompt: "",
+  skills: [],
   createdAt: 0,
 };
 

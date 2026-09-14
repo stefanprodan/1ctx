@@ -43,6 +43,7 @@ const agent: AgentRow = {
   thinking: null,
   effort: "high",
   prompt: "",
+  skills: [],
   createdAt: 1,
 };
 

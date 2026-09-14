@@ -686,6 +686,7 @@ describe("the area reads the key at each call", () => {
       version: "vtest",
       render: (md) => md,
       searchDeps: dependencies(fetcher as never),
+      skills: { forAgent: () => [], body: () => null, file: () => null },
     });
     area.store.setProvider("exa", Date.now());
     return area;
@@ -699,7 +700,7 @@ describe("the area reads the key at each call", () => {
       return exaResponse();
     }) as typeof fetch;
     const area = areaWith(secrets, fetcher);
-    const offered = area.offered(Date.now());
+    const offered = area.offered(Date.now(), "");
     expect(offered.search).toBe("exa");
     const result = await area.run(
       offered,
@@ -718,7 +719,7 @@ describe("the area reads the key at each call", () => {
     }) as unknown as typeof fetch;
     const area = areaWith(secrets, fetcher);
     const result = await area.run(
-      area.offered(Date.now()),
+      area.offered(Date.now(), ""),
       { id: "s", name: "websearch", arguments: '{"query":"find"}' },
       context(),
     );
@@ -747,7 +748,7 @@ describe("the area reads the key at each call", () => {
       );
     }) as typeof fetch;
     const area = areaWith(secrets, fetcher);
-    const offered = area.offered(Date.now());
+    const offered = area.offered(Date.now(), "");
     expect(offered.search).toBe("exa");
     // the file is gone before the call runs
     delete secrets.exa;

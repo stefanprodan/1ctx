@@ -26,6 +26,12 @@ export function shortArg(name: string, args: string): string {
       const zone = value.timezone ?? value.zone;
       return typeof zone === "string" ? zone : "";
     }
+    if (name === "skill" && typeof value.name === "string") {
+      return value.name;
+    }
+    if (name === "skill_file" && typeof value.path === "string") {
+      return value.path;
+    }
     const telling = Object.values(value).find(
       (item) => typeof item === "string",
     );

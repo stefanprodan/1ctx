@@ -10,6 +10,7 @@ import {
   EXHAUSTED_LINE,
   history,
   request,
+  SKILLS_LEAD,
   SUMMARIZE,
   SUMMARY_LEAD,
   summaryRequest,
@@ -24,7 +25,11 @@ import type { Message } from "../../../src/shared/contracts/session.ts";
 
 const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
 
-const NONE: Offered = { tools: [], search: null };
+const NONE: Offered = {
+  tools: [],
+  search: null,
+  skills: { block: "", skills: [] },
+};
 
 const policy: SendPolicy = {
   projectId: "p",
@@ -406,6 +411,7 @@ describe("history", () => {
       offered: {
         tools: [{ name: "time", description: "d", parameters: {} }],
         search: null,
+        skills: { block: "", skills: [] },
       },
     };
     const req = summaryRequest(withTools, "s1", [
@@ -450,6 +456,7 @@ describe("history", () => {
       offered: {
         tools: [{ name: "time", description: "d", parameters: {} }],
         search: null,
+        skills: { block: "", skills: [] },
       },
     };
     const req = request(withTools, "s1", []);
@@ -491,5 +498,87 @@ describe("withExhausted", () => {
       content: EXHAUSTED_LINE,
     });
     expect(messages).toHaveLength(2);
+  });
+});
+
+describe("skills after a summary", () => {
+  const withSkills: SendPolicy = {
+    ...policy,
+    offered: {
+      tools: [],
+      search: null,
+      skills: {
+        block: "catalog",
+        skills: [
+          { id: "sk1", name: "ops", description: "ops", hasFiles: false },
+        ],
+      },
+    },
+  };
+  const work = (id: string, name: string, sendId: string) =>
+    row({
+      id: `w-${id}`,
+      kind: "reply",
+      slot: "work",
+      sendId,
+      toolCalls: [
+        {
+          id,
+          name: "skill",
+          arguments: JSON.stringify({ name }),
+        },
+      ],
+    });
+  const loaded = (
+    id: string,
+    name: string,
+    sendId: string,
+    status: Message["status"] = "done",
+  ) =>
+    row({
+      id: `t-${id}`,
+      kind: "tool",
+      sendId,
+      toolCallId: id,
+      toolName: "skill",
+      status,
+      content: name,
+    });
+
+  test("names first successful loads since the previous summary", () => {
+    const rows = [
+      row({ id: "s1", kind: "summary", content: "old summary" }),
+      work("c1", "ops", "one"),
+      loaded("c1", "ops", "one"),
+      work("c2", "ops", "two"),
+      loaded("c2", "ops", "two"),
+      work("c3", "gone", "three"),
+      loaded("c3", "gone", "three"),
+      work("c4", "ops", "four"),
+      loaded("c4", "ops", "four", "failed"),
+      row({ id: "s2", kind: "summary", content: "latest summary" }),
+      work("c5", "ops", "five"),
+      loaded("c5", "ops", "five"),
+    ];
+    const messages = history(rows, withSkills, lookups, NOW);
+    expect(messages[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nlatest summary\n\n${SKILLS_LEAD} ops`,
+    );
+    expect((messages[1]?.content ?? "").match(/ops/g)).toHaveLength(1);
+  });
+
+  test("adds no line when the snapshot no longer offers the loaded skill", () => {
+    const without = {
+      ...withSkills,
+      offered: { ...withSkills.offered, skills: { block: "", skills: [] } },
+    };
+    const rows = [
+      work("c1", "ops", "one"),
+      loaded("c1", "ops", "one"),
+      row({ id: "s", kind: "summary", content: "summary" }),
+    ];
+    expect(history(rows, without, lookups, NOW)[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsummary`,
+    );
   });
 });

@@ -27,7 +27,7 @@ type Raw = {
   created_at: number;
 };
 
-const row = (raw: Raw): AgentRow => ({
+const row = (raw: Raw, skills: string[]): AgentRow => ({
   id: raw.id,
   name: raw.name,
   avatar: raw.avatar,
@@ -44,7 +44,7 @@ const row = (raw: Raw): AgentRow => ({
   thinking: raw.thinking,
   effort: raw.effort,
   prompt: raw.prompt,
-  skills: [],
+  skills,
   createdAt: raw.created_at,
 });
 
@@ -59,30 +59,34 @@ export type AgentFields = {
   thinking: "on" | "off" | null;
   effort: Effort | null;
   prompt: string;
+  skills: string[];
 };
 
 export class AgentStore {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly assigned: (agentId: string) => string[],
+  ) {}
 
   list(): AgentRow[] {
     return this.db
       .query<Raw, []>("select * from agents order by created_at, name")
       .all()
-      .map(row);
+      .map((raw) => row(raw, this.assigned(raw.id)));
   }
 
   byId(id: string): AgentRow | null {
     const raw = this.db
       .query<Raw, [string]>("select * from agents where id = ?")
       .get(id);
-    return raw ? row(raw) : null;
+    return raw ? row(raw, this.assigned(raw.id)) : null;
   }
 
   byName(name: string): AgentRow | null {
     const raw = this.db
       .query<Raw, [string]>("select * from agents where name = ?")
       .get(name);
-    return raw ? row(raw) : null;
+    return raw ? row(raw, this.assigned(raw.id)) : null;
   }
 
   usesProvider(providerId: string): boolean {

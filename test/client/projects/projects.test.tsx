@@ -525,6 +525,7 @@ describe("the pages", () => {
         thinking: null,
         effort: null,
         prompt: "",
+        skills: [],
         createdAt: 0,
       } as never,
     ];

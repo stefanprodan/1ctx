@@ -70,6 +70,7 @@ describe("Home", () => {
         thinking: null,
         effort: null,
         prompt: "",
+        skills: [],
         createdAt: 1_756_684_800_000,
       },
     ];

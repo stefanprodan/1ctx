@@ -199,7 +199,11 @@ function fakeTools(plans: Record<string, ToolPlan>): { tools: FakeToolsCap } {
   ];
   return {
     tools: {
-      offered: () => ({ tools: schemas, search: null }),
+      offered: () => ({
+        tools: schemas,
+        search: null,
+        skills: { block: "", skills: [] },
+      }),
       async run(_offered, c, ctx) {
         const plan = plans[c.id] ?? {
           result: { content: `ran ${c.name}`, error: false },
@@ -1289,6 +1293,60 @@ describe("socket fixtures", () => {
     const conn2 = await watcher(chat);
     watch(chat, conn2, sessionId);
     write("dropped-then-reconnect", { kind: "fetched", detail }, conn2);
+    chat.app.socket.dispose();
+  });
+
+  // ----- a skill tool row, over the real tools cap and a real skill -----
+
+  test("a skill tool round then an answer", async () => {
+    // the default chatApp uses the real tools area and the real skills
+    // capability, so a skill assigned to the agent is offered and a
+    // scripted skill call runs the real skill tool, writing a tool row
+    // whose name is "skill", the fixture the client's skill fold reads
+    const chat = await chatApp();
+    chat.app.skills.create(
+      {
+        name: "gitops-knowledge",
+        description: "Flux CD expert",
+        body: "Use the gitops skill.",
+        license: "",
+        compatibility: "",
+        metadata: {},
+        allowedTools: "",
+        sourceKind: "file",
+        sourceUrl: "https://skills.test/gitops.md",
+        sourceSelect: "",
+        sourceDigest: "",
+        digest: "gitops-digest",
+        dropped: [],
+        droppedMore: 0,
+        files: [],
+      },
+      chat.app.now.value,
+    );
+    const skill = chat.app.skills.list()[0]!;
+    chat.app.skills.assign(chat.agentId, [skill.id]);
+    const conn = await watcher(chat);
+    const { detail, script, sessionId } = await startChat(chat, "flux help");
+    watch(chat, conn, sessionId);
+    toolRound(script, [
+      {
+        id: "c1",
+        name: "skill",
+        arguments: JSON.stringify({ name: "gitops-knowledge" }),
+      },
+    ]);
+    const r2 = await chat.scripted.next();
+    r2.reply("Here is what the skill says.");
+    await settle(chat, 10);
+    record("skill-tool-round", detail, conn);
+    const row = chat.app.sessions
+      .messages(sessionId)
+      .find((message) => message.kind === "tool")!;
+    expect(row.toolName).toBe("skill");
+    expect(row.status).toBe("done");
+    const send = chat.app.sessions.send(detail.send.id)!;
+    expect(send).toMatchObject({ status: "done", rounds: 2, toolCalls: 1 });
     chat.app.socket.dispose();
   });
 });

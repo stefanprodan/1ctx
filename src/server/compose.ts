@@ -152,6 +152,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     db,
     clock,
     providers,
+    skills,
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
     automations: {
@@ -176,6 +177,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       log: options.log("tools"),
       version: options.version,
       render: renderMarkdown,
+      skills,
     });
   const socket = socketArea({
     refresh: (principal) => access.refresh(principal),

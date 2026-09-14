@@ -10,6 +10,7 @@ import {
   isAvatar,
   isName,
   MAX_NAME,
+  MAX_SKILLS_PER_AGENT,
   MIN_NAME,
   NAME_CHARACTERS,
 } from "../../shared/words.ts";
@@ -63,6 +64,21 @@ export function parseAgent(body: unknown): ParsedAgent {
       `prompt must be text of at most ${MAX_PROMPT} characters`,
     );
   }
+  const skills = b.skills ?? [];
+  if (
+    !Array.isArray(skills) ||
+    skills.some((id) => typeof id !== "string" || id === "")
+  ) {
+    throw new BadRequest("skills must be an array of ids");
+  }
+  if (skills.length > MAX_SKILLS_PER_AGENT) {
+    throw new BadRequest(
+      `an agent may have at most ${MAX_SKILLS_PER_AGENT} skills`,
+    );
+  }
+  if (new Set(skills).size !== skills.length) {
+    throw new BadRequest("skills must not repeat");
+  }
   return {
     name: b.name,
     avatar,
@@ -71,6 +87,6 @@ export function parseAgent(body: unknown): ParsedAgent {
     thinking: b.thinking,
     effort: b.effort,
     prompt: prompt.trim(),
-    skills: [],
+    skills,
   };
 }

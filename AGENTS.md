@@ -209,6 +209,13 @@ violation, and every rule has a rejected fixture under
   checked on add and refresh. Refresh is explicit and never renames the
   skill; deleting one an agent names is a 409. Stored text is cleaned and
   shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
+- **An agent's skills are one send snapshot.** Their capped catalog from
+  `shared/skills.ts` sits in the prompt before the date line. The `skill`
+  tool's name is an enum of that catalog, and `skill_file` is offered only
+  when it can answer. These two tools come from skills, never the tools
+  rows or the Tools page, a deliberate exception to the offered-set rule.
+  A call reads the current body by the snapshot's id and name. After a
+  summary, the user message names still-offered skills loaded before it.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a
