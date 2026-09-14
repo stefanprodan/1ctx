@@ -92,14 +92,19 @@ describe("Home", () => {
     expect(html).not.toContain("Manage");
     week.value = {
       since: 0,
+      until: 1,
+      sends: 1_284,
       sessions: 637,
       promptTokens: 2_130_000,
       completionTokens: 12_400,
     };
     const again = render(<Home />);
+    expect(again).toContain('class="split-value">1.28k<');
     expect(again).toContain('class="split-value">637<');
     // prompt and completion tokens as one number
     expect(again).toContain('class="split-value">2.14M<');
+    // the recent weeks are the project page's, not Home's
+    expect(again).not.toContain("activity-grid");
   });
 
   test("renders the rows with the project name and the state line", () => {

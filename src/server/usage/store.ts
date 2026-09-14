@@ -1,7 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { WeekUsageResponse } from "../../shared/api/usage.ts";
+import type {
+  DaysUsageResponse,
+  WeekUsageResponse,
+} from "../../shared/api/usage.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -32,12 +35,23 @@ export type UsageRow = Omit<UsageFields, "now"> & {
 };
 
 type WeekRaw = {
+  sends: number;
   sessions: number;
   prompt_tokens: number;
   completion_tokens: number;
 };
 
-type WeekTotals = Omit<WeekUsageResponse, "since">;
+type WeekTotals = Omit<WeekUsageResponse, "since" | "until">;
+type DaysTotals = Pick<DaysUsageResponse, "total" | "projects">;
+
+type DayRaw = {
+  project_id: string;
+  day_index: number;
+  sends: number;
+  tokens: number;
+};
+
+type TotalRaw = { sends: number; tokens: number };
 
 type Raw = {
   id: string;
@@ -139,25 +153,82 @@ export class UsageStore {
       .map(row);
   }
 
-  week(projectIds: string[], since: number): WeekTotals {
+  week(projectIds: string[], since: number, until: number): WeekTotals {
     if (projectIds.length === 0) {
-      return { sessions: 0, promptTokens: 0, completionTokens: 0 };
+      return { sends: 0, sessions: 0, promptTokens: 0, completionTokens: 0 };
     }
     const marks = projectIds.map(() => "?").join(", ");
     const raw = this.db
       .query<WeekRaw, (string | number)[]>(
-        `select count(distinct session_id) as sessions,
+        `select count(distinct send_id) as sends,
+                count(distinct session_id) as sessions,
                 coalesce(sum(prompt_tokens), 0) as prompt_tokens,
                 coalesce(sum(completion_tokens), 0) as completion_tokens
            from usage
-          where project_id in (${marks}) and created_at >= ?`,
+          where project_id in (${marks})
+            and created_at >= ? and created_at < ?`,
       )
-      .get(...projectIds, since)!;
+      .get(...projectIds, since, until)!;
     return {
+      sends: raw.sends,
       sessions: raw.sessions,
       promptTokens: raw.prompt_tokens,
       completionTokens: raw.completion_tokens,
     };
+  }
+
+  days(projectIds: string[], starts: number[], until: number): DaysTotals {
+    const projects = projectIds.map((projectId) => ({
+      projectId,
+      usage: starts.map(() => ({ sends: 0, tokens: 0 })),
+    }));
+    if (projectIds.length === 0 || starts.length === 0) {
+      return { total: { sends: 0, tokens: 0 }, projects };
+    }
+    const since = starts[0]!;
+    const ids = JSON.stringify(projectIds);
+    const rows = this.db
+      .query<DayRaw, [number, string, string]>(
+        `with day_starts as materialized (
+           select cast(key as integer) as day_index,
+                  cast(value as integer) as start_at,
+                  lead(cast(value as integer), 1, ?) over (
+                    order by cast(key as integer)
+                  ) as end_at
+             from json_each(?)
+         ), project_ids as materialized (
+           select cast(value as text) as project_id from json_each(?)
+         )
+         select p.project_id, d.day_index,
+                count(distinct u.send_id) as sends,
+                sum(u.prompt_tokens + u.completion_tokens) as tokens
+           from project_ids p
+          cross join day_starts d
+          cross join usage u
+          where u.project_id = p.project_id
+            and u.created_at >= d.start_at and u.created_at < d.end_at
+          group by p.project_id, d.day_index`,
+      )
+      .all(until, JSON.stringify(starts), ids);
+    const byProject = new Map(
+      projects.map((project) => [project.projectId, project]),
+    );
+    for (const raw of rows) {
+      byProject.get(raw.project_id)!.usage[raw.day_index] = {
+        sends: raw.sends,
+        tokens: raw.tokens,
+      };
+    }
+    const total = this.db
+      .query<TotalRaw, [string, number, number]>(
+        `select count(distinct send_id) as sends,
+                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens
+           from usage
+          where project_id in (select value from json_each(?))
+            and created_at >= ? and created_at < ?`,
+      )
+      .get(ids, since, until)!;
+    return { total, projects };
   }
 
   deleteSend(sendId: string): boolean {

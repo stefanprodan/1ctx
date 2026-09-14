@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the user's projects spent over the past seven days, as an aside
-// section: the sessions and the tokens, once the route's load answers.
+// section: the sessions, the turns and the tokens, once the route's load
+// answers.
 
 import { week } from "../../data/usage.ts";
 import { count } from "../../lib/format.ts";
@@ -19,6 +20,10 @@ export function WeekAside() {
           <div class="split-line">
             <span class="split-value">{count(spent.sessions)}</span>
             sessions
+          </div>
+          <div class="split-line">
+            <span class="split-value">{count(spent.sends)}</span>
+            {spent.sends === 1 ? "turn" : "turns"}
           </div>
           <div class="split-line">
             <span class="split-value">
