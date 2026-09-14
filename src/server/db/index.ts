@@ -1,11 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The one SQLite file: open it in WAL mode, apply the migrations in order,
-// and run compound writes through transact(). A transaction body returns
-// its result and the events it wants published; they are published only
-// after the outermost commit and never on a throw, so a publisher cannot
-// get it wrong.
+// A transaction body returns its events instead of publishing them, so
+// they go out only after the outermost commit and never on a throw.
 
 import { Database } from "bun:sqlite";
 import { type BusEvent, publish } from "../lib/bus.ts";
@@ -25,9 +22,6 @@ export function open(path: string): Db {
   return db;
 }
 
-// the applied ids live in the meta table; a fresh file gets every
-// migration, an older file the ones after its last. A migration that
-// throws leaves no trace: its statements and its row roll back together.
 export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {
   db.exec(
     "create table if not exists migrations (id text primary key, applied_at integer not null)",
@@ -53,10 +47,9 @@ export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {
   return ran;
 }
 
-// the events every open body collected so far, per db, held until the
-// outermost body commits. A body that throws truncates back to where it
-// started, so a savepoint that rolled back leaves no event behind, even
-// when a body above it catches the throw and commits.
+// A body that throws truncates back to where it started, so a savepoint
+// that rolled back leaves no event behind, even when a body above it
+// catches the throw and commits.
 const pending = new WeakMap<Db, BusEvent[]>();
 
 export function transact<T>(db: Db, body: () => Transaction<T>): T {

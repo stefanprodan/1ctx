@@ -53,7 +53,7 @@ export type AgentFields = {
   name: string;
   avatar: Avatar;
   providerId: string;
-  // what the catalog said about the model when it was picked
+  // a snapshot: the catalog may change or drop the model later
   model: CatalogMatch;
   thinking: "on" | "off" | null;
   effort: Effort | null;

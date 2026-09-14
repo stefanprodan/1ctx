@@ -33,8 +33,7 @@ const row = (raw: Raw): ProviderRow => ({
   createdAt: raw.created_at,
 });
 
-// the row as the wire shows it: whether the key file is there, never
-// what it holds
+// the wire says whether the key file is there, never what it holds
 export const summary = (
   provider: ProviderRow,
   hasKey: boolean,

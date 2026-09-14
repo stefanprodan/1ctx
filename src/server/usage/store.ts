@@ -20,14 +20,13 @@ export type UsageFields = {
   cachedTokens: number | null;
   reasoningTokens: number | null;
   cost: number | null;
-  // the model's window as the policy saw it
+  // the window as the policy saw it, not as the agent says it now
   contextLength: number | null;
   now: number;
 };
 
 export type UsageRow = Omit<UsageFields, "now"> & {
   id: string;
-  // the order within the session, from 1
   seq: number;
   createdAt: number;
 };
@@ -180,7 +179,6 @@ export class UsageStore {
       .run(sessionId).changes;
   }
 
-  // the last round the provider counted for a session
   latest(sessionId: string): RoundUsage | null {
     const raw = this.db
       .query<Raw, [string]>(
@@ -190,7 +188,6 @@ export class UsageStore {
     return raw ? usageOf(raw) : null;
   }
 
-  // the same for many sessions in one query, for a list
   latestFor(sessionIds: string[]): Map<string, RoundUsage> {
     const out = new Map<string, RoundUsage>();
     if (sessionIds.length === 0) return out;

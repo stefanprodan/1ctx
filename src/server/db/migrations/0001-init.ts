@@ -150,15 +150,11 @@ export const m0001: Migration = {
         created_at integer not null,
         finished_at integer,
         unique (session_id, seq),
-        -- a non-reply row shows nowhere by slot and asks for no calls
         check (kind = 'reply' or (slot is null and tool_calls is null)),
-        -- a tool row names its call and tool; every other row names
-        -- neither
         check (
           (kind = 'tool') = (tool_call_id is not null)
           and (kind = 'tool') = (tool_name is not null)
         ),
-        -- a reply that has stopped streaming has been placed
         check (kind <> 'reply' or status = 'streaming' or slot is not null)
       );
       create unique index messages_answer

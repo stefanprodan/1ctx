@@ -1,9 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The boot repair: every session named by a running session or send or
-// a streaming message ends as failed with cause restart. Each gets its
-// revision and its envelope rather than a global change nobody hears.
+// Each repaired session gets its own revision and envelope rather than
+// a global change nobody hears.
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";

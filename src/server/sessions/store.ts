@@ -44,8 +44,6 @@ export class SessionStore {
     return raw ? session(raw, this.usage.latest(raw.id)) : null;
   }
 
-  // the stream: the sessions of the given projects, running first, then
-  // by last activity, the title searched when there is a query
   list(projectIds: string[], q: string, limit = STREAM_LIMIT): StreamRow[] {
     if (projectIds.length === 0) return [];
     const marks = projectIds.map(() => "?").join(", ");
@@ -92,8 +90,6 @@ export class SessionStore {
     return this.byId(id)!;
   }
 
-  // the one way a session changes: its status and activity move and
-  // the revision counts it
   touch(
     id: string,
     fields: { status: SessionStatus; now: number },
@@ -106,7 +102,6 @@ export class SessionStore {
     return this.byId(id);
   }
 
-  // the title is the user's word; the revision counts the change
   rename(id: string, title: string): SessionRow | null {
     this.db
       .query(
@@ -184,8 +179,7 @@ export class SessionStore {
   }
 
   // the runner generates the ids before any insert and writes the send
-  // row first, so send_id holds without a deferred foreign key. round
-  // is the provider round the message belongs to, from 1
+  // row first, so send_id holds without a deferred foreign key
   addUserMessage(fields: {
     id?: string;
     sessionId: string;
@@ -216,8 +210,6 @@ export class SessionStore {
   replaceSend(user: Message, newSendId: string) {
     return replaceSendRows(this.db, user, newSendId);
   }
-  // a streaming reply for a round: a null slot until it is placed. The
-  // first round of a send is round 1; startRound bumps it
   addReply(fields: {
     id?: string;
     sessionId: string;
@@ -242,7 +234,6 @@ export class SessionStore {
     return addAgentMessage(this.db, "summary", fields);
   }
 
-  // the checkpoint of a reply in flight: what a crash keeps
   writeReply(
     id: string,
     fields: {
@@ -298,9 +289,7 @@ export class SessionStore {
     return changed ? this.message(id) : null;
   }
 
-  // the row moves into the fold at the first call delta of a round: a
-  // streaming reply with a null slot becomes "work". Guarded by the
-  // null slot, so a second delta writes nothing and answers null
+  // guarded by the null slot, so a second call delta writes nothing
   markRoundWork(id: string): Message | null {
     const sql =
       "update messages set slot = 'work' where id = ? and kind = 'reply' and status = 'streaming' and slot is null";
@@ -308,8 +297,7 @@ export class SessionStore {
     return changed ? this.message(id) : null;
   }
 
-  // place a reply's slot without ending it; the repair uses it to make
-  // a null-slot reply it ends an "answer"
+  // the repair places a reply before it ends it
   markSlot(id: string, slot: "work" | "answer"): Message | null {
     const changed =
       this.db
@@ -320,10 +308,8 @@ export class SessionStore {
     return changed ? this.message(id) : null;
   }
 
-  // one streaming tool row per launched call: the call id and tool name
-  // the row answers, the content filled when the tool ends. The ids and
-  // seqs come in order from the caller so a batch is one statement's
-  // worth of rows
+  // the caller hands the ids and seqs in order, so a batch is one
+  // statement's worth of rows
   addToolRows(
     calls: {
       id?: string;
@@ -356,10 +342,8 @@ export class SessionStore {
     });
   }
 
-  // a tool row ends: the result text the model gets and its status,
-  // guarded by status = 'streaming', so a late tool after a terminal
-  // cleanup writes nothing. The updated row, or null when the guard
-  // caught it
+  // guarded by status, so a tool that ends after a terminal cleanup
+  // writes nothing
   finishTool(
     id: string,
     fields: {
@@ -433,7 +417,6 @@ export class SessionStore {
       status: Exclude<SessionStatus, "running">;
       cause: SendCause;
       error: string | null;
-      // the send's final counters: provider rounds and calls launched
       rounds: number;
       toolCalls: number;
       finishedAt: number;
@@ -455,8 +438,6 @@ export class SessionStore {
     return this.send(id);
   }
 
-  // the running counters as the loop advances, without ending the send:
-  // startRound bumps rounds, a round's launched calls bump tool_calls
   bumpCounters(
     id: string,
     fields: { rounds: number; toolCalls: number },
@@ -469,8 +450,8 @@ export class SessionStore {
     return this.send(id);
   }
 
-  // end what a crash left running; the rows are read back through
-  // this store so the envelope carries them
+  // the rows are read back through this store so the envelope carries
+  // them
   repair(now: number, error: string): RepairedSession[] {
     return repairRows(this.db, now, error, {
       touch: (id) => this.touch(id, { status: "failed", now })!,
