@@ -319,6 +319,7 @@ describe("admin users", () => {
         expect(promoted.status).toBe(200);
         expect(conn.data.projects.has("team")).toBe(true);
         expect(conn.data.principal.role).toBe("admin");
+        expect(conn.frames).toContainEqual({ type: "role", role: "admin" });
         conn.frames = [];
         app.socket.message(
           conn,
@@ -341,6 +342,7 @@ describe("admin users", () => {
         expect(demoted.status).toBe(200);
         expect(conn.data.projects.has("team")).toBe(false);
         expect(conn.data.principal.role).toBe("member");
+        expect(conn.frames).toContainEqual({ type: "role", role: "member" });
         expect(conn.frames).toContainEqual({
           type: "revoked",
           projectId: "team",

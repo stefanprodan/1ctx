@@ -129,6 +129,11 @@ function connect(): void {
       if (watching !== null) send({ type: "watch", sessionId: watching });
       void deps.reload();
     }
+    // the user's own row, like the revocation below: the loaders and
+    // the rail follow me, so the new role opens or closes what it may
+    if (parsed.type === "role" && me.value && me.value.role !== parsed.role) {
+      setMe({ ...me.value, role: parsed.role });
+    }
     for (const d of dispatchers) d(parsed);
   };
   ws.onclose = (ev) => {

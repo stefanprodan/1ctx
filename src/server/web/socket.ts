@@ -108,7 +108,11 @@ export function socketArea(deps: SocketDeps): Socket {
       conn.close(CLOSE_REVOKED, "signed out");
       return;
     }
+    const roleChanged = principal.role !== conn.data.principal.role;
     conn.data.principal = principal;
+    // the tab's user carries the role the rail and the menus read, and
+    // nothing else tells it the role moved
+    if (roleChanged) deliver(conn, { type: "role", role: principal.role });
     const ids = deps.visibleProjectIds(principal.userId);
     if (ids === null) {
       conn.close(CLOSE_REVOKED, "signed out");

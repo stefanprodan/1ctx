@@ -9,6 +9,7 @@ import { compose } from "../../src/server/compose.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import {
+  chatMarkdown,
   RESTART_ERROR,
   RESULT_DISPLAY_CHARS,
   SessionStore,
@@ -1242,5 +1243,104 @@ describe("the tool-loop store", () => {
     })!;
     expect(ended).toMatchObject({ rounds: 2, toolCalls: 3, status: "done" });
     db.close();
+  });
+});
+
+describe("GET /api/sessions/:id/markdown", () => {
+  test("writes the messages and answers and leaves the work out", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s1",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "user1",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "user1",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "what time is it?",
+      now: 0,
+    });
+    const work = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    finishStoredReply(store, work.id, "let me check", "work");
+    const [tool] = store.addToolRows([
+      {
+        sessionId: session.id,
+        sendId: send.id,
+        round: 1,
+        toolCallId: "c1",
+        toolName: "get_current_time",
+        now: 1,
+      },
+    ]);
+    store.finishTool(tool.id, {
+      content: "12:00",
+      status: "done",
+      error: null,
+      finishedAt: 2,
+    });
+    const answer = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 2,
+      agentId: "a",
+      model: "m",
+      now: 2,
+    });
+    finishStoredReply(store, answer.id, "It is noon.\n", "answer");
+    expect(
+      chatMarkdown(session.title, store.exportRows(session.id), "UTC"),
+    ).toBe(
+      "# chat\n\n## @user 1970-01-01 00:00\n\nwhat time is it?\n\n## @agent 1970-01-01 00:00\n\nIt is noon.\n",
+    );
+    db.close();
+  });
+
+  test("answers the file in the caller's zone to whoever sees the chat", async () => {
+    const chat = await chatApp();
+    // the fake clock starts at 00:16:40 UTC on the epoch
+    expect(chat.app.now.value).toBe(1_000_000);
+    const path = (id: string, query = "?tz=Asia%2FTokyo") =>
+      `/api/sessions/${id}/markdown${query}`;
+    const started = await startChat(chat, "Plan the release, v2!");
+    const running = await chat.member.call("GET", path(started.sessionId));
+    expect(running.status).toBe(200);
+    expect(await running.text()).toBe(
+      "# Plan the release, v2!\n\n## @caelea 1970-01-01 09:16\n\nPlan the release, v2!\n",
+    );
+    chat.app.now.value += 60_000;
+    await finish(started.script, "Ship it.");
+    const res = await chat.member.call("GET", path(started.sessionId));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe(
+      "text/markdown; charset=utf-8",
+    );
+    expect(res.headers.get("content-disposition")).toBe(
+      'attachment; filename="plan-the-release-v2.md"',
+    );
+    expect(await res.text()).toBe(
+      "# Plan the release, v2!\n\n## @caelea 1970-01-01 09:16\n\nPlan the release, v2!\n\n## @coder 1970-01-01 09:17\n\nShip it.\n",
+    );
+    for (const query of ["", "?tz=Mars%2FOlympus", "?tz=UTC&x=1"]) {
+      expect(
+        (await chat.member.call("GET", path(started.sessionId, query))).status,
+      ).toBe(400);
+    }
+    const hidden = await chat.admin.call("GET", path(started.sessionId));
+    expect(hidden.status).toBe(404);
+    chat.app.socket.dispose();
   });
 });

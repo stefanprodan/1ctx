@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One chat: the crumb is its project, the title its own, and for a
-// personal chat the title opens the menu; /rename in the composer
+// One chat: the crumb is its project, the title its own and opens the
+// menu, with Delete for the chat's owner and for an admin, as the
+// server allows; /rename in the composer
 // changes the title; the transcript
 // flows down the page and the composer stays at the bottom of the
 // window in the transcript's foot. Leaving the page ends the watch on
@@ -18,6 +19,7 @@ import {
   deleteSession,
   leaveSession,
   live,
+  markdownHref,
   projectAgents,
   regenerateSession,
   renameSession,
@@ -59,13 +61,16 @@ export function Chat({ params }: { params: Params }) {
       crumbHref={projectId === null ? undefined : `/projects/${projectId}`}
       title={shown?.session.title ?? "Chat"}
       menu={
-        shown !== null && listed?.kind === "personal" ? (
+        shown !== null ? (
           <Menu
             key={shown.session.id}
             title={shown.session.title}
             running={shown.session.status === "running" || sending.value}
-            onDelete={() =>
-              deleteSession(shown.session.id, shown.session.projectId)
+            download={markdownHref(shown.session.id)}
+            onDelete={
+              user?.id === shown.session.ownerId || user?.role === "admin"
+                ? () => deleteSession(shown.session.id, shown.session.projectId)
+                : undefined
             }
           />
         ) : undefined

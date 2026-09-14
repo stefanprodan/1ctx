@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Both usage routes take the caller's zone; the days route may also
-// take how many weeks, up to the year. Anything else is a 400, as every
-// parser answers the unexpected.
+// Both usage routes and the chat export take the caller's zone; the
+// days route may also take how many weeks, up to the year. Anything
+// else is a 400, as every parser answers the unexpected.
 
 import { BadRequest } from "../lib/errors.ts";
 import { MAX_WEEKS } from "./window.ts";
@@ -33,7 +33,7 @@ function zoneOf(url: URL): string {
   return timeZone;
 }
 
-export function parseWeekUsageQuery(url: URL): string {
+export function parseZoneQuery(url: URL): string {
   only(url, ["tz"]);
   return zoneOf(url);
 }

@@ -246,6 +246,14 @@ violation, and every rule has a rejected fixture under
   a member who did not start the chat gets 403. Neither may change a
   running chat; a rename is one revision and one envelope without rows,
   and a delete removes its usage rows.
+  `GET /api/sessions/:id/markdown?tz=` is the chat as a file for
+  anyone who sees it (`sessions/markdown.ts`, pure): the title, then
+  per send the user message and the agent's turn under `@author
+  YYYY-MM-DD HH:mm` in the zone, the answer with the transcript's cut
+  line (stopped, the error, cut at max tokens); no work, tools,
+  summaries or running turns, and the title and errors escaped. The
+  chat menu offers Download to everyone and Delete to the owner and
+  admins; its `<h1>` is the title button alone.
 - **Compaction is a final provider round.** A summary is a message of
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through
@@ -288,7 +296,9 @@ violation, and every rule has a rejected fixture under
   writer through a port. `watch` is authorized through a port to
   sessions and answered with `watched` and the runner's live snapshot.
   `access.changed` recomputes a connection's set and sends `granted`
-  for a project that joined it or `revoked` for one that left it; `login.revoked` closes the login's
+  for a project that joined it or `revoked` for one that left it, and
+  `role` when the user's role moved, which `data/socket.ts` applies to
+  `me`; `login.revoked` closes the login's
   connections, and the expiry sweep publishes it too. Backpressure
   closes a slow connection; a dropped frame closes with 1013; the
   client reloads on every open. The upgrade is `GET /api/socket` with
