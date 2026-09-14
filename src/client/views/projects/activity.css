@@ -1,0 +1,102 @@
+/* The Activity card's heatmap and a project row's strip: cells shaded
+   by level on the grey ramp. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .activity-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  /* the weeks share the width the card measured them for, and a cell is
+     as tall as wide */
+  .activity-grid {
+    display: grid;
+    grid-template-columns: auto;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 3px;
+    border-radius: var(--radius);
+    outline-offset: var(--space-1);
+  }
+  /* Home's aside: no label column or row, so every track is a week or a
+     day, and a tighter gap for the narrow column */
+  .activity-grid-compact {
+    grid-template-columns: none;
+    grid-template-rows: none;
+    gap: 2px;
+  }
+
+  .activity-month,
+  .activity-weekday {
+    font-family: var(--mono);
+    font-size: var(--text-tiny);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .activity-weekday {
+    align-self: center;
+    padding-right: var(--space-2);
+  }
+  .activity-month {
+    padding-bottom: 2px;
+  }
+
+  .activity-cell {
+    display: block;
+    aspect-ratio: 1;
+    border-radius: var(--radius-cell);
+    cursor: default;
+  }
+  .activity-level-0 {
+    background: var(--line);
+  }
+  .activity-level-1 {
+    background: var(--line-strong);
+  }
+  .activity-level-2 {
+    background: var(--faint);
+  }
+  .activity-level-3 {
+    background: var(--dim);
+  }
+  .activity-level-4 {
+    background: var(--fg);
+  }
+  .activity-selected {
+    outline: 1px solid var(--fg);
+    outline-offset: 1px;
+  }
+
+  .activity-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: var(--text-tiny);
+    color: var(--faint);
+  }
+  .activity-legend .activity-cell {
+    width: 10px;
+    height: 10px;
+  }
+  .activity-legend .activity-cell:first-child {
+    margin-left: var(--space-1);
+  }
+  .activity-legend .activity-cell:last-child {
+    margin-right: var(--space-1);
+  }
+
+  .activity-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .activity-strip .activity-cell {
+    width: 10px;
+  }
+}

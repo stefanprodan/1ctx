@@ -18,18 +18,26 @@ export function RowsCard({
   label,
   action,
   hint,
+  live,
   children,
 }: {
   label: string;
   action?: ComponentChildren;
   hint?: string;
+  // the hint follows a selection in the card, so a screen reader hears
+  // each change
+  live?: boolean;
   children?: ComponentChildren;
 }) {
   return (
     <section class="rows-card">
       <div class="rows-head">
         <span class="label">{label}</span>
-        {hint && <span class="rows-hint">{hint}</span>}
+        {hint && (
+          <span class="rows-hint" aria-live={live ? "polite" : undefined}>
+            {hint}
+          </span>
+        )}
         {action}
       </div>
       {children}

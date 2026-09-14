@@ -8,7 +8,6 @@ import type {
   ProjectSummary,
 } from "../../../shared/contracts/project.ts";
 import type { ProjectKind } from "../../../shared/words.ts";
-import { longDate } from "../../lib/format.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 
 // "1 user", "2 agents"
@@ -34,11 +33,6 @@ export function peopleLine(
   return project.kind === "personal"
     ? "only you"
     : plural(project.memberCount, "member");
-}
-
-// the row's right side: "since 14 September 2026"
-export function sinceLine(project: Pick<ProjectSummary, "createdAt">): string {
-  return `since ${longDate(project.createdAt)}`;
 }
 
 // the About card's first line; a team without a description has none
