@@ -32,6 +32,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   agentId: "a1",
   origin: "chat",
   automationId: null,
+  runSource: null,
   title: "Which pods restarted",
   status: "done",
   revision: 3,
@@ -65,6 +66,7 @@ const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   send: send(),
   last: { seq: 2, author: "assistant", text: "nine pods, all expected" },
   automation: null,
+  runBy: null,
   ...changes,
 });
 
@@ -226,6 +228,7 @@ describe("a run's row", () => {
     const ran = row({
       session: session({ origin: "automation", automationId: "au1" }),
       automation: { id: "au1", name: "nightly" },
+      runBy: null,
     });
     expect(iconOf(ran)).toBe("clock");
     // the title is the automation already, so the line names the agent

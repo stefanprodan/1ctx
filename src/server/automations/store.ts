@@ -24,6 +24,9 @@ type Raw = {
   deadline_ms: number | null;
   retention_days: number;
   suspended_at: number | null;
+  suspended_by: string | null;
+  suspended_by_name: string | null;
+  owner_name: string;
   next_at: number | null;
   last_event_at: number | null;
   last_event_due_at: number | null;
@@ -37,10 +40,18 @@ type Raw = {
   updated_at: number;
 };
 
+// the row with the usernames of its owner and of whoever suspended it
+const SELECT = `select automations.*, owners.username as owner_name,
+    suspenders.username as suspended_by_name
+  from automations
+  join users owners on owners.id = automations.owner_id
+  left join users suspenders on suspenders.id = automations.suspended_by`;
+
 const row = (raw: Raw): AutomationSummary => ({
   id: raw.id,
   projectId: raw.project_id,
   ownerId: raw.owner_id,
+  ownerName: raw.owner_name,
   agentId: raw.agent_id,
   name: raw.name,
   instructions: raw.instructions,
@@ -49,6 +60,10 @@ const row = (raw: Raw): AutomationSummary => ({
   deadlineMs: raw.deadline_ms,
   retentionDays: raw.retention_days,
   suspendedAt: raw.suspended_at,
+  suspendedBy:
+    raw.suspended_by === null
+      ? null
+      : { id: raw.suspended_by, username: raw.suspended_by_name ?? "" },
   nextAt: raw.next_at,
   lastEventAt: raw.last_event_at,
   lastEventDueAt: raw.last_event_due_at,
@@ -90,7 +105,7 @@ export class AutomationStore {
 
   byId(id: string): AutomationSummary | null {
     const raw = this.db
-      .query<Raw, [string]>("select * from automations where id = ?")
+      .query<Raw, [string]>(`${SELECT} where automations.id = ?`)
       .get(id);
     return raw ? row(raw) : null;
   }
@@ -98,7 +113,7 @@ export class AutomationStore {
   byProject(projectId: string): AutomationSummary[] {
     return this.db
       .query<Raw, [string]>(
-        "select * from automations where project_id = ? order by name",
+        `${SELECT} where automations.project_id = ? order by automations.name`,
       )
       .all(projectId)
       .map(row);
@@ -106,7 +121,7 @@ export class AutomationStore {
 
   all(): AutomationSummary[] {
     return this.db
-      .query<Raw, []>("select * from automations order by id")
+      .query<Raw, []>(`${SELECT} order by automations.id`)
       .all()
       .map(row);
   }
@@ -114,7 +129,7 @@ export class AutomationStore {
   due(now: number): AutomationSummary[] {
     return this.db
       .query<Raw, [number]>(
-        "select * from automations where suspended_at is null and next_at <= ? order by next_at, id",
+        `${SELECT} where automations.suspended_at is null and automations.next_at <= ? order by automations.next_at, automations.id`,
       )
       .all(now)
       .map(row);
@@ -216,21 +231,22 @@ export class AutomationStore {
     return this.byId(id);
   }
 
-  suspend(id: string, now: number): AutomationSummary | null {
+  suspend(id: string, by: string, now: number): AutomationSummary | null {
     this.db
       .query(
-        `update automations set suspended_at = ?, next_at = null,
-           revision = revision + 1, updated_at = ?
+        `update automations set suspended_at = ?, suspended_by = ?,
+           next_at = null, revision = revision + 1, updated_at = ?
          where id = ? and suspended_at is null`,
       )
-      .run(now, now, id);
+      .run(now, by, now, id);
     return this.byId(id);
   }
 
   resume(id: string, nextAt: number, now: number): AutomationSummary | null {
     this.db
       .query(
-        `update automations set suspended_at = null, next_at = ?,
+        `update automations set suspended_at = null, suspended_by = null,
+           next_at = ?,
            revision = revision + 1, updated_at = ?
          where id = ? and suspended_at is not null`,
       )

@@ -38,6 +38,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
     agentId: "a1",
     origin: "chat",
     automationId: null,
+    runSource: null,
     title: "Chat",
     status: "done",
     revision: 1,
@@ -54,6 +55,7 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
     send: null,
     last: null,
     automation: null,
+    runBy: null,
   };
 }
 

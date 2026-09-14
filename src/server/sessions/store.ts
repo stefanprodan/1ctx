@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type {
   MessageStatus,
+  RunFilter,
   SendCause,
   SendKind,
   SessionStatus,
@@ -23,6 +25,7 @@ import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
 import {
+  type CreateSession,
   MESSAGE_COLUMNS,
   message,
   type RawMessage,
@@ -59,26 +62,22 @@ export class SessionStore {
     return listSessions(this.db, this.usage, projectIds, q, origin, limit);
   }
 
-  runs(automationId: string, limit = STREAM_LIMIT): StreamRow[] {
-    return automationRuns(this.db, this.usage, automationId, limit);
+  runs(
+    automationId: string,
+    filter: RunFilter | null = null,
+    limit = STREAM_LIMIT,
+  ): AutomationRunsResponse {
+    return automationRuns(this.db, this.usage, automationId, filter, limit);
   }
 
-  create(fields: {
-    id?: string;
-    projectId: string;
-    ownerId: string;
-    agentId: string;
-    origin?: "chat" | "automation";
-    automationId?: string | null;
-    title: string;
-    now: number;
-  }): SessionRow {
+  create(fields: CreateSession): SessionRow {
     const id = fields.id ?? newId();
     this.db
       .query(
         `insert into sessions (id, project_id, owner_id, agent_id, origin,
-           automation_id, title, status, revision, created_at, last_activity_at)
-         values (?, ?, ?, ?, ?, ?, ?, 'running', 0, ?, ?)`,
+           automation_id, run_source, title, status, revision, created_at,
+           last_activity_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, 'running', 0, ?, ?)`,
       )
       .run(
         id,
@@ -87,6 +86,7 @@ export class SessionStore {
         fields.agentId,
         fields.origin ?? "chat",
         fields.automationId ?? null,
+        fields.runSource ?? null,
         fields.title,
         fields.now,
         fields.now,

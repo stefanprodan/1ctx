@@ -16,7 +16,12 @@ import { type Scheduler, scheduler } from "./scheduler.ts";
 import { AutomationStore } from "./store.ts";
 
 export { type AccessPort, type RoutesDeps, routes } from "./routes.ts";
-export { checkSchedule, MIN_GAP_MINUTES, nextFire } from "./schedule.ts";
+export {
+  checkSchedule,
+  MIN_GAP_MINUTES,
+  nextFire,
+  nextFires,
+} from "./schedule.ts";
 export { type Scheduler, scheduler } from "./scheduler.ts";
 export {
   type AutomationFields,

@@ -277,7 +277,16 @@ violation, and every rule has a rejected fixture under
   project, an admin edits and deletes it, else 403. At most
   `MAX_AUTOMATIONS_PER_PROJECT`; an agent an automation names is a 409
   to delete. `next_at` is the next fire and is null exactly while
-  suspended (a table check). The scheduler (`automations/scheduler.ts`)
+  suspended (a table check), and `suspended_by` names who suspended it (null
+  once resumed and for rows suspended before the column); the summary
+  carries the owner's and the suspender's usernames and a stream row
+  its `runBy`, so an admin outside the project is named too. A run's session keeps `run_source`
+  (`schedule` or `manual`, null for a chat and for runs made before the
+  column). `GET /api/automations/:id/runs?filter=failed|manual` narrows
+  the rows and answers the tally of every kept run by status beside
+  them; `GET /api/projects/:id/automations/preview?schedule=&tz=`
+  answers the next `PREVIEW_FIRES` fires, or the 400 a save would get.
+  The scheduler (`automations/scheduler.ts`)
   is a loop of passes on the clock port, never `Bun.cron(handler)`: a
   pass fires every active row with `next_at <= now`, sweeps retention
   hourly, and sleeps until the earliest `next_at` or a minute, woken
@@ -416,13 +425,24 @@ violation, and every rule has a rejected fixture under
   or Settings for a personal one. A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab
-  is one card of `RowsOpen` rows, the schedule in words from
-  `Automations.model.ts` (the expression when the shape is unknown); an
-  open row holds Run now and Suspend or Resume, the form (read-only for
-  whoever may not edit; the agent and the time zone are `ui/Select.tsx`,
-  the searchable select; the deadline starts at the limit, which
-  `GET /api/projects/:id/automations` answers beside the rows) and its
-  runs as stream rows, kept current by `data/automations.ts`. A run's chat page names its automation over
+  is one card of `RowsGo` rows titled Scheduled tasks, the schedule in
+  words from `Automations.model.ts` (the expression when the shape is
+  unknown), each leading to the automation's page, `/automations/:id`,
+  where the rail marks its project through `automationProject`: the
+  brief (schedule, zone, agent, the instructions cut to four lines with
+  Show more), then Suspend or Resume, Edit and Run now over the runs, a
+  log with their source, length against the deadline and Stop, filtered
+  by `?runs=`, and the aside of next fires, the tally and the setup. The editor is a page of
+  `ui/Section.tsx` steps, `/projects/:id/automations/new` and
+  `/automations/:id/edit` (read-only for whoever may not edit): the task
+  is a box with the composer's `AgentPicker`, the schedule is built in
+  `ScheduleField.tsx` from the shapes in `Schedule.model.ts` (cron typed
+  by hand for any other) and read back through the preview route as
+  the next run, the
+  zone is `ui/Select.tsx` with search, and the deadline starts at the
+  limit, which `GET /api/projects/:id/automations` answers beside the
+  rows. `data/automations.ts` keeps the list, the runs and the tally
+  current from the frames. A run's chat page names its automation over
   the transcript and has no composer, no Regenerate and no `/compact`;
   its foot is the state with Stop while it runs (`RunFoot.tsx`).
   A settings page (the profile, a project's Settings) stacks

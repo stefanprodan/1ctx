@@ -104,10 +104,7 @@ export function Chat({ params }: { params: Params }) {
                     : "an automation"}
                 </span>
               ) : (
-                <a
-                  class="chat-run-link"
-                  href={`/projects/${shown.session.projectId}/automations`}
-                >
+                <a class="chat-run-link" href={`/automations/${automation.id}`}>
                   {automation.name}
                 </a>
               )}
@@ -132,6 +129,7 @@ export function Chat({ params }: { params: Params }) {
                     send: shown.send,
                     last: null,
                     automation: null,
+                    runBy: null,
                   }}
                   onStop={() => stopSession(shown.session.id)}
                 />

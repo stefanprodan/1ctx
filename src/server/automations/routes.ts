@@ -5,8 +5,10 @@ import type {
   AutomationResponse,
   AutomationRunsResponse,
   AutomationsResponse,
+  SchedulePreviewResponse,
 } from "../../shared/api/automations.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import { PREVIEW_FIRES } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -20,9 +22,11 @@ import type { UserRow } from "../users/index.ts";
 import {
   MAX_AUTOMATION_BODY,
   parsePatchAutomation,
+  parseRunsQuery,
   parseSaveAutomation,
+  parseSchedulePreview,
 } from "./parse.ts";
-import { checkSchedule, nextFire } from "./schedule.ts";
+import { checkSchedule, nextFire, nextFires } from "./schedule.ts";
 import type { Scheduler } from "./scheduler.ts";
 import {
   type AutomationFields,
@@ -83,6 +87,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const body: AutomationsResponse = {
           automations: deps.store.byProject(project.id),
           runDeadlineMs: deps.limits.current().runDeadlineMs,
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/projects/:id/automations/preview",
+      policy: "authenticated",
+      handle(req, ctx) {
+        deps.access.project(ctx.principal!, ctx.params.id);
+        const { schedule, tz } = parseSchedulePreview(new URL(req.url));
+        const body: SchedulePreviewResponse = {
+          fires: nextFires(schedule, tz, deps.clock(), PREVIEW_FIRES),
         };
         return json(body);
       },
@@ -191,7 +208,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const automation = transact(deps.db, () => {
           const current = visible(principal, found.id);
           if (current.suspendedAt !== null) return { result: current };
-          const updated = deps.store.suspend(current.id, deps.clock())!;
+          const updated = deps.store.suspend(
+            current.id,
+            principal.userId,
+            deps.clock(),
+          )!;
           return { result: updated, events: [changed(updated)] };
         });
         deps.scheduler.wake();
@@ -268,11 +289,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       method: "GET",
       path: "/api/automations/:id/runs",
       policy: "authenticated",
-      handle(_req, ctx) {
+      handle(req, ctx) {
         const automation = visible(ctx.principal!, ctx.params.id);
-        const body: AutomationRunsResponse = {
-          rows: deps.sessions.runs(automation.id),
-        };
+        const filter = parseRunsQuery(new URL(req.url));
+        const body: AutomationRunsResponse = deps.sessions.runs(
+          automation.id,
+          filter,
+        );
         return json(body);
       },
     },

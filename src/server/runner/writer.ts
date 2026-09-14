@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Persistence and the socket frames of a send. Each durable change is
 // one transaction with one revision and one envelope after commit.
-// startSend opens the send; delta streams without a revision,
-// reply into the fold at the first tool call; finishRound ends a work
-// round and launches its tool rows; finishTool ends one tool; recordUnrun
-// writes a round's calls as not run when a cap or the loop cut them;
+// startSend opens the send; delta streams without a revision, and the reply
+// moves into the fold at the first tool call; finishRound ends a work
+// round and launches tools; finishTool ends one; cut calls are recorded not run.
 // startRound begins the next round; finalizeSend ends the send once.
 
 import type {
@@ -115,6 +114,7 @@ export class Writer {
           agentId: policy.agentId,
           origin: fields.origin,
           automationId: fields.automationId,
+          runSource: policy.automation?.source ?? null,
           title: fields.title,
           now,
         });

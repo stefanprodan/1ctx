@@ -1,12 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One project's automations, the tab's list, and the runs of the row
-// that is open. A write keeps the server's row; the socket's frames
-// keep the list current by the revision rule, and a session envelope
-// of a run keeps the open row's runs current the way the stream does.
-// An answer is kept only for the user, the project and the turn it
-// was asked for.
+// One project's automations, the tab's list; the runs of the
+// automation on screen, under its filter, with their tally; and the
+// schedule preview the editor and the page read. A write keeps the
+// server's row; the socket's frames keep the list current by the
+// revision rule, and a session envelope of a run moves a held run in
+// place, or asks for the runs again when it changes what the filter
+// and the tally hold. An answer is kept only for the user, the project
+// and the turn it was asked for.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -14,15 +16,20 @@ import type {
   AutomationRunsResponse,
   AutomationsResponse,
   PatchAutomationRequest,
+  RunTally,
   SaveAutomationRequest,
+  SchedulePreviewResponse,
 } from "../../shared/api/automations.ts";
 import type { SessionResponse, StreamRow } from "../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
+import type { RunFilter } from "../../shared/words.ts";
 import { reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { loadProject } from "./projects.ts";
+import { loadProjectAgents } from "./sessions.ts";
 import { onSocketEvent } from "./socket.ts";
 import { applyAutomationFrame } from "./stream.ts";
 
@@ -30,15 +37,38 @@ export const automations = signal<AutomationSummary[] | null>(null);
 export const automationsError = signal<string | null>(null);
 // the run deadline limit a row with no deadline runs under, in ms
 export const runDeadlineMs = signal<number | null>(null);
-// the open row's runs, newest first; null while they load
-export const runs = signal<{ id: string; rows: StreamRow[] | null } | null>(
-  null,
-);
+// the runs of the automation on screen, newest first, under its
+// filter; rows and tally are null while they load
+export type Runs = {
+  id: string;
+  filter: RunFilter | null;
+  rows: StreamRow[] | null;
+  tally: RunTally | null;
+};
+export const runs = signal<Runs | null>(null);
+// the automation page's own failure, a 404 for one gone or not ours
+export const automationError = signal<string | null>(null);
+// the project the automation on screen was found in, so the page tells
+// a row still loading from one deleted since
+export const automationProject = signal<{
+  id: string;
+  projectId: string;
+} | null>(null);
+// a schedule read back by the server: its next fires, or its refusal;
+// fires and problem are both null while it is asked
+export type Preview = {
+  key: string;
+  fires: number[] | null;
+  problem: string | null;
+};
+export const preview = signal<Preview | null>(null);
 
 let owner: string | null = null;
 let projectFor: string | null = null;
 let listTurn = 0;
 let runsTurn = 0;
+let pageTurn = 0;
+let previewTurn = 0;
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -51,6 +81,9 @@ effect(() => {
   automationsError.value = null;
   runDeadlineMs.value = null;
   runs.value = null;
+  automationError.value = null;
+  automationProject.value = null;
+  preview.value = null;
 });
 
 // how many automations the project has, null while its list is not the
@@ -75,7 +108,17 @@ export function upsertAutomation(
   return [...list.filter((a) => a.id !== row.id), row].sort(byName);
 }
 
-// a run's envelope into the open row's runs: a held row moves when the
+// whether a run belongs under a filter
+export function matchesFilter(
+  row: Pick<StreamRow, "session">,
+  filter: RunFilter | null,
+): boolean {
+  if (filter === "failed") return row.session.status === "failed";
+  if (filter === "manual") return row.session.runSource === "manual";
+  return true;
+}
+
+// a run's envelope into the held runs: a held row moves when the
 // revision is above its own, newest first by when it was opened
 export function upsertRun(rows: StreamRow[], next: StreamRow): StreamRow[] {
   const held = rows.find((r) => r.session.id === next.session.id);
@@ -126,23 +169,131 @@ export async function loadAutomations(projectId: string): Promise<void> {
   }
 }
 
-export async function loadRuns(id: string): Promise<void> {
+export async function loadRuns(
+  id: string,
+  filter: RunFilter | null = null,
+): Promise<void> {
   const forUser = owner;
   const turn = ++runsTurn;
-  if (runs.value?.id !== id) runs.value = { id, rows: null };
+  moved.clear();
+  const held = runs.value;
+  if (held?.id !== id || held.filter !== filter) {
+    // the tally does not follow the filter, so it stays while the rows
+    // of another filter load
+    runs.value = {
+      id,
+      filter,
+      rows: null,
+      tally: held?.id === id ? held.tally : null,
+    };
+  }
   try {
-    const body = await api<AutomationRunsResponse>(`${path(id)}/runs`);
+    const body = await api<AutomationRunsResponse>(
+      `${path(id)}/runs${filter === null ? "" : `?filter=${filter}`}`,
+    );
     if (owner === forUser && runsTurn === turn) {
-      runs.value = { id, rows: body.rows };
+      // a frame that moved a run while the answer was in flight keeps
+      // its word, by the revision rule
+      let rows = body.rows;
+      for (const row of moved.values()) {
+        rows = matchesFilter(row, filter)
+          ? upsertRun(rows, row)
+          : rows.filter((r) => r.session.id !== row.session.id);
+      }
+      moved.clear();
+      runs.value = { id, filter, rows, tally: body.tally };
     }
   } catch {
-    if (owner === forUser && runsTurn === turn) runs.value = { id, rows: [] };
+    if (owner === forUser && runsTurn === turn) {
+      runs.value = { id, filter, rows: [], tally: runs.value?.tally ?? null };
+    }
   }
+}
+
+// the automation page and its editor: the row says which project it is
+// in, and that project's list, its page, its agents and the runs load
+// from there; the runs only for the page, under its filter
+export async function loadAutomationPage(
+  id: string,
+  filter: RunFilter | null | undefined,
+): Promise<void> {
+  const forUser = owner;
+  const turn = ++pageTurn;
+  automationError.value = null;
+  if (filter !== undefined && runs.value?.id !== id) closeRuns();
+  let row: AutomationSummary;
+  try {
+    ({ automation: row } = await api<AutomationResponse>(path(id)));
+  } catch (err) {
+    if (owner === forUser && pageTurn === turn) {
+      automationError.value = reason(err);
+    }
+    return;
+  }
+  if (owner !== forUser || pageTurn !== turn) return;
+  automationProject.value = { id, projectId: row.projectId };
+  if (filter === undefined) closeRuns();
+  await Promise.all([
+    loadAutomations(row.projectId),
+    loadProject(row.projectId),
+    loadProjectAgents(row.projectId),
+    filter === undefined ? undefined : loadRuns(id, filter),
+  ]);
+  // a list answered before the row was made lacks it; the row just read
+  // joins by the revision rule
+  if (
+    owner === forUser &&
+    pageTurn === turn &&
+    projectFor === row.projectId &&
+    automations.value !== null &&
+    !automations.value.some((a) => a.id === row.id)
+  ) {
+    automations.value = upsertAutomation(automations.value, row);
+  }
+}
+
+export const previewKey = (projectId: string, schedule: string, tz: string) =>
+  `${projectId}\n${schedule}\n${tz}`;
+
+// the next fires of a schedule in a zone, as a save would read it; a
+// later ask supersedes this one
+export async function loadPreview(
+  projectId: string,
+  schedule: string,
+  tz: string,
+): Promise<void> {
+  const forUser = owner;
+  const turn = ++previewTurn;
+  const key = previewKey(projectId, schedule, tz);
+  if (preview.value?.key !== key) {
+    preview.value = { key, fires: null, problem: null };
+  }
+  const query = new URLSearchParams({ schedule, tz });
+  try {
+    const body = await api<SchedulePreviewResponse>(
+      `/api/projects/${encodeURIComponent(projectId)}/automations/preview?${query}`,
+    );
+    if (owner === forUser && previewTurn === turn) {
+      preview.value = { key, fires: body.fires, problem: null };
+    }
+  } catch (err) {
+    if (owner === forUser && previewTurn === turn) {
+      preview.value = { key, fires: null, problem: reason(err) };
+    }
+  }
+}
+
+// the runs of one automation go, and nothing else's: the next page's
+// load may already hold its own
+export function closeRunsOf(id: string): void {
+  if (runs.value?.id === id) closeRuns();
 }
 
 export function closeRuns(): void {
   runsTurn++;
   runs.value = null;
+  seen.clear();
+  moved.clear();
 }
 
 function take(row: AutomationSummary, forUser: string | null): void {
@@ -196,22 +347,48 @@ export async function runAutomation(id: string): Promise<SessionDetail> {
   const detail = await api<SessionResponse>(`${path(id)}/run`, "POST");
   const held = runs.value;
   if (owner === forUser && held?.id === id) {
-    runsTurn++;
-    if (held.rows === null) {
-      void loadRuns(id);
-    } else {
-      runs.value = {
-        id,
-        rows: upsertRun(held.rows, {
-          session: detail.session,
-          send: detail.send,
-          last: null,
-          automation: labelOf(id),
-        }),
-      };
-    }
+    applyRun(held, {
+      session: detail.session,
+      send: detail.send,
+      last: null,
+      automation: labelOf(id),
+      // the one who pressed it is the one signed in
+      runBy: me.value ? { id: me.value.id, username: me.value.username } : null,
+    });
   }
   return detail;
+}
+
+// a run's newest word into the held runs. The row moves at once, in or
+// out of the filter. A held row under the same status leaves the tally
+// as it stands; a new run, or one changing status, moves the tally,
+// which only the server counts, so the runs are asked again, once per
+// status a run is seen in
+const seen = new Map<string, string>();
+// the runs frames moved since the last load started
+const moved = new Map<string, StreamRow>();
+function applyRun(held: Runs, next: StreamRow): void {
+  if (held.rows === null) {
+    void loadRuns(held.id, held.filter);
+    return;
+  }
+  const mine = held.rows.find((r) => r.session.id === next.session.id);
+  // no new turn: a load in flight still lands, and keeps this row by
+  // its revision
+  moved.set(next.session.id, next);
+  runs.value = {
+    ...held,
+    rows: matchesFilter(next, held.filter)
+      ? upsertRun(held.rows, next)
+      : held.rows.filter((r) => r.session.id !== next.session.id),
+  };
+  if (mine !== undefined && mine.session.status === next.session.status) {
+    return;
+  }
+  const word = `${held.id} ${held.filter} ${next.session.status}`;
+  if (seen.get(next.session.id) === word) return;
+  seen.set(next.session.id, word);
+  void loadRuns(held.id, held.filter);
 }
 
 export async function deleteAutomation(id: string): Promise<void> {
@@ -246,7 +423,7 @@ export function onAutomationsSocket(ev: SocketEvent): void {
         if (open?.id === ev.automation.id && open.rows !== null) {
           const label = { id: ev.automation.id, name: ev.automation.name };
           runs.value = {
-            id: open.id,
+            ...open,
             rows: open.rows.map((r) =>
               r.automation?.name === label.name
                 ? r
@@ -273,34 +450,30 @@ export function onAutomationsSocket(ev: SocketEvent): void {
     case "session": {
       const held = runs.value;
       if (held === null || ev.session.automationId !== held.id) break;
-      runsTurn++;
       if (held.rows === null) {
-        void loadRuns(held.id);
+        void loadRuns(held.id, held.filter);
         break;
       }
       const mine = held.rows.find((r) => r.session.id === ev.session.id);
-      runs.value = {
-        id: held.id,
-        rows: upsertRun(held.rows, {
-          session: ev.session,
-          send: ev.send ?? mine?.send ?? null,
-          last: ev.last ?? mine?.last ?? null,
-          automation: mine?.automation ?? labelOf(held.id),
-        }),
-      };
+      applyRun(held, {
+        session: ev.session,
+        send: ev.send ?? mine?.send ?? null,
+        last: ev.last ?? mine?.last ?? null,
+        automation: mine?.automation ?? labelOf(held.id),
+        runBy: mine?.runBy ?? null,
+      });
       break;
     }
     case "deleted": {
       const held = runs.value;
       if (held !== null && ev.projectId === projectFor) {
-        runsTurn++;
-        if (held.rows === null) void loadRuns(held.id);
-        else {
-          runs.value = {
-            id: held.id,
-            rows: held.rows.filter((r) => r.session.id !== ev.sessionId),
-          };
-        }
+        // a deleted run leaves the tally too, which only the server
+        // counts
+        runs.value = {
+          ...held,
+          rows: held.rows?.filter((r) => r.session.id !== ev.sessionId) ?? null,
+        };
+        void loadRuns(held.id, held.filter);
       }
       break;
     }

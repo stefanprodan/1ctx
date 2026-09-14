@@ -7,8 +7,12 @@ import type {
 } from "../../shared/api/automations.ts";
 import {
   isName,
+  isRunFilter,
   MAX_MESSAGE_BYTES,
+  MAX_SCHEDULE,
+  MAX_TZ,
   RETENTION_DAYS,
+  type RunFilter,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -92,4 +96,40 @@ export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
   const parsed = fields(body, KEYS);
   if (Object.keys(parsed).length === 0) throw new BadRequest("empty patch");
   return parseValues(parsed, false);
+}
+
+function queryKeys(url: URL, allowed: string[]): void {
+  const seen = new Set<string>();
+  for (const name of url.searchParams.keys()) {
+    if (!allowed.includes(name)) {
+      throw new BadRequest(`unknown parameter ${name}`);
+    }
+    if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
+    seen.add(name);
+  }
+}
+
+export function parseRunsQuery(url: URL): RunFilter | null {
+  queryKeys(url, ["filter"]);
+  const filter = url.searchParams.get("filter");
+  if (filter !== null && !isRunFilter(filter)) {
+    throw new BadRequest("filter must be failed or manual");
+  }
+  return filter;
+}
+
+export function parseSchedulePreview(url: URL): {
+  schedule: string;
+  tz: string;
+} {
+  queryKeys(url, ["schedule", "tz"]);
+  const schedule = url.searchParams.get("schedule")?.trim();
+  const tz = url.searchParams.get("tz")?.trim();
+  if (schedule === undefined || schedule.length > MAX_SCHEDULE) {
+    throw new BadRequest("invalid schedule");
+  }
+  if (tz === undefined || tz.length > MAX_TZ) {
+    throw new BadRequest("invalid time zone");
+  }
+  return { schedule, tz };
 }

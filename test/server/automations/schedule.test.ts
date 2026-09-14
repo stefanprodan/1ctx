@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   checkSchedule,
   nextFire,
+  nextFires,
 } from "../../../src/server/automations/index.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import fixtures from "../../fixtures/automations/next-fires.json";
@@ -50,5 +51,30 @@ describe("automation schedules", () => {
     expect(() => checkSchedule("0 0 30 2 *", "UTC", 0)).toThrow(
       "schedule never fires",
     );
+  });
+
+  test("finds consecutive fires", () => {
+    const from = Date.parse("2026-09-14T06:00:00.000Z");
+    expect(nextFires("0 9 * * *", "Europe/Bucharest", from, 3)).toEqual([
+      Date.parse("2026-09-15T06:00:00.000Z"),
+      Date.parse("2026-09-16T06:00:00.000Z"),
+      Date.parse("2026-09-17T06:00:00.000Z"),
+    ]);
+  });
+
+  test("crosses daylight saving time in Europe/Bucharest", () => {
+    const fires = nextFires(
+      "30 3 * * *",
+      "Europe/Bucharest",
+      Date.parse("2026-03-27T00:00:00.000Z"),
+      5,
+    );
+    expect(fires.map((fire) => new Date(fire).toISOString())).toEqual([
+      "2026-03-27T01:30:00.000Z",
+      "2026-03-28T01:30:00.000Z",
+      "2026-03-29T01:30:00.000Z",
+      "2026-03-30T00:30:00.000Z",
+      "2026-03-31T00:30:00.000Z",
+    ]);
   });
 });

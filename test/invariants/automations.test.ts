@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { nextFire } from "../../src/server/automations/index.ts";
+import { nextFire, nextFires } from "../../src/server/automations/index.ts";
+import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { hashPassword } from "../../src/server/users/index.ts";
 import type { StreamRow } from "../../src/shared/api/sessions.ts";
 import { createAutomation } from "../helpers/automations.ts";
@@ -162,6 +163,189 @@ describe("automations", () => {
     await chat.app.shutdown();
   });
 
+  test.serial(
+    "records scheduled and manual run sources on every session word",
+    async () => {
+      const chat = await chatApp();
+      const automation = await createAutomation(chat);
+      chat.app.automationScheduler.stop();
+      await tick();
+      const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
+      const off = subscribe((event) => {
+        if (event.type === "session.changed") seen.push(event.data);
+      });
+      try {
+        chat.app.now.value = automation.nextAt!;
+        const scheduledPending = chat.scripted.next();
+        const scheduled = await chat.app.automationScheduler.fire(
+          automation.id,
+        );
+        const scheduledScript = await scheduledPending;
+        expect(scheduled?.session.runSource).toBe("schedule");
+        scheduledScript.reply("scheduled");
+        await settle(chat, scheduled!.session.id);
+
+        const manualPending = chat.scripted.next();
+        const manualResponse = await chat.member.call(
+          "POST",
+          `/api/automations/${automation.id}/run`,
+        );
+        const manual = await manualResponse.json();
+        const manualScript = await manualPending;
+        expect(manual.session.runSource).toBe("manual");
+        manualScript.reply("manual");
+        await settle(chat, manual.session.id);
+
+        const runs = await (
+          await chat.member.call(
+            "GET",
+            `/api/automations/${automation.id}/runs`,
+          )
+        ).json();
+        expect(
+          runs.rows.find(
+            (row: StreamRow) => row.session.id === scheduled!.session.id,
+          ).session.runSource,
+        ).toBe("schedule");
+        expect(
+          runs.rows.find(
+            (row: StreamRow) => row.session.id === manual.session.id,
+          ).session.runSource,
+        ).toBe("manual");
+        expect(
+          seen.find((event) => event.session.id === scheduled!.session.id)
+            ?.session.runSource,
+        ).toBe("schedule");
+        expect(
+          seen.find((event) => event.session.id === manual.session.id)?.session
+            .runSource,
+        ).toBe("manual");
+      } finally {
+        off();
+        await chat.app.shutdown();
+      }
+    },
+  );
+
+  test("filters runs while keeping an unfiltered status tally", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat);
+    const rows = [
+      ["run-running", "running", "schedule"],
+      ["run-done", "done", "manual"],
+      ["run-failed-schedule", "failed", "schedule"],
+      ["run-failed-manual", "failed", "manual"],
+      ["run-stopped", "stopped", "schedule"],
+    ] as const;
+    for (const [id, status, runSource] of rows) {
+      chat.app.sessions.create({
+        id,
+        projectId: chat.projectId,
+        ownerId: chat.memberId,
+        agentId: chat.agentId,
+        origin: "automation",
+        automationId: automation.id,
+        runSource,
+        title: automation.name,
+        now: chat.app.now.value,
+      });
+      if (status !== "running") {
+        chat.app.sessions.touch(id, { status, now: chat.app.now.value });
+      }
+    }
+
+    const failed = await (
+      await chat.member.call(
+        "GET",
+        `/api/automations/${automation.id}/runs?filter=failed`,
+      )
+    ).json();
+    expect(failed.rows.map((row: StreamRow) => row.session.id).sort()).toEqual([
+      "run-failed-manual",
+      "run-failed-schedule",
+    ]);
+    expect(failed.tally).toEqual({
+      running: 1,
+      done: 1,
+      failed: 2,
+      stopped: 1,
+    });
+
+    const manual = await (
+      await chat.member.call(
+        "GET",
+        `/api/automations/${automation.id}/runs?filter=manual`,
+      )
+    ).json();
+    expect(manual.rows.map((row: StreamRow) => row.session.id).sort()).toEqual([
+      "run-done",
+      "run-failed-manual",
+    ]);
+    expect(manual.tally).toEqual(failed.tally);
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/automations/${automation.id}/runs?filter=stopped`,
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/automations/${automation.id}/runs?other=failed`,
+        )
+      ).status,
+    ).toBe(400);
+    await chat.app.shutdown();
+  });
+
+  test("previews validated schedules for visible projects", async () => {
+    const chat = await chatApp();
+    const query = new URLSearchParams({
+      schedule: "0 9 * * *",
+      tz: "Europe/Bucharest",
+    });
+    const preview = await chat.member.call(
+      "GET",
+      `/api/projects/${chat.projectId}/automations/preview?${query}`,
+    );
+    expect(preview.status).toBe(200);
+    const body = await preview.json();
+    expect(body.fires).toEqual(
+      nextFires("0 9 * * *", "Europe/Bucharest", chat.app.now.value, 5),
+    );
+    expect(body.fires).toHaveLength(5);
+    expect(body.fires).toEqual([...body.fires].sort((a, b) => a - b));
+
+    for (const fields of [
+      { schedule: "0 9 * * *", tz: "Not/AZone" },
+      { schedule: "* * * * *", tz: "UTC" },
+      { schedule: "0 0 30 2 *", tz: "UTC" },
+    ]) {
+      const invalid = new URLSearchParams(fields);
+      expect(
+        (
+          await chat.member.call(
+            "GET",
+            `/api/projects/${chat.projectId}/automations/preview?${invalid}`,
+          )
+        ).status,
+      ).toBe(400);
+    }
+    const hidden = chat.app.projects.personal(chat.adminId)!;
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/projects/${hidden.id}/automations/preview?${query}`,
+        )
+      ).status,
+    ).toBe(404);
+    await chat.app.shutdown();
+  });
+
   test("keeps names unique and caps a project", async () => {
     const chat = await chatApp();
     await createAutomation(chat, { name: "same-name" });
@@ -257,15 +441,23 @@ describe("automation rights", () => {
       (await otherClient.call("DELETE", `/api/automations/${automation.id}`))
         .status,
     ).toBe(403);
-    expect(
-      (
-        await otherClient.call(
-          "POST",
-          `/api/automations/${automation.id}/suspend`,
-        )
-      ).status,
-    ).toBe(200);
-    await otherClient.call("POST", `/api/automations/${automation.id}/resume`);
+    const suspended = await otherClient.call(
+      "POST",
+      `/api/automations/${automation.id}/suspend`,
+    );
+    expect(suspended.status).toBe(200);
+    // the row names who suspended it, and a resume clears the name
+    const suspendedRow = (await suspended.json()).automation;
+    expect(suspendedRow.suspendedBy).toEqual({
+      id: other.id,
+      username: "other",
+    });
+    expect(suspendedRow.ownerName).toBe("caelea");
+    const resumed = await otherClient.call(
+      "POST",
+      `/api/automations/${automation.id}/resume`,
+    );
+    expect((await resumed.json()).automation.suspendedBy).toBeNull();
 
     const pending = chat.scripted.next();
     const run = await otherClient.call(
@@ -277,6 +469,39 @@ describe("automation rights", () => {
     expect(detail.session.ownerId).toBe(other.id);
     script.reply("done");
     await settle(chat, detail.session.id);
+
+    // an admin outside the project is named on what they do: the run
+    // they start and the suspend they press
+    const adminPending = chat.scripted.next();
+    const adminRun = await (
+      await chat.admin.call("POST", `/api/automations/${automation.id}/run`)
+    ).json();
+    (await adminPending).reply("done");
+    await settle(chat, adminRun.session.id);
+    const listed = await (
+      await otherClient.call(
+        "GET",
+        `/api/automations/${automation.id}/runs?filter=manual`,
+      )
+    ).json();
+    expect(
+      listed.rows
+        .map((r: StreamRow) => [r.session.ownerId, r.runBy])
+        .sort((a: [string], b: [string]) => a[0].localeCompare(b[0])),
+    ).toEqual(
+      [
+        [chat.adminId, { id: chat.adminId, username: "admin" }],
+        [other.id, { id: other.id, username: "other" }],
+      ].sort((a, b) => (a[0] as string).localeCompare(b[0] as string)),
+    );
+    const adminSuspend = await chat.admin.call(
+      "POST",
+      `/api/automations/${automation.id}/suspend`,
+    );
+    expect((await adminSuspend.json()).automation.suspendedBy).toEqual({
+      id: chat.adminId,
+      username: "admin",
+    });
 
     expect(
       (

@@ -170,6 +170,7 @@ export function applyEnvelope(
     send: ev.send ?? held.send,
     last: ev.last ?? held.last,
     automation: held.automation,
+    runBy: held.runBy,
   };
   list.value = ordered([
     ...rows.filter((row) => row.session.id !== ev.session.id),

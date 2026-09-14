@@ -11,9 +11,10 @@
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { isRunFilter } from "../../shared/words.ts";
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
-import { loadAutomations } from "../data/automations.ts";
+import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -139,6 +140,48 @@ export const ROUTES: Route[] = [
         loadRecentDays(),
       ]);
     },
+  },
+  {
+    path: "/projects/:id/automations/new",
+    view: lazy(() =>
+      import("../views/projects/AutomationEditor.tsx").then(
+        (m) => m.NewAutomation,
+      ),
+    ),
+    title: () => "New scheduled task",
+    role: "authenticated",
+    // the list for the deadline limit and the tab's count
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+      ]);
+    },
+  },
+  {
+    path: "/automations/:id",
+    view: lazy(() =>
+      import("../views/projects/Automation.tsx").then((m) => m.Automation),
+    ),
+    title: () => "Automation",
+    role: "authenticated",
+    // ?runs=failed|manual narrows the runs
+    load: (params, query) => {
+      const filter = query.get("runs");
+      return loadAutomationPage(params.id, isRunFilter(filter) ? filter : null);
+    },
+  },
+  {
+    path: "/automations/:id/edit",
+    view: lazy(() =>
+      import("../views/projects/AutomationEditor.tsx").then(
+        (m) => m.EditAutomation,
+      ),
+    ),
+    title: () => "Edit automation",
+    role: "authenticated",
+    load: (params) => loadAutomationPage(params.id, undefined),
   },
   {
     path: "/projects/:id/members",

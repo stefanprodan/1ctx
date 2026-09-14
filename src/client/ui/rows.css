@@ -92,7 +92,7 @@
     text-decoration: none;
   }
   .rows-go:hover {
-    background: var(--page);
+    background: var(--line);
   }
   .rows-go-arrow {
     flex-shrink: 0;

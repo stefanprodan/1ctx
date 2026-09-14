@@ -20,12 +20,15 @@ export type SessionsResponse = { rows: StreamRow[] };
 // one row of the stream: the session, its last send (the counters,
 // the cause and the error while it is not running) and the last line
 // the row shows for a session that is done, and the automation a run
-// belongs to, drawn in the author's place; null for a chat
+// belongs to, drawn in the author's place; null for a chat. runBy is
+// who pressed Run now, whether or not they are in the project; null
+// for a chat and a scheduled run
 export type StreamRow = {
   session: SessionSummary;
   send: SendSummary | null;
   last: LastLine | null;
   automation: { id: string; name: string } | null;
+  runBy: { id: string; username: string } | null;
 };
 
 // GET /api/sessions/:id, and the answer of POST /api/sessions

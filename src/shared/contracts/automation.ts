@@ -15,6 +15,8 @@ export type AutomationSummary = {
   projectId: string;
   // who made it, and whom a scheduled run acts as
   ownerId: string;
+  // the owner's username, an admin outside the project included
+  ownerName: string;
   agentId: string;
   name: string;
   instructions: string;
@@ -25,6 +27,9 @@ export type AutomationSummary = {
   retentionDays: number;
   // an epoch while suspended; nextAt is null exactly then
   suspendedAt: number | null;
+  // who suspended it, an admin outside the project included; null while
+  // it runs, and for a row suspended before this was kept
+  suspendedBy: { id: string; username: string } | null;
   nextAt: number | null;
   lastEventAt: number | null;
   // the fire that was meant; later than lastEventAt means it ran late

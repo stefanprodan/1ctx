@@ -95,6 +95,19 @@ export function nextFire(schedule: string, tz: string, from: number): number {
   return date.getTime();
 }
 
+export function nextFires(
+  schedule: string,
+  tz: string,
+  from: number,
+  count: number,
+): number[] {
+  if (count < 1) return [];
+  const fires = [checkSchedule(schedule, tz, from)];
+  while (fires.length < count) {
+    fires.push(nextFire(schedule, tz, fires.at(-1)!));
+  }
+  return fires;
+}
 export function checkSchedule(
   schedule: string,
   tz: string,

@@ -200,6 +200,14 @@ export type EventSource = (typeof EVENT_SOURCES)[number];
 // an event opened a run, or was skipped with a reason
 export const EVENT_OUTCOMES = ["run", "skipped"] as const;
 export type EventOutcome = (typeof EVENT_OUTCOMES)[number];
+// an automation's runs narrowed on its page
+export const RUN_FILTERS = ["failed", "manual"] as const;
+export type RunFilter = (typeof RUN_FILTERS)[number];
+export function isRunFilter(value: unknown): value is RunFilter {
+  return RUN_FILTERS.includes(value as RunFilter);
+}
+// how many next fires a schedule preview answers
+export const PREVIEW_FIRES = 5;
 
 // an automation's schedule is a five-field cron expression in an IANA
 // zone; the server parses both and its 400 is the rule's only words

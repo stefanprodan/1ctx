@@ -6,7 +6,12 @@
 // single row write the writer wraps in one transact() with a touch().
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
-import type { SendCause, SendKind, SessionStatus } from "../../shared/words.ts";
+import type {
+  EventSource,
+  SendCause,
+  SendKind,
+  SessionStatus,
+} from "../../shared/words.ts";
 import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
@@ -18,6 +23,7 @@ export type SessionsPort = {
     agentId: string;
     origin?: "chat" | "automation";
     automationId?: string | null;
+    runSource?: EventSource | null;
     title: string;
     now: number;
   }): SessionRow;

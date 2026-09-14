@@ -12,6 +12,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type {
+  EventSource,
   MessageKind,
   MessageStatus,
   SendCause,
@@ -21,6 +22,17 @@ import type {
 } from "../../shared/words.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 
+export type CreateSession = {
+  id?: string;
+  projectId: string;
+  ownerId: string;
+  agentId: string;
+  origin?: "chat" | "automation";
+  automationId?: string | null;
+  runSource?: EventSource | null;
+  title: string;
+  now: number;
+};
 export type SessionRow = SessionSummary;
 
 export type RepairedSession = {
@@ -39,6 +51,7 @@ export type RawSession = {
   agent_id: string;
   origin: SessionOrigin;
   automation_id: string | null;
+  run_source: EventSource | null;
   title: string;
   status: SessionStatus;
   revision: number;
@@ -62,6 +75,7 @@ export const session = (
   agentId: raw.agent_id,
   origin: raw.origin,
   automationId: raw.automation_id,
+  runSource: raw.run_source,
   title: raw.title,
   status: raw.status,
   revision: raw.revision,

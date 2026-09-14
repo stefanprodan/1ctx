@@ -6,6 +6,7 @@
 // in a team project, an admin edits and deletes.
 
 import type { AutomationSummary } from "../contracts/automation.ts";
+import type { SessionStatus } from "../words.ts";
 import type { StreamRow } from "./sessions.ts";
 
 // GET /api/projects/:id/automations: the project's rows, by name, and
@@ -33,7 +34,14 @@ export type SaveAutomationRequest = {
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 
-// GET /api/automations/:id/runs: its sessions, newest first, at most
-// the stream's limit. POST /api/automations/:id/run answers 201 with
-// the run's SessionResponse
-export type AutomationRunsResponse = { rows: StreamRow[] };
+// GET /api/automations/:id/runs?filter=failed|manual: its sessions,
+// newest first, at most the stream's limit, narrowed by the filter;
+// the tally counts every kept run by status, whatever the filter.
+// POST /api/automations/:id/run answers 201 with the run's
+// SessionResponse
+export type AutomationRunsResponse = { rows: StreamRow[]; tally: RunTally };
+export type RunTally = Record<SessionStatus, number>;
+
+// GET /api/projects/:id/automations/preview?schedule=&tz=: the next
+// fires from now, at most PREVIEW_FIRES, or the 400 a save would get
+export type SchedulePreviewResponse = { fires: number[] };
