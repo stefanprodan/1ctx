@@ -11,8 +11,10 @@
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { isRunFilter } from "../../shared/words.ts";
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
+import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -71,7 +73,8 @@ export const ROUTES: Route[] = [
     // from the rail's list
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
-      const rows = loadList({ project: null, q });
+      const origin = query.get("origin") === "automation" ? "automation" : null;
+      const rows = loadList({ project: null, q, origin });
       const spent = loadWeek();
       await loadProjects();
       const target = composeProjectOf(projects.value, homeProjectId.value);
@@ -117,9 +120,68 @@ export const ROUTES: Route[] = [
         loadProject(params.id),
         loadList({ project: params.id, q: query.get("q")?.trim() ?? "" }),
         loadProjectAgents(params.id),
+        loadAutomations(params.id),
         loadRecentDays(),
       ]);
     },
+  },
+  {
+    path: "/projects/:id/automations",
+    view: lazy(() =>
+      import("../views/projects/Automations.tsx").then((m) => m.Automations),
+    ),
+    title: () => "Automations",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+        loadRecentDays(),
+      ]);
+    },
+  },
+  {
+    path: "/projects/:id/automations/new",
+    view: lazy(() =>
+      import("../views/projects/AutomationEditor.tsx").then(
+        (m) => m.NewAutomation,
+      ),
+    ),
+    title: () => "New scheduled task",
+    role: "authenticated",
+    // the list for the deadline limit and the tab's count
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+      ]);
+    },
+  },
+  {
+    path: "/automations/:id",
+    view: lazy(() =>
+      import("../views/projects/Automation.tsx").then((m) => m.Automation),
+    ),
+    title: () => "Automation",
+    role: "authenticated",
+    // ?runs=failed|manual narrows the runs
+    load: (params, query) => {
+      const filter = query.get("runs");
+      return loadAutomationPage(params.id, isRunFilter(filter) ? filter : null);
+    },
+  },
+  {
+    path: "/automations/:id/edit",
+    view: lazy(() =>
+      import("../views/projects/AutomationEditor.tsx").then(
+        (m) => m.EditAutomation,
+      ),
+    ),
+    title: () => "Edit automation",
+    role: "authenticated",
+    load: (params) => loadAutomationPage(params.id, undefined),
   },
   {
     path: "/projects/:id/members",
@@ -132,6 +194,7 @@ export const ROUTES: Route[] = [
       await Promise.all([
         loadProject(params.id),
         loadProjectAgents(params.id),
+        loadAutomations(params.id),
         loadRecentDays(),
       ]);
     },
@@ -147,6 +210,7 @@ export const ROUTES: Route[] = [
       await Promise.all([
         loadProject(params.id),
         loadProjectAgents(params.id),
+        loadAutomations(params.id),
         loadRecentDays(),
       ]);
     },
@@ -164,7 +228,13 @@ export const ROUTES: Route[] = [
       if (detail === null || detail.session.id !== params.id) return;
       const projectId = detail.session.projectId;
       if (project.value?.id !== projectId) await loadProject(projectId);
-      await loadProjectAgents(projectId);
+      // a run names its automation under the title
+      await Promise.all([
+        loadProjectAgents(projectId),
+        detail.session.automationId === null
+          ? undefined
+          : loadAutomations(projectId),
+      ]);
     },
   },
   {

@@ -6,12 +6,15 @@
 // server allows; /rename in the composer
 // changes the title; the transcript
 // flows down the page and the composer stays at the bottom of the
-// window in the transcript's foot. Leaving the page ends the watch on
-// its session.
+// window in the transcript's foot. A run names its automation over the
+// transcript and has no composer, no Regenerate and no /compact: its
+// foot is its state, with Stop while it runs. Leaving the page ends the
+// watch on its session.
 
 import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
+import { automations } from "../../data/automations.ts";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
 import {
@@ -29,10 +32,12 @@ import {
   sessionError,
   stopSession,
 } from "../../data/sessions.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Menu } from "./Menu.tsx";
+import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
 
 export function Chat({ params }: { params: Params }) {
@@ -55,6 +60,11 @@ export function Chat({ params }: { params: Params }) {
     "someone";
   const agent =
     projectAgents.value?.find((a) => a.id === shown?.session.agentId) ?? null;
+  const run = shown?.session.origin === "automation";
+  const automation = run
+    ? (automations.value?.find((a) => a.id === shown?.session.automationId) ??
+      null)
+    : null;
   return (
     <Page
       crumb={projectName}
@@ -65,6 +75,7 @@ export function Chat({ params }: { params: Params }) {
           <Menu
             key={shown.session.id}
             title={shown.session.title}
+            noun={run ? "run" : "chat"}
             running={shown.session.status === "running" || sending.value}
             download={markdownHref(shown.session.id)}
             onDelete={
@@ -81,6 +92,24 @@ export function Chat({ params }: { params: Params }) {
     >
       {shown && (
         <div class="chat">
+          {run && (
+            <p class="chat-run">
+              <Icon name="clock" size={12} />
+              <span>Run of</span>
+              {automation === null ? (
+                <span>
+                  {shown.session.automationId === null ||
+                  automations.value !== null
+                    ? "a deleted automation"
+                    : "an automation"}
+                </span>
+              ) : (
+                <a class="chat-run-link" href={`/automations/${automation.id}`}>
+                  {automation.name}
+                </a>
+              )}
+            </p>
+          )}
           <Transcript
             sessionId={shown.session.id}
             nodes={groupRows(shown.messages, shown.send)}
@@ -88,23 +117,36 @@ export function Chat({ params }: { params: Params }) {
             agent={agent}
             authorOf={authorOf}
             onRegenerate={
-              shown.session.status === "running" || sending.value
+              run || shown.session.status === "running" || sending.value
                 ? undefined
                 : () => void regenerateSession(shown.session.id)
             }
             foot={
-              <Composer
-                scope={{ sessionId: shown.session.id }}
-                agents={projectAgents.value}
-                agentId={shown.session.agentId}
-                running={shown.session.status === "running"}
-                busy={sending.value}
-                usage={shown.session.usage}
-                onSend={(text) => sendMessage(shown.session.id, text)}
-                onStop={() => stopSession(shown.session.id)}
-                onCompact={() => compactSession(shown.session.id)}
-                onRename={(title) => renameSession(shown.session.id, title)}
-              />
+              run ? (
+                <RunFoot
+                  row={{
+                    session: shown.session,
+                    send: shown.send,
+                    last: null,
+                    automation: null,
+                    runBy: null,
+                  }}
+                  onStop={() => stopSession(shown.session.id)}
+                />
+              ) : (
+                <Composer
+                  scope={{ sessionId: shown.session.id }}
+                  agents={projectAgents.value}
+                  agentId={shown.session.agentId}
+                  running={shown.session.status === "running"}
+                  busy={sending.value}
+                  usage={shown.session.usage}
+                  onSend={(text) => sendMessage(shown.session.id, text)}
+                  onStop={() => stopSession(shown.session.id)}
+                  onCompact={() => compactSession(shown.session.id)}
+                  onRename={(title) => renameSession(shown.session.id, title)}
+                />
+              )
             }
           />
         </div>

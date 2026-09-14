@@ -214,7 +214,12 @@ violation, and every rule has a rejected fixture under
   keeps its rows. Renaming or retyping what exists is not migrated:
   while alpha there is no backwards compatibility, so the migration
   that created it is edited in place and the preview db wiped with
-  `make preview-clean`. Say which of the two a PR does.
+  `make preview-clean`. Say which of the two a PR does. A migration that
+  rebuilds a table other tables reference sets `rebuild: true`:
+  `migrate()` turns foreign keys off before its transaction, runs
+  `pragma foreign_key_check` after `up()` and throws on a row, and turns
+  them on again in a `finally`, since the pragma cannot change inside a
+  transaction and a drop would cascade.
 - **A send is a row and ends once.** A chat is a session in a project
   with one agent for its life; a user message starts a send under the
   runner's lock, one per session, taken synchronously before anything
@@ -227,7 +232,8 @@ violation, and every rule has a rejected fixture under
   revision once and publishes one `session.changed` envelope after
   commit. The reply in flight is checkpointed every 250 ms or 2 KB
   without a revision. A send ends for one cause (finish, stop,
-  failure, shutdown) through one compare-and-set in the runner, and
+  failure, shutdown, deadline) through one compare-and-set in the
+  runner, and
   `finalizeSend` runs exactly once; the lock is held until the stream
   has let go. A stream quiet for two minutes or a reply past 1 MB is
   a failure (`runner/round.ts`). A `finalizeSend` that fails after
@@ -260,6 +266,50 @@ violation, and every rule has a rejected fixture under
   `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
   send limits. History starts from the last done summary. Compact on
   demand is a send of kind `compact` under the same runner lock.
+- **An automation fires runs, and a run is a session.** An automation
+  is a row in its project (`automations/`): an agent, instructions, a
+  five-field cron schedule in an IANA zone parsed by `Bun.cron.parse`
+  in `automations/schedule.ts` (fires at least `MIN_GAP_MINUTES` apart
+  by the minute field, a schedule that never fires is a 400), a
+  deadline that may only tighten the `runDeadlineMs` limit, and a
+  retention in days. Anyone who sees the project creates it, runs it
+  now, suspends, resumes and stops a run; the owner or, in a team
+  project, an admin edits and deletes it, else 403. At most
+  `MAX_AUTOMATIONS_PER_PROJECT`; an agent an automation names is a 409
+  to delete. `next_at` is the next fire and is null exactly while
+  suspended (a table check), and `suspended_by` names who suspended it (null
+  once resumed and for rows suspended before the column); the summary
+  carries the owner's and the suspender's usernames and a stream row
+  its `runBy`, so an admin outside the project is named too. A run's session keeps `run_source`
+  (`schedule` or `manual`, null for a chat and for runs made before the
+  column). `GET /api/automations/:id/runs?filter=failed|manual` narrows
+  the rows and answers the tally of every kept run by status beside
+  them; `GET /api/projects/:id/automations/preview?schedule=&tz=`
+  answers the next `PREVIEW_FIRES` fires, or the 400 a save would get.
+  The scheduler (`automations/scheduler.ts`)
+  is a loop of passes on the clock port, never `Bun.cron(handler)`: a
+  pass fires every active row with `next_at <= now`, sweeps retention
+  hourly, and sleeps until the earliest `next_at` or a minute, woken
+  early by a store write. A fire is one transaction that reads the row
+  again, checks the owner's access with the pure rule in
+  `projects/visible.ts`, skips when a run of it still runs, moves
+  `next_at` past now (missed fires are dropped, never replayed),
+  records the event and calls the runner's `startRun()`, which is
+  `prepare()` alone; `launch()` runs after the commit and `abandon()`
+  frees the reservation on a throw. A refusal is a skipped event with
+  its reason, never a queue. A scheduled run acts as the owner, a
+  manual run as whoever pressed Run now (409 while one runs, 429 at a
+  cap); both count against the runner's caps. A run is a session with
+  origin `automation`, its `automationId`, the automation's name as
+  title and a send of kind `run`; the runner refuses `send`,
+  `regenerate` and `compact` on it with 409, and arms its deadline
+  beside the loop through `terminate()`, cause `deadline`, status
+  `stopped`. The row keeps its last event (`last_event_*`) apart from
+  its last run (`last_run_*`, written from the session row on
+  `session.changed` and by `reconcile()` at start). The scheduler
+  starts after `sessions.repair()` and stops first at shutdown.
+  Deleting an automation is a 409 while a run runs and leaves its
+  runs, with `automation_id` set null.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
   bytes) and the per-tool caps have their defaults, floors and
@@ -291,7 +341,9 @@ violation, and every rule has a rejected fixture under
   from `access.visibleProjectIds()` (memberships, plus every team
   project for an admin), and at most one watched session. A durable
   event (`session`, `deleted`) goes to the connections holding its
-  project; a stream frame (`delta`, `html`, with a sequence per send)
+  project, and so do `automation` and `automationDeleted`, from the bus's
+  `automation.changed` and `automation.deleted`, by the row's revision;
+  a stream frame (`delta`, `html`, with a sequence per send)
   goes to the connections watching its session, straight from the
   writer through a port. `watch` is authorized through a port to
   sessions and answered with `watched` and the runner's live snapshot.
@@ -321,7 +373,10 @@ violation, and every rule has a rejected fixture under
   fixtures; the transcript, the composer and the chat view render
   what the entity holds.
 - **The stream row is the server's word.** `GET /api/sessions` answers
-  `{session, send, last}` per row: the last send, and the last line a
+  `{session, send, last, automation}` per row (`?origin=chat|automation`
+  narrows it, Home's Runs filter): the automation a run belongs to (a
+  run wears the clock where a chat wears the bubble, and its title is
+  the automation), the last send, and the last line a
   person or the agent wrote (a user message or an answer reply, the
   author's username or the agent's name, the first line cut at
   `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only
@@ -366,9 +421,30 @@ violation, and every rule has a rejected fixture under
   over up to 53 ISO weeks, as many as fit the width, from
   `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
   then one Projects card, personal first, each row with its 14-day
-  strip. A team project's Members tab is the same rows, linking an admin to
-  `/admin/projects?open=<id>` and `/admin/agents`; a personal project
-  has Settings in its place.
+  strip. A project's tabs are Feed, Automations, then Members for a team
+  or Settings for a personal one. A team project's Members tab is the
+  same rows, linking an admin to
+  `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab
+  is one card of `RowsGo` rows titled Scheduled tasks, the schedule in
+  words from `Automations.model.ts` (the expression when the shape is
+  unknown), each leading to the automation's page, `/automations/:id`,
+  where the rail marks its project through `automationProject`: the
+  brief (schedule, zone, agent, the instructions cut to four lines with
+  Show more), then Suspend or Resume, Edit and Run now over the runs, a
+  log with their source, length against the deadline and Stop, filtered
+  by `?runs=`, and the aside of next fires, the tally and the setup. The editor is a page of
+  `ui/Section.tsx` steps, `/projects/:id/automations/new` and
+  `/automations/:id/edit` (read-only for whoever may not edit): the task
+  is a box with the composer's `AgentPicker`, the schedule is built in
+  `ScheduleField.tsx` from the shapes in `Schedule.model.ts` (cron typed
+  by hand for any other) and read back through the preview route as
+  the next run, the
+  zone is `ui/Select.tsx` with search, and the deadline starts at the
+  limit, which `GET /api/projects/:id/automations` answers beside the
+  rows. `data/automations.ts` keeps the list, the runs and the tally
+  current from the frames. A run's chat page names its automation over
+  the transcript and has no composer, no Regenerate and no `/compact`;
+  its foot is the state with Stop while it runs (`RunFoot.tsx`).
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The page's stylesheet holds only what it

@@ -19,7 +19,11 @@ import {
   projectsError,
   savePersonalProject,
 } from "../../../src/client/data/projects.ts";
-import { projectAgents } from "../../../src/client/data/sessions.ts";
+import {
+  loadProjectAgents,
+  projectAgentCount,
+  projectAgents,
+} from "../../../src/client/data/sessions.ts";
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
@@ -84,6 +88,25 @@ describe("the projects entity", () => {
     answer = () => ({ projects: [personal] });
     await loadProjects();
     expect(projects.value).toEqual([personal]);
+  });
+
+  test.serial("an agent count belongs only to the project loaded", async () => {
+    answer = () => ({ agents: [] });
+    await loadProjectAgents("p1");
+    expect(projectAgentCount("p1")).toBe(0);
+
+    let release: (response: Response) => void = () => {};
+    globalThis.fetch = (() =>
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      })) as unknown as typeof fetch;
+    const pending = loadProjectAgents("p2");
+    expect(projectAgentCount("p1")).toBeNull();
+    expect(projectAgentCount("p2")).toBeNull();
+    release(Response.json({ agents: [{}] }));
+    await pending;
+    expect(projectAgentCount("p2")).toBe(1);
+    me.value = null;
   });
 
   test("drops the list with the signed-in user", async () => {
@@ -260,6 +283,10 @@ describe("the rail", () => {
     expect(projectHere("/chat/s1", null)).toBeNull();
     expect(projectHere("/chat/s9", chat)).toBeNull();
     expect(projectHere("/projects", null)).toBeNull();
+    const task = { id: "au1", projectId: "p3" };
+    expect(projectHere("/automations/au1", null, task)).toBe("p3");
+    expect(projectHere("/automations/au1/edit", null, task)).toBe("p3");
+    expect(projectHere("/automations/au9", null, task)).toBeNull();
     expect(projectHere("/", chat)).toBeNull();
   });
 });
@@ -274,12 +301,41 @@ describe("Project.model", () => {
   test("a personal project has Settings where a team has Members", () => {
     expect(tabsOf("p1", "team").map((t) => t.label)).toEqual([
       "Feed",
+      "Automations",
       "Members",
     ]);
     expect(tabsOf("p1", "personal")[1]).toEqual({
+      label: "Automations",
+      href: "/projects/p1/automations",
+    });
+    expect(tabsOf("p1", "personal")[2]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });
+  });
+
+  test("Automations counts its rows, Members the users and the agents", () => {
+    const counts = { automations: 3, members: 4, agents: 5 };
+    expect(tabsOf("p1", "team", counts).map((t) => t.count)).toEqual([
+      undefined,
+      3,
+      9,
+    ]);
+    // Settings counts nothing
+    expect(tabsOf("p1", "personal", counts).map((t) => t.count)).toEqual([
+      undefined,
+      3,
+      undefined,
+    ]);
+    // a count not known yet is left out, never shown as zero
+    expect(
+      tabsOf("p1", "team", { automations: null, members: 4, agents: null }).map(
+        (t) => t.count,
+      ),
+    ).toEqual([undefined, undefined, undefined]);
+    expect(tabsOf("p1", "team", { ...counts, automations: 0 })[1]?.count).toBe(
+      0,
+    );
   });
 
   test("the About line is the description, or says what a personal one is", () => {

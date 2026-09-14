@@ -30,4 +30,14 @@
     color: var(--fg);
     border-bottom-color: var(--fg);
   }
+
+  /* the number beside a label, quiet until its tab is on */
+  .tabs-count {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .tabs-tab-on .tabs-count {
+    color: var(--dim);
+  }
 }

@@ -231,6 +231,66 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/projects/:id/automations",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/automations/preview",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/automations",
+    body: {
+      name: "daily-run",
+      agentId: "none",
+      instructions: "check",
+      schedule: "0 9 * * *",
+      tz: "UTC",
+      deadlineMs: null,
+      retentionDays: 30,
+    },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/automations/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/automations/:id",
+    body: { instructions: "check again" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/automations/:id/suspend",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/automations/:id/resume",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/automations/:id/run",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/automations/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/automations/:id/runs",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/sessions",
     expect: { anonymous: 401, member: 200, admin: 200 },
   },

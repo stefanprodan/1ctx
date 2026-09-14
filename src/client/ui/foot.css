@@ -1,10 +1,12 @@
-/* The foot of a form: the submit with its states, the refusal beside it. */
+/* The foot of a form: the submit with its states, and the refusal on
+   its own line under the buttons, so they never move when it shows. */
 
 @layer tokens, base, owners;
 
 @layer owners {
   .foot {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
   }
@@ -17,7 +19,10 @@
   }
 
   .foot-note {
-    color: var(--faint);
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--failed);
   }
 
   /* the labels share one cell; the hidden ones still take their width */

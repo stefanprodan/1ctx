@@ -1,13 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One session in the stream: the chat icon in the status colour, the
-// title, the project and the state line, the time. The whole row is
-// the link to the chat.
+// One session in the stream: the icon in the status colour, a chat
+// bubble for a chat and the clock for an automation's run, the title,
+// the project and the state line, the time. A run's title is its
+// automation, so its line is the agent's answer like a chat's. The
+// whole row is the link to the chat.
 
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
-import { stateLine, whenText } from "./Row.model.ts";
+import { iconOf, stateLine, whenText } from "./Row.model.ts";
 
 export function Row({
   row,
@@ -25,7 +27,7 @@ export function Row({
   return (
     <a class="stream-row" href={`/chat/${session.id}`}>
       <Icon
-        name="chat"
+        name={iconOf(row)}
         class={`stream-icon stream-icon-${session.status}`}
         size={16}
       />

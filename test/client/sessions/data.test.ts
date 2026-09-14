@@ -21,6 +21,7 @@ import {
   sessionError,
   toolResults,
 } from "../../../src/client/data/sessions.ts";
+import { applyAutomationFrame } from "../../../src/client/data/stream.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type {
   Message,
@@ -36,6 +37,8 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
     ownerId: "u1",
     agentId: "a1",
     origin: "chat",
+    automationId: null,
+    runSource: null,
     title: "Chat",
     status: "done",
     revision: 1,
@@ -47,7 +50,13 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
 }
 
 function row(changes: Partial<SessionSummary> = {}): StreamRow {
-  return { session: summary(changes), send: null, last: null };
+  return {
+    session: summary(changes),
+    send: null,
+    last: null,
+    automation: null,
+    runBy: null,
+  };
 }
 
 const ids = (rows: StreamRow[] | null) => rows?.map((r) => r.session.id);
@@ -319,6 +328,33 @@ describe("the sessions entity", () => {
     });
 
     expect(list.value?.[0].session.title).toBe("Changed");
+  });
+
+  test("automation frames rename and clear loaded run labels", async () => {
+    answer = () =>
+      Response.json({
+        rows: [
+          {
+            ...row({ origin: "automation", automationId: "au1" }),
+            automation: { id: "au1", name: "old-name" },
+          },
+        ],
+      });
+    await loadList({ project: "p1", q: "" });
+
+    applyAutomationFrame({
+      type: "automation",
+      projectId: "p1",
+      automation: { id: "au1", name: "new-name" },
+    } as Parameters<typeof applyAutomationFrame>[0]);
+    expect(list.value?.[0]?.automation?.name).toBe("new-name");
+
+    applyAutomationFrame({
+      type: "automationDeleted",
+      projectId: "p1",
+      automationId: "au1",
+    });
+    expect(list.value?.[0]?.automation).toBeNull();
   });
 
   test("an envelope keeps the row's send and last line unless it carries them", async () => {

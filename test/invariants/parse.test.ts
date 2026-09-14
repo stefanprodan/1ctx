@@ -389,11 +389,18 @@ describe("parseRenameSession", () => {
 
 describe("parseStreamQuery", () => {
   test.each([
-    ["http://one.test/api/sessions", { project: null, q: "" }],
-    ["http://one.test/api/sessions?project=", { project: null, q: "" }],
+    ["http://one.test/api/sessions", { project: null, q: "", origin: null }],
+    [
+      "http://one.test/api/sessions?project=",
+      { project: null, q: "", origin: null },
+    ],
     [
       "http://one.test/api/sessions?project=p1&q=%20Alpha%20",
-      { project: "p1", q: "Alpha" },
+      { project: "p1", q: "Alpha", origin: null },
+    ],
+    [
+      "http://one.test/api/sessions?origin=automation",
+      { project: null, q: "", origin: "automation" as const },
     ],
   ])("accepts %s", (input, expected) => {
     expect(parseStreamQuery(new URL(input))).toEqual(expected);

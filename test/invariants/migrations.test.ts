@@ -277,3 +277,191 @@ describe("the schema", () => {
     db.close();
   });
 });
+
+describe("additive migrations", () => {
+  test("0004 adds run_source and preserves existing sessions", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 3));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+        values ('u4', 'user4', 'User', 'user4@example.com', 'member', 'x', 0);
+      insert into projects (id, kind, name, owner_id, created_at)
+        values ('p4', 'personal', 'personal', 'u4', 0);
+      insert into providers (id, name, wire, base_url, created_at)
+        values ('pr4', 'prov4', 'openai-compatible', 'http://x', 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a4', 'agent4', 'pr4', 'm', 'M', 0);
+      insert into automations
+        (id, project_id, owner_id, agent_id, name, instructions, schedule, tz,
+         retention_days, next_at, created_at, updated_at)
+        values ('au4', 'p4', 'u4', 'a4', 'daily', 'check', '0 9 * * *',
+                'UTC', 30, 1, 0, 0);
+      insert into sessions
+        (id, project_id, owner_id, agent_id, origin, automation_id, title,
+         status, revision, created_at, last_activity_at)
+        values ('chat4', 'p4', 'u4', 'a4', 'chat', null, 'chat', 'done', 1, 0, 1),
+               ('run4', 'p4', 'u4', 'a4', 'automation', 'au4', 'daily',
+                'done', 1, 0, 1);
+    `);
+
+    expect(migrate(db)).toEqual(["0004-run-source", "0005-suspended-by"]);
+    expect(
+      db.query("select id, run_source from sessions order by id").all(),
+    ).toEqual([
+      { id: "chat4", run_source: null },
+      { id: "run4", run_source: null },
+    ]);
+    db.query(
+      "update sessions set run_source = 'manual' where id = 'run4'",
+    ).run();
+    expect(() =>
+      db.query("update sessions set run_source = 'other'").run(),
+    ).toThrow();
+    db.close();
+  });
+});
+
+describe("0005", () => {
+  test("adds suspended_by and keeps a suspended row's time", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 4));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+        values ('u5', 'user5', 'User', 'user5@example.com', 'member', 'x', 0);
+      insert into projects (id, kind, name, owner_id, created_at)
+        values ('p5', 'personal', 'personal', 'u5', 0);
+      insert into providers (id, name, wire, base_url, created_at)
+        values ('pr5', 'prov5', 'openai-compatible', 'http://x', 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a5', 'agent5', 'pr5', 'm', 'M', 0);
+      insert into automations
+        (id, project_id, owner_id, agent_id, name, instructions, schedule, tz,
+         retention_days, suspended_at, next_at, created_at, updated_at)
+        values ('au5', 'p5', 'u5', 'a5', 'daily', 'check', '0 9 * * *',
+                'UTC', 30, 7, null, 0, 0);
+    `);
+    expect(migrate(db)).toEqual(["0005-suspended-by"]);
+    expect(
+      db.query("select suspended_at, suspended_by from automations").get(),
+    ).toEqual({ suspended_at: 7, suspended_by: null });
+    expect(() =>
+      db.query("update automations set suspended_by = 'nobody'").run(),
+    ).toThrow();
+    db.close();
+  });
+});
+
+describe("rebuild migrations", () => {
+  test("0003 preserves chat rows and recreates the indexes", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 2));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+        values ('u3', 'user3', 'User', 'user3@example.com', 'member', 'x', 0);
+      insert into projects (id, kind, name, owner_id, created_at)
+        values ('p3', 'personal', 'personal', 'u3', 0);
+      insert into providers (id, name, wire, base_url, created_at)
+        values ('pr3', 'prov3', 'openai-compatible', 'http://x', 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a3', 'agent3', 'pr3', 'm', 'M', 0);
+      insert into sessions
+        (id, project_id, owner_id, agent_id, origin, title, status,
+         revision, created_at, last_activity_at)
+        values ('s3', 'p3', 'u3', 'a3', 'chat', 'chat', 'done', 1, 0, 1);
+      insert into sends
+        (id, session_id, kind, user_id, agent_id, provider_id, model,
+         status, first_message_id, started_at)
+        values ('d3', 's3', 'chat', 'u3', 'a3', 'pr3', 'm', 'done', 'm3', 0);
+      insert into messages
+        (id, session_id, seq, kind, send_id, round, user_id, content,
+         status, created_at, finished_at)
+        values ('m3', 's3', 1, 'user', 'd3', 1, 'u3', 'hello', 'done', 0, 0);
+      insert into usage
+        (id, send_id, session_id, project_id, user_id, agent_id,
+         provider_id, model, round, seq, prompt_tokens, completion_tokens,
+         created_at)
+        values ('z3', 'd3', 's3', 'p3', 'u3', 'a3', 'pr3', 'm', 1, 1, 1, 1, 0);
+    `);
+
+    expect(migrate(db)).toEqual([
+      "0003-automations",
+      "0004-run-source",
+      "0005-suspended-by",
+    ]);
+    expect(
+      db.query("select origin, automation_id from sessions").get(),
+    ).toEqual({
+      origin: "chat",
+      automation_id: null,
+    });
+    expect(db.query("select kind from sends").get()).toEqual({ kind: "chat" });
+    expect(db.query("select content from messages").get()).toEqual({
+      content: "hello",
+    });
+    expect(db.query("select prompt_tokens from usage").get()).toEqual({
+      prompt_tokens: 1,
+    });
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    expect(db.query("pragma foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    const indexes = db
+      .query<{ name: string }, []>(
+        "select name from sqlite_master where type = 'index'",
+      )
+      .all()
+      .map((row) => row.name);
+    for (const name of [
+      "sessions_project",
+      "sessions_agent",
+      "sessions_automation",
+      "sends_session",
+      "messages_answer",
+      "messages_streaming_reply",
+      "usage_session",
+      "usage_send_round",
+      "usage_activity",
+    ]) {
+      expect(indexes).toContain(name);
+    }
+    db.close();
+  });
+
+  test("foreign keys return after a rebuild check fails", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    expect(() =>
+      migrate(db, [
+        {
+          id: "9999-bad-rebuild",
+          rebuild: true,
+          up(d) {
+            d.exec(`
+              create table rebuild_parent (id text primary key);
+              create table rebuild_child (
+                parent_id text references rebuild_parent(id)
+              );
+              insert into rebuild_child values ('missing');
+            `);
+          },
+        },
+      ]),
+    ).toThrow("foreign key check failed");
+    expect(db.query("pragma foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    expect(
+      db
+        .query(
+          "select count(*) as n from sqlite_master where name = 'rebuild_child'",
+        )
+        .get(),
+    ).toEqual({ n: 0 });
+    db.close();
+  });
+});

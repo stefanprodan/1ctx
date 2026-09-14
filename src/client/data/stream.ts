@@ -10,30 +10,47 @@
 import { effect, signal } from "@preact/signals";
 import type { SessionsResponse, StreamRow } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
+import type { SessionOrigin } from "../../shared/words.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { ordered } from "./sessions-rows.ts";
 
 export const list = signal<StreamRow[] | null>(null);
-export type ListFilter = { project: string | null; q: string };
+// origin narrows the rows to chats or to runs; null lists both
+export type ListFilter = {
+  project: string | null;
+  q: string;
+  origin?: SessionOrigin | null;
+};
 
 let owner: string | null = null;
-let listFor: ListFilter & { turn: number } = { project: "", q: "", turn: 0 };
+let listFor: Required<ListFilter> & { turn: number } = {
+  project: "",
+  q: "",
+  origin: null,
+  turn: 0,
+};
 
 effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
   owner = id;
-  listFor = { project: "", q: "", turn: listFor.turn + 1 };
+  listFor = { project: "", q: "", origin: null, turn: listFor.turn + 1 };
   list.value = null;
 });
 
 const sameFilter = (a: ListFilter, b: ListFilter) =>
-  a.project === b.project && a.q === b.q;
+  a.project === b.project &&
+  a.q === b.q &&
+  (a.origin ?? null) === (b.origin ?? null);
 
-// whether the filter on screen would list a row of that project
-const covers = (projectId: string) =>
-  listFor.project === null || listFor.project === projectId;
+// whether the filter on screen would list a row of that project, and
+// of that origin when one is given
+const covers = (projectId: string, origin?: SessionOrigin) =>
+  (listFor.project === null || listFor.project === projectId) &&
+  (origin === undefined ||
+    listFor.origin === null ||
+    listFor.origin === origin);
 
 // an answer over the rows held: a held row that moved past the
 // answer's copy while it was in flight keeps its newer word
@@ -55,10 +72,11 @@ function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
 export async function loadList(filter: ListFilter): Promise<void> {
   const turn = listFor.turn + 1;
   if (!sameFilter(listFor, filter)) list.value = null;
-  listFor = { ...filter, turn };
+  listFor = { ...filter, origin: filter.origin ?? null, turn };
   const params = new URLSearchParams();
   if (filter.project !== null) params.set("project", filter.project);
   if (filter.q !== "") params.set("q", filter.q);
+  if (filter.origin) params.set("origin", filter.origin);
   const search = params.toString();
   try {
     const body = await api<SessionsResponse>(
@@ -72,7 +90,11 @@ export async function loadList(filter: ListFilter): Promise<void> {
 
 // the list loaded again for the filter on screen
 function reload(): Promise<void> {
-  return loadList({ project: listFor.project, q: listFor.q });
+  return loadList({
+    project: listFor.project,
+    q: listFor.q,
+    origin: listFor.origin,
+  });
 }
 
 // the row goes, and the list is loaded again when the filter covers
@@ -106,11 +128,37 @@ export function revokeRows(projectId: string): void {
 // unchanged: the list is loaded again when the filter would list it,
 // which is its project and no query, since the server's search is
 // not reasoned about here
+export function applyAutomationFrame(
+  ev: Extract<SocketEvent, { type: "automation" | "automationDeleted" }>,
+): void {
+  const rows = list.value;
+  if (rows === null || !covers(ev.projectId)) return;
+  const id = ev.type === "automation" ? ev.automation.id : ev.automationId;
+  const label =
+    ev.type === "automation"
+      ? { id: ev.automation.id, name: ev.automation.name }
+      : null;
+  let changed = false;
+  const next = rows.map((row) => {
+    if (row.session.origin !== "automation") return row;
+    if ((row.automation?.id ?? row.session.automationId) !== id) return row;
+    if (
+      row.automation?.id === label?.id &&
+      row.automation?.name === label?.name
+    ) {
+      return row;
+    }
+    changed = true;
+    return { ...row, automation: label };
+  });
+  if (changed) list.value = next;
+}
+
 export function applyEnvelope(
   ev: Extract<SocketEvent, { type: "session" }>,
 ): void {
   const rows = list.value;
-  if (rows === null || !covers(ev.projectId)) return;
+  if (rows === null || !covers(ev.projectId, ev.session.origin)) return;
   const held = rows.find((row) => row.session.id === ev.session.id);
   if (held === undefined) {
     if (listFor.q === "") void reload();
@@ -121,6 +169,8 @@ export function applyEnvelope(
     session: ev.session,
     send: ev.send ?? held.send,
     last: ev.last ?? held.last,
+    automation: held.automation,
+    runBy: held.runBy,
   };
   list.value = ordered([
     ...rows.filter((row) => row.session.id !== ev.session.id),

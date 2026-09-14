@@ -15,13 +15,43 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-// a team's people are its Members; a personal project has one person,
-// who describes it in Settings
-export function tabsOf(id: string, kind: ProjectKind): Tab[] {
+// what the tabs count; null while it is not known yet
+export type TabCounts = {
+  automations: number | null;
+  // the people and the agents a team tab lists
+  members: number | null;
+  agents: number | null;
+};
+
+const NO_COUNTS: TabCounts = { automations: null, members: null, agents: null };
+
+const counted = (n: number | null) => (n === null ? {} : { count: n });
+
+// every project has automations; a team's people are its Members, and
+// a personal project has one person, who describes it in Settings.
+// Members counts the users and the agents the tab lists
+export function tabsOf(
+  id: string,
+  kind: ProjectKind,
+  counts: TabCounts = NO_COUNTS,
+): Tab[] {
+  const members =
+    counts.members === null || counts.agents === null
+      ? null
+      : counts.members + counts.agents;
   return [
     { label: "Feed", href: `/projects/${id}` },
+    {
+      label: "Automations",
+      href: `/projects/${id}/automations`,
+      ...counted(counts.automations),
+    },
     kind === "team"
-      ? { label: "Members", href: `/projects/${id}/members` }
+      ? {
+          label: "Members",
+          href: `/projects/${id}/members`,
+          ...counted(members),
+        }
       : { label: "Settings", href: `/projects/${id}/settings` },
   ];
 }

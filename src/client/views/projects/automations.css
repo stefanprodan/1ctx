@@ -1,0 +1,388 @@
+/* The automation pages: what the tab's rows add, the automation page's
+   actions, brief, run log and filters, and the editor's task box,
+   schedule builder and its next run. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .automations-agent {
+    color: var(--brand);
+  }
+  .automations-faint {
+    color: var(--faint);
+  }
+  .automations-bad {
+    color: var(--failed);
+  }
+  .automations-strong {
+    color: var(--fg);
+  }
+  .automations-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .automations-note {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  /* the tab's row icon, lit by the last run */
+  .automations-icon-running {
+    color: var(--running);
+  }
+  .automations-icon-failed {
+    color: var(--failed);
+  }
+  /* a run's clock is lit by its status, as the feed's is; the tab's
+     rows light only running and failed */
+  .automations-run-icon {
+    color: var(--faint);
+  }
+  .automations-run-icon.automations-icon-done {
+    color: var(--done);
+  }
+
+  /* the automation page */
+  .automations-actions,
+  .automations-actions-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .automations-actions-end {
+    margin-left: auto;
+  }
+
+  .automations-brief {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+  }
+  .automations-brief-line,
+  .automations-brief-next {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  .automations-brief-next {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--faint);
+  }
+  /* the padding sits on the box, so the cut falls on a line's edge */
+  .automations-brief-text {
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+  }
+  .automations-brief-body {
+    margin: 0;
+    font-size: var(--text-input);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* the state line, with Show more at its end */
+  .automations-brief-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 20px;
+  }
+  .automations-brief-cut {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .automations-more {
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .automations-more:hover {
+    color: var(--fg);
+  }
+
+  .automations-filters {
+    display: flex;
+    gap: var(--space-1);
+    margin-left: auto;
+  }
+  .automations-filter {
+    padding: 2px var(--space-2);
+    border-radius: var(--radius);
+    color: var(--faint);
+    font-size: var(--text-small);
+    text-decoration: none;
+  }
+  .automations-filter:hover {
+    color: var(--fg);
+  }
+  .automations-filter-on {
+    background: var(--line);
+    color: var(--fg);
+  }
+
+  .automations-run {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-right: var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .automations-run:last-child {
+    border-bottom: 0;
+  }
+  .automations-run:hover {
+    background: var(--line);
+  }
+  .automations-run-link {
+    display: grid;
+    grid-template-columns: 16px 116px minmax(0, 1fr) 84px;
+    align-items: center;
+    gap: var(--space-3);
+    flex-grow: 1;
+    min-width: 0;
+    padding: var(--space-3) 0 var(--space-3) 14px;
+    color: var(--dim);
+    text-decoration: none;
+  }
+  .automations-run-when {
+    display: flex;
+    flex-direction: column;
+    font-size: var(--text-ui);
+    color: var(--fg);
+    white-space: nowrap;
+  }
+  .automations-run-when .automations-faint {
+    font-size: var(--text-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .automations-run-said {
+    font-size: var(--text-ui);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .automations-run-link:hover .automations-run-said {
+    color: var(--fg);
+  }
+  .automations-run-took {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .automations-bar {
+    height: 3px;
+    border-radius: var(--radius-cell);
+    background: var(--line-strong);
+    overflow: hidden;
+  }
+  .automations-bar-fill {
+    display: block;
+    height: 100%;
+    background: var(--faint);
+  }
+  .automations-bar-running {
+    background: var(--running);
+  }
+  .automations-bar-failed {
+    background: var(--failed);
+  }
+  .automations-run-end {
+    flex: 0 0 64px;
+    display: flex;
+    justify-content: flex-end;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  .automations-fire {
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+
+  /* the editor */
+  .automations-editor {
+    display: flex;
+    flex-direction: column;
+  }
+  .automations-foot {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+  .automations-aside-text {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+  }
+
+  .automations-task {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-card);
+    background: var(--inset);
+    border: 1px solid var(--line);
+  }
+  .automations-task:focus-within {
+    border-color: var(--line-strong);
+  }
+  .automations-task .automations-task-text {
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    font-size: var(--text-input);
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+  }
+  .automations-task-bar {
+    display: flex;
+    align-items: center;
+  }
+
+  .automations-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .automations-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+  .automations-every {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+    padding: 2px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+  }
+  .automations-every-option {
+    padding: var(--space-1) var(--space-3);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    cursor: pointer;
+  }
+  .automations-every-option:hover {
+    color: var(--fg);
+  }
+  .automations-every-on {
+    background: var(--line);
+    color: var(--fg);
+  }
+
+  .automations-when {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .automations-step {
+    flex: 0 0 160px;
+  }
+  .automations-number {
+    flex: 0 0 88px;
+  }
+  .automations-time {
+    flex: 0 0 120px;
+  }
+  .automations-cron {
+    flex: 1 1 200px;
+  }
+  .automations-zone {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+  .automations-days {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: var(--space-1);
+  }
+  .automations-day {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--inset);
+    color: var(--faint);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .automations-day-on {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .automations-readback {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line);
+    font-size: var(--text-ui);
+  }
+  .automations-readback-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .automations-words {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .automations-next {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--dim);
+  }
+
+  @media (max-width: 719px) {
+    .automations-pair {
+      grid-template-columns: 1fr;
+    }
+    .automations-run-link {
+      grid-template-columns: 16px minmax(0, 1fr) 64px;
+    }
+    .automations-run-said {
+      grid-column: 2 / -1;
+      grid-row: 2;
+    }
+  }
+}

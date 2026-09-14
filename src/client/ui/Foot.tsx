@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The foot of a form: the submit button that says what a Save is going
-// through, the refusal beside it, and room on the left for what else
-// the form offers. A view composes this, never restyles it.
+// through, the refusal on its own line under it, and room on the left
+// for what else the form offers. A view composes this, never restyles it.
 
 import type { ComponentChildren } from "preact";
 import { Icon } from "../lib/icons.tsx";
@@ -49,7 +49,9 @@ export function Foot({
         </span>
       </button>
       {typeof status === "object" && (
-        <span class="foot-note error">{status.error}</span>
+        <p class="foot-note" role="alert">
+          {status.error}
+        </p>
       )}
     </div>
   );

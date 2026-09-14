@@ -19,11 +19,13 @@ import { CLOSED, type MenuAction, menuStep } from "./Menu.model.ts";
 
 export function Menu({
   title,
+  noun = "chat",
   running,
   download,
   onDelete,
 }: {
   title: string;
+  noun?: "chat" | "run";
   // a reply streams or a send is on its way: nothing goes
   running: boolean;
   // the Markdown file's address
@@ -93,14 +95,14 @@ export function Menu({
           {asking ? (
             <div class="chat-menu-ask">
               <p class={`chat-menu-ask-text${failure ? " error" : ""}`}>
-                {failure ?? "Delete this chat?"}
+                {failure ?? `Delete this ${noun}?`}
               </p>
               <div class="chat-menu-ask-row">
                 <button
                   type="button"
                   class="btn btn-small btn-danger"
                   disabled={busy || running}
-                  title={running ? "Stop the chat first" : undefined}
+                  title={running ? `Stop the ${noun} first` : undefined}
                   onClick={() => void remove()}
                 >
                   {busy ? "Deleting" : "Delete"}
@@ -131,7 +133,7 @@ export function Menu({
                   type="button"
                   class="chat-menu-item"
                   disabled={running}
-                  title={running ? "Stop the chat first" : undefined}
+                  title={running ? `Stop the ${noun} first` : undefined}
                   onClick={() => step("ask")}
                 >
                   <Icon name="trash" size={14} />

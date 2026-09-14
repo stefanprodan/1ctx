@@ -1,0 +1,141 @@
+/* The searchable select: a trigger shaped like a field, and the list
+   that hangs under it with the search box at its top. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the field's width is its column's, never its text's, so a long
+     pick is cut at the end instead of widening the form */
+  .select {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    container-type: inline-size;
+  }
+
+  .select-trigger {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    font-size: var(--text-input);
+    text-align: left;
+    cursor: pointer;
+  }
+  .select-trigger:disabled {
+    color: var(--dim);
+    cursor: default;
+  }
+  .select-trigger[aria-expanded="true"] {
+    border-color: var(--line-strong);
+  }
+
+  .select-label {
+    flex-shrink: 0;
+    max-width: 65cqw;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .select-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .select-detail {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .select-chevron {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--faint);
+  }
+
+  .select-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line-strong);
+    overflow: hidden;
+  }
+
+  .select-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 40px;
+    padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+  .select-glass {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .select-input {
+    flex-grow: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    font-size: var(--text-input);
+    outline: none;
+  }
+
+  /* about eight options in sight, the rest a scroll away */
+  .select-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 290px;
+    padding: var(--space-1);
+    overflow-y: auto;
+    outline: none;
+  }
+  .select-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 32px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius);
+    color: var(--dim);
+    font-size: var(--text-ui);
+    cursor: pointer;
+  }
+  .select-option-on {
+    background: var(--line);
+    color: var(--fg);
+  }
+  .select-check {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--brand);
+  }
+  .select-none {
+    margin: 0;
+    padding: var(--space-2);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+}

@@ -1,13 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
 // Persistence and the socket frames of a send. Each durable change is
 // one transaction with one revision and one envelope after commit.
-// startSend opens the send; delta streams without a revision,
-// checkpointed every 250 ms or 2 KB; markRoundWork moves a
-// reply into the fold at the first tool call; finishRound ends a work
-// round and launches its tool rows; finishTool ends one tool; recordUnrun
-// writes a round's calls as not run when a cap or the loop cut them;
+// startSend opens the send; delta streams without a revision, and the reply
+// moves into the fold at the first tool call; finishRound ends a work
+// round and launches tools; finishTool ends one; cut calls are recorded not run.
 // startRound begins the next round; finalizeSend ends the send once.
 
 import type {
@@ -17,7 +14,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
-import type { SendCause, SessionStatus } from "../../shared/words.ts";
+import type { SendCause, SendKind, SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
@@ -70,6 +67,7 @@ export function statusOf(cause: SendCause): Exclude<SessionStatus, "running"> {
       return "done";
     case "stop":
     case "shutdown":
+    case "deadline":
       return "stopped";
     default:
       return "failed";
@@ -96,6 +94,9 @@ export class Writer {
     userId: string;
     sessionId: string;
     session: SessionRow | null;
+    origin?: "chat" | "automation";
+    automationId?: string | null;
+    kind?: SendKind;
     existingUser?: Message;
     title: string;
     policy: SendPolicy;
@@ -111,12 +112,15 @@ export class Writer {
           projectId: policy.projectId,
           ownerId: policy.userId,
           agentId: policy.agentId,
+          origin: fields.origin,
+          automationId: fields.automationId,
+          runSource: policy.automation?.source ?? null,
           title: fields.title,
           now,
         });
       const send = this.deps.sessions.createSend({
         id: fields.sendId,
-        kind: "chat",
+        kind: fields.kind ?? "chat",
         sessionId: base.id,
         userId: policy.userId,
         agentId: policy.agentId,

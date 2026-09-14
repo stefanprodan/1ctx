@@ -46,10 +46,17 @@ export function searchOf(search: string): string {
   return new URLSearchParams(search).get("q")?.trim() ?? "";
 }
 
-// the address for a query on a page, none when it is blank
-export function searchHref(pathname: string, q: string): string {
+// whether the address asks for runs alone
+export function runsOf(search: string): boolean {
+  return new URLSearchParams(search).get("origin") === "automation";
+}
+
+// the address for a query on a page, none when it is blank, with the
+// Runs filter when it is on
+export function searchHref(pathname: string, q: string, runs = false): string {
   const params = new URLSearchParams();
   if (q.trim() !== "") params.set("q", q.trim());
+  if (runs) params.set("origin", "automation");
   const search = params.toString();
   return `${pathname}${search === "" ? "" : `?${search}`}`;
 }

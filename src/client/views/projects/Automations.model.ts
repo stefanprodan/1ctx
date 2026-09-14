@@ -1,0 +1,349 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// What the automation pages say and check without a DOM: a schedule
+// in words for the shapes people write most, the list row's state, a
+// run's source and duration, who may change a row, and the editor's
+// fields to a request. The server parses the schedule and the zone;
+// the words here only read them, and the expression itself stands in
+// for any shape they do not know.
+
+import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
+import type { StreamRow } from "../../../shared/api/sessions.ts";
+import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
+import type { ProjectKind, Role } from "../../../shared/words.ts";
+import { ago, elapsed, until } from "../../lib/format.ts";
+import { placeOf } from "../../lib/places.ts";
+import type { Option } from "../../ui/Select.model.ts";
+import { daysOf, fieldsOf, WEEK } from "./Schedule.model.ts";
+
+const whole = (field: string, max: number): number | null => {
+  if (!/^\d{1,2}$/.test(field)) return null;
+  const n = Number(field);
+  return n <= max ? n : null;
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+const ordinal = (n: number) => {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+};
+
+// "Monday", "Monday and Friday", "Monday, Wednesday and Friday", in
+// week order
+const dayList = (days: number[]): string => {
+  const names = WEEK.filter((d) => days.includes(d.value)).map((d) => d.name);
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+};
+
+// "every weekday at 09:00", "every 15 minutes"; null for a shape the
+// words do not know
+export function scheduleWords(schedule: string): string | null {
+  const fields = fieldsOf(schedule);
+  if (fields === null) return null;
+  const [min, hour, dom, month, dow] = fields as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
+  if (month !== "*") return null;
+  const step = /^\*\/(\d{1,2})$/.exec(min);
+  if (step && hour === "*" && dom === "*" && dow === "*") {
+    const n = Number(step[1]);
+    return n === 1 ? "every minute" : `every ${n} minutes`;
+  }
+  const m = whole(min, 59);
+  if (m === null) return null;
+  if (hour === "*" && dom === "*" && dow === "*") {
+    return m === 0 ? "every hour" : `every hour at :${pad(m)}`;
+  }
+  const h = whole(hour, 23);
+  if (h === null) return null;
+  const at = `at ${pad(h)}:${pad(m)}`;
+  if (dom === "*") {
+    const days = daysOf(dow);
+    if (days === null) return null;
+    const key = days.join(",");
+    if (days.length === 7) return `every day ${at}`;
+    if (key === "1,2,3,4,5") return `every weekday ${at}`;
+    if (key === "0,6") return `every weekend day ${at}`;
+    return `every ${dayList(days)} ${at}`;
+  }
+  if (dow === "*") {
+    const d = whole(dom, 31);
+    return d === null || d === 0
+      ? null
+      : `on the ${ordinal(d)} of each month ${at}`;
+  }
+  return null;
+}
+
+// the words with a capital, for a line of their own
+export function scheduleTitle(schedule: string): string {
+  const words = scheduleWords(schedule);
+  return words === null
+    ? schedule
+    : `${words[0].toUpperCase()}${words.slice(1)}`;
+}
+
+// a list row's state at its right: running, suspended, or the next
+// fire, after a failed last run
+export function rowState(
+  a: AutomationSummary,
+  now: number,
+): { text: string; bad: boolean } {
+  if (a.lastRunStatus === "running") return { text: "running", bad: false };
+  const failed =
+    a.lastRunStatus === "failed" && a.lastEventAt !== null
+      ? `failed ${ago(a.lastEventAt, now)}`
+      : null;
+  const next =
+    a.suspendedAt !== null
+      ? "suspended"
+      : a.nextAt !== null
+        ? `next ${until(a.nextAt, now)}`
+        : null;
+  return {
+    text: [failed, next].filter((s) => s !== null).join(" · "),
+    bad: failed !== null,
+  };
+}
+
+// "Suspended by @bogdan 2h ago"; a row suspended before the name was
+// kept says only when
+export function suspendedText(
+  a: Pick<AutomationSummary, "suspendedAt" | "suspendedBy">,
+  now: number,
+): string {
+  if (a.suspendedAt === null) return "";
+  const by = a.suspendedBy === null ? "" : ` by @${a.suspendedBy.username}`;
+  return `Suspended${by} ${ago(a.suspendedAt, now)}`;
+}
+
+// what started a run: "Scheduled", or "@bogdan" for whoever pressed Run
+// now, under the person icon; the name is the server's, so an admin
+// outside the project is named too. A run from before sources were kept
+// says nothing
+export function sourceText(row: StreamRow): string {
+  const { session } = row;
+  if (session.runSource === "schedule") return "Scheduled";
+  if (session.runSource !== "manual" || row.runBy === null) return "";
+  return `@${row.runBy.username}`;
+}
+
+// how long the run has taken, while it runs up to now; null before its
+// send is on the row
+export function durationOf(row: StreamRow, now: number): number | null {
+  const { send } = row;
+  if (send === null) return null;
+  return Math.max(0, (send.finishedAt ?? now) - send.startedAt);
+}
+
+// "4m 10s", "38s", "1h 2m": a run's length to the second, since runs
+// are minutes long and the list's one letter would say 4m for both
+export function durationText(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+  return `${Math.floor(s / 3600)}h ${pad(Math.floor(s / 60) % 60)}m`;
+}
+
+// a deadline as the setup says it: "10 min", "90 s"
+export function deadlineText(ms: number): string {
+  return ms % 60_000 === 0
+    ? `${ms / 60_000} min`
+    : `${Math.round(ms / 1000)} s`;
+}
+
+// the part of the deadline a run took, 0 to 1
+export function deadlineShare(ms: number, deadlineMs: number): number {
+  if (deadlineMs <= 0) return 0;
+  return Math.min(1, ms / deadlineMs);
+}
+
+// a skipped event's reason, and a fire that ran a minute or more past
+// the one that was meant, for the automation page
+export function eventNote(a: AutomationSummary, now: number): string | null {
+  if (a.lastEventAt === null) return null;
+  if (a.lastEventOutcome === "skipped") {
+    const why = a.lastEventReason ?? "no reason given";
+    return `Skipped ${ago(a.lastEventAt, now)}: ${why}`;
+  }
+  if (
+    a.lastEventSource === "schedule" &&
+    a.lastEventDueAt !== null &&
+    a.lastEventAt - a.lastEventDueAt >= 60_000
+  ) {
+    return `The last run started ${elapsed(a.lastEventAt - a.lastEventDueAt)} late`;
+  }
+  return null;
+}
+
+// the owner edits and deletes; in a team project an admin does too
+export function canChange(
+  a: Pick<AutomationSummary, "ownerId">,
+  user: { id: string; role: Role } | null,
+  kind: ProjectKind,
+): boolean {
+  if (user === null) return false;
+  return a.ownerId === user.id || (kind === "team" && user.role === "admin");
+}
+
+// the offset a zone is at now, "GMT+3", "GMT-4", "GMT"; empty when the
+// runtime cannot say
+export function offsetOf(tz: string, now: number): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(now);
+    const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+    // runtimes differ on zero: Bun says GMT+0 where Chrome says GMT
+    return name === "GMT+0" ? "GMT" : name;
+  } catch {
+    return "";
+  }
+}
+
+// the zone picker's options: every zone the runtime lists with its
+// offset now and its country, matched by its cities too, and the row's
+// own zone when the list leaves it out, since the server takes links
+// such as UTC
+export function zoneOptions(
+  zones: string[],
+  current: string,
+  now: number,
+): Option[] {
+  const names =
+    zones.includes(current) || current === "" ? zones : [current, ...zones];
+  return names.map((tz) => {
+    const place = placeOf(tz);
+    const country = place?.countries.join(", ") ?? "";
+    return {
+      value: tz,
+      label: tz,
+      detail: [offsetOf(tz, now), country].filter(Boolean).join(" · "),
+      keywords: place?.cities ?? "",
+    };
+  });
+}
+
+export type Draft = {
+  name: string;
+  agentId: string;
+  instructions: string;
+  schedule: string;
+  tz: string;
+  // minutes as typed, the limit's to begin with; empty or the limit
+  // itself follows the limit
+  deadline: string;
+  // days as typed
+  retention: string;
+};
+
+export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
+
+// minutes as the field shows them: whole when they are, else exact
+const minutesOf = (ms: number) => String(ms / 60_000);
+
+export function draftOf(
+  a: AutomationSummary | null,
+  agentId: string,
+  tz: string,
+  limitMs: number,
+): Draft {
+  if (a === null) {
+    return {
+      name: "",
+      agentId,
+      instructions: "",
+      schedule: DEFAULT_SCHEDULE,
+      tz,
+      deadline: minutesOf(limitMs),
+      retention: "30",
+    };
+  }
+  return {
+    name: a.name,
+    agentId: a.agentId,
+    instructions: a.instructions,
+    schedule: a.schedule,
+    tz: a.tz,
+    deadline: minutesOf(a.deadlineMs ?? limitMs),
+    retention: String(a.retentionDays),
+  };
+}
+
+// A draft that still follows the limit moves with it. A deadline the
+// user typed, or a fixed deadline on the row, keeps its own value.
+export function followDeadlineLimit(
+  d: Draft,
+  touched: boolean,
+  a: AutomationSummary | null,
+  limitMs: number,
+): Draft {
+  if (touched || (a !== null && a.deadlineMs !== null)) return d;
+  const deadline = minutesOf(limitMs);
+  return d.deadline === deadline ? d : { ...d, deadline };
+}
+
+// the body a save sends, or the first problem. Only emptiness and the
+// numbers' shape are checked here; every rule is the server's
+export function requestOf(
+  d: Draft,
+  limitMs: number,
+): { body: SaveAutomationRequest } | { problem: string } {
+  const name = d.name.trim();
+  const instructions = d.instructions.trim();
+  const schedule = d.schedule.trim();
+  const tz = d.tz.trim();
+  if (name === "") return { problem: "Name is empty" };
+  if (d.agentId === "") return { problem: "Pick an agent" };
+  if (instructions === "") return { problem: "Instructions are empty" };
+  if (schedule === "") return { problem: "The schedule is not complete" };
+  if (tz === "") return { problem: "Pick a time zone" };
+  const minutes = d.deadline.trim();
+  if (minutes !== "" && !/^\d+(\.\d+)?$/.test(minutes)) {
+    return { problem: "Deadline needs a number of minutes" };
+  }
+  const ms = minutes === "" ? null : Math.round(Number(minutes) * 60_000);
+  const days = d.retention.trim();
+  if (!/^\d+$/.test(days)) {
+    return { problem: "History retention needs whole days" };
+  }
+  return {
+    body: {
+      name,
+      agentId: d.agentId,
+      instructions,
+      schedule,
+      tz,
+      // the limit's own value goes as none, so the row keeps following
+      // the limit when an admin moves it
+      deadlineMs: ms === limitMs ? null : ms,
+      retentionDays: Number(days),
+    },
+  };
+}
+
+// whether the draft differs from the row
+export function dirtyOf(
+  d: Draft,
+  a: AutomationSummary | null,
+  limitMs: number,
+): boolean {
+  if (a === null) return true;
+  const base = draftOf(a, a.agentId, a.tz, limitMs);
+  return (Object.keys(base) as (keyof Draft)[]).some(
+    (k) => d[k].trim() !== base[k].trim(),
+  );
+}
+
+// the viewer's zone, where a new automation starts
+export const browserZone = (): string =>
+  Intl.DateTimeFormat().resolvedOptions().timeZone;

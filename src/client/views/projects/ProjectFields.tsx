@@ -20,7 +20,7 @@ export function NameField({
   onInput,
 }: {
   value: string;
-  placeholder: string;
+  placeholder?: string;
   disabled?: boolean;
   class?: string;
   onInput: (value: string) => void;

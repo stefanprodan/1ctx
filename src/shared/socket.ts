@@ -6,6 +6,7 @@
 // frame goes to the connections watching that session and carries a
 // sequence per send. A command is what the client sends.
 
+import type { AutomationSummary } from "./contracts/automation.ts";
 import type {
   LastLine,
   LiveSend,
@@ -17,7 +18,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 7;
+export const PROTOCOL = 8;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -38,6 +39,9 @@ export type SocketEvent =
       last?: LastLine;
     }
   | { type: "deleted"; projectId: string; sessionId: string }
+  // an automation's row after a write, by the same revision rule
+  | { type: "automation"; projectId: string; automation: AutomationSummary }
+  | { type: "automationDeleted"; projectId: string; automationId: string }
   // the connection may now see the project
   | { type: "granted"; projectId: string }
   // the connection may no longer see the project

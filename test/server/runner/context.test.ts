@@ -44,6 +44,8 @@ const policy: SendPolicy = {
   thinking: true,
   effort: "high",
   offered: NONE,
+  automation: null,
+  deadlineMs: null,
   limits: LOOP_LIMITS,
   toolCaps: TOOL_CAPS,
 };
@@ -128,6 +130,30 @@ describe("systemPrompt", () => {
     ).toBe(
       `You work in @caelea's personal project: Incidents and pages.\nYou talk to @caelea (Oana Mangiurea): I run clusters.\n\n${dateLine(NOW)}`,
     );
+  });
+
+  test("a run has its line in place of the user's", () => {
+    const run = (source: "schedule" | "manual") =>
+      systemPrompt(
+        {
+          ...policy,
+          automation: {
+            id: "au",
+            name: "morning-check",
+            source,
+            dueAt: Date.UTC(2026, 8, 14, 17, 10),
+            tz: "Europe/Bucharest",
+          },
+        },
+        NOW,
+      );
+    expect(run("schedule")).toBe(
+      `You write Go.\n\nYou work in the ops project: Incidents and pages.\nThis is a scheduled run of the morning-check automation, started at 2026-09-14 20:10 Europe/Bucharest. You run autonomously. Do not ask questions. Do the task and stop.\n\n${dateLine(NOW)}`,
+    );
+    expect(run("manual")).toContain(
+      "This is a manual run of the morning-check",
+    );
+    expect(run("manual")).not.toContain("@caelea");
   });
 });
 

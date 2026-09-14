@@ -14,6 +14,7 @@ import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
+import { automationProject } from "../data/automations.ts";
 import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
@@ -120,7 +121,7 @@ export function Rail({
   const open = useSignal(false);
   const failure = useSignal<string | null>(null);
   const here = path.value;
-  const inProject = projectHere(here, session.value);
+  const inProject = projectHere(here, session.value, automationProject.value);
   const hide = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (narrow) hide.current?.focus();

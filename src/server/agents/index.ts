@@ -9,6 +9,7 @@ import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
   type AccessPort,
+  type AutomationsPort,
   type ProvidersPort,
   routes,
   type SessionsPort,
@@ -17,6 +18,7 @@ import { type AgentRow, AgentStore } from "./store.ts";
 
 export {
   type AccessPort,
+  type AutomationsPort,
   type ProvidersPort,
   type RoutesDeps,
   routes,
@@ -30,6 +32,7 @@ export type AgentsDeps = {
   providers: ProvidersPort;
   access: AccessPort;
   sessions: SessionsPort;
+  automations: AutomationsPort;
 };
 
 export type Agents = {
@@ -50,6 +53,7 @@ export function agentsArea(deps: AgentsDeps): Agents {
       providers: deps.providers,
       access: deps.access,
       sessions: deps.sessions,
+      automations: deps.automations,
       clock: deps.clock,
     }),
   };

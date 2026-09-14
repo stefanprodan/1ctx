@@ -79,10 +79,11 @@ export function parseRenameSession(body: unknown): RenameSessionRequest {
 export function parseStreamQuery(url: URL): {
   project: string | null;
   q: string;
+  origin: "chat" | "automation" | null;
 } {
   const seen = new Set<string>();
   for (const name of url.searchParams.keys()) {
-    if (name !== "project" && name !== "q") {
+    if (name !== "project" && name !== "q" && name !== "origin") {
       throw new BadRequest(`unknown parameter ${name}`);
     }
     if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
@@ -90,10 +91,15 @@ export function parseStreamQuery(url: URL): {
   }
   const project = url.searchParams.get("project");
   const q = url.searchParams.get("q") ?? "";
+  const origin = url.searchParams.get("origin");
   if (q.length > MAX_SEARCH) throw new BadRequest("q is too long");
+  if (origin !== null && origin !== "chat" && origin !== "automation") {
+    throw new BadRequest("origin must be chat or automation");
+  }
   return {
     project: project === null || project === "" ? null : project,
     q: q.trim(),
+    origin,
   };
 }
 

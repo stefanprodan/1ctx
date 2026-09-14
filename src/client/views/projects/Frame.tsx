@@ -9,7 +9,9 @@
 
 import type { ComponentChildren } from "preact";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
+import { automationCount } from "../../data/automations.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
+import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
 import { Page } from "../../ui/Page.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
@@ -24,13 +26,17 @@ export function Frame({
   children,
 }: {
   id: string;
-  tab: "feed" | "members" | "settings";
+  tab: "feed" | "automations" | "members" | "settings";
   children: (shown: ProjectDetail) => ComponentChildren;
 }) {
   const row = project.value;
   const shown = row !== null && row.id === id ? row : null;
   const listed = projects.value?.find((p) => p.id === id);
-  const tabs = tabsOf(id, shown?.kind ?? listed?.kind ?? "team");
+  const tabs = tabsOf(id, shown?.kind ?? listed?.kind ?? "team", {
+    automations: automationCount(id),
+    members: shown === null ? null : shown.members.length,
+    agents: projectAgentCount(id),
+  });
   const about = shown === null ? null : aboutLine(shown);
   return (
     <Page

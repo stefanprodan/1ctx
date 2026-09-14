@@ -19,6 +19,12 @@ export type StateLine = { author: string | null; text: string };
 
 const plain = (text: string): StateLine => ({ author: null, text });
 
+// the row's icon: the clock for an automation's run, the bubble for a
+// chat
+export function iconOf(row: StreamRow): "clock" | "chat" {
+  return row.session.origin === "automation" ? "clock" : "chat";
+}
+
 export function stateLine(row: StreamRow): StateLine {
   const { session, send, last } = row;
   switch (session.status) {
@@ -35,7 +41,9 @@ export function stateLine(row: StreamRow): StateLine {
       return plain(
         send?.cause === "shutdown" || send?.cause === "restart"
           ? "stopped · the server restarted"
-          : "stopped",
+          : send?.cause === "deadline"
+            ? "stopped · past its deadline"
+            : "stopped",
       );
     default:
       return last === null

@@ -168,22 +168,53 @@ export const SESSION_STATUSES = [
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
 // why a send ended: the model finished, a user stopped it, the
-// provider failed, the process shut down, or the process was found
-// restarted with the send still running
+// provider failed, the process shut down, the process was found
+// restarted with the send still running, or a run passed its deadline
 export const SEND_CAUSES = [
   "finish",
   "stop",
   "failure",
   "shutdown",
   "restart",
+  "deadline",
 ] as const;
 export type SendCause = (typeof SEND_CAUSES)[number];
 
-export const SEND_KINDS = ["chat", "compact"] as const;
+// a run is the send an automation opens its session with
+export const SEND_KINDS = ["chat", "compact", "run"] as const;
 export type SendKind = (typeof SEND_KINDS)[number];
 export function isSendKind(value: unknown): value is SendKind {
   return SEND_KINDS.includes(value as SendKind);
 }
+
+// what opened a session: a person's chat, or an automation's run
+export const SESSION_ORIGINS = ["chat", "automation"] as const;
+export type SessionOrigin = (typeof SESSION_ORIGINS)[number];
+export function isSessionOrigin(value: unknown): value is SessionOrigin {
+  return SESSION_ORIGINS.includes(value as SessionOrigin);
+}
+
+// what made an automation's event: its schedule, or someone's Run now
+export const EVENT_SOURCES = ["schedule", "manual"] as const;
+export type EventSource = (typeof EVENT_SOURCES)[number];
+// an event opened a run, or was skipped with a reason
+export const EVENT_OUTCOMES = ["run", "skipped"] as const;
+export type EventOutcome = (typeof EVENT_OUTCOMES)[number];
+// an automation's runs narrowed on its page
+export const RUN_FILTERS = ["failed", "manual"] as const;
+export type RunFilter = (typeof RUN_FILTERS)[number];
+export function isRunFilter(value: unknown): value is RunFilter {
+  return RUN_FILTERS.includes(value as RunFilter);
+}
+// how many next fires a schedule preview answers
+export const PREVIEW_FIRES = 5;
+
+// an automation's schedule is a five-field cron expression in an IANA
+// zone; the server parses both and its 400 is the rule's only words
+export const MAX_SCHEDULE = 100;
+export const MAX_TZ = 64;
+// how long an automation's runs are kept, in days
+export const RETENTION_DAYS = { min: 1, max: 365, default: 30 } as const;
 
 export const MESSAGE_KINDS = ["user", "reply", "tool", "summary"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
@@ -241,6 +272,7 @@ export const LIMIT_NAMES = [
   "searchBodyBytes",
   "fetchDeadlineMs",
   "searchDeadlineMs",
+  "runDeadlineMs",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {

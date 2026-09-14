@@ -3,7 +3,7 @@
 //
 // What a stream row carries beyond the session: its last send and the
 // last line a person or the agent wrote, both read for every listed
-// id in one query each, so the list costs three queries however long
+// id in one query each, so the list costs a few queries however long
 // it is. The line is cut in SQL before it reaches the process, so a
 // reply of a megabyte weighs nothing here.
 
@@ -78,6 +78,34 @@ function lastLines(db: Db, sessionIds: string[]) {
   return out;
 }
 
+function automations(db: Db, sessionIds: string[]) {
+  const marks = sessionIds.map(() => "?").join(", ");
+  const rows = db
+    .query<{ session_id: string; id: string; name: string }, string[]>(
+      `select sessions.id as session_id, automations.id, automations.name
+       from sessions join automations on automations.id = sessions.automation_id
+       where sessions.id in (${marks})`,
+    )
+    .all(...sessionIds);
+  return new Map(
+    rows.map((raw) => [raw.session_id, { id: raw.id, name: raw.name }]),
+  );
+}
+
+// who pressed Run now on each manual run, by the session's owner
+function runners(db: Db, raws: RawSession[]) {
+  const manual = raws.filter((raw) => raw.run_source === "manual");
+  if (manual.length === 0) return new Map<string, string>();
+  const ids = [...new Set(manual.map((raw) => raw.owner_id))];
+  const marks = ids.map(() => "?").join(", ");
+  const rows = db
+    .query<{ id: string; username: string }, string[]>(
+      `select id, username from users where id in (${marks})`,
+    )
+    .all(...ids);
+  return new Map(rows.map((raw) => [raw.id, raw.username]));
+}
+
 export function streamRows(
   db: Db,
   raws: RawSession[],
@@ -87,9 +115,17 @@ export function streamRows(
   const ids = raws.map((raw) => raw.id);
   const sends = lastSends(db, ids);
   const lines = lastLines(db, ids);
-  return raws.map((raw) => ({
-    session: session(raw, usage.get(raw.id) ?? null),
-    send: sends.get(raw.id) ?? null,
-    last: lines.get(raw.id) ?? null,
-  }));
+  const automationRows = automations(db, ids);
+  const names = runners(db, raws);
+  return raws.map((raw) => {
+    const username =
+      raw.run_source === "manual" ? names.get(raw.owner_id) : undefined;
+    return {
+      session: session(raw, usage.get(raw.id) ?? null),
+      send: sends.get(raw.id) ?? null,
+      last: lines.get(raw.id) ?? null,
+      automation: automationRows.get(raw.id) ?? null,
+      runBy: username === undefined ? null : { id: raw.owner_id, username },
+    };
+  });
 }

@@ -6,7 +6,8 @@
 
 import "./tabs.css";
 
-export type Tab = { label: string; href: string };
+// count is the number beside the label, left out while it is unknown
+export type Tab = { label: string; href: string; count?: number };
 
 export function Tabs({ tabs, active }: { tabs: Tab[]; active: string }) {
   return (
@@ -19,6 +20,9 @@ export function Tabs({ tabs, active }: { tabs: Tab[]; active: string }) {
           aria-current={tab.href === active ? "page" : undefined}
         >
           {tab.label}
+          {tab.count !== undefined && (
+            <span class="tabs-count">{tab.count}</span>
+          )}
         </a>
       ))}
     </nav>

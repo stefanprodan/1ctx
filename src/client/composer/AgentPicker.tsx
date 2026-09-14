@@ -4,6 +4,7 @@
 // The chip that names the agent a chat runs on, with the model in
 // faint text. For a chat not started yet it opens the list of the
 // project's agents; a session's agent is fixed, so the chip is static.
+// The automation form picks its agent with the same chip.
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { shortModel } from "../agents/meta.ts";
@@ -16,20 +17,27 @@ export function AgentPicker({
   agents,
   agentId,
   onPick,
+  field,
 }: {
   agents: AgentSummary[];
   agentId: string | null;
   // absent for a fixed agent
   onPick?: (id: string) => void;
+  // drawn as a form field, full width with its list under it, where
+  // the composer draws a chip with its list above
+  field?: boolean;
 }) {
   const { open, root } = useMenu();
   const picked = agents.find((a) => a.id === agentId) ?? null;
   const fixed = onPick === undefined;
   return (
-    <div class="composer-agent" ref={root}>
+    <div
+      class={`composer-agent${field ? " composer-agent-field" : ""}`}
+      ref={root}
+    >
       <button
         type="button"
-        class="composer-chip"
+        class={`composer-chip${field ? " composer-chip-field" : ""}`}
         disabled={fixed || agents.length === 0}
         aria-expanded={fixed ? undefined : open.value}
         onClick={() => {
@@ -47,10 +55,16 @@ export function AgentPicker({
             short={shortModel(picked.model.id)}
           />
         )}
-        {!fixed && <Icon name="chevron" size={12} />}
+        {!fixed && (
+          <Icon
+            name="chevron"
+            size={field ? 14 : 12}
+            class="composer-chip-chevron"
+          />
+        )}
       </button>
       {open.value && (
-        <ul class="composer-menu">
+        <ul class={`composer-menu${field ? " composer-menu-field" : ""}`}>
           {agents.map((a) => (
             <li key={a.id}>
               <button

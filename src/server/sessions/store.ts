@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type {
   MessageStatus,
+  RunFilter,
   SendCause,
   SendKind,
   SessionStatus,
@@ -12,11 +14,18 @@ import type {
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
+import {
+  automationRunning,
+  automationRuns,
+  expiredAutomationRuns,
+} from "./automation.ts";
+import { listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
 import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
 import {
+  type CreateSession,
   MESSAGE_COLUMNS,
   message,
   type RawMessage,
@@ -30,7 +39,6 @@ import {
   session,
   type UsagePort,
 } from "./rows.ts";
-import { streamRows } from "./stream.ts";
 
 export class SessionStore {
   constructor(
@@ -45,45 +53,40 @@ export class SessionStore {
     return raw ? session(raw, this.usage.latest(raw.id)) : null;
   }
 
-  list(projectIds: string[], q: string, limit = STREAM_LIMIT): StreamRow[] {
-    if (projectIds.length === 0) return [];
-    const marks = projectIds.map(() => "?").join(", ");
-    const needle = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
-    const rows = this.db
-      .query<RawSession, (string | number)[]>(
-        `select * from sessions
-         where project_id in (${marks})
-           and (? = '' or title like ? escape '\\')
-         order by status = 'running' desc, last_activity_at desc, id
-         limit ?`,
-      )
-      .all(...projectIds, q, needle, limit);
-    const usage = this.usage.latestFor(rows.map((r) => r.id));
-    return streamRows(this.db, rows, usage);
+  list(
+    projectIds: string[],
+    q: string,
+    origin: "chat" | "automation" | null = null,
+    limit = STREAM_LIMIT,
+  ): StreamRow[] {
+    return listSessions(this.db, this.usage, projectIds, q, origin, limit);
   }
 
-  // the id may come from the caller: the runner admits a new session
-  // under its id before the row exists
-  create(fields: {
-    id?: string;
-    projectId: string;
-    ownerId: string;
-    agentId: string;
-    title: string;
-    now: number;
-  }): SessionRow {
+  runs(
+    automationId: string,
+    filter: RunFilter | null = null,
+    limit = STREAM_LIMIT,
+  ): AutomationRunsResponse {
+    return automationRuns(this.db, this.usage, automationId, filter, limit);
+  }
+
+  create(fields: CreateSession): SessionRow {
     const id = fields.id ?? newId();
     this.db
       .query(
-        `insert into sessions (id, project_id, owner_id, agent_id, origin, title,
-           status, revision, created_at, last_activity_at)
-         values (?, ?, ?, ?, 'chat', ?, 'running', 0, ?, ?)`,
+        `insert into sessions (id, project_id, owner_id, agent_id, origin,
+           automation_id, run_source, title, status, revision, created_at,
+           last_activity_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, 'running', 0, ?, ?)`,
       )
       .run(
         id,
         fields.projectId,
         fields.ownerId,
         fields.agentId,
+        fields.origin ?? "chat",
+        fields.automationId ?? null,
+        fields.runSource ?? null,
         fields.title,
         fields.now,
         fields.now,
@@ -136,6 +139,14 @@ export class SessionStore {
     );
   }
 
+  runningAutomation(automationId: string): boolean {
+    return automationRunning(this.db, automationId);
+  }
+
+  expiredRuns(now: number): SessionRow[] {
+    return expiredAutomationRuns(this.db, this.usage, now);
+  }
+
   usesAgent(agentId: string): boolean {
     return (
       this.db
@@ -155,8 +166,6 @@ export class SessionStore {
       .map(message);
   }
 
-  // every row the export groups, with its author's name; a work reply
-  // and a tool row travel without content, since only their end matters
   exportRows(sessionId: string): ExportRow[] {
     return this.db
       .query<ExportRow, [string]>(
@@ -202,8 +211,6 @@ export class SessionStore {
     }
   }
 
-  // the runner generates the ids before any insert and writes the send
-  // row first, so send_id holds without a deferred foreign key
   addUserMessage(fields: {
     id?: string;
     sessionId: string;
@@ -332,8 +339,6 @@ export class SessionStore {
     return changed ? this.message(id) : null;
   }
 
-  // the caller hands the ids and seqs in order, so a batch is one
-  // statement's worth of rows
   addToolRows(
     calls: {
       id?: string;

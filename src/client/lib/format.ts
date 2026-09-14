@@ -68,6 +68,11 @@ export function ago(ms: number, now: number): string {
   });
 }
 
+// how long until, in the same units: "in 40s", "in 4h", "in 2d"
+export function until(ms: number, now: number): string {
+  return `in ${span(Math.max(0, ms - now))}`;
+}
+
 // a count the eye can take in: "637", "12.4k", "2.1M"
 export function count(n: number): string {
   if (n < 1000) return String(n);
