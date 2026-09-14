@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import type { WeekUsageResponse } from "../../src/shared/api/usage.ts";
+import type {
+  DaysUsageResponse,
+  WeekUsageResponse,
+} from "../../src/shared/api/usage.ts";
 import {
   type ChatApp,
   chatApp,
@@ -30,14 +33,20 @@ async function finish(
 }
 
 describe("GET /api/usage/week", () => {
-  test("sums distinct visible sessions in the seven-day window", async () => {
+  test("sums the last seven calendar days in the caller's zone", async () => {
     const chat = await chatApp();
     chat.app.now.value = 8 * DAY_MS;
 
     const old = await startChat(chat, "old");
     await finish(chat, old.script, 100, 50);
 
-    chat.app.now.value += 7 * DAY_MS + 1;
+    // a millisecond before the window's first midnight: inside the last
+    // 168 hours, outside the last seven calendar days
+    chat.app.now.value = 9 * DAY_MS - 1;
+    const edge = await startChat(chat, "edge");
+    await finish(chat, edge.script, 200, 100);
+
+    chat.app.now.value = 15 * DAY_MS + 1;
     const first = await startChat(chat, "first");
     await finish(chat, first.script, 11, 5);
     const followUpPending = chat.scripted.next();
@@ -61,18 +70,133 @@ describe("GET /api/usage/week", () => {
     );
     await finish(chat, other.script, 1_000, 500);
 
-    const res = await chat.member.call("GET", "/api/usage/week");
+    const res = await chat.member.call("GET", "/api/usage/week?tz=UTC");
     expect(res.status).toBe(200);
     expect((await res.json()) as WeekUsageResponse).toEqual({
-      since: chat.app.now.value - 7 * DAY_MS,
+      since: 9 * DAY_MS,
+      until: 16 * DAY_MS,
+      // the first chat's two messages and the second's one
+      sends: 3,
       sessions: 2,
       promptTokens: 41,
       completionTokens: 18,
     });
-    expect(
-      (await chat.member.call("GET", "/api/usage/week?extra=1")).status,
-    ).toBe(400);
+    for (const query of ["", "?tz=UTC&extra=1", "?tz=Mars/Olympus"]) {
+      expect(
+        (await chat.member.call("GET", `/api/usage/week${query}`)).status,
+      ).toBe(400);
+    }
 
+    await chat.app.shutdown();
+  });
+});
+
+describe("GET /api/usage/days", () => {
+  test("returns the fixed window with zero-filled visible projects", async () => {
+    const chat = await chatApp();
+    chat.app.now.value = Date.parse("2026-09-16T12:00:00Z");
+    expect((await chat.member.login("caelea", "pw")).status).toBe(200);
+    expect((await chat.admin.login("admin", "hunter2-test")).status).toBe(200);
+    const visible = chat.app.projects.createTeam({
+      ownerId: chat.adminId,
+      name: "visible-team",
+      description: "",
+      now: chat.app.now.value,
+    });
+    chat.app.projects.addMember(visible.id, chat.memberId, chat.app.now.value);
+    const hidden = chat.app.projects.createTeam({
+      ownerId: chat.adminId,
+      name: "hidden-team",
+      description: "",
+      now: chat.app.now.value,
+    });
+
+    const memberRes = await chat.member.call("GET", "/api/usage/days?tz=UTC");
+    expect(memberRes.status).toBe(200);
+    const member = (await memberRes.json()) as DaysUsageResponse;
+    expect(member.since).toBe(Date.parse("2025-09-15T00:00:00Z"));
+    expect(member.until).toBe(Date.parse("2026-09-17T00:00:00Z"));
+    expect(member.days).toHaveLength(367);
+    expect(member.days[0]).toBe("2025-09-15");
+    expect(member.days.at(-1)).toBe("2026-09-16");
+
+    // Home's aside asks for fewer weeks: the same days, from a later Monday
+    const recentRes = await chat.member.call(
+      "GET",
+      "/api/usage/days?tz=UTC&weeks=16",
+    );
+    const recent = (await recentRes.json()) as DaysUsageResponse;
+    expect(recent.days).toHaveLength(15 * 7 + 3);
+    expect(recent.days[0]).toBe("2026-06-01");
+    expect(recent.until).toBe(member.until);
+    expect(recent.days).toEqual(member.days.slice(-recent.days.length));
+    expect(member.total).toEqual({ sends: 0, tokens: 0 });
+    expect(member.projects.map((project) => project.projectId)).toContain(
+      chat.projectId,
+    );
+    expect(member.projects.map((project) => project.projectId)).toContain(
+      visible.id,
+    );
+    expect(member.projects.map((project) => project.projectId)).not.toContain(
+      hidden.id,
+    );
+    for (const project of member.projects) {
+      expect(project.usage).toHaveLength(member.days.length);
+      expect(
+        project.usage.every((day) => day.sends === 0 && day.tokens === 0),
+      ).toBe(true);
+    }
+
+    const adminRes = await chat.admin.call("GET", "/api/usage/days?tz=UTC");
+    expect(adminRes.status).toBe(200);
+    const admin = (await adminRes.json()) as DaysUsageResponse;
+    expect(admin.projects.map((project) => project.projectId)).toContain(
+      hidden.id,
+    );
+    expect(admin.projects.map((project) => project.projectId)).not.toContain(
+      chat.projectId,
+    );
+
+    await chat.app.shutdown();
+  });
+
+  test("places a round that crosses midnight on the later day", async () => {
+    const chat = await chatApp();
+    chat.app.now.value = Date.parse("2026-09-15T23:59:30Z");
+    expect((await chat.member.login("caelea", "pw")).status).toBe(200);
+    const started = await startChat(chat, "cross midnight");
+    chat.app.now.value = Date.parse("2026-09-16T00:00:30Z");
+    await finish(chat, started.script, 11, 5);
+
+    const res = await chat.member.call("GET", "/api/usage/days?tz=UTC");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DaysUsageResponse;
+    const project = body.projects.find(
+      (candidate) => candidate.projectId === chat.projectId,
+    )!;
+    const before = body.days.indexOf("2026-09-15");
+    const after = body.days.indexOf("2026-09-16");
+    expect(project.usage[before]).toEqual({ sends: 0, tokens: 0 });
+    expect(project.usage[after]).toEqual({ sends: 1, tokens: 16 });
+    expect(body.total).toEqual({ sends: 1, tokens: 16 });
+
+    await chat.app.shutdown();
+  });
+
+  test("rejects every malformed timezone query", async () => {
+    const chat = await chatApp();
+    for (const path of [
+      "/api/usage/days",
+      "/api/usage/days?tz=",
+      "/api/usage/days?tz=UTC&tz=Europe%2FBucharest",
+      `/api/usage/days?tz=${"a".repeat(65)}`,
+      "/api/usage/days?tz=Mars%2FOlympus",
+      "/api/usage/days?tz=UTC&extra=1",
+      "/api/usage/days?tz=UTC&weeks=0",
+      "/api/usage/days?tz=UTC&weeks=54",
+    ]) {
+      expect((await chat.member.call("GET", path)).status, path).toBe(400);
+    }
     await chat.app.shutdown();
   });
 });

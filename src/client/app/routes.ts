@@ -29,7 +29,7 @@ import {
   session,
 } from "../data/sessions.ts";
 import { loadTools } from "../data/tools.ts";
-import { loadWeek } from "../data/usage.ts";
+import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { composeProjectOf } from "../views/home/Home.model.ts";
@@ -66,9 +66,9 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/home/Home.tsx").then((m) => m.Home)),
     title: () => "Home",
     role: "authenticated",
-    // the stream for the query, and the agents of the composer's
-    // project, the picked one or the personal; it comes from the rail's
-    // list
+    // the stream for the query, the week for the aside, and the agents of
+    // the composer's project, the picked one or the personal; it comes
+    // from the rail's list
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
       const rows = loadList({ project: null, q });
@@ -94,10 +94,12 @@ export const ROUTES: Route[] = [
     // project offers alike, read through the personal one
     load: async () => {
       const spent = loadWeek();
+      const activity = loadDays();
       await loadProjects();
       const personal = composeProjectOf(projects.value, null);
       await Promise.all([
         spent,
+        activity,
         personal === null ? Promise.resolve() : loadProjectAgents(personal.id),
       ]);
     },
@@ -115,6 +117,7 @@ export const ROUTES: Route[] = [
         loadProject(params.id),
         loadList({ project: params.id, q: query.get("q")?.trim() ?? "" }),
         loadProjectAgents(params.id),
+        loadRecentDays(),
       ]);
     },
   },
@@ -126,7 +129,11 @@ export const ROUTES: Route[] = [
     title: () => "Members",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([loadProject(params.id), loadProjectAgents(params.id)]);
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadRecentDays(),
+      ]);
     },
   },
   {
@@ -137,7 +144,11 @@ export const ROUTES: Route[] = [
     title: () => "Settings",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([loadProject(params.id), loadProjectAgents(params.id)]);
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadRecentDays(),
+      ]);
     },
   },
   {

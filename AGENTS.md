@@ -338,8 +338,11 @@ violation, and every rule has a rejected fixture under
   project pages put their content in the main column, 900px at most, and
   sections of plain lines in the 280px aside at the right, no boxes;
   under 1100, a tablet or a phone, the aside is hidden. The aside holds only honest numbers: the agents and the past
-  seven days from `GET /api/usage/week` on Home and Projects, the About facts on a
-  project, an agent as its name over its model, through `ui/Fit.tsx`, which
+  seven calendar days in the caller's zone from `GET /api/usage/week?tz=`
+  on Home and Projects, the About facts on a project and its last 16
+  weeks as the heatmap without labels (`?weeks=16`, ranked against its
+  own days) in place of the members or the agents, an agent as its
+  name over its model, through `ui/Fit.tsx`, which
   shows the short form of a text (the model without its org) when the
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
@@ -349,10 +352,13 @@ violation, and every rule has a rejected fixture under
   that leads to its page, `RowsLine` for one that does neither,
   `RowsAvatar`, `RowsTitle` (mono for an identifier) and `RowsMeta`
   for its head, `RowsAdd` or `RowsLink` in a card's head. The
-  Projects page is the same rows, the personal card over the teams
-  card. A team project's Members tab is the same rows, linking an admin to
+  Projects page is the same rows: the Activity card (turns per day
+  over up to 53 ISO weeks, as many as fit the width, from
+  `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
+  then one Projects card, personal first, each row with its 14-day
+  strip. A team project's Members tab is the same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`; a personal project
-  has Settings in its place and the agents in its aside, as on Home.
+  has Settings in its place.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The page's stylesheet holds only what it

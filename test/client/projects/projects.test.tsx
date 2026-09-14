@@ -24,7 +24,6 @@ import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
   peopleLine,
-  sinceLine,
   tabsOf,
 } from "../../../src/client/views/projects/Project.model.ts";
 import { Project } from "../../../src/client/views/projects/Project.tsx";
@@ -270,9 +269,6 @@ describe("Project.model", () => {
     expect(peopleLine({ kind: "personal", memberCount: 1 })).toBe("only you");
     expect(peopleLine({ kind: "team", memberCount: 1 })).toBe("1 member");
     expect(peopleLine({ kind: "team", memberCount: 4 })).toBe("4 members");
-    expect(sinceLine({ createdAt: 1_789_387_200_000 })).toBe(
-      "since 14 September 2026",
-    );
   });
 
   test("a personal project has Settings where a team has Members", () => {
@@ -297,16 +293,19 @@ describe("Project.model", () => {
 
 describe("the pages", () => {
   test.serial(
-    "Projects puts the personal project and the teams in two cards",
+    "Projects puts the personal project first in one card with the teams",
     () => {
       projects.value = [
-        personal,
         { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 3 },
+        personal,
       ];
       const html = render(<Projects />);
       expect(html).toContain('class="rows-line rows-go" href="/projects/p1"');
       expect(html).toContain('class="rows-line rows-go" href="/projects/p2"');
-      expect(html.indexOf(">Personal<")).toBeLessThan(html.indexOf(">Teams<"));
+      expect(html.match(/class="rows-card"/g)).toHaveLength(1);
+      expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
+        html.indexOf('href="/projects/p2"'),
+      );
       expect(html).toContain(">only you<");
       expect(html).toContain(">3 members<");
       // a member does not manage teams
@@ -325,9 +324,11 @@ describe("the pages", () => {
     expect(html).toContain(">Agents<");
   });
 
-  test.serial("Projects says when there is no team", () => {
+  test.serial("Projects without a team holds the personal row alone", () => {
     projects.value = [personal];
-    expect(render(<Projects />)).toContain("No team projects yet");
+    const html = render(<Projects />);
+    expect(html.match(/class="rows-item"/g)).toHaveLength(1);
+    expect(html).not.toContain("No team projects yet");
   });
 
   test("Project renders the feed of the project on screen only", () => {
@@ -343,7 +344,9 @@ describe("the pages", () => {
     expect(html).toContain(
       '<div class="split-line">Your personal project</div>',
     );
-    expect(html).toContain("No agents yet.");
+    // the aside's second section is the project's activity, not its agents
+    expect(html).not.toContain("No agents yet.");
+    expect(html).toContain(">Activity<");
     expect(html).not.toContain("Members");
     expect(html).not.toContain("Chats");
     expect(html).toContain('href="/projects/p1/settings"');
@@ -367,7 +370,9 @@ describe("the pages", () => {
     };
     let html = render(<Project params={{ id: "p1" }} />);
     expect(html).toContain('<div class="split-line">Incidents and pages</div>');
-    expect(html).toContain("1 user</a>");
+    // the members are the tab's; the aside shows the activity
+    expect(html).not.toContain("1 user</a>");
+    expect(html).toContain(">Activity<");
     expect(html).toContain('href="/projects/p1/members"');
     project.value = { ...project.value, description: "" };
     html = render(<Project params={{ id: "p1" }} />);
