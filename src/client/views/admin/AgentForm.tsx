@@ -5,9 +5,10 @@
 // by typing part of its name or id into that provider's catalog, and
 // the system prompt. The pick shows its window and prices when the
 // catalog has them. Under the pick, thinking and effort: the default
-// is the provider's, and the levels are the wire's. Delete asks once
-// in place. Skills: one box per skill on the server, the checked ones
-// go with the agent into every send, at most the cap.
+// is the provider's, and the levels are the wire's. After the prompt,
+// the skills: one line per skill on the server, the checked ones go
+// with the agent into every send, at most the cap. Delete asks once
+// in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -16,12 +17,7 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../shared/contracts/provider.ts";
-import {
-  AVATARS,
-  type Avatar,
-  type Effort,
-  MAX_SKILLS_PER_AGENT,
-} from "../../../shared/words.ts";
+import { AVATARS, type Avatar, type Effort } from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import { searchCatalog } from "../../data/providers.ts";
 import { skills as skillRows } from "../../data/skills.ts";
@@ -40,12 +36,12 @@ import {
   reserveOf,
   sameIds,
   sentEffort,
-  skillsHint,
   thinkingChoices,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
+import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
-import { firstSentence, reason } from "../../lib/format.ts";
+import { reason } from "../../lib/format.ts";
 import { shapedInput } from "../../lib/names.ts";
 
 // one catalog line: the name over the id, the rest faint at the right
@@ -217,7 +213,6 @@ export function AgentForm({
   };
   const picked = model.value;
   const busy = save.status.value === "busy";
-  const available = skillRows.value;
   const chosen = chosenSkills();
   const toggleSkill = (id: string) => {
     pickedSkills.value = chosen.includes(id)
@@ -225,7 +220,6 @@ export function AgentForm({
       : [...chosen, id];
     save.touch();
   };
-  const full = chosen.length >= MAX_SKILLS_PER_AGENT;
   const compacts =
     picked === null
       ? ""
@@ -394,40 +388,6 @@ export function AgentForm({
             </span>
           </label>
         )}
-        <div class="field agents-field-wide">
-          <span class="label">Skills</span>
-          {available === null ? (
-            <span class="hint">The skills did not load. Reload the page.</span>
-          ) : available.length === 0 ? (
-            <span class="hint">
-              No skills yet. <a href="/admin/skills">Add one</a> and it shows
-              here.
-            </span>
-          ) : (
-            <div class="agents-skills">
-              {available.map((skill) => (
-                <label key={skill.id} class="agents-skill">
-                  <input
-                    type="checkbox"
-                    class="agents-skill-box"
-                    name="skills"
-                    value={skill.id}
-                    checked={chosen.includes(skill.id)}
-                    disabled={busy || (!chosen.includes(skill.id) && full)}
-                    onChange={() => toggleSkill(skill.id)}
-                  />
-                  <span class="agents-skill-name">{skill.name}</span>
-                  <span class="agents-skill-desc">
-                    {firstSentence(skill.description)}
-                  </span>
-                </label>
-              ))}
-              <span class="hint">
-                {skillsHint(chosen.length, MAX_SKILLS_PER_AGENT)}
-              </span>
-            </div>
-          )}
-        </div>
         <label class="field agents-field-wide">
           <span class="label">System prompt</span>
           <textarea
@@ -444,6 +404,12 @@ export function AgentForm({
             }}
           />
         </label>
+        <SkillPicker
+          available={skillRows.value}
+          chosen={chosen}
+          busy={busy}
+          onToggle={toggleSkill}
+        />
       </div>
       <Foot
         status={save.status.value}

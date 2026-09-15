@@ -87,12 +87,21 @@
     color: var(--dim);
   }
 
+  /* a row the pointer can act on lights as a stream row does: the
+     whole line, a switch at its end included */
+  .rows-toggle.rows-line:hover,
+  .rows-line-end:hover,
+  .rows-line-pick:hover,
+  .rows-go:hover {
+    background: var(--line);
+  }
+  .rows-line-pick {
+    cursor: pointer;
+  }
+
   .rows-go {
     color: var(--dim);
     text-decoration: none;
-  }
-  .rows-go:hover {
-    background: var(--line);
   }
   .rows-go-arrow {
     flex-shrink: 0;
@@ -213,21 +222,26 @@
     .rows-line-static {
       padding-left: var(--space-4);
     }
-    /* the meta wraps under the text it follows: past a radio, an
-       avatar, or a chevron and an avatar */
+    /* the meta wraps under the text it follows: past a radio or a
+       chevron, past nothing in a static row or a link, and past the
+       avatar too when the row has one */
     .rows-meta {
       flex-basis: 100%;
       order: 6;
       white-space: normal;
     }
-    .rows-line > .rows-meta {
+    .rows-line > .rows-meta,
+    .rows-toggle > .rows-meta {
       padding-left: calc(14px + var(--space-3));
     }
-    .rows-line-static .rows-meta,
+    .rows-line-static > .rows-meta,
     .rows-go > .rows-meta {
+      padding-left: 0;
+    }
+    .rows-line:has(> .rows-avatar) > .rows-meta {
       padding-left: calc(28px + var(--space-3));
     }
-    .rows-toggle .rows-meta {
+    .rows-toggle:has(> .rows-avatar) > .rows-meta {
       padding-left: calc(14px + var(--space-3) + 28px + var(--space-3));
     }
     .rows-body,

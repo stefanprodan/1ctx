@@ -37,7 +37,6 @@ import { SkillForm } from "./SkillForm.tsx";
 import {
   bytesWord,
   changeLine,
-  cutLines,
   droppedLine,
   firstSentence,
   metadataLines,
@@ -55,7 +54,6 @@ function Text({
   held: string | undefined;
 }) {
   const failure = useSignal<string | null>(null);
-  const whole = useSignal(false);
   useEffect(() => {
     failure.value = null;
     if (held !== undefined) return;
@@ -69,23 +67,7 @@ function Text({
   }, [held]);
   if (failure.value) return <p class="skills-state error">{failure.value}</p>;
   if (held === undefined) return <p class="skills-state">Loading</p>;
-  const cut = whole.value ? { text: held, more: false } : cutLines(held);
-  return (
-    <>
-      <pre class="skills-text">{cut.text}</pre>
-      {cut.more && (
-        <button
-          type="button"
-          class="btn btn-small skills-more"
-          onClick={() => {
-            whole.value = true;
-          }}
-        >
-          Show more
-        </button>
-      )}
-    </>
-  );
+  return <pre class="skills-text">{held}</pre>;
 }
 
 function FileRow({
@@ -317,7 +299,6 @@ export function Skills() {
       <Rows>
         <RowsCard
           label="Skills"
-          hint="An agent's skills apply to its next send"
           action={
             <RowsAdd
               label="Add skill"

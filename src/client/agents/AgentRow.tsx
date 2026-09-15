@@ -1,17 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One agent as a row: the avatar, the name over the model id, and the
-// faint meta line with the model's window and prices and the thinking
-// level. The admin page wraps it in the button that opens the form;
-// the project's members tab draws it bare. The provider's name leads
-// the meta when the caller knows it, since only an admin lists
-// providers.
+// One agent as the parts of a row: the avatar, the name over the model
+// id, and the faint meta with the model's window and prices and the
+// thinking level. The admin page puts them in the button that opens
+// the form; the project's members tab in a line. They are the row's
+// own parts, so a phone wraps them as it wraps a user's. The
+// provider's name leads the meta when the caller knows it, since only
+// an admin lists providers.
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
+import { RowsAvatar, RowsMeta, RowsTitle } from "../ui/Rows.tsx";
 import { modelMeta, skillsLine, thinkingLine } from "./meta.ts";
-import "./agent-row.css";
 
 export function AgentRow({
   agent,
@@ -32,15 +33,12 @@ export function AgentRow({
     .filter((s) => s !== "")
     .join(" · ");
   return (
-    <span class="agent-row">
-      <span class={`agent-row-tile${lit ? " agent-row-tile-lit" : ""}`}>
+    <>
+      <RowsAvatar lit={lit}>
         <AvatarIcon name={agent.avatar} size={15} />
-      </span>
-      <span class="agent-row-title">
-        <span class="agent-row-name">{agent.name}</span>
-        <span class="agent-row-model">{agent.model.id}</span>
-      </span>
-      <span class="agent-row-meta">{meta}</span>
-    </span>
+      </RowsAvatar>
+      <RowsTitle name={agent.name} sub={agent.model.id} mono />
+      <RowsMeta>{meta}</RowsMeta>
+    </>
   );
 }

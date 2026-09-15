@@ -311,7 +311,7 @@ describe("the page", () => {
     expect(html).toContain('step="any"');
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");
-    expect(html).toContain("applies to the next send");
+    expect(html).not.toContain("rows-hint");
   });
 
   test("says it is loading, then the failure", () => {

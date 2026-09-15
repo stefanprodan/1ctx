@@ -137,7 +137,8 @@ export function RowsOpen({
 }
 
 // a row that does not open, its text lined up with an opening row's;
-// `flush` puts its first child, a radio, where the chevron is
+// `flush` puts its first child, a radio, where the chevron is, and a
+// label row lights under the pointer as a row that opens does
 export function RowsLine({
   as = "div",
   flush,
@@ -150,7 +151,11 @@ export function RowsLine({
   const Tag = as;
   return (
     <div class="rows-item">
-      <Tag class={`rows-line${flush ? "" : " rows-line-static"}`}>
+      <Tag
+        class={`rows-line${flush ? "" : " rows-line-static"}${
+          as === "label" ? " rows-line-pick" : ""
+        }`}
+      >
         {children}
       </Tag>
     </div>

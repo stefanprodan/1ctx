@@ -141,18 +141,6 @@ export function droppedLine(
   return `${plural(total, "file")} not kept: ${list}${more}`;
 }
 
-export const BODY_LINES = 300;
-
-// a long text cut to its first lines, and whether there was more
-export function cutLines(
-  text: string,
-  lines = BODY_LINES,
-): { text: string; more: boolean } {
-  const all = text.split("\n");
-  if (all.length <= lines) return { text, more: false };
-  return { text: all.slice(0, lines).join("\n"), more: true };
-}
-
 // the metadata as "key: value" lines, in key order
 export function metadataLines(metadata: Record<string, string>): string[] {
   return Object.keys(metadata)

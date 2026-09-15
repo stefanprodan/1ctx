@@ -140,8 +140,11 @@
     grid-template-columns: 1fr 1fr;
     gap: var(--space-4);
   }
+  /* a zero minimum, so a skill's long description ellipsizes instead of
+     widening the grid past the card */
   .agents-field-wide {
     grid-column: 1 / -1;
+    min-width: 0;
   }
 
   .agents-prompt {
@@ -149,38 +152,103 @@
     font-size: var(--text-small);
   }
 
-  /* the skill boxes: one line each, the name in mono, the description
-     faint after it */
+  /* the skills: the label with the count at the right, then a list
+     like the catalog's matches, a line per skill with its box, the name
+     in mono over the description */
+  .agents-skills-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .agents-skills-count {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
   .agents-skills {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    overflow: hidden;
   }
   .agents-skill {
+    position: relative;
     display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-3);
     min-width: 0;
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--line);
     cursor: pointer;
   }
+  .agents-skill:last-child {
+    border-bottom: 0;
+  }
+  .agents-skill:hover {
+    background: var(--line);
+  }
+  .agents-skill-full {
+    cursor: default;
+  }
+  .agents-skill-full:hover {
+    background: transparent;
+  }
+  /* the native box stays for the keyboard and a screen reader, drawn
+     over by the owner's */
+  .agents-skill-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
   .agents-skill-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
-    margin: 0;
-    accent-color: var(--brand);
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--page);
+  }
+  .agents-skill-on .agents-skill-box {
+    border-color: var(--brand);
+    background: var(--brand);
+  }
+  .agents-skill-input:focus-visible + .agents-skill-box {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .agents-skill-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 0;
+    min-width: 0;
   }
   .agents-skill-name {
-    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: var(--mono);
     font-size: var(--text-mono);
     color: var(--fg);
   }
   .agents-skill-desc {
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--text-small);
-    color: var(--dim);
+    color: var(--faint);
+  }
+  .agents-skill-full .agents-skill-box,
+  .agents-skill-full .agents-skill-name {
+    opacity: 0.5;
   }
 
   /* the model field: the glass at the left end of the search */

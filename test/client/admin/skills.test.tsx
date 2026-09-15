@@ -3,9 +3,9 @@
 //
 // The skills page's model: the form's kind from the URL and what its
 // button says, the head's words, the source and change words, the
-// bytes and the cut; the entity that loads the list and folds a write
-// back, keeping a body until a refresh; the rail entry; and the page
-// rendered over the rows.
+// bytes; the entity that loads the list and folds a write back, keeping
+// a body until a refresh; the rail entry; the page rendered over the
+// rows; and the agent form's picker.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -26,10 +26,10 @@ import {
   skillsError,
 } from "../../../src/client/data/skills.ts";
 import { SkillForm } from "../../../src/client/views/admin/SkillForm.tsx";
+import { SkillPicker } from "../../../src/client/views/admin/SkillPicker.tsx";
 import {
   bytesWord,
   changeLine,
-  cutLines,
   droppedLine,
   formKind,
   metadataLines,
@@ -42,6 +42,7 @@ import {
 import { Skills } from "../../../src/client/views/admin/Skills.tsx";
 import type { SkillSummary } from "../../../src/shared/contracts/skill.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import { MAX_SKILLS_PER_AGENT } from "../../../src/shared/words.ts";
 
 const admin: Me = {
   id: "u1",
@@ -213,7 +214,7 @@ describe("the row's words", () => {
     ).toMatch(/^Body changed, license changed, 2 files added, 1 file removed/);
   });
 
-  test("the bytes, the dropped files, the metadata and the cut", () => {
+  test("the bytes, the dropped files and the metadata", () => {
     expect(bytesWord(612)).toBe("612 B");
     expect(bytesWord(37_000)).toBe("36.1 KB");
     expect(bytesWord(2 * 1024 * 1024)).toBe("2 MB");
@@ -228,12 +229,6 @@ describe("the row's words", () => {
       "author: stefanprodan",
       "version: 1.0",
     ]);
-    const long = Array.from({ length: 5 }, (_, i) => `line ${i}`).join("\n");
-    expect(cutLines(long, 3)).toEqual({
-      text: "line 0\nline 1\nline 2",
-      more: true,
-    });
-    expect(cutLines("one", 3)).toEqual({ text: "one", more: false });
   });
 });
 
@@ -352,6 +347,44 @@ describe("the page", () => {
     expect(html).not.toContain("rows-meta-bad");
     skills.value = [];
     expect(render(<Skills />)).toContain("No skills yet");
+    expect(render(<Skills />)).not.toContain("rows-hint");
+  });
+
+  test("the picker counts the checked, and past the cap an unchecked line takes no click", () => {
+    const toggle = () => {};
+    const html = render(
+      <SkillPicker
+        available={[gitops, timoni]}
+        chosen={["s1"]}
+        busy={false}
+        onToggle={toggle}
+      />,
+    );
+    expect(html).toContain(`1 of ${MAX_SKILLS_PER_AGENT}`);
+    expect(html).toContain('class="agents-skill agents-skill-on"');
+    expect(html).toContain("Flux CD and Flux Operator expert.");
+    expect(html).not.toContain("agents-skill-full");
+    const ids = Array.from({ length: MAX_SKILLS_PER_AGENT }, (_, i) => `x${i}`);
+    const full = render(
+      <SkillPicker
+        available={[gitops, timoni]}
+        chosen={ids}
+        busy={false}
+        onToggle={toggle}
+      />,
+    );
+    expect(full).toContain('class="agents-skill agents-skill-full"');
+    expect(full).toContain("disabled");
+    expect(
+      render(
+        <SkillPicker
+          available={[]}
+          chosen={[]}
+          busy={false}
+          onToggle={toggle}
+        />,
+      ),
+    ).toContain("No skills yet");
   });
 
   test("the form asks for a URL and names the four forms", () => {

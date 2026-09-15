@@ -161,10 +161,9 @@ export function keyLine(keyName: string | null, hasKey: boolean): string {
   return hasKey ? `${keyName}.key` : `${keyName}.key missing`;
 }
 
-// the line under the skill boxes: how many are checked against the cap
-export function skillsHint(chosen: number, cap: number): string {
-  if (chosen === 0) return `Up to ${cap}. The checked ones go into every send.`;
-  return `${chosen} of ${cap}. The checked ones go into every send.`;
+// beside the skills label: how many are checked against the cap
+export function skillsCount(chosen: number, cap: number): string {
+  return `${chosen} of ${cap}`;
 }
 
 // the same ids in any order

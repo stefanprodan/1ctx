@@ -120,9 +120,6 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .skills-more {
-    align-self: flex-start;
-  }
 
   /* the files, a card of rows inside the open row */
   .skills-files {

@@ -530,11 +530,11 @@ describe("the pages", () => {
       } as never,
     ];
     html = render(<Members params={{ id: "p1" }} />);
-    expect(html).toContain('class="agent-row-name">coder<');
+    expect(html).toContain('class="rows-name rows-name-mono">coder<');
     expect(html).toContain("deepseek/deepseek-v4-flash");
     // no provider name for a member, and no form to open
     expect(html).toContain(
-      'class="agent-row-meta">128k · $0.14 / $0.28 · tools · reasoning<',
+      'class="rows-meta">128k · $0.14 / $0.28 · tools · reasoning<',
     );
     expect(html).not.toContain("rows-toggle");
     projectAgents.value = [];
