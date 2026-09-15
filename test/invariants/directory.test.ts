@@ -141,7 +141,9 @@ describe("the directory", () => {
       { name: "datetime", provider: null },
       { name: "webfetch", provider: null },
     ]);
-    // the agent has no prompt and no skills; the two tool schemas cost
+    // the agent has no prompt and no skills; the two tool schemas cost,
+    // and no MCP server is offered
+    expect(body.mcp).toEqual({ servers: [], tokens: 0 });
     expect(body.tokens.prompt).toBe(0);
     expect(body.tokens.skills).toBe(0);
     expect(body.tokens.tools).toBeGreaterThan(50);
@@ -268,6 +270,8 @@ describe("the directory", () => {
         thinking: null,
         effort: null,
         prompt: "You write code. Keep diffs small.",
+        servers: [],
+        mcpMode: "auto",
       },
     });
     expect(res.status).toBe(200);

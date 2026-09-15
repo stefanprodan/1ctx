@@ -29,6 +29,9 @@ const NONE: Offered = {
   tools: [],
   search: null,
   skills: { block: "", skills: [] },
+  mcp: [],
+  mcpPrompt: { text: "", digest: {} },
+  mcpCatalog: "",
 };
 
 const policy: SendPolicy = {
@@ -160,6 +163,33 @@ describe("systemPrompt", () => {
       "This is a manual run of the morning-check",
     );
     expect(run("manual")).not.toContain("@caelea");
+  });
+  test("orders MCP catalog and instructions before the date and the note last", () => {
+    const offered: Offered = {
+      ...NONE,
+      skills: {
+        block: "<available_skills>skills</available_skills>",
+        skills: [],
+      },
+      mcpCatalog: "<available_mcp_tools>catalog</available_mcp_tools>",
+      mcpPrompt: {
+        text: "<mcp_instructions>instructions</mcp_instructions>",
+        digest: {},
+      },
+    };
+    const without = systemPrompt({ ...policy, offered }, NOW);
+    const note = "Since your last turn, tools changed.";
+    const withNote = systemPrompt({ ...policy, offered }, NOW, note);
+    expect(withNote).toBe(`${without}\n\n${note}`);
+    expect(without.indexOf("available_skills")).toBeLessThan(
+      without.indexOf("available_mcp_tools"),
+    );
+    expect(without.indexOf("available_mcp_tools")).toBeLessThan(
+      without.indexOf("mcp_instructions"),
+    );
+    expect(without.indexOf("mcp_instructions")).toBeLessThan(
+      without.indexOf(dateLine(NOW)),
+    );
   });
 });
 
@@ -413,6 +443,9 @@ describe("history", () => {
         tools: [{ name: "time", description: "d", parameters: {} }],
         search: null,
         skills: { block: "", skills: [] },
+        mcp: [],
+        mcpPrompt: { text: "", digest: {} },
+        mcpCatalog: "",
       },
     };
     const req = summaryRequest(withTools, "s1", [
@@ -458,6 +491,9 @@ describe("history", () => {
         tools: [{ name: "time", description: "d", parameters: {} }],
         search: null,
         skills: { block: "", skills: [] },
+        mcp: [],
+        mcpPrompt: { text: "", digest: {} },
+        mcpCatalog: "",
       },
     };
     const req = request(withTools, "s1", []);
@@ -514,6 +550,9 @@ describe("skills after a summary", () => {
           { id: "sk1", name: "ops", description: "ops", hasFiles: false },
         ],
       },
+      mcp: [],
+      mcpPrompt: { text: "", digest: {} },
+      mcpCatalog: "",
     },
   };
   const work = (id: string, name: string, sendId: string) =>

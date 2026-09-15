@@ -6,8 +6,10 @@
 // model is the route's check, not the parser's.
 
 import type { SaveAgentRequest } from "../../shared/api/agents.ts";
+import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
   isAvatar,
+  isMcpMode,
   isName,
   MAX_NAME,
   MAX_SKILLS_PER_AGENT,
@@ -19,9 +21,15 @@ import { BadRequest } from "../lib/errors.ts";
 
 export const MAX_MODEL = 200;
 export const MAX_PROMPT = 16_000;
+export const MAX_SERVERS_PER_AGENT = 50;
 
-export type ParsedAgent = Omit<SaveAgentRequest, "effort"> & {
+export type ParsedAgent = Omit<
+  SaveAgentRequest,
+  "effort" | "servers" | "mcpMode"
+> & {
   effort: string | null;
+  servers: AgentServer[];
+  mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
 };
 
 // an agent's name as a path names it, by the same rule a save keeps
@@ -34,6 +42,39 @@ export function parseAgentName(value: unknown): string {
   return value;
 }
 
+function parseServers(value: unknown): AgentServer[] {
+  if (!Array.isArray(value)) {
+    throw new BadRequest("servers must be an array");
+  }
+  if (value.length > MAX_SERVERS_PER_AGENT) {
+    throw new BadRequest(
+      `an agent may have at most ${MAX_SERVERS_PER_AGENT} MCP servers`,
+    );
+  }
+  const seen = new Set<string>();
+  return value.map((item) => {
+    const server = fields(item, ["serverId", "read", "write"]);
+    if (typeof server.serverId !== "string" || server.serverId === "") {
+      throw new BadRequest("serverId must be an id");
+    }
+    if (typeof server.read !== "boolean" || typeof server.write !== "boolean") {
+      throw new BadRequest("server read and write must be booleans");
+    }
+    if (!server.read && !server.write) {
+      throw new BadRequest("a server needs read or write");
+    }
+    if (seen.has(server.serverId)) {
+      throw new BadRequest("serverId must not repeat");
+    }
+    seen.add(server.serverId);
+    return {
+      serverId: server.serverId,
+      read: server.read,
+      write: server.write,
+    };
+  });
+}
+
 export function parseAgent(body: unknown): ParsedAgent {
   const b = fields(body, [
     "name",
@@ -44,6 +85,8 @@ export function parseAgent(body: unknown): ParsedAgent {
     "effort",
     "prompt",
     "skills",
+    "servers",
+    "mcpMode",
   ]);
   const name = parseAgentName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
@@ -85,6 +128,11 @@ export function parseAgent(body: unknown): ParsedAgent {
   if (new Set(skills).size !== skills.length) {
     throw new BadRequest("skills must not repeat");
   }
+  const servers = parseServers(b.servers);
+  if (!isMcpMode(b.mcpMode)) {
+    throw new BadRequest("mcpMode must be all, catalog or auto");
+  }
+  const mcpMode = b.mcpMode;
   return {
     name,
     avatar,
@@ -94,5 +142,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     effort: b.effort,
     prompt: prompt.trim(),
     skills,
+    servers,
+    mcpMode,
   };
 }

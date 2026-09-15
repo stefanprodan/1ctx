@@ -4,11 +4,11 @@
 import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
+import type { McpDigest } from "../../shared/mcp.ts";
 import type {
   MessageStatus,
   RunFilter,
   SendCause,
-  SendKind,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -21,6 +21,12 @@ import {
 } from "./automation.ts";
 import { listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
+import {
+  insertMcpSend,
+  type McpSendFields,
+  lastMcpDigest as readLastMcpDigest,
+  sweepMcpDigests,
+} from "./mcp.ts";
 import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -392,36 +398,16 @@ export class SessionStore {
     return changed ? this.message(id) : null;
   }
 
-  createSend(fields: {
-    id?: string;
-    kind?: SendKind;
-    sessionId: string;
-    userId: string;
-    agentId: string;
-    providerId: string;
-    model: string;
-    firstMessageId: string;
-    now: number;
-  }): SendSummary {
-    const id = fields.id ?? newId();
-    this.db
-      .query(
-        `insert into sends (id, session_id, kind, user_id, agent_id, provider_id, model,
-           status, first_message_id, started_at)
-         values (?, ?, ?, ?, ?, ?, ?, 'running', ?, ?)`,
-      )
-      .run(
-        id,
-        fields.sessionId,
-        fields.kind ?? "chat",
-        fields.userId,
-        fields.agentId,
-        fields.providerId,
-        fields.model,
-        fields.firstMessageId,
-        fields.now,
-      );
-    return this.send(id)!;
+  createSend(fields: McpSendFields): SendSummary {
+    return this.send(insertMcpSend(this.db, fields))!;
+  }
+
+  lastMcpDigest(sessionId: string, excludeSendId: string): McpDigest | null {
+    return readLastMcpDigest(this.db, sessionId, excludeSendId);
+  }
+
+  sweepDigests(): number {
+    return sweepMcpDigests(this.db);
   }
 
   send(id: string): SendSummary | null {

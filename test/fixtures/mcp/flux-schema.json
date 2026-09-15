@@ -1,0 +1,130 @@
+{
+  "initialize": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {
+      "tools": {
+        "listChanged": true
+      }
+    },
+    "serverInfo": {
+      "name": "flux-schema-catalog",
+      "title": "Flux Schema Catalog",
+      "version": "0.2.0"
+    },
+    "instructions": "An LLM-friendly `kubectl explain` for the whole Kubernetes ecosystem, no cluster required: authoritative JSON Schemas and field indexes for core Kubernetes, OpenShift, the Flux ecosystem, and a broad set of CNCF projects, controllers, and operators. Use these tools whenever you generate, edit, review, or validate a Kubernetes manifest or custom resource: look up the real kinds, field names, types, constraints, required values, and apiVersions here instead of reconstructing them from training data. Flow: discover with `grep_catalog`, answer field questions with `grep_schema`, and call `get_schema` only when you need the complete JSON Schema."
+  },
+  "tools": {
+    "tools": [
+      {
+        "name": "grep_catalog",
+        "title": "Grep catalog",
+        "description": "Grep the catalog of kinds with JavaScript RegExp syntax; returns one line per apiVersion: `<apiVersion> <Kind> (aliases)  # project`, where aliases are kubectl short names and irregular resource names. Start here to resolve what a manifest needs.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1
+            },
+            "limit": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "grep_schema",
+        "title": "Grep schema",
+        "description": "Grep an apiVersion/kind flattened field index with JavaScript RegExp syntax; matches are case-insensitive and evaluated per field line. Constraints are part of each line, so a query like `\\(required\\)` lists every required field. Prefer it over get_schema for targeted field lookup.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "query": {
+              "type": "string"
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "limit": {
+              "default": 200,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind"
+          ]
+        }
+      },
+      {
+        "name": "list_projects",
+        "title": "List projects",
+        "description": "Enumerate every project in catalog order as plain-text lines with project name, version, GitHub repo, and kind count. Grouped projects report their source count in place of a version.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {}
+        }
+      },
+      {
+        "name": "get_project",
+        "title": "Get project",
+        "description": "Fetch one project's TypeMeta lines by name, alias, or member source name (e.g. ack-s3 resolves to the AWS Controllers for Kubernetes project), including every apiVersion/Kind pair and field-index coverage.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "project": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "project"
+          ]
+        }
+      },
+      {
+        "name": "get_schema",
+        "title": "Get schema",
+        "description": "Fetch the complete JSON Schema for an apiVersion and kind when you need every field; oversized schemas return a direct URL and a pointer to grep_schema.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind"
+          ]
+        }
+      }
+    ]
+  }
+}

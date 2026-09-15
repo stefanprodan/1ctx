@@ -203,6 +203,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     user: UserRow,
     agent: AgentRow,
     event: Event | null = null,
+    offerTools = true,
   ) => {
     const limits = deps.limits.current();
     return buildPolicy({
@@ -210,7 +211,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       user,
       agent,
       now: deps.clock(),
-      tools: agent.model.tools ? deps.tools : null,
+      tools: offerTools && agent.model.tools ? deps.tools : null,
       limits,
       automation:
         event === null
@@ -407,7 +408,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
-      const policy = policyFor(project, user, agent);
+      const policy = policyFor(project, user, agent, null, false);
       registry.admit(session.id, user.id);
       const sendId = newId();
       const summaryId = newId();

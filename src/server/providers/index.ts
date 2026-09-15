@@ -26,6 +26,7 @@ export {
 } from "./catalog.ts";
 export { wireTools } from "./openai.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
+export { parseKeyName, RESERVED_KEYS } from "./parse.ts";
 export { type AgentsPort, type RoutesDeps, routes } from "./routes.ts";
 export { type ProviderRow, ProviderStore, summary } from "./store.ts";
 export type {

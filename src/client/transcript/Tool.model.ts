@@ -3,6 +3,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { splitWireName } from "../../shared/mcp.ts";
 import { secs } from "./stream.ts";
 
 // not on the wire: the chat fetches it when the row is opened, so a
@@ -11,6 +12,34 @@ export type ToolResult =
   | { status: "loading" }
   | { status: "done"; content: string; bytes: number; cut: boolean }
   | { status: "failed"; error: string };
+
+// the tool that ran is the row's word: a catalog-mode call is asked
+// for as mcp_call with the wire name inside, and the server writes
+// that name on the row, so the fold reads like a direct call
+export function ranCall(call: ToolCall, result: Message | null): ToolCall {
+  const name = result?.toolName ?? call.name;
+  if (name === call.name || call.name !== "mcp_call") {
+    return { ...call, name };
+  }
+  try {
+    const inner = (
+      JSON.parse(call.arguments || "{}") as Record<string, unknown>
+    ).arguments;
+    return { ...call, name, arguments: JSON.stringify(inner ?? {}) };
+  } catch {
+    return { ...call, name };
+  }
+}
+
+// Keep MCP folds readable by naming the server before the tool.
+export const MAX_MCP_ARGUMENT = 60;
+export function toolLabel(name: string): {
+  server: string | null;
+  tool: string;
+} {
+  const split = splitWireName(name);
+  return split === null ? { server: null, tool: name } : split;
+}
 
 export function shortArg(name: string, args: string): string {
   try {
@@ -37,7 +66,11 @@ export function shortArg(name: string, args: string): string {
     const telling = Object.values(value).find(
       (item) => typeof item === "string",
     );
-    return typeof telling === "string" ? telling : "";
+    if (typeof telling !== "string") return "";
+    // an MCP argument can be a whole manifest; the line shows its start
+    return splitWireName(name) === null
+      ? telling
+      : telling.replace(/\s+/g, " ").trim().slice(0, MAX_MCP_ARGUMENT);
   } catch {
     return "";
   }
@@ -106,8 +139,9 @@ export function toolSummary(
     const ms = Math.max(0, result.finishedAt - result.createdAt);
     state = ms < 100 ? "instant" : secs(ms);
   }
+  const ran = ranCall(call, result);
   return {
-    argument: shortArg(call.name, call.arguments),
+    argument: shortArg(ran.name, ran.arguments),
     state,
     live,
   };

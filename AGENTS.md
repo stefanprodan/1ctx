@@ -229,6 +229,81 @@ violation, and every rule has a rejected fixture under
   rows or the Tools page, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
   summary, the user message names still-offered skills loaded before it.
+- **An MCP server is rows, discovered through the official SDK.** The
+  wire is `@modelcontextprotocol/client` v2 over Streamable HTTP in
+  `auto` negotiation (the modern stateless era, or the legacy
+  handshake); `mcp/client.ts` is its one importer, with one client per
+  discovery or call, every response under one byte budget per client,
+  the key from `mcp-<name>.key` sent as a bearer and scrubbed from every
+  string the server says, every server string cut. An admin registers a
+  server by name and URL (`isServerName`: the channel rule without the
+  underscore, at most 24, since the wire name is `mcp__<server>__<tool>`
+  inside the OpenAI rule) and picks the key from the `mcp-` files
+  `secrets.list()` names. Its tools are rows: discovered on add, on an
+  endpoint PATCH (url or keyName alone, the row kept on a 502), on
+  Refresh, on a call that sees the server's fingerprint move and hourly,
+  under the caps in `mcp/limits.ts`, with no approval step; a failed
+  refresh keeps the last good list and records `refreshError`. The
+  sides are the admin's patterns through `shared/mcp.ts` (`classify`:
+  unusable, excluded, read, write, in that order) and never stored;
+  `offered()` intersects the server's and the agent's switches. One
+  refresh coordinator per `mcpArea`, never module state, closed in
+  `shutdown()` after the runner; a delete aborts a discovery in flight
+  and is a 409 while an agent references the server. Every server
+  string is shown as text; `parametersHtml` is the one HTML, rendered on
+  the server. The name never changes.
+- **An agent's MCP tools are one send snapshot, decided in the policy.**
+  An agent carries `servers` (a server id with `read` and `write`,
+  saved with the agent row in one `transact()` through the mcp
+  capability) and `mcpMode`. The offered set is the intersection of the
+  server's and the agent's switches over the patterns, through
+  `offeredServers()` in `shared/mcp.ts`, so the page's preview and the
+  send agree: each schema lean (`wireSchema`, `wireDescription`, the
+  description cut at 1,024) and the tools sorted by server then name
+  after the built-ins and the skill tools, so the `tools` array is
+  byte-stable across a session. `mcpMode` `all` puts every offered
+  schema on the wire; `catalog` puts `mcp_describe` and `mcp_call`
+  (`tools/builtin/mcp.ts`, the name an enum of the offered wire names,
+  the arguments checked against the stored schema with the SDK's
+  validator before anything goes out) and one line per tool in the
+  prompt; `auto`, the default, is `all` while the lean schemas count at
+  most `MCP_CATALOG_FROM_TOKENS` through `lib/tokens.ts`. A call runs
+  through the registry under the wire name in both modes, under the
+  server's `timeoutMs` or the limits' call timeout, one client per
+  call over the snapshot's URL and key name; the row is a tool row
+  like any other. Access to an agent grants its MCP tools. The system
+  prompt is the agent's prompt, the project and user or automation
+  part, the skills catalog, the MCP catalog, the servers' instructions
+  as the delimited `<mcp_instructions>` block (capped, tags neutered,
+  off per server), the date line, and last the change note. A send
+  records a content-addressed digest of what it offered from MCP
+  (`mcp_digests`, `sends.mcp`, null for a compact send, swept with the
+  logins); `startSend` compares it with the session's previous send
+  (a regenerated turn against the turn before it), and a difference
+  is the note after the date line naming added, removed and changed
+  wire names, so the stable prefix stays cacheable. A running send
+  never changes its set.
+- **The MCP page shows the loaded rows as a send would carry them.**
+  `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
+  by `shapeServerName()`, the key a `Select` of the `mcp-` files the
+  route answered, the timeout's hint naming the limits' call timeout
+  the route answered), a row's head is the name over its tool count and
+  last check (the refresh failure in red) with Refresh at its end, and
+  it opens to the last change, the server's own words, the endpoint
+  with its own Change endpoint button (it discovers first, a 502
+  keeps what was typed), the settings with Save, the tools in the
+  four groups the pattern fields give live through `shared/mcp.ts`
+  (a pattern matching nothing marked under its field), and the
+  instructions as `serverBlock()` gives them, trimmed to 12 lines with
+  Show all. `data/mcp.ts` keeps the rows, the keys and `loadedAt`; the
+  agent form reads them again on open and says when it did. The agent form's
+  section is a line per server with Read and Write boxes (a side off
+  on the server faint with the word),
+  the mode as a `Select`, and the prompt's instructions total with a
+  warning per server a cap leaves out and View for the block, all from
+  `promptPreview()` in `Mcp.model.ts` over `offeredServers()` and
+  `promptSnapshot()`, so the preview is the bytes a send starting on
+  those rows would carry. A model without the tools flag says so.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

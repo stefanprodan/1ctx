@@ -168,9 +168,10 @@ export function history(
   >,
   lookups: ContextLookups,
   now: number,
+  mcpNote = "",
 ): ChatMessageIn[] {
   const out: ChatMessageIn[] = [
-    { role: "system", content: systemPrompt(policy, now) },
+    { role: "system", content: systemPrompt(policy, now, mcpNote) },
   ];
   let start = 0;
   for (let i = rows.length - 1; i >= 0; i--) {

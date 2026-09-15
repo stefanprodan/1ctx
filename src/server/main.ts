@@ -126,6 +126,7 @@ log(`secrets: ${store.dir} (${store.mode})`);
 const app = await compose({
   db,
   secret: (name) => store.read(name),
+  secretNames: (prefix) => store.list(prefix),
   clock: wallClock,
   log: logger,
   version: VERSION,
@@ -133,6 +134,7 @@ const app = await compose({
   trustProxy,
 });
 app.sweep();
+app.mcpStart();
 setInterval(() => app.sweep(), TOUCH_AFTER_MS);
 
 const { server, stop } = serve({

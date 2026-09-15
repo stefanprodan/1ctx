@@ -9,6 +9,8 @@ import type { CallNode } from "./rows.ts";
 import {
   displayResult,
   prettyArguments,
+  ranCall,
+  toolLabel,
   toolSummary,
   wantsResult,
 } from "./Tool.model.ts";
@@ -18,6 +20,7 @@ const opened = signal<ReadonlySet<string>>(new Set());
 export function Tool({ node }: { node: CallNode }) {
   const open = opened.value.has(node.key);
   const summary = toolSummary(node.call, node.result);
+  const label = toolLabel(ranCall(node.call, node.result).name);
   const held =
     node.result === null ? undefined : toolResults.value.get(node.result.id);
   const resultId = node.result?.id ?? null;
@@ -45,7 +48,10 @@ export function Tool({ node }: { node: CallNode }) {
       <summary class="transcript-tool-head">
         <Icon name="spinner" size={12} class="transcript-tool-spin" />
         <Icon name="chevron-right" size={12} class="transcript-tool-chevron" />
-        <span class="transcript-tool-name">{node.call.name}</span>
+        {label.server !== null && (
+          <span class="transcript-tool-server">{label.server}</span>
+        )}
+        <span class="transcript-tool-name">{label.tool}</span>
         {summary.argument !== "" && (
           <span class="transcript-tool-argument">{summary.argument}</span>
         )}

@@ -71,6 +71,8 @@ describe("Home", () => {
         effort: null,
         prompt: "",
         skills: [],
+        servers: [],
+        mcpMode: "auto",
         createdAt: 1_756_684_800_000,
       },
     ];

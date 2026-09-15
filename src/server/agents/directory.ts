@@ -7,21 +7,36 @@
 // with their descriptions and when they were fetched, the built-in tools
 // a send would offer it now with websearch's provider, and token counts.
 // The tools are the tools area's answer at this moment, none when the
-// model does not accept tools; the list leaves out the skill tools,
-// which the skills stand for, but their schemas count, since every
-// request carries them.
+// model does not accept tools. The list is built-ins alone; skill and
+// MCP schemas still count because the provider request carries them.
 
 import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { isSkillTool } from "../../shared/words.ts";
+import { BUILTIN_TOOLS } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { tokens } from "../lib/tokens.ts";
+import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTools } from "../providers/index.ts";
 import { parseAgentName } from "./parse.ts";
 import type { ProvidersPort } from "./routes.ts";
-import { type AgentStore, summary } from "./store.ts";
+import { type AgentRow, type AgentStore, summary } from "./store.ts";
+
+const BUILTIN_NAMES = new Set<string>(BUILTIN_TOOLS);
+
+// the lean MCP schemas as the wire carries them in all mode, the count
+// the token cap reads whatever mode the send resolved to
+function schemaTokens(servers: OfferedServer[]): number {
+  const schemas = servers.flatMap((server) =>
+    server.tools.map((tool) => ({
+      name: tool.wireName,
+      description: tool.description,
+      parameters: tool.wireInputSchema,
+    })),
+  );
+  return schemas.length === 0 ? 0 : tokens(JSON.stringify(wireTools(schemas)));
+}
 
 export type SkillsListPort = {
   forAgent(agentId: string): OfferedSkill[];
@@ -37,7 +52,14 @@ export type ToolsPort = {
   offered(
     now: number,
     agentId: string,
-  ): { tools: ChatTool[]; search: string | null };
+    agentServers: AgentRow["servers"],
+    mode: AgentRow["mcpMode"],
+  ): {
+    tools: ChatTool[];
+    search: string | null;
+    mcp: OfferedServer[];
+    mcpCatalog: string;
+  };
 };
 
 export type DirectoryDeps = {
@@ -76,8 +98,13 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const agent = deps.store.byName(parseAgentName(ctx.params.name));
         if (agent === null) throw new NotFound("no such agent");
         const offered = agent.model.tools
-          ? deps.tools.offered(deps.clock(), agent.id)
-          : { tools: [], search: null };
+          ? deps.tools.offered(
+              deps.clock(),
+              agent.id,
+              agent.servers,
+              agent.mcpMode,
+            )
+          : { tools: [], search: null, mcp: [], mcpCatalog: "" };
         const versions = deps.skills.versions(agent.id);
         const fetched = new Map(versions.map((v) => [v.id, v.fetchedAt]));
         const body: DirectoryAgentResponse = {
@@ -88,11 +115,25 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             fetchedAt: fetched.get(skill.id) ?? 0,
           })),
           tools: offered.tools
-            .filter((t) => !isSkillTool(t.name))
-            .map((t) => ({
-              name: t.name,
-              provider: t.name === "websearch" ? offered.search : null,
+            .filter((tool) => BUILTIN_NAMES.has(tool.name))
+            .map((tool) => ({
+              name: tool.name,
+              provider: tool.name === "websearch" ? offered.search : null,
             })),
+          mcp: {
+            servers: offered.mcp.map((server) => {
+              const link = agent.servers.find((s) => s.serverId === server.id);
+              return {
+                name: server.name,
+                read: link?.read ?? false,
+                write: link?.write ?? false,
+                tools: server.tools.length,
+                checkedAt: server.checkedAt,
+                refreshFailedAt: server.refreshFailedAt,
+              };
+            }),
+            tokens: schemaTokens(offered.mcp),
+          },
           tokens: {
             prompt: tokens(agent.prompt),
             skills: versions.reduce(

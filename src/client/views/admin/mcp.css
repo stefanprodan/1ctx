@@ -1,0 +1,298 @@
+/* MCP: the add form's fields, and what an open row holds: the facts,
+   the endpoint and the settings as fields, the tools in their four
+   groups, the instructions box and the actions. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .mcp-form,
+  .mcp-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .mcp-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+  .mcp-field-wide {
+    grid-column: 1 / -1;
+  }
+  .mcp-head-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .mcp-pattern-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+  }
+  .mcp-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .mcp-patterns {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    min-height: 72px;
+  }
+  .mcp-switches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+  .mcp-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+  .mcp-note {
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  .mcp-change-head {
+    cursor: pointer;
+  }
+  .mcp-change-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) 0 0 var(--space-4);
+  }
+  .mcp-change-line {
+    display: flex;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--text-small);
+  }
+  .mcp-change-kind {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+
+  /* the facts: a label and a value per line */
+  .mcp-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-1) var(--space-4);
+    font-size: var(--text-small);
+  }
+  .mcp-fact-label {
+    color: var(--faint);
+  }
+  .mcp-fact {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .mcp-fact-mono {
+    font-family: var(--mono);
+  }
+
+  /* a group of tools: its head with the count, a line per tool that
+     opens to the description and the parameters */
+  .mcp-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .mcp-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+  .mcp-group-count {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .mcp-tools {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    overflow: hidden;
+  }
+  .mcp-tool {
+    border-bottom: 1px solid var(--line);
+  }
+  .mcp-tool:last-child {
+    border-bottom: 0;
+  }
+  .mcp-tool-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    cursor: pointer;
+    list-style: none;
+  }
+  .mcp-tool-head::-webkit-details-marker {
+    display: none;
+  }
+  .mcp-tool-head:hover {
+    background: var(--line);
+  }
+  .mcp-tool-name {
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    color: var(--fg);
+  }
+  .mcp-tool-desc {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  .mcp-tool-reason {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: var(--text-label);
+    color: var(--failed);
+  }
+  .mcp-tool-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: 0 var(--space-3) var(--space-3);
+    font-size: var(--text-small);
+  }
+  .mcp-tool-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* the instructions: the block as the prompt carries it */
+  .mcp-instructions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .mcp-instructions-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .mcp-block {
+    margin: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .mcp-toggle {
+    align-self: flex-start;
+  }
+
+  .mcp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .mcp-ask {
+    font-size: var(--text-small);
+  }
+
+  /* the agent form's section: a line per server with its two boxes */
+  .mcp-pick-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .mcp-picks {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    overflow: hidden;
+  }
+  .mcp-pick {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+  .mcp-pick:last-child {
+    border-bottom: 0;
+  }
+  .mcp-pick-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    color: var(--fg);
+  }
+  .mcp-pick-side {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .mcp-pick-off {
+    color: var(--faint);
+    cursor: default;
+  }
+  .mcp-pick-off-word {
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .mcp-preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  @media (max-width: 719px) {
+    .mcp-head-row,
+    .mcp-pattern-row {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 719px) {
+    .mcp-pick-head,
+    .mcp-instructions-head,
+    .mcp-tool-head,
+    .mcp-pick {
+      flex-wrap: wrap;
+    }
+    .mcp-tool-desc {
+      order: 3;
+      flex-basis: 100%;
+    }
+    .mcp-pick-name {
+      flex-basis: 100%;
+    }
+    .mcp-pick-side {
+      flex: 1 1 120px;
+      flex-wrap: wrap;
+    }
+    .mcp-pick-off-word {
+      flex-basis: 100%;
+    }
+  }
+}

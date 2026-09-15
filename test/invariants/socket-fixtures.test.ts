@@ -45,6 +45,7 @@ import {
   tick,
   waitScript,
 } from "../helpers/chat.ts";
+import { fixture, mcpFetch } from "../server/mcp/fake.ts";
 
 const DIR = join(import.meta.dir, "..", "fixtures", "socket");
 
@@ -203,6 +204,9 @@ function fakeTools(plans: Record<string, ToolPlan>): { tools: FakeToolsCap } {
         tools: schemas,
         search: null,
         skills: { block: "", skills: [] },
+        mcp: [],
+        mcpPrompt: { text: "", digest: {} },
+        mcpCatalog: "",
       }),
       async run(_offered, c, ctx) {
         const plan = plans[c.id] ?? {
@@ -385,6 +389,66 @@ describe("socket fixtures", () => {
     record("one-tool-round", detail, conn);
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send).toMatchObject({ status: "done", rounds: 2, toolCalls: 1 });
+    chat.app.socket.dispose();
+  });
+
+  test("an MCP tool round then an answer", async () => {
+    const flux = mcpFetch({ recorded: await fixture("flux") });
+    const chat = await chatApp({ fetcher: flux.fetcher });
+    const { server } = await (
+      await chat.admin.call("POST", "/api/mcp", {
+        body: {
+          name: "flux",
+          url: "http://flux.test/mcp",
+          keyName: null,
+          read: true,
+          write: false,
+          instructionsOn: true,
+          timeoutMs: null,
+          readPatterns: ["get_*"],
+          writePatterns: [],
+          excludedPatterns: [],
+        },
+      })
+    ).json();
+    const agent = chat.app.agents.byId(chat.agentId)!;
+    const saved = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
+      body: {
+        name: agent.name,
+        avatar: agent.avatar,
+        providerId: agent.providerId,
+        model: agent.model.id,
+        thinking: agent.thinking,
+        effort: agent.effort,
+        prompt: agent.prompt,
+        skills: agent.skills,
+        servers: [{ serverId: server.id, read: true, write: false }],
+        mcpMode: "all",
+      },
+    });
+    expect(saved.status).toBe(200);
+    const conn = await watcher(chat);
+    const { detail, script, sessionId } = await startChat(chat, "inspect flux");
+    watch(chat, conn, sessionId);
+    toolRound(script, [
+      {
+        id: "c1",
+        name: "mcp__flux__get_flux_instance",
+        arguments: "{}",
+      },
+    ]);
+    const r2 = await chat.scripted.next();
+    r2.reply("Flux is ready.");
+    await settle(chat, 10);
+    record("mcp-call", detail, conn);
+    const row = chat.app.sessions
+      .messages(sessionId)
+      .find((message) => message.kind === "tool")!;
+    expect(row).toMatchObject({
+      toolName: "mcp__flux__get_flux_instance",
+      status: "done",
+      content: "called",
+    });
     chat.app.socket.dispose();
   });
 

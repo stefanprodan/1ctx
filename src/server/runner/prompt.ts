@@ -77,6 +77,7 @@ export function systemPrompt(
     | "offered"
   >,
   now: number,
+  mcpNote = "",
 ): string {
   const parts: string[] = [];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
@@ -90,6 +91,13 @@ export function systemPrompt(
   if (policy.offered.skills.block !== "") {
     parts.push(policy.offered.skills.block);
   }
+  if (policy.offered.mcpCatalog !== "") {
+    parts.push(policy.offered.mcpCatalog);
+  }
+  if (policy.offered.mcpPrompt.text !== "") {
+    parts.push(policy.offered.mcpPrompt.text);
+  }
   parts.push(dateLine(now));
+  if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");
 }

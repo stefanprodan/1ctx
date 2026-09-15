@@ -33,7 +33,13 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
-import { effortText, thinkingText, tokensText } from "./People.model.ts";
+import {
+  effortText,
+  serverLine,
+  serverMeta,
+  thinkingText,
+  tokensText,
+} from "./People.model.ts";
 import "./people.css";
 
 // a prompt may run to 16,000 characters: cut to its first lines, with
@@ -208,6 +214,44 @@ export function Agent({ params }: { params: Params }) {
                     <RowsMeta>fetched {ago(s.fetchedAt, now.value)}</RowsMeta>
                   </RowsLine>
                 ))}
+              </RowsCard>
+              <RowsCard
+                label="MCP"
+                hint={
+                  shown.mcp.servers.length === 0
+                    ? undefined
+                    : tokensText(shown.mcp.tokens)
+                }
+              >
+                {shown.mcp.servers.length === 0 && (
+                  <RowsNote>
+                    {shown.agent.model.tools
+                      ? "No MCP servers."
+                      : "The model does not take tools."}
+                  </RowsNote>
+                )}
+                {shown.mcp.servers.map((server) => {
+                  const line = serverLine(server, now.value);
+                  return (
+                    <RowsLine key={server.name} flush>
+                      <RowsAvatar>
+                        <Icon name="plug" size={14} />
+                      </RowsAvatar>
+                      <RowsTitle
+                        name={server.name}
+                        sub={
+                          line.bad ? (
+                            <span class="people-bad">{line.text}</span>
+                          ) : (
+                            line.text
+                          )
+                        }
+                        mono
+                      />
+                      <RowsMeta>{serverMeta(server)}</RowsMeta>
+                    </RowsLine>
+                  );
+                })}
               </RowsCard>
               <RowsCard
                 label="Tools"

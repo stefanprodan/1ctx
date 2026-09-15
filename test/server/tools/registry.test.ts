@@ -59,4 +59,16 @@ describe("the registry's result cleaning", () => {
       error: true,
     });
   });
+
+  test("keeps a built-in error that mentions timeout", async () => {
+    expect(
+      await echo("the upstream timeout policy refused this", true).run(
+        call,
+        context(),
+      ),
+    ).toEqual({
+      content: "Error: the upstream timeout policy refused this",
+      error: true,
+    });
+  });
 });

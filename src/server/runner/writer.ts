@@ -14,15 +14,19 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
-import type { SendCause, SendKind, SessionStatus } from "../../shared/words.ts";
+import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
-import type { SessionRow } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
-import type { SendPolicy, ToolResult } from "./policy.ts";
+import type { ToolResult } from "./policy.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
+import {
+  type Started,
+  type StartFields,
+  startSend as startSendRows,
+} from "./start.ts";
 import { streamDelta } from "./stream.ts";
 import {
   type CompactFields,
@@ -32,6 +36,7 @@ import {
 } from "./summary.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
+export type { Started } from "./start.ts";
 export { HTML_EVERY_MS, WRITE_EVERY_BYTES, WRITE_EVERY_MS } from "./stream.ts";
 export type { SessionsPort } from "./writer-port.ts";
 
@@ -51,13 +56,6 @@ export type WriterDeps = {
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
-};
-
-export type Started = {
-  session: SessionSummary;
-  user: Message;
-  reply: Message;
-  send: SendSummary;
 };
 
 // the status a cause ends in
@@ -85,96 +83,8 @@ export class Writer {
     return startCompactRows(this.deps, fields);
   }
 
-  // with the lock already held: the send row, its user row, the reply
-  // that streams, and the running state. Regeneration reuses its user
-  // row while the same transaction removes the send it replaces.
-  startSend(fields: {
-    sendId: string;
-    replyId: string;
-    userId: string;
-    sessionId: string;
-    session: SessionRow | null;
-    origin?: "chat" | "automation";
-    automationId?: string | null;
-    kind?: SendKind;
-    existingUser?: Message;
-    title: string;
-    policy: SendPolicy;
-    text: string;
-  }): Started {
-    const { policy } = fields;
-    const now = this.deps.clock();
-    return transact(this.deps.db, () => {
-      const base =
-        fields.session ??
-        this.deps.sessions.create({
-          id: fields.sessionId,
-          projectId: policy.projectId,
-          ownerId: policy.userId,
-          agentId: policy.agentId,
-          origin: fields.origin,
-          automationId: fields.automationId,
-          runSource: policy.automation?.source ?? null,
-          title: fields.title,
-          now,
-        });
-      const send = this.deps.sessions.createSend({
-        id: fields.sendId,
-        kind: fields.kind ?? "chat",
-        sessionId: base.id,
-        userId: policy.userId,
-        agentId: policy.agentId,
-        providerId: policy.providerId,
-        model: policy.model,
-        firstMessageId: fields.userId,
-        now,
-      });
-      let removedMessageIds: string[] = [];
-      let user: Message;
-      if (fields.existingUser === undefined) {
-        user = this.deps.sessions.addUserMessage({
-          id: fields.userId,
-          sessionId: base.id,
-          sendId: send.id,
-          userId: policy.userId,
-          content: fields.text,
-          now,
-        });
-      } else {
-        const existing = fields.existingUser;
-        const replacement = this.deps.sessions.replaceSend(existing, send.id);
-        for (const sendId of replacement.removedSendIds) {
-          this.deps.usage.deleteSend(sendId);
-        }
-        user = replacement.user;
-        removedMessageIds = replacement.removedMessageIds;
-      }
-      const reply = this.deps.sessions.addReply({
-        id: fields.replyId,
-        sessionId: base.id,
-        sendId: send.id,
-        round: 1,
-        agentId: policy.agentId,
-        model: policy.model,
-        now,
-      });
-      const session = this.deps.sessions.touch(base.id, {
-        status: "running",
-        now,
-      })!;
-      return {
-        result: { session, user, reply, send },
-        events: [
-          envelope(
-            session,
-            [user, reply],
-            send,
-            removedMessageIds,
-            lastLine(user, policy.username),
-          ),
-        ],
-      };
-    });
+  startSend(fields: StartFields): Started {
+    return startSendRows(this.deps, fields);
   }
 
   delta(
@@ -257,14 +167,19 @@ export class Writer {
     });
   }
 
-  private newToolRows(send: ActiveSend, calls: ToolCall[], now: number) {
+  private newToolRows(
+    send: ActiveSend,
+    calls: ToolCall[],
+    now: number,
+    toolNames: string[] = calls.map((call) => call.name),
+  ) {
     return this.deps.sessions.addToolRows(
-      calls.map((call) => ({
+      calls.map((call, index) => ({
         sessionId: send.sessionId,
         sendId: send.id,
         round: send.roundNo,
         toolCallId: call.id,
-        toolName: call.name,
+        toolName: toolNames[index] ?? call.name,
         now,
       })),
     );
@@ -275,7 +190,10 @@ export class Writer {
   // send's counters bumped. One revision, one envelope with every row.
   // The launched tool rows are tracked on the send, by call id, so the
   // loop's finishTool and a terminal cleanup find them
-  finishRound(send: ActiveSend): { rows: Message[]; toolCalls: number } {
+  finishRound(
+    send: ActiveSend,
+    toolNames: string[] = send.round?.calls.map((call) => call.name) ?? [],
+  ): { rows: Message[]; toolCalls: number } {
     const round = send.round;
     if (round === null) return { rows: [], toolCalls: 0 };
     const now = this.deps.clock();
@@ -290,7 +208,7 @@ export class Writer {
         now,
       );
       this.recordUsage(send, round, now);
-      const rows = this.newToolRows(send, round.calls, now);
+      const rows = this.newToolRows(send, round.calls, now, toolNames);
       const sendRow = this.deps.sessions.bumpCounters(send.id, {
         rounds: send.roundNo,
         toolCalls: launched,

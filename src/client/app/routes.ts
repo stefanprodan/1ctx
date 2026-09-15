@@ -16,6 +16,7 @@ import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadAgentPage, loadPerson } from "../data/directory.ts";
+import { loadMcp } from "../data/mcp.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -282,6 +283,7 @@ export const ROUTES: Route[] = [
         loadProviders(),
         loadTools(),
         loadSkills(),
+        loadMcp(),
       ]);
     },
     nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
@@ -301,6 +303,14 @@ export const ROUTES: Route[] = [
     role: "admin",
     load: () => loadSkills(),
     nav: { label: "Skills", icon: "skill", order: 12, group: "Admin" },
+  },
+  {
+    path: "/admin/mcp",
+    view: lazy(() => import("../views/admin/Mcp.tsx").then((m) => m.Mcp)),
+    title: () => "MCP",
+    role: "admin",
+    load: () => loadMcp(),
+    nav: { label: "MCP", icon: "plug", order: 13, group: "Admin" },
   },
   {
     path: "/users/:username",

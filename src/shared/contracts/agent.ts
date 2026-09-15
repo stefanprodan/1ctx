@@ -6,7 +6,8 @@
 // picked, so a list shows the window and the prices without asking;
 // and the system prompt every session of it starts from.
 
-import type { Avatar, Effort } from "../words.ts";
+import type { Avatar, Effort, McpMode } from "../words.ts";
+import type { AgentServer } from "./mcp.ts";
 import type { CatalogMatch } from "./provider.ts";
 
 export type AgentSummary = {
@@ -23,5 +24,9 @@ export type AgentSummary = {
   prompt: string;
   // the ids of the skills it carries, in name order
   skills: string[];
+  // the MCP servers it may use, with the sides, in server name order
+  servers: AgentServer[];
+  // how its MCP tools reach the model; auto flips on the token cap
+  mcpMode: McpMode;
   createdAt: number;
 };

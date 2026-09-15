@@ -7,6 +7,7 @@
 
 import type { AgentResponse, AgentsResponse } from "../../shared/api/agents.ts";
 import type { ProjectAgentsResponse } from "../../shared/api/sessions.ts";
+import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -43,11 +44,16 @@ export type SkillsPort = {
   assign(agentId: string, ids: string[]): void;
 };
 
+export type McpPort = {
+  setAgentServers(agentId: string, rows: AgentServer[]): void;
+};
+
 export type RoutesDeps = {
   db: Db;
   store: AgentStore;
   providers: ProvidersPort;
   skills: SkillsPort;
+  mcp: McpPort;
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -55,12 +61,8 @@ export type RoutesDeps = {
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  // the body checked against the world: the provider is there, the
-  // catalog lists the model, and no other agent has the name
-  // the rows the body names, as they are right now: run before the
-  // catalog is asked, so a bad body costs no fetch, and again in the
-  // same turn as the write, since the world may have moved while the
-  // catalog answered
+  // the rows the body names are checked before the catalog fetch and
+  // again in the transaction, since the world may move while it waits
   const check = (body: ParsedAgent, except: string | null) => {
     const other = deps.store.byName(body.name);
     if (other && other.id !== except) {
@@ -101,6 +103,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         effort,
         prompt: body.prompt,
         skills: body.skills,
+        servers: body.servers,
+        mcpMode: body.mcpMode,
       };
     };
   };
@@ -129,6 +133,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const values = fields();
           const created = deps.store.create({ ...values, now: deps.clock() });
           deps.skills.assign(created.id, values.skills);
+          deps.mcp.setAgentServers(created.id, values.servers);
           return { result: deps.store.byId(created.id)! };
         });
         const body: AgentResponse = { agent: summary(agent) };
@@ -147,6 +152,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const saved = deps.store.update(agent.id, values);
           if (!saved) throw new NotFound("no such agent");
           deps.skills.assign(agent.id, values.skills);
+          deps.mcp.setAgentServers(agent.id, values.servers);
           return { result: deps.store.byId(agent.id)! };
         });
         const body: AgentResponse = { agent: summary(updated) };

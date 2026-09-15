@@ -40,7 +40,12 @@ const flash = {
   reasoning: true,
 };
 
-const defaults = { thinking: null, effort: null } as const;
+const defaults = {
+  thinking: null,
+  effort: null,
+  servers: [],
+  mcpMode: "auto",
+} as const;
 
 describe("parseAgent", () => {
   refuses(
@@ -81,6 +86,63 @@ describe("parseAgent", () => {
     expect(() => parseAgent({ ...body, thinking: "maybe" })).toThrow();
     expect(() => parseAgent({ ...body, effort: 1 })).toThrow();
   });
+
+  test("parses MCP servers and mode and refuses bad assignments", () => {
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: "p",
+      model: "m",
+      servers: [{ serverId: "s1", read: true, write: false }],
+      mcpMode: "catalog",
+    } as const;
+    expect(parseAgent(body)).toMatchObject({
+      servers: [{ serverId: "s1", read: true, write: false }],
+      mcpMode: "catalog",
+    });
+    expect(() =>
+      parseAgent({
+        ...body,
+        servers: [{ serverId: "s1", read: false, write: false }],
+      }),
+    ).toThrow("a server needs read or write");
+    expect(() =>
+      parseAgent({ ...body, servers: [...body.servers, ...body.servers] }),
+    ).toThrow("serverId must not repeat");
+    expect(() => parseAgent({ ...body, mcpMode: "sometimes" })).toThrow(
+      "mcpMode must be all, catalog or auto",
+    );
+    expect(() =>
+      parseAgent({
+        name: "coder",
+        providerId: "p",
+        model: "m",
+        thinking: null,
+        effort: null,
+        mcpMode: "auto",
+      }),
+    ).toThrow("servers must be an array");
+    expect(() =>
+      parseAgent({
+        name: "coder",
+        providerId: "p",
+        model: "m",
+        thinking: null,
+        effort: null,
+        servers: [],
+      }),
+    ).toThrow("mcpMode must be all, catalog or auto");
+    expect(() =>
+      parseAgent({
+        ...body,
+        servers: Array.from({ length: 51 }, (_, index) => ({
+          serverId: `s${index}`,
+          read: true,
+          write: false,
+        })),
+      }),
+    ).toThrow("an agent may have at most 50 MCP servers");
+  });
 });
 
 describe("the agents", () => {
@@ -117,6 +179,7 @@ describe("the agents", () => {
     const { app, client, provider } = await setup();
     const res = await client.call("POST", "/api/agents", {
       body: {
+        ...defaults,
         name: "coder",
         providerId: provider.id,
         model: flash.id,
@@ -138,11 +201,29 @@ describe("the agents", () => {
       effort: "xhigh",
       prompt: "You write Go.",
       skills: [],
+      servers: [],
+      mcpMode: "auto",
       createdAt: app.now.value,
     });
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({
       agents: [agent],
     });
+  });
+
+  test("an unknown MCP server rolls the agent save back", async () => {
+    const { app, client, provider } = await setup();
+    const res = await client.call("POST", "/api/agents", {
+      body: {
+        ...defaults,
+        name: "coder",
+        providerId: provider.id,
+        model: flash.id,
+        servers: [{ serverId: "missing", read: true, write: false }],
+      },
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("serverId is unknown");
+    expect(app.agents.list()).toEqual([]);
   });
 
   test("a model the catalog does not list, or a provider that is not there, is refused", async () => {
@@ -290,6 +371,47 @@ describe("the agents", () => {
     const [first, second] = await Promise.all([a, twin]);
     expect([first.status, second.status].sort()).toEqual([201, 409]);
     const { agent } = await (first.status === 201 ? first : second).json();
+    const server = app.mcp.create(
+      {
+        name: "cluster",
+        url: "http://cluster.test/mcp",
+        keyName: null,
+        read: true,
+        write: false,
+        instructionsOn: true,
+        timeoutMs: null,
+        readPatterns: ["*"],
+        writePatterns: [],
+        excludedPatterns: [],
+      },
+      {
+        serverName: "cluster",
+        serverVersion: "1",
+        protocolEra: "modern",
+        protocolVersion: "2026-07-28",
+        instructions: "",
+        fingerprint: "fingerprint",
+        checkedAt: app.now.value,
+        tools: [],
+      },
+    );
+    catalogs.forget(provider.id);
+    const vanished = client.call("POST", "/api/agents", {
+      body: {
+        ...body,
+        name: "vanished-server",
+        servers: [{ serverId: server.id, read: true, write: false }],
+      },
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(app.mcp.deleteUnreferenced(server.id)).toBe("deleted");
+    for (const g of gates) g();
+    const vanishedResponse = await vanished;
+    expect(vanishedResponse.status).toBe(400);
+    expect(await vanishedResponse.json()).toEqual({
+      error: "serverId is unknown",
+    });
+    expect(app.agents.byName("vanished-server")).toBeNull();
     // a PATCH whose agent goes while the catalog is asked
     catalogs.forget(provider.id);
     const patch = client.call("PATCH", `/api/agents/${agent.id}`, {

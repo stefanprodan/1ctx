@@ -83,6 +83,8 @@ const coder: AgentSummary = {
   effort: null,
   prompt: "",
   skills: [],
+  servers: [],
+  mcpMode: "auto",
   createdAt: 0,
 };
 
@@ -301,6 +303,7 @@ describe("the rail", () => {
       "/admin/agents",
       "/admin/tools",
       "/admin/skills",
+      "/admin/mcp",
     ]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });

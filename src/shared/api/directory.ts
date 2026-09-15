@@ -28,12 +28,31 @@ export type DirectoryTool = { name: string; provider: string | null };
 // loading every skill costs) and the tool schemas every request carries
 export type DirectoryTokens = { prompt: number; skills: number; tools: number };
 
+// an MCP server a send would offer the agent now: the sides the agent
+// may use, how many of its tools reach the model, when its list was
+// last discovered and when a refresh last failed since, if one did
+export type DirectoryMcpServer = {
+  name: string;
+  read: boolean;
+  write: boolean;
+  tools: number;
+  checkedAt: number;
+  refreshFailedAt: number | null;
+};
+
+// the agent's MCP: the offered servers and their lean schemas' count
+export type DirectoryMcp = {
+  servers: DirectoryMcpServer[];
+  tokens: number;
+};
+
 // GET /api/directory/agents/:name; the provider's name, the skills it
-// carries and the built-in tools a send would offer it now
+// carries, the built-in tools a send would offer it now, and its MCP
 export type DirectoryAgentResponse = {
   agent: AgentSummary;
   provider: string;
   skills: DirectorySkill[];
   tools: DirectoryTool[];
+  mcp: DirectoryMcp;
   tokens: DirectoryTokens;
 };

@@ -1,44 +1,47 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The built-in tools, datetime, webfetch and websearch, and
-// their server-wide settings: the switch on each and the search
-// provider, rows in the tools table an admin changes on the Tools page.
-// offered(now) answers the schemas the model gets, every enabled tool
-// and websearch only when a provider was chosen, and that provider for
-// the send's life; run(offered, call, ctx)
-// answers a call's result from that snapshot alone, so a tool switched
-// off mid-send is still run by a send that was offered it and a tool
-// the model names outside its set is a failed result. The runner holds
-// the snapshot on the policy and never a key: the key is read here from
-// the secrets port at each call, and every provider answers without one.
-// Anything that reaches a provider goes through
-// the fetcher compose option, so a test passes a fake and the suite
-// never reaches a network.
+// Built-ins, skills and MCP tools are resolved once for a send. The
+// runner keeps this snapshot and the area dispatches only through it.
 
 import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
+import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import type { ToolSummary } from "../../shared/contracts/tool.ts";
+import {
+  mcpCatalog,
+  type PromptServer,
+  promptSnapshot,
+  resolveMode,
+} from "../../shared/mcp.ts";
 import { catalog } from "../../shared/skills.ts";
 import {
   BUILTIN_TOOLS,
   type BuiltinTool,
+  type McpMode,
   type SearchProvider,
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
+import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
-import type { ChatTool, ToolCall } from "../providers/index.ts";
+import { tokens } from "../lib/tokens.ts";
+import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
+import { type ChatTool, type ToolCall, wireTools } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
 import {
   DEFAULT_TIMEZONE,
   datetimeTool,
   formatDatetime,
 } from "./builtin/datetime.ts";
+import {
+  makeMcpCatalogTools,
+  mcpCallName,
+  resolveMcpCall,
+} from "./builtin/mcp.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import {
   type FetchDependencies,
@@ -72,31 +75,27 @@ export type SkillsPort = SkillToolsPort & {
 
 export type ToolsDeps = {
   db: Db;
-  // what reaches a provider; a test passes a fake (the compose fetcher)
   fetcher: typeof fetch;
-  // the secrets port: the bare value or null. A search key is read here,
-  // never by the runner
   secret: (name: string) => string | null;
   clock: Clock;
   log: Log;
-  // the User-Agent the three request builders carry: 1ctx/<version>
   version: string;
-  // keeps Markdown parsing and highlighting at the server safety boundary
   render: (markdown: string, streaming: boolean) => string;
   skills: SkillsPort;
-  // test seams for the two network tools; production leaves them unset
+  mcp?: Pick<Mcp, "offered" | "call" | "validateArguments">;
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
 };
 
 export type Tools = {
-  // the schemas and the search provider chosen for the send, the
-  // {{year}} filled in UTC
-  offered(now: number, agentId: string): Offered;
-  // one call's result; a throw is turned into a failed result, never a
-  // rejection the runner must catch
+  offered(
+    now: number,
+    agentId: string,
+    agentServers?: AgentServer[],
+    mode?: McpMode,
+  ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
-  // the Tools page's routes; a test's seam may leave them out
+  toolName?(offered: Offered, call: ToolCall): string;
   routes?: RouteDescriptor[];
 };
 
@@ -105,9 +104,6 @@ export type ToolsArea = Tools & {
   routes: RouteDescriptor[];
 };
 
-// a description may carry {{year}}, filled at send time in UTC, the
-// zone of the prompt's date line: a model searching for "the latest" tends to write the year
-// its weights end in, so the year sits where the query is composed
 function fillYear(tools: ChatTool[], now: number): ChatTool[] {
   const year = formatDatetime(now, DEFAULT_TIMEZONE).datetime.slice(0, 4);
   return tools.map((tool) => ({
@@ -116,9 +112,55 @@ function fillYear(tools: ChatTool[], now: number): ChatTool[] {
   }));
 }
 
+function schema(tool: Tool): ChatTool {
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+  };
+}
+
+function promptServers(servers: OfferedServer[]): PromptServer[] {
+  return servers.map((server) => ({
+    name: server.name,
+    instructions: server.instructions,
+    tools: server.tools.map((tool) => ({
+      wireName: tool.wireName,
+      description: tool.description,
+      schemaJson: tool.schemaJson,
+    })),
+  }));
+}
+
+function directSchemas(servers: OfferedServer[]): ChatTool[] {
+  return servers.flatMap((server) =>
+    server.tools.map((tool) => ({
+      name: tool.wireName,
+      description: tool.description,
+      parameters: tool.wireInputSchema,
+    })),
+  );
+}
+
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
   const skillStore: SkillsPort = deps.skills;
+  const mcpService = deps.mcp ?? {
+    offered: () => ({
+      servers: [],
+      prompt: {
+        text: "",
+        included: [],
+        leftForSchemas: [],
+        leftForInstructions: [],
+        digest: {},
+      },
+    }),
+    async call() {
+      throw new Error("MCP is not configured");
+    },
+    validateArguments: () => null,
+  };
   const fetchDeps: FetchDependencies = deps.fetchDeps ?? {
     fetch: deps.fetcher,
   };
@@ -142,8 +184,6 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       }),
   };
 
-  // the three tools, websearch built for one provider; which of them a
-  // send gets is decided by the rows in offered()
   const toolsFor = (search: SearchProvider): Tool[] => [
     datetimeTool,
     makeWebfetchTool(deps.version, fetchDeps),
@@ -155,23 +195,39 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     ),
   ];
 
-  // what the Tools page shows: the schema text as the model gets it,
-  // read-only, with the switch and whether each key file is there; the
-  // key's value never rides
+  const mcpTools = (servers: OfferedServer[], ctx: ToolContext): Tool[] =>
+    servers.flatMap((server) =>
+      server.tools.map((tool: OfferedMcpTool) => {
+        const timeoutMs = server.timeoutMs ?? ctx.caps.callTimeoutMs;
+        return {
+          name: tool.wireName,
+          description: tool.description,
+          parameters: tool.wireInputSchema,
+          timeoutMs,
+          run: (args: Record<string, unknown>, runCtx: ToolContext) =>
+            mcpService.call(server, tool, args, {
+              signal: runCtx.signal,
+              timeoutMs,
+              bodyBytes: runCtx.caps.fetchBodyBytes,
+            }),
+        };
+      }),
+    );
+
   const response = (now: number): ToolsResponse => {
     const rows = new Map(store.rows().map((row) => [row.name, row]));
     const selected = rows.get("websearch")?.provider ?? "exa";
     const schemas = new Map(
       fillYear(toolsFor(selected), now).map((tool) => [tool.name, tool]),
     );
-    const tools: ToolSummary[] = BUILTIN_TOOLS.map((name) => {
+    const tools = BUILTIN_TOOLS.map((name): ToolsResponse["tools"][number] => {
       const row = rows.get(name)!;
-      const schema = schemas.get(name)!;
-      const json = JSON.stringify(schema.parameters, null, 2);
+      const tool = schemas.get(name)!;
+      const json = JSON.stringify(tool.parameters, null, 2);
       return {
         name,
-        description: schema.description,
-        parameters: schema.parameters,
+        description: tool.description,
+        parameters: tool.parameters,
         parametersHtml: deps.render(`\`\`\`json\n${json}\n\`\`\``, false),
         enabled: row.enabled,
         updatedAt: row.updatedAt,
@@ -207,11 +263,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const area: ToolsArea = {
     store,
     routes: [],
-    offered(now, agentId) {
+    offered(now, agentId, agentServers = [], requestedMode = "auto") {
       const rows = new Map(store.rows().map((row) => [row.name, row]));
       const searchRow = rows.get("websearch")!;
-      // the chosen provider, key or not: each answers keyless, so the
-      // key file only raises the rate
       const search =
         searchRow.enabled && searchRow.provider !== null
           ? searchRow.provider
@@ -225,31 +279,92 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       for (const name of skillCatalog.leftOut) {
         deps.log(`skill ${name} left out of the catalog`);
       }
-      const skillOffer = {
+      const skills = {
         block: skillCatalog.text,
         skills: skillCatalog.included,
       };
-      const schemas: ChatTool[] = [
-        ...toolsFor(search ?? "exa").filter((tool) =>
-          allowed.has(tool.name as BuiltinTool),
-        ),
-        ...makeSkillTools(skillOffer.skills, skillStore),
-      ].map(({ name, description, parameters }) => ({
-        name,
-        description,
-        parameters,
-      }));
-      return { tools: fillYear(schemas, now), search, skills: skillOffer };
+      const baseTools = fillYear(
+        [
+          ...toolsFor(search ?? "exa").filter((tool) =>
+            allowed.has(tool.name as BuiltinTool),
+          ),
+          ...makeSkillTools(skills.skills, skillStore),
+        ].map(schema),
+        now,
+      );
+      const offered = mcpService.offered(agentServers);
+      let mcp = offered.servers;
+      let mcpPrompt = {
+        text: offered.prompt.text,
+        digest: offered.prompt.digest,
+      };
+      let mcpCatalogText = "";
+      const allSchemas = directSchemas(mcp);
+      const schemaTokens = tokens(JSON.stringify(wireTools(allSchemas)));
+      const mode = resolveMode(requestedMode, schemaTokens);
+      let mcpSchemas = allSchemas;
+      if (mode === "catalog" && mcp.length > 0) {
+        const catalogOffer = mcpCatalog(promptServers(mcp));
+        for (const name of catalogOffer.leftOut) {
+          deps.log(
+            `server ${name} left out: its catalog is over the prompt cap`,
+          );
+        }
+        const included = new Set(catalogOffer.included);
+        mcp = mcp.filter((server) => included.has(server.name));
+        if (mcp.length !== offered.servers.length) {
+          const snapshot = promptSnapshot(promptServers(mcp), sha256);
+          mcpPrompt = { text: snapshot.text, digest: snapshot.digest };
+        }
+        mcpCatalogText = catalogOffer.text;
+        mcpSchemas = makeMcpCatalogTools(mcp).map(schema);
+      }
+      return {
+        tools: [...baseTools, ...mcpSchemas],
+        search,
+        skills,
+        mcp,
+        mcpPrompt,
+        mcpCatalog: mcpCatalogText,
+      };
     },
-    run(offered, call, ctx) {
+    toolName(offered, call) {
+      return mcpCallName(offered.mcp, call) ?? call.name;
+    },
+    async run(offered, call, ctx) {
       const allowed = new Set(offered.tools.map((tool) => tool.name));
-      const tools = [
+      const base = [
         ...toolsFor(offered.search ?? "exa").filter((tool) =>
           allowed.has(tool.name),
         ),
         ...makeSkillTools(offered.skills.skills, skillStore),
       ];
-      return new Registry(tools).run(call, ctx);
+      const direct = mcpTools(offered.mcp, ctx);
+      if (call.name === "mcp_call" && allowed.has("mcp_call")) {
+        try {
+          const target = resolveMcpCall(
+            offered.mcp,
+            call,
+            mcpService.validateArguments,
+          );
+          return new Registry([...base, ...direct]).run(target, ctx);
+        } catch (error) {
+          const failed: Tool = {
+            name: "mcp_call",
+            description: "",
+            parameters: {},
+            async run() {
+              throw error;
+            },
+          };
+          return new Registry([failed]).run({ ...call, arguments: "{}" }, ctx);
+        }
+      }
+      const runtime =
+        offered.mcpCatalog === ""
+          ? [...base, ...direct]
+          : [...base, ...makeMcpCatalogTools(offered.mcp)];
+      return new Registry(runtime).run(call, ctx);
     },
   };
   area.routes = routes({ clock: deps.clock, response, patch });

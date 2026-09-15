@@ -6,7 +6,7 @@
 // them later; mounted mode is a Kubernetes Secret and read-only. Nothing
 // here logs or returns a value to a route; a holder reads what it needs.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 export type SecretsMode = "local" | "mounted";
@@ -18,6 +18,9 @@ export type Secrets = {
   // file is absent or empty
   read(name: string): string | null;
   has(name: string): boolean;
+  // the names of the key files starting with the prefix, sorted; the
+  // names alone, so a page can offer a pick without a value crossing
+  list(prefix: string): string[];
 };
 
 // ../secrets next to the binary; .preview/secrets when run from source
@@ -44,6 +47,16 @@ export function secrets(dir: string, mode: SecretsMode): Secrets {
     },
     has(name) {
       return existsSync(pathOf(name));
+    },
+    list(prefix) {
+      if (!existsSync(dir)) return [];
+      return readdirSync(dir)
+        .filter((file) => file.endsWith(".key"))
+        .map((file) => file.slice(0, -".key".length))
+        .filter(
+          (name) => name.startsWith(prefix) && /^[a-z][a-z0-9-]*$/.test(name),
+        )
+        .sort();
     },
   };
 }

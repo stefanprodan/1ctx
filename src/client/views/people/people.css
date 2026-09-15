@@ -160,4 +160,7 @@
       display: block;
     }
   }
+  .people-bad {
+    color: var(--failed);
+  }
 }
