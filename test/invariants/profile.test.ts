@@ -22,6 +22,7 @@ describe("GET /api/profile", () => {
         username: "admin",
         fullName: "Administrator",
         email: "admin@1ctx.dev",
+        tz: "UTC",
         about: "",
         role: "admin",
         createdAt: app.now.value,
@@ -33,18 +34,24 @@ describe("GET /api/profile", () => {
 });
 
 describe("PATCH /api/profile", () => {
-  test("changes the full name and the about text, and me follows", async () => {
+  test("changes the full name, the about text and the zone, and me follows", async () => {
     const app = await testApp();
     const client = app.client();
     await client.login("admin", "hunter2-test");
     const res = await client.call("PATCH", "/api/profile", {
-      body: { fullName: "Oana Mangiurea", about: "Actor." },
+      body: {
+        fullName: "Oana Mangiurea",
+        about: "Actor.",
+        tz: "Europe/Bucharest",
+      },
     });
     expect(res.status).toBe(200);
     const { user } = await res.json();
     expect(user.fullName).toBe("Oana Mangiurea");
     expect(user.about).toBe("Actor.");
     expect(app.users.byUsername("admin")?.about).toBe("Actor.");
+    expect(user.tz).toBe("Europe/Bucharest");
+    expect(app.users.byUsername("admin")?.tz).toBe("Europe/Bucharest");
     const me = await (await client.call("GET", "/api/me")).json();
     expect(me.user.fullName).toBe("Oana Mangiurea");
     expect(me.user.about).toBeUndefined();
@@ -56,7 +63,7 @@ describe("PATCH /api/profile", () => {
     const client = app.client();
     await client.login("admin", "hunter2-test");
     const res = await client.call("PATCH", "/api/profile", {
-      body: { fullName: "  ", about: "" },
+      body: { fullName: "  ", about: "", tz: "UTC" },
     });
     expect(res.status).toBe(400);
     expect(app.users.byUsername("admin")?.fullName).toBe("Administrator");

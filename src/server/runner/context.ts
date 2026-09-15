@@ -160,6 +160,7 @@ export function history(
     | "projectDescription"
     | "fullName"
     | "about"
+    | "tz"
     | "username"
     | "userId"
     | "automation"

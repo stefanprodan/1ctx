@@ -54,6 +54,7 @@ const admin: Me = {
 const root: UserAccount = {
   ...admin,
   email: "admin@1ctx.dev",
+  tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
 };
@@ -63,6 +64,7 @@ const caelea: UserAccount = {
   fullName: "Oana Mangiurea",
   role: "member",
   email: "caelea@example.com",
+  tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: false,

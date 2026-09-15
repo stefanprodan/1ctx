@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// New user: the username, the full name, the email, the role and the
-// password, typed twice, which the admin hands over. An existing
+// New user: the username, the full name, the email, the time zone, the
+// role and the password, typed twice, which the admin hands over. An existing
 // user opens the same fields without the password; under them, a
 // section resets the password, which signs the person out everywhere.
 // The admin's own row has no role choice and no reset: the profile
@@ -16,6 +16,7 @@ import { me } from "../../data/me.ts";
 import { createUser, resetPassword, updateUser } from "../../data/users.ts";
 import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
+import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   disableLock,
   emailProblem,
@@ -24,6 +25,7 @@ import {
   patchOf,
   ROLE_CHOICES,
   roleLock,
+  tzProblem,
   usernameProblem,
 } from "./Users.model.ts";
 import "./users.css";
@@ -179,6 +181,7 @@ export function UserForm({
   const fullName = useSignal(user?.fullName ?? "");
   const email = useSignal(user?.email ?? "");
   const role = useSignal<Role>(user?.role ?? "member");
+  const tz = useSignal(user?.tz ?? "");
   const password = useSignal("");
   const again = useSignal("");
   const lock = user === null ? null : roleLock(user, meId, admins);
@@ -190,6 +193,7 @@ export function UserForm({
         fullName: fullName.value.trim(),
         email: email.value.trim().toLowerCase(),
         role: role.value,
+        tz: tz.value,
         password: password.value,
       });
       onDone();
@@ -200,6 +204,7 @@ export function UserForm({
       fullName: fullName.value,
       email: email.value,
       role: role.value,
+      tz: tz.value,
     });
     if (body !== null) await updateUser(saved.id, body);
   });
@@ -216,6 +221,7 @@ export function UserForm({
           fullName: fullName.value,
           email: email.value,
           role: role.value,
+          tz: tz.value,
         }) !== null;
   const submit = (event: Event) => {
     event.preventDefault();
@@ -223,6 +229,7 @@ export function UserForm({
       usernameProblem(username.value) ??
         fullNameProblem(fullName.value) ??
         emailProblem(email.value) ??
+        tzProblem(tz.value) ??
         (user === null
           ? newPasswordProblem(password.value, again.value)
           : null),
@@ -258,7 +265,7 @@ export function UserForm({
               onInput={bind(fullName)}
             />
           </label>
-          <label class="field users-field-wide">
+          <label class="field">
             <span class="label label-required">Email</span>
             <input
               name="email"
@@ -271,6 +278,18 @@ export function UserForm({
               onInput={bind(email)}
             />
           </label>
+          <div class="field">
+            <span class="label label-required">Time zone</span>
+            <ZoneSelect
+              value={tz.value}
+              disabled={busy}
+              placeholder="Pick a zone"
+              onChange={(next) => {
+                tz.value = next;
+                save.touch();
+              }}
+            />
+          </div>
           {(user === null || user.id !== meId) && (
             <RolePick
               value={role.value}

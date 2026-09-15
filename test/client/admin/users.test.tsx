@@ -46,6 +46,7 @@ const root: UserAccount = {
   fullName: "Stefan Prodan",
   role: "admin",
   email: "admin@1ctx.dev",
+  tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
   mustChangePassword: false,
@@ -56,6 +57,7 @@ const caelea: UserAccount = {
   fullName: "Oana Mangiurea",
   role: "member",
   email: "caelea@example.com",
+  tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: true,
@@ -152,6 +154,7 @@ describe("the checks", () => {
         fullName: "Oana Mangiurea",
         email: "caelea@example.com",
         role: "member",
+        tz: "Europe/Bucharest",
       }),
     ).toBeNull();
     expect(
@@ -160,6 +163,7 @@ describe("the checks", () => {
         fullName: "Oana Mangiurea",
         email: "Caelea@Example.com",
         role: "admin",
+        tz: "Europe/Bucharest",
       }),
     ).toEqual({ username: "oana2", role: "admin" });
     expect(
@@ -168,8 +172,9 @@ describe("the checks", () => {
         fullName: "Oana",
         email: "o@example.com",
         role: "member",
+        tz: "Asia/Tokyo",
       }),
-    ).toEqual({ fullName: "Oana", email: "o@example.com" });
+    ).toEqual({ fullName: "Oana", email: "o@example.com", tz: "Asia/Tokyo" });
   });
 });
 
@@ -190,6 +195,7 @@ describe("the entity", () => {
       fullName: "Oana Mangiurea",
       email: "caelea@example.com",
       role: "member",
+      tz: "Europe/Bucharest",
       password: "longenough",
     });
     expect(users.value).toEqual([root, caelea]);

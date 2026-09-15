@@ -213,6 +213,20 @@ export const PREVIEW_FIRES = 5;
 // zone; the server parses both and its 400 is the rule's only words
 export const MAX_SCHEDULE = 100;
 export const MAX_TZ = 64;
+// the zone a user starts in when nobody picked one
+export const DEFAULT_TZ = "UTC";
+// an IANA zone the runtime knows, links such as UTC included
+export function isTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || value === "" || value.length > MAX_TZ) {
+    return false;
+  }
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 // how long an automation's runs are kept, in days
 export const RETENTION_DAYS = { min: 1, max: 365, default: 30 } as const;
 

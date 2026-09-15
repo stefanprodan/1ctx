@@ -17,6 +17,7 @@ import {
 import { me } from "../../../src/client/data/me.ts";
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
+import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
 import {
   canChange,
   type Draft,
@@ -34,7 +35,6 @@ import {
   scheduleWords,
   sourceText,
   suspendedText,
-  zoneOptions,
 } from "../../../src/client/views/projects/Automations.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";

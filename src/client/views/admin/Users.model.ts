@@ -5,6 +5,7 @@
 // an empty field, a malformed email and a mistyped password, caught
 // without a round trip. The username rule is the server's alone.
 
+import type { UpdateUserRequest } from "../../../shared/api/users.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import {
   isEmail,
@@ -43,6 +44,11 @@ export function emailProblem(value: string): string | null {
     return `Keep it under ${MAX_EMAIL} characters`;
   if (!isEmail(trimmed.toLowerCase())) return "Not an email address";
   return null;
+}
+
+// a new user's zone is picked, never guessed from the admin's browser
+export function tzProblem(value: string): string | null {
+  return value === "" ? "Pick a time zone" : null;
 }
 
 // a first password, or a reset: typed twice, since nobody sees it
@@ -116,19 +122,15 @@ export function adminCount(users: UserAccount[]): number {
 // and null when nothing did
 export function patchOf(
   user: UserAccount,
-  fields: { username: string; fullName: string; email: string; role: Role },
-): {
-  username?: string;
-  fullName?: string;
-  email?: string;
-  role?: Role;
-} | null {
-  const body: {
-    username?: string;
-    fullName?: string;
-    email?: string;
-    role?: Role;
-  } = {};
+  fields: {
+    username: string;
+    fullName: string;
+    email: string;
+    role: Role;
+    tz: string;
+  },
+): UpdateUserRequest | null {
+  const body: UpdateUserRequest = {};
   const username = fields.username.trim();
   const fullName = fields.fullName.trim();
   const email = fields.email.trim().toLowerCase();
@@ -136,5 +138,6 @@ export function patchOf(
   if (fullName !== user.fullName) body.fullName = fullName;
   if (email !== user.email) body.email = email;
   if (fields.role !== user.role) body.role = fields.role;
+  if (fields.tz !== user.tz) body.tz = fields.tz;
   return Object.keys(body).length === 0 ? null : body;
 }

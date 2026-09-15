@@ -8,13 +8,14 @@
 // shapes teach cron rather than hide it.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { MAX_SCHEDULE } from "../../../shared/words.ts";
 import { loadPreview, preview, previewKey } from "../../data/automations.ts";
 import { until } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { Select } from "../../ui/Select.tsx";
-import { scheduleTitle, zoneOptions } from "./Automations.model.ts";
+import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
+import { scheduleTitle } from "./Automations.model.ts";
 import {
   type Builder,
   builderOf,
@@ -26,16 +27,6 @@ import {
   switchEvery,
   WEEK,
 } from "./Schedule.model.ts";
-
-// the zones the runtime knows; the server also takes the links this
-// list leaves out
-const ZONES: string[] = (() => {
-  try {
-    return Intl.supportedValuesOf("timeZone");
-  } catch {
-    return [];
-  }
-})();
 
 // the preview waits for the typing to pause
 const PREVIEW_WAIT_MS = 300;
@@ -87,7 +78,6 @@ export function ScheduleField({
   if (held?.fires) last.current = held.fires;
   if (held?.problem || expression === "") last.current = null;
   const fires = held?.fires ?? last.current;
-  const zones = useMemo(() => zoneOptions(ZONES, tz, now), [tz]);
   const time = (
     <label class="field automations-time">
       <span class="label">At</span>
@@ -229,14 +219,7 @@ export function ScheduleField({
         )}
         <div class="field automations-zone">
           <span class="label">Time zone</span>
-          <Select
-            label="Time zone"
-            value={tz}
-            options={zones}
-            disabled={disabled}
-            search
-            onChange={onTz}
-          />
+          <ZoneSelect value={tz} disabled={disabled} onChange={onTz} />
         </div>
       </div>
       <div class="automations-readback" aria-live="polite">

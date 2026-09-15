@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The signed-in user's own page: read it, change the full name and the
-// about text, change the password. A password change proves the current
+// The signed-in user's own page: read it, change the full name, the
+// about text and the time zone, change the password. A password change proves the current
 // one first, then revokes every other login of the user, so a stolen
 // cookie dies with the old password while the tab that changed it stays
 // signed in. The proof is rate limited per user, since a signed-in thief
@@ -33,6 +33,7 @@ export const PASSWORD_WINDOW_MS = 60 * 1000;
 export type UsersPort = {
   byId(id: string): UserRow | null;
   setDetails(id: string, fields: { fullName: string; about: string }): void;
+  setTz(id: string, tz: string): void;
   setPasswordHash(id: string, hash: string): void;
   setMustChangePassword(id: string, required: boolean): void;
 };
@@ -75,7 +76,11 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
         const details = parseProfile(await jsonBody(req));
         const id = ctx.principal!.userId;
         const user = transact(deps.db, () => {
-          deps.users.setDetails(id, details);
+          deps.users.setDetails(id, {
+            fullName: details.fullName,
+            about: details.about,
+          });
+          deps.users.setTz(id, details.tz);
           return { result: self(id) };
         });
         const body: ProfileResponse = { user: profile(user) };

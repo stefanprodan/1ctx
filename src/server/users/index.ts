@@ -32,6 +32,8 @@ export type UserFields = {
   fullName: string;
   email: string;
   role: Role;
+  // UTC when left out: the first admin, whose zone nobody typed
+  tz?: string;
   passwordHash: string;
   mustChangePassword: boolean;
   now: number;
@@ -136,6 +138,7 @@ export type Users = {
   setUsername(id: string, username: string): void;
   setEmail(id: string, email: string): void;
   setRole(id: string, role: Role): void;
+  setTz(id: string, tz: string): void;
   setDisabled(id: string, disabled: boolean): void;
   setMustChangePassword(id: string, required: boolean): void;
   setPasswordHash(id: string, hash: string): void;
@@ -159,6 +162,7 @@ export function usersArea(deps: UsersDeps): Users {
     setUsername: (id, username) => store.setUsername(id, username),
     setEmail: (id, email) => store.setEmail(id, email),
     setRole: (id, role) => store.setRole(id, role),
+    setTz: (id, tz) => store.setTz(id, tz),
     setDisabled: (id, disabled) => store.setDisabled(id, disabled),
     setMustChangePassword: (id, required) =>
       store.setMustChangePassword(id, required),

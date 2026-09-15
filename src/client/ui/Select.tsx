@@ -166,6 +166,7 @@ export function Select({
               <input
                 ref={box}
                 class="select-input"
+                name="search"
                 type="text"
                 role="combobox"
                 aria-label={`Search ${label.toLowerCase()}`}

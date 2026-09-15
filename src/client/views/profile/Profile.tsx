@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The profile: who the user is on one line, then two sections down one
-// column, a heading on the left and the form on the right: the name
-// with the about text, and the password. The username is shown, not
+// column, a heading on the left and the form on the right: the name,
+// the time zone and the about text, and the password. The username is shown, not
 // edited; an admin changes it. A Save wakes when something changed,
 // says Saved for a moment, and a refusal stays beside it until the
 // next edit; lib/save.ts holds that.
@@ -21,6 +21,7 @@ import { useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
+import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   aboutProblem,
   fullNameProblem,
@@ -31,8 +32,13 @@ import "./profile.css";
 function DetailsForm({ user }: { user: ProfileRow }) {
   const fullName = useSignal(user.fullName);
   const about = useSignal(user.about);
+  const tz = useSignal(user.tz);
   const save = useSave(() =>
-    saveProfile({ fullName: fullName.value.trim(), about: about.value }),
+    saveProfile({
+      fullName: fullName.value.trim(),
+      about: about.value,
+      tz: tz.value,
+    }),
   );
   const submit = (event: Event) => {
     event.preventDefault();
@@ -52,6 +58,16 @@ function DetailsForm({ user }: { user: ProfileRow }) {
           }}
         />
       </label>
+      <div class="field">
+        <span class="label">Time zone</span>
+        <ZoneSelect
+          value={tz.value}
+          onChange={(next) => {
+            tz.value = next;
+            save.touch();
+          }}
+        />
+      </div>
       <label class="field">
         <span class="label">About</span>
         <textarea
@@ -68,7 +84,9 @@ function DetailsForm({ user }: { user: ProfileRow }) {
       <Foot
         status={save.status.value}
         dirty={
-          fullName.value.trim() !== user.fullName || about.value !== user.about
+          fullName.value.trim() !== user.fullName ||
+          about.value !== user.about ||
+          tz.value !== user.tz
         }
         label="Save"
       />

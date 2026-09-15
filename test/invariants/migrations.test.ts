@@ -311,6 +311,7 @@ describe("additive migrations", () => {
       "0004-run-source",
       "0005-suspended-by",
       "0006-skills",
+      "0007-user-tz",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -350,7 +351,11 @@ describe("0005", () => {
         values ('au5', 'p5', 'u5', 'a5', 'daily', 'check', '0 9 * * *',
                 'UTC', 30, 7, null, 0, 0);
     `);
-    expect(migrate(db)).toEqual(["0005-suspended-by", "0006-skills"]);
+    expect(migrate(db)).toEqual([
+      "0005-suspended-by",
+      "0006-skills",
+      "0007-user-tz",
+    ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
     ).toEqual({ suspended_at: 7, suspended_by: null });
@@ -401,6 +406,7 @@ describe("rebuild migrations", () => {
       "0004-run-source",
       "0005-suspended-by",
       "0006-skills",
+      "0007-user-tz",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -483,7 +489,7 @@ describe("0006 skills migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a6', 'agent6', 'pr6', 'm', 'Model', 0);
     `);
-    expect(migrate(db)).toEqual(["0006-skills"]);
+    expect(migrate(db)).toEqual(["0006-skills", "0007-user-tz"]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
     });
@@ -511,6 +517,24 @@ describe("0006 skills migration", () => {
       n: 0,
     });
     expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+});
+
+describe("0007 user tz migration", () => {
+  test("puts every existing user in UTC", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 6));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+        values ('u7', 'user7', 'User', 'u7@example.com', 'member', 'h', 0);
+    `);
+    expect(migrate(db)).toEqual(["0007-user-tz"]);
+    expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
+      tz: "UTC",
+    });
     db.close();
   });
 });

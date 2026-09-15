@@ -146,7 +146,12 @@ violation, and every rule has a rejected fixture under
   `admin@1ctx.dev` as its email. Every user has an email, unique and
   lowercased; an admin sets it with the username and the role on
   `/admin/users` (the routes in `access/users.ts`, since a reset needs
-  the login store), and the profile shows it. A reset deletes every
+  the login store), and the profile shows it. Every user has a time
+  zone, `tz`, an IANA zone by `isTimeZone` in `shared/words.ts`: an
+  admin picks it when creating the user (required, never guessed) and
+  may change it, the user changes it on the profile, and the first
+  admin starts in `UTC`. The prompt's user line names it, so the
+  model asks the `datetime` tool in it. A reset deletes every
   login of the user; a role change publishes `access.changed`; the
   admin's own row, and the last enabled admin, are 409s to demote,
   disable or reset. A disabled user gets the login's 401, no
@@ -460,7 +465,7 @@ violation, and every rule has a rejected fixture under
   `ScheduleField.tsx` from the shapes in `Schedule.model.ts` (cron typed
   by hand for any other) and read back through the preview route as
   the next run, the
-  zone is `ui/Select.tsx` with search, and the deadline starts at the
+  zone is `ui/ZoneSelect.tsx`, and the deadline starts at the
   limit, which `GET /api/projects/:id/automations` answers beside the
   rows. `data/automations.ts` keeps the list, the runs and the tally
   current from the frames. A run's chat page names its automation over

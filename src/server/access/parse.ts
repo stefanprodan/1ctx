@@ -20,6 +20,7 @@ import {
   isEmail,
   isFullName,
   isRole,
+  isTimeZone,
   isUsername,
   MAX_ABOUT,
   MAX_EMAIL,
@@ -102,9 +103,20 @@ export function parseAbout(value: unknown): string {
   return value;
 }
 
+export function parseTz(value: unknown): string {
+  if (!isTimeZone(value)) {
+    throw new BadRequest("time zone must be an IANA zone name");
+  }
+  return value;
+}
+
 export function parseProfile(body: unknown): UpdateProfileRequest {
-  const b = fields(body, ["fullName", "about"]);
-  return { fullName: parseFullName(b.fullName), about: parseAbout(b.about) };
+  const b = fields(body, ["fullName", "about", "tz"]);
+  return {
+    fullName: parseFullName(b.fullName),
+    about: parseAbout(b.about),
+    tz: parseTz(b.tz),
+  };
 }
 
 export function parsePasswordChange(body: unknown): ChangePasswordRequest {
@@ -116,23 +128,39 @@ export function parsePasswordChange(body: unknown): ChangePasswordRequest {
 }
 
 export function parseNewUser(body: unknown): CreateUserRequest {
-  const b = fields(body, ["username", "fullName", "email", "role", "password"]);
+  const b = fields(body, [
+    "username",
+    "fullName",
+    "email",
+    "role",
+    "tz",
+    "password",
+  ]);
   if (!isRole(b.role)) throw new BadRequest("role must be admin or member");
   return {
     username: parseUsername(b.username),
     fullName: parseFullName(b.fullName),
     email: parseEmail(b.email),
     role: b.role,
+    tz: parseTz(b.tz),
     password: password(b.password, "password", MIN_PASSWORD),
   };
 }
 
 export function parseUserPatch(body: unknown): UpdateUserRequest {
-  const b = fields(body, ["username", "fullName", "email", "role", "disabled"]);
+  const b = fields(body, [
+    "username",
+    "fullName",
+    "email",
+    "role",
+    "tz",
+    "disabled",
+  ]);
   const patch: UpdateUserRequest = {};
   if (b.username !== undefined) patch.username = parseUsername(b.username);
   if (b.fullName !== undefined) patch.fullName = parseFullName(b.fullName);
   if (b.email !== undefined) patch.email = parseEmail(b.email);
+  if (b.tz !== undefined) patch.tz = parseTz(b.tz);
   if (b.role !== undefined) {
     if (!isRole(b.role)) throw new BadRequest("role must be admin or member");
     patch.role = b.role;

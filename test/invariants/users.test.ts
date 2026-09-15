@@ -29,6 +29,7 @@ const userBody = (username: string) => ({
       : `${username[0].toUpperCase()}${username.slice(1)}`,
   email: `${username}@example.com`,
   role: "member" as const,
+  tz: "Europe/Bucharest",
   password: "longenough",
 });
 
@@ -113,6 +114,28 @@ describe("admin users", () => {
     expect(user.email).toBe("caelea@example.com");
     expect(app.users.byId(user.id)?.email).toBe("caelea@example.com");
     expect(app.projects.personal(user.id)?.name).toBe("personal");
+  });
+
+  test("a user is made in the zone the admin picked, and the admin moves it", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const missing = { ...userBody("caelea"), tz: undefined };
+    expect(
+      (await client.call("POST", "/api/users", { body: missing })).status,
+    ).toBe(400);
+    const user = await create(client, "caelea");
+    expect(app.users.byId(user.id)?.tz).toBe("Europe/Bucharest");
+    const moved = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: { tz: "Asia/Tokyo" },
+    });
+    expect(moved.status).toBe(200);
+    expect((await moved.json()).user.tz).toBe("Asia/Tokyo");
+    const bad = await client.call("PATCH", `/api/users/${user.id}`, {
+      body: { tz: "Mars/Olympus" },
+    });
+    expect(bad.status).toBe(400);
+    expect(app.users.byId(user.id)?.tz).toBe("Asia/Tokyo");
+    expect(app.users.byUsername("admin")?.tz).toBe("UTC");
   });
 
   test("create rolls the user back when its personal project fails", async () => {

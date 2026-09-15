@@ -49,6 +49,8 @@ export type SendPolicy = {
   username: string;
   fullName: string;
   about: string;
+  // the user's zone, so the model asks the datetime tool in it
+  tz: string;
   agentId: string;
   agentName: string;
   providerId: string;
@@ -106,6 +108,7 @@ export function buildPolicy(input: {
     username: user.username,
     fullName: user.fullName,
     about: user.about,
+    tz: user.tz,
     agentId: agent.id,
     agentName: agent.name,
     providerId: agent.providerId,
