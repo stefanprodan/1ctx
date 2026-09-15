@@ -154,28 +154,31 @@ afterEach(() => {
 });
 
 describe("the limit words and units", () => {
-  test("every name has its words", () => {
+  test.serial("every name has its words", () => {
     for (const name of LIMIT_NAMES) {
       expect(LIMIT_WORDS[name].label).not.toBe("");
       expect(LIMIT_WORDS[name].text).not.toBe("");
     }
   });
 
-  test("a millisecond cap is typed in seconds, bytes in KB or MB", () => {
-    expect(displayOf(rounds)).toEqual({ word: "", factor: 1 });
-    expect(displayOf(toolMs).word).toBe("s");
-    expect(displayOf(resultBytes).word).toBe("MB");
-    expect(displayOf(searchBody).word).toBe("MB");
-    expect(displayOf(cut).word).toBe("chars");
-    expect(displayOf(reserve)).toEqual({ word: "tokens", factor: 1 });
-    expect(show(toolMs, 600_000)).toBe("600");
-    expect(show(timeout, 1500)).toBe("1.5");
-    expect(show(resultBytes, 2 * 1024 * 1024)).toBe("2");
-    expect(show(searchBody, 512 * 1024)).toBe("0.5");
-    expect(show(rounds, 10)).toBe("10");
-  });
+  test.serial(
+    "a millisecond cap is typed in seconds, bytes in KB or MB",
+    () => {
+      expect(displayOf(rounds)).toEqual({ word: "", factor: 1 });
+      expect(displayOf(toolMs).word).toBe("s");
+      expect(displayOf(resultBytes).word).toBe("MB");
+      expect(displayOf(searchBody).word).toBe("MB");
+      expect(displayOf(cut).word).toBe("chars");
+      expect(displayOf(reserve)).toEqual({ word: "tokens", factor: 1 });
+      expect(show(toolMs, 600_000)).toBe("600");
+      expect(show(timeout, 1500)).toBe("1.5");
+      expect(show(resultBytes, 2 * 1024 * 1024)).toBe("2");
+      expect(show(searchBody, 512 * 1024)).toBe("0.5");
+      expect(show(rounds, 10)).toBe("10");
+    },
+  );
 
-  test("what is typed comes back whole in the runner's units", () => {
+  test.serial("what is typed comes back whole in the runner's units", () => {
     expect(read(toolMs, "0.5")).toBe(500);
     expect(read(resultBytes, "1.5")).toBe(1_572_864);
     expect(read(rounds, " 12 ")).toBe(12);
@@ -188,7 +191,7 @@ describe("the limit words and units", () => {
     expect(read(rounds, "-1")).toBeNull();
   });
 
-  test("the range check speaks the page's unit", () => {
+  test.serial("the range check speaks the page's unit", () => {
     expect(problem(rounds, "0")).toBe("Rounds is 1 to 50");
     expect(problem(toolMs, "5")).toBe("Tool time is 10 to 3600 s");
     expect(problem(resultBytes, "64")).toBe("Result bytes is 0.0625 to 32 MB");
@@ -196,7 +199,7 @@ describe("the limit words and units", () => {
     expect(problem(rounds, "50")).toBeNull();
   });
 
-  test("the draft, what a Save collects and what is dirty", () => {
+  test.serial("the draft, what a Save collects and what is dirty", () => {
     const draft = draftOf(rows);
     expect(draft.toolMs).toBe("600");
     expect(draft.callTimeoutMs).toBe("1.5");
@@ -223,7 +226,7 @@ describe("the limit words and units", () => {
     expect(defaultLine(rounds)).toBe("default 10");
   });
 
-  test("the search lines and the first sentence", () => {
+  test.serial("the search lines and the first sentence", () => {
     expect(keyLine("exa", true)).toBe("exa.key present");
     expect(keyLine("firecrawl", false)).toBe("firecrawl.key keyless");
     expect(searchLine(search)).toBe("websearch runs on exa.");
@@ -239,7 +242,7 @@ describe("the limit words and units", () => {
 });
 
 describe("the tools entity", () => {
-  test("loads both routes and keeps a failure", async () => {
+  test.serial("loads both routes and keeps a failure", async () => {
     answer = (url) =>
       url === "/api/tools"
         ? Response.json({ tools: [time], search })
@@ -252,35 +255,69 @@ describe("the tools entity", () => {
     expect(toolsError.value).toEqual({ words: "nope", status: 500 });
   });
 
-  test("a write replaces what it holds with the server's rows", async () => {
-    const calls: { url: string; method?: string; body?: string }[] = [];
-    answer = (url, init) => {
-      calls.push({ url, method: init?.method, body: init?.body as string });
-      if (url.startsWith("/api/tools/")) {
-        return Response.json({ tools: [{ ...time, enabled: false }], search });
-      }
-      if (init?.method === "DELETE") return new Response(null, { status: 204 });
-      return Response.json({ limits: [{ ...rounds, value: 3, changedAt: 9 }] });
-    };
-    await patchTool("datetime", { enabled: false });
-    expect(tools.value?.tools[0]?.enabled).toBe(false);
-    expect(calls[0]).toMatchObject({
-      url: "/api/tools/datetime",
-      method: "PATCH",
-      body: '{"enabled":false}',
-    });
-    await saveLimits({ values: { rounds: 3 } as never });
-    expect(limits.value?.[0]?.value).toBe(3);
-    await resetLimits();
-    expect(calls.map((c) => c.method)).toEqual([
-      "PATCH",
-      "PUT",
-      "DELETE",
-      "GET",
-    ]);
-  });
+  test.serial(
+    "a write replaces what it holds with the server's rows",
+    async () => {
+      const calls: { url: string; method?: string; body?: string }[] = [];
+      answer = (url, init) => {
+        calls.push({ url, method: init?.method, body: init?.body as string });
+        if (url.startsWith("/api/tools/")) {
+          return Response.json({
+            tools: [{ ...time, enabled: false }],
+            search,
+          });
+        }
+        if (init?.method === "DELETE")
+          return new Response(null, { status: 204 });
+        return Response.json({
+          limits: [{ ...rounds, value: 3, changedAt: 9 }],
+        });
+      };
+      await patchTool("datetime", { enabled: false });
+      expect(tools.value?.tools[0]?.enabled).toBe(false);
+      expect(calls[0]).toMatchObject({
+        url: "/api/tools/datetime",
+        method: "PATCH",
+        body: '{"enabled":false}',
+      });
+      await saveLimits({ values: { rounds: 3 } as never });
+      expect(limits.value?.[0]?.value).toBe(3);
+      await resetLimits();
+      expect(calls.map((c) => c.method)).toEqual([
+        "PATCH",
+        "PUT",
+        "DELETE",
+        "GET",
+      ]);
+    },
+  );
 
-  test("the entities go with the signed-in user", () => {
+  test.serial(
+    "an earlier write answering last does not undo a later one",
+    async () => {
+      const pending: Array<() => void> = [];
+      answer = (_url, init) => {
+        const enabled = JSON.parse(init?.body as string).enabled as boolean;
+        return Response.json({ tools: [{ ...time, enabled }], search });
+      };
+      const realAnswer = answer;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        await new Promise<void>((release) => pending.push(release));
+        return realAnswer(url, init);
+      }) as unknown as typeof fetch;
+      const first = patchTool("datetime", { enabled: false });
+      const second = patchTool("datetime", { enabled: true });
+      while (pending.length < 2) await Promise.resolve();
+      pending[1]();
+      await second;
+      expect(tools.value?.tools[0]?.enabled).toBe(true);
+      pending[0]();
+      await first;
+      expect(tools.value?.tools[0]?.enabled).toBe(true);
+    },
+  );
+
+  test.serial("the entities go with the signed-in user", () => {
     tools.value = { tools: [time], search };
     me.value = { ...admin, id: "u2" };
     expect(tools.value).toBeNull();
@@ -288,7 +325,7 @@ describe("the tools entity", () => {
 });
 
 describe("the page", () => {
-  test("sits in the Admin group after Agents", () => {
+  test.serial("sits in the Admin group after Agents", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
@@ -296,29 +333,32 @@ describe("the page", () => {
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });
 
-  test("renders the rows, the switch, the providers and the fields", () => {
-    tools.value = { tools: [time], search };
-    limits.value = rows;
-    const html = render(<Tools />);
-    expect(html).toContain("datetime");
-    expect(html).toContain('role="switch"');
-    expect(html).not.toContain("md-pre");
-    expect(html).toContain('aria-checked="true"');
-    expect(html).toContain("exa.key present");
-    expect(html).toContain("firecrawl.key keyless");
-    expect(html).toContain("tavily.key keyless");
-    expect(html).not.toContain("rows-meta-bad");
-    expect(html).toContain("websearch runs on exa.");
-    expect(html).toContain("Per send");
-    expect(html).toContain("Per call");
-    expect(html).toContain('type="number"');
-    expect(html).toContain('step="any"');
-    expect(html).toContain('value="1.5"');
-    expect(html).toContain("default 20 s");
-    expect(html).not.toContain("rows-hint");
-  });
+  test.serial(
+    "renders the rows, the switch, the providers and the fields",
+    () => {
+      tools.value = { tools: [time], search };
+      limits.value = rows;
+      const html = render(<Tools />);
+      expect(html).toContain("datetime");
+      expect(html).toContain('role="switch"');
+      expect(html).not.toContain("md-pre");
+      expect(html).toContain('aria-checked="true"');
+      expect(html).toContain("exa.key present");
+      expect(html).toContain("firecrawl.key keyless");
+      expect(html).toContain("tavily.key keyless");
+      expect(html).not.toContain("rows-meta-bad");
+      expect(html).toContain("websearch runs on exa.");
+      expect(html).toContain("Per send");
+      expect(html).toContain("Per call");
+      expect(html).toContain('type="number"');
+      expect(html).toContain('step="any"');
+      expect(html).toContain('value="1.5"');
+      expect(html).toContain("default 20 s");
+      expect(html).not.toContain("rows-hint");
+    },
+  );
 
-  test("says it is loading, then the failure", () => {
+  test.serial("says it is loading, then the failure", () => {
     expect(render(<Tools />)).toContain("Loading");
     toolsError.value = {
       words: "the server failed while answering",
