@@ -3,10 +3,11 @@
 //
 // The profile: who the user is on one line, then two sections down one
 // column, a heading on the left and the form on the right: the name,
-// the time zone and the about text, and the password. The username is shown, not
-// edited; an admin changes it. A Save wakes when something changed,
-// says Saved for a moment, and a refusal stays beside it until the
-// next edit; lib/save.ts holds that.
+// the time zone and the about text, and the password. The aside holds
+// the account: the email, the role and when the user joined. The
+// username is shown, not edited; an admin changes it. A Save wakes when
+// something changed, says Saved for a moment, and a refusal stays beside
+// it until the next edit; lib/save.ts holds that.
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
@@ -23,6 +24,7 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
+import { AsideSection, Split } from "../../ui/Split.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   aboutProblem,
@@ -197,33 +199,57 @@ export function Profile() {
       error={profileError.value}
     >
       {user && (
-        <div class="profile">
-          {user.mustChangePassword && (
-            <p class="profile-notice">
-              Change the password you were handed before going on.
-            </p>
-          )}
-          <div class="profile-head">
-            <span class="profile-avatar">{initials(user.fullName)}</span>
-            <div class="profile-who">
-              <span class="profile-name">{user.fullName}</span>
-              <span class="profile-meta">@{user.username}</span>
-              <span class="profile-meta">{user.email}</span>
-              <span class="profile-meta">
-                joined {longDate(user.createdAt)}
-              </span>
+        <Split
+          aside={
+            <AsideSection label="Account">
+              <div class="split-line">
+                Email
+                <span class="split-strong profile-email">{user.email}</span>
+              </div>
+              <div class="split-line">
+                Role
+                <span class="split-strong">
+                  {user.role === "admin" ? "Admin" : "Member"}
+                </span>
+              </div>
+              <div class="split-line">
+                Joined
+                <span class="split-strong">{longDate(user.createdAt)}</span>
+              </div>
+            </AsideSection>
+          }
+        >
+          <div class="profile">
+            {user.mustChangePassword && (
+              <p class="profile-notice">
+                Change the password you were handed before going on.
+              </p>
+            )}
+            <div class="profile-head">
+              <span class="profile-avatar">{initials(user.fullName)}</span>
+              <div class="profile-who">
+                <span class="profile-name">{user.fullName}</span>
+                <span class="profile-meta profile-handle">
+                  @{user.username}
+                </span>
+                {/* the aside holds the email, and it is hidden this narrow */}
+                <span class="profile-meta profile-narrow">{user.email}</span>
+              </div>
             </div>
+            <Section
+              title="About you"
+              text="What agents should know about you."
+            >
+              <DetailsForm user={user} />
+            </Section>
+            <Section
+              title="Password"
+              text="Changing it signs out every other device."
+            >
+              <PasswordForm />
+            </Section>
           </div>
-          <Section title="About you" text="What agents should know about you.">
-            <DetailsForm user={user} />
-          </Section>
-          <Section
-            title="Password"
-            text="Changing it signs out every other device."
-          >
-            <PasswordForm />
-          </Section>
-        </div>
+        </Split>
       )}
     </Page>
   );

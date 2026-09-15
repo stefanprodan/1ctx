@@ -75,6 +75,10 @@ describe("Profile", () => {
     expect(html).toContain('class="profile-avatar">OM<');
     expect(html).toContain("@caelea");
     expect(html).toContain('class="section"');
+    expect(html).toContain('class="split-aside"');
+    expect(html).toContain(">Account<");
+    expect(html).toContain(">caelea@example.com<");
+    expect(html).toContain(">Member<");
     expect(html).toContain("12 September 2026");
     expect(html).toContain('autocomplete="name"');
     expect(html).toContain('name="about"');

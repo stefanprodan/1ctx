@@ -425,8 +425,8 @@ violation, and every rule has a rejected fixture under
   `app/routes.ts` wrapped in `lazy()`; the rail is computed from it.
   Bun does not yet split the HTML bundle, so the views still ship in one
   chunk; the table stays lazy so they will not the day it does.
-- **A page with an aside is `ui/Split.tsx`.** Home, Projects and the
-  project pages put their content in the main column, 900px at most, and
+- **A page with an aside is `ui/Split.tsx`.** Home, Projects, the
+  project pages and the profile put their content in the main column, 900px at most, and
   sections of plain lines in the 280px aside at the right, no boxes;
   under 1100, a tablet or a phone, the aside is hidden. The aside holds only honest numbers: the agents and the past
   seven calendar days in the caller's zone from `GET /api/usage/week?tz=`
@@ -474,7 +474,9 @@ violation, and every rule has a rejected fixture under
   its foot is the state with Stop while it runs (`RunFoot.tsx`).
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
-  the right. The page's stylesheet holds only what it
+  the right. The profile's aside is the account (email, role, joined),
+  its head the name and the handle, and the email where the aside is
+  hidden. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
   failure's words come from `reason()` in `lib/format.ts`.
