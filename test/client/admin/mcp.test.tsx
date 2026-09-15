@@ -335,7 +335,7 @@ describe("the model", () => {
     expect(mcpFieldOf("readPatterns has an invalid pattern")).toBe(
       "readPatterns",
     );
-    expect(mcpFieldOf("the server refused the key")).toBeUndefined();
+    expect(mcpFieldOf("the MCP server refused the key")).toBeUndefined();
   });
 
   test.serial(

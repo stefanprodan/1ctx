@@ -255,18 +255,18 @@ export function connectionFailed(error: unknown): boolean {
 
 function errorText(error: unknown, key: string | null, budget: Budget): string {
   if (budget.over) {
-    return `the server's answer is over ${budgetWords(budget.limit)}`;
+    return `the MCP server's answer is over ${budgetWords(budget.limit)}`;
   }
   let text: string;
   if (
     error instanceof UnauthorizedError ||
     (error instanceof SdkHttpError && error.status === 401)
   ) {
-    text = "the server refused the key";
+    text = "the MCP server refused the key";
   } else if (connectionFailed(error)) {
-    text = "could not connect to the server";
+    text = "the MCP server is offline";
   } else if (error instanceof SdkHttpError) {
-    text = `the server answered ${error.status}: ${error.message}`;
+    text = `the MCP server answered ${error.status}: ${error.message}`;
   } else if (
     error instanceof SdkError &&
     error.code === SdkErrorCode.RequestTimeout

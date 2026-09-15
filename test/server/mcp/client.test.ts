@@ -376,7 +376,7 @@ describe("MCP SDK client", () => {
         options(),
         async () => null,
       ),
-    ).rejects.toThrow("the server refused the key");
+    ).rejects.toThrow("the MCP server refused the key");
   });
 
   test("refuses a declared response over the shared budget", async () => {
@@ -401,7 +401,7 @@ describe("MCP SDK client", () => {
         { ...options(), bodyBytes: 100 },
         async () => null,
       ),
-    ).rejects.toThrow("the server's answer is over 100 bytes");
+    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
     expect(cancelled).toBeTrue();
   });
 
@@ -545,7 +545,7 @@ describe("MCP SDK client", () => {
         () => new Response("boom", { status }),
       );
       await expect(runCall(fetcher)).rejects.toThrow(
-        `the server answered ${status}`,
+        `the MCP server answered ${status}`,
       );
     }
   });
@@ -706,7 +706,7 @@ describe("MCP streamed response budget", () => {
         { ...options(), bodyBytes: 100 },
         async () => null,
       ),
-    ).rejects.toThrow("the server's answer is over 100 bytes");
+    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
   });
 
   test("keeps the byte-cap error for an oversized HTTP error body", async () => {
@@ -723,7 +723,7 @@ describe("MCP streamed response budget", () => {
         { ...options(), bodyBytes: 100 },
         async () => null,
       ),
-    ).rejects.toThrow("the server's answer is over 100 bytes");
+    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
   });
 
   test("aborts an SSE stream that crosses the budget", async () => {
@@ -758,7 +758,7 @@ describe("MCP streamed response budget", () => {
         { ...options(), bodyBytes: 100 },
         async (client) => client.listTools(),
       ),
-    ).rejects.toThrow("the server's answer is over 100 bytes");
+    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
     expect(transportClosed).toBeTrue();
   });
 });
