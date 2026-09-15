@@ -228,9 +228,10 @@ export function AgentForm({
     <form class="agents-form" onSubmit={submit}>
       <div class="agents-fields">
         <label class="field">
-          <span class="label">Name</span>
+          <span class="label label-required">Name</span>
           <input
             name="name"
+            aria-required="true"
             autocomplete="off"
             spellcheck={false}
             placeholder="coder"
@@ -264,7 +265,7 @@ export function AgentForm({
           </div>
         </div>
         <div class="field">
-          <span class="label">Provider</span>
+          <span class="label label-required">Provider</span>
           <div class="agents-picks">
             {providers.map((p) => (
               <button
@@ -281,7 +282,7 @@ export function AgentForm({
           </div>
         </div>
         <div class="field agents-field-wide">
-          <span class="label">Model</span>
+          <span class="label label-required">Model</span>
           {picked ? (
             <div class="agents-picked">
               <span class="agents-model">

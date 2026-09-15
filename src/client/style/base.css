@@ -67,6 +67,14 @@
     letter-spacing: 0.12em;
     color: var(--faint);
   }
+  /* a field the form cannot save without */
+  .label-required::after {
+    content: "*";
+    margin-left: 2px;
+    font-family: var(--sans);
+    letter-spacing: 0;
+    color: var(--brand);
+  }
 
   .btn {
     display: inline-flex;

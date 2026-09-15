@@ -82,9 +82,10 @@ export function SkillForm({ onDone }: { onDone: () => void }) {
     <form class="skills-form" onSubmit={submit}>
       <div class="skills-fields">
         <label class="field">
-          <span class="label">URL</span>
+          <span class="label label-required">URL</span>
           <input
             name="url"
+            aria-required="true"
             class="skills-url"
             autocomplete="off"
             spellcheck={false}

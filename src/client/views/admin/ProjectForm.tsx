@@ -124,7 +124,6 @@ export function ProjectForm({
     <form class="admin-projects-form" onSubmit={submit}>
       <NameField
         class="admin-projects-name-field"
-        placeholder="platform"
         disabled={busy}
         value={name.value}
         onInput={(value) => {
@@ -134,6 +133,7 @@ export function ProjectForm({
       />
       <DescriptionField
         class="admin-projects-description-field"
+        placeholder="What agents should know about this project"
         disabled={busy}
         value={description.value}
         onInput={(value) => {
