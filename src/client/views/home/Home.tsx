@@ -29,8 +29,9 @@ import { Split } from "../../ui/Split.tsx";
 import {
   composeProjectOf,
   dateLine,
+  emptyLine,
   greeting,
-  runsOf,
+  originOf,
   searchHref,
   searchOf,
 } from "./Home.model.ts";
@@ -49,7 +50,7 @@ export function Home() {
   }, [tick, now]);
   const target = composeProjectOf(projects.value, homeProjectId.value);
   const q = searchOf(query.value);
-  const runs = runsOf(query.value);
+  const origin = originOf(query.value);
   const projectName = (id: string) =>
     projects.value?.find((p) => p.id === id)?.name ?? null;
   const agents = projectAgents.value;
@@ -90,19 +91,13 @@ export function Home() {
           projectName={projectName}
           search={{
             value: q,
-            onChange: (next) => navigate(searchHref("/", next, runs), true),
+            onChange: (next) => navigate(searchHref("/", next, origin), true),
           }}
-          runs={{
-            on: runs,
-            onToggle: () => navigate(searchHref("/", q, !runs), true),
+          filter={{
+            value: origin,
+            onPick: (next) => navigate(searchHref("/", q, next), true),
           }}
-          empty={
-            q !== ""
-              ? "No sessions match"
-              : runs
-                ? "No runs yet"
-                : "No sessions found"
-          }
+          empty={emptyLine(q, origin)}
           now={now.value}
         />
       </Split>

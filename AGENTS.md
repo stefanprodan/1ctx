@@ -394,9 +394,10 @@ violation, and every rule has a rejected fixture under
   what the entity holds.
 - **The stream row is the server's word.** `GET /api/sessions` answers
   `{session, send, last, automation}` per row (`?origin=chat|automation`
-  narrows it, Home's Runs filter): the automation a run belongs to (a
-  run wears the clock where a chat wears the bubble, and its title is
-  the automation), the last send, and the last line a
+  narrows it, the All, Chats and Tasks switch in the stream's head on
+  Home and a project's Feed): the automation a run belongs to (a run
+  wears the clock where a chat wears the bubble, and its title is the
+  automation), the last send, and the last line a
   person or the agent wrote (a user message or an answer reply, the
   author's username or the agent's name, the first line cut at
   `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only

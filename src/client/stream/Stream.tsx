@@ -7,10 +7,21 @@
 // is the page's.
 
 import type { StreamRow } from "../../shared/api/sessions.ts";
-import { Icon } from "../lib/icons.tsx";
+import type { SessionOrigin } from "../../shared/words.ts";
+import { Icon, type IconName } from "../lib/icons.tsx";
 import { Row } from "./Row.tsx";
 import { Search } from "./Search.tsx";
 import "./stream.css";
+
+const FILTERS: {
+  value: SessionOrigin | null;
+  label: string;
+  icon: IconName | null;
+}[] = [
+  { value: null, label: "All", icon: null },
+  { value: "chat", label: "Chats", icon: "chat" },
+  { value: "automation", label: "Tasks", icon: "bolt" },
+];
 
 export function Stream({
   rows,
@@ -18,7 +29,7 @@ export function Stream({
   // project already
   projectName,
   search,
-  runs,
+  filter,
   empty,
   now,
 }: {
@@ -27,27 +38,35 @@ export function Stream({
   // the query as the address has it, and where a new one goes; a list
   // without a head, the runs of an automation, has none
   search?: { value: string; onChange: (q: string) => void };
-  // the Runs filter beside the search, on a page that offers it
-  runs?: { on: boolean; onToggle: () => void };
+  // All, Chats or Tasks beside the search, on a page that offers it
+  filter?: {
+    value: SessionOrigin | null;
+    onPick: (origin: SessionOrigin | null) => void;
+  };
   // what the card says with no rows
   empty: string;
   now: number;
 }) {
   return (
     <section class="stream">
-      {(search || runs) && (
+      {(search || filter) && (
         <div class="stream-head">
           {search && <Search value={search.value} onChange={search.onChange} />}
-          {runs && (
-            <button
-              type="button"
-              class={`stream-filter${runs.on ? " stream-filter-on" : ""}`}
-              aria-pressed={runs.on}
-              onClick={runs.onToggle}
-            >
-              <Icon name="clock" size={12} />
-              Runs
-            </button>
+          {filter && (
+            <div class="stream-filters">
+              {FILTERS.map((choice) => (
+                <button
+                  key={choice.label}
+                  type="button"
+                  class={`stream-filter${filter.value === choice.value ? " stream-filter-on" : ""}`}
+                  aria-pressed={filter.value === choice.value}
+                  onClick={() => filter.onPick(choice.value)}
+                >
+                  {choice.icon && <Icon name={choice.icon} size={12} />}
+                  {choice.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}

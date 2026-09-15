@@ -404,7 +404,10 @@ describe("the pages", () => {
     expect(html).not.toContain("No agents yet.");
     expect(html).toContain(">Activity<");
     expect(html).not.toContain("Members");
-    expect(html).not.toContain("Chats");
+    expect(html).not.toContain('<div class="split-line">Chats');
+    expect(html).toContain(
+      'class="stream-filter stream-filter-on" aria-pressed="true">All<',
+    );
     expect(html).toContain('href="/projects/p1/settings"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
     expect(html).toContain('placeholder="Search sessions"');

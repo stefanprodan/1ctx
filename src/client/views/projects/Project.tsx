@@ -18,7 +18,12 @@ import {
 } from "../../data/sessions.ts";
 import { tickMs } from "../../stream/Row.model.ts";
 import { Stream } from "../../stream/Stream.tsx";
-import { searchHref, searchOf } from "../home/Home.model.ts";
+import {
+  emptyLine,
+  originOf,
+  searchHref,
+  searchOf,
+} from "../home/Home.model.ts";
 import { Frame } from "./Frame.tsx";
 
 export function Project({ params }: { params: Params }) {
@@ -33,6 +38,7 @@ export function Project({ params }: { params: Params }) {
     return () => clearInterval(timer);
   }, [tick, now]);
   const q = searchOf(query.value);
+  const origin = originOf(query.value);
   return (
     <Frame id={id} tab="feed">
       {(shown) => (
@@ -55,9 +61,17 @@ export function Project({ params }: { params: Params }) {
             search={{
               value: q,
               onChange: (next) =>
-                navigate(searchHref(`/projects/${shown.id}`, next), true),
+                navigate(
+                  searchHref(`/projects/${shown.id}`, next, origin),
+                  true,
+                ),
             }}
-            empty={q === "" ? "No sessions found" : "No sessions match"}
+            filter={{
+              value: origin,
+              onPick: (next) =>
+                navigate(searchHref(`/projects/${shown.id}`, q, next), true),
+            }}
+            empty={emptyLine(q, origin)}
             now={now.value}
           />
         </>

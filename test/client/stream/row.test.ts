@@ -13,7 +13,8 @@ import {
 } from "../../../src/client/stream/Row.model.ts";
 import {
   composeProjectOf,
-  runsOf,
+  emptyLine,
+  originOf,
   searchHref,
   searchOf,
 } from "../../../src/client/views/home/Home.model.ts";
@@ -212,13 +213,25 @@ describe("Home.model", () => {
     expect(searchOf("?q=pods+%26+co")).toBe("pods & co");
   });
 
-  test("the Runs filter rides on the address beside the query", () => {
-    expect(runsOf("")).toBe(false);
-    expect(runsOf("?origin=automation")).toBe(true);
-    expect(runsOf("?origin=chat")).toBe(false);
+  test("the filter rides on the address beside the query", () => {
+    expect(originOf("")).toBeNull();
+    expect(originOf("?origin=automation")).toBe("automation");
+    expect(originOf("?origin=chat")).toBe("chat");
+    expect(originOf("?origin=other")).toBeNull();
     expect(searchHref("/", "")).toBe("/");
-    expect(searchHref("/", " pods ", true)).toBe("/?q=pods&origin=automation");
-    expect(searchHref("/", "", true)).toBe("/?origin=automation");
+    expect(searchHref("/", " pods ", "automation")).toBe(
+      "/?q=pods&origin=automation",
+    );
+    expect(searchHref("/projects/p1", "", "chat")).toBe(
+      "/projects/p1?origin=chat",
+    );
+  });
+
+  test("the empty line names what the filter hides", () => {
+    expect(emptyLine("pods", "chat")).toBe("No sessions match");
+    expect(emptyLine("", "chat")).toBe("No chats yet");
+    expect(emptyLine("", "automation")).toBe("No task runs yet");
+    expect(emptyLine("", null)).toBe("No sessions found");
   });
 });
 

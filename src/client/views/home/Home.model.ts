@@ -5,6 +5,7 @@
 // and the rail's list.
 
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
+import type { SessionOrigin } from "../../../shared/words.ts";
 
 export function dateLine(now: Date): string {
   return now.toLocaleDateString("en-GB", {
@@ -46,17 +47,31 @@ export function searchOf(search: string): string {
   return new URLSearchParams(search).get("q")?.trim() ?? "";
 }
 
-// whether the address asks for runs alone
-export function runsOf(search: string): boolean {
-  return new URLSearchParams(search).get("origin") === "automation";
+// the stream's filter as the address carries it: chats, task runs, or
+// null for both
+export function originOf(search: string): SessionOrigin | null {
+  const origin = new URLSearchParams(search).get("origin");
+  return origin === "chat" || origin === "automation" ? origin : null;
 }
 
-// the address for a query on a page, none when it is blank, with the
-// Runs filter when it is on
-export function searchHref(pathname: string, q: string, runs = false): string {
+// the address for a query and a filter on a page, none when both are
+// blank
+export function searchHref(
+  pathname: string,
+  q: string,
+  origin: SessionOrigin | null = null,
+): string {
   const params = new URLSearchParams();
   if (q.trim() !== "") params.set("q", q.trim());
-  if (runs) params.set("origin", "automation");
+  if (origin !== null) params.set("origin", origin);
   const search = params.toString();
   return `${pathname}${search === "" ? "" : `?${search}`}`;
+}
+
+// what the stream says with no rows
+export function emptyLine(q: string, origin: SessionOrigin | null): string {
+  if (q !== "") return "No sessions match";
+  if (origin === "chat") return "No chats yet";
+  if (origin === "automation") return "No task runs yet";
+  return "No sessions found";
 }
