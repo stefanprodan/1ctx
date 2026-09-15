@@ -110,6 +110,7 @@ const PATHS: Record<string, string> = {
   pause: "M5.5 3.5v9M10.5 3.5v9",
   tools:
     "M10 2.5a3.5 3.5 0 0 0-4.2 4.6L2.5 10.4l3.1 3.1 3.3-3.3a3.5 3.5 0 0 0 4.6-4.2L11.3 8.2 7.8 4.7z",
+  skill: "M4 2.5h5.5L13 6v7.5H4zM9.5 2.5V6H13M6.5 9h3M6.5 11.5h3",
 };
 
 export type IconName = keyof typeof PATHS;

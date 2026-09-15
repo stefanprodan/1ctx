@@ -6,7 +6,8 @@
 // the system prompt. The pick shows its window and prices when the
 // catalog has them. Under the pick, thinking and effort: the default
 // is the provider's, and the levels are the wire's. Delete asks once
-// in place.
+// in place. Skills: one box per skill on the server, the checked ones
+// go with the agent into every send, at most the cap.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -15,9 +16,15 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../shared/contracts/provider.ts";
-import { AVATARS, type Avatar, type Effort } from "../../../shared/words.ts";
+import {
+  AVATARS,
+  type Avatar,
+  type Effort,
+  MAX_SKILLS_PER_AGENT,
+} from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import { searchCatalog } from "../../data/providers.ts";
+import { skills as skillRows } from "../../data/skills.ts";
 import { limits } from "../../data/tools.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
@@ -31,12 +38,14 @@ import {
   modelMeta,
   nameProblem,
   reserveOf,
+  sameIds,
   sentEffort,
+  skillsHint,
   thinkingChoices,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import "./agents.css";
-import { reason } from "../../lib/format.ts";
+import { firstSentence, reason } from "../../lib/format.ts";
 import { shapedInput } from "../../lib/names.ts";
 
 // one catalog line: the name over the id, the rest faint at the right
@@ -100,6 +109,16 @@ export function AgentForm({
   const thinking = useSignal<"on" | "off" | null>(agent?.thinking ?? null);
   const effort = useSignal<Effort | null>(agent?.effort ?? null);
   const avatar = useSignal<Avatar>(agent?.avatar ?? "bot");
+  const pickedSkills = useSignal<string[]>(agent?.skills ?? []);
+  // a skill deleted since the agent was saved is not a box, and it goes
+  // from the save too, since the server would refuse the id; when the
+  // list did not load, the ids are kept as they are
+  const chosenSkills = () => {
+    const rows = skillRows.value;
+    return rows === null
+      ? pickedSkills.value
+      : pickedSkills.value.filter((id) => rows.some((s) => s.id === id));
+  };
   const asking = useSignal(false);
   const failure = useSignal<string | null>(null);
   const search = useRef<CatalogSearch | null>(null);
@@ -149,7 +168,7 @@ export function AgentForm({
         effort.value,
         wireOf(providerId.value),
       ),
-      skills: agent?.skills ?? [],
+      skills: chosenSkills(),
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -178,7 +197,8 @@ export function AgentForm({
     model.value?.id !== agent.model.id ||
     prompt.value.trim() !== agent.prompt ||
     thinking.value !== agent.thinking ||
-    effortSent !== agent.effort;
+    effortSent !== agent.effort ||
+    !sameIds(pickedSkills.value, agent.skills);
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -197,6 +217,15 @@ export function AgentForm({
   };
   const picked = model.value;
   const busy = save.status.value === "busy";
+  const available = skillRows.value;
+  const chosen = chosenSkills();
+  const toggleSkill = (id: string) => {
+    pickedSkills.value = chosen.includes(id)
+      ? chosen.filter((s) => s !== id)
+      : [...chosen, id];
+    save.touch();
+  };
+  const full = chosen.length >= MAX_SKILLS_PER_AGENT;
   const compacts =
     picked === null
       ? ""
@@ -365,6 +394,40 @@ export function AgentForm({
             </span>
           </label>
         )}
+        <div class="field agents-field-wide">
+          <span class="label">Skills</span>
+          {available === null ? (
+            <span class="hint">The skills did not load. Reload the page.</span>
+          ) : available.length === 0 ? (
+            <span class="hint">
+              No skills yet. <a href="/admin/skills">Add one</a> and it shows
+              here.
+            </span>
+          ) : (
+            <div class="agents-skills">
+              {available.map((skill) => (
+                <label key={skill.id} class="agents-skill">
+                  <input
+                    type="checkbox"
+                    class="agents-skill-box"
+                    name="skills"
+                    value={skill.id}
+                    checked={chosen.includes(skill.id)}
+                    disabled={busy || (!chosen.includes(skill.id) && full)}
+                    onChange={() => toggleSkill(skill.id)}
+                  />
+                  <span class="agents-skill-name">{skill.name}</span>
+                  <span class="agents-skill-desc">
+                    {firstSentence(skill.description)}
+                  </span>
+                </label>
+              ))}
+              <span class="hint">
+                {skillsHint(chosen.length, MAX_SKILLS_PER_AGENT)}
+              </span>
+            </div>
+          )}
+        </div>
         <label class="field agents-field-wide">
           <span class="label">System prompt</span>
           <textarea

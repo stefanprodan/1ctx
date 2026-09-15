@@ -160,3 +160,16 @@ export function keyLine(keyName: string | null, hasKey: boolean): string {
   if (keyName === null) return "no key";
   return hasKey ? `${keyName}.key` : `${keyName}.key missing`;
 }
+
+// the line under the skill boxes: how many are checked against the cap
+export function skillsHint(chosen: number, cap: number): string {
+  if (chosen === 0) return `Up to ${cap}. The checked ones go into every send.`;
+  return `${chosen} of ${cap}. The checked ones go into every send.`;
+}
+
+// the same ids in any order
+export function sameIds(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
+}

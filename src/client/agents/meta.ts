@@ -56,6 +56,12 @@ export function thinkingLine(
     .join(" · ");
 }
 
+// "2 skills": what the row says of the agent's skills, empty for none
+export function skillsLine(agent: Pick<AgentSummary, "skills">): string {
+  const n = agent.skills.length;
+  return n === 0 ? "" : `${n} skill${n === 1 ? "" : "s"}`;
+}
+
 // the model's own name, the org before the slash gone: what a narrow
 // line shows when "org/name" does not fit
 export function shortModel(id: string): string {

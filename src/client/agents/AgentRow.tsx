@@ -10,7 +10,7 @@
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { modelMeta, thinkingLine } from "./meta.ts";
+import { modelMeta, skillsLine, thinkingLine } from "./meta.ts";
 import "./agent-row.css";
 
 export function AgentRow({
@@ -23,7 +23,12 @@ export function AgentRow({
   // the avatar in the foreground, for the row that is open
   lit?: boolean;
 }) {
-  const meta = [providerName ?? "", modelMeta(agent.model), thinkingLine(agent)]
+  const meta = [
+    providerName ?? "",
+    modelMeta(agent.model),
+    thinkingLine(agent),
+    skillsLine(agent),
+  ]
     .filter((s) => s !== "")
     .join(" · ");
   return (

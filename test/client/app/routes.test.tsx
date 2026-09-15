@@ -71,6 +71,7 @@ describe("the route table", () => {
       "/admin/x",
       "/admin/agents",
       "/admin/tools",
+      "/admin/skills",
     ]);
   });
 

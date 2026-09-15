@@ -300,6 +300,7 @@ describe("the rail", () => {
       "/admin/users",
       "/admin/agents",
       "/admin/tools",
+      "/admin/skills",
     ]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });

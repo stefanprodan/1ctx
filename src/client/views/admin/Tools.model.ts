@@ -191,7 +191,4 @@ export function searchLine(state: SearchState): string {
 }
 
 // the first sentence of a description, for the row
-export function firstSentence(text: string): string {
-  const end = text.search(/[.!?](\s|$)/);
-  return end === -1 ? text : text.slice(0, end + 1);
-}
+export { firstSentence } from "../../lib/format.ts";

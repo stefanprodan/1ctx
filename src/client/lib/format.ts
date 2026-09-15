@@ -85,6 +85,12 @@ export function elapsed(ms: number): string {
   return span(Math.max(0, ms));
 }
 
+// a description's first sentence, for a row's head
+export function firstSentence(text: string): string {
+  const end = text.search(/[.!?](\s|$)/);
+  return end === -1 ? text : text.slice(0, end + 1);
+}
+
 // the words of a thrown value, for a failure line
 export function reason(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

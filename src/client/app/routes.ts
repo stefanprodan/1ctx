@@ -30,6 +30,7 @@ import {
   loadSession,
   session,
 } from "../data/sessions.ts";
+import { loadSkills } from "../data/skills.ts";
 import { loadTools } from "../data/tools.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
@@ -269,8 +270,14 @@ export const ROUTES: Route[] = [
     title: () => "Agents",
     role: "admin",
     load: async () => {
-      // the limits too: the agents page shows where each model compacts
-      await Promise.all([loadAgents(), loadProviders(), loadTools()]);
+      // the limits too: the agents page shows where each model compacts;
+      // the skills for the form's section
+      await Promise.all([
+        loadAgents(),
+        loadProviders(),
+        loadTools(),
+        loadSkills(),
+      ]);
     },
     nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
   },
@@ -281,6 +288,14 @@ export const ROUTES: Route[] = [
     role: "admin",
     load: () => loadTools(),
     nav: { label: "Tools", icon: "tools", order: 11, group: "Admin" },
+  },
+  {
+    path: "/admin/skills",
+    view: lazy(() => import("../views/admin/Skills.tsx").then((m) => m.Skills)),
+    title: () => "Skills",
+    role: "admin",
+    load: () => loadSkills(),
+    nav: { label: "Skills", icon: "skill", order: 12, group: "Admin" },
   },
   {
     path: "/profile",

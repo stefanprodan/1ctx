@@ -209,6 +209,13 @@ violation, and every rule has a rejected fixture under
   checked on add and refresh. Refresh is explicit and never renames the
   skill; deleting one an agent names is a 409. Stored text is cleaned and
   shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
+  The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
+  (a site or an index is looked up first and its entries listed with
+  Add), a row opens to the fields, the body and each file as
+  preformatted text, then Refresh and Delete; the agent form checks
+  skills by box, at most `MAX_SKILLS_PER_AGENT`, and loads them through
+  the agents route. `data/skills.ts` keeps the list, a body and a file
+  once read, dropped on refresh.
 - **An agent's skills are one send snapshot.** Their capped catalog from
   `shared/skills.ts` sits in the prompt before the date line. The `skill`
   tool's name is an enum of that catalog, and `skill_file` is offered only

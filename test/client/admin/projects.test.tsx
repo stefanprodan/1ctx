@@ -380,7 +380,7 @@ describe("the rail", () => {
       group?.kind === "group"
         ? group.routes.map((route) => route.nav!.label)
         : [];
-    expect(entries).toEqual(["Projects", "Users", "Agents", "Tools"]);
+    expect(entries).toEqual(["Projects", "Users", "Agents", "Tools", "Skills"]);
   });
 
   test("granted and revoked refresh the rail and admin list", async () => {
