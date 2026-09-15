@@ -361,6 +361,8 @@ describe("automations", () => {
           tz: "UTC",
           deadlineMs: null,
           retentionDays: 30,
+          projectMemory: false,
+          ownMemory: false,
         },
       },
     );
@@ -380,6 +382,8 @@ describe("automations", () => {
           tz: "UTC",
           deadlineMs: null,
           retentionDays: 30,
+          projectMemory: false,
+          ownMemory: false,
         },
       },
     );
@@ -424,6 +428,8 @@ describe("automation rights", () => {
           tz: "UTC",
           deadlineMs: null,
           retentionDays: 30,
+          projectMemory: false,
+          ownMemory: false,
         },
       },
     );

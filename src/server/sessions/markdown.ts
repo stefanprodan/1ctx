@@ -12,6 +12,8 @@ import type { MessageKind, MessageStatus } from "../../shared/words.ts";
 
 export type ExportRow = {
   sendId: string;
+  round: number;
+  memoryRound: number | null;
   kind: MessageKind;
   slot: "work" | "answer" | null;
   status: MessageStatus;
@@ -65,11 +67,14 @@ function agentTurn(turn: ExportRow[]): {
   cut: string | null;
   at: number;
 } | null {
-  const agentRows = turn.filter(
+  const memoryRound = turn[0]?.memoryRound ?? null;
+  const main =
+    memoryRound === null ? turn : turn.filter((row) => row.round < memoryRound);
+  const agentRows = main.filter(
     (row) => row.kind === "reply" || row.kind === "tool",
   );
   if (agentRows.length === 0) return null;
-  if (turn.some((row) => row.status === "streaming")) return null;
+  if (main.some((row) => row.status === "streaming")) return null;
   const answer =
     agentRows.find((row) => row.kind === "reply" && row.slot === "answer") ??
     null;

@@ -373,5 +373,101 @@
       }
     ],
     "expected": "# chat\n\n## @someone 1970-01-01 00:16\n\nhi\n\n## @agent 1970-01-01 00:17\n\nhello\n"
+  },
+  {
+    "name": "a successful memory phase does not replace a failed run",
+    "rows": [
+      {
+        "sendId": "s1",
+        "round": 1,
+        "memoryRound": 2,
+        "kind": "user",
+        "status": "done",
+        "author": "caelea",
+        "content": "check it",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "round": 1,
+        "memoryRound": 2,
+        "kind": "reply",
+        "slot": "work",
+        "status": "failed",
+        "author": "coder",
+        "content": "",
+        "createdAt": 1010000,
+        "finishedAt": 1020000,
+        "error": "provider failed",
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "round": 2,
+        "memoryRound": 2,
+        "kind": "reply",
+        "slot": "work",
+        "status": "done",
+        "author": "coder",
+        "content": "memory updated",
+        "createdAt": 1030000,
+        "finishedAt": 1040000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\n_provider failed_\n"
+  },
+  {
+    "name": "memory phase text does not replace the run answer",
+    "rows": [
+      {
+        "sendId": "s1",
+        "round": 1,
+        "memoryRound": 2,
+        "kind": "user",
+        "status": "done",
+        "author": "caelea",
+        "content": "check it",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "round": 1,
+        "memoryRound": 2,
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "run answer",
+        "createdAt": 1010000,
+        "finishedAt": 1020000,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "round": 2,
+        "memoryRound": 2,
+        "kind": "reply",
+        "slot": "work",
+        "status": "done",
+        "author": "coder",
+        "content": "memory text",
+        "createdAt": 1030000,
+        "finishedAt": 1040000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\nrun answer\n"
   }
 ]

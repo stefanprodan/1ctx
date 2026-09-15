@@ -16,6 +16,7 @@ import type { Limits, LoopLimits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type {
+  MemoryScope,
   Offered,
   ToolCaps,
   ToolContext,
@@ -41,6 +42,7 @@ export type ToolsPort = {
     agentId: string,
     agentServers: AgentRow["servers"],
     mode: AgentRow["mcpMode"],
+    scope: MemoryScope,
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
@@ -87,6 +89,7 @@ const NONE: Offered = {
   mcp: [],
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
+  memory: null,
 };
 
 export function buildPolicy(input: {
@@ -104,7 +107,11 @@ export function buildPolicy(input: {
   const { user, agent } = input;
   const offered =
     input.tools !== null && agent.model.tools
-      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode)
+      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
+          projectId: input.project.id,
+          automation: null,
+          phase: "main",
+        })
       : NONE;
   const thinking =
     agent.thinking === null ? agent.model.reasoning : agent.thinking === "on";
@@ -137,6 +144,8 @@ export function buildPolicy(input: {
       resultBytes: input.limits.resultBytes,
       contextReserve: input.limits.contextReserve,
       summaryMaxTokens: input.limits.summaryMaxTokens,
+      memoryPhaseMs: input.limits.memoryPhaseMs,
+      memoryPhaseRounds: input.limits.memoryPhaseRounds,
     },
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,

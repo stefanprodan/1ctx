@@ -102,11 +102,11 @@ function addTeam(chat: ChatApp, id: string) {
 }
 
 describe("the socket", () => {
-  test("open sends hello with protocol 8", async () => {
+  test("open sends hello with protocol 9", async () => {
     const chat = await chatApp();
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
-    expect(conn.frames).toEqual([{ type: "hello", protocol: 8 }]);
+    expect(conn.frames).toEqual([{ type: "hello", protocol: 9 }]);
     close(chat, conn);
   });
 
@@ -126,6 +126,34 @@ describe("the socket", () => {
     await tick();
     expect(frames(member, "session")).toHaveLength(2);
     expect(frames(admin, "session")).toEqual([]);
+    close(chat, member, admin);
+  });
+
+  test("a memory frame reaches only connections holding its project", async () => {
+    const chat = await chatApp();
+    const member = await connection(chat, chat.member);
+    const admin = await connection(chat, chat.admin);
+    chat.app.socket.open(member);
+    chat.app.socket.open(admin);
+    member.frames = [];
+    admin.frames = [];
+
+    const saved = await chat.member.call(
+      "PUT",
+      `/api/projects/${chat.projectId}/memory`,
+      { body: { entries: ["remember"], revision: 0 } },
+    );
+
+    expect(saved.status).toBe(200);
+    expect(frames(member, "memory")).toEqual([
+      {
+        type: "memory",
+        projectId: chat.projectId,
+        automationId: null,
+        revision: 1,
+      },
+    ]);
+    expect(frames(admin, "memory")).toEqual([]);
     close(chat, member, admin);
   });
 
@@ -195,6 +223,20 @@ describe("the socket", () => {
 
     expect(conn.data.watching).toBeNull();
     expect(frames(conn, "watched")).toEqual([]);
+    transact(chat.app.db, () => ({
+      result: undefined,
+      events: [
+        {
+          type: "memory.changed" as const,
+          data: {
+            projectId: chat.projectId,
+            automationId: null,
+            revision: 1,
+          },
+        },
+      ],
+    }));
+    expect(frames(conn, "memory")).toEqual([]);
     await finish(script);
     expect(frames(conn, "session")).toEqual([]);
     close(chat, conn);
@@ -368,6 +410,20 @@ describe("the socket", () => {
     ]);
     expect(conn.data.projects.has("socket-team")).toBe(false);
     expect(conn.data.watching).toBeNull();
+    transact(chat.app.db, () => ({
+      result: undefined,
+      events: [
+        {
+          type: "memory.changed" as const,
+          data: {
+            projectId: "socket-team",
+            automationId: null,
+            revision: 1,
+          },
+        },
+      ],
+    }));
+    expect(frames(conn, "memory")).toEqual([]);
     script.content("hidden");
     await finish(script);
     expect(frames(conn, "delta")).toEqual([]);

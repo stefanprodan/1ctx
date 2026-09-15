@@ -30,7 +30,12 @@ export function repairRows(
   // the reply rows about to end need a slot; a null one becomes an
   // answer before its status moves, so the not-streaming check holds
   db.query(
-    "update messages set slot = 'answer' where kind = 'reply' and status = 'streaming' and slot is null",
+    `update messages set slot = case
+       when round >= coalesce(
+         (select memory_round from sends where sends.id = messages.send_id),
+         round + 1
+       ) then 'work' else 'answer' end
+     where kind = 'reply' and status = 'streaming' and slot is null`,
   ).run();
   // the ids of the rows this repair will end, before they change, so
   // the envelope can read them back
@@ -40,8 +45,10 @@ export function repairRows(
     )
     .all();
   db.query(
-    "update sends set status = 'failed', cause = 'restart', error = ?, finished_at = ? where status = 'running'",
-  ).run(error, now);
+    `update sends set status = 'failed', cause = 'restart', error = ?,
+       memory_error = case when memory_round is null then memory_error else ? end,
+       finished_at = ? where status = 'running'`,
+  ).run(error, error, now);
   db.query(
     "update messages set status = 'stopped', error = ?, finished_at = ? where kind = 'tool' and status = 'streaming'",
   ).run(error, now);

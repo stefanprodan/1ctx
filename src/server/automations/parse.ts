@@ -26,6 +26,8 @@ const KEYS = [
   "tz",
   "deadlineMs",
   "retentionDays",
+  "projectMemory",
+  "ownMemory",
 ];
 
 function text(value: unknown, name: string): string {
@@ -79,6 +81,18 @@ function parseValues(
       );
     }
     out.retentionDays = value as number;
+  }
+  if (take("projectMemory")) {
+    if (typeof body.projectMemory !== "boolean") {
+      throw new BadRequest("projectMemory must be boolean");
+    }
+    out.projectMemory = body.projectMemory;
+  }
+  if (take("ownMemory")) {
+    if (typeof body.ownMemory !== "boolean") {
+      throw new BadRequest("ownMemory must be boolean");
+    }
+    out.ownMemory = body.ownMemory;
   }
   return out;
 }

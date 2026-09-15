@@ -113,7 +113,13 @@ describe("automation run deadlines", () => {
       transact(chat.app.db, () => {
         holder.prepared = chat.app.runner.startRun({
           source: "manual",
-          automation: { id: "auto", name: "rolled-back", tz: "UTC" },
+          automation: {
+            id: "auto",
+            name: "rolled-back",
+            tz: "UTC",
+            projectMemory: false,
+            ownMemory: false,
+          },
           instructions: "check",
           dueAt: chat.app.now.value,
           receivedAt: chat.app.now.value,

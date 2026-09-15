@@ -197,6 +197,9 @@ export type RawSend = {
   first_message_id: string;
   rounds: number;
   tool_calls: number;
+  memory_round: number | null;
+  memory_error: string | null;
+  memory_skipped: number | null;
   started_at: number;
   finished_at: number | null;
 };
@@ -215,6 +218,9 @@ export const send = (raw: RawSend): SendSummary => ({
   firstMessageId: raw.first_message_id,
   rounds: raw.rounds,
   toolCalls: raw.tool_calls,
+  memoryRound: raw.memory_round,
+  memoryError: raw.memory_error,
+  memorySkipped: raw.memory_skipped,
   startedAt: raw.started_at,
   finishedAt: raw.finished_at,
 });

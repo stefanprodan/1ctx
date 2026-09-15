@@ -112,7 +112,13 @@ export function scheduler(deps: Deps): Scheduler {
     agent: AgentRow,
   ): Event => ({
     source,
-    automation: { id: row.id, name: row.name, tz: row.tz },
+    automation: {
+      id: row.id,
+      name: row.name,
+      tz: row.tz,
+      projectMemory: row.projectMemory,
+      ownMemory: row.ownMemory,
+    },
     instructions: row.instructions,
     dueAt,
     receivedAt,

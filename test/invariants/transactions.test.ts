@@ -303,6 +303,7 @@ describe("finishTool rollback", () => {
           mcp: [],
           mcpPrompt: { text: "", digest: {} },
           mcpCatalog: "",
+          memory: null,
           tools: [
             {
               name: "datetime",
@@ -414,6 +415,7 @@ describe("finalizeSend rollback", () => {
         mcp: [],
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
+        memory: null,
         tools: [
           {
             name: "datetime",

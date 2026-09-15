@@ -27,6 +27,10 @@ import {
   lastMcpDigest as readLastMcpDigest,
   sweepMcpDigests,
 } from "./mcp.ts";
+import {
+  type MemorySnapshot,
+  memorySnapshot as readMemorySnapshot,
+} from "./memory.ts";
 import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -175,7 +179,8 @@ export class SessionStore {
   exportRows(sessionId: string): ExportRow[] {
     return this.db
       .query<ExportRow, [string]>(
-        `select messages.send_id as sendId, messages.kind, messages.slot,
+        `select messages.send_id as sendId, messages.round,
+           sends.memory_round as memoryRound, messages.kind, messages.slot,
            messages.status, messages.error,
            messages.finish_reason as finishReason,
            coalesce(users.username, agents.name) as author,
@@ -185,12 +190,17 @@ export class SessionStore {
            messages.created_at as createdAt,
            messages.finished_at as finishedAt
          from messages
+         join sends on sends.id = messages.send_id
          left join users on users.id = messages.user_id
          left join agents on agents.id = messages.agent_id
          where messages.session_id = ?
          order by messages.seq`,
       )
       .all(sessionId);
+  }
+
+  memorySnapshot(projectId: string, id: string): MemorySnapshot | null {
+    return readMemorySnapshot(projectId, id, this);
   }
 
   message(id: string): Message | null {

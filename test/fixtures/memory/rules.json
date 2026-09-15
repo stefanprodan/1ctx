@@ -1,0 +1,12 @@
+{
+  "roundTrip": [
+    "keeps § inside an entry\nand a tab\there",
+    "drops controls\u0000\u0007\u0085\u202e but keeps text"
+  ],
+  "normalized": [
+    "keeps § inside an entry\nand a tab\there",
+    "drops controls but keeps text"
+  ],
+  "duplicates": ["same", " same ", "", "other", "same"],
+  "deduplicated": ["same", "other"]
+}

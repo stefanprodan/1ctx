@@ -32,6 +32,7 @@ const NONE: Offered = {
   mcp: [],
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
+  memory: null,
 };
 
 const policy: SendPolicy = {
@@ -172,6 +173,7 @@ describe("systemPrompt", () => {
         skills: [],
       },
       mcpCatalog: "<available_mcp_tools>catalog</available_mcp_tools>",
+      memory: null,
       mcpPrompt: {
         text: "<mcp_instructions>instructions</mcp_instructions>",
         digest: {},
@@ -446,6 +448,7 @@ describe("history", () => {
         mcp: [],
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
+        memory: null,
       },
     };
     const req = summaryRequest(withTools, "s1", [
@@ -494,6 +497,7 @@ describe("history", () => {
         mcp: [],
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
+        memory: null,
       },
     };
     const req = request(withTools, "s1", []);
@@ -553,6 +557,7 @@ describe("skills after a summary", () => {
       mcp: [],
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
+      memory: null,
     },
   };
   const work = (id: string, name: string, sendId: string) =>

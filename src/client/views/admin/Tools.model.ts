@@ -77,6 +77,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Summary tokens",
     text: "Tokens a summary may run to, the reserve at most.",
   },
+  memoryPhaseMs: {
+    label: "Memory time",
+    text: "How long an automation may spend updating its memory.",
+  },
+  memoryPhaseRounds: {
+    label: "Memory rounds",
+    text: "Provider turns an automation may spend updating its memory.",
+  },
   runDeadlineMs: {
     label: "Run deadline",
     text: "How long an automation's run may take. An automation may set less.",

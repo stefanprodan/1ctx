@@ -207,6 +207,7 @@ function fakeTools(plans: Record<string, ToolPlan>): { tools: FakeToolsCap } {
         mcp: [],
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
+        memory: null,
       }),
       async run(_offered, c, ctx) {
         const plan = plans[c.id] ?? {
