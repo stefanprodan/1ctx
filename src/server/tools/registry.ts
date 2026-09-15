@@ -9,14 +9,18 @@
 import type { ToolCall } from "../providers/index.ts";
 import type { Tool, ToolContext, ToolResult } from "./types.ts";
 
-// controls that are not text and the C1 block, dropped so a page cannot
-// smuggle escape sequences into the result the model reads
+// controls that are not text, the C1 block and the bidi embeddings,
+// overrides and isolates, dropped so a page cannot smuggle escape
+// sequences into the result the model reads or reorder a URL on screen
 function clean(text: string, cut: number): string {
   let result = "";
   for (let index = 0; index < text.length; index++) {
     const code = text.charCodeAt(index);
     const control =
-      (code < 32 && code !== 9 && code !== 10) || (code >= 127 && code <= 159);
+      (code < 32 && code !== 9 && code !== 10) ||
+      (code >= 127 && code <= 159) ||
+      (code >= 0x202a && code <= 0x202e) ||
+      (code >= 0x2066 && code <= 0x2069);
     if (!control) result += text[index];
   }
   return result.slice(0, cut);
