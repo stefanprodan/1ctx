@@ -4,6 +4,7 @@
 // The words on a user's page and an agent's page.
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import type { McpMode } from "../../../shared/words.ts";
 import { count } from "../../lib/format.ts";
 import { offsetOf } from "../../ui/Zone.model.ts";
 
@@ -39,4 +40,32 @@ export function effortText(
 ): string {
   if (agent.thinking === "off") return "none";
   return agent.effort ?? "provider default";
+}
+
+// the MCP card's hint: what a send resolves the mode to now, and the
+// lean schemas' count against the cap that flips auto
+export function mcpHint(mcp: {
+  mode: McpMode;
+  resolved: "all" | "catalog";
+  tokens: number;
+  cap: number;
+}): string {
+  const what =
+    mcp.resolved === "catalog" ? "a catalog with two tools" : "every schema";
+  const how =
+    mcp.mode === "auto"
+      ? `auto, ${count(mcp.tokens)} of ${count(mcp.cap)} tokens`
+      : mcp.mode === "all"
+        ? "all schemas"
+        : "catalog";
+  return `${what} · ${how}`;
+}
+
+export function sidesText(server: { read: boolean; write: boolean }): string {
+  if (server.read && server.write) return "read and write";
+  return server.read ? "read" : "write";
+}
+
+export function toolsCount(n: number): string {
+  return `${n} tool${n === 1 ? "" : "s"}`;
 }

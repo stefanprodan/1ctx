@@ -88,6 +88,37 @@ export function patternText(list: string[]): string {
   return list.join("\n");
 }
 
+export function endpointDirty(
+  server: McpServerSummary,
+  url: string,
+  keyName: string,
+): boolean {
+  const key = keyName === NO_KEY ? null : keyName;
+  return url.trim() !== server.url || key !== server.keyName;
+}
+
+export function settingsDirty(
+  server: McpServerSummary,
+  draft: {
+    read: boolean;
+    write: boolean;
+    instructionsOn: boolean;
+    timeout: string;
+    patterns: Patterns;
+  },
+): boolean {
+  return (
+    draft.read !== server.read ||
+    draft.write !== server.write ||
+    draft.instructionsOn !== server.instructionsOn ||
+    timeoutMs(draft.timeout) !== server.timeoutMs ||
+    patternText(draft.patterns.read) !== patternText(server.readPatterns) ||
+    patternText(draft.patterns.write) !== patternText(server.writePatterns) ||
+    patternText(draft.patterns.excluded) !==
+      patternText(server.excludedPatterns)
+  );
+}
+
 export function patternsOf(server: McpServerSummary): Patterns {
   return {
     read: server.readPatterns,
@@ -245,9 +276,11 @@ export function promptPreview(
   for (const name of snapshot.leftForSchemas) {
     warnings.push(`${name} left out: its tools are over the 1 MB cap`);
   }
+  const included = new Set(snapshot.included);
   const from = offered
     .filter(
       (s) =>
+        included.has(s.name) &&
         s.instructions !== null &&
         !snapshot.leftForInstructions.includes(s.name),
     )

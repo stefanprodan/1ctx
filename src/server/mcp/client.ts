@@ -225,6 +225,34 @@ function budgetedFetch(
   }) as Fetcher;
 }
 
+// a request that never reached the server: the runtime's fetch failure,
+// wrapped by the SDK in its probe or request error, whose words name
+// the computer and the url and help nobody
+const CONNECT_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ConnectionRefused",
+  "FailedToOpenSocket",
+]);
+
+export function connectionFailed(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth++) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && CONNECT_CODES.has(code)) return true;
+    if (
+      /unable to connect|fetch failed|failed to fetch/i.test(current.message)
+    ) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
 function errorText(error: unknown, key: string | null, budget: Budget): string {
   if (budget.over) {
     return `the server's answer is over ${budgetWords(budget.limit)}`;
@@ -235,6 +263,8 @@ function errorText(error: unknown, key: string | null, budget: Budget): string {
     (error instanceof SdkHttpError && error.status === 401)
   ) {
     text = "the server refused the key";
+  } else if (connectionFailed(error)) {
+    text = "could not connect to the server";
   } else if (error instanceof SdkHttpError) {
     text = `the server answered ${error.status}: ${error.message}`;
   } else if (

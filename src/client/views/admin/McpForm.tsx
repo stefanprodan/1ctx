@@ -270,7 +270,10 @@ export function McpForm({ onDone }: { onDone: () => void }) {
             name="keyName"
             mono
             value={keyName.value}
-            options={keyOptions(keys.value, null)}
+            options={keyOptions(
+              keys.value,
+              keyName.value === NO_KEY ? null : keyName.value,
+            )}
             disabled={busy}
             invalid={invalid("keyName")}
             onChange={(value) => {
@@ -316,7 +319,7 @@ export function McpForm({ onDone }: { onDone: () => void }) {
         label="Add server"
         start={<span />}
         before={
-          <button type="button" class="btn" onClick={onDone}>
+          <button type="button" class="btn" disabled={busy} onClick={onDone}>
             Cancel
           </button>
         }

@@ -43,6 +43,26 @@
     font-size: var(--text-small);
     color: var(--dim);
   }
+  .mcp-change-head {
+    cursor: pointer;
+  }
+  .mcp-change-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) 0 0 var(--space-4);
+  }
+  .mcp-change-line {
+    display: flex;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--text-small);
+  }
+  .mcp-change-kind {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
 
   /* the facts: a label and a value per line */
   .mcp-facts {
@@ -110,6 +130,8 @@
   }
   .mcp-tool-name {
     flex-shrink: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     font-family: var(--mono);
     font-size: var(--text-mono);
     color: var(--fg);
@@ -232,5 +254,28 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+  }
+
+  @media (max-width: 719px) {
+    .mcp-pick-head,
+    .mcp-instructions-head,
+    .mcp-tool-head,
+    .mcp-pick {
+      flex-wrap: wrap;
+    }
+    .mcp-tool-desc {
+      order: 3;
+      flex-basis: 100%;
+    }
+    .mcp-pick-name {
+      flex-basis: 100%;
+    }
+    .mcp-pick-side {
+      flex: 1 1 120px;
+      flex-wrap: wrap;
+    }
+    .mcp-pick-off-word {
+      flex-basis: 100%;
+    }
   }
 }

@@ -46,7 +46,10 @@ export function McpPicker({
 }) {
   const viewing = useSignal(false);
   const linkOf = (id: string) => chosen.find((s) => s.serverId === id);
-  const preview = available === null ? null : promptPreview(available, chosen);
+  const preview =
+    available === null || !takesTools
+      ? null
+      : promptPreview(available, chosen);
   const side = (
     server: McpServerSummary,
     which: "read" | "write",
@@ -73,7 +76,7 @@ export function McpPicker({
     <div class="field agents-field-wide">
       <span class="mcp-pick-head">
         <span class="label">MCP servers</span>
-        {loadedAt !== null && available !== null && available.length > 0 && (
+        {loadedAt !== null && available !== null && (
           <span class="hint">
             as of the servers loaded {ago(loadedAt, Date.now())}
           </span>
@@ -86,9 +89,10 @@ export function McpPicker({
           No MCP servers yet. <a href="/admin/mcp">Add one</a> and it shows
           here.
         </span>
+      ) : !takesTools ? (
+        <span class="hint">This model takes no tools.</span>
       ) : (
         <>
-          {!takesTools && <span class="hint">This model takes no tools.</span>}
           <div class="mcp-picks">
             {available.map((server) => (
               <div key={server.id} class="mcp-pick">

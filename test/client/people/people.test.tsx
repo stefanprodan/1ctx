@@ -75,6 +75,7 @@ const agent: DirectoryAgentResponse = {
     { name: "datetime", provider: null },
     { name: "websearch", provider: "exa" },
   ],
+  mcp: { mode: "auto", resolved: "all", servers: [], tokens: 0, cap: 6000 },
   tokens: { prompt: 7, skills: 2000, tools: 300 },
 };
 

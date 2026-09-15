@@ -12,6 +12,7 @@
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type {
+  McpChange,
   McpServerSummary,
   McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
@@ -23,15 +24,16 @@ import {
   patchServer,
   refreshServer,
 } from "../../data/mcp.ts";
-import { firstSentence, reason } from "../../lib/format.ts";
+import { ago, firstSentence, reason } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
-import { RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
+import { RowsMeta, RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   changeLine,
   characters,
+  endpointDirty,
   instructionsBox,
   KEY_HINT,
   keyOptions,
@@ -40,6 +42,7 @@ import {
   NO_KEY,
   patternText,
   servedLine,
+  settingsDirty,
   timeoutMs,
   timeoutProblem,
   timeoutText,
@@ -49,6 +52,30 @@ import {
 } from "./Mcp.model.ts";
 import { McpFields } from "./McpForm.tsx";
 import "./mcp.css";
+
+function Change({ change, now }: { change: McpChange; now: number }) {
+  const line = changeLine(change, now);
+  const groups: [string, string[]][] = [
+    ["Added", change.added],
+    ["Removed", change.removed],
+    ["Changed", change.changed],
+  ];
+  const named = groups.filter(([, names]) => names.length > 0);
+  if (named.length === 0) return <span class="mcp-note">{line}</span>;
+  return (
+    <details class="mcp-change">
+      <summary class="mcp-note mcp-change-head">{line}</summary>
+      <div class="mcp-change-lines">
+        {named.map(([label, names]) => (
+          <span key={label} class="mcp-change-line">
+            <span class="mcp-change-kind">{label}</span>
+            {names.join(", ")}
+          </span>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 function Fact({
   label,
@@ -134,9 +161,7 @@ function Endpoint({ server }: { server: McpServerSummary }) {
   }, mcpFieldOf);
   useFocusField(save, form);
   const invalid = (field: string) => save.fieldError(field) !== null;
-  const dirty =
-    url.value.trim() !== server.url ||
-    (keyName.value === NO_KEY ? null : keyName.value) !== server.keyName;
+  const dirty = endpointDirty(server, url.value, keyName.value);
   const busy = save.busy;
   return (
     <form
@@ -174,7 +199,10 @@ function Endpoint({ server }: { server: McpServerSummary }) {
             name="keyName"
             mono
             value={keyName.value}
-            options={keyOptions(keys.value, server.keyName)}
+            options={keyOptions(
+              keys.value,
+              keyName.value === NO_KEY ? null : keyName.value,
+            )}
             disabled={busy}
             invalid={invalid("keyName")}
             onChange={(value) => {
@@ -221,7 +249,7 @@ export function ServerRow({
   const expanded = useSignal(false);
   const asking = useSignal(false);
   const refreshing = useSignal(false);
-  const refreshFailure = useSignal<string | null>(null);
+  const refreshFailure = useSignal<{ words: string; at: number } | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
     await patchServer(server.id, {
@@ -241,14 +269,13 @@ export function ServerRow({
     write: patternLines(writeText.value),
     excluded: patternLines(excludedText.value),
   };
-  const dirty =
-    read.value !== server.read ||
-    write.value !== server.write ||
-    instructionsOn.value !== server.instructionsOn ||
-    timeoutMs(timeout.value) !== server.timeoutMs ||
-    patternText(patterns.read) !== patternText(server.readPatterns) ||
-    patternText(patterns.write) !== patternText(server.writePatterns) ||
-    patternText(patterns.excluded) !== patternText(server.excludedPatterns);
+  const dirty = settingsDirty(server, {
+    read: read.value,
+    write: write.value,
+    instructionsOn: instructionsOn.value,
+    timeout: timeout.value,
+    patterns,
+  });
   const groups = toolGroups(server, patterns);
   const marks = {
     read: unmatchedLine(unmatchedIn(server, patterns.read)),
@@ -261,15 +288,19 @@ export function ServerRow({
     try {
       await refreshServer(server.id);
     } catch (err) {
-      refreshFailure.value = reason(err);
-      // the server records the failure on the row, so the list learns it
-      void loadMcp();
+      refreshFailure.value = { words: reason(err), at: Date.now() };
+      // The failed route has no row, so read the failure the server kept.
+      await loadMcp();
+      refreshFailure.value = null;
     }
     refreshing.value = false;
   };
   const remove = () => save.act("delete", () => deleteServer(server.id));
-  const meta = metaLine(server, now);
-  const change = changeLine(server.lastChange, now);
+  const failed = refreshFailure.value;
+  const meta =
+    failed === null
+      ? metaLine(server, now)
+      : { text: `refresh failed ${ago(failed.at, now)}`, bad: true };
   const box = instructionsBox(server.name, server.instructions, expanded.value);
   const busy = save.busy || refreshing.value;
   return (
@@ -278,21 +309,12 @@ export function ServerRow({
       onToggle={onToggle}
       indent="chevron"
       head={
-        <RowsTitle
-          name={server.name}
-          sub={
-            refreshFailure.value !== null ? (
-              <span class="error" role="alert">
-                {refreshFailure.value}
-              </span>
-            ) : meta.bad ? (
-              <span class="error">{meta.text}</span>
-            ) : (
-              meta.text
-            )
-          }
-          mono
-        />
+        <>
+          <RowsTitle name={server.name} sub={server.url} mono />
+          <RowsMeta bad={meta.bad}>
+            {`Read ${server.read ? "on" : "off"} · Write ${server.write ? "on" : "off"} · ${meta.text}`}
+          </RowsMeta>
+        </>
       }
       end={
         <button
@@ -306,12 +328,14 @@ export function ServerRow({
       }
     >
       <div class="mcp-open">
-        {server.refreshError !== null && (
+        {(failed !== null || server.refreshError !== null) && (
           <span class="mcp-note error">
-            {server.refreshError}, {servedLine(server, now)}
+            {failed?.words ?? server.refreshError}, {servedLine(server, now)}
           </span>
         )}
-        {change !== "" && <span class="mcp-note">{change}</span>}
+        {server.lastChange !== null && (
+          <Change change={server.lastChange} now={now} />
+        )}
         <div class="mcp-facts">
           <Fact label="Server" mono>
             {`${server.serverName || "unnamed"} ${server.serverVersion}`.trim()}
@@ -371,10 +395,10 @@ export function ServerRow({
                 <span class="hint">{characters(box.count)}</span>
               )}
             </span>
-            {server.instructions === "" ? (
-              <span class="hint">Server sent no instructions</span>
-            ) : !instructionsOn.value ? (
+            {!instructionsOn.value ? (
               <span class="hint">off, not sent</span>
+            ) : server.instructions === "" ? (
+              <span class="hint">Server sent no instructions</span>
             ) : (
               <>
                 <pre class="mcp-block">{box.text}</pre>
@@ -424,6 +448,7 @@ export function ServerRow({
                 <button
                   type="button"
                   class="btn"
+                  disabled={busy}
                   onClick={() => {
                     asking.value = true;
                   }}

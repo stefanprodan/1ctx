@@ -12,17 +12,32 @@
 
 import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
+import { MCP_CATALOG_FROM_TOKENS } from "../../shared/mcp.ts";
 import { BUILTIN_TOOLS } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { tokens } from "../lib/tokens.ts";
+import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTools } from "../providers/index.ts";
 import { parseAgentName } from "./parse.ts";
 import type { ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
 
 const BUILTIN_NAMES = new Set<string>(BUILTIN_TOOLS);
+
+// the lean MCP schemas as the wire carries them in all mode, the count
+// the token cap reads whatever mode the send resolved to
+function schemaTokens(servers: OfferedServer[]): number {
+  const schemas = servers.flatMap((server) =>
+    server.tools.map((tool) => ({
+      name: tool.wireName,
+      description: tool.description,
+      parameters: tool.wireInputSchema,
+    })),
+  );
+  return schemas.length === 0 ? 0 : tokens(JSON.stringify(wireTools(schemas)));
+}
 
 export type SkillsListPort = {
   forAgent(agentId: string): OfferedSkill[];
@@ -40,7 +55,12 @@ export type ToolsPort = {
     agentId: string,
     agentServers: AgentRow["servers"],
     mode: AgentRow["mcpMode"],
-  ): { tools: ChatTool[]; search: string | null };
+  ): {
+    tools: ChatTool[];
+    search: string | null;
+    mcp: OfferedServer[];
+    mcpCatalog: string;
+  };
 };
 
 export type DirectoryDeps = {
@@ -85,7 +105,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               agent.servers,
               agent.mcpMode,
             )
-          : { tools: [], search: null };
+          : { tools: [], search: null, mcp: [], mcpCatalog: "" };
         const versions = deps.skills.versions(agent.id);
         const fetched = new Map(versions.map((v) => [v.id, v.fetchedAt]));
         const body: DirectoryAgentResponse = {
@@ -101,6 +121,21 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               name: tool.name,
               provider: tool.name === "websearch" ? offered.search : null,
             })),
+          mcp: {
+            mode: agent.mcpMode,
+            resolved: offered.mcpCatalog === "" ? "all" : "catalog",
+            servers: offered.mcp.map((server) => {
+              const link = agent.servers.find((s) => s.serverId === server.id);
+              return {
+                name: server.name,
+                read: link?.read ?? false,
+                write: link?.write ?? false,
+                tools: server.tools.length,
+              };
+            }),
+            tokens: schemaTokens(offered.mcp),
+            cap: MCP_CATALOG_FROM_TOKENS,
+          },
           tokens: {
             prompt: tokens(agent.prompt),
             skills: versions.reduce(

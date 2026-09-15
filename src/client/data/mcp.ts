@@ -26,11 +26,13 @@ export const keys = signal<string[]>([]);
 export const loadedAt = signal<number | null>(null);
 
 let owner: string | null = null;
+let turn = 0;
 
 effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
   owner = id;
+  turn++;
   servers.value = null;
   serversError.value = null;
   keys.value = [];
@@ -39,7 +41,6 @@ effect(() => {
 
 // a load's answer is kept only when it is still the one wanted: for
 // the signed-in user of the moment and the latest word on the list
-let turn = 0;
 
 const byName = (rows: McpServerSummary[]) =>
   rows.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -73,9 +74,11 @@ export async function addServer(
   body: CreateMcpRequest,
 ): Promise<McpServerSummary> {
   const forUser = owner;
-  const answer = await api<McpServerResponse>("/api/mcp", "POST", body);
   turn++;
-  return owner === forUser ? keep(answer) : answer.server;
+  const answer = await api<McpServerResponse>("/api/mcp", "POST", body);
+  if (owner !== forUser) return answer.server;
+  turn++;
+  return keep(answer);
 }
 
 export async function patchServer(
@@ -83,31 +86,36 @@ export async function patchServer(
   body: PatchMcpRequest,
 ): Promise<McpServerSummary> {
   const forUser = owner;
+  turn++;
   const answer = await api<McpServerResponse>(
     `/api/mcp/${encodeURIComponent(id)}`,
     "PATCH",
     body,
   );
+  if (owner !== forUser) return answer.server;
   turn++;
-  return owner === forUser ? keep(answer) : answer.server;
+  return keep(answer);
 }
 
 export async function refreshServer(id: string): Promise<McpServerSummary> {
   const forUser = owner;
+  turn++;
   const answer = await api<McpServerResponse>(
     `/api/mcp/${encodeURIComponent(id)}/refresh`,
     "POST",
     {},
   );
+  if (owner !== forUser) return answer.server;
   turn++;
-  return owner === forUser ? keep(answer) : answer.server;
+  return keep(answer);
 }
 
 export async function deleteServer(id: string): Promise<void> {
   const forUser = owner;
-  await api(`/api/mcp/${encodeURIComponent(id)}`, "DELETE");
   turn++;
+  await api(`/api/mcp/${encodeURIComponent(id)}`, "DELETE");
   if (owner === forUser) {
+    turn++;
     servers.value = (servers.value ?? []).filter((s) => s.id !== id);
   }
 }
