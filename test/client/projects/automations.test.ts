@@ -57,6 +57,8 @@ const automation = (
   tz: "Europe/Bucharest",
   deadlineMs: null,
   retentionDays: 30,
+  projectMemory: false,
+  ownMemory: false,
   suspendedAt: null,
   suspendedBy: null,
   nextAt: now + 4 * HOUR,
@@ -252,6 +254,8 @@ describe("the form", () => {
       tz: "Europe/Bucharest",
       deadline: "10",
       retention: "30",
+      projectMemory: false,
+      ownMemory: true,
     });
   });
 
@@ -267,6 +271,8 @@ describe("the form", () => {
         tz: "UTC",
         deadlineMs: 300_000,
         retentionDays: 30,
+        projectMemory: false,
+        ownMemory: true,
       },
     });
     const empty = requestOf(filled({ deadline: "" }), LIMIT);
@@ -393,6 +399,9 @@ describe("the run log", () => {
       firstMessageId: "m1",
       rounds: 1,
       toolCalls: 0,
+      memoryRound: null,
+      memoryError: null,
+      memorySkipped: null,
       startedAt: now - 250_000,
       finishedAt: null,
     };

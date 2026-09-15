@@ -122,6 +122,8 @@ function Editor({
   const busy = save.busy;
   const off = busy || !editable;
   const d = draft.value;
+  const takesTools =
+    agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
@@ -167,6 +169,43 @@ function Editor({
           </div>
           <FieldError save={save} field="instructions" />
           <FieldError save={save} field="agent" />
+        </div>
+      </Section>
+      <Section title="Memory" text="What a run remembers">
+        <div class="automations-stack">
+          <label class="automations-switch">
+            <input
+              type="checkbox"
+              name="ownMemory"
+              checked={d.ownMemory}
+              disabled={off || !takesTools}
+              onChange={(e) =>
+                set({
+                  ownMemory: (e.currentTarget as HTMLInputElement).checked,
+                })
+              }
+            />
+            Keeps its own memory
+          </label>
+          <label class="automations-switch">
+            <input
+              type="checkbox"
+              name="projectMemory"
+              checked={d.projectMemory}
+              disabled={off || !takesTools}
+              onChange={(e) =>
+                set({
+                  projectMemory: (e.currentTarget as HTMLInputElement).checked,
+                })
+              }
+            />
+            Updates project memory from chats
+          </label>
+          <span class="hint">
+            {takesTools
+              ? "Its own memory is kept at the end of every run. A task that updates project memory reads the chats it has not read and edits the note on the Memory tab."
+              : "This agent's model takes no tools, so it keeps no memory."}
+          </span>
         </div>
       </Section>
       <Section title="When" text="In the time zone you pick">

@@ -317,6 +317,7 @@ describe("Project.model", () => {
     expect(tabsOf("p1", "team").map((t) => t.label)).toEqual([
       "Feed",
       "Automations",
+      "Memory",
       "Members",
     ]);
     expect(tabsOf("p1", "personal")[1]).toEqual({
@@ -324,6 +325,10 @@ describe("Project.model", () => {
       href: "/projects/p1/automations",
     });
     expect(tabsOf("p1", "personal")[2]).toEqual({
+      label: "Memory",
+      href: "/projects/p1/memory",
+    });
+    expect(tabsOf("p1", "personal")[3]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });
@@ -334,12 +339,14 @@ describe("Project.model", () => {
     expect(tabsOf("p1", "team", counts).map((t) => t.count)).toEqual([
       undefined,
       3,
+      undefined,
       9,
     ]);
     // Settings counts nothing
     expect(tabsOf("p1", "personal", counts).map((t) => t.count)).toEqual([
       undefined,
       3,
+      undefined,
       undefined,
     ]);
     // a count not known yet is left out, never shown as zero

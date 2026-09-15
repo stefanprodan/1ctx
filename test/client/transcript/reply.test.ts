@@ -59,6 +59,9 @@ function send(status: SendSummary["status"]): SendSummary {
     firstMessageId: "user-1",
     rounds: 2,
     toolCalls: 1,
+    memoryRound: null,
+    memoryError: null,
+    memorySkipped: null,
     startedAt: 10_000,
     finishedAt: status === "running" ? null : 20_000,
   };
@@ -72,6 +75,7 @@ function node(summary: SendSummary | null): ReplyNode {
     message,
     work: null,
     summary: null,
+    memory: null,
     compact: false,
     rows: [message],
     send: summary,

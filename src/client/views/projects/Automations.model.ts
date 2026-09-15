@@ -203,6 +203,8 @@ export type Draft = {
   deadline: string;
   // days as typed
   retention: string;
+  projectMemory: boolean;
+  ownMemory: boolean;
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -225,6 +227,8 @@ export function draftOf(
       tz,
       deadline: minutesOf(limitMs),
       retention: "30",
+      projectMemory: false,
+      ownMemory: true,
     };
   }
   return {
@@ -235,6 +239,8 @@ export function draftOf(
     tz: a.tz,
     deadline: minutesOf(a.deadlineMs ?? limitMs),
     retention: String(a.retentionDays),
+    projectMemory: a.projectMemory,
+    ownMemory: a.ownMemory,
   };
 }
 
@@ -318,6 +324,8 @@ export function requestOf(
       // the limit when an admin moves it
       deadlineMs: ms === limitMs ? null : ms,
       retentionDays: Number(days),
+      projectMemory: d.projectMemory,
+      ownMemory: d.ownMemory,
     },
   };
 }
@@ -330,11 +338,26 @@ export function dirtyOf(
 ): boolean {
   if (a === null) return true;
   const base = draftOf(a, a.agentId, a.tz, limitMs);
-  return (Object.keys(base) as (keyof Draft)[]).some(
-    (k) => d[k].trim() !== base[k].trim(),
-  );
+  return (Object.keys(base) as (keyof Draft)[]).some((k) => {
+    const left = d[k];
+    const right = base[k];
+    return typeof left === "string" && typeof right === "string"
+      ? left.trim() !== right.trim()
+      : left !== right;
+  });
 }
 
 // the viewer's zone, where a new automation starts
 export const browserZone = (): string =>
   Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// the brief's line for the memory boxes that are on; null when none is
+export function memoryWords(
+  a: Pick<AutomationSummary, "projectMemory" | "ownMemory">,
+): string | null {
+  const parts: string[] = [];
+  if (a.ownMemory) parts.push("Keeps its own memory");
+  if (a.projectMemory) parts.push("updates project memory");
+  if (parts.length === 0) return null;
+  return `${parts.join(" and ")}.`;
+}

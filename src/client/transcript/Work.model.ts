@@ -95,3 +95,25 @@ export function workSummary(
   }
   return { live, toolCalls, failed, durationMs, text };
 }
+
+// the Memory fold's line: the phase running, then what it did
+export function memorySummary(
+  node: WorkNode,
+  live: boolean,
+  now = 0,
+): WorkSummary {
+  const base = workSummary(node, live, now);
+  const send = node.send;
+  let text: string;
+  if (live) {
+    text = `Updating memory ${clock(base.durationMs)}`;
+  } else if (send?.memoryError != null) {
+    text = `Memory not updated. ${send.memoryError}`;
+  } else {
+    text = "Memory updated";
+    if (send?.memorySkipped != null && send.memorySkipped > 0) {
+      text += `, ${send.memorySkipped} edits no longer applied`;
+    }
+  }
+  return { ...base, text };
+}

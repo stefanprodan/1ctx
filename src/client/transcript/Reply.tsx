@@ -149,6 +149,15 @@ export function Reply({
         {node.summary !== null && (
           <Summary message={node.summary} live={live} />
         )}
+        {node.memory !== null && (
+          <Work
+            node={node.memory}
+            reply={null}
+            live={live}
+            running={running}
+            memory
+          />
+        )}
         {!running && (
           <div class="transcript-after">
             {cut && (

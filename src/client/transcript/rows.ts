@@ -38,6 +38,9 @@ export type ReplyNode = {
   work: WorkNode | null;
   // the summary round's row, after the answer; a compact send's only row
   summary: Message | null;
+  // the memory phase after the answer, a run's own fold; null for a
+  // send without one
+  memory: WorkNode | null;
   // a compact send: no user message and no reply of its own
   compact: boolean;
   rows: Message[];
@@ -93,7 +96,11 @@ function workRounds(rows: Message[]): WorkRound[] {
 // row's end shows in its own fold, never on the turn's line
 export function endedBy(node: ReplyNode): Message | null {
   if (node.message !== null) return node.message;
-  const rows = node.rows.filter((row) => row.kind !== "summary");
+  // the phase's rows never say how the turn ended
+  const phase = new Set(node.memory?.rows ?? []);
+  const rows = node.rows.filter(
+    (row) => row.kind !== "summary" && !phase.has(row),
+  );
   const status = node.send?.status;
   if (status === "stopped" || status === "failed" || node.send === null) {
     for (let index = rows.length - 1; index >= 0; index--) {
@@ -127,31 +134,50 @@ export function groupRows(
 
     const answer =
       rows.find((row) => row.kind === "reply" && row.slot === "answer") ?? null;
+    const send = currentSend?.id === sendId ? currentSend : null;
+    // the rows from the memory round on are the phase's, never the
+    // turn's; the boundary is the server's word on the send
+    const boundary = send?.memoryRound ?? null;
+    const inPhase = (row: Message) =>
+      boundary !== null && row.round >= boundary;
     const workRows = rows.filter(
       (row) =>
-        (row.kind === "reply" && row.slot === "work") || row.kind === "tool",
+        ((row.kind === "reply" && row.slot === "work") ||
+          row.kind === "tool") &&
+        !inPhase(row),
     );
-    const send = currentSend?.id === sendId ? currentSend : null;
-    const work: WorkNode | null =
-      workRows.length > 0
+    const memoryRows = rows.filter(
+      (row) => (row.kind === "reply" || row.kind === "tool") && inPhase(row),
+    );
+    const fold = (list: Message[]): WorkNode | null =>
+      list.length > 0
         ? {
             sendId,
-            rows: workRows,
-            rounds: workRounds(workRows),
+            rows: list,
+            rounds: workRounds(list),
             answer,
             send,
           }
         : null;
+    const work = fold(workRows);
+    const memory = fold(memoryRows);
 
-    const reply = answer ?? rows.find(isMainReply) ?? null;
+    const reply =
+      answer ?? rows.find((row) => isMainReply(row) && !inPhase(row)) ?? null;
     const summary = rows.find((row) => row.kind === "summary") ?? null;
-    if (reply !== null || work !== null || summary !== null) {
+    if (
+      reply !== null ||
+      work !== null ||
+      memory !== null ||
+      summary !== null
+    ) {
       nodes.push({
         kind: "reply",
         sendId,
         message: reply,
         work,
         summary,
+        memory,
         compact: user === undefined && reply === null && work === null,
         rows,
         send,

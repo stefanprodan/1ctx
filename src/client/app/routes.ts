@@ -17,6 +17,7 @@ import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadMcp } from "../data/mcp.ts";
+import { keyOf, loadMemory } from "../data/memory.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -145,6 +146,23 @@ export const ROUTES: Route[] = [
         loadProjectAgents(params.id),
         loadAutomations(params.id),
         loadRecentDays(),
+      ]);
+    },
+  },
+  {
+    path: "/projects/:id/memory",
+    view: lazy(() =>
+      import("../views/projects/Memory.tsx").then((m) => m.Memory),
+    ),
+    title: () => "Memory",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+        loadRecentDays(),
+        loadMemory(keyOf(params.id, null)),
       ]);
     },
   },

@@ -17,7 +17,7 @@ import type { WorkNode } from "./rows.ts";
 import type { Live } from "./stream.ts";
 import { Think } from "./Think.tsx";
 import { Tool } from "./Tool.tsx";
-import { workJustEnded, workSummary } from "./Work.model.ts";
+import { memorySummary, workJustEnded, workSummary } from "./Work.model.ts";
 
 const opened = signal<ReadonlySet<string>>(new Set());
 
@@ -26,14 +26,18 @@ export function Work({
   reply,
   live,
   running,
+  memory = false,
 }: {
   node: WorkNode;
   // the answer, or the reply streaming after the work
   reply: Message | null;
   live: ReadonlyMap<string, Live>;
   running: boolean;
+  // the run's memory phase, folded after the answer
+  memory?: boolean;
 }) {
-  const open = opened.value.has(node.sendId);
+  const foldKey = memory ? `${node.sendId}:memory` : node.sendId;
+  const open = opened.value.has(foldKey);
   // the label's clock counts this tab's time every 250 ms while it runs
   const [, tick] = useState(0);
   useEffect(() => {
@@ -41,7 +45,9 @@ export function Work({
     const timer = setInterval(() => tick((n) => n + 1), 250);
     return () => clearInterval(timer);
   }, [running]);
-  const summary = workSummary(node, running, Date.now());
+  const summary = memory
+    ? memorySummary(node, running, Date.now())
+    : workSummary(node, running, Date.now());
   const wasRunning = useRef(running);
 
   // only the transition shuts the fold: mounting a finished send must
@@ -49,11 +55,11 @@ export function Work({
   useEffect(() => {
     const ended = workJustEnded(wasRunning.current, running);
     wasRunning.current = running;
-    if (!ended || !opened.value.has(node.sendId)) return;
+    if (!ended || !opened.value.has(foldKey)) return;
     const next = new Set(opened.value);
-    next.delete(node.sendId);
+    next.delete(foldKey);
     opened.value = next;
-  }, [node.sendId, running]);
+  }, [foldKey, running]);
 
   const replyLive =
     running && reply !== null ? (live.get(reply.id) ?? null) : null;
@@ -67,8 +73,8 @@ export function Work({
       open={open}
       onToggle={(event) => {
         const next = new Set(opened.value);
-        if (event.currentTarget.open) next.add(node.sendId);
-        else next.delete(node.sendId);
+        if (event.currentTarget.open) next.add(foldKey);
+        else next.delete(foldKey);
         opened.value = next;
       }}
     >

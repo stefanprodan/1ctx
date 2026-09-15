@@ -30,6 +30,7 @@ import {
   runs,
 } from "../../data/automations.ts";
 import { me } from "../../data/me.ts";
+import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents, stopSession } from "../../data/sessions.ts";
 import { longDate, reason, stamp, until } from "../../lib/format.ts";
@@ -39,6 +40,7 @@ import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsNote } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Note } from "../memory/Note.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
   browserZone,
@@ -48,6 +50,7 @@ import {
   durationOf,
   durationText,
   eventNote,
+  memoryWords,
   scheduleTitle,
   sourceText,
   suspendedText,
@@ -97,6 +100,9 @@ function RunRow({
             <span class="automations-agent">@{line.author} </span>
           )}
           {failure.value ?? line.text}
+          {row.send?.memoryError != null && (
+            <span class="automations-faint"> Memory not updated.</span>
+          )}
         </span>
         <span class="automations-run-took">
           <span>{took === null ? "" : durationText(took)}</span>
@@ -238,6 +244,8 @@ export function Automation({ params }: { params: Params }) {
   }, [tick, now]);
   // the runs are this page's; once it goes, no frame moves them
   useEffect(() => () => closeRunsOf(id), [id]);
+  const noteKey = keyOf(projectId ?? "", id);
+  const memoryNote = notes.value.get(noteKey) ?? null;
   // the next fires move with the schedule, and past each fire
   useEffect(() => {
     if (row === null || row.suspendedAt !== null) return;
@@ -346,18 +354,25 @@ export function Automation({ params }: { params: Params }) {
             <Instructions
               text={row.instructions}
               foot={
-                row.suspendedAt !== null ? (
-                  <p class="automations-brief-next">
-                    <Icon name="pause" size={14} />
-                    {suspendedText(row, now.value)}
-                  </p>
-                ) : row.nextAt !== null ? (
-                  <p class="automations-brief-next">
-                    <Icon name="arrow-right" size={14} />
-                    Next run {fireLabel(row.nextAt, now.value, row.tz, true)},{" "}
-                    {until(row.nextAt, now.value)}
-                  </p>
-                ) : null
+                <>
+                  {memoryWords(row) !== null && (
+                    <p class="automations-brief-next automations-faint">
+                      {memoryWords(row)}
+                    </p>
+                  )}
+                  {row.suspendedAt !== null ? (
+                    <p class="automations-brief-next">
+                      <Icon name="pause" size={14} />
+                      {suspendedText(row, now.value)}
+                    </p>
+                  ) : row.nextAt !== null ? (
+                    <p class="automations-brief-next">
+                      <Icon name="arrow-right" size={14} />
+                      Next run {fireLabel(row.nextAt, now.value, row.tz, true)},{" "}
+                      {until(row.nextAt, now.value)}
+                    </p>
+                  ) : null}
+                </>
               }
             />
           </section>
@@ -373,6 +388,18 @@ export function Automation({ params }: { params: Params }) {
             <p class="automations-note error" role="alert">
               {failure.value}
             </p>
+          )}
+          {(row.ownMemory || (memoryNote?.entries.length ?? 0) > 0) && (
+            <Note
+              memory={memoryNote}
+              memoryKey={noteKey}
+              error={noteErrors.value.get(noteKey) ?? null}
+              empty={
+                row.ownMemory
+                  ? "No memory yet. The next run writes it."
+                  : "No memory."
+              }
+            />
           )}
           <RowsCard
             label="Runs"
