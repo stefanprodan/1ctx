@@ -311,8 +311,12 @@ export function ServerRow({
       head={
         <>
           <RowsTitle name={server.name} sub={server.url} mono />
-          <RowsMeta bad={meta.bad}>
-            {`Read ${server.read ? "on" : "off"} · Write ${server.write ? "on" : "off"} · ${meta.text}`}
+          <RowsMeta>
+            {`Read ${server.read ? "on" : "off"} · Write ${server.write ? "on" : "off"} · `}
+            {/* only the failure is red, the switches keep their colour */}
+            <span class={meta.bad ? "rows-meta-bad" : undefined}>
+              {meta.text}
+            </span>
           </RowsMeta>
         </>
       }

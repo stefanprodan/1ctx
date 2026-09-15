@@ -30,11 +30,13 @@ import {
 } from "../../../src/client/views/admin/Agents.model.ts";
 import {
   changeLine,
+  endpointDirty,
   instructionsBox,
   keyOptions,
   mcpFieldOf,
   metaLine,
   promptPreview,
+  settingsDirty,
   timeoutMs,
   timeoutProblem,
   timeoutText,
@@ -44,12 +46,16 @@ import {
 } from "../../../src/client/views/admin/Mcp.model.ts";
 import { Mcp } from "../../../src/client/views/admin/Mcp.tsx";
 import { McpPicker } from "../../../src/client/views/admin/McpPicker.tsx";
+import { ServerRow } from "../../../src/client/views/admin/McpRow.tsx";
 import type {
   McpServerSummary,
   McpToolSummary,
 } from "../../../src/shared/contracts/mcp.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
-import { MAX_INSTRUCTIONS_BLOCK } from "../../../src/shared/mcp.ts";
+import {
+  MAX_INSTRUCTIONS_BLOCK,
+  MAX_SCHEMAS_BYTES,
+} from "../../../src/shared/mcp.ts";
 
 const admin: Me = {
   id: "u1",
@@ -109,7 +115,7 @@ const server = (changes: Partial<McpServerSummary> = {}): McpServerSummary => ({
 const flux = server();
 
 const realFetch = globalThis.fetch;
-let answer: (url: string, init?: RequestInit) => Response;
+let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
 
 beforeEach(() => {
   me.value = admin;
@@ -126,20 +132,23 @@ afterEach(() => {
 });
 
 describe("the model", () => {
-  test("the head: the tools and the check, or the failure in red", () => {
-    expect(metaLine(flux, now)).toEqual({
-      text: "5 tools · checked 2h ago",
-      bad: false,
-    });
-    expect(
-      metaLine(
-        server({ refreshError: "boom", refreshFailedAt: now - 60_000 }),
-        now,
-      ),
-    ).toEqual({ text: "refresh failed 1m ago", bad: true });
-  });
+  test.serial(
+    "the head: the tools and the check, or the failure in red",
+    () => {
+      expect(metaLine(flux, now)).toEqual({
+        text: "5 tools · checked 2h ago",
+        bad: false,
+      });
+      expect(
+        metaLine(
+          server({ refreshError: "boom", refreshFailedAt: now - 60_000 }),
+          now,
+        ),
+      ).toEqual({ text: "refresh failed 1m ago", bad: true });
+    },
+  );
 
-  test("the last change as one line", () => {
+  test.serial("the last change as one line", () => {
     expect(changeLine(null, now)).toBe("");
     expect(
       changeLine(
@@ -167,7 +176,7 @@ describe("the model", () => {
     ).toBe("0s ago: 1 tool changed");
   });
 
-  test("the four groups from the fields, live", () => {
+  test.serial("the four groups from the fields, live", () => {
     const groups = toolGroups(flux, {
       read: ["get_*"],
       write: [],
@@ -192,7 +201,7 @@ describe("the model", () => {
     expect(unmatchedLine(["x", "y*"])).toBe("match no tool: x, y*");
   });
 
-  test("the timeout in seconds, empty for the limits' value", () => {
+  test.serial("the timeout in seconds, empty for the limits' value", () => {
     expect(timeoutText(null)).toBe("");
     expect(timeoutText(90_000)).toBe("90");
     expect(timeoutMs("")).toBeNull();
@@ -204,35 +213,41 @@ describe("the model", () => {
     expect(timeoutProblem("3601")).toBe("1 to 3600 seconds");
   });
 
-  test("the key options: No key first, the files, a missing one marked", () => {
-    expect(keyOptions(["mcp-github"], null)).toEqual([
-      { value: "", label: "No key" },
-      { value: "mcp-github", label: "mcp-github" },
-    ]);
-    expect(keyOptions(["mcp-github"], "mcp-flux")).toEqual([
-      { value: "", label: "No key" },
-      { value: "mcp-github", label: "mcp-github" },
-      { value: "mcp-flux", label: "mcp-flux", detail: "missing" },
-    ]);
-  });
+  test.serial(
+    "the key options: No key first, the files, a missing one marked",
+    () => {
+      expect(keyOptions(["mcp-github"], null)).toEqual([
+        { value: "", label: "No key" },
+        { value: "mcp-github", label: "mcp-github" },
+      ]);
+      expect(keyOptions(["mcp-github"], "mcp-flux")).toEqual([
+        { value: "", label: "No key" },
+        { value: "mcp-github", label: "mcp-github" },
+        { value: "mcp-flux", label: "mcp-flux", detail: "missing" },
+      ]);
+    },
+  );
 
-  test("the instructions box shows the block, trimmed past 12 lines", () => {
-    const short = instructionsBox("flux", "one\ntwo", false);
-    expect(short.text).toBe(
-      '  <server name="flux">\n    one\n    two\n  </server>',
-    );
-    expect(short.canToggle).toBe(false);
-    expect(short.count).toBe(short.text.length);
-    const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
-    const folded = instructionsBox("flux", long, false);
-    expect(folded.canToggle).toBe(true);
-    expect(folded.text.split("\n")).toHaveLength(12);
-    expect(instructionsBox("flux", long, true).text.split("\n")).toHaveLength(
-      22,
-    );
-  });
+  test.serial(
+    "the instructions box shows the block, trimmed past 12 lines",
+    () => {
+      const short = instructionsBox("flux", "one\ntwo", false);
+      expect(short.text).toBe(
+        '  <server name="flux">\n    one\n    two\n  </server>',
+      );
+      expect(short.canToggle).toBe(false);
+      expect(short.count).toBe(short.text.length);
+      const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
+      const folded = instructionsBox("flux", long, false);
+      expect(folded.canToggle).toBe(true);
+      expect(folded.text.split("\n")).toHaveLength(12);
+      expect(instructionsBox("flux", long, true).text.split("\n")).toHaveLength(
+        22,
+      );
+    },
+  );
 
-  test("the agent form's preview from the rows loaded", () => {
+  test.serial("the agent form's preview from the rows loaded", () => {
     const docs = server({
       id: "m2",
       name: "docs",
@@ -251,6 +266,29 @@ describe("the model", () => {
     expect(preview.warnings).toEqual(["docs left out: over the 32,000 cap"]);
     expect(preview.text).toContain('<server name="flux">');
     expect(preview.text).not.toContain('name="docs"');
+    const huge = server({
+      id: "m3",
+      name: "huge",
+      instructions: "huge instructions",
+      tools: [
+        {
+          ...tool("get_huge"),
+          wireName: "mcp__huge__get_huge",
+          schemaJson: JSON.stringify({
+            type: "object",
+            enum: ["x".repeat(MAX_SCHEMAS_BYTES)],
+          }),
+        },
+      ],
+    });
+    const schemaPreview = promptPreview(
+      [flux, huge],
+      [links[0]!, { serverId: "m3", read: true, write: true }],
+    );
+    expect(schemaPreview.warnings).toEqual([
+      "huge left out: its tools are over the 1 MB cap",
+    ]);
+    expect(schemaPreview.line).toEndWith("from flux");
     // the switch off on the only server: no line, no warning
     const quiet = promptPreview(
       [server({ instructionsOn: false })],
@@ -264,7 +302,25 @@ describe("the model", () => {
     ).toBe("");
   });
 
-  test("a refusal's field", () => {
+  test.serial("the endpoint and settings dirty states stay apart", () => {
+    const draft = {
+      read: flux.read,
+      write: flux.write,
+      instructionsOn: flux.instructionsOn,
+      timeout: "",
+      patterns: {
+        read: flux.readPatterns,
+        write: flux.writePatterns,
+        excluded: flux.excludedPatterns,
+      },
+    };
+    expect(endpointDirty(flux, flux.url, "")).toBe(false);
+    expect(endpointDirty(flux, "http://other.test/mcp", "")).toBe(true);
+    expect(settingsDirty(flux, draft)).toBe(false);
+    expect(settingsDirty(flux, { ...draft, write: true })).toBe(true);
+  });
+
+  test.serial("a refusal's field", () => {
     expect(mcpFieldOf("name is invalid")).toBe("name");
     expect(mcpFieldOf("an MCP server named flux exists")).toBe("name");
     expect(mcpFieldOf("keyName must start with mcp-")).toBe("keyName");
@@ -274,78 +330,107 @@ describe("the model", () => {
     expect(mcpFieldOf("the server refused the key")).toBeUndefined();
   });
 
-  test("the agent's servers: a side toggled, the listed ones, the same set", () => {
-    const one = toggleSide([], "m1", "read");
-    expect(one).toEqual([{ serverId: "m1", read: true, write: false }]);
-    const both = toggleSide(one, "m1", "write");
-    expect(both).toEqual([{ serverId: "m1", read: true, write: true }]);
-    expect(toggleSide(toggleSide(both, "m1", "read"), "m1", "write")).toEqual(
-      [],
-    );
-    expect(listedServers(both, null)).toBe(both);
-    expect(listedServers(both, [{ id: "m2" }])).toEqual([]);
-    expect(
-      sameServers(both, [{ serverId: "m1", write: true, read: true }]),
-    ).toBe(true);
-    expect(sameServers(both, one)).toBe(false);
-  });
+  test.serial(
+    "the agent's servers: a side toggled, the listed ones, the same set",
+    () => {
+      const one = toggleSide([], "m1", "read");
+      expect(one).toEqual([{ serverId: "m1", read: true, write: false }]);
+      const both = toggleSide(one, "m1", "write");
+      expect(both).toEqual([{ serverId: "m1", read: true, write: true }]);
+      expect(toggleSide(toggleSide(both, "m1", "read"), "m1", "write")).toEqual(
+        [],
+      );
+      expect(listedServers(both, null)).toBe(both);
+      expect(listedServers(both, [{ id: "m2" }])).toEqual([]);
+      expect(
+        sameServers(both, [{ serverId: "m1", write: true, read: true }]),
+      ).toBe(true);
+      expect(sameServers(both, one)).toBe(false);
+    },
+  );
 });
 
 describe("the entity", () => {
-  test("loads the rows with the keys and when they were read, and folds a write back", async () => {
-    const calls: string[] = [];
-    answer = (url, init) => {
-      calls.push(`${init?.method ?? "GET"} ${url}`);
-      if (url === "/api/mcp" && (init?.method ?? "GET") === "GET") {
-        return Response.json({
-          servers: [flux],
-          keys: ["mcp-github"],
-          loadedAt: now,
-        });
-      }
-      if (url === "/api/mcp/m1" && init?.method === "PATCH") {
-        return Response.json({ server: server({ write: true }) });
-      }
-      if (url === "/api/mcp/m1/refresh") {
-        return Response.json({
-          server: server({ serverVersion: "2.0.0", checkedAt: now }),
-        });
-      }
-      if (url === "/api/mcp" && init?.method === "POST") {
-        return Response.json({ server: server({ id: "m2", name: "docs" }) });
-      }
-      if (url === "/api/mcp/m2" && init?.method === "DELETE") {
-        return new Response(null, { status: 204 });
-      }
-      return Response.json({ error: "nope" }, { status: 500 });
-    };
-    await loadMcp();
-    expect(servers.value).toEqual([flux]);
-    expect(keys.value).toEqual(["mcp-github"]);
-    expect(loadedAt.value).toBe(now);
-    await patchServer("m1", { write: true });
-    expect(servers.value?.[0]?.write).toBe(true);
-    await refreshServer("m1");
-    expect(servers.value?.[0]?.serverVersion).toBe("2.0.0");
-    await addServer({
-      name: "docs",
-      url: "http://docs.test/mcp",
-      keyName: null,
-      read: true,
-      write: false,
-      instructionsOn: true,
-      timeoutMs: null,
-      readPatterns: [],
-      writePatterns: [],
-      excludedPatterns: [],
+  test.serial(
+    "loads the rows with the keys and when they were read, and folds a write back",
+    async () => {
+      const calls: string[] = [];
+      answer = (url, init) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (url === "/api/mcp" && (init?.method ?? "GET") === "GET") {
+          return Response.json({
+            servers: [flux],
+            keys: ["mcp-github"],
+            loadedAt: now,
+          });
+        }
+        if (url === "/api/mcp/m1" && init?.method === "PATCH") {
+          return Response.json({ server: server({ write: true }) });
+        }
+        if (url === "/api/mcp/m1/refresh") {
+          return Response.json({
+            server: server({ serverVersion: "2.0.0", checkedAt: now }),
+          });
+        }
+        if (url === "/api/mcp" && init?.method === "POST") {
+          return Response.json({ server: server({ id: "m2", name: "docs" }) });
+        }
+        if (url === "/api/mcp/m2" && init?.method === "DELETE") {
+          return new Response(null, { status: 204 });
+        }
+        return Response.json({ error: "nope" }, { status: 500 });
+      };
+      await loadMcp();
+      expect(servers.value).toEqual([flux]);
+      expect(keys.value).toEqual(["mcp-github"]);
+      expect(loadedAt.value).toBe(now);
+      await patchServer("m1", { write: true });
+      expect(servers.value?.[0]?.write).toBe(true);
+      await refreshServer("m1");
+      expect(servers.value?.[0]?.serverVersion).toBe("2.0.0");
+      await addServer({
+        name: "docs",
+        url: "http://docs.test/mcp",
+        keyName: null,
+        read: true,
+        write: false,
+        instructionsOn: true,
+        timeoutMs: null,
+        readPatterns: [],
+        writePatterns: [],
+        excludedPatterns: [],
+      });
+      expect(servers.value?.map((s) => s.name)).toEqual(["docs", "flux"]);
+      await deleteServer("m2");
+      expect(servers.value?.map((s) => s.name)).toEqual(["flux"]);
+      expect(calls[0]).toBe("GET /api/mcp");
+    },
+  );
+
+  test.serial("a write supersedes a load in flight", async () => {
+    let finishLoad!: (response: Response) => void;
+    let finishWrite!: (response: Response) => void;
+    const loadResponse = new Promise<Response>((resolve) => {
+      finishLoad = resolve;
     });
-    expect(servers.value?.map((s) => s.name)).toEqual(["docs", "flux"]);
-    await deleteServer("m2");
-    expect(servers.value?.map((s) => s.name)).toEqual(["flux"]);
-    expect(calls[0]).toBe("GET /api/mcp");
+    const writeResponse = new Promise<Response>((resolve) => {
+      finishWrite = resolve;
+    });
+    answer = (_url, init) =>
+      init?.method === "PATCH" ? writeResponse : loadResponse;
+    const loading = loadMcp();
+    const writing = patchServer("m1", { write: true });
+    finishLoad(
+      Response.json({ servers: [flux], keys: [], loadedAt: now - HOUR }),
+    );
+    await loading;
+    expect(servers.value).toBeNull();
+    finishWrite(Response.json({ server: server({ write: true }) }));
+    await writing;
+    expect(servers.value?.[0]?.write).toBe(true);
   });
 
-  test("a load that fails is the page's error", async () => {
+  test.serial("a load that fails is the page's error", async () => {
     answer = () => Response.json({ error: "down" }, { status: 503 });
     await loadMcp();
     expect(servers.value).toBeNull();
@@ -354,7 +439,7 @@ describe("the entity", () => {
 });
 
 describe("the page", () => {
-  test("sits in the Admin group after Skills", () => {
+  test.serial("sits in the Admin group after Skills", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
@@ -362,45 +447,121 @@ describe("the page", () => {
     expect(labels.at(-2)).toBe("Skills");
   });
 
-  test("renders the rows with their head and the loaded-ago hint", () => {
-    servers.value = [flux];
-    loadedAt.value = Date.now() - 2 * 60_000;
-    const html = render(<Mcp />);
-    expect(html).toContain("flux");
-    expect(html).toContain("5 tools · checked");
-    expect(html).toContain("loaded 2m ago");
-    expect(html).toContain("New server");
-  });
+  test.serial(
+    "renders the rows with their head and the loaded-ago hint",
+    () => {
+      servers.value = [flux];
+      loadedAt.value = Date.now() - 2 * 60_000;
+      const html = render(<Mcp />);
+      expect(html).toContain("flux");
+      expect(html).toContain("5 tools · checked");
+      expect(html).toContain(flux.url);
+      expect(html).toContain("Read on · Write off");
+      expect(html).toContain("loaded 2m ago");
+      expect(html).toContain("New server");
+    },
+  );
 
-  test("the picker shows a side off on the server faint, and the preview", () => {
-    const html = render(
-      <McpPicker
-        available={[flux]}
-        loadedAt={Date.now() - 60_000}
-        chosen={[{ serverId: "m1", read: true, write: false }]}
-        mode="auto"
-        takesTools
-        busy={false}
-        onToggle={() => {}}
-        onMode={() => {}}
-      />,
-    );
-    expect(html).toContain("off on the server");
-    expect(html).toContain("as of the servers loaded 1m ago");
-    expect(html).toContain("Instructions in the prompt:");
-    expect(html).toContain("Every tool schema goes to the model");
-    const none = render(
-      <McpPicker
-        available={[]}
-        loadedAt={null}
-        chosen={[]}
-        mode="auto"
-        takesTools={false}
-        busy={false}
-        onToggle={() => {}}
-        onMode={() => {}}
-      />,
-    );
-    expect(none).toContain("No MCP servers yet");
-  });
+  test.serial(
+    "an open row renders change names, failure age and instructions states",
+    () => {
+      const changed = server({
+        instructions: "one\ntwo",
+        refreshError: "discovery failed",
+        refreshFailedAt: now - 60_000,
+        lastChange: {
+          at: now - HOUR,
+          added: ["new_tool"],
+          removed: ["old_tool"],
+          changed: ["moved_tool"],
+          instructions: true,
+        },
+      });
+      const html = render(
+        <ServerRow server={changed} now={now} open onToggle={() => {}} />,
+      );
+      expect(html).toContain("refresh failed 1m ago");
+      expect(html).toContain("discovery failed, serving the list from 2h ago");
+      expect(html).toContain("1h ago: 1 tool added, 1 removed, 1 changed");
+      expect(html).toContain("new_tool");
+      expect(html).toContain("old_tool");
+      expect(html).toContain("moved_tool");
+      expect(html).not.toContain("Show all");
+      const long = render(
+        <ServerRow
+          server={server({
+            instructions: Array.from(
+              { length: 20 },
+              (_, i) => `line ${i}`,
+            ).join("\n"),
+          })}
+          now={now}
+          open
+          onToggle={() => {}}
+        />,
+      );
+      expect(long).toContain("Show all");
+      const off = render(
+        <ServerRow
+          server={server({ instructionsOn: false, instructions: "" })}
+          now={now}
+          open
+          onToggle={() => {}}
+        />,
+      );
+      expect(off).toContain("off, not sent");
+      expect(off).not.toContain("Server sent no instructions");
+    },
+  );
+
+  test.serial(
+    "the picker shows a side off on the server faint, and the preview",
+    () => {
+      const html = render(
+        <McpPicker
+          available={[flux]}
+          loadedAt={Date.now() - 60_000}
+          chosen={[{ serverId: "m1", read: true, write: false }]}
+          mode="auto"
+          takesTools
+          busy={false}
+          onToggle={() => {}}
+          onMode={() => {}}
+        />,
+      );
+      expect(html).toContain("off on the server");
+      expect(html).toContain("as of the servers loaded 1m ago");
+      expect(html).toContain("Instructions in the prompt:");
+      expect(html).toContain("Every tool schema goes to the model");
+      const noTools = render(
+        <McpPicker
+          available={[flux]}
+          loadedAt={Date.now() - 60_000}
+          chosen={[{ serverId: "m1", read: true, write: false }]}
+          mode="auto"
+          takesTools={false}
+          busy={false}
+          onToggle={() => {}}
+          onMode={() => {}}
+        />,
+      );
+      expect(noTools).toContain("This model takes no tools");
+      expect(noTools).not.toContain("Instructions in the prompt");
+      expect(noTools).not.toContain("Tool schemas");
+      const none = render(
+        <McpPicker
+          available={[]}
+          loadedAt={Date.now() - 60_000}
+          chosen={[]}
+          mode="auto"
+          takesTools={false}
+          busy={false}
+          onToggle={() => {}}
+          onMode={() => {}}
+        />,
+      );
+      expect(none).toContain("No MCP servers yet");
+      expect(none).toContain("as of the servers loaded 1m ago");
+    },
+  );
 });

@@ -47,9 +47,7 @@ export function McpPicker({
   const viewing = useSignal(false);
   const linkOf = (id: string) => chosen.find((s) => s.serverId === id);
   const preview =
-    available === null || !takesTools
-      ? null
-      : promptPreview(available, chosen);
+    available === null || !takesTools ? null : promptPreview(available, chosen);
   const side = (
     server: McpServerSummary,
     which: "read" | "write",
