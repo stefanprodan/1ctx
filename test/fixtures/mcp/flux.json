@@ -1,0 +1,565 @@
+{
+  "initialize": {
+    "capabilities": {
+      "tools": {}
+    },
+    "instructions": "This server connects to Kubernetes API to inspect, troubleshoot and manage workloads and the GitOps pipelines run by Flux CD.\n\nWorkflow:\n- To check if Flux is installed and learn the Flux Operator status, the installed controllers and the apiVersion of the Flux CRDs, call get_flux_instance.\n- Read Kubernetes and Flux resources with get_kubernetes_resources. Never guess an apiVersion, call get_kubernetes_api_versions when it is unknown.\n- When listing many resources or when only some fields matter, set the fields parameter of get_kubernetes_resources to kubectl JSONPath expressions (e.g. spec.chart.spec.version, status.conditions[?(@.type==\"Ready\")].message) to reduce the result size. Include status.events and status.inventory when the events or the inventory are needed.\n- Resources managed by Flux carry labels containing fluxcd that identify the Kustomization, HelmRelease or ResourceSet managing them.\n- To find the GitOps pipeline that delivers an object (pod, workload or Flux resource), call trace_kubernetes_resource; it reports the Flux objects managing the object and their source.\n- When troubleshooting workloads, call get_kubernetes_events with the workload kind, name and namespace, and narrow with type Warning, since and grep.\n- To read application logs, call get_kubernetes_logs directly with the workload kind, name and namespace found in a Flux resource's inventory via get_kubernetes_resources. Omit container to read all regular containers. Use since to focus on the incident window and grep to keep only the relevant entries, such as error|panic|fatal|exception; if the result is truncated, narrow it with container, since, grep and limit.\n- To check the CPU and memory usage of pods, call get_kubernetes_metrics.\n- To work with a different cluster, call get_kubeconfig_contexts to find the context, switch to it with set_kubeconfig_context, then call get_flux_instance again.\n- Before committing GitOps changes, build the manifests locally (kustomize build <path> --load-restrictor=LoadRestrictionsNone, flux-operator build resourceset, helm template) and pass the COMPLETE output to diff_kubernetes_manifest. For manifests managed by Flux, identify the owner (Kustomization, HelmRelease or ResourceSet) that matches spec.path/sourceRef with get_kubernetes_resources and set owner_kind/owner_name/owner_namespace, or pass its YAML in flux_object if it is new or not yet on the cluster. Skip owner lookup when the user already names the owner; ad-hoc manifests need none.\n\nActions:\n- To create or update resources, generate a Kubernetes multi-doc YAML, preview the changes with diff_kubernetes_manifest (no owner needed) and apply it with apply_kubernetes_manifest. Avoid changing Flux-managed resources directly unless explicitly asked.\n- To change fields of an existing resource in place (rollout restart, finalizer removal, scaling, annotations), call patch_kubernetes_resource; set dry_run to preview when unsure. Flux-managed resources need overwrite.\n- To trigger a sync, call reconcile_flux_resource, then verify the outcome with get_kubernetes_resources.\n- To pause and unpause the reconciliation of a Flux resource, call suspend_flux_reconciliation and resume_flux_reconciliation.\n- To remove resources from the cluster, call delete_kubernetes_resource.\n- To bootstrap Flux on a cluster without it, call install_flux_instance.\n\nWhen generating or reviewing Flux resource definitions, call `search_flux_docs` with a query that names the kind and field (e.g. `HelmRelease valuesFrom`), then call `read_flux_doc` with the returned `Path` and heading anchor to read the full section.",
+    "protocolVersion": "2025-06-18",
+    "serverInfo": {
+      "name": "flux-operator-mcp",
+      "version": "0.0.0-dev.0"
+    }
+  },
+  "tools": {
+    "ttlMs": 0,
+    "cacheScope": "public",
+    "tools": [
+      {
+        "description": "Applies a Kubernetes YAML manifest on the cluster.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "yaml_content": {
+              "type": "string",
+              "description": "The multi-doc YAML content."
+            },
+            "overwrite": {
+              "type": "boolean",
+              "description": "Overwrite resources managed by Flux."
+            }
+          },
+          "required": [
+            "yaml_content"
+          ],
+          "additionalProperties": false
+        },
+        "name": "apply_kubernetes_manifest"
+      },
+      {
+        "description": "Deletes a Kubernetes resource from the cluster.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "The apiVersion of the resource to delete."
+            },
+            "kind": {
+              "type": "string",
+              "description": "The kind of the resource to delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "The name of the resource to delete."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "The namespace of the resource to delete."
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "name": "delete_kubernetes_resource"
+      },
+      {
+        "description": "Diffs a Kubernetes YAML manifest against the cluster using a server-side apply dry-run.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "yaml_content": {
+              "type": "string",
+              "description": "Multi-doc YAML content to diff."
+            },
+            "flux_object": {
+              "type": "string",
+              "description": "YAML of the owning Flux resource, when new or changed."
+            },
+            "owner_kind": {
+              "type": "string",
+              "description": "Owning Flux resource kind: Kustomization, HelmRelease or ResourceSet."
+            },
+            "owner_name": {
+              "type": "string",
+              "description": "Name of the owning Flux resource."
+            },
+            "owner_namespace": {
+              "type": "string",
+              "description": "Namespace of the owning Flux resource."
+            }
+          },
+          "additionalProperties": false
+        },
+        "name": "diff_kubernetes_manifest"
+      },
+      {
+        "description": "Retrieves the Flux installation report with controllers, CRDs and their reconciliation status.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "name": "get_flux_instance"
+      },
+      {
+        "description": "Retrieves the cluster names and contexts found in the kubeconfig.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "name": "get_kubeconfig_contexts"
+      },
+      {
+        "description": "Retrieves the CRDs registered on the cluster and their preferred apiVersion for each kind.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "name": "get_kubernetes_api_versions"
+      },
+      {
+        "description": "Retrieves Kubernetes events, optionally filtered by namespace, involved object, type, time window and regex.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "Exact apiVersion of the involved object."
+            },
+            "kind": {
+              "type": "string",
+              "description": "Exact kind of the involved object."
+            },
+            "name": {
+              "type": "string",
+              "description": "Exact name of the involved object."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace of the involved objects; omit to list across all namespaces."
+            },
+            "type": {
+              "type": "string",
+              "description": "Event type: Normal or Warning."
+            },
+            "since": {
+              "type": "string",
+              "description": "Only events newer than this Go duration, for example 10m or 1h."
+            },
+            "grep": {
+              "type": "string",
+              "description": "Case-insensitive RE2 expression matched against reason, message and the object rendered as Kind/namespace/name."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of events to return. Defaults to 100."
+            }
+          },
+          "additionalProperties": false
+        },
+        "name": "get_kubernetes_events"
+      },
+      {
+        "description": "Retrieves logs from a Kubernetes pod.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "description": "Kind of the resource: Pod (default), Deployment, StatefulSet, DaemonSet, CronJob or Job."
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the pod or workload."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace of the pod or workload."
+            },
+            "container": {
+              "type": "string",
+              "description": "Container name; omit to read all containers."
+            },
+            "since": {
+              "type": "string",
+              "description": "Only log entries newer than this Go duration, for example 10m or 1h."
+            },
+            "grep": {
+              "type": "string",
+              "description": "Case-insensitive RE2 expression; keeps the log entries whose line matches, including attached continuation lines."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max log lines. Defaults to 100."
+            },
+            "previous": {
+              "type": "boolean",
+              "description": "Logs from the previously terminated containers."
+            }
+          },
+          "required": [
+            "name",
+            "namespace"
+          ],
+          "additionalProperties": false
+        },
+        "name": "get_kubernetes_logs"
+      },
+      {
+        "description": "Retrieves CPU and memory usage of pods.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "pod_name": {
+              "type": "string",
+              "description": "Pod name; omit to select all pods."
+            },
+            "pod_namespace": {
+              "type": "string",
+              "description": "Namespace of the pods."
+            },
+            "pod_selector": {
+              "type": "string",
+              "description": "Label selector in the format key1=value1 key2=value2."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max resources. Defaults to 100."
+            }
+          },
+          "required": [
+            "pod_namespace"
+          ],
+          "additionalProperties": false
+        },
+        "name": "get_kubernetes_metrics"
+      },
+      {
+        "description": "Retrieves Kubernetes resources from the cluster.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "apiVersion of the resource. Use get_kubernetes_api_versions when unknown."
+            },
+            "kind": {
+              "type": "string",
+              "description": "Kind of the resource."
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the resource; omit to list."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace; omit for all namespaces."
+            },
+            "selector": {
+              "type": "string",
+              "description": "Label selector in the format key1=value1 key2=value2."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max number of resources to return."
+            },
+            "fields": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "kubectl JSONPath expressions to include in the result to reduce its size, e.g. spec.sourceRef.name or status.conditions[?(@.type=='Ready')].message."
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "name": "get_kubernetes_resources"
+      },
+      {
+        "description": "Installs Flux Operator and a Flux instance on the cluster from a manifest URL.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "instance_url": {
+              "type": "string",
+              "description": "The URL pointing to the Flux Instance manifest file."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "The installation timeout. Default is 5m."
+            }
+          },
+          "required": [
+            "instance_url"
+          ],
+          "additionalProperties": false
+        },
+        "name": "install_flux_instance"
+      },
+      {
+        "description": "Patches a Kubernetes resource on the cluster with a merge, JSON or strategic merge patch.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "The apiVersion of the resource to patch."
+            },
+            "kind": {
+              "type": "string",
+              "description": "The kind of the resource to patch."
+            },
+            "name": {
+              "type": "string",
+              "description": "The name of the resource to patch."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "The namespace of the resource; omit for cluster-scoped resources."
+            },
+            "patch": {
+              "type": "string",
+              "description": "The patch body as a YAML or JSON string."
+            },
+            "type": {
+              "type": "string",
+              "description": "Patch type: merge (RFC 7386, default), json (RFC 6902 operation list) or strategic (built-in kinds only)."
+            },
+            "subresource": {
+              "type": "string",
+              "description": "Subresource to patch; only status is supported."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "description": "Preview the patch with server-side dry run without persisting it."
+            },
+            "overwrite": {
+              "type": "boolean",
+              "description": "Allow patching resources managed by Flux."
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind",
+            "name",
+            "patch"
+          ],
+          "additionalProperties": false
+        },
+        "name": "patch_kubernetes_resource"
+      },
+      {
+        "description": "Reads a Flux Operator documentation page as markdown. Use the path from search_flux_docs results. Long pages should be read in slices: pass heading to jump to a section, or offset and limit to page; the response reports the next offset. Output is capped at 30KB per call.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Doc path from search results, e.g. /docs/crd/helmrelease"
+            },
+            "heading": {
+              "type": "string",
+              "description": "Heading anchor or text; reads that section only"
+            },
+            "offset": {
+              "type": "number",
+              "description": "1-based start line, ignored when heading is set"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum lines to return (1-1000). Default is 400."
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        "name": "read_flux_doc"
+      },
+      {
+        "description": "Reconciles a Flux resource by triggering an on-demand reconciliation, optionally reconciling its source first.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "The apiVersion of the Flux resource. Optional, when omitted it is resolved from the kind."
+            },
+            "kind": {
+              "type": "string",
+              "description": "The kind of the Flux resource e.g. Kustomization, HelmRelease, ResourceSet, ResourceSetInputProvider, FluxInstance, GitRepository, OCIRepository, HelmRepository, HelmChart, Bucket, ImageRepository, ImagePolicy, ImageUpdateAutomation, Receiver."
+            },
+            "name": {
+              "type": "string",
+              "description": "The name of the Flux resource."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "The namespace of the Flux resource."
+            },
+            "with_source": {
+              "type": "boolean",
+              "description": "If true, the source referenced by the resource (spec.sourceRef, spec.chartRef or spec.chart.spec.sourceRef) is reconciled first. Applies to Kustomization and HelmRelease."
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "namespace"
+          ],
+          "additionalProperties": false
+        },
+        "name": "reconcile_flux_resource"
+      },
+      {
+        "description": "Resumes reconciliation for a Flux resource.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "The apiVersion of the Flux resource. Optional, when omitted it is resolved from the kind."
+            },
+            "kind": {
+              "type": "string",
+              "description": "The kind of the Flux resource."
+            },
+            "name": {
+              "type": "string",
+              "description": "The name of the Flux resource."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "The namespace of the Flux resource."
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "namespace"
+          ],
+          "additionalProperties": false
+        },
+        "name": "resume_flux_reconciliation"
+      },
+      {
+        "description": "Searches the Flux Operator and Flux CRD documentation, returning the most relevant sections with their path and line range. Query with 2-5 keywords naming the kind and field (e.g. HelmRelease valuesFrom, CEL expression), not a question. Pages are published at https://fluxoperator.dev{path}/.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Keywords naming the kind and field, e.g. HelmRelease valuesFrom (2-200 characters)."
+            },
+            "path": {
+              "type": "string",
+              "description": "Optional doc or section path (max 300 characters): /docs/guides, /docs/instance, /docs/resourcesets, /docs/web-ui, /docs/mcp, /docs/crd, /docs/controllers, /docs/charts."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum sections to return (1-20). Default is 8."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "name": "search_flux_docs"
+      },
+      {
+        "description": "Sets the current kubeconfig context.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Kubeconfig context name."
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "name": "set_kubeconfig_context"
+      },
+      {
+        "description": "Suspends reconciliation for a Flux resource.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "The apiVersion of the Flux resource. Optional, when omitted it is resolved from the kind."
+            },
+            "kind": {
+              "type": "string",
+              "description": "The kind of the Flux resource."
+            },
+            "name": {
+              "type": "string",
+              "description": "The name of the Flux resource."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "The namespace of the Flux resource."
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "namespace"
+          ],
+          "additionalProperties": false
+        },
+        "name": "suspend_flux_reconciliation"
+      },
+      {
+        "description": "Traces a Kubernetes resource up the GitOps delivery pipeline to the Flux objects managing it and their source.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "apiVersion": {
+              "type": "string",
+              "description": "apiVersion of the resource. Use get_kubernetes_api_versions when unknown."
+            },
+            "kind": {
+              "type": "string",
+              "description": "Kind of the resource."
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the resource."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace of the resource; omit for cluster-scoped resources."
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "name": "trace_kubernetes_resource"
+      }
+    ]
+  }
+}

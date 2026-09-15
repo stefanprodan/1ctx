@@ -313,6 +313,7 @@ describe("additive migrations", () => {
       "0006-skills",
       "0007-user-tz",
       "0008-search-tavily",
+      "0009-mcp",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -357,6 +358,7 @@ describe("0005", () => {
       "0006-skills",
       "0007-user-tz",
       "0008-search-tavily",
+      "0009-mcp",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -410,6 +412,7 @@ describe("rebuild migrations", () => {
       "0006-skills",
       "0007-user-tz",
       "0008-search-tavily",
+      "0009-mcp",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -496,6 +499,7 @@ describe("0006 skills migration", () => {
       "0006-skills",
       "0007-user-tz",
       "0008-search-tavily",
+      "0009-mcp",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -538,9 +542,63 @@ describe("0007 user tz migration", () => {
         (id, username, full_name, email, role, password_hash, created_at)
         values ('u7', 'user7', 'User', 'u7@example.com', 'member', 'h', 0);
     `);
-    expect(migrate(db)).toEqual(["0007-user-tz", "0008-search-tavily"]);
+    expect(migrate(db)).toEqual([
+      "0007-user-tz",
+      "0008-search-tavily",
+      "0009-mcp",
+    ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
+    });
+    db.close();
+  });
+});
+
+describe("0009 mcp migration", () => {
+  test("keeps the agents and sends, adds the mode and the digest key", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 8));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, tz, role, password_hash, created_at)
+        values ('u9', 'user9', 'User', 'u9@example.com', 'UTC', 'admin', 'h', 0);
+      insert into providers (id, name, wire, base_url, key_name, created_at)
+        values ('p9', 'prov9', 'openai-compatible', 'http://x', null, 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a9', 'agent9', 'p9', 'm', 'M', 0);
+    `);
+    expect(migrate(db)).toEqual(["0009-mcp"]);
+    expect(
+      db.query("select mcp_mode from agents where id = 'a9'").get(),
+    ).toEqual({ mcp_mode: "auto" });
+    expect(() =>
+      db.query("update agents set mcp_mode = 'other' where id = 'a9'").run(),
+    ).toThrow();
+    db.query("update agents set mcp_mode = 'catalog' where id = 'a9'").run();
+    db.exec(`
+      insert into mcp_servers
+        (id, name, url, read, write, read_patterns, write_patterns,
+         excluded_patterns, server_name, server_version, protocol_version,
+         instructions, fingerprint, checked_at, created_at)
+        values ('s9', 'flux', 'http://x/mcp', 1, 0, '[]', '[]', '[]',
+                '', '', '2025-06-18', '', 'f', 0, 0);
+      insert into agent_servers (agent_id, server_id, read, write)
+        values ('a9', 's9', 1, 0);
+    `);
+    // at least one side on
+    expect(() =>
+      db.query("update agent_servers set read = 0 where agent_id = 'a9'").run(),
+    ).toThrow();
+    // a server an agent references stays
+    expect(() =>
+      db.query("delete from mcp_servers where id = 's9'").run(),
+    ).toThrow();
+    // an agent's rows go with it
+    db.query("delete from agents where id = 'a9'").run();
+    expect(db.query("select count(*) as n from agent_servers").get()).toEqual({
+      n: 0,
     });
     db.close();
   });
@@ -556,7 +614,7 @@ describe("0008 search tavily migration", () => {
       update tools set provider = 'firecrawl', updated_at = 6
         where name = 'websearch';
     `);
-    expect(migrate(db)).toEqual(["0008-search-tavily"]);
+    expect(migrate(db)).toEqual(["0008-search-tavily", "0009-mcp"]);
     expect(
       db
         .query(

@@ -122,6 +122,54 @@ export function isName(value: unknown): value is string {
   );
 }
 
+// an MCP server's name: the channel rule without the underscore, 2 to
+// 24. It makes the wire name mcp__<server>__<tool>, so with no `_` in
+// it the first `__` after `mcp__` always ends it, and at 24 the longest
+// name leaves 33 characters for the tool inside the wire's 64
+const SERVER_NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+export const MIN_SERVER_NAME = 2;
+export const MAX_SERVER_NAME = 24;
+export function isServerName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= MIN_SERVER_NAME &&
+    value.length <= MAX_SERVER_NAME &&
+    SERVER_NAME_RE.test(value)
+  );
+}
+// what a server name field does as it is typed: shapeName, and an
+// underscore becomes a dash
+export function shapeServerName(value: string): string {
+  return shapeName(value).replace(/_/g, "-");
+}
+
+// the two sides an MCP server's tools are sorted into
+export const SIDES = ["read", "write"] as const;
+export type Side = (typeof SIDES)[number];
+export function isSide(value: unknown): value is Side {
+  return SIDES.includes(value as Side);
+}
+
+// a pattern on MCP tool names: `*` alone, or a name in the characters
+// MCP allows with an optional trailing `*` making it a prefix
+const PATTERN_RE = /^[a-zA-Z0-9_.-]{1,128}\*?$/;
+export function isPattern(value: unknown): value is string {
+  return typeof value === "string" && (value === "*" || PATTERN_RE.test(value));
+}
+export const MAX_PATTERNS = 50;
+
+// how an agent's MCP tools reach the model: every schema on the wire,
+// a catalog with two tools, or whichever the token cap picks
+export const MCP_MODES = ["all", "catalog", "auto"] as const;
+export type McpMode = (typeof MCP_MODES)[number];
+export function isMcpMode(value: unknown): value is McpMode {
+  return MCP_MODES.includes(value as McpMode);
+}
+
+// an MCP server's own call timeout, null for the limits' callTimeoutMs
+export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;
+export const MAX_MCP_URL = 2048;
+
 // every personal project is named this, so a team project may not be
 export const PERSONAL_PROJECT_NAME = "personal";
 export const RESERVED_PROJECT_NAMES: readonly string[] = [
