@@ -6,6 +6,7 @@ import {
   bytesWord,
   displayResult,
   prettyArguments,
+  ranCall,
   shortArg,
   toolLabel,
   toolSummary,
@@ -88,6 +89,34 @@ describe("tool summaries", () => {
       ),
     ).toBe(`apiVersion: v1 kind: Namespace ${"x".repeat(200)}`.slice(0, 60));
     expect(shortArg("mcp__flux__get_flux_instance", "{}")).toBe("");
+  });
+
+  test("a catalog-mode call reads as the tool the row says ran", () => {
+    const viaCatalog = call("mcp_call", {
+      name: "mcp__github__list_pull_requests",
+      arguments: { owner: "fluxcd", repo: "flux2" },
+    });
+    const ran = ranCall(
+      viaCatalog,
+      result({ toolName: "mcp__github__list_pull_requests" }),
+    );
+    expect(ran.name).toBe("mcp__github__list_pull_requests");
+    expect(toolLabel(ran.name)).toEqual({
+      server: "github",
+      tool: "list_pull_requests",
+    });
+    expect(shortArg(ran.name, ran.arguments)).toBe("fluxcd");
+    expect(
+      toolSummary(
+        viaCatalog,
+        result({ toolName: "mcp__github__list_pull_requests" }),
+      ).argument,
+    ).toBe("fluxcd");
+    // a call the server could not resolve keeps the model's words
+    expect(ranCall(viaCatalog, result({ toolName: "mcp_call" })).name).toBe(
+      "mcp_call",
+    );
+    expect(ranCall(viaCatalog, null).name).toBe("mcp_call");
   });
 
   test("shows a duration only for a completed result", () => {

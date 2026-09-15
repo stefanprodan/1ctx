@@ -13,6 +13,24 @@ export type ToolResult =
   | { status: "done"; content: string; bytes: number; cut: boolean }
   | { status: "failed"; error: string };
 
+// the tool that ran is the row's word: a catalog-mode call is asked
+// for as mcp_call with the wire name inside, and the server writes
+// that name on the row, so the fold reads like a direct call
+export function ranCall(call: ToolCall, result: Message | null): ToolCall {
+  const name = result?.toolName ?? call.name;
+  if (name === call.name || call.name !== "mcp_call") {
+    return { ...call, name };
+  }
+  try {
+    const inner = (
+      JSON.parse(call.arguments || "{}") as Record<string, unknown>
+    ).arguments;
+    return { ...call, name, arguments: JSON.stringify(inner ?? {}) };
+  } catch {
+    return { ...call, name };
+  }
+}
+
 // Keep MCP folds readable by naming the server before the tool.
 export const MAX_MCP_ARGUMENT = 60;
 export function toolLabel(name: string): {
@@ -121,8 +139,9 @@ export function toolSummary(
     const ms = Math.max(0, result.finishedAt - result.createdAt);
     state = ms < 100 ? "instant" : secs(ms);
   }
+  const ran = ranCall(call, result);
   return {
-    argument: shortArg(call.name, call.arguments),
+    argument: shortArg(ran.name, ran.arguments),
     state,
     live,
   };
