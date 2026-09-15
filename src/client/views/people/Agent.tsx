@@ -35,11 +35,10 @@ import {
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import {
   effortText,
-  mcpHint,
-  sidesText,
+  serverLine,
+  serverMeta,
   thinkingText,
   tokensText,
-  toolsCount,
 } from "./People.model.ts";
 import "./people.css";
 
@@ -217,6 +216,44 @@ export function Agent({ params }: { params: Params }) {
                 ))}
               </RowsCard>
               <RowsCard
+                label="MCP"
+                hint={
+                  shown.mcp.servers.length === 0
+                    ? undefined
+                    : tokensText(shown.mcp.tokens)
+                }
+              >
+                {shown.mcp.servers.length === 0 && (
+                  <RowsNote>
+                    {shown.agent.model.tools
+                      ? "No MCP servers."
+                      : "The model does not take tools."}
+                  </RowsNote>
+                )}
+                {shown.mcp.servers.map((server) => {
+                  const line = serverLine(server, now.value);
+                  return (
+                    <RowsLine key={server.name} flush>
+                      <RowsAvatar>
+                        <Icon name="plug" size={14} />
+                      </RowsAvatar>
+                      <RowsTitle
+                        name={server.name}
+                        sub={
+                          line.bad ? (
+                            <span class="people-bad">{line.text}</span>
+                          ) : (
+                            line.text
+                          )
+                        }
+                        mono
+                      />
+                      <RowsMeta>{serverMeta(server)}</RowsMeta>
+                    </RowsLine>
+                  );
+                })}
+              </RowsCard>
+              <RowsCard
                 label="Tools"
                 hint={
                   shown.tools.length === 0
@@ -240,35 +277,6 @@ export function Agent({ params }: { params: Params }) {
                     {tool.provider !== null && (
                       <RowsMeta>{tool.provider}</RowsMeta>
                     )}
-                  </RowsLine>
-                ))}
-              </RowsCard>
-              <RowsCard
-                label="MCP"
-                hint={
-                  shown.mcp.servers.length === 0
-                    ? undefined
-                    : mcpHint(shown.mcp)
-                }
-              >
-                {shown.mcp.servers.length === 0 && (
-                  <RowsNote>
-                    {shown.agent.model.tools
-                      ? "No MCP servers."
-                      : "The model does not take tools."}
-                  </RowsNote>
-                )}
-                {shown.mcp.servers.map((server) => (
-                  <RowsLine key={server.name} flush>
-                    <RowsAvatar>
-                      <Icon name="plug" size={14} />
-                    </RowsAvatar>
-                    <RowsTitle
-                      name={server.name}
-                      sub={sidesText(server)}
-                      mono
-                    />
-                    <RowsMeta>{toolsCount(server.tools)}</RowsMeta>
                   </RowsLine>
                 ))}
               </RowsCard>

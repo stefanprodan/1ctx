@@ -12,7 +12,6 @@
 
 import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { MCP_CATALOG_FROM_TOKENS } from "../../shared/mcp.ts";
 import { BUILTIN_TOOLS } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
@@ -122,8 +121,6 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               provider: tool.name === "websearch" ? offered.search : null,
             })),
           mcp: {
-            mode: agent.mcpMode,
-            resolved: offered.mcpCatalog === "" ? "all" : "catalog",
             servers: offered.mcp.map((server) => {
               const link = agent.servers.find((s) => s.serverId === server.id);
               return {
@@ -131,10 +128,11 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
                 read: link?.read ?? false,
                 write: link?.write ?? false,
                 tools: server.tools.length,
+                checkedAt: server.checkedAt,
+                refreshFailedAt: server.refreshFailedAt,
               };
             }),
             tokens: schemaTokens(offered.mcp),
-            cap: MCP_CATALOG_FROM_TOKENS,
           },
           tokens: {
             prompt: tokens(agent.prompt),

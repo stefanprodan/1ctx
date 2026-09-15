@@ -4,8 +4,7 @@
 // The words on a user's page and an agent's page.
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type { McpMode } from "../../../shared/words.ts";
-import { count } from "../../lib/format.ts";
+import { ago, count } from "../../lib/format.ts";
 import { offsetOf } from "../../ui/Zone.model.ts";
 
 // "16:34 · GMT+3": the time where the user is, and how far that is from
@@ -44,28 +43,33 @@ export function effortText(
 
 // the MCP card's hint: what a send resolves the mode to now, and the
 // lean schemas' count against the cap that flips auto
-export function mcpHint(mcp: {
-  mode: McpMode;
-  resolved: "all" | "catalog";
-  tokens: number;
-  cap: number;
+// under a server's name: when its list was last discovered, or the
+// failure since, in red, as the MCP page's row head says it
+export function serverLine(
+  server: { checkedAt: number; refreshFailedAt: number | null },
+  now: number,
+): { text: string; bad: boolean } {
+  if (server.refreshFailedAt !== null) {
+    return {
+      text: `refresh failed ${ago(server.refreshFailedAt, now)}`,
+      bad: true,
+    };
+  }
+  return { text: `refreshed ${ago(server.checkedAt, now)}`, bad: false };
+}
+
+// the tools that reach the model and the sides the agent may use
+export function serverMeta(server: {
+  read: boolean;
+  write: boolean;
+  tools: number;
 }): string {
-  const what =
-    mcp.resolved === "catalog" ? "a catalog with two tools" : "every schema";
-  const how =
-    mcp.mode === "auto"
-      ? `auto, ${count(mcp.tokens)} of ${count(mcp.cap)} tokens`
-      : mcp.mode === "all"
-        ? "all schemas"
-        : "catalog";
-  return `${what} · ${how}`;
-}
-
-export function sidesText(server: { read: boolean; write: boolean }): string {
-  if (server.read && server.write) return "read and write";
-  return server.read ? "read" : "write";
-}
-
-export function toolsCount(n: number): string {
-  return `${n} tool${n === 1 ? "" : "s"}`;
+  const n = server.tools;
+  const sides =
+    server.read && server.write
+      ? "read and write"
+      : server.read
+        ? "read"
+        : "write";
+  return `${n} tool${n === 1 ? "" : "s"} · ${sides} access`;
 }

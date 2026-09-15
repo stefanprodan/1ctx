@@ -20,6 +20,8 @@ import { Agent } from "../../../src/client/views/people/Agent.tsx";
 import {
   effortText,
   localTime,
+  serverLine,
+  serverMeta,
   thinkingText,
   tokensText,
 } from "../../../src/client/views/people/People.model.ts";
@@ -75,7 +77,7 @@ const agent: DirectoryAgentResponse = {
     { name: "datetime", provider: null },
     { name: "websearch", provider: "exa" },
   ],
-  mcp: { mode: "auto", resolved: "all", servers: [], tokens: 0, cap: 6000 },
+  mcp: { servers: [], tokens: 0 },
   tokens: { prompt: 7, skills: 2000, tools: 300 },
 };
 
@@ -201,6 +203,29 @@ describe("People.model", () => {
   test("a token count reads in thousands", () => {
     expect(tokensText(1)).toBe("1 token");
     expect(tokensText(2716)).toBe("2.72k tokens");
+  });
+
+  test("an MCP server's line: refreshed, or the failure since, in red", () => {
+    const now = Date.now();
+    const hour = 60 * 60 * 1000;
+    expect(
+      serverLine({ checkedAt: now - 2 * hour, refreshFailedAt: null }, now),
+    ).toEqual({ text: "refreshed 2h ago", bad: false });
+    expect(
+      serverLine(
+        { checkedAt: now - 2 * hour, refreshFailedAt: now - 60_000 },
+        now,
+      ),
+    ).toEqual({ text: "refresh failed 1m ago", bad: true });
+    expect(serverMeta({ read: true, write: false, tools: 11 })).toBe(
+      "11 tools · read access",
+    );
+    expect(serverMeta({ read: true, write: true, tools: 1 })).toBe(
+      "1 tool · read and write access",
+    );
+    expect(serverMeta({ read: false, write: true, tools: 27 })).toBe(
+      "27 tools · write access",
+    );
   });
 
   test("thinking and effort say the default when the agent sets none", () => {

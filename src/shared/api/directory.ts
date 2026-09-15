@@ -8,7 +8,6 @@ import type { AgentSummary } from "../contracts/agent.ts";
 import type { ProjectSummary } from "../contracts/project.ts";
 import type { OfferedSkill } from "../contracts/skill.ts";
 import type { DirectoryUser } from "../contracts/user.ts";
-import type { McpMode } from "../words.ts";
 
 // GET /api/directory/users/:username; the projects are the team
 // projects the caller and the user are both members of
@@ -29,24 +28,22 @@ export type DirectoryTool = { name: string; provider: string | null };
 // loading every skill costs) and the tool schemas every request carries
 export type DirectoryTokens = { prompt: number; skills: number; tools: number };
 
-// an MCP server a send would offer the agent now, with the sides the
-// agent may use and how many of its tools reach the model
+// an MCP server a send would offer the agent now: the sides the agent
+// may use, how many of its tools reach the model, when its list was
+// last discovered and when a refresh last failed since, if one did
 export type DirectoryMcpServer = {
   name: string;
   read: boolean;
   write: boolean;
   tools: number;
+  checkedAt: number;
+  refreshFailedAt: number | null;
 };
 
-// the agent's MCP: its mode, what a send resolves it to now, the
-// offered servers, and the lean schemas' count against the cap that
-// flips auto to the catalog
+// the agent's MCP: the offered servers and their lean schemas' count
 export type DirectoryMcp = {
-  mode: McpMode;
-  resolved: "all" | "catalog";
   servers: DirectoryMcpServer[];
   tokens: number;
-  cap: number;
 };
 
 // GET /api/directory/agents/:name; the provider's name, the skills it

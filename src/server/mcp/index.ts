@@ -51,6 +51,10 @@ export type OfferedServer = {
   fingerprint: string;
   instructions: string | null;
   tools: OfferedMcpTool[];
+  // when the list was last discovered, and when a refresh last failed
+  // since, for the agent's page
+  checkedAt: number;
+  refreshFailedAt: number | null;
 };
 
 export type McpPrompt = {
@@ -171,6 +175,8 @@ function offeredRow(row: McpServerRow, prompt: PromptServer): OfferedServer {
     fingerprint: row.fingerprint,
     instructions: prompt.instructions,
     tools,
+    checkedAt: row.checkedAt,
+    refreshFailedAt: row.refreshFailedAt,
   };
 }
 
