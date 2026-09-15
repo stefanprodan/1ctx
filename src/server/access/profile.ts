@@ -95,7 +95,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const principal = ctx.principal!;
         if (!limit.hit(principal.userId, deps.clock())) {
-          throw new TooManyRequests("too many attempts; wait a minute");
+          throw new TooManyRequests("too many attempts. Wait a minute");
         }
         const { current, next } = parsePasswordChange(await jsonBody(req));
         const user = self(principal.userId);

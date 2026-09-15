@@ -65,6 +65,12 @@
     color: var(--faint);
   }
 
+  .profile-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
   .profile-pair {
     display: grid;
     grid-template-columns: 1fr 1fr;

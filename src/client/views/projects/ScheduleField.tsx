@@ -36,6 +36,7 @@ export function ScheduleField({
   schedule,
   tz,
   disabled,
+  invalidTz,
   onSchedule,
   onTz,
 }: {
@@ -43,6 +44,8 @@ export function ScheduleField({
   schedule: string;
   tz: string;
   disabled: boolean;
+  // a refusal names the zone
+  invalidTz?: boolean;
   onSchedule: (expression: string) => void;
   onTz: (tz: string) => void;
 }) {
@@ -219,7 +222,13 @@ export function ScheduleField({
         )}
         <div class="field automations-zone">
           <span class="label">Time zone</span>
-          <ZoneSelect value={tz} disabled={disabled} onChange={onTz} />
+          <ZoneSelect
+            name="tz"
+            value={tz}
+            invalid={invalidTz}
+            disabled={disabled}
+            onChange={onTz}
+          />
         </div>
       </div>
       <div class="automations-readback" aria-live="polite">

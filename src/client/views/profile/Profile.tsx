@@ -9,6 +9,7 @@
 // next edit; lib/save.ts holds that.
 
 import { useSignal } from "@preact/signals";
+import { useRef } from "preact/hooks";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
   changePassword,
@@ -17,15 +18,18 @@ import {
   saveProfile,
 } from "../../data/profile.ts";
 import { initials, longDate } from "../../lib/format.ts";
-import { useSave } from "../../lib/save.ts";
+import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   aboutProblem,
+  detailsFieldOf,
   fullNameProblem,
-  passwordProblem,
+  passwordFieldOf,
+  passwordFieldProblem,
 } from "./Profile.model.ts";
 import "./profile.css";
 
@@ -33,56 +37,73 @@ function DetailsForm({ user }: { user: ProfileRow }) {
   const fullName = useSignal(user.fullName);
   const about = useSignal(user.about);
   const tz = useSignal(user.tz);
-  const save = useSave(() =>
-    saveProfile({
-      fullName: fullName.value.trim(),
-      about: about.value,
-      tz: tz.value,
-    }),
+  const form = useRef<HTMLDivElement>(null);
+  const save = useSave(
+    () =>
+      saveProfile({
+        fullName: fullName.value.trim(),
+        about: about.value,
+        tz: tz.value,
+      }),
+    detailsFieldOf,
   );
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const submit = (event: Event) => {
     event.preventDefault();
-    void save.run(fullNameProblem(fullName.value) ?? aboutProblem(about.value));
+    void save.run(
+      at("fullName", fullNameProblem(fullName.value)) ??
+        at("about", aboutProblem(about.value)),
+    );
   };
   return (
     <SectionForm onSubmit={submit}>
-      <label class="field">
-        <span class="label">Full name</span>
-        <input
-          name="fullName"
-          autocomplete="name"
-          value={fullName.value}
-          onInput={(e) => {
-            fullName.value = (e.currentTarget as HTMLInputElement).value;
-            save.touch();
-          }}
-        />
-      </label>
-      <div class="field">
-        <span class="label">Time zone</span>
-        <ZoneSelect
-          value={tz.value}
-          onChange={(next) => {
-            tz.value = next;
-            save.touch();
-          }}
-        />
+      <div class="profile-fields" ref={form}>
+        <label class="field">
+          <span class="label">Full name</span>
+          <input
+            name="fullName"
+            autocomplete="name"
+            aria-invalid={invalid("fullName") || undefined}
+            value={fullName.value}
+            onInput={(e) => {
+              fullName.value = (e.currentTarget as HTMLInputElement).value;
+              save.touch();
+            }}
+          />
+          <FieldError save={save} field="fullName" />
+        </label>
+        <div class="field">
+          <span class="label">Time zone</span>
+          <ZoneSelect
+            name="tz"
+            value={tz.value}
+            invalid={invalid("tz")}
+            onChange={(next) => {
+              tz.value = next;
+              save.touch();
+            }}
+          />
+          <FieldError save={save} field="tz" />
+        </div>
+        <label class="field">
+          <span class="label">About</span>
+          <textarea
+            name="about"
+            rows={5}
+            placeholder="Who you are and what you work on."
+            aria-invalid={invalid("about") || undefined}
+            value={about.value}
+            onInput={(e) => {
+              about.value = (e.currentTarget as HTMLTextAreaElement).value;
+              save.touch();
+            }}
+          />
+          <FieldError save={save} field="about" />
+        </label>
       </div>
-      <label class="field">
-        <span class="label">About</span>
-        <textarea
-          name="about"
-          rows={5}
-          placeholder="Who you are and what you work on."
-          value={about.value}
-          onInput={(e) => {
-            about.value = (e.currentTarget as HTMLTextAreaElement).value;
-            save.touch();
-          }}
-        />
-      </label>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={
           fullName.value.trim() !== user.fullName ||
           about.value !== user.about ||
@@ -98,56 +119,67 @@ function PasswordForm() {
   const current = useSignal("");
   const next = useSignal("");
   const again = useSignal("");
+  const form = useRef<HTMLDivElement>(null);
   const save = useSave(async () => {
     await changePassword({ current: current.value, next: next.value });
     current.value = "";
     next.value = "";
     again.value = "";
-  });
+  }, passwordFieldOf);
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const bind = (s: { value: string }) => (e: Event) => {
     s.value = (e.currentTarget as HTMLInputElement).value;
     save.touch();
   };
   const submit = (event: Event) => {
     event.preventDefault();
-    void save.run(passwordProblem(current.value, next.value, again.value));
+    void save.run(passwordFieldProblem(current.value, next.value, again.value));
   };
   return (
     <SectionForm onSubmit={submit}>
-      <label class="field">
-        <span class="label">Current password</span>
-        <input
-          name="current"
-          type="password"
-          autocomplete="current-password"
-          value={current.value}
-          onInput={bind(current)}
-        />
-      </label>
-      <div class="profile-pair">
+      <div class="profile-fields" ref={form}>
         <label class="field">
-          <span class="label">New password</span>
+          <span class="label">Current password</span>
           <input
-            name="next"
+            name="current"
             type="password"
-            autocomplete="new-password"
-            value={next.value}
-            onInput={bind(next)}
+            autocomplete="current-password"
+            aria-invalid={invalid("current") || undefined}
+            value={current.value}
+            onInput={bind(current)}
           />
+          <FieldError save={save} field="current" />
         </label>
-        <label class="field">
-          <span class="label">New password again</span>
-          <input
-            name="again"
-            type="password"
-            autocomplete="new-password"
-            value={again.value}
-            onInput={bind(again)}
-          />
-        </label>
+        <div class="profile-pair">
+          <label class="field">
+            <span class="label">New password</span>
+            <input
+              name="next"
+              type="password"
+              autocomplete="new-password"
+              aria-invalid={invalid("next") || undefined}
+              value={next.value}
+              onInput={bind(next)}
+            />
+            <FieldError save={save} field="next" />
+          </label>
+          <label class="field">
+            <span class="label">New password again</span>
+            <input
+              name="again"
+              type="password"
+              autocomplete="new-password"
+              aria-invalid={invalid("again") || undefined}
+              value={again.value}
+              onInput={bind(again)}
+            />
+            <FieldError save={save} field="again" />
+          </label>
+        </div>
       </div>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={current.value !== "" && next.value !== "" && again.value !== ""}
         label="Change password"
       />

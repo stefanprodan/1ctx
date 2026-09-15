@@ -148,6 +148,33 @@
     line-height: 1.5;
   }
 
+  /* a refusal at its field: the words under it, its border in the
+     failed colour */
+  .field-error {
+    font-size: var(--text-small);
+    color: var(--failed);
+  }
+  .field input[aria-invalid="true"],
+  .field textarea[aria-invalid="true"] {
+    border-color: var(--failed);
+  }
+
+  /* the HTTP status beside a failure's words, small and in mono, so
+     it reads as a reference and never as the message */
+  .code-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border: 1px solid var(--failed-line);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    line-height: 1;
+    color: var(--failed);
+    white-space: nowrap;
+  }
+
   .card {
     border-radius: var(--radius-card);
     background: var(--card);

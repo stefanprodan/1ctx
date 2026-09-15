@@ -23,11 +23,15 @@ export function ZoneSelect({
   onChange,
   disabled,
   placeholder,
+  name,
+  invalid,
 }: {
   value: string;
   onChange: (tz: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  name?: string;
+  invalid?: boolean;
 }) {
   const options = useMemo(() => zoneOptions(ZONES, value, Date.now()), [value]);
   return (
@@ -37,6 +41,8 @@ export function ZoneSelect({
       options={options}
       disabled={disabled}
       placeholder={placeholder}
+      name={name}
+      invalid={invalid}
       search
       onChange={onChange}
     />

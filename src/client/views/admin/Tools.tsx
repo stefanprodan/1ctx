@@ -25,7 +25,7 @@ import {
   tools,
   toolsError,
 } from "../../data/tools.ts";
-import { useSave } from "../../lib/save.ts";
+import { useFocusField, useSave } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -47,6 +47,7 @@ import {
   firstSentence,
   keyLine,
   LIMIT_WORDS,
+  limitFieldOf,
   searchLine,
   TOOL_WORDS,
 } from "./Tools.model.ts";
@@ -183,11 +184,14 @@ function LimitField({
   row,
   text,
   busy,
+  error,
   onInput,
 }: {
   row: LimitRow;
   text: string;
   busy: boolean;
+  // a refusal that names this limit
+  error: string | null;
   onInput: (text: string) => void;
 }) {
   const { word } = displayOf(row);
@@ -200,8 +204,9 @@ function LimitField({
       </span>
       <span class="tools-limit-field">
         <input
-          class="tools-input"
+          class={`tools-input${error ? " tools-input-invalid" : ""}`}
           name={row.name}
+          aria-invalid={error ? true : undefined}
           type="number"
           step="any"
           inputMode="decimal"
@@ -216,6 +221,11 @@ function LimitField({
       {row.changedAt !== null && (
         <span class="tools-default">{defaultLine(row)}</span>
       )}
+      {error && (
+        <span class="field-error tools-limit-error" role="alert">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
@@ -224,8 +234,7 @@ function LimitField({
 // re-seeded when a save or a reset answers new rows
 function LimitsCard({ rows }: { rows: LimitRow[] }) {
   const draft = useSignal(draftOf(rows));
-  const resetting = useSignal(false);
-  const failure = useSignal<string | null>(null);
+  const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
     draft.value = draftOf(rows);
   }, [rows]);
@@ -233,23 +242,17 @@ function LimitsCard({ rows }: { rows: LimitRow[] }) {
     const got = collect(rows, draft.value);
     if ("problem" in got) throw new Error(got.problem);
     await saveLimits({ values: got.values });
-  });
+  }, limitFieldOf);
+  useFocusField(save, form);
   const submit = (event: Event) => {
     event.preventDefault();
     const got = collect(rows, draft.value);
-    void save.run("problem" in got ? got.problem : null);
+    void save.run(
+      "problem" in got ? { error: got.problem, field: got.field } : null,
+    );
   };
-  const reset = async () => {
-    resetting.value = true;
-    failure.value = null;
-    try {
-      await resetLimits();
-    } catch (err) {
-      failure.value = reason(err);
-    }
-    resetting.value = false;
-  };
-  const busy = save.status.value === "busy" || resetting.value;
+  const reset = () => save.act("reset the limits", resetLimits);
+  const busy = save.busy;
   const group = (scope: LimitScope, title: string) => (
     <div class="tools-group">
       <span class="label">{title}</span>
@@ -261,6 +264,7 @@ function LimitsCard({ rows }: { rows: LimitRow[] }) {
             row={row}
             text={draft.value[row.name] ?? ""}
             busy={busy}
+            error={save.fieldError(row.name)}
             onInput={(text) => {
               draft.value = { ...draft.value, [row.name]: text };
               save.touch();
@@ -272,27 +276,24 @@ function LimitsCard({ rows }: { rows: LimitRow[] }) {
   const changed = rows.some((row) => row.changedAt !== null);
   return (
     <RowsCard label="Limits">
-      <form class="tools-form" onSubmit={submit}>
+      <form class="tools-form" ref={form} onSubmit={submit}>
         {group("send", "Per send")}
         {group("call", "Per call")}
         <Foot
-          status={save.status.value}
+          save={save}
           dirty={dirty(rows, draft.value)}
           label="Save"
           start={
-            <>
-              <button
-                type="button"
-                class="btn"
-                disabled={busy || !changed}
-                onClick={() => void reset()}
-              >
-                {resetting.value ? "Resetting" : "Reset to defaults"}
-              </button>
-              {failure.value && (
-                <span class="tools-note error">{failure.value}</span>
-              )}
-            </>
+            <button
+              type="button"
+              class="btn"
+              disabled={busy || !changed}
+              onClick={() => void reset()}
+            >
+              {save.pending.value === "reset the limits"
+                ? "Resetting"
+                : "Reset to defaults"}
+            </button>
           }
         />
       </form>

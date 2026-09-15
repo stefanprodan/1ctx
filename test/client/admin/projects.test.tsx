@@ -216,7 +216,7 @@ describe("the entity", () => {
         await createProject({ name: "personal" });
       });
       await save.run(nameProblem("personal"));
-      expect(save.status.value).toEqual({ error });
+      expect(save.status.value).toEqual({ error, status });
       save.dispose();
     }
     expect(adminProject.value).toBeNull();

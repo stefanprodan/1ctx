@@ -19,16 +19,16 @@ import type {
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { loadProjects } from "./projects.ts";
 import { onSocketEvent } from "./socket.ts";
 
 export const adminProjects = signal<ProjectSummary[] | null>(null);
-export const adminProjectsError = signal<string | null>(null);
+export const adminProjectsError = signal<Failure | null>(null);
 export const adminProject = signal<ProjectDetail | null>(null);
-export const adminProjectError = signal<string | null>(null);
+export const adminProjectError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 let listTurn = 0;
@@ -68,7 +68,7 @@ export async function loadAdminProjects(): Promise<void> {
     }
   } catch (err) {
     if (owner === forUser && listTurn === turn) {
-      adminProjectsError.value = reason(err);
+      adminProjectsError.value = failure(err);
     }
   }
 }
@@ -89,7 +89,7 @@ export async function loadAdminProject(id: string): Promise<void> {
     }
   } catch (err) {
     if (owner === forUser && detailTurn === turn) {
-      adminProjectError.value = reason(err);
+      adminProjectError.value = failure(err);
     }
   }
 }

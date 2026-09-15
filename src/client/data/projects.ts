@@ -20,15 +20,15 @@ import type {
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { onSocketEvent } from "./socket.ts";
 
 export const projects = signal<ProjectSummary[] | null>(null);
-export const projectsError = signal<string | null>(null);
+export const projectsError = signal<Failure | null>(null);
 export const project = signal<ProjectDetail | null>(null);
-export const projectError = signal<string | null>(null);
+export const projectError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 let listTurn = 0;
@@ -57,7 +57,7 @@ export async function loadProjects(): Promise<void> {
     }
   } catch (err) {
     if (owner === forUser && listTurn === turn) {
-      projectsError.value = reason(err);
+      projectsError.value = failure(err);
     }
   }
 }
@@ -73,7 +73,7 @@ export async function loadProject(id: string): Promise<void> {
     );
     if (wanted.turn === turn) project.value = body.project;
   } catch (err) {
-    if (wanted.turn === turn) projectError.value = reason(err);
+    if (wanted.turn === turn) projectError.value = failure(err);
   }
 }
 

@@ -25,6 +25,8 @@ export function Select({
   disabled,
   search,
   mono,
+  name,
+  invalid,
   placeholder = "Pick one",
 }: {
   label: string;
@@ -36,6 +38,10 @@ export function Select({
   search?: boolean;
   // the label in the mono face, for an identifier
   mono?: boolean;
+  // the form's field name, so a refusal can take the focus here
+  name?: string;
+  // a refusal names this field
+  invalid?: boolean;
   placeholder?: string;
 }) {
   const open = useSignal(false);
@@ -131,8 +137,10 @@ export function Select({
         id={`${id}-trigger`}
         ref={trigger}
         type="button"
-        class="select-trigger"
+        name={name}
+        class={`select-trigger${invalid ? " select-trigger-invalid" : ""}`}
         aria-label={label}
+        aria-invalid={invalid || undefined}
         aria-haspopup="listbox"
         aria-controls={open.value ? listId : undefined}
         aria-expanded={open.value}

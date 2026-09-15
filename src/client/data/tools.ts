@@ -17,13 +17,13 @@ import type {
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
 import type { BuiltinTool } from "../../shared/words.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const tools = signal<ToolsResponse | null>(null);
 export const limits = signal<LimitRow[] | null>(null);
-export const toolsError = signal<string | null>(null);
+export const toolsError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 
@@ -56,7 +56,7 @@ export async function loadTools(): Promise<void> {
       limits.value = l.limits;
     }
   } catch (err) {
-    if (owner === forUser && turn === mine) toolsError.value = reason(err);
+    if (owner === forUser && turn === mine) toolsError.value = failure(err);
   }
 }
 

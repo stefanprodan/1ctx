@@ -1,5 +1,6 @@
-/* The foot of a form: the submit with its states, and the refusal on
-   its own line under the buttons, so they never move when it shows. */
+/* The foot of a form: the notice of a refusal on its own line over the
+   buttons, so they never move when it shows, and the submit with its
+   states. */
 
 @layer tokens, base, owners;
 
@@ -18,10 +19,30 @@
     margin-right: auto;
   }
 
-  .foot-note {
+  .foot-notice {
     flex-basis: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
     margin: 0;
-    font-size: var(--text-small);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--failed-line);
+    border-radius: var(--radius);
+    background: var(--failed-wash);
+    font-size: var(--text-ui);
+    line-height: 1.45;
+    color: var(--fg);
+  }
+  .foot-notice-words {
+    min-width: 0;
+  }
+  .foot-notice-code {
+    margin-left: var(--space-2);
+    vertical-align: 1px;
+  }
+  .foot-notice-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
     color: var(--failed);
   }
 

@@ -23,11 +23,13 @@ import {
   disableLock,
   emailProblem,
   metaLine,
+  newPasswordFieldProblem,
   newPasswordProblem,
   patchOf,
   roleLock,
   sinceLine,
   stateLine,
+  userFieldOf,
   usernameProblem,
 } from "../../../src/client/views/admin/Users.model.ts";
 import { Users } from "../../../src/client/views/admin/Users.tsx";
@@ -178,6 +180,36 @@ describe("the checks", () => {
   });
 });
 
+describe("the refusals", () => {
+  test("each server refusal names the field to fix", () => {
+    expect(userFieldOf("username is taken")).toBe("username");
+    expect(userFieldOf("username must be 3 to 32 lowercase")).toBe("username");
+    expect(userFieldOf("full name must be 1 to 64 characters")).toBe(
+      "fullName",
+    );
+    expect(userFieldOf("email is taken")).toBe("email");
+    expect(userFieldOf("time zone must be an IANA zone name")).toBe("tz");
+    expect(userFieldOf("cannot change your own role")).toBe("role");
+    expect(userFieldOf("password must be a string of 8 to 1024 bytes")).toBe(
+      "password",
+    );
+    expect(userFieldOf("the last admin must remain enabled")).toBeUndefined();
+  });
+
+  test("a password slip is pinned to the box to fix", () => {
+    const names = { next: "password", again: "again" };
+    expect(newPasswordFieldProblem("short", "short", names)?.field).toBe(
+      "password",
+    );
+    expect(
+      newPasswordFieldProblem("longenough", "longenougx", names)?.field,
+    ).toBe("again");
+    expect(
+      newPasswordFieldProblem("longenough", "longenough", names),
+    ).toBeNull();
+  });
+});
+
 describe("the entity", () => {
   test("loads for the signed-in user and drops with them", async () => {
     answer = () => Response.json({ users: [root, caelea] });
@@ -228,7 +260,7 @@ describe("the entity", () => {
   test("a refusal is the error shown", async () => {
     answer = () => Response.json({ error: "forbidden" }, { status: 403 });
     await loadUsers();
-    expect(usersError.value).toBe("forbidden");
+    expect(usersError.value).toEqual({ words: "forbidden", status: 403 });
     expect(users.value).toBeNull();
   });
 });
@@ -257,8 +289,9 @@ describe("the page", () => {
   });
 
   test("shows the load's refusal", () => {
-    usersError.value = "forbidden";
+    usersError.value = { words: "forbidden", status: 403 };
     const html = render(<Users />);
-    expect(html).toContain("forbidden");
+    expect(html).toContain("This page did not load");
+    expect(html).toContain("Forbidden.");
   });
 });

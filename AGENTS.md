@@ -477,6 +477,24 @@ violation, and every rule has a rejected fixture under
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
   failure's words come from `reason()` in `lib/format.ts`.
+- **A form's refusals have two places.** One `useSave()` per form runs
+  the submit (`run`) and every other button of the form (`act("delete",
+  ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
+  runs every button waits. A refusal that names a field, a check pinned
+  with `at(field, ...)` or a server word the form's `fieldOf` maps, is
+  shown at that field: `aria-invalid` on the control (the failed border
+  in `base.css`, `invalid` on `ui/Select.tsx`), `ui/FieldError.tsx` in
+  place of its hint, and `useFocusField()` moves the focus to the
+  control carrying that `name`. Any other refusal is the notice `Foot`
+  draws over the buttons, "Could not delete." then the server's words.
+  No form shows a refusal anywhere else. A page whose load failed is
+  `Page`'s `error`: a card saying the page did not load, the words and
+  Try again. A failure is words first: `api()` passes the server's own
+  words and gives an answer without them the words of `statusWords()`,
+  never a bare status. The status rides beside them, `failure()` in
+  `lib/format.ts` for a page's error signal and `status` on a form's
+  problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
+  words, and left out when the server did not answer.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

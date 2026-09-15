@@ -15,6 +15,7 @@ import {
   type Role,
 } from "../../../shared/words.ts";
 import { longDate } from "../../lib/format.ts";
+import type { Problem } from "../../lib/save.ts";
 
 export { fullNameProblem } from "../profile/Profile.model.ts";
 
@@ -59,6 +60,40 @@ export function newPasswordProblem(next: string, again: string): string | null {
     return `The password needs at most ${MAX_PASSWORD_BYTES} bytes`;
   if (again !== next) return "The two passwords differ";
   return null;
+}
+
+// the same checks pinned to the field to fix: a mismatch is the second
+// box, anything else the first
+export function newPasswordFieldProblem(
+  next: string,
+  again: string,
+  names: { next: string; again: string },
+): Problem | null {
+  const error = newPasswordProblem(next, again);
+  if (error === null) return null;
+  return { error, field: error.includes("differ") ? names.again : names.next };
+}
+
+// the fields of the user form, by the name each control carries
+export type UserField =
+  | "username"
+  | "fullName"
+  | "email"
+  | "tz"
+  | "role"
+  | "password";
+
+// which field a server refusal of the user routes names; the words are
+// the parsers' and the conflicts' in access/
+export function userFieldOf(message: string): UserField | undefined {
+  const m = message.toLowerCase();
+  if (m.startsWith("username")) return "username";
+  if (m.startsWith("full name")) return "fullName";
+  if (m.startsWith("email")) return "email";
+  if (m.startsWith("time zone")) return "tz";
+  if (m.startsWith("role") || m.includes("own role")) return "role";
+  if (m.startsWith("password")) return "password";
+  return undefined;
 }
 
 // "@oana · oana@example.com"

@@ -233,7 +233,7 @@ describe("the sessions entity", () => {
 
     await loadSession("s1");
 
-    expect(sessionError.value).toBe("gone");
+    expect(sessionError.value?.words).toBe("gone");
   });
 
   test("loads running sessions first, then newest activity", async () => {
@@ -937,7 +937,7 @@ describe("the sessions entity", () => {
 
   test("drops every session entity when the signed-in user changes", () => {
     session.value = liveDetail();
-    sessionError.value = "old";
+    sessionError.value = { words: "old", status: 404 };
     live.value = new Map([
       [
         "m1",

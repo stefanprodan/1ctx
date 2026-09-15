@@ -14,12 +14,12 @@ import type {
   UpdateProfileRequest,
 } from "../../shared/api/profile.ts";
 import type { Profile } from "../../shared/contracts/user.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me, setMe } from "./me.ts";
 
 export const profile = signal<Profile | null>(null);
-export const profileError = signal<string | null>(null);
+export const profileError = signal<Failure | null>(null);
 
 // a load's answer is kept only while it is the latest word on the row:
 // a later load, or a write, supersedes it, since a route arrival
@@ -50,7 +50,7 @@ export async function loadProfile(): Promise<void> {
     if (turn === mine) settle(user);
   } catch (err) {
     if (turn === mine) {
-      profileError.value = reason(err);
+      profileError.value = failure(err);
     }
   }
 }

@@ -36,6 +36,10 @@
   .select-trigger[aria-expanded="true"] {
     border-color: var(--line-strong);
   }
+  .select-trigger-invalid,
+  .select-trigger-invalid[aria-expanded="true"] {
+    border-color: var(--failed);
+  }
 
   .select-label {
     flex-shrink: 0;

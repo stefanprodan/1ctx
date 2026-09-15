@@ -76,7 +76,7 @@ describe("the projects entity", () => {
         members: [caelea],
       };
       project.value = { ...saved, description: "" };
-      projectError.value = "stale failure";
+      projectError.value = { words: "stale failure", status: 500 };
       answer = () => ({ project: saved, projects: [saved] });
       await savePersonalProject({ description: "Scratch work" });
       expect(project.value).toEqual(saved);

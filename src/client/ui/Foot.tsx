@@ -1,25 +1,27 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The foot of a form: the submit button that says what a Save is going
-// through, the refusal on its own line under it, and room on the left
-// for what else the form offers. A view composes this, never restyles it.
+// The foot of a form: the notice of a refusal that names no field, on
+// its own line over the buttons so they never move when it shows; the
+// submit button that says what a Save is going through; and room on the
+// left for the form's other actions. A view composes this, never
+// restyles it.
 
 import type { ComponentChildren } from "preact";
 import { Icon } from "../lib/icons.tsx";
-import type { Status } from "../lib/save.ts";
+import { noticeOf, type Save } from "../lib/save.ts";
 import "./foot.css";
 
 // every label is laid out in the same cell, so the button keeps the
 // width of the widest one whatever it says
 export function Foot({
-  status,
+  save,
   dirty,
   label,
   start,
   before,
 }: {
-  status: Status;
+  save: Save;
   dirty: boolean;
   label: string;
   // what sits at the left end, apart from the submit: a Delete
@@ -27,17 +29,32 @@ export function Foot({
   // what sits right before the submit: a Cancel
   before?: ComponentChildren;
 }) {
+  const status = save.status.value;
   const done = status === "done";
   const busy = status === "busy";
+  const notice = save.notice();
   const on = (yes: boolean) => `foot-label${yes ? " foot-label-on" : ""}`;
   return (
     <div class="foot">
+      {notice !== null && (
+        <p class="foot-notice" role="alert">
+          <Icon name="alert" size={14} class="foot-notice-icon" />
+          <span class="foot-notice-words">
+            {noticeOf(notice)}
+            {notice.status !== undefined && (
+              <span class="code-tag foot-notice-code">
+                HTTP {notice.status}
+              </span>
+            )}
+          </span>
+        </p>
+      )}
       {start && <div class="foot-start">{start}</div>}
       {before}
       <button
         type="submit"
         class={`btn btn-primary${done ? " foot-done" : ""}`}
-        disabled={busy || done || !dirty}
+        disabled={save.busy || done || !dirty}
       >
         <span class="foot-labels">
           <span class={on(!busy && !done)}>{label}</span>
@@ -48,11 +65,6 @@ export function Foot({
           </span>
         </span>
       </button>
-      {typeof status === "object" && (
-        <p class="foot-note" role="alert">
-          {status.error}
-        </p>
-      )}
     </div>
   );
 }

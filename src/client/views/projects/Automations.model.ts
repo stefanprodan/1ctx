@@ -253,27 +253,59 @@ export function followDeadlineLimit(
 
 // the body a save sends, or the first problem. Only emptiness and the
 // numbers' shape are checked here; every rule is the server's
+// the editor's fields, by the name each control carries
+export type AutomationField =
+  | "name"
+  | "agent"
+  | "instructions"
+  | "schedule"
+  | "tz"
+  | "deadline"
+  | "retention";
+
+// which field a server refusal of the automation routes names; a cap on
+// the project or a run still going is the form's
+export function automationFieldOf(
+  message: string,
+): AutomationField | undefined {
+  if (message === "invalid name" || message === "name is taken") return "name";
+  if (message === "no such agent") return "agent";
+  if (message.startsWith("instructions")) return "instructions";
+  if (message.includes("schedule")) return "schedule";
+  if (message.includes("time zone")) return "tz";
+  if (message.startsWith("deadlineMs")) return "deadline";
+  if (message.startsWith("retention")) return "retention";
+  return undefined;
+}
+
 export function requestOf(
   d: Draft,
   limitMs: number,
-): { body: SaveAutomationRequest } | { problem: string } {
+):
+  | { body: SaveAutomationRequest }
+  | { problem: string; field: AutomationField } {
   const name = d.name.trim();
   const instructions = d.instructions.trim();
   const schedule = d.schedule.trim();
   const tz = d.tz.trim();
-  if (name === "") return { problem: "Name is empty" };
-  if (d.agentId === "") return { problem: "Pick an agent" };
-  if (instructions === "") return { problem: "Instructions are empty" };
-  if (schedule === "") return { problem: "The schedule is not complete" };
-  if (tz === "") return { problem: "Pick a time zone" };
+  if (name === "") return { problem: "Name is empty", field: "name" };
+  if (d.agentId === "") return { problem: "Pick an agent", field: "agent" };
+  if (instructions === "")
+    return { problem: "Instructions are empty", field: "instructions" };
+  if (schedule === "")
+    return { problem: "The schedule is not complete", field: "schedule" };
+  if (tz === "") return { problem: "Pick a time zone", field: "tz" };
   const minutes = d.deadline.trim();
   if (minutes !== "" && !/^\d+(\.\d+)?$/.test(minutes)) {
-    return { problem: "Deadline needs a number of minutes" };
+    return { problem: "Deadline needs a number of minutes", field: "deadline" };
   }
   const ms = minutes === "" ? null : Math.round(Number(minutes) * 60_000);
   const days = d.retention.trim();
   if (!/^\d+$/.test(days)) {
-    return { problem: "History retention needs whole days" };
+    return {
+      problem: "History retention needs whole days",
+      field: "retention",
+    };
   }
   return {
     body: {

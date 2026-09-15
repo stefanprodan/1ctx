@@ -77,6 +77,29 @@ export function baseUrlProblem(value: string): string | null {
 }
 
 // the key file's name, or empty for a server with no key
+// which field of the agent form a refusal names; a chat or an automation
+// running on the agent is the form's
+export function agentFieldOf(message: string): string | undefined {
+  if (message.startsWith("name") || message.startsWith("an agent named"))
+    return "name";
+  if (message.startsWith("providerId") || message === "no such provider")
+    return "provider";
+  if (message.startsWith("model") || message.includes(" does not list "))
+    return "model";
+  if (message.startsWith("prompt")) return "prompt";
+  return undefined;
+}
+
+// which field of the provider form a refusal names; a catalog that does
+// not answer is the form's
+export function providerFieldOf(message: string): string | undefined {
+  if (message.startsWith("name") || message.startsWith("a provider named"))
+    return "name";
+  if (message.startsWith("baseUrl")) return "baseUrl";
+  if (message.includes(".key is not")) return "keyName";
+  return undefined;
+}
+
 export function keyNameProblem(value: string): string | null {
   const v = value.trim();
   if (v === "") return null;

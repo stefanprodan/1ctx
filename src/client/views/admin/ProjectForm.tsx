@@ -4,9 +4,11 @@
 // A team project in place: the name and the description, the members
 // with the picker as the list's last line, and one foot for the whole
 // row. The foot saves the two fields; a member is added or removed at
-// once.
+// once. Every refusal of the row, a member's included, shows at the
+// field it names or in the foot's notice.
 
 import { useSignal } from "@preact/signals";
+import { useRef } from "preact/hooks";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import {
@@ -15,13 +17,13 @@ import {
   removeProjectMember,
   updateProject,
 } from "../../data/admin-projects.ts";
-import { initials, reason } from "../../lib/format.ts";
-import { useSave } from "../../lib/save.ts";
+import { initials } from "../../lib/format.ts";
+import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { RowsAvatar } from "../../ui/Rows.tsx";
 import { nameProblem } from "../projects/Project.model.ts";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
-import { deleteLabel } from "./AdminProjects.model.ts";
+import { deleteLabel, projectFieldOf } from "./AdminProjects.model.ts";
 import { MemberPicker } from "./MemberPicker.tsx";
 import "./admin-projects.css";
 
@@ -30,27 +32,15 @@ function MemberRow({
   userId,
   fullName,
   username,
-  disabled,
+  save,
 }: {
   project: ProjectDetail;
   userId: string;
   fullName: string;
   username: string;
-  disabled: boolean;
+  save: Save;
 }) {
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
-  const remove = async () => {
-    if (disabled || busy.value) return;
-    busy.value = true;
-    failure.value = null;
-    try {
-      await removeProjectMember(project.id, userId);
-    } catch (err) {
-      failure.value = reason(err);
-    }
-    busy.value = false;
-  };
+  const action = `remove @${username}`;
   return (
     <div class="admin-projects-member">
       <RowsAvatar>{initials(fullName)}</RowsAvatar>
@@ -58,16 +48,15 @@ function MemberRow({
         <span class="admin-projects-person-name">{fullName}</span>
         <span class="admin-projects-person-user">@{username}</span>
       </span>
-      {failure.value !== null && (
-        <span class="admin-projects-note error">{failure.value}</span>
-      )}
       <button
         type="button"
         class="btn btn-small"
-        disabled={disabled || busy.value}
-        onClick={() => void remove()}
+        disabled={save.busy}
+        onClick={() =>
+          void save.act(action, () => removeProjectMember(project.id, userId))
+        }
       >
-        Remove
+        {save.pending.value === action ? "Removing" : "Remove"}
       </button>
     </div>
   );
@@ -85,8 +74,7 @@ export function ProjectForm({
   const name = useSignal(project?.name ?? "");
   const description = useSignal(project?.description ?? "");
   const asking = useSignal(false);
-  const deleting = useSignal(false);
-  const failure = useSignal<string | null>(null);
+  const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
     const body = {
       name: name.value.trim(),
@@ -95,36 +83,26 @@ export function ProjectForm({
     if (project === null) await createProject(body);
     else await updateProject(project.id, body);
     if (project === null) onDone();
-  });
+  }, projectFieldOf);
+  useFocusField(save, form);
   const remove = async () => {
-    if (deleting.value || save.status.value === "busy") return;
-    deleting.value = true;
-    failure.value = null;
-    let removed = false;
-    try {
-      await deleteProject(project!.id);
-      removed = true;
-    } catch (err) {
-      failure.value = reason(err);
-    }
-    deleting.value = false;
-    if (removed) onDone();
+    if (await save.act("delete", () => deleteProject(project!.id))) onDone();
   };
   const submit = (event: Event) => {
     event.preventDefault();
-    if (deleting.value) return;
-    void save.run(nameProblem(name.value));
+    void save.run(at("name", nameProblem(name.value)));
   };
-  const busy = save.status.value === "busy" || deleting.value;
+  const busy = save.busy;
   const dirty =
     project === null ||
     name.value.trim() !== project.name ||
     description.value.trim() !== project.description;
   return (
-    <form class="admin-projects-form" onSubmit={submit}>
+    <form class="admin-projects-form" ref={form} onSubmit={submit}>
       <NameField
         class="admin-projects-name-field"
         disabled={busy}
+        error={save.fieldError("name")}
         value={name.value}
         onInput={(value) => {
           name.value = value;
@@ -135,6 +113,7 @@ export function ProjectForm({
         class="admin-projects-description-field"
         placeholder="What agents should know about this project"
         disabled={busy}
+        error={save.fieldError("description")}
         value={description.value}
         onInput={(value) => {
           description.value = value;
@@ -155,17 +134,17 @@ export function ProjectForm({
                   userId={member.id}
                   fullName={member.fullName}
                   username={member.username}
-                  disabled={busy}
+                  save={save}
                 />
               ))
             )}
-            <MemberPicker project={project} users={users} disabled={busy} />
+            <MemberPicker project={project} users={users} save={save} />
           </div>
         </section>
       )}
       <div class={project === null ? undefined : "admin-projects-foot"}>
         <Foot
-          status={deleting.value ? "busy" : save.status.value}
+          save={save}
           dirty={dirty}
           label={project === null ? "New project" : "Save"}
           start={
@@ -179,7 +158,9 @@ export function ProjectForm({
                   disabled={busy}
                   onClick={() => void remove()}
                 >
-                  {deleting.value ? "Deleting" : deleteLabel(project.chats)}
+                  {save.pending.value === "delete"
+                    ? "Deleting"
+                    : deleteLabel(project.chats)}
                 </button>
                 <button
                   type="button"
@@ -187,14 +168,11 @@ export function ProjectForm({
                   disabled={busy}
                   onClick={() => {
                     asking.value = false;
-                    failure.value = null;
+                    save.touch();
                   }}
                 >
                   Keep
                 </button>
-                {failure.value !== null && (
-                  <span class="admin-projects-note error">{failure.value}</span>
-                )}
               </>
             ) : (
               <button

@@ -5,7 +5,9 @@
 // thrown error so a view can show it as is; the status rides on it so
 // the caller can tell a 401 from the rest. Every 401 also fires the
 // unauthorized hook, so a login revoked elsewhere drops the shell at
-// once instead of leaving a stale signed-in page.
+// once instead of leaving a stale signed-in page. An answer without the
+// server's words, a crash or a proxy's page, gets plain words for its
+// status, never the status code.
 
 export class ApiError extends Error {
   constructor(
@@ -14,6 +16,19 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+}
+
+// the words for an answer that carries none of the server's own
+export function statusWords(status: number): string {
+  if (status === 0) return "the server did not answer";
+  if (status === 403) return "you do not have access to this";
+  if (status === 404) return "this is no longer there";
+  if (status === 413) return "this is too large to send";
+  if (status === 429) return "too many requests. Wait a moment and try again";
+  if (status >= 500) {
+    return "the server failed while answering. Contact the admin if this error persists";
+  }
+  return "the server refused this";
 }
 
 let unauthorized: () => void = () => {};
@@ -35,11 +50,16 @@ export async function api<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "the server did not answer");
+    throw new ApiError(0, statusWords(0));
   }
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  const data = (await res.json().catch(() => ({}))) as { error?: unknown };
   if (res.status === 401) unauthorized();
-  if (!res.ok)
-    throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    const words =
+      typeof data.error === "string" && data.error.trim() !== ""
+        ? data.error
+        : statusWords(res.status);
+    throw new ApiError(res.status, words);
+  }
   return data as T;
 }

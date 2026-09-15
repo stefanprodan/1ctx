@@ -214,7 +214,10 @@ describe("the limit words and units", () => {
     });
     const edited = { ...draft, rounds: "200" };
     expect(dirty(rows, edited)).toBe(true);
-    expect(collect(rows, edited)).toEqual({ problem: "Rounds is 1 to 50" });
+    expect(collect(rows, edited)).toEqual({
+      problem: "Rounds is 1 to 50",
+      field: "rounds",
+    });
     expect(defaultLine(timeout)).toBe("default 20 s");
     expect(defaultLine(searchBody)).toBe("default 1 MB");
     expect(defaultLine(rounds)).toBe("default 10");
@@ -246,7 +249,7 @@ describe("the tools entity", () => {
     expect(limits.value?.length).toBe(rows.length);
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadTools();
-    expect(toolsError.value).toBe("nope");
+    expect(toolsError.value).toEqual({ words: "nope", status: 500 });
   });
 
   test("a write replaces what it holds with the server's rows", async () => {
@@ -316,7 +319,12 @@ describe("the page", () => {
 
   test("says it is loading, then the failure", () => {
     expect(render(<Tools />)).toContain("Loading");
-    toolsError.value = "the server did not answer";
-    expect(render(<Tools />)).toContain("the server did not answer");
+    toolsError.value = {
+      words: "the server failed while answering",
+      status: 500,
+    };
+    const html = render(<Tools />);
+    expect(html).toContain("The server failed while answering.");
+    expect(html).toContain('<span class="code-tag">HTTP 500</span>');
   });
 });

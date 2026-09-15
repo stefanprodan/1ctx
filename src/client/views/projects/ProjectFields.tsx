@@ -15,11 +15,14 @@ const withOwner = (owner?: string) => `field${owner ? ` ${owner}` : ""}`;
 export function NameField({
   value,
   disabled,
+  error,
   class: owner,
   onInput,
 }: {
   value: string;
   disabled?: boolean;
+  // a refusal that names the field
+  error?: string | null;
   class?: string;
   onInput: (value: string) => void;
 }) {
@@ -29,12 +32,18 @@ export function NameField({
       <input
         name="name"
         aria-required="true"
+        aria-invalid={error ? true : undefined}
         autocomplete="off"
         spellcheck={false}
         disabled={disabled}
         value={value}
         onInput={(event) => onInput(shapedInput(event))}
       />
+      {error && (
+        <span class="field-error" role="alert">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
@@ -43,6 +52,7 @@ export function DescriptionField({
   value,
   placeholder,
   disabled,
+  error,
   class: owner,
   onInput,
 }: {
@@ -50,6 +60,8 @@ export function DescriptionField({
   // none where the section's text already says it
   placeholder?: string;
   disabled?: boolean;
+  // a refusal that names the field
+  error?: string | null;
   class?: string;
   onInput: (value: string) => void;
 }) {
@@ -61,6 +73,7 @@ export function DescriptionField({
         rows={3}
         maxLength={MAX_DESCRIPTION}
         placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
         disabled={disabled}
         value={value}
         onInput={(event) => {
@@ -69,6 +82,11 @@ export function DescriptionField({
           onInput(box.value);
         }}
       />
+      {error && (
+        <span class="field-error" role="alert">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
