@@ -29,6 +29,10 @@
     padding: 0 var(--space-4);
     border-bottom: 1px solid var(--line);
   }
+  /* the search fills the band from the card's edge, as over the stream */
+  .rows-head-search {
+    padding-left: 0;
+  }
   .rows-hint {
     margin-left: auto;
     font-family: var(--mono);

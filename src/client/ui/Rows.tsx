@@ -16,12 +16,16 @@ export function Rows({ children }: { children: ComponentChildren }) {
 
 export function RowsCard({
   label,
+  search,
   action,
   hint,
   live,
   children,
 }: {
   label: string;
+  // a search box in place of the label, for a list long enough to need
+  // one; the label still names the card to a screen reader
+  search?: ComponentChildren;
   action?: ComponentChildren;
   hint?: string;
   // the hint follows a selection in the card, so a screen reader hears
@@ -30,9 +34,9 @@ export function RowsCard({
   children?: ComponentChildren;
 }) {
   return (
-    <section class="rows-card">
-      <div class="rows-head">
-        <span class="label">{label}</span>
+    <section class="rows-card" aria-label={search ? label : undefined}>
+      <div class={`rows-head${search ? " rows-head-search" : ""}`}>
+        {search ?? <span class="label">{label}</span>}
         {hint && (
           <span class="rows-hint" aria-live={live ? "polite" : undefined}>
             {hint}

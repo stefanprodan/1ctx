@@ -447,7 +447,8 @@ violation, and every rule has a rejected fixture under
   over up to 53 ISO weeks, as many as fit the width, from
   `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
   then one Projects card, personal first, each row with its 14-day
-  strip. A project's tabs are Feed, Automations, then Members for a team
+  strip, headed by `ui/Search.tsx` (the stream's box too) narrowing the
+  rows by name in place. A project's tabs are Feed, Automations, then Members for a team
   or Settings for a personal one. A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab

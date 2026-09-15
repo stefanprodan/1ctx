@@ -10,6 +10,19 @@ import type {
 import type { ProjectKind } from "../../../shared/words.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 
+// the Projects card: the personal project first, then the teams, those
+// whose name holds the search, in any case
+export function listedProjects<T extends Pick<ProjectSummary, "kind" | "name">>(
+  list: readonly T[],
+  q: string,
+): T[] {
+  const needle = q.trim().toLowerCase();
+  return [
+    ...list.filter((p) => p.kind === "personal"),
+    ...list.filter((p) => p.kind === "team"),
+  ].filter((p) => p.name.toLowerCase().includes(needle));
+}
+
 // "1 user", "2 agents"
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;

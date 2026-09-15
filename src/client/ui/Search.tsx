@@ -1,28 +1,33 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The search box over the stream. The query lives in the address: the
-// box is seeded from it and writes it back a moment after the last
-// keystroke, and the route's load does the fetch, so back, reload and
-// a shared address keep the search. Escape clears it.
+// The search box in a card's head band: the glass, then the text, no
+// box of its own. The owner holds the query: the stream keeps it in the
+// address, where the route's load does the fetch, so back, reload and a
+// shared address keep the search; a list already loaded filters in
+// place. The box writes the query a moment after the last keystroke,
+// and Escape clears it.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
+import "./search.css";
 
 export const SEARCH_DELAY = 200;
 
 export function Search({
   value,
   onChange,
+  placeholder,
 }: {
-  // the query as the address has it
+  // the query as its owner holds it
   value: string;
   onChange: (q: string) => void;
+  placeholder: string;
 }) {
   const text = useSignal(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // the address moved under the box (back, a link): the box follows,
+  // the query moved under the box (back, a link): the box follows,
   // and a write still pending would only put the old text back
   useEffect(() => {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -48,14 +53,14 @@ export function Search({
     }, SEARCH_DELAY);
   };
   return (
-    <label class="stream-search">
+    <label class="search">
       <Icon name="search" size={14} />
       <input
-        class="stream-search-input"
+        class="search-input"
         type="search"
         name="q"
-        placeholder="Search sessions"
-        aria-label="Search sessions"
+        placeholder={placeholder}
+        aria-label={placeholder}
         autocomplete="off"
         value={text.value}
         onInput={(ev) => {

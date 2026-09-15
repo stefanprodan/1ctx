@@ -27,6 +27,7 @@ import {
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
+  listedProjects,
   peopleLine,
   tabsOf,
 } from "../../../src/client/views/projects/Project.model.ts";
@@ -292,6 +293,20 @@ describe("the rail", () => {
 });
 
 describe("Project.model", () => {
+  test("the Projects card lists the personal first, narrowed by name", () => {
+    const list = [
+      { kind: "team" as const, name: "on-call" },
+      { kind: "team" as const, name: "platform" },
+      { kind: "personal" as const, name: "personal" },
+    ];
+    const names = (q: string) => listedProjects(list, q).map((p) => p.name);
+    expect(names("")).toEqual(["personal", "on-call", "platform"]);
+    expect(names("  ")).toEqual(["personal", "on-call", "platform"]);
+    expect(names("ON")).toEqual(["personal", "on-call"]);
+    expect(names("call ")).toEqual(["on-call"]);
+    expect(names("ops")).toEqual([]);
+  });
+
   test("the words on a project's row", () => {
     expect(peopleLine({ kind: "personal", memberCount: 1 })).toBe("only you");
     expect(peopleLine({ kind: "team", memberCount: 1 })).toBe("1 member");
@@ -370,6 +385,14 @@ describe("the pages", () => {
       expect(render(<Projects />)).toContain('href="/admin/projects"');
     },
   );
+
+  test.serial("Projects heads its card with the search", () => {
+    projects.value = [personal];
+    const html = render(<Projects />);
+    expect(html).toContain('aria-label="Projects"');
+    expect(html).toContain('placeholder="Search projects"');
+    expect(html).not.toContain("No projects found");
+  });
 
   test.serial("Projects has Home's aside: the week and the agents", () => {
     projects.value = [personal];
