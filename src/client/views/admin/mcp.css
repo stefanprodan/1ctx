@@ -19,6 +19,17 @@
   .mcp-field-wide {
     grid-column: 1 / -1;
   }
+  .mcp-head-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .mcp-pattern-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+  }
   .mcp-mono {
     font-family: var(--mono);
     font-size: var(--text-small);
@@ -256,6 +267,12 @@
     gap: var(--space-2);
   }
 
+  @media (max-width: 719px) {
+    .mcp-head-row,
+    .mcp-pattern-row {
+      grid-template-columns: 1fr;
+    }
+  }
   @media (max-width: 719px) {
     .mcp-pick-head,
     .mcp-instructions-head,

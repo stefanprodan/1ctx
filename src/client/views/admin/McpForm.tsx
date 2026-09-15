@@ -118,59 +118,65 @@ export function McpFields({
   );
   return (
     <>
-      <div class="field mcp-field-wide">
-        <span class="label">Offered</span>
-        <div class="mcp-switches">
-          {switchOf("read", read, "Read tools")}
-          {switchOf("write", write, "Write tools")}
-          {switchOf("instructionsOn", instructionsOn, "Instructions")}
+      {/* the switches and the timeout share a row, the three pattern
+          fields the next, so the form reads as two lines of settings */}
+      <div class="mcp-field-wide mcp-head-row">
+        <div class="field">
+          <span class="label">Offered</span>
+          <div class="mcp-switches">
+            {switchOf("read", read, "Read tools")}
+            {switchOf("write", write, "Write tools")}
+            {switchOf("instructionsOn", instructionsOn, "Instructions")}
+          </div>
         </div>
+        <label class="field">
+          <span class="label">Call timeout</span>
+          <input
+            name="timeoutMs"
+            class="mcp-mono"
+            inputMode="decimal"
+            autocomplete="off"
+            placeholder={timeoutText(callTimeoutMs.value)}
+            aria-invalid={invalid("timeoutMs") || undefined}
+            disabled={busy}
+            value={timeout}
+            onInput={(e) =>
+              onChange("timeout", (e.currentTarget as HTMLInputElement).value)
+            }
+          />
+          {invalid("timeoutMs") ? (
+            <FieldError save={save} field="timeoutMs" />
+          ) : (
+            <span class="hint">{timeoutHint(callTimeoutMs.value)}</span>
+          )}
+        </label>
       </div>
-      <label class="field">
-        <span class="label">Call timeout</span>
-        <input
-          name="timeoutMs"
-          class="mcp-mono"
-          inputMode="decimal"
-          autocomplete="off"
-          placeholder={timeoutText(callTimeoutMs.value)}
-          aria-invalid={invalid("timeoutMs") || undefined}
-          disabled={busy}
-          value={timeout}
-          onInput={(e) =>
-            onChange("timeout", (e.currentTarget as HTMLInputElement).value)
-          }
-        />
-        {invalid("timeoutMs") ? (
-          <FieldError save={save} field="timeoutMs" />
-        ) : (
-          <span class="hint">{timeoutHint(callTimeoutMs.value)}</span>
+      <div class="mcp-field-wide mcp-pattern-row">
+        {patterns(
+          "readText",
+          "readPatterns",
+          "Read",
+          readText,
+          marks?.read,
+          PATTERN_HINT,
         )}
-      </label>
-      {patterns(
-        "readText",
-        "readPatterns",
-        "Read",
-        readText,
-        marks?.read,
-        PATTERN_HINT,
-      )}
-      {patterns(
-        "writeText",
-        "writePatterns",
-        "Write",
-        writeText,
-        marks?.write,
-        "Empty means everything not read or excluded",
-      )}
-      {patterns(
-        "excludedText",
-        "excludedPatterns",
-        "Excluded",
-        excludedText,
-        marks?.excluded,
-        "Never offered to any agent",
-      )}
+        {patterns(
+          "writeText",
+          "writePatterns",
+          "Write",
+          writeText,
+          marks?.write,
+          "Empty means everything not read or excluded",
+        )}
+        {patterns(
+          "excludedText",
+          "excludedPatterns",
+          "Excluded",
+          excludedText,
+          marks?.excluded,
+          "Never offered to any agent",
+        )}
+      </div>
     </>
   );
 }
