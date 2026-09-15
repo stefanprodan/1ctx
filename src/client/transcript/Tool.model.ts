@@ -22,9 +22,11 @@ export function shortArg(name: string, args: string): string {
     if (name === "websearch" && typeof value.query === "string") {
       return value.query.replace(/\s+/g, " ").trim();
     }
-    if (name === "get_current_time") {
-      const zone = value.timezone ?? value.zone;
-      return typeof zone === "string" ? zone : "";
+    if (name === "datetime") {
+      // the tool's default, so a call without one still says its zone
+      return typeof value.timezone === "string" && value.timezone !== ""
+        ? value.timezone
+        : "UTC";
     }
     if (name === "skill" && typeof value.name === "string") {
       return value.name;

@@ -198,7 +198,7 @@ describe("history", () => {
 
   test("a complete work round: the calls turn and each tool row in order", () => {
     const calls = [
-      { id: "c1", name: "get_current_time", arguments: "{}" },
+      { id: "c1", name: "datetime", arguments: "{}" },
       { id: "c2", name: "websearch", arguments: '{"q":"x"}' },
     ];
     const rows = [
@@ -219,7 +219,7 @@ describe("history", () => {
         sendId: "snd1",
         round: 1,
         toolCallId: "c1",
-        toolName: "get_current_time",
+        toolName: "datetime",
         content: "2026-09-13",
       }),
       row({

@@ -9,10 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
-import {
-  dateLine,
-  formatCurrentTime,
-} from "../../../src/server/tools/builtin/time.ts";
+import { formatDatetime } from "../../../src/server/tools/builtin/datetime.ts";
 import type { SkillsPort } from "../../../src/server/tools/index.ts";
 import { type ToolsArea, toolsArea } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
@@ -93,29 +90,23 @@ function area(
   return tools;
 }
 
-describe("formatCurrentTime", () => {
+describe("formatDatetime", () => {
   test("formats a fixed instant with the requested zone offset", () => {
-    expect(formatCurrentTime(now, "Europe/Bucharest")).toEqual({
+    expect(formatDatetime(now, "Europe/Bucharest")).toEqual({
       timezone: "Europe/Bucharest",
       datetime: "2026-09-08T17:42:10+03:00",
       day_of_week: "Tuesday",
     });
-    expect(formatCurrentTime(now, "Asia/Tokyo").datetime).toBe(
+    expect(formatDatetime(now, "Asia/Tokyo").datetime).toBe(
       "2026-09-08T23:42:10+09:00",
     );
-    expect(formatCurrentTime(now, "America/New_York").datetime).toBe(
+    expect(formatDatetime(now, "America/New_York").datetime).toBe(
       "2026-09-08T10:42:10-04:00",
-    );
-    expect(dateLine(now, "Europe/Bucharest")).toBe(
-      "Today's date: Tuesday, 2026-09-08",
-    );
-    expect(dateLine(now, "Pacific/Auckland")).toBe(
-      "Today's date: Wednesday, 2026-09-09",
     );
   });
 
   test("names an invalid timezone", () => {
-    expect(() => formatCurrentTime(now, "Mars/Olympus")).toThrow(
+    expect(() => formatDatetime(now, "Mars/Olympus")).toThrow(
       'unknown timezone "Mars/Olympus"',
     );
   });
@@ -127,12 +118,12 @@ describe("offered", () => {
       area()
         .offered(now, "")
         .tools.map((tool) => tool.name),
-    ).toEqual(["get_current_time", "webfetch"]);
+    ).toEqual(["datetime", "webfetch"]);
     expect(area().offered(now, "").search).toBeNull();
 
     const withExa = area({ exa: "exa-key" }, "exa").offered(now, "");
     expect(withExa.tools.map((tool) => tool.name)).toEqual([
-      "get_current_time",
+      "datetime",
       "webfetch",
       "websearch",
     ]);
@@ -162,14 +153,12 @@ describe("offered", () => {
     expect(area({ exa: "e" }).offered(now, "").search).toBeNull();
   });
 
-  test("fills {{year}} in the websearch description in the host zone", () => {
+  test("fills {{year}} in the websearch description in UTC", () => {
     const websearch = area({ exa: "e" }, "exa")
       .offered(now, "")
       .tools.find((tool) => tool.name === "websearch");
-    // the host timezone decides the year; both are plausible around the
-    // fixed instant, so assert the placeholder is gone and a year is set
     expect(websearch?.description).not.toContain("{{year}}");
-    expect(websearch?.description).toMatch(/The current year is 20\d\d\./);
+    expect(websearch?.description).toContain("The current year is 2026.");
 
     const fetch = area()
       .offered(now, "")
@@ -183,19 +172,22 @@ describe("offered", () => {
     });
     const time = area()
       .offered(now, "")
-      .tools.find((tool) => tool.name === "get_current_time");
-    expect(time?.parameters).toMatchObject({ required: ["timezone"] });
+      .tools.find((tool) => tool.name === "datetime");
+    expect(time?.parameters).not.toHaveProperty("required");
+    expect(time?.parameters).toMatchObject({
+      properties: { timezone: { default: "UTC" } },
+    });
   });
 });
 
 describe("run", () => {
-  test("runs get_current_time and accepts empty arguments as an object", async () => {
+  test("runs datetime, in UTC when no timezone is given", async () => {
     const offered = area().offered(now, "");
     const result = await area().run(
       offered,
       {
         id: "call_1",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       },
       context(),
@@ -207,13 +199,31 @@ describe("run", () => {
       day_of_week: "Tuesday",
     });
 
-    const empty = await area().run(
-      offered,
-      { id: "call_2", name: "get_current_time", arguments: "" },
-      context(),
-    );
-    expect(empty).toMatchObject({
-      content: "Error: timezone must be a non-empty string",
+    const utc = {
+      content: JSON.stringify({
+        timezone: "UTC",
+        datetime: "2026-09-08T14:42:10+00:00",
+        day_of_week: "Tuesday",
+      }),
+      error: false,
+    };
+    for (const args of ["", "{}", '{"timezone":null}', '{"timezone":""}']) {
+      expect(
+        await area().run(
+          offered,
+          { id: "call_2", name: "datetime", arguments: args },
+          context(),
+        ),
+      ).toEqual(utc);
+    }
+    expect(
+      await area().run(
+        offered,
+        { id: "call_3", name: "datetime", arguments: '{"timezone":3}' },
+        context(),
+      ),
+    ).toMatchObject({
+      content: "Error: timezone must be a string",
       error: true,
     });
   });
@@ -230,19 +240,19 @@ describe("run", () => {
     expect(
       await area().run(
         offered,
-        { id: "x", name: "get_current_time", arguments: "{" },
+        { id: "x", name: "datetime", arguments: "{" },
         context(),
       ),
     ).toMatchObject({
       error: true,
-      content: 'Error: invalid JSON arguments for tool "get_current_time"',
+      content: 'Error: invalid JSON arguments for tool "datetime"',
     });
     expect(
       await area().run(
         offered,
         {
           id: "x",
-          name: "get_current_time",
+          name: "datetime",
           arguments: '{"timezone":"Not/AZone"}',
         },
         context(),
@@ -258,12 +268,12 @@ describe("run", () => {
     expect(
       await area().run(
         offered,
-        { id: "x", name: "get_current_time", arguments: "[1,2]" },
+        { id: "x", name: "datetime", arguments: "[1,2]" },
         context(),
       ),
     ).toMatchObject({
       error: true,
-      content: 'Error: arguments for tool "get_current_time" must be an object',
+      content: 'Error: arguments for tool "datetime" must be an object',
     });
   });
 

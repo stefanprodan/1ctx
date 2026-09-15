@@ -267,20 +267,20 @@ describe("transcript rows", () => {
       message("tool-2", 4, "tool", {
         slot: null,
         toolCallId: "dup",
-        toolName: "get_current_time",
+        toolName: "datetime",
       }),
       message("user", 1, "user"),
       message("work", 2, "reply", {
         slot: "work",
         toolCalls: [
-          { id: "dup", name: "get_current_time", arguments: "{}" },
-          { id: "dup", name: "get_current_time", arguments: "{}" },
+          { id: "dup", name: "datetime", arguments: "{}" },
+          { id: "dup", name: "datetime", arguments: "{}" },
         ],
       }),
       message("tool-1", 3, "tool", {
         slot: null,
         toolCallId: "dup",
-        toolName: "get_current_time",
+        toolName: "datetime",
       }),
     ];
 

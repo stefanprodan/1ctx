@@ -120,7 +120,7 @@ const reserve = row({
 const rows = [rounds, toolMs, resultBytes, timeout, searchBody, cut, reserve];
 
 const time: ToolSummary = {
-  name: "get_current_time",
+  name: "datetime",
   description: "The current date and time in a timezone. Ask before math.",
   parameters: { type: "object", properties: {} },
   parametersHtml:
@@ -242,7 +242,7 @@ describe("the tools entity", () => {
         ? Response.json({ tools: [time], search })
         : Response.json({ limits: rows });
     await loadTools();
-    expect(tools.value?.tools[0]?.name).toBe("get_current_time");
+    expect(tools.value?.tools[0]?.name).toBe("datetime");
     expect(limits.value?.length).toBe(rows.length);
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadTools();
@@ -259,10 +259,10 @@ describe("the tools entity", () => {
       if (init?.method === "DELETE") return new Response(null, { status: 204 });
       return Response.json({ limits: [{ ...rounds, value: 3, changedAt: 9 }] });
     };
-    await patchTool("get_current_time", { enabled: false });
+    await patchTool("datetime", { enabled: false });
     expect(tools.value?.tools[0]?.enabled).toBe(false);
     expect(calls[0]).toMatchObject({
-      url: "/api/tools/get_current_time",
+      url: "/api/tools/datetime",
       method: "PATCH",
       body: '{"enabled":false}',
     });
@@ -297,7 +297,7 @@ describe("the page", () => {
     tools.value = { tools: [time], search };
     limits.value = rows;
     const html = render(<Tools />);
-    expect(html).toContain("get_current_time");
+    expect(html).toContain("datetime");
     expect(html).toContain('role="switch"');
     expect(html).not.toContain("md-pre");
     expect(html).toContain('aria-checked="true"');

@@ -35,7 +35,7 @@ function message(changes: Partial<Message> = {}): Message {
     toolCalls: [
       {
         id: "call-1",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       },
     ],
@@ -169,7 +169,7 @@ describe("work summaries", () => {
       slot: null,
       toolCalls: null,
       toolCallId: "call-1",
-      toolName: "get_current_time",
+      toolName: "datetime",
     });
     const withRow = node({
       rows: [message(), tool],

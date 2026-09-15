@@ -187,14 +187,14 @@ export const m0001: Migration = {
 
       create table tools (
         name text primary key
-          check (name in ('get_current_time', 'webfetch', 'websearch')),
+          check (name in ('datetime', 'webfetch', 'websearch')),
         enabled integer not null default 1 check (enabled in (0, 1)),
         provider text check (provider in ('exa', 'firecrawl')),
         updated_at integer not null
       );
       -- migrations get no clock, so the rows start at zero
       insert into tools (name, enabled, provider, updated_at) values
-        ('get_current_time', 1, null, 0),
+        ('datetime', 1, null, 0),
         ('webfetch', 1, null, 0),
         ('websearch', 1, null, 0);
 

@@ -1,6 +1,6 @@
 data: {"id":"chatcmpl-1788882606702","object":"chat.completion.chunk","created":1788882606,"model":"stefanprodan/Ornith-1.5-35B-A3B-BigBang-oQ4e-mtp","system_fingerprint":"mlx-serve","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}],"usage":null}
 
-data: {"id":"chatcmpl-1788882606702","object":"chat.completion.chunk","created":1788882607,"model":"stefanprodan/Ornith-1.5-35B-A3B-BigBang-oQ4e-mtp","system_fingerprint":"mlx-serve","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1788882606702_0","type":"function","function":{"name":"get_current_time","arguments":"{}"}}]},"finish_reason":null}],"usage":null}
+data: {"id":"chatcmpl-1788882606702","object":"chat.completion.chunk","created":1788882607,"model":"stefanprodan/Ornith-1.5-35B-A3B-BigBang-oQ4e-mtp","system_fingerprint":"mlx-serve","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1788882606702_0","type":"function","function":{"name":"datetime","arguments":"{}"}}]},"finish_reason":null}],"usage":null}
 
 data: {"id":"chatcmpl-1788882606702","object":"chat.completion.chunk","created":1788882607,"model":"stefanprodan/Ornith-1.5-35B-A3B-BigBang-oQ4e-mtp","system_fingerprint":"mlx-serve","choices":[{"index":0,"delta":{},"finish_reason":"length"}],"usage":null}
 

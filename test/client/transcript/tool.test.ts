@@ -40,7 +40,7 @@ function result(changes: Partial<Message> = {}): Message {
     finishReason: null,
     toolCalls: null,
     toolCallId: "call-1",
-    toolName: "get_current_time",
+    toolName: "datetime",
     model: null,
     ttftMs: null,
     thinkingMs: null,
@@ -58,9 +58,9 @@ describe("tool summaries", () => {
     expect(shortArg("websearch", '{"query":"  two   words  "}')).toBe(
       "two words",
     );
-    expect(
-      shortArg("get_current_time", '{"timezone":"Europe/Bucharest"}'),
-    ).toBe("Europe/Bucharest");
+    expect(shortArg("datetime", '{"timezone":"Europe/Bucharest"}')).toBe(
+      "Europe/Bucharest",
+    );
     expect(shortArg("skill", '{"name":"gitops-knowledge"}')).toBe(
       "gitops-knowledge",
     );
@@ -73,8 +73,9 @@ describe("tool summaries", () => {
   });
 
   test("shows a duration only for a completed result", () => {
-    expect(toolSummary(call("get_current_time", {}), result())).toEqual({
-      argument: "",
+    expect(shortArg("datetime", "{}")).toBe("UTC");
+    expect(toolSummary(call("datetime", {}), result())).toEqual({
+      argument: "UTC",
       state: "3.2 s",
       live: false,
     });

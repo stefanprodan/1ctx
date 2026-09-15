@@ -62,7 +62,7 @@ function fixedTools(content: string): Tools {
     offered: () => ({
       tools: [
         {
-          name: "get_current_time",
+          name: "datetime",
           description: "the current time",
           parameters: { type: "object", properties: {} },
         },
@@ -76,7 +76,7 @@ function fixedTools(content: string): Tools {
 
 const timeCall = {
   id: "time-1",
-  name: "get_current_time",
+  name: "datetime",
   arguments: '{"timezone":"UTC"}',
 };
 
@@ -941,14 +941,14 @@ describe("the tool-loop store", () => {
       error: null,
       finishReason: "tool_calls",
       slot: "work",
-      toolCalls: [{ id: "c1", name: "get_current_time", arguments: "{}" }],
+      toolCalls: [{ id: "c1", name: "datetime", arguments: "{}" }],
       ttftMs: null,
       thinkingMs: null,
       finishedAt: 1,
     })!;
     expect(work.slot).toBe("work");
     expect(work.toolCalls).toEqual([
-      { id: "c1", name: "get_current_time", arguments: "{}" },
+      { id: "c1", name: "datetime", arguments: "{}" },
     ]);
 
     const [tool] = store.addToolRows([
@@ -957,7 +957,7 @@ describe("the tool-loop store", () => {
         sendId: send.id,
         round: 1,
         toolCallId: "c1",
-        toolName: "get_current_time",
+        toolName: "datetime",
         now: 1,
       },
     ]);
@@ -1283,7 +1283,7 @@ describe("GET /api/sessions/:id/markdown", () => {
         sendId: send.id,
         round: 1,
         toolCallId: "c1",
-        toolName: "get_current_time",
+        toolName: "datetime",
         now: 1,
       },
     ]);

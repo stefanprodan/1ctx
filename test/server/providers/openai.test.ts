@@ -83,7 +83,7 @@ describe("OpenAI chat body", () => {
           toolCalls: [
             {
               id: "call_time",
-              name: "get_current_time",
+              name: "datetime",
               arguments: '{"timezone":"UTC"}',
             },
           ],
@@ -113,7 +113,7 @@ describe("OpenAI chat body", () => {
               id: "call_time",
               type: "function",
               function: {
-                name: "get_current_time",
+                name: "datetime",
                 arguments: '{"timezone":"UTC"}',
               },
             },
@@ -324,11 +324,11 @@ describe("ToolCallTracker", () => {
     tracker.push(delta({ index: 0, arguments: '{"time' }));
     tracker.push(delta({ index: 0, arguments: 'zone":"' }));
     tracker.push(delta({ index: 0, arguments: 'UTC"}' }));
-    tracker.push(delta({ id: "server_call", name: "get_current_time" }));
+    tracker.push(delta({ id: "server_call", name: "datetime" }));
     expect(tracker.flush()).toEqual([
       {
         id: "server_call",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       },
     ]);
@@ -386,7 +386,7 @@ describe("OpenAI chat stream", () => {
       { kind: "toolCalls" }
     >;
     expect(calls.calls).toHaveLength(1);
-    expect(calls.calls[0].name).toBe("get_current_time");
+    expect(calls.calls[0].name).toBe("datetime");
     expect(JSON.parse(calls.calls[0].arguments)).toHaveProperty("timezone");
     expect(events.some((e) => e.kind === "error")).toBe(false);
   });

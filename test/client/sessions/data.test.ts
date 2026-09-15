@@ -739,7 +739,7 @@ describe("the sessions entity", () => {
             finishReason: null,
             agentId: null,
             toolCallId: "c1",
-            toolName: "get_current_time",
+            toolName: "datetime",
           }),
         ],
         send: sent,

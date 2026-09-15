@@ -196,7 +196,7 @@ describe("the schema", () => {
         .all(),
     ).toEqual([
       {
-        name: "get_current_time",
+        name: "datetime",
         enabled: 1,
         provider: null,
         updated_at: 0,

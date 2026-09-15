@@ -121,7 +121,7 @@ describe("privacy", () => {
     // envelope; it reaches the owner's connection and no one else's
     script.toolCall({
       id: "c1",
-      name: "get_current_time",
+      name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
     await tick();
@@ -129,7 +129,7 @@ describe("privacy", () => {
       c.frames.filter((f) => f.type === "session");
     expect(durable(mine).length).toBeGreaterThanOrEqual(1);
     expect(durable(theirs)).toEqual([]);
-    expect(JSON.stringify(theirs.frames)).not.toContain("get_current_time");
+    expect(JSON.stringify(theirs.frames)).not.toContain("datetime");
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
     await tick();
     await tick();

@@ -209,7 +209,7 @@ describe("tools administration", () => {
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["get_current_time", "webfetch", "websearch"]);
+    ).toEqual(["datetime", "webfetch", "websearch"]);
     chat.app.socket.dispose();
   });
 });

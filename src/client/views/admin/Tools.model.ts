@@ -84,7 +84,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
 };
 
 export const TOOL_WORDS: Record<BuiltinTool, string> = {
-  get_current_time: "The clock, in any timezone.",
+  datetime: "The date and time, in UTC or any timezone.",
   webfetch: "A page by URL, as text.",
   websearch: "The web, through the chosen search provider.",
 };

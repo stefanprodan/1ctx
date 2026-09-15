@@ -236,11 +236,7 @@ export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
 export const MAX_SEARCH = 100;
 
 // the built-in tools, each with a server-wide switch on the tools page
-export const BUILTIN_TOOLS = [
-  "get_current_time",
-  "webfetch",
-  "websearch",
-] as const;
+export const BUILTIN_TOOLS = ["datetime", "webfetch", "websearch"] as const;
 export type BuiltinTool = (typeof BUILTIN_TOOLS)[number];
 export function isBuiltinTool(value: unknown): value is BuiltinTool {
   return BUILTIN_TOOLS.includes(value as BuiltinTool);
