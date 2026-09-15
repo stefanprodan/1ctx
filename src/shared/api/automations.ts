@@ -31,6 +31,8 @@ export type SaveAutomationRequest = {
   // null for the limit's value, else at most the limit
   deadlineMs: number | null;
   retentionDays: number;
+  projectMemory: boolean;
+  ownMemory: boolean;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 

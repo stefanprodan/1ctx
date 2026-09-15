@@ -25,6 +25,10 @@ export type AutomationSummary = {
   // null for the limit's value
   deadlineMs: number | null;
   retentionDays: number;
+  // its runs update the project's memory from the chats they read
+  projectMemory: boolean;
+  // its runs end with a memory phase that keeps the automation's note
+  ownMemory: boolean;
   // an epoch while suspended; nextAt is null exactly then
   suspendedAt: number | null;
   // who suspended it, an admin outside the project included; null while
