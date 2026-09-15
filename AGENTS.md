@@ -296,7 +296,7 @@ violation, and every rule has a rejected fixture under
   (a pattern matching nothing marked under its field), and the
   instructions as `serverBlock()` gives them, trimmed to 12 lines with
   Show all. `data/mcp.ts` keeps the rows, the keys and `loadedAt`; the
-  agent form reads them again on open and says when. The agent form's
+  agent form reads them again on open and says when it did. The agent form's
   section is a line per server with Read and Write boxes (a side off
   on the server faint with the word),
   the mode as a `Select`, and the prompt's instructions total with a

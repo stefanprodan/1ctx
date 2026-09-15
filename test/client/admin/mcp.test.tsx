@@ -542,7 +542,7 @@ describe("the page", () => {
         />,
       );
       expect(html).toContain("off on the server");
-      expect(html).toContain("as of the servers loaded 1m ago");
+      expect(html).toContain("refreshed 1m ago");
       expect(html).toContain("Instructions in the prompt:");
       expect(html).toContain("Every tool schema goes to the model");
       const noTools = render(
@@ -573,7 +573,7 @@ describe("the page", () => {
         />,
       );
       expect(none).toContain("No MCP servers yet");
-      expect(none).toContain("as of the servers loaded 1m ago");
+      expect(none).toContain("refreshed 1m ago");
     },
   );
 });

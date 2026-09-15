@@ -75,9 +75,7 @@ export function McpPicker({
       <span class="mcp-pick-head">
         <span class="label">MCP servers</span>
         {loadedAt !== null && available !== null && (
-          <span class="hint">
-            as of the servers loaded {ago(loadedAt, Date.now())}
-          </span>
+          <span class="hint">refreshed {ago(loadedAt, Date.now())}</span>
         )}
       </span>
       {available === null ? (
