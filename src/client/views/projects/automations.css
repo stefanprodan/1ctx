@@ -116,13 +116,22 @@
     color: var(--fg);
   }
 
+  /* the same segmented switch as the stream's head */
   .automations-filters {
     display: flex;
-    gap: var(--space-1);
+    flex-shrink: 0;
+    gap: 2px;
     margin-left: auto;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
   }
   .automations-filter {
-    padding: 2px var(--space-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 var(--space-2);
     border-radius: var(--radius);
     color: var(--faint);
     font-size: var(--text-small);

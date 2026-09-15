@@ -57,7 +57,7 @@ export function AutomationActions({
         title={running ? "A run is on its way" : undefined}
         onClick={() => void act("run", () => runAutomation(automation.id))}
       >
-        <Icon name="play" size={12} />
+        <Icon name="bolt" size={12} />
         {busy.value === "run" ? "Starting" : "Run now"}
       </button>
       <div class="automations-actions-end">

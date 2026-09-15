@@ -79,7 +79,7 @@ function RunRow({
     <div class="automations-run">
       <a class="automations-run-link" href={`/chat/${session.id}`}>
         <Icon
-          name={session.runSource === "manual" ? "user" : "clock"}
+          name={session.runSource === "manual" ? "bolt" : "clock"}
           size={16}
           class={`automations-run-icon automations-icon-${session.status}`}
         />
@@ -291,11 +291,9 @@ export function Automation({ params }: { params: Params }) {
                 ) : (
                   <>
                     <div class="split-line">
-                      <span class="split-strong">{total}</span>
-                      <span>
-                        {total === 1 ? "run" : "runs"}, kept {row.retentionDays}{" "}
-                        {row.retentionDays === 1 ? "day" : "days"}
-                      </span>
+                      {total} {total === 1 ? "run" : "runs"} ·{" "}
+                      {row.retentionDays}{" "}
+                      {row.retentionDays === 1 ? "day" : "days"} retention
                     </div>
                     <div class="split-line">
                       {[

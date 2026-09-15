@@ -272,15 +272,14 @@ function Editor({
 
 // how a fire becomes a run, in the scheduler's and the runner's terms
 const RUN_FACTS = [
-  "Each fire opens a new session in this project with the chosen agent.",
-  "The system prompt carries the agent's prompt, the project, the fire time in the zone and the autonomous run rule. The task is the first user message.",
-  "A scheduled run acts as the owner. Run now acts as whoever pressed it. Both count against the send caps.",
-  "A fire is skipped while the previous run is still running. Missed fires are dropped, never replayed.",
-  "The deadline terminates the run as stopped. Runs past the retention are deleted hourly.",
+  "Each run starts a new session where the agent works on its own, without asking questions.",
+  "A scheduled run is skipped if the previous one is still running.",
+  "A run that exceeds the deadline is stopped.",
+  "Runs are deleted after the retention period.",
 ];
 
 const aside = (
-  <AsideSection label="How it runs">
+  <AsideSection label="How it works">
     {RUN_FACTS.map((fact) => (
       <p key={fact} class="automations-aside-text">
         {fact}
