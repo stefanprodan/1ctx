@@ -28,7 +28,6 @@ function SettingsForm({ project }: { project: ProjectDetail }) {
   return (
     <SectionForm onSubmit={submit}>
       <DescriptionField
-        hint={false}
         disabled={busy}
         value={description.value}
         onInput={(value) => {

@@ -21,15 +21,6 @@ export function sinceLine(project: ProjectSummary): string {
   return `since ${longDate(project.createdAt)}`;
 }
 
-// the row's avatar: the first letters of the name's first two words, or
-// its first two letters. "on-call" is "OC", "research" is "RE"
-export function mark(name: string): string {
-  const words = name.split("-").filter(Boolean);
-  const letters =
-    words.length >= 2 ? words[0][0] + words[1][0] : name.slice(0, 2);
-  return letters.toUpperCase();
-}
-
 export function deleteLabel(chats: number): string {
   return chats === 0 ? "Delete" : `Delete with ${plural(chats, "chat")}`;
 }

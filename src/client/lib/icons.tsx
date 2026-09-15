@@ -106,10 +106,13 @@ const PATHS: Record<string, string> = {
   trash: "M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5M6.8 7v4M9.2 7v4",
   redo: "M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5",
   clock: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8 4.5V8l2.5 1.5",
+  // automation as a whole, whatever starts a run
+  bolt: "M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z",
   play: "M5 3.5v9l7-4.5z",
   pause: "M5.5 3.5v9M10.5 3.5v9",
   tools:
     "M10 2.5a3.5 3.5 0 0 0-4.2 4.6L2.5 10.4l3.1 3.1 3.3-3.3a3.5 3.5 0 0 0 4.6-4.2L11.3 8.2 7.8 4.7z",
+  skill: "M4 2.5h5.5L13 6v7.5H4zM9.5 2.5V6H13M6.5 9h3M6.5 11.5h3",
 };
 
 export type IconName = keyof typeof PATHS;

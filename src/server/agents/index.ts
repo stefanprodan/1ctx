@@ -13,6 +13,7 @@ import {
   type ProvidersPort,
   routes,
   type SessionsPort,
+  type SkillsPort,
 } from "./routes.ts";
 import { type AgentRow, AgentStore } from "./store.ts";
 
@@ -23,6 +24,7 @@ export {
   type RoutesDeps,
   routes,
   type SessionsPort,
+  type SkillsPort,
 } from "./routes.ts";
 export { type AgentRow, AgentStore, summary } from "./store.ts";
 
@@ -30,6 +32,7 @@ export type AgentsDeps = {
   db: Db;
   clock: Clock;
   providers: ProvidersPort;
+  skills: SkillsPort & { assigned(agentId: string): string[] };
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -43,14 +46,16 @@ export type Agents = {
 };
 
 export function agentsArea(deps: AgentsDeps): Agents {
-  const store = new AgentStore(deps.db);
+  const store = new AgentStore(deps.db, deps.skills.assigned);
   return {
     store,
     byId: (id) => store.byId(id),
     usesProvider: (providerId) => store.usesProvider(providerId),
     routes: routes({
+      db: deps.db,
       store,
       providers: deps.providers,
+      skills: deps.skills,
       access: deps.access,
       sessions: deps.sessions,
       automations: deps.automations,

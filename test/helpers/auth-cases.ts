@@ -291,6 +291,43 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/skills",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/skills/discover",
+    body: { url: "http://skills.test" },
+    expect: { anonymous: 401, member: 403, admin: 502 },
+  },
+  {
+    method: "POST",
+    path: "/api/skills",
+    body: { url: "http://skills.test/SKILL.md" },
+    expect: { anonymous: 401, member: 403, admin: 502 },
+  },
+  {
+    method: "GET",
+    path: "/api/skills/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/skills/:id/file",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/skills/:id/refresh",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/skills/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/sessions",
     expect: { anonymous: 401, member: 200, admin: 200 },
   },

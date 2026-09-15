@@ -271,7 +271,7 @@ function LimitsCard({ rows }: { rows: LimitRow[] }) {
   );
   const changed = rows.some((row) => row.changedAt !== null);
   return (
-    <RowsCard label="Limits" hint="applies to the next send">
+    <RowsCard label="Limits">
       <form class="tools-form" onSubmit={submit}>
         {group("send", "Per send")}
         {group("call", "Per call")}
@@ -313,10 +313,7 @@ export function Tools() {
       error={error}
     >
       <Rows>
-        <RowsCard
-          label="Built-in tools"
-          hint="a switch applies to the next send"
-        >
+        <RowsCard label="Built-in tools">
           {(state?.tools ?? []).map((tool) => (
             <ToolRow
               key={tool.name}

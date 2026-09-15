@@ -18,8 +18,16 @@ import { longDate } from "../../lib/format.ts";
 export { fullNameProblem } from "../profile/Profile.model.ts";
 
 export const ROLE_CHOICES: { value: Role; label: string; text: string }[] = [
-  { value: "member", label: "Member", text: "Chats in their projects." },
-  { value: "admin", label: "Admin", text: "Runs the server." },
+  {
+    value: "member",
+    label: "Member",
+    text: "Works in the projects they belong to.",
+  },
+  {
+    value: "admin",
+    label: "Admin",
+    text: "Also manages users, projects and agents.",
+  },
 ];
 
 // the field shapes the username as it is typed and the server holds

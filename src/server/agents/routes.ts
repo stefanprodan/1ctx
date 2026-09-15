@@ -9,6 +9,7 @@ import type { AgentResponse, AgentsResponse } from "../../shared/api/agents.ts";
 import type { ProjectAgentsResponse } from "../../shared/api/sessions.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
+import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
@@ -37,9 +38,16 @@ export type AutomationsPort = {
   usesAgent(agentId: string): boolean;
 };
 
+export type SkillsPort = {
+  exists(id: string): boolean;
+  assign(agentId: string, ids: string[]): void;
+};
+
 export type RoutesDeps = {
+  db: Db;
   store: AgentStore;
   providers: ProvidersPort;
+  skills: SkillsPort;
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -60,6 +68,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     }
     const provider = deps.providers.byId(body.providerId);
     if (!provider) throw new BadRequest("no such provider");
+    for (const id of body.skills) {
+      if (!deps.skills.exists(id)) throw new BadRequest(`no such skill ${id}`);
+    }
     const effort = body.effort;
     if (effort !== null && !isEffort(provider.wire, effort)) {
       throw new BadRequest(
@@ -89,6 +100,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         thinking: body.thinking,
         effort,
         prompt: body.prompt,
+        skills: body.skills,
       };
     };
   };
@@ -113,7 +125,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(req) {
         const fields = await resolve(req, null);
-        const agent = deps.store.create({ ...fields(), now: deps.clock() });
+        const agent = transact(deps.db, () => {
+          const values = fields();
+          const created = deps.store.create({ ...values, now: deps.clock() });
+          deps.skills.assign(created.id, values.skills);
+          return { result: deps.store.byId(created.id)! };
+        });
         const body: AgentResponse = { agent: summary(agent) };
         return json(body, 201);
       },
@@ -125,9 +142,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const agent = find(ctx.params.id);
         const fields = await resolve(req, agent.id);
-        // gone while the catalog was asked
-        const updated = deps.store.update(agent.id, fields());
-        if (!updated) throw new NotFound("no such agent");
+        const updated = transact(deps.db, () => {
+          const values = fields();
+          const saved = deps.store.update(agent.id, values);
+          if (!saved) throw new NotFound("no such agent");
+          deps.skills.assign(agent.id, values.skills);
+          return { result: deps.store.byId(agent.id)! };
+        });
         const body: AgentResponse = { agent: summary(updated) };
         return json(body);
       },

@@ -299,6 +299,7 @@ describe("finishTool rollback", () => {
       const tools: Tools = {
         offered: () => ({
           search: null,
+          skills: { block: "", skills: [] },
           tools: [
             {
               name: "get_current_time",
@@ -406,6 +407,7 @@ describe("finalizeSend rollback", () => {
     const tools: Tools = {
       offered: () => ({
         search: null,
+        skills: { block: "", skills: [] },
         tools: [
           {
             name: "get_current_time",

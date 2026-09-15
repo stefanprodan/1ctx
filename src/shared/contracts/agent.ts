@@ -21,5 +21,7 @@ export type AgentSummary = {
   effort: Effort | null;
   // empty for an agent that runs on the model's own defaults
   prompt: string;
+  // the ids of the skills it carries, in name order
+  skills: string[];
   createdAt: number;
 };

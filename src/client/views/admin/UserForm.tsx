@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // New user: the username, the full name, the email, the role and the
-// first password, typed twice, which the admin hands over. An existing
+// password, typed twice, which the admin hands over. An existing
 // user opens the same fields without the password; under them, a
 // section resets the password, which signs the person out everywhere.
 // The admin's own row has no role choice and no reset: the profile
@@ -130,7 +130,7 @@ function ResetForm({ user }: { user: UserAccount }) {
       </div>
       <div class="users-fields">
         <label class="field">
-          <span class="label">New password</span>
+          <span class="label label-required">New password</span>
           <input
             name="next"
             type="password"
@@ -141,7 +141,7 @@ function ResetForm({ user }: { user: UserAccount }) {
           />
         </label>
         <label class="field">
-          <span class="label">New password again</span>
+          <span class="label label-required">New password again</span>
           <input
             name="again"
             type="password"
@@ -233,12 +233,12 @@ export function UserForm({
       <form class="users-form" onSubmit={submit}>
         <div class="users-fields">
           <label class="field">
-            <span class="label">Username</span>
+            <span class="label label-required">Username</span>
             <input
               name="username"
+              aria-required="true"
               autocomplete="off"
               spellcheck={false}
-              placeholder="oana"
               disabled={busy}
               value={username.value}
               onInput={(e) => {
@@ -246,27 +246,26 @@ export function UserForm({
                 save.touch();
               }}
             />
-            <span class="hint">The sign-in name and the handle.</span>
           </label>
           <label class="field">
-            <span class="label">Full name</span>
+            <span class="label label-required">Full name</span>
             <input
               name="fullName"
+              aria-required="true"
               autocomplete="off"
-              placeholder="Oana Pellea"
               disabled={busy}
               value={fullName.value}
               onInput={bind(fullName)}
             />
           </label>
           <label class="field users-field-wide">
-            <span class="label">Email</span>
+            <span class="label label-required">Email</span>
             <input
               name="email"
+              aria-required="true"
               type="email"
               autocomplete="off"
               spellcheck={false}
-              placeholder="oana@example.com"
               disabled={busy}
               value={email.value}
               onInput={bind(email)}
@@ -286,7 +285,7 @@ export function UserForm({
           {user === null && (
             <>
               <label class="field">
-                <span class="label">First password</span>
+                <span class="label label-required">Password</span>
                 <input
                   name="password"
                   type="password"
@@ -300,7 +299,7 @@ export function UserForm({
                 </span>
               </label>
               <label class="field">
-                <span class="label">First password again</span>
+                <span class="label label-required">Password again</span>
                 <input
                   name="again"
                   type="password"

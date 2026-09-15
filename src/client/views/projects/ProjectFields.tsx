@@ -14,25 +14,23 @@ const withOwner = (owner?: string) => `field${owner ? ` ${owner}` : ""}`;
 
 export function NameField({
   value,
-  placeholder,
   disabled,
   class: owner,
   onInput,
 }: {
   value: string;
-  placeholder?: string;
   disabled?: boolean;
   class?: string;
   onInput: (value: string) => void;
 }) {
   return (
     <label class={withOwner(owner)}>
-      <span class="label">Name</span>
+      <span class="label label-required">Name</span>
       <input
         name="name"
+        aria-required="true"
         autocomplete="off"
         spellcheck={false}
-        placeholder={placeholder}
         disabled={disabled}
         value={value}
         onInput={(event) => onInput(shapedInput(event))}
@@ -43,15 +41,15 @@ export function NameField({
 
 export function DescriptionField({
   value,
+  placeholder,
   disabled,
-  hint = true,
   class: owner,
   onInput,
 }: {
   value: string;
+  // none where the section's text already says it
+  placeholder?: string;
   disabled?: boolean;
-  // off where the section's text already says it
-  hint?: boolean;
   class?: string;
   onInput: (value: string) => void;
 }) {
@@ -62,7 +60,7 @@ export function DescriptionField({
         name="description"
         rows={3}
         maxLength={MAX_DESCRIPTION}
-        placeholder="What the work here is about"
+        placeholder={placeholder}
         disabled={disabled}
         value={value}
         onInput={(event) => {
@@ -71,9 +69,6 @@ export function DescriptionField({
           onInput(box.value);
         }}
       />
-      {hint && (
-        <span class="hint">What agents should know about this project.</span>
-      )}
     </label>
   );
 }

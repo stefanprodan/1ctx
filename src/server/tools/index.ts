@@ -20,7 +20,9 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
+import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { ToolSummary } from "../../shared/contracts/tool.ts";
+import { catalog } from "../../shared/skills.ts";
 import {
   BUILTIN_TOOLS,
   type BuiltinTool,
@@ -31,6 +33,8 @@ import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatTool, ToolCall } from "../providers/index.ts";
+import { CATALOG_CAP } from "../skills/index.ts";
+import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import { formatCurrentTime, HOST_TIMEZONE, timeTool } from "./builtin/time.ts";
 import {
   type FetchDependencies,
@@ -58,6 +62,10 @@ export type {
   ToolResult,
 } from "./types.ts";
 
+export type SkillsPort = SkillToolsPort & {
+  forAgent(agentId: string): OfferedSkill[];
+};
+
 export type ToolsDeps = {
   db: Db;
   // what reaches a provider; a test passes a fake (the compose fetcher)
@@ -71,6 +79,7 @@ export type ToolsDeps = {
   version: string;
   // keeps Markdown parsing and highlighting at the server safety boundary
   render: (markdown: string, streaming: boolean) => string;
+  skills: SkillsPort;
   // test seams for the two network tools; production leaves them unset
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
@@ -79,7 +88,7 @@ export type ToolsDeps = {
 export type Tools = {
   // the schemas and the search provider chosen for the send, the
   // {{year}} filled in the host's timezone
-  offered(now: number): Offered;
+  offered(now: number, agentId: string): Offered;
   // one call's result; a throw is turned into a failed result, never a
   // rejection the runner must catch
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
@@ -105,6 +114,7 @@ function fillYear(tools: ChatTool[], now: number): ChatTool[] {
 
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
+  const skillStore: SkillsPort = deps.skills;
   const fetchDeps: FetchDependencies = deps.fetchDeps ?? {
     fetch: deps.fetcher,
   };
@@ -192,7 +202,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const area: ToolsArea = {
     store,
     routes: [],
-    offered(now) {
+    offered(now, agentId) {
       const rows = new Map(store.rows().map((row) => [row.name, row]));
       const searchRow = rows.get("websearch")!;
       // the chosen provider, key or not: both answer keyless, so the
@@ -206,20 +216,34 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           .filter((row) => row.enabled && (row.name !== "websearch" || search))
           .map((row) => row.name),
       );
-      const schemas: ChatTool[] = toolsFor(search ?? "exa")
-        .filter((tool) => allowed.has(tool.name as BuiltinTool))
-        .map(({ name, description, parameters }) => ({
-          name,
-          description,
-          parameters,
-        }));
-      return { tools: fillYear(schemas, now), search };
+      const skillCatalog = catalog(skillStore.forAgent(agentId), CATALOG_CAP);
+      for (const name of skillCatalog.leftOut) {
+        deps.log(`skill ${name} left out of the catalog`);
+      }
+      const skillOffer = {
+        block: skillCatalog.text,
+        skills: skillCatalog.included,
+      };
+      const schemas: ChatTool[] = [
+        ...toolsFor(search ?? "exa").filter((tool) =>
+          allowed.has(tool.name as BuiltinTool),
+        ),
+        ...makeSkillTools(skillOffer.skills, skillStore),
+      ].map(({ name, description, parameters }) => ({
+        name,
+        description,
+        parameters,
+      }));
+      return { tools: fillYear(schemas, now), search, skills: skillOffer };
     },
     run(offered, call, ctx) {
       const allowed = new Set(offered.tools.map((tool) => tool.name));
-      const tools = toolsFor(offered.search ?? "exa").filter((tool) =>
-        allowed.has(tool.name),
-      );
+      const tools = [
+        ...toolsFor(offered.search ?? "exa").filter((tool) =>
+          allowed.has(tool.name),
+        ),
+        ...makeSkillTools(offered.skills.skills, skillStore),
+      ];
       return new Registry(tools).run(call, ctx);
     },
   };

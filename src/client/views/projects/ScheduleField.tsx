@@ -64,11 +64,15 @@ export function ScheduleField({
   };
   const b = builder.value;
   const expression = expressionOf(b);
+  // the first reading is asked at once, so the page opens with it
+  const asked = useRef(false);
   useEffect(() => {
     if (expression === "" || tz === "") return;
+    const wait = asked.current ? PREVIEW_WAIT_MS : 0;
+    asked.current = true;
     const timer = setTimeout(
       () => void loadPreview(projectId, expression, tz),
-      PREVIEW_WAIT_MS,
+      wait,
     );
     return () => clearTimeout(timer);
   }, [projectId, expression, tz]);
@@ -257,7 +261,13 @@ export function ScheduleField({
             Next run {fireLabel(fires[0], now, tz, true)},{" "}
             {until(fires[0], now)}
           </span>
-        ) : null}
+        ) : (
+          // holds the line's room while the reading is on its way, so
+          // the panel does not grow when it lands
+          <span class="automations-next" aria-hidden="true">
+            &nbsp;
+          </span>
+        )}
       </div>
     </div>
   );

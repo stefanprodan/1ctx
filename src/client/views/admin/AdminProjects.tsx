@@ -20,7 +20,6 @@ import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAdd,
-  RowsAvatar,
   RowsCard,
   RowsMeta,
   RowsNew,
@@ -28,7 +27,7 @@ import {
   RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { countLine, mark, sinceLine } from "./AdminProjects.model.ts";
+import { countLine, sinceLine } from "./AdminProjects.model.ts";
 import { ProjectForm } from "./ProjectForm.tsx";
 import "./admin-projects.css";
 
@@ -46,9 +45,9 @@ function ProjectRow({
     <RowsOpen
       open={open}
       onToggle={onToggle}
+      indent="chevron"
       head={
         <>
-          <RowsAvatar lit={open}>{mark(project.name)}</RowsAvatar>
           <RowsTitle name={project.name} sub={countLine(project)} mono />
           <RowsMeta>{sinceLine(project)}</RowsMeta>
         </>

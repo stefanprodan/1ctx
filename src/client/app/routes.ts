@@ -30,11 +30,12 @@ import {
   loadSession,
   session,
 } from "../data/sessions.ts";
+import { loadSkills } from "../data/skills.ts";
 import { loadTools } from "../data/tools.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
-import { composeProjectOf } from "../views/home/Home.model.ts";
+import { composeProjectOf, originOf } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
@@ -73,7 +74,7 @@ export const ROUTES: Route[] = [
     // from the rail's list
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
-      const origin = query.get("origin") === "automation" ? "automation" : null;
+      const origin = originOf(`?${query.toString()}`);
       const rows = loadList({ project: null, q, origin });
       const spent = loadWeek();
       await loadProjects();
@@ -118,7 +119,11 @@ export const ROUTES: Route[] = [
     load: async (params, query) => {
       await Promise.all([
         loadProject(params.id),
-        loadList({ project: params.id, q: query.get("q")?.trim() ?? "" }),
+        loadList({
+          project: params.id,
+          q: query.get("q")?.trim() ?? "",
+          origin: originOf(`?${query.toString()}`),
+        }),
         loadProjectAgents(params.id),
         loadAutomations(params.id),
         loadRecentDays(),
@@ -269,8 +274,14 @@ export const ROUTES: Route[] = [
     title: () => "Agents",
     role: "admin",
     load: async () => {
-      // the limits too: the agents page shows where each model compacts
-      await Promise.all([loadAgents(), loadProviders(), loadTools()]);
+      // the limits too: the agents page shows where each model compacts;
+      // the skills for the form's section
+      await Promise.all([
+        loadAgents(),
+        loadProviders(),
+        loadTools(),
+        loadSkills(),
+      ]);
     },
     nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
   },
@@ -281,6 +292,14 @@ export const ROUTES: Route[] = [
     role: "admin",
     load: () => loadTools(),
     nav: { label: "Tools", icon: "tools", order: 11, group: "Admin" },
+  },
+  {
+    path: "/admin/skills",
+    view: lazy(() => import("../views/admin/Skills.tsx").then((m) => m.Skills)),
+    title: () => "Skills",
+    role: "admin",
+    load: () => loadSkills(),
+    nav: { label: "Skills", icon: "skill", order: 12, group: "Admin" },
   },
   {
     path: "/profile",

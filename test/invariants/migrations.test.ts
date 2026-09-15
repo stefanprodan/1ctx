@@ -307,7 +307,11 @@ describe("additive migrations", () => {
                 'done', 1, 0, 1);
     `);
 
-    expect(migrate(db)).toEqual(["0004-run-source", "0005-suspended-by"]);
+    expect(migrate(db)).toEqual([
+      "0004-run-source",
+      "0005-suspended-by",
+      "0006-skills",
+    ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
     ).toEqual([
@@ -346,7 +350,7 @@ describe("0005", () => {
         values ('au5', 'p5', 'u5', 'a5', 'daily', 'check', '0 9 * * *',
                 'UTC', 30, 7, null, 0, 0);
     `);
-    expect(migrate(db)).toEqual(["0005-suspended-by"]);
+    expect(migrate(db)).toEqual(["0005-suspended-by", "0006-skills"]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
     ).toEqual({ suspended_at: 7, suspended_by: null });
@@ -396,6 +400,7 @@ describe("rebuild migrations", () => {
       "0003-automations",
       "0004-run-source",
       "0005-suspended-by",
+      "0006-skills",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -462,6 +467,50 @@ describe("rebuild migrations", () => {
         )
         .get(),
     ).toEqual({ n: 0 });
+    db.close();
+  });
+});
+
+describe("0006 skills migration", () => {
+  test("adds the skills tables without changing existing rows", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 5));
+    db.exec(`
+      insert into providers (id, name, wire, base_url, created_at)
+        values ('pr6', 'prov6', 'openai-compatible', 'http://x', 0);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+        values ('a6', 'agent6', 'pr6', 'm', 'Model', 0);
+    `);
+    expect(migrate(db)).toEqual(["0006-skills"]);
+    expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
+      name: "agent6",
+    });
+    db.exec(`
+      insert into skills
+        (id, name, description, body, license, compatibility, metadata,
+         allowed_tools, source_kind, source_url, source_select, source_digest,
+         digest, dropped, fetched_at, created_at)
+        values
+        ('sk6', 'ops', 'ops', 'body', '', '', '{}', '', 'file',
+         'http://x/skill.md', '', '', 'd', '[]', 0, 0);
+      insert into skill_files (skill_id, path, content, bytes)
+        values ('sk6', 'references/a.md', 'a', 1);
+      insert into agent_skills (agent_id, skill_id) values ('a6', 'sk6');
+    `);
+    expect(() =>
+      db.query("delete from skills where id = 'sk6'").run(),
+    ).toThrow();
+    db.query("delete from agents where id = 'a6'").run();
+    expect(db.query("select count(*) as n from agent_skills").get()).toEqual({
+      n: 0,
+    });
+    db.query("delete from skills where id = 'sk6'").run();
+    expect(db.query("select count(*) as n from skill_files").get()).toEqual({
+      n: 0,
+    });
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     db.close();
   });
 });

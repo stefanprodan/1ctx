@@ -404,7 +404,10 @@ describe("the pages", () => {
     expect(html).not.toContain("No agents yet.");
     expect(html).toContain(">Activity<");
     expect(html).not.toContain("Members");
-    expect(html).not.toContain("Chats");
+    expect(html).not.toContain('<div class="split-line">Chats');
+    expect(html).toContain(
+      'class="stream-filter stream-filter-on" aria-pressed="true">All<',
+    );
     expect(html).toContain('href="/projects/p1/settings"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
     expect(html).toContain('placeholder="Search sessions"');
@@ -525,15 +528,16 @@ describe("the pages", () => {
         thinking: null,
         effort: null,
         prompt: "",
+        skills: [],
         createdAt: 0,
       } as never,
     ];
     html = render(<Members params={{ id: "p1" }} />);
-    expect(html).toContain('class="agent-row-name">coder<');
+    expect(html).toContain('class="rows-name rows-name-mono">coder<');
     expect(html).toContain("deepseek/deepseek-v4-flash");
     // no provider name for a member, and no form to open
     expect(html).toContain(
-      'class="agent-row-meta">128k · $0.14 / $0.28 · tools · reasoning<',
+      'class="rows-meta">128k · $0.14 / $0.28 · tools · reasoning<',
     );
     expect(html).not.toContain("rows-toggle");
     projectAgents.value = [];

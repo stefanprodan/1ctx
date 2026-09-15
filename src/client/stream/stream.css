@@ -92,19 +92,27 @@
     color: var(--brand);
   }
 
-  /* the head's filter beside the search: Runs, on or off */
+  /* the head's filter beside the search: one segmented switch, All,
+     Chats or Tasks, the picked one filled */
+  .stream-filters {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+    margin-right: var(--space-2);
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
   .stream-filter {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    flex-shrink: 0;
-    height: 26px;
-    margin-right: var(--space-2);
+    height: 24px;
     padding: 0 var(--space-2);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--radius);
     background: transparent;
-    color: var(--dim);
+    color: var(--faint);
     font-size: var(--text-small);
     cursor: pointer;
   }
@@ -112,8 +120,8 @@
     color: var(--fg);
   }
   .stream-filter-on {
-    border-color: var(--brand);
-    color: var(--brand);
+    background: var(--line);
+    color: var(--fg);
   }
 
   .stream-when {

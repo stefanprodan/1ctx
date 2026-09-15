@@ -68,6 +68,7 @@ function fixedTools(content: string): Tools {
         },
       ],
       search: null,
+      skills: { block: "", skills: [] },
     }),
     run: () => Promise.resolve({ content, error: false }),
   };

@@ -5,7 +5,9 @@
 // by typing part of its name or id into that provider's catalog, and
 // the system prompt. The pick shows its window and prices when the
 // catalog has them. Under the pick, thinking and effort: the default
-// is the provider's, and the levels are the wire's. Delete asks once
+// is the provider's, and the levels are the wire's. After the prompt,
+// the skills: one line per skill on the server, the checked ones go
+// with the agent into every send, at most the cap. Delete asks once
 // in place.
 
 import { useSignal } from "@preact/signals";
@@ -18,6 +20,7 @@ import type {
 import { AVATARS, type Avatar, type Effort } from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import { searchCatalog } from "../../data/providers.ts";
+import { skills as skillRows } from "../../data/skills.ts";
 import { limits } from "../../data/tools.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
@@ -31,10 +34,12 @@ import {
   modelMeta,
   nameProblem,
   reserveOf,
+  sameIds,
   sentEffort,
   thinkingChoices,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
+import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
 import { reason } from "../../lib/format.ts";
 import { shapedInput } from "../../lib/names.ts";
@@ -100,6 +105,16 @@ export function AgentForm({
   const thinking = useSignal<"on" | "off" | null>(agent?.thinking ?? null);
   const effort = useSignal<Effort | null>(agent?.effort ?? null);
   const avatar = useSignal<Avatar>(agent?.avatar ?? "bot");
+  const pickedSkills = useSignal<string[]>(agent?.skills ?? []);
+  // a skill deleted since the agent was saved is not a box, and it goes
+  // from the save too, since the server would refuse the id; when the
+  // list did not load, the ids are kept as they are
+  const chosenSkills = () => {
+    const rows = skillRows.value;
+    return rows === null
+      ? pickedSkills.value
+      : pickedSkills.value.filter((id) => rows.some((s) => s.id === id));
+  };
   const asking = useSignal(false);
   const failure = useSignal<string | null>(null);
   const search = useRef<CatalogSearch | null>(null);
@@ -149,6 +164,7 @@ export function AgentForm({
         effort.value,
         wireOf(providerId.value),
       ),
+      skills: chosenSkills(),
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -177,7 +193,8 @@ export function AgentForm({
     model.value?.id !== agent.model.id ||
     prompt.value.trim() !== agent.prompt ||
     thinking.value !== agent.thinking ||
-    effortSent !== agent.effort;
+    effortSent !== agent.effort ||
+    !sameIds(pickedSkills.value, agent.skills);
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -196,6 +213,13 @@ export function AgentForm({
   };
   const picked = model.value;
   const busy = save.status.value === "busy";
+  const chosen = chosenSkills();
+  const toggleSkill = (id: string) => {
+    pickedSkills.value = chosen.includes(id)
+      ? chosen.filter((s) => s !== id)
+      : [...chosen, id];
+    save.touch();
+  };
   const compacts =
     picked === null
       ? ""
@@ -204,9 +228,10 @@ export function AgentForm({
     <form class="agents-form" onSubmit={submit}>
       <div class="agents-fields">
         <label class="field">
-          <span class="label">Name</span>
+          <span class="label label-required">Name</span>
           <input
             name="name"
+            aria-required="true"
             autocomplete="off"
             spellcheck={false}
             placeholder="coder"
@@ -240,7 +265,7 @@ export function AgentForm({
           </div>
         </div>
         <div class="field">
-          <span class="label">Provider</span>
+          <span class="label label-required">Provider</span>
           <div class="agents-picks">
             {providers.map((p) => (
               <button
@@ -257,7 +282,7 @@ export function AgentForm({
           </div>
         </div>
         <div class="field agents-field-wide">
-          <span class="label">Model</span>
+          <span class="label label-required">Model</span>
           {picked ? (
             <div class="agents-picked">
               <span class="agents-model">
@@ -380,6 +405,12 @@ export function AgentForm({
             }}
           />
         </label>
+        <SkillPicker
+          available={skillRows.value}
+          chosen={chosen}
+          busy={busy}
+          onToggle={toggleSkill}
+        />
       </div>
       <Foot
         status={save.status.value}

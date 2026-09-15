@@ -60,7 +60,7 @@ describe("the parts", () => {
       '<span class="rows-hint">next send</span>',
     );
     expect(render(<RowsLine as="label">exa</RowsLine>)).toContain(
-      '<label class="rows-line rows-line-static">exa</label>',
+      '<label class="rows-line rows-line-static rows-line-pick">exa</label>',
     );
     expect(render(<RowsLine flush>exa</RowsLine>)).toContain(
       '<div class="rows-line">exa</div>',

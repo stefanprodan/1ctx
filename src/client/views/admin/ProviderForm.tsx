@@ -89,9 +89,10 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
       </div>
       <div class="agents-fields">
         <label class="field">
-          <span class="label">Name</span>
+          <span class="label label-required">Name</span>
           <input
             name="name"
+            aria-required="true"
             autocomplete="off"
             spellcheck={false}
             placeholder="openrouter"
@@ -122,9 +123,10 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
         </label>
         {chosen.baseUrl === null && (
           <label class="field agents-field-wide">
-            <span class="label">Base URL</span>
+            <span class="label label-required">Base URL</span>
             <input
               name="baseUrl"
+              aria-required="true"
               autocomplete="off"
               spellcheck={false}
               placeholder="http://host:port/v1"

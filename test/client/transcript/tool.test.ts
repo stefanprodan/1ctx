@@ -61,6 +61,15 @@ describe("tool summaries", () => {
     expect(
       shortArg("get_current_time", '{"timezone":"Europe/Bucharest"}'),
     ).toBe("Europe/Bucharest");
+    expect(shortArg("skill", '{"name":"gitops-knowledge"}')).toBe(
+      "gitops-knowledge",
+    );
+    expect(
+      shortArg(
+        "skill_file",
+        '{"name":"gitops-knowledge","path":"references/runbook.md"}',
+      ),
+    ).toBe("references/runbook.md");
   });
 
   test("shows a duration only for a completed result", () => {

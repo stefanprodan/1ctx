@@ -31,7 +31,6 @@ import {
   candidates,
   countLine,
   deleteLabel,
-  mark,
   plural,
   sinceLine,
   step,
@@ -134,12 +133,6 @@ describe("the words", () => {
     expect(deleteLabel(3)).toBe("Delete with 3 chats");
     expect(deleteLabel(1)).toBe("Delete with 1 chat");
     expect(deleteLabel(0)).toBe("Delete");
-  });
-
-  test("marks an avatar with the first letters of the name", () => {
-    expect(mark("on-call")).toBe("OC");
-    expect(mark("research")).toBe("RE");
-    expect(mark("a-b-c")).toBe("AB");
   });
 
   test("offers the people not in the project, by any of their names", () => {
@@ -337,7 +330,7 @@ describe("the page", () => {
     const html = render(<AdminProjects />);
     expect(html).toContain("New project");
     expect(html).toContain('class="rows-name rows-name-mono">platform<');
-    expect(html).toContain(">PL<");
+    expect(html).not.toContain("rows-avatar");
     expect(html).toContain('class="rows-sub">3 members<');
     expect(html).toContain(">since 14 September 2026<");
     expect(html).not.toContain("Oana Mangiurea");
@@ -380,7 +373,7 @@ describe("the rail", () => {
       group?.kind === "group"
         ? group.routes.map((route) => route.nav!.label)
         : [];
-    expect(entries).toEqual(["Projects", "Users", "Agents", "Tools"]);
+    expect(entries).toEqual(["Projects", "Users", "Agents", "Tools", "Skills"]);
   });
 
   test("granted and revoked refresh the rail and admin list", async () => {

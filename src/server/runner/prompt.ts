@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The system prompt: the agent's prompt, the project and the user with
-// what was written about each, and the date. A run belongs to its
-// project, not to a person, so the run's line takes the user's place.
+// what was written about each, the skills catalog and the date. A run belongs
+// to its project, not to a person, so the run's line takes the user's place.
 // The project comes before the user, who changes with the author of a
 // team chat, and a day, not a time, so the prefix holds until midnight
-// and a provider's cache with it. Memory, knowledge and skills arrive through ports wired to
-// empty until their slices.
+// and a provider's cache with it. The skills catalog arrives on the
+// policy's offered snapshot; memory and knowledge arrive through ports
+// wired to empty until their slices.
 
 import type { SendPolicy } from "./policy.ts";
 
@@ -70,6 +71,7 @@ export function systemPrompt(
     | "username"
     | "about"
     | "automation"
+    | "offered"
   >,
   now: number,
 ): string {
@@ -82,6 +84,9 @@ export function systemPrompt(
       : automationLine(policy.automation),
   ];
   parts.push(context.join("\n"));
+  if (policy.offered.skills.block !== "") {
+    parts.push(policy.offered.skills.block);
+  }
   parts.push(dateLine(now));
   return parts.join("\n\n");
 }

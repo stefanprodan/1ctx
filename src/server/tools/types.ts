@@ -7,6 +7,7 @@
 // tool reads only its ToolContext; the key it needs is read by the area
 // from the secrets port, never carried here.
 
+import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { ChatTool } from "../providers/index.ts";
 
@@ -47,4 +48,5 @@ export type Tool = {
 export type Offered = {
   tools: ChatTool[];
   search: "exa" | "firecrawl" | null;
+  skills: { block: string; skills: OfferedSkill[] };
 };

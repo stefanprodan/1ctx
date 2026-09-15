@@ -289,7 +289,7 @@ describe("the page", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual(["Projects", "Users", "Agents", "Tools"]);
+    expect(labels).toEqual(["Projects", "Users", "Agents", "Tools", "Skills"]);
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });
 
@@ -311,7 +311,7 @@ describe("the page", () => {
     expect(html).toContain('step="any"');
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");
-    expect(html).toContain("applies to the next send");
+    expect(html).not.toContain("rows-hint");
   });
 
   test("says it is loading, then the failure", () => {

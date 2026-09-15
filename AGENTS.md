@@ -203,6 +203,26 @@ violation, and every rule has a rejected fixture under
   delete. An agent carries `thinking` and `effort`, null for the provider's
   default; the levels per wire are `EFFORTS` in `shared/words.ts`, and the
   policy resolves both once per send.
+- **A skill is stored text, never executable.** An admin adds a `SKILL.md`
+  and its text files from a GitHub directory, an archive, a discovery
+  index or a raw file through the compose fetcher. An index digest is
+  checked on add and refresh. Refresh is explicit and never renames the
+  skill; deleting one an agent names is a 409. Stored text is cleaned and
+  shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
+  The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
+  (a site or an index is looked up first and its entries listed with
+  Add), a row opens to the fields, the body and each file as
+  preformatted text, then Refresh and Delete; the agent form checks
+  skills by box, at most `MAX_SKILLS_PER_AGENT`, and loads them through
+  the agents route. `data/skills.ts` keeps the list, a body and a file
+  once read, dropped on refresh.
+- **An agent's skills are one send snapshot.** Their capped catalog from
+  `shared/skills.ts` sits in the prompt before the date line. The `skill`
+  tool's name is an enum of that catalog, and `skill_file` is offered only
+  when it can answer. These two tools come from skills, never the tools
+  rows or the Tools page, a deliberate exception to the offered-set rule.
+  A call reads the current body by the snapshot's id and name. After a
+  summary, the user message names still-offered skills loaded before it.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a
@@ -374,9 +394,10 @@ violation, and every rule has a rejected fixture under
   what the entity holds.
 - **The stream row is the server's word.** `GET /api/sessions` answers
   `{session, send, last, automation}` per row (`?origin=chat|automation`
-  narrows it, Home's Runs filter): the automation a run belongs to (a
-  run wears the clock where a chat wears the bubble, and its title is
-  the automation), the last send, and the last line a
+  narrows it, the All, Chats and Tasks switch in the stream's head on
+  Home and a project's Feed): the automation a run belongs to (a run
+  wears the clock where a chat wears the bubble, and its title is the
+  automation), the last send, and the last line a
   person or the agent wrote (a user message or an answer reply, the
   author's username or the agent's name, the first line cut at
   `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only
