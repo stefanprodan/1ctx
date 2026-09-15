@@ -12,8 +12,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { loadedAt, servers, serversError } from "../../data/mcp.ts";
-import { ago } from "../../lib/format.ts";
+import { servers, serversError } from "../../data/mcp.ts";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import { Rows, RowsAdd, RowsCard, RowsNew, RowsNote } from "../../ui/Rows.tsx";
@@ -39,7 +38,6 @@ export function Mcp() {
     }, 60_000);
     return () => clearInterval(timer);
   }, []);
-  const read = loadedAt.value;
   return (
     <Page
       crumb="Admin"
@@ -59,7 +57,6 @@ export function Mcp() {
               placeholder="Search servers"
             />
           }
-          hint={read === null ? undefined : `loaded ${ago(read, now.value)}`}
           action={
             <RowsAdd
               label="New server"

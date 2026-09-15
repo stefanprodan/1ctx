@@ -462,20 +462,17 @@ describe("the page", () => {
     expect(labels.at(-2)).toBe("Skills");
   });
 
-  test.serial(
-    "renders the rows with their head and the loaded-ago hint",
-    () => {
-      servers.value = [flux];
-      loadedAt.value = Date.now() - 2 * 60_000;
-      const html = render(<Mcp />);
-      expect(html).toContain("flux");
-      expect(html).toContain("5 tools · checked");
-      expect(html).toContain(flux.url);
-      expect(html).toContain("Read on · Write off");
-      expect(html).toContain("loaded 2m ago");
-      expect(html).toContain("New server");
-    },
-  );
+  test.serial("renders the rows with their head", () => {
+    servers.value = [flux];
+    loadedAt.value = Date.now() - 2 * 60_000;
+    const html = render(<Mcp />);
+    expect(html).toContain("flux");
+    expect(html).toContain("5 tools · checked");
+    expect(html).toContain(flux.url);
+    expect(html).toContain("Read on · Write off");
+    expect(html).not.toContain("loaded ");
+    expect(html).toContain("New server");
+  });
 
   test.serial(
     "an open row renders change names, failure age and instructions states",
