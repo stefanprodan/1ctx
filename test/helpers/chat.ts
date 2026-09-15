@@ -72,7 +72,7 @@ export type Scripted = {
   refuse(status: number, body?: string): void;
 };
 
-export function scriptedFetch(): Scripted {
+export function scriptedFetch(fallback?: typeof fetch): Scripted {
   const scripts: Script[] = [];
   const waiting: ((s: Script) => void)[] = [];
   let refusal: { status: number; body: string } | null = null;
@@ -87,6 +87,7 @@ export function scriptedFetch(): Scripted {
       });
     }
     if (url !== `${PROVIDER_URL}/chat/completions`) {
+      if (fallback !== undefined) return fallback(input, init);
       throw new TypeError("unable to connect");
     }
     if (refusal !== null) {
@@ -237,9 +238,10 @@ export async function chatApp(
     // is offered the built-ins
     model?: string;
     tools?: Tools;
+    fetcher?: typeof fetch;
   } = {},
 ): Promise<ChatApp> {
-  const scripted = scriptedFetch();
+  const scripted = scriptedFetch(options.fetcher);
   const secrets = options.secrets ?? {};
   const app = await testApp({
     fetcher: scripted.fetcher,
@@ -267,6 +269,8 @@ export async function chatApp(
         model: fields.model,
         thinking: null,
         effort: null,
+        servers: [],
+        mcpMode: "auto",
       },
     });
     if (res.status !== 201) {

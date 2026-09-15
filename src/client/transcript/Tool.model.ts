@@ -3,6 +3,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { splitWireName } from "../../shared/mcp.ts";
 import { secs } from "./stream.ts";
 
 // not on the wire: the chat fetches it when the row is opened, so a
@@ -11,6 +12,16 @@ export type ToolResult =
   | { status: "loading" }
   | { status: "done"; content: string; bytes: number; cut: boolean }
   | { status: "failed"; error: string };
+
+// Keep MCP folds readable by naming the server before the tool.
+export const MAX_MCP_ARGUMENT = 60;
+export function toolLabel(name: string): {
+  server: string | null;
+  tool: string;
+} {
+  const split = splitWireName(name);
+  return split === null ? { server: null, tool: name } : split;
+}
 
 export function shortArg(name: string, args: string): string {
   try {
@@ -37,7 +48,11 @@ export function shortArg(name: string, args: string): string {
     const telling = Object.values(value).find(
       (item) => typeof item === "string",
     );
-    return typeof telling === "string" ? telling : "";
+    if (typeof telling !== "string") return "";
+    // an MCP argument can be a whole manifest; the line shows its start
+    return splitWireName(name) === null
+      ? telling
+      : telling.replace(/\s+/g, " ").trim().slice(0, MAX_MCP_ARGUMENT);
   } catch {
     return "";
   }

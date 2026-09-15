@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
-import type { Avatar, Effort } from "../../shared/words.ts";
+import type { Avatar, Effort, McpMode } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
@@ -24,10 +25,11 @@ type Raw = {
   thinking: "on" | "off" | null;
   effort: Effort | null;
   prompt: string;
+  mcp_mode: McpMode;
   created_at: number;
 };
 
-const row = (raw: Raw, skills: string[]): AgentRow => ({
+const row = (raw: Raw, skills: string[], servers: AgentServer[]): AgentRow => ({
   id: raw.id,
   name: raw.name,
   avatar: raw.avatar,
@@ -45,6 +47,8 @@ const row = (raw: Raw, skills: string[]): AgentRow => ({
   effort: raw.effort,
   prompt: raw.prompt,
   skills,
+  servers,
+  mcpMode: raw.mcp_mode,
   createdAt: raw.created_at,
 });
 
@@ -60,33 +64,40 @@ export type AgentFields = {
   effort: Effort | null;
   prompt: string;
   skills: string[];
+  servers: AgentServer[];
+  mcpMode: McpMode;
 };
 
 export class AgentStore {
   constructor(
     private readonly db: Db,
     private readonly assigned: (agentId: string) => string[],
+    private readonly agentServers: (agentId: string) => AgentServer[],
   ) {}
+
+  private row(raw: Raw): AgentRow {
+    return row(raw, this.assigned(raw.id), this.agentServers(raw.id));
+  }
 
   list(): AgentRow[] {
     return this.db
       .query<Raw, []>("select * from agents order by created_at, name")
       .all()
-      .map((raw) => row(raw, this.assigned(raw.id)));
+      .map((raw) => this.row(raw));
   }
 
   byId(id: string): AgentRow | null {
     const raw = this.db
       .query<Raw, [string]>("select * from agents where id = ?")
       .get(id);
-    return raw ? row(raw, this.assigned(raw.id)) : null;
+    return raw ? this.row(raw) : null;
   }
 
   byName(name: string): AgentRow | null {
     const raw = this.db
       .query<Raw, [string]>("select * from agents where name = ?")
       .get(name);
-    return raw ? row(raw, this.assigned(raw.id)) : null;
+    return raw ? this.row(raw) : null;
   }
 
   usesProvider(providerId: string): boolean {
@@ -106,8 +117,8 @@ export class AgentStore {
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           thinking, effort, prompt, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           thinking, effort, prompt, mcp_mode, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -124,6 +135,7 @@ export class AgentStore {
         fields.thinking,
         fields.effort,
         fields.prompt,
+        fields.mcpMode,
         fields.now,
       );
     return this.byId(id)!;
@@ -135,7 +147,7 @@ export class AgentStore {
       .query(
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
-           tools = ?, reasoning = ?, thinking = ?, effort = ?, prompt = ?
+           tools = ?, reasoning = ?, thinking = ?, effort = ?, prompt = ?, mcp_mode = ?
          where id = ?`,
       )
       .run(
@@ -152,6 +164,7 @@ export class AgentStore {
         fields.thinking,
         fields.effort,
         fields.prompt,
+        fields.mcpMode,
         id,
       );
     return this.byId(id);

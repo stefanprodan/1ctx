@@ -57,6 +57,8 @@ const agent: DirectoryAgentResponse = {
     effort: "high",
     prompt: "You write code.\nSmall diffs.",
     skills: ["s1"],
+    servers: [],
+    mcpMode: "auto",
     createdAt: 0,
   },
   provider: "router",

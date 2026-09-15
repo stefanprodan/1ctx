@@ -69,6 +69,9 @@ function fixedTools(content: string): Tools {
       ],
       search: null,
       skills: { block: "", skills: [] },
+      mcp: [],
+      mcpPrompt: { text: "", digest: {} },
+      mcpCatalog: "",
     }),
     run: () => Promise.resolve({ content, error: false }),
   };

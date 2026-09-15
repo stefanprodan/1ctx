@@ -150,6 +150,7 @@ export function startCompact(
       providerId: fields.policy.providerId,
       model: fields.policy.model,
       firstMessageId: fields.firstMessageId,
+      mcpDigest: null,
       now,
     });
     const summary = deps.sessions.addSummary({

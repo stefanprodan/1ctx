@@ -150,6 +150,8 @@ describe("the providers", () => {
         model: "deepseek/deepseek-chat",
         thinking: null,
         effort: null,
+        servers: [],
+        mcpMode: "auto",
       },
     });
     expect(agent.status).toBe(201);

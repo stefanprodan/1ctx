@@ -75,6 +75,8 @@ export type ActiveSend = {
   // the tokens the last counted round used, prompt plus completion: the
   // room the summary round has to fit in; null when nothing was counted
   used: number | null;
+  // the change since the previous non-compact send, fixed for its life
+  mcpNote: string;
   // the current round's launched tool rows still streaming, keyed by
   // the call object so duplicate provider call ids remain distinct
   openTools: Map<ToolCall, string>;
@@ -145,6 +147,7 @@ export function newSend(fields: {
     answering: false,
     summarizing: fields.summarizing ?? false,
     used: fields.used ?? null,
+    mcpNote: "",
     openTools: new Map(),
     tools: null,
     seq: 0,

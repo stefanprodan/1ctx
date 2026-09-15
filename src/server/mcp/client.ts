@@ -6,13 +6,16 @@
 
 import {
   Client,
+  type JsonSchemaType,
   ProtocolError,
   SdkError,
+  SdkErrorCode,
   SdkHttpError,
   StreamableHTTPClientTransport,
   type Tool,
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
 import type { McpResult } from "./result.ts";
 
@@ -49,6 +52,24 @@ export type ClientOptions = {
   timeoutMs: number;
   bodyBytes: number;
 };
+
+const argumentValidator = new AjvJsonSchemaValidator();
+
+export function validateArguments(
+  schema: Record<string, unknown>,
+  input: Record<string, unknown>,
+): string | null {
+  try {
+    const validate = argumentValidator.getValidator<Record<string, unknown>>(
+      schema as JsonSchemaType,
+    );
+    const result = validate(input);
+    if (result.valid) return null;
+    return result.errorMessage.split(",")[0]?.trim() || "arguments are invalid";
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
 
 export function cut(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -216,6 +237,11 @@ function errorText(error: unknown, key: string | null, budget: Budget): string {
     text = "the server refused the key";
   } else if (error instanceof SdkHttpError) {
     text = `the server answered ${error.status}: ${error.message}`;
+  } else if (
+    error instanceof SdkError &&
+    error.code === SdkErrorCode.RequestTimeout
+  ) {
+    text = "MCP request timed out";
   } else if (error instanceof ProtocolError || error instanceof SdkError) {
     text = error.message;
   } else {

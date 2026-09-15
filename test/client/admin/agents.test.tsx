@@ -83,6 +83,8 @@ const coder: AgentSummary = {
   effort: null,
   prompt: "",
   skills: [],
+  servers: [],
+  mcpMode: "auto",
   createdAt: 0,
 };
 

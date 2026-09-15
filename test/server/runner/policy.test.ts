@@ -45,6 +45,8 @@ const agent: AgentRow = {
   effort: "high",
   prompt: "",
   skills: [],
+  servers: [],
+  mcpMode: "auto",
   createdAt: 1,
 };
 

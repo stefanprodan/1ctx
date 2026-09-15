@@ -268,6 +268,8 @@ describe("the directory", () => {
         thinking: null,
         effort: null,
         prompt: "You write code. Keep diffs small.",
+        servers: [],
+        mcpMode: "auto",
       },
     });
     expect(res.status).toBe(200);

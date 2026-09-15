@@ -252,6 +252,37 @@ violation, and every rule has a rejected fixture under
   and is a 409 while an agent references the server. Every server
   string is shown as text; `parametersHtml` is the one HTML, rendered on
   the server. The name never changes.
+- **An agent's MCP tools are one send snapshot, decided in the policy.**
+  An agent carries `servers` (a server id with `read` and `write`,
+  saved with the agent row in one `transact()` through the mcp
+  capability) and `mcpMode`. The offered set is the intersection of the
+  server's and the agent's switches over the patterns, through
+  `offeredServers()` in `shared/mcp.ts`, so the page's preview and the
+  send agree: each schema lean (`wireSchema`, `wireDescription`, the
+  description cut at 1,024) and the tools sorted by server then name
+  after the built-ins and the skill tools, so the `tools` array is
+  byte-stable across a session. `mcpMode` `all` puts every offered
+  schema on the wire; `catalog` puts `mcp_describe` and `mcp_call`
+  (`tools/builtin/mcp.ts`, the name an enum of the offered wire names,
+  the arguments checked against the stored schema with the SDK's
+  validator before anything goes out) and one line per tool in the
+  prompt; `auto`, the default, is `all` while the lean schemas count at
+  most `MCP_CATALOG_FROM_TOKENS` through `lib/tokens.ts`. A call runs
+  through the registry under the wire name in both modes, under the
+  server's `timeoutMs` or the limits' call timeout, one client per
+  call over the snapshot's URL and key name; the row is a tool row
+  like any other. Access to an agent grants its MCP tools. The system
+  prompt is the agent's prompt, the project and user or automation
+  part, the skills catalog, the MCP catalog, the servers' instructions
+  as the delimited `<mcp_instructions>` block (capped, tags neutered,
+  off per server), the date line, and last the change note. A send
+  records a content-addressed digest of what it offered from MCP
+  (`mcp_digests`, `sends.mcp`, null for a compact send, swept with the
+  logins); `startSend` compares it with the session's previous send
+  (a regenerated turn against the turn before it), and a difference
+  is the note after the date line naming added, removed and changed
+  wire names, so the stable prefix stays cacheable. A running send
+  never changes its set.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

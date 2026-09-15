@@ -1,17 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The list of built-ins and the lookup by name; MCP tools merge here
-// later. A call for a name not in the list, or arguments that are not a
-// JSON object, is a failed result, never a throw. A tool that throws is
-// turned into a failed result too: the model still gets the error text.
+// The ordered tool lookup. Unknown names, malformed arguments and
+// throws become failed results so the runner only handles ToolResult.
 
 import type { ToolCall } from "../providers/index.ts";
 import type { Tool, ToolContext, ToolResult } from "./types.ts";
 
-// controls that are not text, the C1 block and the bidi embeddings,
-// overrides and isolates, dropped so a page cannot smuggle escape
-// sequences into the result the model reads or reorder a URL on screen
 function clean(text: string, cut: number): string {
   let result = "";
   for (let index = 0; index < text.length; index++) {
@@ -33,8 +28,6 @@ function describe(error: unknown, timeoutMs: number): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// the ordered set of tools a send runs with, looked up by name; the area
-// builds one per offered snapshot
 export class Registry {
   private readonly byName = new Map<string, Tool>();
 
@@ -47,9 +40,12 @@ export class Registry {
   }
 
   async run(call: ToolCall, ctx: ToolContext): Promise<ToolResult> {
+    let timeoutMs = ctx.caps.callTimeoutMs;
+    let timeoutSignal: AbortSignal | null = null;
     try {
       const tool = this.byName.get(call.name);
       if (!tool) throw new Error(`tool "${call.name}" not found.`);
+      timeoutMs = tool.timeoutMs ?? ctx.caps.callTimeoutMs;
       let parsed: unknown;
       try {
         parsed = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
@@ -63,17 +59,19 @@ export class Registry {
       ) {
         throw new Error(`arguments for tool "${call.name}" must be an object`);
       }
-      const signal = AbortSignal.any([
-        ctx.signal,
-        AbortSignal.timeout(ctx.caps.callTimeoutMs),
-      ]);
+      timeoutSignal = AbortSignal.timeout(timeoutMs);
+      const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
       const text = await tool.run(parsed as Record<string, unknown>, {
         ...ctx,
         signal,
       });
       return { content: clean(String(text), ctx.caps.resultCut), error: false };
     } catch (error) {
-      const message = describe(error, ctx.caps.callTimeoutMs);
+      const failure =
+        timeoutSignal?.aborted && !ctx.signal.aborted
+          ? timeoutSignal.reason
+          : error;
+      const message = describe(failure, timeoutMs);
       return {
         content: clean(`Error: ${message}`, ctx.caps.resultCut),
         error: true,

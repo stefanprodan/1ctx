@@ -329,6 +329,13 @@
     font-size: var(--text-label);
     color: var(--dim);
   }
+  .transcript-tool-server {
+    flex-shrink: 0;
+    color: var(--fg);
+  }
+  .transcript-tool-server::after {
+    content: " ";
+  }
   .transcript-tool-name {
     flex-shrink: 0;
     color: var(--fg);

@@ -36,8 +36,14 @@ export type {
 // port is the runner's own interface over the area's types; compose
 // passes the tools area
 export type ToolsPort = {
-  offered(now: number, agentId: string): Offered;
+  offered(
+    now: number,
+    agentId: string,
+    agentServers: AgentRow["servers"],
+    mode: AgentRow["mcpMode"],
+  ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
+  toolName?(offered: Offered, call: ToolCall): string;
 };
 
 export type SendPolicy = {
@@ -78,6 +84,9 @@ const NONE: Offered = {
   tools: [],
   search: null,
   skills: { block: "", skills: [] },
+  mcp: [],
+  mcpPrompt: { text: "", digest: {} },
+  mcpCatalog: "",
 };
 
 export function buildPolicy(input: {
@@ -95,7 +104,7 @@ export function buildPolicy(input: {
   const { user, agent } = input;
   const offered =
     input.tools !== null && agent.model.tools
-      ? input.tools.offered(input.now, agent.id)
+      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode)
       : NONE;
   const thinking =
     agent.thinking === null ? agent.model.reasoning : agent.thinking === "on";

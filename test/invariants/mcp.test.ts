@@ -7,8 +7,12 @@
 // shutdown while a discovery runs.
 
 import { describe, expect, test } from "bun:test";
+import { sha256 } from "../../src/server/lib/ids.ts";
+import { tokens } from "../../src/server/lib/tokens.ts";
 import type { McpServerSummary } from "../../src/shared/contracts/mcp.ts";
+import { offeredServers, promptSnapshot } from "../../src/shared/mcp.ts";
 import { fakeFetch, PROVIDER_URL, testApp } from "../helpers/app.ts";
+import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 import { fixture, mcpFetch } from "../server/mcp/fake.ts";
 
 // the MCP hosts go to the recorded servers, the rest to the provider
@@ -261,6 +265,8 @@ describe("MCP servers over the routes", () => {
         effort: null,
         prompt: "",
         skills: [],
+        servers: [],
+        mcpMode: "auto",
       },
     });
     expect(made.status).toBe(201);
@@ -313,5 +319,584 @@ describe("MCP servers over the routes", () => {
     expect(row?.refreshFailedAt).toBeNull();
     const after = await client.call("POST", `/api/mcp/${server.id}/refresh`);
     expect(after.status).toBe(503);
+  });
+});
+
+const toolNames = (body: Record<string, unknown>): string[] =>
+  (body.tools as { function: { name: string } }[] | undefined)?.map(
+    (tool) => tool.function.name,
+  ) ?? [];
+
+async function waitDone(
+  app: Awaited<ReturnType<typeof chatApp>>["app"],
+  id: string,
+) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    if (app.sessions.byId(id)?.status !== "running") return;
+    await tick();
+  }
+  throw new Error("chat did not finish");
+}
+
+async function saveServers(
+  chat: Awaited<ReturnType<typeof chatApp>>,
+  servers: { serverId: string; read: boolean; write: boolean }[],
+  mcpMode: "all" | "catalog" | "auto",
+) {
+  const agent = chat.app.agents.byId(chat.agentId)!;
+  const saved = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
+    body: {
+      name: agent.name,
+      avatar: agent.avatar,
+      providerId: agent.providerId,
+      model: agent.model.id,
+      thinking: agent.thinking,
+      effort: agent.effort,
+      prompt: agent.prompt,
+      skills: agent.skills,
+      servers,
+      mcpMode,
+    },
+  });
+  expect(saved.status).toBe(200);
+}
+
+async function sendFixture(options: {
+  callResult?: Record<string, unknown>;
+  mode?: "all" | "catalog" | "auto";
+  timeoutMs?: number | null;
+  wrap?: (fetcher: typeof fetch) => typeof fetch;
+}) {
+  const flux = mcpFetch({
+    recorded: await fixture("flux"),
+    callResult: options.callResult,
+  });
+  const chat = await chatApp({
+    fetcher: options.wrap?.(flux.fetcher) ?? flux.fetcher,
+  });
+  const { server } = await (
+    await chat.admin.call("POST", "/api/mcp", {
+      body: {
+        ...create(),
+        timeoutMs: options.timeoutMs ?? null,
+      },
+    })
+  ).json();
+  const servers = [{ serverId: server.id, read: true, write: false }];
+  await saveServers(chat, servers, options.mode ?? "auto");
+  return { chat, flux, server, servers };
+}
+
+describe("MCP tools in a send", () => {
+  test("offers the shared read snapshot and calls it as a tool row", async () => {
+    const { chat, flux, server, servers } = await sendFixture({});
+    const started = await startChat(chat, "inspect flux");
+    const names = toolNames(started.script.body);
+    expect(names).toContain("mcp__flux__get_flux_instance");
+    expect(names).not.toContain("mcp__flux__reconcile_flux_kustomization");
+
+    const list = await (await chat.admin.call("GET", "/api/mcp")).json();
+    const prompt = promptSnapshot(
+      offeredServers(list.servers, servers),
+      sha256,
+    ).text;
+    const messages = started.script.body.messages as {
+      role: string;
+      content: string;
+    }[];
+    expect(messages[0]?.content).toContain(prompt);
+    const directory = await (
+      await chat.member.call("GET", "/api/directory/agents/coder")
+    ).json();
+    expect(directory.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      "datetime",
+      "webfetch",
+    ]);
+    expect(directory.tokens.tools).toBe(
+      tokens(JSON.stringify(started.script.body.tools ?? [])),
+    );
+
+    started.script.toolRound([
+      {
+        id: "mcp-1",
+        name: "mcp__flux__get_flux_instance",
+        arguments: "{}",
+      },
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    answer.reply("done");
+    await waitDone(chat.app, started.sessionId);
+    const tool = chat.app.sessions
+      .messages(started.sessionId)
+      .find((row) => row.kind === "tool");
+    expect(tool).toMatchObject({
+      toolName: "mcp__flux__get_flux_instance",
+      status: "done",
+      content: "called",
+    });
+    expect(
+      flux.requests.filter((request) => request.method === "tools/call"),
+    ).toHaveLength(1);
+
+    const agent = chat.app.agents.byId(chat.agentId)!;
+    await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
+      body: {
+        name: agent.name,
+        avatar: agent.avatar,
+        providerId: agent.providerId,
+        model: agent.model.id,
+        thinking: agent.thinking,
+        effort: agent.effort,
+        prompt: agent.prompt,
+        skills: agent.skills,
+        servers: [{ serverId: server.id, read: false, write: true }],
+        mcpMode: "all",
+      },
+    });
+    const none = await startChat(chat, "write flux");
+    expect(
+      toolNames(none.script.body).some((name) => name.startsWith("mcp__")),
+    ).toBe(false);
+    none.script.reply("none");
+    await waitDone(chat.app, none.sessionId);
+  });
+
+  test("records an MCP isError answer as a failed tool row", async () => {
+    const { chat } = await sendFixture({
+      callResult: {
+        content: [{ type: "text", text: "flux refused the call" }],
+        isError: true,
+      },
+    });
+    const started = await startChat(chat);
+    started.script.toolRound([
+      {
+        id: "mcp-error",
+        name: "mcp__flux__get_flux_instance",
+        arguments: "{}",
+      },
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    const row = chat.app.sessions
+      .messages(started.sessionId)
+      .find((message) => message.kind === "tool");
+    expect(row).toMatchObject({
+      toolName: "mcp__flux__get_flux_instance",
+      status: "failed",
+    });
+    expect(row?.content).toContain("flux refused the call");
+    answer.reply("handled");
+    await waitDone(chat.app, started.sessionId);
+  });
+
+  test("catalog mode describes and validates calls without changing its tools", async () => {
+    const { chat, flux } = await sendFixture({ mode: "catalog" });
+    const started = await startChat(chat);
+    expect(toolNames(started.script.body)).toContain("mcp_describe");
+    expect(toolNames(started.script.body)).toContain("mcp_call");
+    expect(toolNames(started.script.body)).not.toContain(
+      "mcp__flux__get_flux_instance",
+    );
+    const directory = await (
+      await chat.member.call("GET", "/api/directory/agents/coder")
+    ).json();
+    expect(directory.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      "datetime",
+      "webfetch",
+    ]);
+    expect(directory.tokens.tools).toBe(
+      tokens(JSON.stringify(started.script.body.tools ?? [])),
+    );
+
+    started.script.toolRound([
+      {
+        id: "describe",
+        name: "mcp_describe",
+        arguments: JSON.stringify({ name: "mcp__flux__search_flux_docs" }),
+      },
+    ]);
+    started.script.end();
+    const bad = await waitScript(chat.scripted, 2);
+    bad.toolRound([
+      {
+        id: "bad",
+        name: "mcp_call",
+        arguments: JSON.stringify({
+          name: "mcp__flux__search_flux_docs",
+          arguments: {},
+        }),
+      },
+    ]);
+    bad.end();
+    const extra = await waitScript(chat.scripted, 3);
+    expect(
+      flux.requests.filter((request) => request.method === "tools/call"),
+    ).toHaveLength(0);
+    extra.toolRound([
+      {
+        id: "extra",
+        name: "mcp_call",
+        arguments: JSON.stringify({
+          name: "mcp__flux__search_flux_docs",
+          arguments: { query: "HelmRelease", extra: true },
+        }),
+      },
+    ]);
+    extra.end();
+    const good = await waitScript(chat.scripted, 4);
+    expect(
+      flux.requests.filter((request) => request.method === "tools/call"),
+    ).toHaveLength(0);
+    good.toolRound([
+      {
+        id: "good",
+        name: "mcp_call",
+        arguments: JSON.stringify({
+          name: "mcp__flux__search_flux_docs",
+          arguments: { query: "HelmRelease valuesFrom" },
+        }),
+      },
+    ]);
+    good.end();
+    const answer = await waitScript(chat.scripted, 5);
+    expect(
+      flux.requests.filter((request) => request.method === "tools/call"),
+    ).toHaveLength(1);
+    expect(chat.scripted.scripts.map((script) => script.body.tools)).toEqual([
+      started.script.body.tools,
+      started.script.body.tools,
+      started.script.body.tools,
+      started.script.body.tools,
+      started.script.body.tools,
+    ]);
+    const rows = chat.app.sessions
+      .messages(started.sessionId)
+      .filter((message) => message.kind === "tool");
+    expect(rows[0]?.content).toContain('"required": [');
+    expect(rows[0]?.content).not.toContain("additionalProperties");
+    expect(rows[1]).toMatchObject({
+      toolName: "mcp__flux__search_flux_docs",
+      status: "failed",
+    });
+    expect(rows[1]?.content).toContain("required property 'query'");
+    expect(rows[2]).toMatchObject({
+      toolName: "mcp__flux__search_flux_docs",
+      status: "failed",
+    });
+    expect(rows[2]?.content).toContain("additional properties");
+    expect(rows[3]).toMatchObject({
+      toolName: "mcp__flux__search_flux_docs",
+      status: "done",
+    });
+    answer.reply("done");
+    await waitDone(chat.app, started.sessionId);
+  });
+
+  test("auto keeps three Flux catalogs direct and flips when GitHub is added", async () => {
+    const transports = {
+      flux: mcpFetch({ recorded: await fixture("flux") }),
+      docs: mcpFetch({ recorded: await fixture("flux-docs") }),
+      schema: mcpFetch({ recorded: await fixture("flux-schema") }),
+      github: mcpFetch({ recorded: await fixture("github") }),
+    };
+    const fallback = (async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = new URL(String(input instanceof Request ? input.url : input));
+      const transport =
+        transports[url.hostname.split(".")[0] as keyof typeof transports];
+      if (transport === undefined) throw new TypeError("unable to connect");
+      return transport.fetcher(input, init);
+    }) as typeof fetch;
+    const chat = await chatApp({ fetcher: fallback });
+    const links: { serverId: string; read: boolean; write: boolean }[] = [];
+    for (const name of ["flux", "docs", "schema", "github"] as const) {
+      const response = await chat.admin.call("POST", "/api/mcp", {
+        body: {
+          ...create(name),
+          readPatterns: ["*"],
+          excludedPatterns: [],
+        },
+      });
+      expect(response.status).toBe(201);
+      const { server } = await response.json();
+      links.push({ serverId: server.id, read: true, write: false });
+    }
+    await saveServers(chat, links.slice(0, 3), "auto");
+    const first = await startChat(chat);
+    expect(
+      toolNames(first.script.body).filter((name) => name.startsWith("mcp__")),
+    ).toHaveLength(27);
+    expect(toolNames(first.script.body)).not.toContain("mcp_call");
+
+    await saveServers(chat, links, "auto");
+    expect(toolNames(first.script.body)).not.toContain("mcp_call");
+    first.script.reply("first");
+    await waitDone(chat.app, first.sessionId);
+
+    const secondPending = chat.scripted.next();
+    const secondResponse = await chat.member.call(
+      "POST",
+      `/api/sessions/${first.sessionId}/messages`,
+      { body: { message: "again" } },
+    );
+    expect(secondResponse.status).toBe(201);
+    const second = await secondPending;
+    expect(toolNames(second.body)).toContain("mcp_describe");
+    expect(toolNames(second.body)).toContain("mcp_call");
+    expect(
+      toolNames(second.body).some((name) => name.startsWith("mcp__")),
+    ).toBe(false);
+    const system = (
+      second.body.messages as { role: string; content: string }[]
+    )[0]!.content;
+    expect(system).toContain("<available_mcp_tools>");
+    expect(system.indexOf("<available_mcp_tools>")).toBeLessThan(
+      system.indexOf("<mcp_instructions>"),
+    );
+    expect(system.indexOf("Today is ")).toBeLessThan(
+      system.indexOf("Since your last turn"),
+    );
+    expect(system).toContain("- github: now available");
+    second.reply("second");
+    await waitDone(chat.app, first.sessionId);
+
+    const thirdPending = chat.scripted.next();
+    await chat.member.call(
+      "POST",
+      `/api/sessions/${first.sessionId}/messages`,
+      {
+        body: { message: "once more" },
+      },
+    );
+    const third = await thirdPending;
+    const thirdSystem = (
+      third.body.messages as { role: string; content: string }[]
+    )[0]!.content;
+    expect(thirdSystem).not.toContain("Since your last turn");
+    third.reply("third");
+    await waitDone(chat.app, first.sessionId);
+  });
+
+  test("uses the server timeout while a built-in in the round finishes", async () => {
+    const wrap = (fetcher: typeof fetch) =>
+      (async (input: string | URL | Request, init?: RequestInit) => {
+        const request =
+          input instanceof Request ? input : new Request(String(input), init);
+        if (request.method === "POST") {
+          const body = (await request.clone().json()) as { method?: string };
+          if (body.method === "tools/call") {
+            return new Promise<Response>((_resolve, reject) => {
+              request.signal.addEventListener(
+                "abort",
+                () => reject(request.signal.reason),
+                { once: true },
+              );
+            });
+          }
+        }
+        return fetcher(input, init);
+      }) as typeof fetch;
+    const { chat } = await sendFixture({ timeoutMs: 1000, wrap });
+    const started = await startChat(chat);
+    started.script.toolRound([
+      {
+        id: "slow",
+        name: "mcp__flux__get_flux_instance",
+        arguments: "{}",
+      },
+      {
+        id: "time",
+        name: "datetime",
+        arguments: JSON.stringify({ timezone: "UTC" }),
+      },
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2, 400);
+    const rows = chat.app.sessions
+      .messages(started.sessionId)
+      .filter((message) => message.kind === "tool");
+    expect(rows[0]).toMatchObject({ status: "failed" });
+    expect(rows[0]?.content).toContain("timed out after 1 seconds");
+    expect(rows[1]).toMatchObject({ status: "done", toolName: "datetime" });
+    answer.reply("done");
+    await waitDone(chat.app, started.sessionId);
+  });
+
+  test("a stop aborts an MCP call without waiting for its timeout", async () => {
+    let reached!: () => void;
+    const called = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const wrap = (fetcher: typeof fetch) =>
+      (async (input: string | URL | Request, init?: RequestInit) => {
+        const request =
+          input instanceof Request ? input : new Request(String(input), init);
+        if (request.method === "POST") {
+          const body = (await request.clone().json()) as { method?: string };
+          if (body.method === "tools/call") {
+            reached();
+            return new Promise<Response>((_resolve, reject) => {
+              request.signal.addEventListener(
+                "abort",
+                () => reject(request.signal.reason),
+                { once: true },
+              );
+            });
+          }
+        }
+        return fetcher(input, init);
+      }) as typeof fetch;
+    const { chat } = await sendFixture({ timeoutMs: 60_000, wrap });
+    const started = await startChat(chat);
+    started.script.toolRound([
+      {
+        id: "stopped",
+        name: "mcp__flux__get_flux_instance",
+        arguments: "{}",
+      },
+    ]);
+    started.script.end();
+    await called;
+    const response = await chat.member.call(
+      "POST",
+      `/api/sessions/${started.sessionId}/stop`,
+    );
+    expect(response.status).toBe(200);
+    await Promise.race([
+      waitDone(chat.app, started.sessionId),
+      new Promise<never>((_resolve, reject) =>
+        setTimeout(
+          () => reject(new Error("stop waited for the timeout")),
+          1000,
+        ),
+      ),
+    ]);
+    expect(chat.app.sessions.byId(started.sessionId)?.status).toBe("stopped");
+  });
+
+  test("skips compact digests and regenerate compares with the turn before", async () => {
+    const { chat, servers } = await sendFixture({});
+    const first = await startChat(chat);
+    first.script.reply("first answer");
+    await waitDone(chat.app, first.sessionId);
+
+    const compactPending = chat.scripted.next();
+    const compactResponse = await chat.member.call(
+      "POST",
+      `/api/sessions/${first.sessionId}/compact`,
+    );
+    expect(compactResponse.status).toBe(200);
+    const compact = await compactPending;
+    expect(compact.body.tools).toBeUndefined();
+    compact.reply("summary");
+    await waitDone(chat.app, first.sessionId);
+
+    await saveServers(chat, [], "auto");
+    const secondPending = chat.scripted.next();
+    await chat.member.call(
+      "POST",
+      `/api/sessions/${first.sessionId}/messages`,
+      {
+        body: { message: "second" },
+      },
+    );
+    const second = await secondPending;
+    const secondSystem = (
+      second.body.messages as { role: string; content: string }[]
+    )[0]!.content;
+    expect(secondSystem).toContain("- flux: no longer available");
+    second.reply("second answer");
+    await waitDone(chat.app, first.sessionId);
+
+    await saveServers(chat, servers, "auto");
+    const regeneratePending = chat.scripted.next();
+    const regenerate = await chat.member.call(
+      "POST",
+      `/api/sessions/${first.sessionId}/regenerate`,
+    );
+    expect(regenerate.status).toBe(201);
+    const regenerated = await regeneratePending;
+    const regeneratedSystem = (
+      regenerated.body.messages as { role: string; content: string }[]
+    )[0]!.content;
+    expect(regeneratedSystem).not.toContain("Since your last turn");
+    expect(toolNames(regenerated.body)).toContain(
+      "mcp__flux__get_flux_instance",
+    );
+    regenerated.reply("regenerated");
+    await waitDone(chat.app, first.sessionId);
+
+    const sends = chat.app.db
+      .query<{ kind: string; mcp: string | null }, [string]>(
+        "select kind, mcp from sends where session_id = ? order by started_at, rowid",
+      )
+      .all(first.sessionId);
+    expect(sends.find((send) => send.kind === "compact")?.mcp).toBeNull();
+  });
+
+  test("stores one digest for repeated sends and sweeps an orphan", async () => {
+    const { chat } = await sendFixture({});
+    const started = await startChat(chat);
+    started.script.reply("done");
+    await waitDone(chat.app, started.sessionId);
+    const digest = {
+      flux: {
+        tools: {
+          mcp__flux__z: "same-z",
+          "mcp__flux__a-b": "same-a",
+        },
+        instructions: null,
+      },
+      docs: {
+        tools: { mcp__docs__search: "same-docs" },
+        instructions: null,
+      },
+    };
+    const reordered = {
+      docs: digest.docs,
+      flux: {
+        ...digest.flux,
+        tools: {
+          "mcp__flux__a-b": "same-a",
+          mcp__flux__z: "same-z",
+        },
+      },
+    };
+    for (let index = 0; index < 100; index++) {
+      chat.app.sessions.createSend({
+        id: `digest-${index}`,
+        sessionId: started.sessionId,
+        userId: chat.memberId,
+        agentId: chat.agentId,
+        providerId: chat.providerId,
+        model: "model",
+        firstMessageId: "message",
+        mcpDigest: index % 2 === 0 ? digest : reordered,
+        now: chat.app.now.value + index,
+      });
+    }
+    expect(
+      chat.app.db
+        .query<{ n: number }, []>(
+          `select count(distinct mcp) as n from sends
+           where id like 'digest-%'`,
+        )
+        .get()!.n,
+    ).toBe(1);
+    chat.app.db
+      .query("insert into mcp_digests (key, body) values ('orphan', '{}')")
+      .run();
+    chat.app.sweep();
+    expect(
+      chat.app.db
+        .query<{ n: number }, []>(
+          "select count(*) as n from mcp_digests where key = 'orphan'",
+        )
+        .get()!.n,
+    ).toBe(0);
   });
 });

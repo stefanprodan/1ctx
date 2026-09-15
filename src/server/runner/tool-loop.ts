@@ -151,7 +151,10 @@ export async function toolLoop(
 
     // launch the round's calls in parallel, record the send counters,
     // write one streaming tool row per call, then run them
-    send.budget.calls = deps.writer.finishRound(send).toolCalls;
+    const toolNames = calls.map(
+      (call) => deps.tools.toolName?.(send.policy.offered, call) ?? call.name,
+    );
+    send.budget.calls = deps.writer.finishRound(send, toolNames).toolCalls;
     if (send.terminal !== null) return endFor(send.terminal);
     goToTools(send);
     await runCalls(deps, send, calls);

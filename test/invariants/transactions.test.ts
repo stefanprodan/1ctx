@@ -300,6 +300,9 @@ describe("finishTool rollback", () => {
         offered: () => ({
           search: null,
           skills: { block: "", skills: [] },
+          mcp: [],
+          mcpPrompt: { text: "", digest: {} },
+          mcpCatalog: "",
           tools: [
             {
               name: "datetime",
@@ -408,6 +411,9 @@ describe("finalizeSend rollback", () => {
       offered: () => ({
         search: null,
         skills: { block: "", skills: [] },
+        mcp: [],
+        mcpPrompt: { text: "", digest: {} },
+        mcpCatalog: "",
         tools: [
           {
             name: "datetime",

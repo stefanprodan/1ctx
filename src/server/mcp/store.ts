@@ -431,8 +431,10 @@ export class McpServerStore {
   agentServers(agentId: string): AgentServer[] {
     return this.db
       .query<RawAgentServer, [string]>(
-        `select server_id, read, write from agent_servers
-         where agent_id = ? order by server_id`,
+        `select agent_servers.server_id, agent_servers.read, agent_servers.write
+         from agent_servers
+         join mcp_servers on mcp_servers.id = agent_servers.server_id
+         where agent_servers.agent_id = ? order by mcp_servers.name`,
       )
       .all(agentId)
       .map((link) => ({

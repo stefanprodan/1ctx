@@ -6,6 +6,7 @@
 // single row write the writer wraps in one transact() with a touch().
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
+import type { McpDigest } from "../../shared/mcp.ts";
 import type {
   EventSource,
   SendCause,
@@ -107,8 +108,10 @@ export type SessionsPort = {
     providerId: string;
     model: string;
     firstMessageId: string;
+    mcpDigest: McpDigest | null;
     now: number;
   }): SendSummary;
+  lastMcpDigest(sessionId: string, excludeSendId: string): McpDigest | null;
   // the running counters as the loop advances, without ending the send
   bumpCounters(
     id: string,

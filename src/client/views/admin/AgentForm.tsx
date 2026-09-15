@@ -165,6 +165,10 @@ export function AgentForm({
         wireOf(providerId.value),
       ),
       skills: chosenSkills(),
+      // Preserve hidden MCP choices so an ordinary edit cannot clear them;
+      // a new agent has no server and lets the token threshold choose.
+      servers: agent?.servers ?? [],
+      mcpMode: agent?.mcpMode ?? "auto",
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);

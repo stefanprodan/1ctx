@@ -7,6 +7,7 @@ import {
   displayResult,
   prettyArguments,
   shortArg,
+  toolLabel,
   toolSummary,
   wantsResult,
 } from "../../../src/client/transcript/Tool.model.ts";
@@ -70,6 +71,23 @@ describe("tool summaries", () => {
         '{"name":"gitops-knowledge","path":"references/runbook.md"}',
       ),
     ).toBe("references/runbook.md");
+  });
+
+  test("an MCP wire name shows the server, then the tool, and cuts its argument", () => {
+    expect(toolLabel("mcp__flux__get_flux_instance")).toEqual({
+      server: "flux",
+      tool: "get_flux_instance",
+    });
+    expect(toolLabel("webfetch")).toEqual({ server: null, tool: "webfetch" });
+    expect(
+      shortArg(
+        "mcp__flux__apply_kubernetes_manifest",
+        JSON.stringify({
+          manifest: `apiVersion: v1\nkind: Namespace\n${"x".repeat(200)}`,
+        }),
+      ),
+    ).toBe(`apiVersion: v1 kind: Namespace ${"x".repeat(200)}`.slice(0, 60));
+    expect(shortArg("mcp__flux__get_flux_instance", "{}")).toBe("");
   });
 
   test("shows a duration only for a completed result", () => {

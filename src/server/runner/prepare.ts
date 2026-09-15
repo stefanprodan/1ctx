@@ -5,6 +5,7 @@ import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
+import { changeNote } from "../mcp/index.ts";
 import {
   type SessionRow,
   type SessionStore,
@@ -71,7 +72,12 @@ export function prepareSend(fields: {
       title: fields.title,
       policy: fields.policy,
       text: fields.text,
+      mcpDigest: fields.policy.offered.mcpPrompt.digest,
     });
+    send.mcpNote = changeNote(
+      started.previousMcpDigest,
+      fields.policy.offered.mcpPrompt.digest,
+    );
   } catch (err) {
     fields.registry.free(send);
     throw err;

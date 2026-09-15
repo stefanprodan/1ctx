@@ -172,7 +172,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     providers,
     skills,
-    tools: { offered: (now, agentId) => tools.offered(now, agentId) },
+    mcp,
+    tools: {
+      offered: (now, agentId, agentServers, mode) =>
+        tools.offered(now, agentId, agentServers, mode),
+    },
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
     automations: {
@@ -198,6 +202,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       version: options.version,
       render: renderMarkdown,
       skills,
+      mcp,
     });
   const socket = socketArea({
     refresh: (principal) => access.refresh(principal),
@@ -278,7 +283,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     socket,
     routes,
     handle,
-    sweep: () => access.sweep(),
+    sweep: () => access.sweep() + sessions.store.sweepDigests(),
     mcpStart: () => mcp.start(),
     // the runner first, whose ending calls may still ask for a refresh
     // that the MCP close then refuses; nothing touches the db after
