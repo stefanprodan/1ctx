@@ -24,6 +24,16 @@ export type ParsedAgent = Omit<SaveAgentRequest, "effort"> & {
   effort: string | null;
 };
 
+// an agent's name as a path names it, by the same rule a save keeps
+export function parseAgentName(value: unknown): string {
+  if (!isName(value)) {
+    throw new BadRequest(
+      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
+    );
+  }
+  return value;
+}
+
 export function parseAgent(body: unknown): ParsedAgent {
   const b = fields(body, [
     "name",
@@ -35,11 +45,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "prompt",
     "skills",
   ]);
-  if (!isName(b.name)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
+  const name = parseAgentName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
     throw new BadRequest("providerId must be an id");
   }
@@ -80,7 +86,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     throw new BadRequest("skills must not repeat");
   }
   return {
-    name: b.name,
+    name,
     avatar,
     providerId: b.providerId,
     model: b.model,

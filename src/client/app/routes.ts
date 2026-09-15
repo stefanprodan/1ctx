@@ -15,6 +15,7 @@ import { isRunFilter } from "../../shared/words.ts";
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
+import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -300,6 +301,20 @@ export const ROUTES: Route[] = [
     role: "admin",
     load: () => loadSkills(),
     nav: { label: "Skills", icon: "skill", order: 12, group: "Admin" },
+  },
+  {
+    path: "/users/:username",
+    view: lazy(() => import("../views/people/User.tsx").then((m) => m.User)),
+    title: (params) => `@${params.username}`,
+    role: "authenticated",
+    load: (params) => loadPerson(params.username),
+  },
+  {
+    path: "/agents/:name",
+    view: lazy(() => import("../views/people/Agent.tsx").then((m) => m.Agent)),
+    title: (params) => `@${params.name}`,
+    role: "authenticated",
+    load: (params) => loadAgentPage(params.name),
   },
   {
     path: "/profile",

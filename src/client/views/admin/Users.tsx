@@ -11,6 +11,7 @@ import type { UserAccount } from "../../../shared/contracts/user.ts";
 import { me } from "../../data/me.ts";
 import { users, usersError } from "../../data/users.ts";
 import { initials } from "../../lib/format.ts";
+import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -19,9 +20,11 @@ import {
   RowsCard,
   RowsMeta,
   RowsNew,
+  RowsNote,
   RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { UserForm } from "./UserForm.tsx";
 import { adminCount, metaLine, stateLine } from "./Users.model.ts";
 import "./users.css";
@@ -70,6 +73,10 @@ export function Users() {
   const adding = useSignal(false);
   const error = usersError.value;
   const admins = adminCount(list ?? []);
+  const q = useSignal("");
+  const shown = (list ?? []).filter((u) =>
+    matches(q.value, [u.username, u.fullName, u.email]),
+  );
   return (
     <Page
       crumb="Admin"
@@ -80,6 +87,15 @@ export function Users() {
       <Rows>
         <RowsCard
           label="Users"
+          search={
+            <Search
+              value={q.value}
+              onChange={(next) => {
+                q.value = next;
+              }}
+              placeholder="Search users"
+            />
+          }
           action={
             <RowsAdd
               label="New user"
@@ -102,7 +118,10 @@ export function Users() {
               />
             </RowsNew>
           )}
-          {(list ?? []).map((u) => (
+          {q.value.trim() !== "" && shown.length === 0 && (
+            <RowsNote>No users found</RowsNote>
+          )}
+          {shown.map((u) => (
             <UserRow
               key={u.id}
               user={u}

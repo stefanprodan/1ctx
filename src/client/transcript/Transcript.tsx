@@ -37,7 +37,11 @@ export function Transcript({
   live: ReadonlyMap<string, Live>;
   agent: Agent | null;
   // the name of a user row's author
-  authorOf: (userId: string | null) => string;
+  // the author's name, and the username for the link to their page
+  authorOf: (userId: string | null) => {
+    name: string;
+    username: string | null;
+  };
   // the last turn's Regenerate; absent while a send runs
   onRegenerate?: () => void;
   foot?: ComponentChildren;

@@ -3,6 +3,7 @@
 //
 // Projects: the personal and team containers everything lives in.
 
+import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
@@ -40,6 +41,7 @@ export type Projects = {
   isMember(projectId: string, userId: string): boolean;
   memberProjectIds(userId: string): string[];
   teamProjectIds(): string[];
+  visibleFor(userId: string, admin: boolean): ProjectSummary[];
   personal(userId: string): ProjectRow | null;
   createPersonal(fields: { userId: string; now: number }): void;
   routes: RouteDescriptor[];
@@ -53,6 +55,7 @@ export function projectsArea(deps: ProjectsDeps): Projects {
     isMember: (projectId, userId) => store.isMember(projectId, userId),
     memberProjectIds: (userId) => store.memberProjectIds(userId),
     teamProjectIds: () => store.teamProjectIds(),
+    visibleFor: (userId, admin) => store.visibleFor(userId, admin),
     personal: (userId) => store.personal(userId),
     createPersonal: (fields) => {
       store.createPersonal(fields);

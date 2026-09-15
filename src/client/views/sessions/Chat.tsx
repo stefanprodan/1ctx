@@ -54,10 +54,15 @@ export function Chat({ params }: { params: Params }) {
   const projectName = listed?.name ?? "Project";
   const user = me.value;
   const members = row !== null && row.id === projectId ? row.members : [];
-  const authorOf = (userId: string | null) =>
-    (userId !== null && user?.id === userId ? user.fullName : null) ??
-    members.find((m) => m.id === userId)?.fullName ??
-    "someone";
+  const authorOf = (userId: string | null) => {
+    const known =
+      (userId !== null && user?.id === userId ? user : null) ??
+      members.find((m) => m.id === userId) ??
+      null;
+    return known === null
+      ? { name: "someone", username: null }
+      : { name: known.fullName, username: known.username };
+  };
   const agent =
     projectAgents.value?.find((a) => a.id === shown?.session.agentId) ?? null;
   const run = shown?.session.origin === "automation";

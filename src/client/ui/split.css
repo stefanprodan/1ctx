@@ -98,6 +98,9 @@
     font-size: var(--text-mono);
     color: var(--fg);
   }
+  .split-name-link:hover {
+    color: var(--brand);
+  }
   .split-faint {
     display: block;
     min-width: 0;

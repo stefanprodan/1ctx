@@ -1,0 +1,163 @@
+/* A user's page and an agent's page: the head, then sections of text,
+   then cards of rows. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .people {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .people-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .people-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: var(--text-input);
+    font-weight: 600;
+    color: var(--dim);
+  }
+  /* an agent's avatar in the brand colour, as the transcript draws it */
+  .people-avatar-agent {
+    color: var(--brand);
+  }
+
+  .people-who {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .people-name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-size: var(--text-body);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  /* the model id is one text: cut it as a block */
+  .people-name-mono {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+  }
+
+  .people-meta {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* the handle in the brand colour, as the stream names an author */
+  .people-handle {
+    color: var(--brand);
+  }
+
+  /* the name gives way before the tag does */
+  .people-tag {
+    flex-shrink: 0;
+    padding: 1px var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    color: var(--faint);
+  }
+
+  /* a long value in the aside is cut to its width */
+  .people-cut {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .people-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .people-about {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--fg);
+  }
+
+  .people-empty {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+
+  /* the prompt card's one row: the text, then Show more under it */
+  .people-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+  .people-prompt-text {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--fg);
+  }
+
+  /* the first lines of a long prompt; Show more opens the rest */
+  .people-prompt-cut {
+    display: -webkit-box;
+    -webkit-line-clamp: 12;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .people-more {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .people-more:hover {
+    color: var(--fg);
+  }
+
+  /* shown only where the aside is hidden; 1100 is the split's width */
+  .people-narrow {
+    display: none;
+  }
+  @media (max-width: 1099px) {
+    .people-narrow {
+      display: block;
+    }
+  }
+}

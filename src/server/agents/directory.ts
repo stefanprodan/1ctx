@@ -1,0 +1,114 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// An agent's page, for every signed-in user: how it is configured. The
+// composer's route already sends the whole row, so the page adds only
+// what a user cannot see elsewhere: the provider's name, the skills
+// with their descriptions and when they were fetched, the built-in tools
+// a send would offer it now with websearch's provider, and token counts.
+// The tools are the tools area's answer at this moment, none when the
+// model does not accept tools; the list leaves out the skill tools,
+// which the skills stand for, but their schemas count, since every
+// request carries them.
+
+import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
+import type { OfferedSkill } from "../../shared/contracts/skill.ts";
+import { isSkillTool } from "../../shared/words.ts";
+import type { Clock } from "../lib/clock.ts";
+import { NotFound } from "../lib/errors.ts";
+import { json, type RouteDescriptor } from "../lib/http.ts";
+import { tokens } from "../lib/tokens.ts";
+import { type ChatTool, wireTools } from "../providers/index.ts";
+import { parseAgentName } from "./parse.ts";
+import type { ProvidersPort } from "./routes.ts";
+import { type AgentStore, summary } from "./store.ts";
+
+export type SkillsListPort = {
+  forAgent(agentId: string): OfferedSkill[];
+  versions(
+    agentId: string,
+  ): { id: string; digest: string; fetchedAt: number }[];
+  bodyText(id: string): string | null;
+};
+
+// the tools a send of the agent would be offered: a closure, since
+// tools are built after agents
+export type ToolsPort = {
+  offered(
+    now: number,
+    agentId: string,
+  ): { tools: ChatTool[]; search: string | null };
+};
+
+export type DirectoryDeps = {
+  store: AgentStore;
+  providers: Pick<ProvidersPort, "byId">;
+  skills: SkillsListPort;
+  tools: ToolsPort;
+  clock: Clock;
+};
+
+// a body is up to 40,000 characters and an agent carries up to twenty,
+// so a count is kept per skill until its digest moves; the cap bounds
+// the map when skills come and go
+export const MAX_COUNTED_SKILLS = 500;
+
+export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
+  const counted = new Map<string, { digest: string; tokens: number }>();
+  const bodyTokens = (id: string, digest: string): number => {
+    const held = counted.get(id);
+    if (held !== undefined && held.digest === digest) return held.tokens;
+    const n = tokens(deps.skills.bodyText(id) ?? "");
+    counted.delete(id);
+    if (counted.size >= MAX_COUNTED_SKILLS) {
+      const oldest = counted.keys().next().value;
+      if (oldest !== undefined) counted.delete(oldest);
+    }
+    counted.set(id, { digest, tokens: n });
+    return n;
+  };
+  return [
+    {
+      method: "GET",
+      path: "/api/directory/agents/:name",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const agent = deps.store.byName(parseAgentName(ctx.params.name));
+        if (agent === null) throw new NotFound("no such agent");
+        const offered = agent.model.tools
+          ? deps.tools.offered(deps.clock(), agent.id)
+          : { tools: [], search: null };
+        const versions = deps.skills.versions(agent.id);
+        const fetched = new Map(versions.map((v) => [v.id, v.fetchedAt]));
+        const body: DirectoryAgentResponse = {
+          agent: summary(agent),
+          provider: deps.providers.byId(agent.providerId)?.name ?? "",
+          skills: deps.skills.forAgent(agent.id).map((skill) => ({
+            ...skill,
+            fetchedAt: fetched.get(skill.id) ?? 0,
+          })),
+          tools: offered.tools
+            .filter((t) => !isSkillTool(t.name))
+            .map((t) => ({
+              name: t.name,
+              provider: t.name === "websearch" ? offered.search : null,
+            })),
+          tokens: {
+            prompt: tokens(agent.prompt),
+            skills: versions.reduce(
+              (n, v) => n + bodyTokens(v.id, v.digest),
+              0,
+            ),
+            // the schemas as the chat body carries them, skill tools
+            // included
+            tools:
+              offered.tools.length === 0
+                ? 0
+                : tokens(JSON.stringify(wireTools(offered.tools))),
+          },
+        };
+        return json(body);
+      },
+    },
+  ];
+}

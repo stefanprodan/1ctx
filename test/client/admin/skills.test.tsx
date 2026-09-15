@@ -144,13 +144,13 @@ describe("the form", () => {
 });
 
 describe("the row's words", () => {
-  test("the head: the files and the fetch, or the failure", () => {
+  test("the head: the files, SKILL.md counted, and the fetch, or the failure", () => {
     expect(metaLine(timoni, now)).toEqual({
-      text: "fetched 2h ago",
+      text: "1 file · fetched 2h ago",
       bad: false,
     });
     expect(metaLine(gitops, now)).toEqual({
-      text: "2 files · fetched 2h ago",
+      text: "3 files · fetched 2h ago",
       bad: false,
     });
     expect(
@@ -341,10 +341,25 @@ describe("the page", () => {
     skills.value = [gitops, timoni];
     const html = render(<Skills />);
     expect(html).toContain("gitops-knowledge");
-    expect(html).toContain("Flux CD and Flux Operator expert.");
-    expect(html).toContain("2 files · fetched");
+    // the files and the fetch sit under the name, Refresh at the row's end
+    expect(html).toContain('class="rows-sub">3 files · fetched');
+    expect(html).toContain(
+      '</button><button type="button" class="btn btn-small">Refresh</button>',
+    );
+    expect(html).not.toContain("Flux CD and Flux Operator expert.");
     expect(html).toContain("Add skill");
-    expect(html).not.toContain("rows-meta-bad");
+    expect(html).not.toContain('class="error"');
+    // a failed refresh reads in red under the name
+    skills.value = [
+      {
+        ...gitops,
+        refreshError: "the source answered 404",
+        refreshFailedAt: 0,
+      },
+    ];
+    expect(render(<Skills />)).toContain(
+      '<span class="rows-sub"><span class="error">Refresh failed',
+    );
     skills.value = [];
     expect(render(<Skills />)).toContain("No skills yet");
     expect(render(<Skills />)).not.toContain("rows-hint");

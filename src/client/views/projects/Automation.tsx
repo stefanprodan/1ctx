@@ -33,6 +33,7 @@ import { me } from "../../data/me.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents, stopSession } from "../../data/sessions.ts";
 import { longDate, reason, stamp, until } from "../../lib/format.ts";
+import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
@@ -315,7 +316,9 @@ export function Automation({ params }: { params: Params }) {
                 </div>
                 <div class="split-line">
                   Owner
-                  <span class="split-strong">@{row.ownerName}</span>
+                  <a class="split-strong" href={userHref(row.ownerName)}>
+                    @{row.ownerName}
+                  </a>
                 </div>
                 <div class="split-line">
                   Created
@@ -331,9 +334,13 @@ export function Automation({ params }: { params: Params }) {
                 {scheduleTitle(row.schedule)}
               </span>
               , {row.tz},{" "}
-              <span class="automations-agent">
-                @{agent?.name ?? "a deleted agent"}
-              </span>{" "}
+              {agent ? (
+                <a class="automations-agent" href={agentHref(agent.name)}>
+                  @{agent.name}
+                </a>
+              ) : (
+                <span class="automations-agent">a deleted agent</span>
+              )}{" "}
               is asked:
             </p>
             <Instructions

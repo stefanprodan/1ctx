@@ -14,6 +14,7 @@ import type { Message } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { stamp } from "../lib/format.ts";
+import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { endedBy, type ReplyNode, type WorkNode } from "./rows.ts";
 import { Summary } from "./Summary.tsx";
@@ -121,7 +122,16 @@ export function Reply({
         <span class="transcript-agent-tile">
           <AvatarIcon name={agent?.avatar ?? "bot"} size={14} />
         </span>
-        <span class="transcript-name">{agent?.name ?? "agent"}</span>
+        {agent ? (
+          <a
+            class="transcript-name transcript-name-link"
+            href={agentHref(agent.name)}
+          >
+            {agent.name}
+          </a>
+        ) : (
+          <span class="transcript-name">agent</span>
+        )}
       </div>
       <div class="transcript-body">
         {!node.compact && (
