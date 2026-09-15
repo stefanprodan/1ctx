@@ -73,7 +73,7 @@ describe("tools administration", () => {
     expect(body.tools).toHaveLength(3);
     expect(body.search).toEqual({
       provider: null,
-      keys: { exa: true, firecrawl: false },
+      keys: { exa: true, firecrawl: false, tavily: false },
     });
     expect(
       body.tools.find((tool: { name: string }) => tool.name === "webfetch"),

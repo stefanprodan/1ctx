@@ -13,6 +13,7 @@ import { m0004 } from "./0004-run-source.ts";
 import { m0005 } from "./0005-suspended-by.ts";
 import { m0006 } from "./0006-skills.ts";
 import { m0007 } from "./0007-user-tz.ts";
+import { m0008 } from "./0008-search-tavily.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -22,4 +23,5 @@ export const MIGRATIONS: Migration[] = [
   m0005,
   m0006,
   m0007,
+  m0008,
 ];

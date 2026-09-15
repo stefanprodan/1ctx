@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The shapes the two search wires share: the argument the tool parsed,
+// The shapes the search wires share: the argument the tool parsed,
 // the request one wire builds and the error a wire raises when the
 // provider answered with one.
 
-export type SearchProvider = "exa" | "firecrawl";
+export type { SearchProvider } from "../../../../shared/words.ts";
 
 export type SearchArgs = {
   query: string;

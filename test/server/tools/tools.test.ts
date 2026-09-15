@@ -150,6 +150,9 @@ describe("offered", () => {
     expect(area({ exa: "e" }, "firecrawl").offered(now, "").search).toBe(
       "firecrawl",
     );
+    expect(area({ firecrawl: "f" }, "tavily").offered(now, "").search).toBe(
+      "tavily",
+    );
     expect(area({ exa: "e" }).offered(now, "").search).toBeNull();
   });
 

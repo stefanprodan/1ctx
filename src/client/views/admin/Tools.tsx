@@ -3,8 +3,8 @@
 //
 // The tools: three cards. The built-ins, a row each with its switch,
 // opening in place to the text and the parameters the model gets,
-// read-only. The search provider, one of two, with whether its key
-// file is there. The limits, per send and per call, each typed in the
+// read-only. The search provider, one row per provider, with whether
+// its key file is there. The limits, per send and per call, each typed in the
 // page's unit with the default beside a changed one; Save and Reset
 // to defaults at the foot. A change applies to the next send.
 
@@ -135,7 +135,7 @@ function ToolRow({
   );
 }
 
-// the two providers as radio rows; a pick writes at once
+// the providers as radio rows; a pick writes at once
 function SearchCard() {
   const state = tools.value?.search;
   const busy = useSignal(false);

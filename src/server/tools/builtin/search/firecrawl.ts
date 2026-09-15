@@ -3,24 +3,27 @@
 //
 // The Firecrawl wire: a search over its v2 endpoint, answered as JSON.
 // Nothing here reads a key file or reaches the network; the area passes
-// the key and the version, the caller does the request.
+// the key, the version and the deadline, the caller does the request.
 
+import { formatHits, isObject, jsonObject, unexpected } from "./answer.ts";
 import {
   ProviderError,
   type ProviderRequest,
   type SearchArgs,
 } from "./types.ts";
 
-function unexpected(): never {
-  throw new Error("websearch answered with an unexpected shape");
-}
-
 export const FIRECRAWL_URL = "https://api.firecrawl.dev/v2/search";
+
+// Firecrawl stops its own search at the timeout it is sent; it gets the
+// tool's deadline less a margin, so its answer arrives before ours ends
+const DEADLINE_MARGIN_MS = 2000;
+const MIN_TIMEOUT_MS = 1000;
 
 export function buildRequest(
   args: SearchArgs,
   key: string | null,
   version: string,
+  deadlineMs: number,
 ): ProviderRequest {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -33,50 +36,20 @@ export function buildRequest(
     body: JSON.stringify({
       query: args.query,
       limit: 5,
-      timeout: 8000,
+      timeout: Math.max(MIN_TIMEOUT_MS, deadlineMs - DEADLINE_MARGIN_MS),
       ...(args.domain ? { includeDomains: [args.domain] } : {}),
     }),
   };
 }
 
-export function parseAnswer(
-  body: string,
-  _contentType: string | null,
-  _keySent: boolean,
-): string {
-  let value: unknown;
-  try {
-    value = JSON.parse(body);
-  } catch {
-    return unexpected();
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return unexpected();
-  }
-  const answer = value as Record<string, unknown>;
+export function parseAnswer(body: string): string {
+  const answer = jsonObject(body);
   if (answer.success !== true) {
     if (typeof answer.error === "string") {
       throw new ProviderError(answer.error);
     }
     return unexpected();
   }
-  const data = answer.data;
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return unexpected();
-  }
-  const web = (data as Record<string, unknown>).web;
-  if (!Array.isArray(web)) return unexpected();
-  const results: string[] = [];
-  for (const hit of web) {
-    if (typeof hit !== "object" || hit === null || Array.isArray(hit)) continue;
-    const item = hit as Record<string, unknown>;
-    if (typeof item.url !== "string") continue;
-    const title = typeof item.title === "string" ? item.title : "";
-    const description =
-      typeof item.description === "string" ? item.description : "";
-    results.push(
-      `${results.length + 1}. ${title}\n${item.url}\n${description}`,
-    );
-  }
-  return results.length === 0 ? "No results." : results.join("\n\n");
+  if (!isObject(answer.data)) return unexpected();
+  return formatHits(answer.data.web, "description");
 }

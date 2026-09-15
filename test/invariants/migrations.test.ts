@@ -312,6 +312,7 @@ describe("additive migrations", () => {
       "0005-suspended-by",
       "0006-skills",
       "0007-user-tz",
+      "0008-search-tavily",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -355,6 +356,7 @@ describe("0005", () => {
       "0005-suspended-by",
       "0006-skills",
       "0007-user-tz",
+      "0008-search-tavily",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -407,6 +409,7 @@ describe("rebuild migrations", () => {
       "0005-suspended-by",
       "0006-skills",
       "0007-user-tz",
+      "0008-search-tavily",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -489,7 +492,11 @@ describe("0006 skills migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a6', 'agent6', 'pr6', 'm', 'Model', 0);
     `);
-    expect(migrate(db)).toEqual(["0006-skills", "0007-user-tz"]);
+    expect(migrate(db)).toEqual([
+      "0006-skills",
+      "0007-user-tz",
+      "0008-search-tavily",
+    ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
     });
@@ -531,10 +538,44 @@ describe("0007 user tz migration", () => {
         (id, username, full_name, email, role, password_hash, created_at)
         values ('u7', 'user7', 'User', 'u7@example.com', 'member', 'h', 0);
     `);
-    expect(migrate(db)).toEqual(["0007-user-tz"]);
+    expect(migrate(db)).toEqual(["0007-user-tz", "0008-search-tavily"]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
     });
+    db.close();
+  });
+});
+
+describe("0008 search tavily migration", () => {
+  test("keeps the tool rows and accepts tavily", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 7));
+    db.exec(`
+      update tools set enabled = 0, updated_at = 5 where name = 'webfetch';
+      update tools set provider = 'firecrawl', updated_at = 6
+        where name = 'websearch';
+    `);
+    expect(migrate(db)).toEqual(["0008-search-tavily"]);
+    expect(
+      db
+        .query(
+          "select name, enabled, provider, updated_at from tools order by rowid",
+        )
+        .all(),
+    ).toEqual([
+      { name: "datetime", enabled: 1, provider: null, updated_at: 0 },
+      { name: "webfetch", enabled: 0, provider: null, updated_at: 5 },
+      { name: "websearch", enabled: 1, provider: "firecrawl", updated_at: 6 },
+    ]);
+    db.query(
+      "update tools set provider = 'tavily' where name = 'websearch'",
+    ).run();
+    expect(() =>
+      db
+        .query("update tools set provider = 'other' where name = 'websearch'")
+        .run(),
+    ).toThrow();
     db.close();
   });
 });

@@ -9,9 +9,12 @@
 // suite passes a fake and never leaves the process. The body cap, the
 // deadline and the result cut come from the tool caps on the context.
 
+import { bytesWords } from "../../lib/bytes.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
-const BODY_CUT_NOTE = "<error>Content truncated at 2 MB.</error>";
+function cutNote(maxBytes: number): string {
+  return `<error>Content truncated at ${bytesWords(maxBytes)}.</error>`;
+}
 
 // what reaches the network; a test passes a fake
 export type FetchDependencies = {
@@ -382,7 +385,7 @@ export async function fetchText(
       if (type.type === "text/html" || type.type === "application/xhtml+xml") {
         text = await extractHtml(text, url);
       }
-      if (body.cut) text = `${text}\n\n${BODY_CUT_NOTE}`;
+      if (body.cut) text = `${text}\n\n${cutNote(ctx.caps.fetchBodyBytes)}`;
       return sliceContent(text, startIndex, maxLength);
     }
   } catch (error) {

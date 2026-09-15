@@ -186,6 +186,29 @@ describe("fetch response", () => {
     );
   });
 
+  test("notes the cut at the cap an admin set", async () => {
+    const limit = 64 * 1024;
+    const bytes = new Uint8Array(limit + 1).fill("a".charCodeAt(0));
+    const ctx = context();
+    ctx.caps = { ...ctx.caps, fetchBodyBytes: limit };
+    const result = await fetchText(
+      {
+        url: "https://public.example/large",
+        start_index: limit - 10,
+        max_length: 500,
+      },
+      ctx,
+      "vtest",
+      dependencies(
+        () =>
+          new Response(bytes, { headers: { "content-type": "text/plain" } }),
+      ),
+    );
+    expect(result).toBe(
+      `${"a".repeat(10)}\n\n<error>Content truncated at 64 KB.</error>`,
+    );
+  });
+
   test("refuses missing and unsupported media types", async () => {
     const missing = dependencies(() => new Response("body"));
     await expect(

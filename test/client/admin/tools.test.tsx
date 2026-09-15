@@ -134,7 +134,7 @@ const time: ToolSummary = {
 };
 const search: SearchState = {
   provider: "exa",
-  keys: { exa: true, firecrawl: false },
+  keys: { exa: true, firecrawl: false, tavily: false },
 };
 
 const realFetch = globalThis.fetch;
@@ -228,7 +228,7 @@ describe("the limit words and units", () => {
     expect(keyLine("firecrawl", false)).toBe("firecrawl.key keyless");
     expect(searchLine(search)).toBe("websearch runs on exa.");
     expect(searchLine({ ...search, provider: "firecrawl" })).toBe(
-      "websearch runs on firecrawl without a key; firecrawl.key in the secrets directory raises the rate.",
+      "websearch runs on firecrawl keyless. Add firecrawl.key for a higher rate.",
     );
     expect(searchLine({ ...search, provider: null })).toContain("Choose");
     expect(firstSentence(time.description)).toBe(
@@ -306,6 +306,7 @@ describe("the page", () => {
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain("exa.key present");
     expect(html).toContain("firecrawl.key keyless");
+    expect(html).toContain("tavily.key keyless");
     expect(html).not.toContain("rows-meta-bad");
     expect(html).toContain("websearch runs on exa.");
     expect(html).toContain("Per send");

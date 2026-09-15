@@ -6,15 +6,12 @@
 // network; the area passes the key and the version, the caller does the
 // request.
 
+import { isObject, jsonObject, unexpected } from "./answer.ts";
 import {
   ProviderError,
   type ProviderRequest,
   type SearchArgs,
 } from "./types.ts";
-
-function unexpected(): never {
-  throw new Error("websearch answered with an unexpected shape");
-}
 
 function messageData(body: string): string {
   const lines = body.replace(/\r\n?/gu, "\n").split("\n");
@@ -41,21 +38,6 @@ function messageData(body: string): string {
     else if (field === "data") data.push(value);
   }
   return dispatch() ?? unexpected();
-}
-
-function parseJson(text: string): Record<string, unknown> {
-  try {
-    const value = JSON.parse(text);
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return unexpected();
-    }
-    return value as Record<string, unknown>;
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith("websearch ")) {
-      throw error;
-    }
-    return unexpected();
-  }
 }
 
 function serverMessage(value: unknown): string {
@@ -98,36 +80,20 @@ export function parseAnswer(
   keySent: boolean,
 ): string {
   const mediaType = contentType?.split(";", 1)[0].trim().toLowerCase();
-  const envelope = parseJson(
+  const envelope = jsonObject(
     mediaType === "application/json" ? body : messageData(body),
   );
   if (envelope.error !== undefined) {
-    const error = envelope.error;
-    if (typeof error !== "object" || error === null || Array.isArray(error)) {
-      return unexpected();
-    }
-    throw new ProviderError(
-      serverMessage((error as Record<string, unknown>).message),
-    );
+    if (!isObject(envelope.error)) return unexpected();
+    throw new ProviderError(serverMessage(envelope.error.message));
   }
-  const result = envelope.result;
-  if (typeof result !== "object" || result === null || Array.isArray(result)) {
-    return unexpected();
-  }
-  const record = result as Record<string, unknown>;
-  if (!Array.isArray(record.content)) return unexpected();
+  const record = envelope.result;
+  if (!isObject(record) || !Array.isArray(record.content)) return unexpected();
   const texts: string[] = [];
   for (const item of record.content) {
-    if (
-      typeof item !== "object" ||
-      item === null ||
-      Array.isArray(item) ||
-      (item as Record<string, unknown>).type !== "text" ||
-      typeof (item as Record<string, unknown>).text !== "string"
-    ) {
-      return unexpected();
-    }
-    texts.push((item as Record<string, unknown>).text as string);
+    if (!isObject(item) || item.type !== "text") return unexpected();
+    if (typeof item.text !== "string") return unexpected();
+    texts.push(item.text);
   }
   const text = texts.join("\n\n");
   if (record.isError === true) {

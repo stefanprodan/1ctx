@@ -257,7 +257,7 @@ export function isBuiltinTool(value: unknown): value is BuiltinTool {
 }
 
 // the services websearch can run on; the key file carries the name
-export const SEARCH_PROVIDERS = ["exa", "firecrawl"] as const;
+export const SEARCH_PROVIDERS = ["exa", "firecrawl", "tavily"] as const;
 export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
 export function isSearchProvider(value: unknown): value is SearchProvider {
   return SEARCH_PROVIDERS.includes(value as SearchProvider);

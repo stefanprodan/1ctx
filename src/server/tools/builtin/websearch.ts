@@ -8,9 +8,11 @@
 // and never leaves the process. The body cap and the deadline come from
 // the tool caps on the context.
 
+import { bytesWords } from "../../lib/bytes.ts";
 import type { Tool, ToolContext } from "../types.ts";
 import * as exa from "./search/exa.ts";
 import * as firecrawl from "./search/firecrawl.ts";
+import * as tavily from "./search/tavily.ts";
 import {
   ProviderError,
   type ProviderRequest,
@@ -18,9 +20,23 @@ import {
   type SearchProvider,
 } from "./search/types.ts";
 
+// a wire takes what it needs of the call and ignores the rest
+const WIRES = { exa, firecrawl, tavily } satisfies Record<
+  SearchProvider,
+  {
+    buildRequest(
+      args: SearchArgs,
+      key: string | null,
+      version: string,
+      deadlineMs: number,
+    ): ProviderRequest;
+    parseAnswer(body: string, contentType: string | null, key: boolean): string;
+  }
+>;
+
 // the provider chosen for the send and the key read for this call; the
-// key is null when the file is gone since the send began, which is a
-// failed result, never a switch (decision 3)
+// key is null when there is no file, and the call runs keyless on the
+// same provider, never a switch to another (decision 3)
 export type Search = { provider: SearchProvider; key: string | null };
 
 export type SearchDependencies = {
@@ -55,12 +71,15 @@ function domainError(): never {
 }
 
 export function parseArgs(args: Record<string, unknown>): SearchArgs {
-  if (typeof args.query !== "string" || args.query.trim() === "") {
-    throw new Error("query must be a non-empty string");
+  if (typeof args.query !== "string") {
+    throw new Error("query must be a string");
   }
   const query = args.query.trim();
-  if (query.length > 500)
-    throw new Error("query must be at most 500 characters");
+  // counted by code point, so one emoji is one character; a single
+  // character finds nothing useful, and Tavily refuses it
+  const characters = Array.from(query).length;
+  if (characters < 2) throw new Error("query must be at least 2 characters");
+  if (characters > 500) throw new Error("query must be at most 500 characters");
   if (args.domain === undefined || args.domain === null) {
     return { query, domain: null };
   }
@@ -133,7 +152,7 @@ async function readBody(
       size += value.byteLength;
       if (size > maxBytes) {
         reader.cancel().catch(() => {});
-        throw new Error("websearch answer over 1 MB");
+        throw new Error(`websearch answer over ${bytesWords(maxBytes)}`);
       }
       chunks.push(value);
     }
@@ -170,7 +189,13 @@ function errorFromBody(body: string): string | null {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       return null;
     }
-    const error = (value as Record<string, unknown>).error;
+    const record = value as Record<string, unknown>;
+    // Tavily nests its words under detail
+    const detail = record.detail;
+    const error =
+      typeof detail === "object" && detail !== null && !Array.isArray(detail)
+        ? (detail as Record<string, unknown>).error
+        : record.error;
     return typeof error === "string" ? serverText(error) : null;
   } catch {
     return null;
@@ -218,18 +243,18 @@ async function post(
     }
     const body = await readBody(response, signal, maxBytes);
     if (response.status < 200 || response.status >= 300) {
+      // the status and whether a key went out decide what failed; the
+      // provider's words, when it sent readable ones, only follow
       const text = errorFromBody(body);
-      if (keySent && response.status === 401 && text !== null) {
-        throw new Error(`websearch key rejected: ${text}`);
+      const words = (head: string) =>
+        text === null ? head : `${head}: ${text}`;
+      if (keySent && response.status === 401) {
+        throw new Error(words("websearch key rejected"));
       }
-      if (!keySent && response.status === 403 && text !== null) {
-        throw new Error(`websearch refused: ${text}`);
+      if (!keySent && response.status === 403) {
+        throw new Error(words("websearch refused"));
       }
-      throw new Error(
-        text === null
-          ? `websearch failed (HTTP ${response.status})`
-          : `websearch failed (HTTP ${response.status}): ${text}`,
-      );
+      throw new Error(words(`websearch failed (HTTP ${response.status})`));
     }
     try {
       return parse(body, response.headers.get("content-type"), keySent);
@@ -254,15 +279,16 @@ export async function searchWeb(
   }
   ctx.budget.searches++;
   const { provider, key } = search;
-  const request =
-    provider === "exa"
-      ? exa.buildRequest(parsed, key, version)
-      : firecrawl.buildRequest(parsed, key, version);
-  const parse = provider === "exa" ? exa.parseAnswer : firecrawl.parseAnswer;
   const deadlineMs = ctx.caps.searchDeadlineMs;
+  // the call timeout ends the call first when it is the shorter one, so
+  // the provider's timeout and the retry wait follow whichever ends first
+  const effectiveMs = Math.min(deadlineMs, ctx.caps.callTimeoutMs);
+  const wire = WIRES[provider];
+  const request = wire.buildRequest(parsed, key, version, effectiveMs);
+  const parse = wire.parseAnswer;
   const timeout = AbortSignal.timeout(deadlineMs);
   const signal = AbortSignal.any([ctx.signal, timeout]);
-  const deadlineAt = Date.now() + deadlineMs;
+  const deadlineAt = Date.now() + effectiveMs;
   try {
     return await post(
       request,
@@ -283,7 +309,7 @@ export async function searchWeb(
 }
 
 const DESCRIPTION =
-  "Search the web. Describe the page you want in a sentence rather than keywords; set domain to limit the results to one site. Returns titles, URLs and excerpts; call webfetch on a result's URL to read the whole page. Searches have a per-send budget, so make each one count and do not repeat a query in other words. The current year is {{year}}. You MUST use this year when searching for recent information.";
+  "Search the web. Describe the page you want in a sentence, not keywords. Set domain to limit the results to one site. Returns titles, URLs and excerpts. Call webfetch on a result's URL to read the whole page. Searches have a per-send budget, so make each one count and do not repeat a query in other words. The current year is {{year}}. You MUST use this year when searching for recent information.";
 
 // the tool the area builds per send, with the provider chosen and the
 // version bound; the key is passed in per call by the area
@@ -301,7 +327,7 @@ export function makeWebsearchTool(
       properties: {
         query: {
           type: "string",
-          minLength: 1,
+          minLength: 2,
           maxLength: 500,
           description: "Describe the page you want in a sentence.",
         },
@@ -314,22 +340,26 @@ export function makeWebsearchTool(
       additionalProperties: false,
     },
     async run(args, ctx) {
-      // both providers answer without a key, at their keyless rate; a
+      // every provider answers without a key, at its keyless rate; a
       // key file that appears or goes between calls is read each time
       const value = key();
+      // a provider may echo the key in an answer as well as an error, and
+      // either would reach the model, the stored row and the UI
+      const scrub = (text: string) =>
+        value === null ? text : text.replaceAll(value, "[key]");
       try {
-        return await searchWeb(
-          args,
-          ctx,
-          { provider, key: value },
-          version,
-          dependencies,
+        return scrub(
+          await searchWeb(
+            args,
+            ctx,
+            { provider, key: value },
+            version,
+            dependencies,
+          ),
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          value === null ? message : message.replaceAll(value, "[key]"),
-        );
+        throw new Error(scrub(message));
       }
     },
   };
