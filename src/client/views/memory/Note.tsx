@@ -92,6 +92,7 @@ function Editor({
         <div class="note-box" key={index}>
           <textarea
             class="input note-box-text"
+            name={`entry-${index + 1}`}
             aria-label={`Entry ${index + 1}`}
             rows={2}
             value={text}
