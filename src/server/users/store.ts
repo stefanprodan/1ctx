@@ -7,7 +7,7 @@ import type {
   UserAccount,
   UserSummary,
 } from "../../shared/contracts/user.ts";
-import type { Role } from "../../shared/words.ts";
+import { DEFAULT_TZ, type Role } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
@@ -23,6 +23,7 @@ type Raw = {
   email: string;
   about: string;
   role: Role;
+  tz: string;
   password_hash: string;
   created_at: number;
   disabled: number;
@@ -36,6 +37,7 @@ const row = (raw: Raw): UserRow => ({
   email: raw.email,
   about: raw.about,
   role: raw.role,
+  tz: raw.tz,
   passwordHash: raw.password_hash,
   createdAt: raw.created_at,
   disabled: raw.disabled !== 0,
@@ -57,6 +59,7 @@ export const meOf = (user: UserRow): Me => ({
 export const account = (user: UserRow): UserAccount => ({
   ...summary(user),
   email: user.email,
+  tz: user.tz,
   createdAt: user.createdAt,
   disabled: user.disabled,
   mustChangePassword: user.mustChangePassword,
@@ -117,6 +120,7 @@ export class UserStore {
     fullName: string;
     email: string;
     role: Role;
+    tz?: string;
     passwordHash: string;
     mustChangePassword: boolean;
     now: number;
@@ -125,9 +129,9 @@ export class UserStore {
     this.db
       .query(
         `insert into users
-          (id, username, full_name, email, role, password_hash,
+          (id, username, full_name, email, role, tz, password_hash,
            must_change_password, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -135,6 +139,7 @@ export class UserStore {
         fields.fullName,
         fields.email,
         fields.role,
+        fields.tz ?? DEFAULT_TZ,
         fields.passwordHash,
         fields.mustChangePassword ? 1 : 0,
         fields.now,
@@ -156,6 +161,10 @@ export class UserStore {
 
   setEmail(id: string, email: string): void {
     this.db.query("update users set email = ? where id = ?").run(email, id);
+  }
+
+  setTz(id: string, tz: string): void {
+    this.db.query("update users set tz = ? where id = ?").run(tz, id);
   }
 
   setRole(id: string, role: Role): void {

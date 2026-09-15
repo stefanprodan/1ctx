@@ -12,12 +12,12 @@ import type {
   SaveAgentRequest,
 } from "../../shared/api/agents.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const agents = signal<AgentSummary[] | null>(null);
-export const agentsError = signal<string | null>(null);
+export const agentsError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 
@@ -43,7 +43,7 @@ export async function loadAgents(): Promise<void> {
     const body = await api<AgentsResponse>("/api/agents");
     if (owner === forUser && turn === mine) agents.value = body.agents;
   } catch (err) {
-    if (owner === forUser && turn === mine) agentsError.value = reason(err);
+    if (owner === forUser && turn === mine) agentsError.value = failure(err);
   }
 }
 

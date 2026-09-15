@@ -4,8 +4,11 @@
 // The user's activity over up to a year, then their projects as one card of
 // rows, the personal one first, each row leading to its project with
 // its last two weeks on the chart's levels. An admin gets the link to
-// where teams are made. The aside is Home's: the week and the agents.
+// where teams are made. A search over the card narrows the rows by name,
+// in place, since the list is the rail's and already loaded. The aside is
+// Home's: the week and the agents.
 
+import { useSignal } from "@preact/signals";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
 import { AgentsAside } from "../../agents/AgentsAside.tsx";
@@ -22,13 +25,15 @@ import {
   RowsGo,
   RowsLink,
   RowsMeta,
+  RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { WeekAside } from "../home/WeekAside.tsx";
 import { activityModel } from "./Activity.model.ts";
 import { Activity } from "./Activity.tsx";
-import { peopleLine } from "./Project.model.ts";
+import { listedProjects, peopleLine } from "./Project.model.ts";
 import { Strip } from "./Strip.tsx";
 
 function ProjectRow({
@@ -61,10 +66,8 @@ function ProjectRow({
 
 export function Projects() {
   const list = projects.value;
-  const ordered = [
-    ...(list ?? []).filter((p) => p.kind === "personal"),
-    ...(list ?? []).filter((p) => p.kind === "team"),
-  ];
+  const q = useSignal("");
+  const shown = listedProjects(list ?? [], q.value);
   const admin = me.value?.role === "admin";
   const answer = days.value;
   const model = answer === null ? null : activityModel(answer);
@@ -89,13 +92,25 @@ export function Projects() {
           )}
           <RowsCard
             label="Projects"
+            search={
+              <Search
+                value={q.value}
+                onChange={(next) => {
+                  q.value = next;
+                }}
+                placeholder="Search projects"
+              />
+            }
             action={
               admin ? (
                 <RowsLink label="Manage" href="/admin/projects" />
               ) : undefined
             }
           >
-            {ordered.map((p) => (
+            {list !== null && shown.length === 0 && (
+              <RowsNote>No projects found</RowsNote>
+            )}
+            {shown.map((p) => (
               <ProjectRow
                 key={p.id}
                 project={p}

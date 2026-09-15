@@ -25,7 +25,7 @@ import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { RunFilter } from "../../shared/words.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure, reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { loadProject } from "./projects.ts";
@@ -34,7 +34,7 @@ import { onSocketEvent } from "./socket.ts";
 import { applyAutomationFrame } from "./stream.ts";
 
 export const automations = signal<AutomationSummary[] | null>(null);
-export const automationsError = signal<string | null>(null);
+export const automationsError = signal<Failure | null>(null);
 // the run deadline limit a row with no deadline runs under, in ms
 export const runDeadlineMs = signal<number | null>(null);
 // the runs of the automation on screen, newest first, under its
@@ -47,7 +47,7 @@ export type Runs = {
 };
 export const runs = signal<Runs | null>(null);
 // the automation page's own failure, a 404 for one gone or not ours
-export const automationError = signal<string | null>(null);
+export const automationError = signal<Failure | null>(null);
 // the project the automation on screen was found in, so the page tells
 // a row still loading from one deleted since
 export const automationProject = signal<{
@@ -164,7 +164,7 @@ export async function loadAutomations(projectId: string): Promise<void> {
     }
   } catch (err) {
     if (owner === forUser && listTurn === turn) {
-      automationsError.value = reason(err);
+      automationsError.value = failure(err);
     }
   }
 }
@@ -226,7 +226,7 @@ export async function loadAutomationPage(
     ({ automation: row } = await api<AutomationResponse>(path(id)));
   } catch (err) {
     if (owner === forUser && pageTurn === turn) {
-      automationError.value = reason(err);
+      automationError.value = failure(err);
     }
     return;
   }

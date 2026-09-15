@@ -4,11 +4,10 @@
 @layer tokens, base, owners;
 
 @layer owners {
+  /* the split's main column sets the width, as on Home */
   .profile {
     display: flex;
     flex-direction: column;
-    width: 760px;
-    max-width: 100%;
   }
 
   /* the one line a person who must change their password sees first */
@@ -63,6 +62,35 @@
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
+  }
+
+  /* a long email is cut to the aside's width */
+  .profile-email {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* shown only where the aside is hidden; 1100 is the split's width */
+  .profile-narrow {
+    display: none;
+  }
+  @media (max-width: 1099px) {
+    .profile-narrow {
+      display: block;
+    }
+  }
+
+  /* the handle in the brand colour, as the stream names an author */
+  .profile-handle {
+    color: var(--brand);
+  }
+
+  .profile-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
   }
 
   .profile-pair {

@@ -82,7 +82,7 @@ describe("the chat wire through the app", () => {
       now: 0,
     });
     const calls = [
-      { id: "c1", name: "get_current_time", arguments: '{"timezone":"UTC"}' },
+      { id: "c1", name: "datetime", arguments: '{"timezone":"UTC"}' },
     ];
     const toolRequest = {
       model: "org/model",
@@ -94,7 +94,7 @@ describe("the chat wire through the app", () => {
         { role: "tool" as const, toolCallId: "c1", content: "2026-09-13" },
       ],
       thinking: false,
-      tools: [{ name: "get_current_time", description: "d", parameters: {} }],
+      tools: [{ name: "datetime", description: "d", parameters: {} }],
       // the answer round forbids a call
       toolChoice: "none" as const,
     };
@@ -119,7 +119,7 @@ describe("the chat wire through the app", () => {
       {
         id: "c1",
         type: "function",
-        function: { name: "get_current_time", arguments: '{"timezone":"UTC"}' },
+        function: { name: "datetime", arguments: '{"timezone":"UTC"}' },
       },
     ]);
     const tool = body.messages.find((m: { role: string }) => m.role === "tool");

@@ -19,6 +19,7 @@ const caelea: Profile = {
   username: "caelea",
   fullName: "Oana",
   email: "caelea@example.com",
+  tz: "UTC",
   disabled: false,
   mustChangePassword: false,
   about: "",
@@ -75,7 +76,7 @@ describe("the profile entity", () => {
       mustChangePassword: false,
     };
     answer = () => caelea;
-    await saveProfile({ fullName: "Oana", about: "" });
+    await saveProfile({ fullName: "Oana", about: "", tz: "UTC" });
     expect(profile.value).toBeNull();
     expect(me.value?.id).toBe("u2");
   });

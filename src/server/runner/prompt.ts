@@ -55,9 +55,11 @@ function automationLine(
   return `This is a ${kind} run of the ${automation.name} automation, started at ${at} ${automation.tz}. You run autonomously. Do not ask questions. Do the task and stop.`;
 }
 
-function userLine(fullName: string, username: string, about: string): string {
-  const said = about.trim();
-  return `You talk to @${username} (${fullName})${said === "" ? "." : `: ${said}`}`;
+function userLine(
+  policy: Pick<SendPolicy, "fullName" | "username" | "about" | "tz">,
+): string {
+  const said = policy.about.trim();
+  return `You talk to @${policy.username} (${policy.fullName}), in the ${policy.tz} time zone${said === "" ? "." : `: ${said}`}`;
 }
 
 export function systemPrompt(
@@ -70,6 +72,7 @@ export function systemPrompt(
     | "fullName"
     | "username"
     | "about"
+    | "tz"
     | "automation"
     | "offered"
   >,
@@ -80,7 +83,7 @@ export function systemPrompt(
   const context = [
     projectLine(policy),
     policy.automation === null
-      ? userLine(policy.fullName, policy.username, policy.about)
+      ? userLine(policy)
       : automationLine(policy.automation),
   ];
   parts.push(context.join("\n"));

@@ -3,7 +3,7 @@
 //
 // The tool loop as a state machine, driven through the composed app: the
 // scripted provider streams a round's calls in the OpenAI shape, the real
-// tools area runs them (the time tool with no network, the search tools
+// tools area runs them (the datetime tool with no network, the search tools
 // through the fake fetch that fails every host but the provider's), and
 // the runner drives round after round to the answer. Every assertion is
 // on the rows the server wrote and the send it ended: the slot per reply,
@@ -78,7 +78,7 @@ function answerNodes(chat: ChatApp, sessionId: string) {
 
 const time = (id: string, tz = "UTC") => ({
   id,
-  name: "get_current_time",
+  name: "datetime",
   arguments: JSON.stringify({ timezone: tz }),
 });
 
@@ -194,14 +194,14 @@ describe("the tool loop", () => {
         round: 1,
         status: "done",
         toolName: null,
-        calls: ["get_current_time"],
+        calls: ["datetime"],
       },
       {
         kind: "tool",
         slot: null,
         round: 1,
         status: "done",
-        toolName: "get_current_time",
+        toolName: "datetime",
         calls: null,
       },
       {
@@ -214,7 +214,7 @@ describe("the tool loop", () => {
       },
     ]);
     const toolRow = chat.app.sessions.messages(sessionId)[2]!;
-    // the time tool answers a JSON object with the timezone it was asked
+    // the datetime tool answers a JSON object with the timezone it was asked
     expect(toolRow.content).toContain("UTC");
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send).toMatchObject({
@@ -254,14 +254,14 @@ describe("the tool loop", () => {
         round: 1,
         status: "done",
         toolName: null,
-        calls: ["get_current_time"],
+        calls: ["datetime"],
       },
       {
         kind: "tool",
         slot: null,
         round: 1,
         status: "done",
-        toolName: "get_current_time",
+        toolName: "datetime",
         calls: null,
       },
       {
@@ -270,14 +270,14 @@ describe("the tool loop", () => {
         round: 2,
         status: "done",
         toolName: null,
-        calls: ["get_current_time"],
+        calls: ["datetime"],
       },
       {
         kind: "tool",
         slot: null,
         round: 2,
         status: "done",
-        toolName: "get_current_time",
+        toolName: "datetime",
         calls: null,
       },
       {
@@ -360,9 +360,7 @@ describe("the tool loop", () => {
     const chat = await chatApp();
     const { sessionId } = await startChat(chat, "bad args");
     const script = chat.scripted.scripts[0];
-    script.toolRound([
-      { id: "c1", name: "get_current_time", arguments: "{not json" },
-    ]);
+    script.toolRound([{ id: "c1", name: "datetime", arguments: "{not json" }]);
     script.end();
     const r2 = await chat.scripted.next();
     r2.reply("ok");
@@ -566,7 +564,7 @@ describe("the tool loop", () => {
     const tools = (script.body.tools as { function: { name: string } }[]).map(
       (t) => t.function.name,
     );
-    expect(tools).toContain("get_current_time");
+    expect(tools).toContain("datetime");
     expect(tools).toContain("webfetch");
     expect(tools).not.toContain("websearch");
     script.reply("no search offered");

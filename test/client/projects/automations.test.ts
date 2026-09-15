@@ -17,6 +17,7 @@ import {
 import { me } from "../../../src/client/data/me.ts";
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
+import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
 import {
   canChange,
   type Draft,
@@ -34,7 +35,6 @@ import {
   scheduleWords,
   sourceText,
   suspendedText,
-  zoneOptions,
 } from "../../../src/client/views/projects/Automations.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
@@ -281,18 +281,23 @@ describe("the form", () => {
   test("only emptiness and the numbers' shape are refused here", () => {
     expect(requestOf(filled({ name: " " }), LIMIT)).toEqual({
       problem: "Name is empty",
+      field: "name",
     });
     expect(requestOf(filled({ agentId: "" }), LIMIT)).toEqual({
       problem: "Pick an agent",
+      field: "agent",
     });
     expect(requestOf(filled({ schedule: "" }), LIMIT)).toEqual({
       problem: "The schedule is not complete",
+      field: "schedule",
     });
     expect(requestOf(filled({ deadline: "ten" }), LIMIT)).toEqual({
       problem: "Deadline needs a number of minutes",
+      field: "deadline",
     });
     expect(requestOf(filled({ retention: "" }), LIMIT)).toEqual({
       problem: "History retention needs whole days",
+      field: "retention",
     });
     // out of range is the server's word
     expect("body" in requestOf(filled({ retention: "9999" }), LIMIT)).toBe(

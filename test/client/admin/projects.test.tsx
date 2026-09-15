@@ -54,6 +54,7 @@ const admin: Me = {
 const root: UserAccount = {
   ...admin,
   email: "admin@1ctx.dev",
+  tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
 };
@@ -63,6 +64,7 @@ const caelea: UserAccount = {
   fullName: "Oana Mangiurea",
   role: "member",
   email: "caelea@example.com",
+  tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: false,
@@ -214,7 +216,7 @@ describe("the entity", () => {
         await createProject({ name: "personal" });
       });
       await save.run(nameProblem("personal"));
-      expect(save.status.value).toEqual({ error });
+      expect(save.status.value).toEqual({ error, status });
       save.dispose();
     }
     expect(adminProject.value).toBeNull();

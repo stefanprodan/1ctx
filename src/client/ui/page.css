@@ -131,9 +131,59 @@
     color: var(--faint);
   }
 
+  /* a page whose load failed: one card in the content column, the
+     failure's words and the way out */
+  .page-failed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-3);
+    max-width: 640px;
+    padding: var(--space-4);
+    border: 1px solid var(--failed-line);
+    border-radius: var(--radius-card);
+    background: var(--failed-wash);
+  }
+  .page-failed-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--failed);
+  }
+  .page-failed-words {
+    display: flex;
+    flex: 1 1 240px;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .page-failed-retry {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .page-failed-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-body);
+    color: var(--fg);
+  }
+  .page-failed-text {
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    color: var(--dim);
+  }
+
   /* below 720 the rail's button floats on this row, 32px tall: the
      crumb takes its height to centre on it */
   @media (max-width: 719px) {
+    /* the button drops under the words, lined up with them */
+    .page-failed-retry {
+      flex-basis: auto;
+      margin-left: calc(20px + var(--space-3));
+    }
     .page-crumb {
       line-height: 32px;
     }

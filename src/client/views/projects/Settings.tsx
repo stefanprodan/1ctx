@@ -17,18 +17,21 @@ import { DescriptionField } from "./ProjectFields.tsx";
 
 function SettingsForm({ project }: { project: ProjectDetail }) {
   const description = useSignal(project.description);
-  const save = useSave(() =>
-    savePersonalProject({ description: description.value.trim() }),
+  const save = useSave(
+    () => savePersonalProject({ description: description.value.trim() }),
+    (message) =>
+      message.startsWith("description") ? "description" : undefined,
   );
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(null);
   };
-  const busy = save.status.value === "busy";
+  const busy = save.busy;
   return (
     <SectionForm onSubmit={submit}>
       <DescriptionField
         disabled={busy}
+        error={save.fieldError("description")}
         value={description.value}
         onInput={(value) => {
           description.value = value;
@@ -36,7 +39,7 @@ function SettingsForm({ project }: { project: ProjectDetail }) {
         }}
       />
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={description.value.trim() !== project.description}
         label="Save"
       />

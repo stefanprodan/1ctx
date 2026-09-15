@@ -146,7 +146,7 @@ const call = (
   args: Record<string, unknown> = { timezone: "UTC" },
 ) => ({
   id,
-  name: "get_current_time",
+  name: "datetime",
   arguments: JSON.stringify(args),
 });
 
@@ -187,7 +187,7 @@ type FakeToolsCap = {
 function fakeTools(plans: Record<string, ToolPlan>): { tools: FakeToolsCap } {
   const schemas: Offered["tools"] = [
     {
-      name: "get_current_time",
+      name: "datetime",
       description: "the current time",
       parameters: { type: "object", properties: {} },
     },
@@ -531,7 +531,7 @@ describe("socket fixtures", () => {
     script.toolCall({
       index: 0,
       id: "c1",
-      name: "get_current_time",
+      name: "datetime",
       arguments: "{not json",
     });
     script.finish("tool_calls");
@@ -590,13 +590,13 @@ describe("socket fixtures", () => {
     script.toolCall({
       index: 0,
       id: "dup",
-      name: "get_current_time",
+      name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
     script.toolCall({
       index: 1,
       id: "dup",
-      name: "get_current_time",
+      name: "datetime",
       arguments: '{"timezone":"Asia/Tokyo"}',
     });
     script.finish("tool_calls");

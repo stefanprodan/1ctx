@@ -15,12 +15,12 @@ import type {
   UsersResponse,
 } from "../../shared/api/users.ts";
 import type { UserAccount } from "../../shared/contracts/user.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const users = signal<UserAccount[] | null>(null);
-export const usersError = signal<string | null>(null);
+export const usersError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 
@@ -51,7 +51,7 @@ export async function loadUsers(): Promise<void> {
     const body = await api<UsersResponse>("/api/users");
     if (owner === forUser && turn === mine) users.value = body.users;
   } catch (err) {
-    if (owner === forUser && turn === mine) usersError.value = reason(err);
+    if (owner === forUser && turn === mine) usersError.value = failure(err);
   }
 }
 

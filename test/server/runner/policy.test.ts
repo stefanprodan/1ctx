@@ -18,6 +18,7 @@ const user: UserRow = {
   username: "ana",
   fullName: "Ana",
   email: "ana@example.com",
+  tz: "UTC",
   about: "",
   role: "member",
   passwordHash: "hash",

@@ -24,9 +24,11 @@ import { skills as skillRows } from "../../data/skills.ts";
 import { limits } from "../../data/tools.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
-import { useSave } from "../../lib/save.ts";
+import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import {
+  agentFieldOf,
   type Choice,
   compactLine,
   effortApplies,
@@ -41,7 +43,6 @@ import {
 import { CatalogSearch } from "./Agents.state.ts";
 import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
-import { reason } from "../../lib/format.ts";
 import { shapedInput } from "../../lib/names.ts";
 
 // one catalog line: the name over the id, the rest faint at the right
@@ -116,7 +117,6 @@ export function AgentForm({
       : pickedSkills.value.filter((id) => rows.some((s) => s.id === id));
   };
   const asking = useSignal(false);
-  const failure = useSignal<string | null>(null);
   const search = useRef<CatalogSearch | null>(null);
   if (search.current === null) {
     search.current = new CatalogSearch((q) =>
@@ -169,7 +169,10 @@ export function AgentForm({
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
     onDone();
-  });
+  }, agentFieldOf);
+  const form = useRef<HTMLFormElement>(null);
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const pick = (m: CatalogMatch) => {
     model.value = m;
     s.clear();
@@ -198,21 +201,17 @@ export function AgentForm({
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
-      nameProblem(name.value) ??
-        (providerId.value === "" ? "Add a provider first" : null) ??
-        (model.value === null ? "Pick a model" : null),
+      at("name", nameProblem(name.value)) ??
+        at(
+          "provider",
+          providerId.value === "" ? "Add a provider first" : null,
+        ) ??
+        at("model", model.value === null ? "Pick a model" : null),
     );
   };
-  const remove = async () => {
-    failure.value = null;
-    try {
-      await deleteAgent(agent!.id);
-    } catch (err) {
-      failure.value = reason(err);
-    }
-  };
+  const remove = () => save.act("delete", () => deleteAgent(agent!.id));
   const picked = model.value;
-  const busy = save.status.value === "busy";
+  const busy = save.busy;
   const chosen = chosenSkills();
   const toggleSkill = (id: string) => {
     pickedSkills.value = chosen.includes(id)
@@ -225,7 +224,7 @@ export function AgentForm({
       ? ""
       : compactLine(picked.contextLength, reserveOf(limits.value));
   return (
-    <form class="agents-form" onSubmit={submit}>
+    <form class="agents-form" ref={form} onSubmit={submit}>
       <div class="agents-fields">
         <label class="field">
           <span class="label label-required">Name</span>
@@ -235,6 +234,7 @@ export function AgentForm({
             autocomplete="off"
             spellcheck={false}
             placeholder="coder"
+            aria-invalid={invalid("name") || undefined}
             disabled={busy}
             value={name.value}
             onInput={(e) => {
@@ -242,6 +242,7 @@ export function AgentForm({
               save.touch();
             }}
           />
+          <FieldError save={save} field="name" />
         </label>
         <div class="field">
           <span class="label">Avatar</span>
@@ -271,6 +272,7 @@ export function AgentForm({
               <button
                 key={p.id}
                 type="button"
+                name="provider"
                 aria-pressed={providerId.value === p.id}
                 disabled={busy}
                 class={`agents-pick${providerId.value === p.id ? " agents-pick-on" : ""}`}
@@ -280,6 +282,7 @@ export function AgentForm({
               </button>
             ))}
           </div>
+          <FieldError save={save} field="provider" />
         </div>
         <div class="field agents-field-wide">
           <span class="label label-required">Model</span>
@@ -313,6 +316,7 @@ export function AgentForm({
                 class="agents-search-input"
                 autocomplete="off"
                 spellcheck={false}
+                aria-invalid={invalid("model") || undefined}
                 disabled={busy || providerId.value === ""}
                 placeholder="Type part of the model's name or id"
                 value={s.query.value}
@@ -344,6 +348,7 @@ export function AgentForm({
               )}
             </div>
           )}
+          <FieldError save={save} field="model" />
         </div>
         {picked && (
           <div class="field">
@@ -396,6 +401,7 @@ export function AgentForm({
             class="agents-prompt"
             rows={5}
             spellcheck={false}
+            aria-invalid={invalid("prompt") || undefined}
             disabled={busy}
             placeholder="What the agent is and how it works. Empty runs the model as it comes."
             value={prompt.value}
@@ -404,6 +410,7 @@ export function AgentForm({
               save.touch();
             }}
           />
+          <FieldError save={save} field="prompt" />
         </label>
         <SkillPicker
           available={skillRows.value}
@@ -413,7 +420,7 @@ export function AgentForm({
         />
       </div>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={dirty}
         label={agent ? "Save" : "Add agent"}
         start={
@@ -421,27 +428,26 @@ export function AgentForm({
             <span />
           ) : asking.value ? (
             <>
-              <span class="agents-ask">Delete {agent.name}?</span>
+              <span class="agents-ask-words">Delete {agent.name}?</span>
               <button
                 type="button"
                 class="btn btn-danger"
+                disabled={busy}
                 onClick={() => void remove()}
               >
-                Delete
+                {save.pending.value === "delete" ? "Deleting" : "Delete"}
               </button>
               <button
                 type="button"
                 class="btn"
+                disabled={busy}
                 onClick={() => {
                   asking.value = false;
-                  failure.value = null;
+                  save.touch();
                 }}
               >
                 Keep
               </button>
-              {failure.value && (
-                <span class="agents-note error">{failure.value}</span>
-              )}
             </>
           ) : (
             <button

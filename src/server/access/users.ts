@@ -30,6 +30,7 @@ export type UsersPort = {
   setUsername(id: string, username: string): void;
   setEmail(id: string, email: string): void;
   setRole(id: string, role: Role): void;
+  setTz(id: string, tz: string): void;
   setDisabled(id: string, disabled: boolean): void;
   setMustChangePassword(id: string, required: boolean): void;
   setPasswordHash(id: string, hash: string): void;
@@ -90,6 +91,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
               fullName: parsed.fullName,
               email: parsed.email,
               role: parsed.role,
+              tz: parsed.tz,
               passwordHash,
               mustChangePassword: true,
               now: deps.clock(),
@@ -128,6 +130,9 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
               fullName: patch.fullName,
               about: user.about,
             });
+          }
+          if (patch.tz !== undefined && patch.tz !== user.tz) {
+            deps.users.setTz(user.id, patch.tz);
           }
           const roleChanged =
             patch.role !== undefined && patch.role !== user.role;

@@ -148,25 +148,34 @@ describe("parseEmail", () => {
 });
 
 describe("parseProfile", () => {
-  test("accepts a full name and an about text", () => {
-    expect(
-      parseProfile({ fullName: "Oana Mangiurea", about: "Actor.\nBucharest." }),
-    ).toEqual({ fullName: "Oana Mangiurea", about: "Actor.\nBucharest." });
+  test("accepts a full name, an about text and a zone", () => {
+    const body = {
+      fullName: "Oana Mangiurea",
+      about: "Actor.\nBucharest.",
+      tz: "Europe/Bucharest",
+    };
+    expect(parseProfile(body)).toEqual(body);
+    expect(parseProfile({ ...body, tz: "UTC" }).tz).toBe("UTC");
   });
 
   refuses(
     [
       {},
       { fullName: "Oana" },
-      { fullName: "", about: "" },
-      { fullName: " Oana", about: "" },
-      { fullName: "Oana\nP", about: "" },
-      { fullName: "Oana\u2028P", about: "" },
-      { fullName: "a".repeat(65), about: "" },
-      { fullName: "Oana", about: "", username: "caelea" },
-      { fullName: 1, about: "" },
-      { fullName: "Oana", about: 1 },
-      { fullName: "Oana", about: "a".repeat(2001) },
+      { fullName: "Oana", about: "" },
+      { fullName: "Oana", about: "", tz: "" },
+      { fullName: "Oana", about: "", tz: "Mars/Olympus" },
+      { fullName: "Oana", about: "", tz: 3 },
+      { fullName: "Oana", about: "", tz: "a".repeat(65) },
+      { fullName: "", about: "", tz: "UTC" },
+      { fullName: " Oana", about: "", tz: "UTC" },
+      { fullName: "Oana\nP", about: "", tz: "UTC" },
+      { fullName: "Oana\u2028P", about: "", tz: "UTC" },
+      { fullName: "a".repeat(65), about: "", tz: "UTC" },
+      { fullName: "Oana", about: "", tz: "UTC", username: "caelea" },
+      { fullName: 1, about: "", tz: "UTC" },
+      { fullName: "Oana", about: 1, tz: "UTC" },
+      { fullName: "Oana", about: "a".repeat(2001), tz: "UTC" },
     ],
     parseProfile,
   );
@@ -200,6 +209,7 @@ describe("parseNewUser", () => {
     fullName: "Oana Mangiurea",
     email: "CAELEA@EXAMPLE.COM",
     role: "member" as const,
+    tz: "Europe/Bucharest",
     password: "longenough",
   };
 
@@ -217,6 +227,8 @@ describe("parseNewUser", () => {
       { ...body, fullName: undefined },
       { ...body, email: "a@b" },
       { ...body, role: "owner" },
+      { ...body, tz: undefined },
+      { ...body, tz: "Mars/Olympus" },
       { ...body, password: "short" },
       { ...body, extra: true },
     ],
@@ -234,12 +246,14 @@ describe("parseUserPatch", () => {
         fullName: "Maria Popescu",
         email: "MARIA@EXAMPLE.COM",
         role: "admin",
+        tz: "Asia/Tokyo",
         disabled: true,
       }),
     ).toEqual({
       fullName: "Maria Popescu",
       email: "maria@example.com",
       role: "admin",
+      tz: "Asia/Tokyo",
       disabled: true,
     });
   });
@@ -251,6 +265,8 @@ describe("parseUserPatch", () => {
       { fullName: "" },
       { email: "a@b" },
       { role: "owner" },
+      { tz: "" },
+      { tz: "Mars/Olympus" },
       { disabled: 1 },
       { disabled: "true" },
       { disabled: null },

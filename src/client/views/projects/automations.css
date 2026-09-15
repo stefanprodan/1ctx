@@ -256,6 +256,16 @@
   .automations-task:focus-within {
     border-color: var(--line-strong);
   }
+  .automations-task-invalid,
+  .automations-task-invalid:focus-within {
+    border-color: var(--failed);
+  }
+  /* a box and the refusal under it */
+  .automations-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
   .automations-task .automations-task-text {
     padding: var(--space-1) 0;
     border: 0;

@@ -56,3 +56,11 @@ export function candidateNote(user: UserAccount): string {
   if (user.disabled) return "disabled";
   return user.role === "admin" ? "admin" : "";
 }
+
+// which field a refusal of the project routes names; the rest, a running
+// chat or a member already there, is the form's
+export function projectFieldOf(message: string): string | undefined {
+  if (message.startsWith("name")) return "name";
+  if (message.startsWith("description")) return "description";
+  return undefined;
+}

@@ -279,7 +279,7 @@ describe("the entities", () => {
   test("a refusal is the error shown, and the search asks the server", async () => {
     answer = () => Response.json({ error: "forbidden" }, { status: 403 });
     await loadProviders();
-    expect(providersError.value).toBe("forbidden");
+    expect(providersError.value).toEqual({ words: "forbidden", status: 403 });
     let asked = "";
     answer = (url) => {
       asked = url;

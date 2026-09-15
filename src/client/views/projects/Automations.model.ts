@@ -13,8 +13,6 @@ import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
-import { placeOf } from "../../lib/places.ts";
-import type { Option } from "../../ui/Select.model.ts";
 import { daysOf, fieldsOf, WEEK } from "./Schedule.model.ts";
 
 const whole = (field: string, max: number): number | null => {
@@ -194,45 +192,6 @@ export function canChange(
   return a.ownerId === user.id || (kind === "team" && user.role === "admin");
 }
 
-// the offset a zone is at now, "GMT+3", "GMT-4", "GMT"; empty when the
-// runtime cannot say
-export function offsetOf(tz: string, now: number): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      timeZoneName: "shortOffset",
-    }).formatToParts(now);
-    const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
-    // runtimes differ on zero: Bun says GMT+0 where Chrome says GMT
-    return name === "GMT+0" ? "GMT" : name;
-  } catch {
-    return "";
-  }
-}
-
-// the zone picker's options: every zone the runtime lists with its
-// offset now and its country, matched by its cities too, and the row's
-// own zone when the list leaves it out, since the server takes links
-// such as UTC
-export function zoneOptions(
-  zones: string[],
-  current: string,
-  now: number,
-): Option[] {
-  const names =
-    zones.includes(current) || current === "" ? zones : [current, ...zones];
-  return names.map((tz) => {
-    const place = placeOf(tz);
-    const country = place?.countries.join(", ") ?? "";
-    return {
-      value: tz,
-      label: tz,
-      detail: [offsetOf(tz, now), country].filter(Boolean).join(" · "),
-      keywords: place?.cities ?? "",
-    };
-  });
-}
-
 export type Draft = {
   name: string;
   agentId: string;
@@ -294,27 +253,59 @@ export function followDeadlineLimit(
 
 // the body a save sends, or the first problem. Only emptiness and the
 // numbers' shape are checked here; every rule is the server's
+// the editor's fields, by the name each control carries
+export type AutomationField =
+  | "name"
+  | "agent"
+  | "instructions"
+  | "schedule"
+  | "tz"
+  | "deadline"
+  | "retention";
+
+// which field a server refusal of the automation routes names; a cap on
+// the project or a run still going is the form's
+export function automationFieldOf(
+  message: string,
+): AutomationField | undefined {
+  if (message === "invalid name" || message === "name is taken") return "name";
+  if (message === "no such agent") return "agent";
+  if (message.startsWith("instructions")) return "instructions";
+  if (message.includes("schedule")) return "schedule";
+  if (message.includes("time zone")) return "tz";
+  if (message.startsWith("deadlineMs")) return "deadline";
+  if (message.startsWith("retention")) return "retention";
+  return undefined;
+}
+
 export function requestOf(
   d: Draft,
   limitMs: number,
-): { body: SaveAutomationRequest } | { problem: string } {
+):
+  | { body: SaveAutomationRequest }
+  | { problem: string; field: AutomationField } {
   const name = d.name.trim();
   const instructions = d.instructions.trim();
   const schedule = d.schedule.trim();
   const tz = d.tz.trim();
-  if (name === "") return { problem: "Name is empty" };
-  if (d.agentId === "") return { problem: "Pick an agent" };
-  if (instructions === "") return { problem: "Instructions are empty" };
-  if (schedule === "") return { problem: "The schedule is not complete" };
-  if (tz === "") return { problem: "Pick a time zone" };
+  if (name === "") return { problem: "Name is empty", field: "name" };
+  if (d.agentId === "") return { problem: "Pick an agent", field: "agent" };
+  if (instructions === "")
+    return { problem: "Instructions are empty", field: "instructions" };
+  if (schedule === "")
+    return { problem: "The schedule is not complete", field: "schedule" };
+  if (tz === "") return { problem: "Pick a time zone", field: "tz" };
   const minutes = d.deadline.trim();
   if (minutes !== "" && !/^\d+(\.\d+)?$/.test(minutes)) {
-    return { problem: "Deadline needs a number of minutes" };
+    return { problem: "Deadline needs a number of minutes", field: "deadline" };
   }
   const ms = minutes === "" ? null : Math.round(Number(minutes) * 60_000);
   const days = d.retention.trim();
   if (!/^\d+$/.test(days)) {
-    return { problem: "History retention needs whole days" };
+    return {
+      problem: "History retention needs whole days",
+      field: "retention",
+    };
   }
   return {
     body: {

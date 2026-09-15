@@ -18,6 +18,8 @@ export type Me = UserSummary & { mustChangePassword: boolean };
 
 export type UserAccount = UserSummary & {
   email: string;
+  // the IANA zone the user lives in, named to the agent
+  tz: string;
   createdAt: number;
   disabled: boolean;
   mustChangePassword: boolean;

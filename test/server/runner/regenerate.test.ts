@@ -10,7 +10,7 @@ import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
 
 const timeCall = {
   id: "time-1",
-  name: "get_current_time",
+  name: "datetime",
   arguments: '{"timezone":"UTC"}',
 };
 

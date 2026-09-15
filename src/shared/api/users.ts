@@ -11,6 +11,7 @@ export type CreateUserRequest = {
   fullName: string;
   email: string;
   role: Role;
+  tz: string;
   password: string;
 };
 export type UpdateUserRequest = {
@@ -18,6 +19,7 @@ export type UpdateUserRequest = {
   fullName?: string;
   email?: string;
   role?: Role;
+  tz?: string;
   disabled?: boolean;
 };
 export type ResetPasswordRequest = { password: string };

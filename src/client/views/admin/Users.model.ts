@@ -5,6 +5,7 @@
 // an empty field, a malformed email and a mistyped password, caught
 // without a round trip. The username rule is the server's alone.
 
+import type { UpdateUserRequest } from "../../../shared/api/users.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import {
   isEmail,
@@ -14,6 +15,7 @@ import {
   type Role,
 } from "../../../shared/words.ts";
 import { longDate } from "../../lib/format.ts";
+import type { Problem } from "../../lib/save.ts";
 
 export { fullNameProblem } from "../profile/Profile.model.ts";
 
@@ -45,6 +47,11 @@ export function emailProblem(value: string): string | null {
   return null;
 }
 
+// a new user's zone is picked, never guessed from the admin's browser
+export function tzProblem(value: string): string | null {
+  return value === "" ? "Pick a time zone" : null;
+}
+
 // a first password, or a reset: typed twice, since nobody sees it
 export function newPasswordProblem(next: string, again: string): string | null {
   if (next.length < MIN_PASSWORD)
@@ -53,6 +60,40 @@ export function newPasswordProblem(next: string, again: string): string | null {
     return `The password needs at most ${MAX_PASSWORD_BYTES} bytes`;
   if (again !== next) return "The two passwords differ";
   return null;
+}
+
+// the same checks pinned to the field to fix: a mismatch is the second
+// box, anything else the first
+export function newPasswordFieldProblem(
+  next: string,
+  again: string,
+  names: { next: string; again: string },
+): Problem | null {
+  const error = newPasswordProblem(next, again);
+  if (error === null) return null;
+  return { error, field: error.includes("differ") ? names.again : names.next };
+}
+
+// the fields of the user form, by the name each control carries
+export type UserField =
+  | "username"
+  | "fullName"
+  | "email"
+  | "tz"
+  | "role"
+  | "password";
+
+// which field a server refusal of the user routes names; the words are
+// the parsers' and the conflicts' in access/
+export function userFieldOf(message: string): UserField | undefined {
+  const m = message.toLowerCase();
+  if (m.startsWith("username")) return "username";
+  if (m.startsWith("full name")) return "fullName";
+  if (m.startsWith("email")) return "email";
+  if (m.startsWith("time zone")) return "tz";
+  if (m.startsWith("role") || m.includes("own role")) return "role";
+  if (m.startsWith("password")) return "password";
+  return undefined;
 }
 
 // "@oana · oana@example.com"
@@ -116,19 +157,15 @@ export function adminCount(users: UserAccount[]): number {
 // and null when nothing did
 export function patchOf(
   user: UserAccount,
-  fields: { username: string; fullName: string; email: string; role: Role },
-): {
-  username?: string;
-  fullName?: string;
-  email?: string;
-  role?: Role;
-} | null {
-  const body: {
-    username?: string;
-    fullName?: string;
-    email?: string;
-    role?: Role;
-  } = {};
+  fields: {
+    username: string;
+    fullName: string;
+    email: string;
+    role: Role;
+    tz: string;
+  },
+): UpdateUserRequest | null {
+  const body: UpdateUserRequest = {};
   const username = fields.username.trim();
   const fullName = fields.fullName.trim();
   const email = fields.email.trim().toLowerCase();
@@ -136,5 +173,6 @@ export function patchOf(
   if (fullName !== user.fullName) body.fullName = fullName;
   if (email !== user.email) body.email = email;
   if (fields.role !== user.role) body.role = fields.role;
+  if (fields.tz !== user.tz) body.tz = fields.tz;
   return Object.keys(body).length === 0 ? null : body;
 }

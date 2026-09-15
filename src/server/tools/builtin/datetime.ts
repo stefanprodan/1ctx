@@ -1,18 +1,19 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The clock the tools and the runner share, formatted in a timezone.
-// The runner imports dateLine to show the date line it sends.
+// The datetime tool, shaped like OpenRouter's server tool of the same
+// name: an optional IANA timezone, UTC when left out, so the answer
+// never depends on where the binary runs.
 
 import type { ToolContext } from "../types.ts";
 
-export type CurrentTime = {
+export type Datetime = {
   timezone: string;
   datetime: string;
   day_of_week: string;
 };
 
-export const HOST_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const DEFAULT_TIMEZONE = "UTC";
 
 function part(
   parts: Intl.DateTimeFormatPart[],
@@ -21,10 +22,7 @@ function part(
   return parts.find((item) => item.type === type)?.value ?? "";
 }
 
-export function formatCurrentTime(
-  epochMs: number,
-  timezone: string,
-): CurrentTime {
+export function formatDatetime(epochMs: number, timezone: string): Datetime {
   let parts: Intl.DateTimeFormatPart[];
   try {
     parts = new Intl.DateTimeFormat("en-US", {
@@ -51,34 +49,32 @@ export function formatCurrentTime(
   };
 }
 
-// the line the runner appends to the system prompt while a tool is on
-export function dateLine(epochMs: number, timezone: string): string {
-  const date = formatCurrentTime(epochMs, timezone);
-  return `Today's date: ${date.day_of_week}, ${date.datetime.slice(0, 10)}`;
-}
-
+// a model often sends null or an empty string for an optional field
 function timezone(args: Record<string, unknown>): string {
-  if (typeof args.timezone !== "string" || args.timezone === "") {
-    throw new Error("timezone must be a non-empty string");
+  const value = args.timezone;
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_TIMEZONE;
   }
-  return args.timezone;
+  if (typeof value !== "string") throw new Error("timezone must be a string");
+  return value;
 }
 
-export const timeTool = {
-  name: "get_current_time",
-  description: "Get the current time in a specific timezone.",
+export const datetimeTool = {
+  name: "datetime",
+  description: "Get the current date and time.",
   parameters: {
     type: "object",
     properties: {
       timezone: {
         type: "string",
-        description: `IANA timezone name. Use ${HOST_TIMEZONE} when the user did not specify one.`,
+        description:
+          "IANA timezone name (e.g. America/New_York, Europe/London, Asia/Tokyo)",
+        default: DEFAULT_TIMEZONE,
       },
     },
-    required: ["timezone"],
     additionalProperties: false,
   },
   async run(args: Record<string, unknown>, ctx: ToolContext): Promise<string> {
-    return JSON.stringify(formatCurrentTime(ctx.now(), timezone(args)));
+    return JSON.stringify(formatDatetime(ctx.now(), timezone(args)));
   },
 };

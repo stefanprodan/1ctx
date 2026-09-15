@@ -63,6 +63,7 @@ describe("Profile", () => {
       username: "caelea",
       fullName: "Oana Mangiurea",
       email: "caelea@example.com",
+      tz: "Europe/Bucharest",
       disabled: false,
       mustChangePassword: false,
       about: "Actor.",
@@ -74,10 +75,15 @@ describe("Profile", () => {
     expect(html).toContain('class="profile-avatar">OM<');
     expect(html).toContain("@caelea");
     expect(html).toContain('class="section"');
+    expect(html).toContain('class="split-aside"');
+    expect(html).toContain(">Account<");
+    expect(html).toContain(">caelea@example.com<");
+    expect(html).toContain(">Member<");
     expect(html).toContain("12 September 2026");
     expect(html).toContain('autocomplete="name"');
     expect(html).toContain('name="about"');
     expect(html).toContain(">Actor.</textarea>");
+    expect(html).toContain("Europe/Bucharest");
     expect(html).toContain('autocomplete="new-password"');
     expect(html).toContain("Change password");
   });
@@ -88,6 +94,7 @@ describe("Profile", () => {
       username: "caelea",
       fullName: "Oana Mangiurea",
       email: "caelea@example.com",
+      tz: "Europe/Bucharest",
       disabled: false,
       mustChangePassword: true,
       about: "",

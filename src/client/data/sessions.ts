@@ -26,7 +26,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure, reason } from "../lib/format.ts";
 import {
   applyDelta,
   applyHtml,
@@ -48,7 +48,7 @@ export { type ListFilter, list, loadList } from "./stream.ts";
 export const BUFFER_MAX = 256;
 
 export const session = signal<SessionDetail | null>(null);
-export const sessionError = signal<string | null>(null);
+export const sessionError = signal<Failure | null>(null);
 // the replies streaming on the chat on screen, by message id
 export const live = signal<ReadonlyMap<string, Live>>(new Map());
 // the stream's rows for the filter last asked for: Home's, every
@@ -144,7 +144,7 @@ export async function loadSession(id: string): Promise<void> {
     pending = { buffer: [], overflow: false };
     watch(id);
   } catch (err) {
-    if (wanted.turn === turn) sessionError.value = reason(err);
+    if (wanted.turn === turn) sessionError.value = failure(err);
   }
 }
 

@@ -4,12 +4,15 @@
 // The head of a view and its states in one place: a label over the
 // title, or a crumb with the title on one line for a page whose title
 // is a noun, actions on the right, then either the content, a loading
-// line, an empty line or an error. A view composes this, never
-// restyles it.
+// line, an empty line or the page's failure: what failed, the words, and
+// Try again. A view composes this, never restyles it.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
+import type { Failure } from "../lib/format.ts";
+import { Icon } from "../lib/icons.tsx";
+import { sentence } from "../lib/save.ts";
 import { scrollParent } from "../lib/scroll.ts";
 import "./page.css";
 
@@ -42,7 +45,8 @@ export function Page({
   actions?: ComponentChildren;
   loading?: boolean;
   empty?: string;
-  error?: string | null;
+  // the load's failure, or a view's own words for why there is nothing
+  error?: Failure | string | null;
   // the view has a foot stuck to the bottom and spends the inset there
   flush?: boolean;
   children?: ComponentChildren;
@@ -51,6 +55,12 @@ export function Page({
   // with a menu the row is no heading: the menu's items would read as
   // the page's title
   const Crumb = menu === undefined ? "h1" : "div";
+  const failed: Failure | null =
+    typeof error === "string"
+      ? error === ""
+        ? null
+        : { words: error, status: null }
+      : (error ?? null);
   // content has scrolled under the head: it casts its shadow
   const stuck = useSignal(false);
   useEffect(() => {
@@ -99,8 +109,28 @@ export function Page({
         {aside && <div class="page-aside">{aside}</div>}
         {actions && <div class="page-actions">{actions}</div>}
       </div>
-      {error ? (
-        <p class="page-state error">{error}</p>
+      {failed ? (
+        <div class="page-failed" role="alert">
+          <Icon name="alert" size={20} class="page-failed-icon" />
+          <div class="page-failed-words">
+            <p class="page-failed-title">
+              This page did not load
+              {failed.status !== null && (
+                <span class="code-tag">HTTP {failed.status}</span>
+              )}
+            </p>
+            <p class="page-failed-text">{sentence(failed.words)}</p>
+          </div>
+          {/* A full reload runs the route's load again, and the shell's
+              with it, which is what a failed first answer needs. */}
+          <button
+            type="button"
+            class="btn page-failed-retry"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </button>
+        </div>
       ) : loading ? (
         <p class="page-state">Loading</p>
       ) : empty ? (

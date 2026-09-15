@@ -45,7 +45,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "PATCH",
     path: "/api/profile",
-    body: { fullName: "Oana", about: "" },
+    body: { fullName: "Oana", about: "", tz: "UTC" },
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
@@ -76,6 +76,7 @@ export const AUTH_CASES: AuthCase[] = [
       fullName: "Maria",
       email: "maria@example.com",
       role: "member",
+      tz: "UTC",
       password: "longenough",
     },
     expect: { anonymous: 401, member: 403, admin: 201 },

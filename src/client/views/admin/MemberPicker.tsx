@@ -10,8 +10,9 @@ import { useEffect, useRef } from "preact/hooks";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import { addProjectMember } from "../../data/admin-projects.ts";
-import { initials, reason } from "../../lib/format.ts";
+import { initials } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import type { Save } from "../../lib/save.ts";
 import { RowsAvatar } from "../../ui/Rows.tsx";
 import { candidateNote, candidates, step } from "./AdminProjects.model.ts";
 import "./admin-projects.css";
@@ -19,17 +20,20 @@ import "./admin-projects.css";
 export function MemberPicker({
   project,
   users,
-  disabled,
+  save,
 }: {
   project: ProjectDetail;
   users: UserAccount[];
-  disabled: boolean;
+  // the project form's, so a refused add is the form's notice
+  save: Save;
 }) {
   const open = useSignal(false);
   const query = useSignal("");
   const highlight = useSignal(0);
   const adding = useSignal<string | null>(null);
-  const failure = useSignal<string | null>(null);
+  // another action of the form is running; an add in flight keeps the
+  // list open on its "adding" line
+  const disabled = save.busy && adding.value === null;
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -47,7 +51,6 @@ export function MemberPicker({
     open.value = false;
     query.value = "";
     highlight.value = 0;
-    failure.value = null;
   };
 
   useEffect(() => {
@@ -80,13 +83,12 @@ export function MemberPicker({
   const add = async (user: UserAccount) => {
     if (disabled || adding.value !== null) return;
     adding.value = user.id;
-    failure.value = null;
-    try {
-      await addProjectMember(project.id, { userId: user.id });
+    const added = await save.act(`add @${user.username}`, () =>
+      addProjectMember(project.id, { userId: user.id }),
+    );
+    if (added) {
       query.value = "";
       highlight.value = 0;
-    } catch (err) {
-      failure.value = reason(err);
     }
     adding.value = null;
     input.current?.focus();
@@ -154,7 +156,6 @@ export function MemberPicker({
           onInput={(event) => {
             query.value = (event.currentTarget as HTMLInputElement).value;
             highlight.value = 0;
-            failure.value = null;
           }}
           onKeyDown={onKeyDown}
         />
@@ -205,9 +206,6 @@ export function MemberPicker({
             </div>
           ))}
         </div>
-      )}
-      {failure.value !== null && (
-        <p class="admin-projects-pick-none error">{failure.value}</p>
       )}
     </div>
   );

@@ -120,7 +120,7 @@ const reserve = row({
 const rows = [rounds, toolMs, resultBytes, timeout, searchBody, cut, reserve];
 
 const time: ToolSummary = {
-  name: "get_current_time",
+  name: "datetime",
   description: "The current date and time in a timezone. Ask before math.",
   parameters: { type: "object", properties: {} },
   parametersHtml:
@@ -214,7 +214,10 @@ describe("the limit words and units", () => {
     });
     const edited = { ...draft, rounds: "200" };
     expect(dirty(rows, edited)).toBe(true);
-    expect(collect(rows, edited)).toEqual({ problem: "Rounds is 1 to 50" });
+    expect(collect(rows, edited)).toEqual({
+      problem: "Rounds is 1 to 50",
+      field: "rounds",
+    });
     expect(defaultLine(timeout)).toBe("default 20 s");
     expect(defaultLine(searchBody)).toBe("default 1 MB");
     expect(defaultLine(rounds)).toBe("default 10");
@@ -242,11 +245,11 @@ describe("the tools entity", () => {
         ? Response.json({ tools: [time], search })
         : Response.json({ limits: rows });
     await loadTools();
-    expect(tools.value?.tools[0]?.name).toBe("get_current_time");
+    expect(tools.value?.tools[0]?.name).toBe("datetime");
     expect(limits.value?.length).toBe(rows.length);
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadTools();
-    expect(toolsError.value).toBe("nope");
+    expect(toolsError.value).toEqual({ words: "nope", status: 500 });
   });
 
   test("a write replaces what it holds with the server's rows", async () => {
@@ -259,10 +262,10 @@ describe("the tools entity", () => {
       if (init?.method === "DELETE") return new Response(null, { status: 204 });
       return Response.json({ limits: [{ ...rounds, value: 3, changedAt: 9 }] });
     };
-    await patchTool("get_current_time", { enabled: false });
+    await patchTool("datetime", { enabled: false });
     expect(tools.value?.tools[0]?.enabled).toBe(false);
     expect(calls[0]).toMatchObject({
-      url: "/api/tools/get_current_time",
+      url: "/api/tools/datetime",
       method: "PATCH",
       body: '{"enabled":false}',
     });
@@ -297,7 +300,7 @@ describe("the page", () => {
     tools.value = { tools: [time], search };
     limits.value = rows;
     const html = render(<Tools />);
-    expect(html).toContain("get_current_time");
+    expect(html).toContain("datetime");
     expect(html).toContain('role="switch"');
     expect(html).not.toContain("md-pre");
     expect(html).toContain('aria-checked="true"');
@@ -316,7 +319,12 @@ describe("the page", () => {
 
   test("says it is loading, then the failure", () => {
     expect(render(<Tools />)).toContain("Loading");
-    toolsError.value = "the server did not answer";
-    expect(render(<Tools />)).toContain("the server did not answer");
+    toolsError.value = {
+      words: "the server failed while answering",
+      status: 500,
+    };
+    const html = render(<Tools />);
+    expect(html).toContain("The server failed while answering.");
+    expect(html).toContain('<span class="code-tag">HTTP 500</span>');
   });
 });

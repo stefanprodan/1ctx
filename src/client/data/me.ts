@@ -13,11 +13,11 @@ import type {
   MeResponse,
 } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api, onUnauthorized } from "./api.ts";
 
 export const me = signal<Me | null | undefined>(undefined);
-export const meError = signal<string | null>(null);
+export const meError = signal<Failure | null>(null);
 
 // every change of who is signed in bumps this, so a load that started
 // before the change is dropped when it answers: the first load of the
@@ -45,7 +45,7 @@ export async function loadMe(): Promise<void> {
     if (turn === mine) me.value = user;
   } catch (err) {
     if (turn === mine) {
-      meError.value = reason(err);
+      meError.value = failure(err);
     }
   }
 }

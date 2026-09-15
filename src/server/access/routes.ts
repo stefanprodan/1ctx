@@ -45,7 +45,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "public",
       async handle(req, ctx) {
         if (!limit.hit(ctx.address, deps.clock())) {
-          throw new TooManyRequests("too many sign-in attempts; wait a minute");
+          throw new TooManyRequests("too many sign-in attempts. Wait a minute");
         }
         const { username, password } = parseLogin(await jsonBody(req));
         const user = deps.users.byUsername(username);

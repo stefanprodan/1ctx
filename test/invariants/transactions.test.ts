@@ -263,7 +263,7 @@ describe("markRoundWork", () => {
         // slot, in its own transaction: one revision, one envelope
         script.toolCall({
           id: "c1",
-          name: "get_current_time",
+          name: "datetime",
           arguments: '{"timezone":"UTC"}',
         });
         await tick();
@@ -302,7 +302,7 @@ describe("finishTool rollback", () => {
           skills: { block: "", skills: [] },
           tools: [
             {
-              name: "get_current_time",
+              name: "datetime",
               description: "time",
               parameters: { type: "object" },
             },
@@ -341,12 +341,12 @@ describe("finishTool rollback", () => {
         script.toolRound([
           {
             id: "first",
-            name: "get_current_time",
+            name: "datetime",
             arguments: '{"timezone":"UTC"}',
           },
           {
             id: "second",
-            name: "get_current_time",
+            name: "datetime",
             arguments: '{"timezone":"Asia/Tokyo"}',
           },
         ]);
@@ -410,7 +410,7 @@ describe("finalizeSend rollback", () => {
         skills: { block: "", skills: [] },
         tools: [
           {
-            name: "get_current_time",
+            name: "datetime",
             description: "time",
             parameters: { type: "object" },
           },
@@ -430,7 +430,7 @@ describe("finalizeSend rollback", () => {
     script.toolRound([
       {
         id: "call",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       },
     ]);
@@ -487,7 +487,7 @@ describe("new tool transaction rollback", () => {
 
     script.toolCall({
       id: "call",
-      name: "get_current_time",
+      name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
     for (let i = 0; i < 20; i++) await tick();
@@ -507,7 +507,7 @@ describe("new tool transaction rollback", () => {
     const { detail, script, sessionId } = await startChat(chat, "finish round");
     script.toolCall({
       id: "call",
-      name: "get_current_time",
+      name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
     await tick();
@@ -546,7 +546,7 @@ describe("new tool transaction rollback", () => {
     const { detail, script, sessionId } = await startChat(chat, "next round");
     script.toolCall({
       id: "call",
-      name: "get_current_time",
+      name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
     await tick();

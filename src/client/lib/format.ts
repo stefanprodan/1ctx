@@ -95,3 +95,16 @@ export function firstSentence(text: string): string {
 export function reason(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
+
+// a failure as a page shows it: the words, and the HTTP status when the
+// server answered with one (null when it did not answer or nothing was
+// asked of it)
+export type Failure = { words: string; status: number | null };
+
+export function failure(err: unknown): Failure {
+  const status =
+    err instanceof Error && "status" in err && typeof err.status === "number"
+      ? err.status
+      : null;
+  return { words: reason(err), status: status === 0 ? null : status };
+}

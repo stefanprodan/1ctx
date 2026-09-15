@@ -58,7 +58,7 @@ const request: ChatRequest = {
   cacheKey: "session-1",
   tools: [
     {
-      name: "get_current_time",
+      name: "datetime",
       description: "the clock",
       parameters: { type: "object", properties: {} },
     },
@@ -280,7 +280,7 @@ describe("OpenRouter stream", () => {
       ChatEvent,
       { kind: "toolCalls" }
     >;
-    expect(calls.calls[0].name).toBe("get_current_time");
+    expect(calls.calls[0].name).toBe("datetime");
     expect(JSON.parse(calls.calls[0].arguments)).toMatchObject({
       timezone: expect.any(String),
     });

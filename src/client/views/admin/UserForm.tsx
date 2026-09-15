@@ -1,12 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// New user: the username, the full name, the email, the role and the
-// password, typed twice, which the admin hands over. An existing
-// user opens the same fields without the password; under them, a
-// section resets the password, which signs the person out everywhere.
-// The admin's own row has no role choice and no reset: the profile
-// page is the place for those.
+// New user: the username, the full name, the email, the time zone, the
+// role and the password, typed twice, which the admin hands over. An
+// existing user opens the same fields without the password, with
+// Disable or Enable in the foot; under them, a section resets the
+// password, which signs the person out everywhere. The admin's own row
+// has no role choice, no switch and no reset: the profile page is the
+// place for those. A refusal shows at the field it names, or in the
+// foot's notice.
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
@@ -14,31 +16,34 @@ import type { UserAccount } from "../../../shared/contracts/user.ts";
 import type { Role } from "../../../shared/words.ts";
 import { me } from "../../data/me.ts";
 import { createUser, resetPassword, updateUser } from "../../data/users.ts";
-import { useSave } from "../../lib/save.ts";
+import { shapedInput } from "../../lib/names.ts";
+import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
+import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   disableLock,
   emailProblem,
   fullNameProblem,
-  newPasswordProblem,
+  newPasswordFieldProblem,
   patchOf,
   ROLE_CHOICES,
   roleLock,
+  tzProblem,
+  userFieldOf,
   usernameProblem,
 } from "./Users.model.ts";
 import "./users.css";
-import { reason } from "../../lib/format.ts";
-import { shapedInput } from "../../lib/names.ts";
 
 function RolePick({
   value,
   lock,
-  busy,
+  save,
   onPick,
 }: {
   value: Role;
   lock: string | null;
-  busy: boolean;
+  save: Save;
   onPick: (role: Role) => void;
 }) {
   return (
@@ -49,8 +54,9 @@ function RolePick({
           <button
             key={choice.value}
             type="button"
+            name="role"
             aria-pressed={value === choice.value}
-            disabled={busy || lock !== null}
+            disabled={save.busy || lock !== null}
             title={lock ?? undefined}
             class={`users-role${value === choice.value ? " users-role-on" : ""}`}
             onClick={() => onPick(choice.value)}
@@ -60,44 +66,50 @@ function RolePick({
           </button>
         ))}
       </div>
+      <FieldError save={save} field="role" />
       {lock !== null && <span class="hint">{lock}</span>}
     </div>
   );
 }
 
-// Disable or Enable, at the foot's left: one call, its failure beside
-// it until the next click
-function Switch({ user, lock }: { user: UserAccount; lock: string | null }) {
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
-  const flip = async () => {
-    busy.value = true;
-    failure.value = null;
-    try {
-      await updateUser(user.id, { disabled: !user.disabled });
-    } catch (err) {
-      failure.value = reason(err);
-    }
-    busy.value = false;
-  };
+// Disable or Enable, at the foot's left; a refusal is the form's notice
+function Switch({
+  user,
+  lock,
+  save,
+}: {
+  user: UserAccount;
+  lock: string | null;
+  save: Save;
+}) {
+  const action = user.disabled ? "enable" : "disable";
+  const running = save.pending.value === action;
   return (
     <span class="users-switch">
       <button
         type="button"
         class={`btn${user.disabled ? "" : " btn-danger"}`}
-        disabled={busy.value || lock !== null}
+        disabled={save.busy || lock !== null}
         title={lock ?? undefined}
-        onClick={() => void flip()}
+        onClick={() =>
+          void save.act(action, () =>
+            updateUser(user.id, { disabled: !user.disabled }),
+          )
+        }
       >
-        {user.disabled ? "Enable" : "Disable"}
+        {user.disabled
+          ? running
+            ? "Enabling"
+            : "Enable"
+          : running
+            ? "Disabling"
+            : "Disable"}
       </button>
       <span class="hint">
-        {failure.value !== null
-          ? failure.value
-          : (lock ??
-            (user.disabled
-              ? "Cannot sign in."
-              : "Signs them out and blocks sign-in."))}
+        {lock ??
+          (user.disabled
+            ? "Cannot sign in."
+            : "Signs them out and blocks sign-in.")}
       </span>
     </span>
   );
@@ -106,22 +118,31 @@ function Switch({ user, lock }: { user: UserAccount; lock: string | null }) {
 function ResetForm({ user }: { user: UserAccount }) {
   const next = useSignal("");
   const again = useSignal("");
-  const save = useSave(async () => {
-    await resetPassword(user.id, { password: next.value });
-    next.value = "";
-    again.value = "";
-  });
+  const form = useRef<HTMLFormElement>(null);
+  const save = useSave(
+    async () => {
+      await resetPassword(user.id, { password: next.value });
+      next.value = "";
+      again.value = "";
+    },
+    (message) => (message.startsWith("password") ? "next" : undefined),
+  );
+  useFocusField(save, form);
   const bind = (s: { value: string }) => (e: Event) => {
     s.value = (e.currentTarget as HTMLInputElement).value;
     save.touch();
   };
-  const busy = save.status.value === "busy";
   const submit = (event: Event) => {
     event.preventDefault();
-    void save.run(newPasswordProblem(next.value, again.value));
+    void save.run(
+      newPasswordFieldProblem(next.value, again.value, {
+        next: "next",
+        again: "again",
+      }),
+    );
   };
   return (
-    <form class="users-form users-reset" onSubmit={submit}>
+    <form class="users-form users-reset" ref={form} onSubmit={submit}>
       <div class="users-reset-head">
         <span class="label">Reset password</span>
         <span class="hint">
@@ -135,10 +156,12 @@ function ResetForm({ user }: { user: UserAccount }) {
             name="next"
             type="password"
             autocomplete="new-password"
-            disabled={busy}
+            aria-invalid={save.fieldError("next") !== null || undefined}
+            disabled={save.busy}
             value={next.value}
             onInput={bind(next)}
           />
+          <FieldError save={save} field="next" />
         </label>
         <label class="field">
           <span class="label label-required">New password again</span>
@@ -146,14 +169,16 @@ function ResetForm({ user }: { user: UserAccount }) {
             name="again"
             type="password"
             autocomplete="new-password"
-            disabled={busy}
+            aria-invalid={save.fieldError("again") !== null || undefined}
+            disabled={save.busy}
             value={again.value}
             onInput={bind(again)}
           />
+          <FieldError save={save} field="again" />
         </label>
       </div>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={next.value !== "" && again.value !== ""}
         label="Reset password"
       />
@@ -175,13 +200,22 @@ export function UserForm({
   const meId = me.value?.id ?? "";
   const current = useRef(user);
   current.current = user;
+  const form = useRef<HTMLFormElement>(null);
   const username = useSignal(user?.username ?? "");
   const fullName = useSignal(user?.fullName ?? "");
   const email = useSignal(user?.email ?? "");
   const role = useSignal<Role>(user?.role ?? "member");
+  const tz = useSignal(user?.tz ?? "");
   const password = useSignal("");
   const again = useSignal("");
   const lock = user === null ? null : roleLock(user, meId, admins);
+  const fields = () => ({
+    username: username.value,
+    fullName: fullName.value,
+    email: email.value,
+    role: role.value,
+    tz: tz.value,
+  });
   const save = useSave(async () => {
     const saved = current.current;
     if (saved === null) {
@@ -190,53 +224,48 @@ export function UserForm({
         fullName: fullName.value.trim(),
         email: email.value.trim().toLowerCase(),
         role: role.value,
+        tz: tz.value,
         password: password.value,
       });
       onDone();
       return;
     }
-    const body = patchOf(saved, {
-      username: username.value,
-      fullName: fullName.value,
-      email: email.value,
-      role: role.value,
-    });
+    const body = patchOf(saved, fields());
     if (body !== null) await updateUser(saved.id, body);
-  });
+  }, userFieldOf);
+  useFocusField(save, form);
   const bind = (s: { value: string }) => (e: Event) => {
     s.value = (e.currentTarget as HTMLInputElement).value;
     save.touch();
   };
-  const busy = save.status.value === "busy";
-  const dirty =
-    user === null
-      ? true
-      : patchOf(user, {
-          username: username.value,
-          fullName: fullName.value,
-          email: email.value,
-          role: role.value,
-        }) !== null;
+  const invalid = (field: string) => save.fieldError(field) !== null;
+  const busy = save.busy;
+  const dirty = user === null ? true : patchOf(user, fields()) !== null;
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
-      usernameProblem(username.value) ??
-        fullNameProblem(fullName.value) ??
-        emailProblem(email.value) ??
+      at("username", usernameProblem(username.value)) ??
+        at("fullName", fullNameProblem(fullName.value)) ??
+        at("email", emailProblem(email.value)) ??
+        at("tz", tzProblem(tz.value)) ??
         (user === null
-          ? newPasswordProblem(password.value, again.value)
+          ? newPasswordFieldProblem(password.value, again.value, {
+              next: "password",
+              again: "again",
+            })
           : null),
     );
   };
   return (
     <div class="users-forms">
-      <form class="users-form" onSubmit={submit}>
+      <form class="users-form" ref={form} onSubmit={submit}>
         <div class="users-fields">
           <label class="field">
             <span class="label label-required">Username</span>
             <input
               name="username"
               aria-required="true"
+              aria-invalid={invalid("username") || undefined}
               autocomplete="off"
               spellcheck={false}
               disabled={busy}
@@ -246,23 +275,27 @@ export function UserForm({
                 save.touch();
               }}
             />
+            <FieldError save={save} field="username" />
           </label>
           <label class="field">
             <span class="label label-required">Full name</span>
             <input
               name="fullName"
               aria-required="true"
+              aria-invalid={invalid("fullName") || undefined}
               autocomplete="off"
               disabled={busy}
               value={fullName.value}
               onInput={bind(fullName)}
             />
+            <FieldError save={save} field="fullName" />
           </label>
-          <label class="field users-field-wide">
+          <label class="field">
             <span class="label label-required">Email</span>
             <input
               name="email"
               aria-required="true"
+              aria-invalid={invalid("email") || undefined}
               type="email"
               autocomplete="off"
               spellcheck={false}
@@ -270,12 +303,28 @@ export function UserForm({
               value={email.value}
               onInput={bind(email)}
             />
+            <FieldError save={save} field="email" />
           </label>
+          <div class="field">
+            <span class="label label-required">Time zone</span>
+            <ZoneSelect
+              name="tz"
+              value={tz.value}
+              invalid={invalid("tz")}
+              disabled={busy}
+              placeholder="Pick a zone"
+              onChange={(next) => {
+                tz.value = next;
+                save.touch();
+              }}
+            />
+            <FieldError save={save} field="tz" />
+          </div>
           {(user === null || user.id !== meId) && (
             <RolePick
               value={role.value}
               lock={lock}
-              busy={busy}
+              save={save}
               onPick={(next) => {
                 role.value = next;
                 save.touch();
@@ -290,13 +339,18 @@ export function UserForm({
                   name="password"
                   type="password"
                   autocomplete="new-password"
+                  aria-invalid={invalid("password") || undefined}
                   disabled={busy}
                   value={password.value}
                   onInput={bind(password)}
                 />
-                <span class="hint">
-                  Hand it over. They change it on their profile.
-                </span>
+                {invalid("password") ? (
+                  <FieldError save={save} field="password" />
+                ) : (
+                  <span class="hint">
+                    Hand it over. They change it on their profile.
+                  </span>
+                )}
               </label>
               <label class="field">
                 <span class="label label-required">Password again</span>
@@ -304,23 +358,29 @@ export function UserForm({
                   name="again"
                   type="password"
                   autocomplete="new-password"
+                  aria-invalid={invalid("again") || undefined}
                   disabled={busy}
                   value={again.value}
                   onInput={bind(again)}
                 />
+                <FieldError save={save} field="again" />
               </label>
             </>
           )}
         </div>
         <Foot
-          status={save.status.value}
+          save={save}
           dirty={dirty}
           label={user === null ? "New user" : "Save"}
           start={
             user === null || user.id === meId ? (
               <span />
             ) : (
-              <Switch user={user} lock={disableLock(user, meId, admins)} />
+              <Switch
+                user={user}
+                lock={disableLock(user, meId, admins)}
+                save={save}
+              />
             )
           }
           before={

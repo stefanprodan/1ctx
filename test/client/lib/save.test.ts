@@ -5,10 +5,12 @@
 // a call is busy then done for a moment, a failure is its reason until
 // the next edit, an edit during done wakes the button, a second submit
 // while busy is ignored, and a call answering after the form is gone
-// changes nothing.
+// changes nothing. A refusal naming a field is that field's and never
+// the notice; another action of the form holds every button and its
+// refusal is the notice, naming the action.
 
 import { describe, expect, test } from "bun:test";
-import { Save } from "../../../src/client/lib/save.ts";
+import { at, noticeOf, Save, sentence } from "../../../src/client/lib/save.ts";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -88,5 +90,69 @@ describe("Save", () => {
     await run;
     await tick();
     expect(save.status.value).toBe("busy");
+  });
+
+  test("a check pinned to a field is that field's, not the notice", async () => {
+    const save = new Save(async () => {});
+    await save.run(at("email", "Not an email address"));
+    expect(save.fieldError("email")).toBe("Not an email address.");
+    expect(save.fieldError("username")).toBeNull();
+    expect(save.notice()).toBeNull();
+    save.touch();
+    expect(save.fieldError("email")).toBeNull();
+  });
+
+  test("a server refusal lands on the field its words name", async () => {
+    const save = new Save(
+      () => Promise.reject(new Error("username is taken")),
+      5,
+      (message) => (message.startsWith("username") ? "username" : undefined),
+    );
+    await save.run(null);
+    expect(save.fieldError("username")).toBe("Username is taken.");
+    expect(save.notice()).toBeNull();
+  });
+
+  test("a refusal naming no field is the notice", async () => {
+    const save = new Save(
+      () => Promise.reject(new Error("project has a running chat")),
+      5,
+      () => undefined,
+    );
+    await save.run(null);
+    expect(save.notice()).toEqual({ error: "project has a running chat" });
+  });
+
+  test("another action holds every button and names itself when refused", async () => {
+    const call = deferred();
+    let saves = 0;
+    const save = new Save(async () => void saves++);
+    const acting = save.act("delete", () => call.promise);
+    expect(save.busy).toBe(true);
+    expect(save.pending.value).toBe("delete");
+    await save.run(null);
+    expect(await save.act("disable", async () => {})).toBe(false);
+    expect(saves).toBe(0);
+    call.reject(new Error("an agent runs on local"));
+    expect(await acting).toBe(false);
+    expect(save.busy).toBe(false);
+    const notice = save.notice();
+    expect(notice).toEqual({
+      error: "an agent runs on local",
+      action: "delete",
+    });
+    expect(noticeOf(notice!)).toBe("Could not delete. An agent runs on local.");
+    expect(await save.act("delete", async () => {})).toBe(true);
+    expect(save.notice()).toBeNull();
+    expect(save.status.value).toBe("idle");
+  });
+
+  test("the server's fragments read as sentences", () => {
+    expect(sentence("email is taken")).toBe("Email is taken.");
+    expect(sentence("Too many attempts. Wait a minute")).toBe(
+      "Too many attempts. Wait a minute.",
+    );
+    expect(sentence("Done.")).toBe("Done.");
+    expect(noticeOf({ error: "name is taken" })).toBe("Name is taken.");
   });
 });

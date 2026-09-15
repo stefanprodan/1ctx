@@ -9,8 +9,8 @@
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
 import { Icon, type IconName } from "../lib/icons.tsx";
+import { Search } from "../ui/Search.tsx";
 import { Row } from "./Row.tsx";
-import { Search } from "./Search.tsx";
 import "./stream.css";
 
 const FILTERS: {
@@ -51,7 +51,13 @@ export function Stream({
     <section class="stream">
       {(search || filter) && (
         <div class="stream-head">
-          {search && <Search value={search.value} onChange={search.onChange} />}
+          {search && (
+            <Search
+              value={search.value}
+              onChange={search.onChange}
+              placeholder="Search sessions"
+            />
+          )}
           {filter && (
             <div class="stream-filters">
               {FILTERS.map((choice) => (

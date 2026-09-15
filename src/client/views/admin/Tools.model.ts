@@ -84,7 +84,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
 };
 
 export const TOOL_WORDS: Record<BuiltinTool, string> = {
-  get_current_time: "The clock, in any timezone.",
+  datetime: "The date and time, in UTC or any timezone.",
   webfetch: "A page by URL, as text.",
   websearch: "The web, through the chosen search provider.",
 };
@@ -147,19 +147,27 @@ export function draftOf(rows: LimitRow[]): Record<string, string> {
   return out;
 }
 
-// the body a Save sends, or the first problem
+// the body a Save sends, or the first problem and the limit it is about
 export function collect(
   rows: LimitRow[],
   draft: Record<string, string>,
-): { values: Record<LimitName, number> } | { problem: string } {
+):
+  | { values: Record<LimitName, number> }
+  | { problem: string; field: LimitName } {
   const values = {} as Record<LimitName, number>;
   for (const row of rows) {
     const text = draft[row.name] ?? "";
     const why = problem(row, text);
-    if (why !== null) return { problem: why };
+    if (why !== null) return { problem: why, field: row.name };
     values[row.name] = read(row, text) as number;
   }
   return { values };
+}
+
+// which limit a server refusal names: its words open with the name
+export function limitFieldOf(message: string): LimitName | undefined {
+  const name = message.split(" ", 1)[0] as LimitName;
+  return name in LIMIT_WORDS ? name : undefined;
 }
 
 // whether any field differs from its row

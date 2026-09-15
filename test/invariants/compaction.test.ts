@@ -147,7 +147,7 @@ describe("compaction", () => {
     tool.script.toolRound([
       {
         id: "time-1",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       },
     ]);
@@ -167,7 +167,7 @@ describe("compaction", () => {
     capped.script.toolRound([
       {
         id: "time-2",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       },
     ]);

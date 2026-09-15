@@ -17,12 +17,12 @@ import type {
   SkillsResponse,
 } from "../../shared/api/skills.ts";
 import type { IndexEntry, SkillSummary } from "../../shared/contracts/skill.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const skills = signal<SkillSummary[] | null>(null);
-export const skillsError = signal<string | null>(null);
+export const skillsError = signal<Failure | null>(null);
 // the bodies read so far, by id, and the files by id and path
 export const bodies = signal<Record<string, string>>({});
 export const files = signal<Record<string, string>>({});
@@ -58,7 +58,7 @@ export async function loadSkills(): Promise<void> {
     const body = await api<SkillsResponse>("/api/skills");
     if (owner === forUser && turn === mine) skills.value = byName(body.skills);
   } catch (err) {
-    if (owner === forUser && turn === mine) skillsError.value = reason(err);
+    if (owner === forUser && turn === mine) skillsError.value = failure(err);
   }
 }
 

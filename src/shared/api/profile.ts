@@ -10,7 +10,11 @@ import type { Profile } from "../contracts/user.ts";
 export type ProfileResponse = { user: Profile };
 
 // PATCH /api/profile
-export type UpdateProfileRequest = { fullName: string; about: string };
+export type UpdateProfileRequest = {
+  fullName: string;
+  about: string;
+  tz: string;
+};
 
 // POST /api/profile/password: the current password proves it is the
 // user, the next one replaces it and every other login is revoked

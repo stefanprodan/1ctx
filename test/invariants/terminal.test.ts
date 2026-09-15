@@ -148,7 +148,7 @@ describe("the terminal transition", () => {
       script.content("let me check the clock");
       script.toolCall({
         id: "c1",
-        name: "get_current_time",
+        name: "datetime",
         arguments: '{"timezone":"UTC"}',
       });
       await tick();

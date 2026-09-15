@@ -19,12 +19,12 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../shared/contracts/provider.ts";
-import { reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const providers = signal<ProviderSummary[] | null>(null);
-export const providersError = signal<string | null>(null);
+export const providersError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 
@@ -50,7 +50,7 @@ export async function loadProviders(): Promise<void> {
     const body = await api<ProvidersResponse>("/api/providers");
     if (owner === forUser && turn === mine) providers.value = body.providers;
   } catch (err) {
-    if (owner === forUser && turn === mine) providersError.value = reason(err);
+    if (owner === forUser && turn === mine) providersError.value = failure(err);
   }
 }
 

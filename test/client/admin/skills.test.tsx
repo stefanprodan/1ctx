@@ -242,7 +242,7 @@ describe("the skills entity", () => {
     ]);
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadSkills();
-    expect(skillsError.value).toBe("nope");
+    expect(skillsError.value).toEqual({ words: "nope", status: 500 });
   });
 
   test("a write folds the row and its body back, a refresh drops the files held", async () => {
@@ -398,7 +398,9 @@ describe("the page", () => {
 
   test("says it is loading, then the failure", () => {
     expect(render(<Skills />)).toContain("Loading");
-    skillsError.value = "the server did not answer";
-    expect(render(<Skills />)).toContain("the server did not answer");
+    skillsError.value = { words: "the server did not answer", status: null };
+    const html = render(<Skills />);
+    expect(html).toContain("The server did not answer.");
+    expect(html).not.toContain("HTTP");
   });
 });

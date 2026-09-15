@@ -146,7 +146,12 @@ violation, and every rule has a rejected fixture under
   `admin@1ctx.dev` as its email. Every user has an email, unique and
   lowercased; an admin sets it with the username and the role on
   `/admin/users` (the routes in `access/users.ts`, since a reset needs
-  the login store), and the profile shows it. A reset deletes every
+  the login store), and the profile shows it. Every user has a time
+  zone, `tz`, an IANA zone by `isTimeZone` in `shared/words.ts`: an
+  admin picks it when creating the user (required, never guessed) and
+  may change it, the user changes it on the profile, and the first
+  admin starts in `UTC`. The prompt's user line names it, so the
+  model asks the `datetime` tool in it. A reset deletes every
   login of the user; a role change publishes `access.changed`; the
   admin's own row, and the last enabled admin, are 409s to demote,
   disable or reset. A disabled user gets the login's 401, no
@@ -420,8 +425,8 @@ violation, and every rule has a rejected fixture under
   `app/routes.ts` wrapped in `lazy()`; the rail is computed from it.
   Bun does not yet split the HTML bundle, so the views still ship in one
   chunk; the table stays lazy so they will not the day it does.
-- **A page with an aside is `ui/Split.tsx`.** Home, Projects and the
-  project pages put their content in the main column, 900px at most, and
+- **A page with an aside is `ui/Split.tsx`.** Home, Projects, the
+  project pages and the profile put their content in the main column, 900px at most, and
   sections of plain lines in the 280px aside at the right, no boxes;
   under 1100, a tablet or a phone, the aside is hidden. The aside holds only honest numbers: the agents and the past
   seven calendar days in the caller's zone from `GET /api/usage/week?tz=`
@@ -442,7 +447,8 @@ violation, and every rule has a rejected fixture under
   over up to 53 ISO weeks, as many as fit the width, from
   `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
   then one Projects card, personal first, each row with its 14-day
-  strip. A project's tabs are Feed, Automations, then Members for a team
+  strip, headed by `ui/Search.tsx` (the stream's box too) narrowing the
+  rows by name in place. A project's tabs are Feed, Automations, then Members for a team
   or Settings for a personal one. A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab
@@ -460,7 +466,7 @@ violation, and every rule has a rejected fixture under
   `ScheduleField.tsx` from the shapes in `Schedule.model.ts` (cron typed
   by hand for any other) and read back through the preview route as
   the next run, the
-  zone is `ui/Select.tsx` with search, and the deadline starts at the
+  zone is `ui/ZoneSelect.tsx`, and the deadline starts at the
   limit, which `GET /api/projects/:id/automations` answers beside the
   rows. `data/automations.ts` keeps the list, the runs and the tally
   current from the frames. A run's chat page names its automation over
@@ -468,10 +474,30 @@ violation, and every rule has a rejected fixture under
   its foot is the state with Stop while it runs (`RunFoot.tsx`).
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
-  the right. The page's stylesheet holds only what it
+  the right. The profile's aside is the account (email, role, joined),
+  its head the name and the handle, and the email where the aside is
+  hidden. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
   failure's words come from `reason()` in `lib/format.ts`.
+- **A form's refusals have two places.** One `useSave()` per form runs
+  the submit (`run`) and every other button of the form (`act("delete",
+  ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
+  runs every button waits. A refusal that names a field, a check pinned
+  with `at(field, ...)` or a server word the form's `fieldOf` maps, is
+  shown at that field: `aria-invalid` on the control (the failed border
+  in `base.css`, `invalid` on `ui/Select.tsx`), `ui/FieldError.tsx` in
+  place of its hint, and `useFocusField()` moves the focus to the
+  control carrying that `name`. Any other refusal is the notice `Foot`
+  draws over the buttons, "Could not delete." then the server's words.
+  No form shows a refusal anywhere else. A page whose load failed is
+  `Page`'s `error`: a card saying the page did not load, the words and
+  Try again. A failure is words first: `api()` passes the server's own
+  words and gives an answer without them the words of `statusWords()`,
+  never a bare status. The status rides beside them, `failure()` in
+  `lib/format.ts` for a page's error signal and `status` on a form's
+  problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
+  words, and left out when the server did not answer.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

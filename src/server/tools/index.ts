@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The built-in tools, get_current_time, webfetch and websearch, and
+// The built-in tools, datetime, webfetch and websearch, and
 // their server-wide settings: the switch on each and the search
 // provider, rows in the tools table an admin changes on the Tools page.
 // offered(now) answers the schemas the model gets, every enabled tool
@@ -34,8 +34,12 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatTool, ToolCall } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
+import {
+  DEFAULT_TIMEZONE,
+  datetimeTool,
+  formatDatetime,
+} from "./builtin/datetime.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
-import { formatCurrentTime, HOST_TIMEZONE, timeTool } from "./builtin/time.ts";
 import {
   type FetchDependencies,
   makeWebfetchTool,
@@ -49,7 +53,7 @@ import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
 import type { Offered, Tool, ToolContext, ToolResult } from "./types.ts";
 
-export { dateLine, formatCurrentTime, HOST_TIMEZONE } from "./builtin/time.ts";
+export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
 export { TOOL_CAPS } from "./limits.ts";
 export { parseToolName, parseToolPatch } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
@@ -87,7 +91,7 @@ export type ToolsDeps = {
 
 export type Tools = {
   // the schemas and the search provider chosen for the send, the
-  // {{year}} filled in the host's timezone
+  // {{year}} filled in UTC
   offered(now: number, agentId: string): Offered;
   // one call's result; a throw is turned into a failed result, never a
   // rejection the runner must catch
@@ -101,11 +105,11 @@ export type ToolsArea = Tools & {
   routes: RouteDescriptor[];
 };
 
-// a description may carry {{year}}, filled at send time in the host's
-// timezone: a model searching for "the latest" tends to write the year
+// a description may carry {{year}}, filled at send time in UTC, the
+// zone of the prompt's date line: a model searching for "the latest" tends to write the year
 // its weights end in, so the year sits where the query is composed
 function fillYear(tools: ChatTool[], now: number): ChatTool[] {
-  const year = formatCurrentTime(now, HOST_TIMEZONE).datetime.slice(0, 4);
+  const year = formatDatetime(now, DEFAULT_TIMEZONE).datetime.slice(0, 4);
   return tools.map((tool) => ({
     ...tool,
     description: tool.description.replaceAll("{{year}}", year),
@@ -141,7 +145,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   // the three tools, websearch built for one provider; which of them a
   // send gets is decided by the rows in offered()
   const toolsFor = (search: SearchProvider): Tool[] => [
-    timeTool,
+    datetimeTool,
     makeWebfetchTool(deps.version, fetchDeps),
     makeWebsearchTool(
       () => deps.secret(search),

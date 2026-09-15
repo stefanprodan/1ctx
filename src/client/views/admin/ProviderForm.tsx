@@ -6,10 +6,12 @@
 // preset leaves it to the admin. A provider is never edited after.
 
 import { useSignal } from "@preact/signals";
+import { useRef } from "preact/hooks";
 import type { Wire } from "../../../shared/words.ts";
 import { createProvider } from "../../data/providers.ts";
 import { shapedInput } from "../../lib/names.ts";
-import { useSave } from "../../lib/save.ts";
+import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import {
   baseUrlProblem,
@@ -17,6 +19,7 @@ import {
   nameProblem,
   PRESETS,
   preset,
+  providerFieldOf,
 } from "./Agents.model.ts";
 import "./agents.css";
 
@@ -53,25 +56,30 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
     }
     save.touch();
   };
+  const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
     await createProvider(body());
     onDone();
-  });
+  }, providerFieldOf);
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const bind = (s: { value: string }) => (e: Event) => {
     s.value = (e.currentTarget as HTMLInputElement).value;
     save.touch();
   };
-  const busy = save.status.value === "busy";
+  const busy = save.busy;
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
-      nameProblem(name.value) ??
-        (chosen.baseUrl === null ? baseUrlProblem(baseUrl.value) : null) ??
-        keyNameProblem(keyName.value),
+      at("name", nameProblem(name.value)) ??
+        (chosen.baseUrl === null
+          ? at("baseUrl", baseUrlProblem(baseUrl.value))
+          : null) ??
+        at("keyName", keyNameProblem(keyName.value)),
     );
   };
   return (
-    <form class="agents-form" onSubmit={submit}>
+    <form class="agents-form" ref={form} onSubmit={submit}>
       <div class="agents-presets">
         {PRESETS.map((p) => (
           <button
@@ -96,6 +104,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             autocomplete="off"
             spellcheck={false}
             placeholder="openrouter"
+            aria-invalid={invalid("name") || undefined}
             disabled={busy}
             value={name.value}
             onInput={(e) => {
@@ -103,6 +112,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
               save.touch();
             }}
           />
+          <FieldError save={save} field="name" />
         </label>
         <label class="field">
           <span class="label">Key file</span>
@@ -111,15 +121,20 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             autocomplete="off"
             spellcheck={false}
             placeholder="none"
+            aria-invalid={invalid("keyName") || undefined}
             disabled={busy}
             value={keyName.value}
             onInput={bind(keyName)}
           />
-          <span class="hint">
-            {keyName.value.trim() === ""
-              ? "Leave it empty for a server without a key."
-              : `${keyName.value.trim()}.key in the secrets directory.`}
-          </span>
+          {invalid("keyName") ? (
+            <FieldError save={save} field="keyName" />
+          ) : (
+            <span class="hint">
+              {keyName.value.trim() === ""
+                ? "Leave it empty for a server without a key."
+                : `${keyName.value.trim()}.key in the secrets directory.`}
+            </span>
+          )}
         </label>
         {chosen.baseUrl === null && (
           <label class="field agents-field-wide">
@@ -130,18 +145,23 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
               autocomplete="off"
               spellcheck={false}
               placeholder="http://host:port/v1"
+              aria-invalid={invalid("baseUrl") || undefined}
               disabled={busy}
               value={baseUrl.value}
               onInput={bind(baseUrl)}
             />
-            <span class="hint">
-              /models and /chat/completions are under it.
-            </span>
+            {invalid("baseUrl") ? (
+              <FieldError save={save} field="baseUrl" />
+            ) : (
+              <span class="hint">
+                /models and /chat/completions are under it.
+              </span>
+            )}
           </label>
         )}
       </div>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={true}
         label="New provider"
         start={<span />}

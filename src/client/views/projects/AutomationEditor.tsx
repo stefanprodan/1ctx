@@ -29,13 +29,14 @@ import {
 import { me } from "../../data/me.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
-import { reason } from "../../lib/format.ts";
-import { useSave } from "../../lib/save.ts";
+import { useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import {
+  automationFieldOf,
   browserZone,
   canChange,
   type Draft,
@@ -67,9 +68,8 @@ function Editor({
     draftOf(automation, agents[0]?.id ?? "", browserZone(), limitMs),
   );
   const asking = useSignal(false);
-  const deleting = useSignal(false);
   const deadlineTouched = useSignal(false);
-  const failure = useSignal<string | null>(null);
+  const form = useRef<HTMLFormElement>(null);
   const limitRef = useRef(limitMs);
   limitRef.current = limitMs;
   useEffect(() => {
@@ -96,33 +96,34 @@ function Editor({
         ? await createAutomation(projectId, current.body)
         : await updateAutomation(automation.id, current.body);
     navigate(`/automations/${saved.id}`);
-  });
+  }, automationFieldOf);
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const set = (patch: Partial<Draft>) => {
     draft.value = { ...draft.value, ...patch };
     save.touch();
   };
   const remove = async () => {
-    if (automation === null || deleting.value) return;
-    deleting.value = true;
-    failure.value = null;
-    try {
-      await deleteAutomation(automation.id);
+    if (automation === null) return;
+    const id = automation.id;
+    if (await save.act("delete", () => deleteAutomation(id))) {
       navigate(`/projects/${projectId}/automations`);
-    } catch (err) {
-      failure.value = reason(err);
-      deleting.value = false;
     }
   };
   const submit = (event: Event) => {
     event.preventDefault();
-    if (!editable || deleting.value) return;
-    void save.run("problem" in request ? request.problem : null);
+    if (!editable) return;
+    void save.run(
+      "problem" in request
+        ? { error: request.problem, field: request.field }
+        : null,
+    );
   };
-  const busy = save.status.value === "busy" || deleting.value;
+  const busy = save.busy;
   const off = busy || !editable;
   const d = draft.value;
   return (
-    <form class="automations-editor" onSubmit={submit}>
+    <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
         <p class="automations-note">
           Its owner or an admin changes it. You can run, suspend and resume it.
@@ -131,33 +132,41 @@ function Editor({
       <Section title="Name" text="Unique in this project">
         <NameField
           disabled={off}
+          error={save.fieldError("name")}
           value={d.name}
           onInput={(name) => set({ name })}
         />
       </Section>
       <Section title="Task" text="The first message of every run">
-        <div class="automations-task">
-          <textarea
-            name="instructions"
-            class="automations-task-text"
-            aria-label="Instructions"
-            placeholder="Instructions for the agent"
-            rows={5}
-            disabled={off}
-            value={d.instructions}
-            onInput={(e) =>
-              set({
-                instructions: (e.currentTarget as HTMLTextAreaElement).value,
-              })
-            }
-          />
-          <div class="automations-task-bar">
-            <AgentPicker
-              agents={agents}
-              agentId={d.agentId}
-              onPick={off ? undefined : (agentId) => set({ agentId })}
+        <div class="automations-stack">
+          <div
+            class={`automations-task${invalid("instructions") || invalid("agent") ? " automations-task-invalid" : ""}`}
+          >
+            <textarea
+              name="instructions"
+              class="automations-task-text"
+              aria-label="Instructions"
+              aria-invalid={invalid("instructions") || undefined}
+              placeholder="Instructions for the agent"
+              rows={5}
+              disabled={off}
+              value={d.instructions}
+              onInput={(e) =>
+                set({
+                  instructions: (e.currentTarget as HTMLTextAreaElement).value,
+                })
+              }
             />
+            <div class="automations-task-bar">
+              <AgentPicker
+                agents={agents}
+                agentId={d.agentId}
+                onPick={off ? undefined : (agentId) => set({ agentId })}
+              />
+            </div>
           </div>
+          <FieldError save={save} field="instructions" />
+          <FieldError save={save} field="agent" />
         </div>
       </Section>
       <Section title="When" text="In the time zone you pick">
@@ -166,9 +175,12 @@ function Editor({
           schedule={d.schedule}
           tz={d.tz}
           disabled={off}
+          invalidTz={invalid("tz")}
           onSchedule={(schedule) => set({ schedule })}
           onTz={(tz) => set({ tz })}
         />
+        <FieldError save={save} field="schedule" />
+        <FieldError save={save} field="tz" />
       </Section>
       <Section
         title="Limits"
@@ -181,6 +193,7 @@ function Editor({
               name="deadline"
               inputMode="decimal"
               autocomplete="off"
+              aria-invalid={invalid("deadline") || undefined}
               disabled={off}
               value={d.deadline}
               onInput={(e) => {
@@ -188,6 +201,7 @@ function Editor({
                 set({ deadline: (e.currentTarget as HTMLInputElement).value });
               }}
             />
+            <FieldError save={save} field="deadline" />
           </label>
           <label class="field">
             <span class="label">History retention (in days)</span>
@@ -196,19 +210,21 @@ function Editor({
               inputMode="numeric"
               autocomplete="off"
               placeholder={String(RETENTION_DAYS.default)}
+              aria-invalid={invalid("retention") || undefined}
               disabled={off}
               value={d.retention}
               onInput={(e) =>
                 set({ retention: (e.currentTarget as HTMLInputElement).value })
               }
             />
+            <FieldError save={save} field="retention" />
           </label>
         </div>
       </Section>
       <div class="automations-foot">
         {editable ? (
           <Foot
-            status={deleting.value ? "busy" : save.status.value}
+            save={save}
             dirty={dirtyOf(d, automation, limitMs)}
             label={automation === null ? "Create scheduled task" : "Save"}
             start={
@@ -222,7 +238,7 @@ function Editor({
                     disabled={busy}
                     onClick={() => void remove()}
                   >
-                    {deleting.value ? "Deleting" : "Delete"}
+                    {save.pending.value === "delete" ? "Deleting" : "Delete"}
                   </button>
                   <button
                     type="button"
@@ -230,16 +246,12 @@ function Editor({
                     disabled={busy}
                     onClick={() => {
                       asking.value = false;
-                      failure.value = null;
+                      save.touch();
                     }}
                   >
                     Keep
                   </button>
-                  <span
-                    class={`automations-note${failure.value ? " error" : ""}`}
-                  >
-                    {failure.value ?? "Its runs stay"}
-                  </span>
+                  <span class="automations-note">Its runs stay</span>
                 </>
               ) : (
                 <button

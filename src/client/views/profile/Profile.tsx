@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The profile: who the user is on one line, then two sections down one
-// column, a heading on the left and the form on the right: the name
-// with the about text, and the password. The username is shown, not
-// edited; an admin changes it. A Save wakes when something changed,
-// says Saved for a moment, and a refusal stays beside it until the
-// next edit; lib/save.ts holds that.
+// column, a heading on the left and the form on the right: the name,
+// the time zone and the about text, and the password. The aside holds
+// the account: the email, the role and when the user joined. The
+// username is shown, not edited; an admin changes it. A Save wakes when
+// something changed, says Saved for a moment, and a refusal stays beside
+// it until the next edit; lib/save.ts holds that.
 
 import { useSignal } from "@preact/signals";
+import { useRef } from "preact/hooks";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
   changePassword,
@@ -17,58 +19,97 @@ import {
   saveProfile,
 } from "../../data/profile.ts";
 import { initials, longDate } from "../../lib/format.ts";
-import { useSave } from "../../lib/save.ts";
+import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
+import { AsideSection, Split } from "../../ui/Split.tsx";
+import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   aboutProblem,
+  detailsFieldOf,
   fullNameProblem,
-  passwordProblem,
+  passwordFieldOf,
+  passwordFieldProblem,
 } from "./Profile.model.ts";
 import "./profile.css";
 
 function DetailsForm({ user }: { user: ProfileRow }) {
   const fullName = useSignal(user.fullName);
   const about = useSignal(user.about);
-  const save = useSave(() =>
-    saveProfile({ fullName: fullName.value.trim(), about: about.value }),
+  const tz = useSignal(user.tz);
+  const form = useRef<HTMLDivElement>(null);
+  const save = useSave(
+    () =>
+      saveProfile({
+        fullName: fullName.value.trim(),
+        about: about.value,
+        tz: tz.value,
+      }),
+    detailsFieldOf,
   );
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const submit = (event: Event) => {
     event.preventDefault();
-    void save.run(fullNameProblem(fullName.value) ?? aboutProblem(about.value));
+    void save.run(
+      at("fullName", fullNameProblem(fullName.value)) ??
+        at("about", aboutProblem(about.value)),
+    );
   };
   return (
     <SectionForm onSubmit={submit}>
-      <label class="field">
-        <span class="label">Full name</span>
-        <input
-          name="fullName"
-          autocomplete="name"
-          value={fullName.value}
-          onInput={(e) => {
-            fullName.value = (e.currentTarget as HTMLInputElement).value;
-            save.touch();
-          }}
-        />
-      </label>
-      <label class="field">
-        <span class="label">About</span>
-        <textarea
-          name="about"
-          rows={5}
-          placeholder="Who you are and what you work on."
-          value={about.value}
-          onInput={(e) => {
-            about.value = (e.currentTarget as HTMLTextAreaElement).value;
-            save.touch();
-          }}
-        />
-      </label>
+      <div class="profile-fields" ref={form}>
+        <label class="field">
+          <span class="label">Full name</span>
+          <input
+            name="fullName"
+            autocomplete="name"
+            aria-invalid={invalid("fullName") || undefined}
+            value={fullName.value}
+            onInput={(e) => {
+              fullName.value = (e.currentTarget as HTMLInputElement).value;
+              save.touch();
+            }}
+          />
+          <FieldError save={save} field="fullName" />
+        </label>
+        <div class="field">
+          <span class="label">Time zone</span>
+          <ZoneSelect
+            name="tz"
+            value={tz.value}
+            invalid={invalid("tz")}
+            onChange={(next) => {
+              tz.value = next;
+              save.touch();
+            }}
+          />
+          <FieldError save={save} field="tz" />
+        </div>
+        <label class="field">
+          <span class="label">About</span>
+          <textarea
+            name="about"
+            rows={5}
+            placeholder="Who you are and what you work on."
+            aria-invalid={invalid("about") || undefined}
+            value={about.value}
+            onInput={(e) => {
+              about.value = (e.currentTarget as HTMLTextAreaElement).value;
+              save.touch();
+            }}
+          />
+          <FieldError save={save} field="about" />
+        </label>
+      </div>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={
-          fullName.value.trim() !== user.fullName || about.value !== user.about
+          fullName.value.trim() !== user.fullName ||
+          about.value !== user.about ||
+          tz.value !== user.tz
         }
         label="Save"
       />
@@ -80,56 +121,67 @@ function PasswordForm() {
   const current = useSignal("");
   const next = useSignal("");
   const again = useSignal("");
+  const form = useRef<HTMLDivElement>(null);
   const save = useSave(async () => {
     await changePassword({ current: current.value, next: next.value });
     current.value = "";
     next.value = "";
     again.value = "";
-  });
+  }, passwordFieldOf);
+  useFocusField(save, form);
+  const invalid = (field: string) => save.fieldError(field) !== null;
   const bind = (s: { value: string }) => (e: Event) => {
     s.value = (e.currentTarget as HTMLInputElement).value;
     save.touch();
   };
   const submit = (event: Event) => {
     event.preventDefault();
-    void save.run(passwordProblem(current.value, next.value, again.value));
+    void save.run(passwordFieldProblem(current.value, next.value, again.value));
   };
   return (
     <SectionForm onSubmit={submit}>
-      <label class="field">
-        <span class="label">Current password</span>
-        <input
-          name="current"
-          type="password"
-          autocomplete="current-password"
-          value={current.value}
-          onInput={bind(current)}
-        />
-      </label>
-      <div class="profile-pair">
+      <div class="profile-fields" ref={form}>
         <label class="field">
-          <span class="label">New password</span>
+          <span class="label">Current password</span>
           <input
-            name="next"
+            name="current"
             type="password"
-            autocomplete="new-password"
-            value={next.value}
-            onInput={bind(next)}
+            autocomplete="current-password"
+            aria-invalid={invalid("current") || undefined}
+            value={current.value}
+            onInput={bind(current)}
           />
+          <FieldError save={save} field="current" />
         </label>
-        <label class="field">
-          <span class="label">New password again</span>
-          <input
-            name="again"
-            type="password"
-            autocomplete="new-password"
-            value={again.value}
-            onInput={bind(again)}
-          />
-        </label>
+        <div class="profile-pair">
+          <label class="field">
+            <span class="label">New password</span>
+            <input
+              name="next"
+              type="password"
+              autocomplete="new-password"
+              aria-invalid={invalid("next") || undefined}
+              value={next.value}
+              onInput={bind(next)}
+            />
+            <FieldError save={save} field="next" />
+          </label>
+          <label class="field">
+            <span class="label">New password again</span>
+            <input
+              name="again"
+              type="password"
+              autocomplete="new-password"
+              aria-invalid={invalid("again") || undefined}
+              value={again.value}
+              onInput={bind(again)}
+            />
+            <FieldError save={save} field="again" />
+          </label>
+        </div>
       </div>
       <Foot
-        status={save.status.value}
+        save={save}
         dirty={current.value !== "" && next.value !== "" && again.value !== ""}
         label="Change password"
       />
@@ -147,33 +199,57 @@ export function Profile() {
       error={profileError.value}
     >
       {user && (
-        <div class="profile">
-          {user.mustChangePassword && (
-            <p class="profile-notice">
-              Change the password you were handed before going on.
-            </p>
-          )}
-          <div class="profile-head">
-            <span class="profile-avatar">{initials(user.fullName)}</span>
-            <div class="profile-who">
-              <span class="profile-name">{user.fullName}</span>
-              <span class="profile-meta">@{user.username}</span>
-              <span class="profile-meta">{user.email}</span>
-              <span class="profile-meta">
-                joined {longDate(user.createdAt)}
-              </span>
+        <Split
+          aside={
+            <AsideSection label="Account">
+              <div class="split-line">
+                Email
+                <span class="split-strong profile-email">{user.email}</span>
+              </div>
+              <div class="split-line">
+                Role
+                <span class="split-strong">
+                  {user.role === "admin" ? "Admin" : "Member"}
+                </span>
+              </div>
+              <div class="split-line">
+                Joined
+                <span class="split-strong">{longDate(user.createdAt)}</span>
+              </div>
+            </AsideSection>
+          }
+        >
+          <div class="profile">
+            {user.mustChangePassword && (
+              <p class="profile-notice">
+                Change the password you were handed before going on.
+              </p>
+            )}
+            <div class="profile-head">
+              <span class="profile-avatar">{initials(user.fullName)}</span>
+              <div class="profile-who">
+                <span class="profile-name">{user.fullName}</span>
+                <span class="profile-meta profile-handle">
+                  @{user.username}
+                </span>
+                {/* the aside holds the email, and it is hidden this narrow */}
+                <span class="profile-meta profile-narrow">{user.email}</span>
+              </div>
             </div>
+            <Section
+              title="About you"
+              text="What agents should know about you."
+            >
+              <DetailsForm user={user} />
+            </Section>
+            <Section
+              title="Password"
+              text="Changing it signs out every other device."
+            >
+              <PasswordForm />
+            </Section>
           </div>
-          <Section title="About you" text="What agents should know about you.">
-            <DetailsForm user={user} />
-          </Section>
-          <Section
-            title="Password"
-            text="Changing it signs out every other device."
-          >
-            <PasswordForm />
-          </Section>
-        </div>
+        </Split>
       )}
     </Page>
   );
