@@ -13,12 +13,23 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../shared/contracts/provider.ts";
-import { AVATARS, type Avatar, type Effort } from "../../../shared/words.ts";
+import {
+  AVATARS,
+  type Avatar,
+  type Effort,
+  type McpMode,
+} from "../../../shared/words.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
+import {
+  loadMcp,
+  loadedAt as mcpLoadedAt,
+  servers as serverRows,
+} from "../../data/mcp.ts";
 import { searchCatalog } from "../../data/providers.ts";
 import { skills as skillRows } from "../../data/skills.ts";
 import { limits } from "../../data/tools.ts";
@@ -32,15 +43,19 @@ import {
   type Choice,
   compactLine,
   effortApplies,
-  effortChoices,
+  listedServers,
   modelMeta,
   nameProblem,
   reserveOf,
   sameIds,
+  sameServers,
   sentEffort,
   thinkingChoices,
+  toggleSide,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
+import { EffortField } from "./EffortField.tsx";
+import { McpPicker } from "./McpPicker.tsx";
 import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
 import { shapedInput } from "../../lib/names.ts";
@@ -107,6 +122,13 @@ export function AgentForm({
   const effort = useSignal<Effort | null>(agent?.effort ?? null);
   const avatar = useSignal<Avatar>(agent?.avatar ?? "bot");
   const pickedSkills = useSignal<string[]>(agent?.skills ?? []);
+  const pickedServers = useSignal<AgentServer[]>(agent?.servers ?? []);
+  const mcpMode = useSignal<McpMode>(agent?.mcpMode ?? "auto");
+  // the servers are read again on open, since a background refresh
+  // may have changed the rows the preview is built from
+  useEffect(() => void loadMcp(), []);
+  const chosenServers = () =>
+    listedServers(pickedServers.value, serverRows.value);
   // a skill deleted since the agent was saved is not a box, and it goes
   // from the save too, since the server would refuse the id; when the
   // list did not load, the ids are kept as they are
@@ -167,8 +189,8 @@ export function AgentForm({
       skills: chosenSkills(),
       // Preserve hidden MCP choices so an ordinary edit cannot clear them;
       // a new agent has no server and lets the token threshold choose.
-      servers: agent?.servers ?? [],
-      mcpMode: agent?.mcpMode ?? "auto",
+      servers: chosenServers(),
+      mcpMode: mcpMode.value,
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -201,7 +223,9 @@ export function AgentForm({
     prompt.value.trim() !== agent.prompt ||
     thinking.value !== agent.thinking ||
     effortSent !== agent.effort ||
-    !sameIds(pickedSkills.value, agent.skills);
+    !sameIds(pickedSkills.value, agent.skills) ||
+    mcpMode.value !== agent.mcpMode ||
+    !sameServers(pickedServers.value, agent.servers);
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -217,6 +241,10 @@ export function AgentForm({
   const picked = model.value;
   const busy = save.busy;
   const chosen = chosenSkills();
+  const toggleServer = (serverId: string, side: "read" | "write") => {
+    pickedServers.value = toggleSide(chosenServers(), serverId, side);
+    save.touch();
+  };
   const toggleSkill = (id: string) => {
     pickedSkills.value = chosen.includes(id)
       ? chosen.filter((s) => s !== id)
@@ -369,34 +397,15 @@ export function AgentForm({
           </div>
         )}
         {picked && effortShown && wire !== undefined && (
-          <label class="field">
-            <span class="label">Effort</span>
-            <span class="agents-select">
-              <select
-                name="effort"
-                class="agents-select-input"
-                disabled={busy}
-                onChange={(e) => {
-                  const value = (e.currentTarget as HTMLSelectElement).value;
-                  effort.value = value === "" ? null : (value as Effort);
-                  save.touch();
-                }}
-              >
-                {effortChoices(wire).map((choice) => (
-                  // Preact sets no default on a select, so the option
-                  // carries the selection
-                  <option
-                    key={choice.value ?? ""}
-                    value={choice.value ?? ""}
-                    selected={effort.value === choice.value}
-                  >
-                    {choice.label}
-                  </option>
-                ))}
-              </select>
-              <Icon name="chevron" size={14} class="agents-select-chevron" />
-            </span>
-          </label>
+          <EffortField
+            wire={wire}
+            value={effort.value}
+            busy={busy}
+            onChange={(value) => {
+              effort.value = value;
+              save.touch();
+            }}
+          />
         )}
         <label class="field agents-field-wide">
           <span class="label">System prompt</span>
@@ -421,6 +430,19 @@ export function AgentForm({
           chosen={chosen}
           busy={busy}
           onToggle={toggleSkill}
+        />
+        <McpPicker
+          available={serverRows.value}
+          loadedAt={mcpLoadedAt.value}
+          chosen={chosenServers()}
+          mode={mcpMode.value}
+          takesTools={picked?.tools ?? true}
+          busy={busy}
+          onToggle={toggleServer}
+          onMode={(mode) => {
+            mcpMode.value = mode;
+            save.touch();
+          }}
         />
       </div>
       <Foot

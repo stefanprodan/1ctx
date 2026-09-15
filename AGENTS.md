@@ -283,6 +283,26 @@ violation, and every rule has a rejected fixture under
   is the note after the date line naming added, removed and changed
   wire names, so the stable prefix stays cacheable. A running send
   never changes its set.
+- **The MCP page shows the loaded rows as a send would carry them.**
+  `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
+  by `shapeServerName()`, the key a `Select` of the `mcp-` files the
+  route answered), a row's head is the name over its tool count and
+  last check (the refresh failure in red) with Refresh at its end, and
+  it opens to the last change, the server's own words, the endpoint
+  with its own Change endpoint button (it discovers first, a 502
+  keeps what was typed), the settings with Save, the tools in the
+  four groups the pattern fields give live through `shared/mcp.ts`
+  (a pattern matching nothing marked under its field), and the
+  instructions as `serverBlock()` gives them, trimmed to 12 lines with
+  Show all. `data/mcp.ts` keeps the rows, the keys and `loadedAt`; the
+  page says when they were loaded, and the agent form reads them
+  again on open. The agent form's section is a line per server with
+  Read and Write boxes (a side off on the server faint with the word),
+  the mode as a `Select`, and the prompt's instructions total with a
+  warning per server a cap leaves out and View for the block, all from
+  `promptPreview()` in `Mcp.model.ts` over `offeredServers()` and
+  `promptSnapshot()`, so the preview is the bytes a send starting on
+  those rows would carry. A model without the tools flag says so.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

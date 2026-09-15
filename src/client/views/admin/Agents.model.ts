@@ -7,6 +7,7 @@
 // window, a price and a key.
 
 import { compactsAt } from "../../../shared/compaction.ts";
+import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import { windowLine } from "../../agents/meta.ts";
 
 export {
@@ -194,4 +195,42 @@ export function sameIds(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const set = new Set(a);
   return b.every((id) => set.has(id));
+}
+
+// the same servers with the same sides, in any order
+export function sameServers(a: AgentServer[], b: AgentServer[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (s: AgentServer) =>
+    `${s.serverId}:${s.read ? 1 : 0}${s.write ? 1 : 0}`;
+  const bKeys = new Set(b.map(key));
+  return a.every((s) => bKeys.has(key(s)));
+}
+
+// a side toggled on an agent's server: a link gains or loses the side,
+// and one with neither side goes
+export function toggleSide(
+  current: AgentServer[],
+  serverId: string,
+  side: "read" | "write",
+): AgentServer[] {
+  const link = current.find((s) => s.serverId === serverId);
+  const next = link
+    ? { ...link, [side]: !link[side] }
+    : { serverId, read: side === "read", write: side === "write" };
+  return [
+    ...current.filter((s) => s.serverId !== serverId),
+    ...(next.read || next.write ? [next] : []),
+  ];
+}
+
+// a server deleted since the agent was saved is not a line, and it
+// goes from the save too, since the server would refuse the id; when
+// the list did not load, the links are kept as they are
+export function listedServers(
+  links: AgentServer[],
+  rows: { id: string }[] | null,
+): AgentServer[] {
+  return rows === null
+    ? links
+    : links.filter((s) => rows.some((r) => r.id === s.serverId));
 }

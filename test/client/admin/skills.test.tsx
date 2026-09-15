@@ -334,7 +334,14 @@ describe("the page", () => {
     const group = railRows("admin").find((r) => r.kind === "group");
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual(["Projects", "Users", "Agents", "Tools", "Skills"]);
+    expect(labels).toEqual([
+      "Projects",
+      "Users",
+      "Agents",
+      "Tools",
+      "Skills",
+      "MCP",
+    ]);
   });
 
   test("renders the rows with their heads and the empty note", () => {
