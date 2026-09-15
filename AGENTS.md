@@ -216,8 +216,9 @@ violation, and every rule has a rejected fixture under
   shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
   The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
   (a site or an index is looked up first and its entries listed with
-  Add), a row opens to the fields, the body and each file as
-  preformatted text, then Refresh and Delete; the agent form checks
+  Add), a row's head is the name over its files and when it was fetched
+  (the refresh failure in red), with Refresh at its end, and it opens to
+  the fields, the body and each file as preformatted text, then Delete; the agent form checks
   skills by box, at most `MAX_SKILLS_PER_AGENT`, and loads them through
   the agents route. `data/skills.ts` keeps the list, a body and a file
   once read, dropped on refresh.
@@ -442,7 +443,11 @@ violation, and every rule has a rejected fixture under
   column: `RowsOpen` for a row that opens in place, `RowsGo` for one
   that leads to its page, `RowsLine` for one that does neither,
   `RowsAvatar`, `RowsTitle` (mono for an identifier) and `RowsMeta`
-  for its head, `RowsAdd` or `RowsLink` in a card's head. The
+  for its head, `RowsAdd` or `RowsLink` in a card's head. A card whose
+  list grows (the Projects page, and Users, Projects, Agents and Skills
+  under Admin) passes `ui/Search.tsx` as `RowsCard`'s `search`, in
+  place of the label, and filters the loaded rows through `matches()`
+  in `lib/search.ts`, with "No ... found" when nothing is left. The
   Projects page is the same rows: the Activity card (turns per day
   over up to 53 ISO weeks, as many as fit the width, from
   `GET /api/usage/days`, levels and columns in `Activity.model.ts`),

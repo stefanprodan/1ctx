@@ -21,6 +21,7 @@ import {
 } from "../../data/providers.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { WireMark } from "../../lib/marks.tsx";
+import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -33,6 +34,7 @@ import {
   RowsNote,
   RowsOpen,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { AgentForm } from "./AgentForm.tsx";
 import { keyLine } from "./Agents.model.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
@@ -151,6 +153,14 @@ export function Agents() {
   const adding = useSignal(false);
   const addingProvider = useSignal(false);
   const error = agentsError.value ?? providersError.value;
+  const q = useSignal("");
+  const shown = (list ?? []).filter((a) =>
+    matches(q.value, [
+      a.name,
+      a.model.id,
+      rows?.find((p) => p.id === a.providerId)?.name ?? "",
+    ]),
+  );
   return (
     <Page
       crumb="Admin"
@@ -161,6 +171,15 @@ export function Agents() {
       <Rows>
         <RowsCard
           label="Agents"
+          search={
+            <Search
+              value={q.value}
+              onChange={(next) => {
+                q.value = next;
+              }}
+              placeholder="Search agents"
+            />
+          }
           action={
             <RowsAdd
               label="New agent"
@@ -190,7 +209,10 @@ export function Agents() {
                 : "No agents yet. New agent picks a model from a provider below."}
             </RowsNote>
           )}
-          {(list ?? []).map((a) => (
+          {q.value.trim() !== "" && shown.length === 0 && (
+            <RowsNote>No agents found</RowsNote>
+          )}
+          {shown.map((a) => (
             <AgentRow
               key={a.id}
               agent={a}

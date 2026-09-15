@@ -53,7 +53,7 @@ export function bytesWord(n: number): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// the faint words at the head's right: the files and the fetch, or the
+// the faint line under the name: the files and the fetch, or the
 // failure in red
 export function metaLine(
   skill: Pick<
@@ -68,9 +68,12 @@ export function metaLine(
       bad: true,
     };
   }
-  const files =
-    skill.files.length === 0 ? "" : `${plural(skill.files.length, "file")} · `;
-  return { text: `${files}fetched ${ago(skill.fetchedAt, now)}`, bad: false };
+  // SKILL.md is a file too, so a skill always has one
+  const files = plural(skill.files.length + 1, "file");
+  return {
+    text: `${files} · fetched ${ago(skill.fetchedAt, now)}`,
+    bad: false,
+  };
 }
 
 // where the skill came from, in words

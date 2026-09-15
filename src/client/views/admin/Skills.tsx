@@ -15,6 +15,7 @@ import {
   deleteSkill,
   fileKey,
   files,
+  loadSkills,
   readSkill,
   readSkillFile,
   refreshSkill,
@@ -22,6 +23,7 @@ import {
   skillsError,
 } from "../../data/skills.ts";
 import { reason } from "../../lib/format.ts";
+import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -33,12 +35,12 @@ import {
   RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { SkillForm } from "./SkillForm.tsx";
 import {
   bytesWord,
   changeLine,
   droppedLine,
-  firstSentence,
   metadataLines,
   metaLine,
   sourceLine,
@@ -143,6 +145,9 @@ function SkillRow({
       else await deleteSkill(skill.id);
     } catch (err) {
       failure.value = reason(err);
+      // the server records a failed refresh on the row: the list learns
+      // it, so the head still says so once these words are gone
+      if (what === "refresh") void loadSkills();
     }
     busy.value = null;
   };
@@ -154,14 +159,33 @@ function SkillRow({
       onToggle={onToggle}
       indent="chevron"
       head={
-        <>
-          <RowsTitle
-            name={skill.name}
-            sub={firstSentence(skill.description)}
-            mono
-          />
-          <RowsMeta bad={meta.bad}>{meta.text}</RowsMeta>
-        </>
+        <RowsTitle
+          name={skill.name}
+          sub={
+            // a refused refresh reads under the name, where a long reason
+            // is cut to the row instead of pushing Refresh off it
+            failure.value !== null && !asking.value ? (
+              <span class="error" role="alert">
+                {failure.value}
+              </span>
+            ) : meta.bad ? (
+              <span class="error">{meta.text}</span>
+            ) : (
+              meta.text
+            )
+          }
+          mono
+        />
+      }
+      end={
+        <button
+          type="button"
+          class="btn btn-small"
+          disabled={busy.value !== null}
+          onClick={() => void act("refresh")}
+        >
+          {busy.value === "refresh" ? "Refreshing" : "Refresh"}
+        </button>
       }
     >
       <div class="skills-open">
@@ -245,29 +269,19 @@ function SkillRow({
               </button>
             </>
           ) : (
-            <>
-              <button
-                type="button"
-                class="btn btn-small"
-                disabled={busy.value !== null}
-                onClick={() => void act("refresh")}
-              >
-                {busy.value === "refresh" ? "Refreshing" : "Refresh"}
-              </button>
-              <button
-                type="button"
-                class="btn btn-small"
-                disabled={busy.value !== null}
-                onClick={() => {
-                  asking.value = true;
-                  failure.value = null;
-                }}
-              >
-                Delete
-              </button>
-            </>
+            <button
+              type="button"
+              class="btn btn-small"
+              disabled={busy.value !== null}
+              onClick={() => {
+                asking.value = true;
+                failure.value = null;
+              }}
+            >
+              Delete
+            </button>
           )}
-          {failure.value && (
+          {failure.value && asking.value && (
             <span class="skills-note error">{failure.value}</span>
           )}
         </div>
@@ -281,6 +295,10 @@ export function Skills() {
   const open = useSignal<string | null>(null);
   const adding = useSignal(false);
   const error = skillsError.value;
+  const q = useSignal("");
+  const shown = (list ?? []).filter((skill) =>
+    matches(q.value, [skill.name, skill.description]),
+  );
   // the fetched-ago words move by the minute
   const now = useSignal(Date.now());
   useEffect(() => {
@@ -299,6 +317,15 @@ export function Skills() {
       <Rows>
         <RowsCard
           label="Skills"
+          search={
+            <Search
+              value={q.value}
+              onChange={(next) => {
+                q.value = next;
+              }}
+              placeholder="Search skills"
+            />
+          }
           action={
             <RowsAdd
               label="Add skill"
@@ -325,7 +352,10 @@ export function Skills() {
               there.
             </RowsNote>
           )}
-          {(list ?? []).map((skill) => (
+          {q.value.trim() !== "" && shown.length === 0 && (
+            <RowsNote>No skills found</RowsNote>
+          )}
+          {shown.map((skill) => (
             <SkillRow
               key={skill.id}
               skill={skill}

@@ -8,6 +8,7 @@ import type {
   ProjectSummary,
 } from "../../../shared/contracts/project.ts";
 import type { ProjectKind } from "../../../shared/words.ts";
+import { matches } from "../../lib/search.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 
 // the Projects card: the personal project first, then the teams, those
@@ -16,11 +17,10 @@ export function listedProjects<T extends Pick<ProjectSummary, "kind" | "name">>(
   list: readonly T[],
   q: string,
 ): T[] {
-  const needle = q.trim().toLowerCase();
   return [
     ...list.filter((p) => p.kind === "personal"),
     ...list.filter((p) => p.kind === "team"),
-  ].filter((p) => p.name.toLowerCase().includes(needle));
+  ].filter((p) => matches(q, [p.name]));
 }
 
 // "1 user", "2 agents"

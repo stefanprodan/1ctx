@@ -16,6 +16,7 @@ import {
   loadAdminProject,
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
+import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -27,6 +28,7 @@ import {
   RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { countLine, sinceLine } from "./AdminProjects.model.ts";
 import { ProjectForm } from "./ProjectForm.tsx";
 import "./admin-projects.css";
@@ -78,6 +80,10 @@ export function AdminProjects() {
   }, [asked, open]);
   const adding = useSignal(false);
   const error = adminProjectsError.value ?? usersError.value;
+  const q = useSignal("");
+  const shown = (list ?? []).filter((project) =>
+    matches(q.value, [project.name]),
+  );
   return (
     <Page
       crumb="Admin"
@@ -88,6 +94,15 @@ export function AdminProjects() {
       <Rows>
         <RowsCard
           label="Projects"
+          search={
+            <Search
+              value={q.value}
+              onChange={(next) => {
+                q.value = next;
+              }}
+              placeholder="Search projects"
+            />
+          }
           action={
             <RowsAdd
               label="New project"
@@ -113,7 +128,10 @@ export function AdminProjects() {
           {list?.length === 0 && !adding.value && (
             <RowsNote>No team projects yet.</RowsNote>
           )}
-          {(list ?? []).map((project) => (
+          {q.value.trim() !== "" && shown.length === 0 && (
+            <RowsNote>No projects found</RowsNote>
+          )}
+          {shown.map((project) => (
             <ProjectRow
               key={project.id}
               project={project}
