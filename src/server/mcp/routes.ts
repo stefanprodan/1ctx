@@ -28,6 +28,7 @@ export type RoutesDeps = {
   log: (line: string) => void;
   hasSecret: (name: string) => boolean;
   keys: () => string[];
+  callTimeoutMs: () => number;
   render: (markdown: string, streaming?: boolean) => string;
   discover(
     endpoint: Pick<McpServerRow, "url" | "keyName">,
@@ -72,6 +73,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const body: McpResponse = {
           servers: deps.store.list().map(show),
           keys: deps.keys(),
+          callTimeoutMs: deps.callTimeoutMs(),
           loadedAt: deps.clock(),
         };
         return json(body);

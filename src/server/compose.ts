@@ -121,6 +121,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     secret,
     keys: () => options.secretNames?.(MCP_KEY_PREFIX) ?? [],
+    callTimeoutMs: () => limits.current().callTimeoutMs,
     fetcher: options.fetcher ?? fetch,
     log: options.log("mcp"),
     version: options.version,

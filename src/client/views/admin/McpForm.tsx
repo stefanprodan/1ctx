@@ -10,7 +10,7 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import { patternLines } from "../../../shared/mcp.ts";
 import { shapeServerName } from "../../../shared/words.ts";
-import { addServer, keys } from "../../data/mcp.ts";
+import { addServer, callTimeoutMs, keys } from "../../data/mcp.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
@@ -20,8 +20,10 @@ import {
   keyOptions,
   mcpFieldOf,
   NO_KEY,
+  timeoutHint,
   timeoutMs,
   timeoutProblem,
+  timeoutText,
 } from "./Mcp.model.ts";
 import "./mcp.css";
 
@@ -131,7 +133,7 @@ export function McpFields({
           class="mcp-mono"
           inputMode="decimal"
           autocomplete="off"
-          placeholder="the tools' timeout"
+          placeholder={timeoutText(callTimeoutMs.value)}
           aria-invalid={invalid("timeoutMs") || undefined}
           disabled={busy}
           value={timeout}
@@ -142,9 +144,7 @@ export function McpFields({
         {invalid("timeoutMs") ? (
           <FieldError save={save} field="timeoutMs" />
         ) : (
-          <span class="hint">
-            Seconds. Empty uses the limits' call timeout.
-          </span>
+          <span class="hint">{timeoutHint(callTimeoutMs.value)}</span>
         )}
       </label>
       {patterns(

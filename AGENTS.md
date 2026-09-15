@@ -286,7 +286,8 @@ violation, and every rule has a rejected fixture under
 - **The MCP page shows the loaded rows as a send would carry them.**
   `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
   by `shapeServerName()`, the key a `Select` of the `mcp-` files the
-  route answered), a row's head is the name over its tool count and
+  route answered, the timeout's hint naming the limits' call timeout
+  the route answered), a row's head is the name over its tool count and
   last check (the refresh failure in red) with Refresh at its end, and
   it opens to the last change, the server's own words, the endpoint
   with its own Change endpoint button (it discovers first, a 502

@@ -6,11 +6,13 @@
 import type { McpServerSummary } from "../contracts/mcp.ts";
 
 // GET /api/mcp: the rows, the names of the mcp- key files the form may
-// pick (names alone, never a value), and when they were read, so a page
-// can say how old its preview is
+// pick (names alone, never a value), the limits' call timeout a server
+// without its own runs under, so the form's hint can name it, and when
+// they were read, so a page can say how old its preview is
 export type McpResponse = {
   servers: McpServerSummary[];
   keys: string[];
+  callTimeoutMs: number;
   loadedAt: number;
 };
 

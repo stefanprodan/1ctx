@@ -23,6 +23,7 @@ import { me } from "./me.ts";
 export const servers = signal<McpServerSummary[] | null>(null);
 export const serversError = signal<Failure | null>(null);
 export const keys = signal<string[]>([]);
+export const callTimeoutMs = signal<number | null>(null);
 export const loadedAt = signal<number | null>(null);
 
 let owner: string | null = null;
@@ -36,6 +37,7 @@ effect(() => {
   servers.value = null;
   serversError.value = null;
   keys.value = [];
+  callTimeoutMs.value = null;
   loadedAt.value = null;
 });
 
@@ -54,6 +56,7 @@ export async function loadMcp(): Promise<void> {
     if (owner === forUser && turn === mine) {
       servers.value = byName(body.servers);
       keys.value = body.keys;
+      callTimeoutMs.value = body.callTimeoutMs;
       loadedAt.value = body.loadedAt;
     }
   } catch (err) {

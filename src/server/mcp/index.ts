@@ -78,6 +78,8 @@ export type McpDeps = {
   version: string;
   // the names of the mcp- key files, for the form; never a value
   keys: () => string[];
+  // the limits' call timeout of the moment, for the form's hint
+  callTimeoutMs: () => number;
   render: (markdown: string, streaming?: boolean) => string;
 };
 
@@ -258,6 +260,7 @@ export function mcpArea(deps: McpDeps): Mcp {
     log: deps.log,
     hasSecret: (name) => deps.secret(name) !== null,
     keys: deps.keys,
+    callTimeoutMs: deps.callTimeoutMs,
     render: deps.render,
     discover: runDiscovery,
   });

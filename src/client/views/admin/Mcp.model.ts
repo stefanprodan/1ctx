@@ -194,6 +194,15 @@ export function timeoutProblem(text: string): string | null {
   return null;
 }
 
+// the field's hint names the limits' value an empty field runs under,
+// as the Tools page has it now, once the rows are loaded
+export function timeoutHint(limitMs: number | null): string {
+  const base = "Seconds. Empty uses the limits' call timeout";
+  return limitMs === null
+    ? `${base}.`
+    : `${base}, now ${timeoutText(limitMs)}.`;
+}
+
 export function timeoutMs(text: string): number | null {
   const trimmed = text.trim();
   return trimmed === "" ? null : Math.round(Number(trimmed) * 1000);

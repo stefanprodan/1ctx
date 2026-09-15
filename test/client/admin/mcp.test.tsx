@@ -13,6 +13,7 @@ import { render } from "preact-render-to-string";
 import { railRows } from "../../../src/client/app/routes.ts";
 import {
   addServer,
+  callTimeoutMs,
   deleteServer,
   keys,
   loadedAt,
@@ -37,6 +38,7 @@ import {
   metaLine,
   promptPreview,
   settingsDirty,
+  timeoutHint,
   timeoutMs,
   timeoutProblem,
   timeoutText,
@@ -211,6 +213,12 @@ describe("the model", () => {
     expect(timeoutProblem("abc")).toBe("A number of seconds");
     expect(timeoutProblem("0.5")).toBe("1 to 3600 seconds");
     expect(timeoutProblem("3601")).toBe("1 to 3600 seconds");
+    expect(timeoutHint(null)).toBe(
+      "Seconds. Empty uses the limits' call timeout.",
+    );
+    expect(timeoutHint(20_000)).toBe(
+      "Seconds. Empty uses the limits' call timeout, now 20.",
+    );
   });
 
   test.serial(
@@ -361,6 +369,7 @@ describe("the entity", () => {
           return Response.json({
             servers: [flux],
             keys: ["mcp-github"],
+            callTimeoutMs: 20_000,
             loadedAt: now,
           });
         }
@@ -383,6 +392,7 @@ describe("the entity", () => {
       await loadMcp();
       expect(servers.value).toEqual([flux]);
       expect(keys.value).toEqual(["mcp-github"]);
+      expect(callTimeoutMs.value).toBe(20_000);
       expect(loadedAt.value).toBe(now);
       await patchServer("m1", { write: true });
       expect(servers.value?.[0]?.write).toBe(true);
@@ -421,7 +431,12 @@ describe("the entity", () => {
     const loading = loadMcp();
     const writing = patchServer("m1", { write: true });
     finishLoad(
-      Response.json({ servers: [flux], keys: [], loadedAt: now - HOUR }),
+      Response.json({
+        servers: [flux],
+        keys: [],
+        callTimeoutMs: 20_000,
+        loadedAt: now - HOUR,
+      }),
     );
     await loading;
     expect(servers.value).toBeNull();

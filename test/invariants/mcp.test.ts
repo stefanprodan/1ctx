@@ -94,6 +94,7 @@ describe("MCP servers over the routes", () => {
     expect(list.servers).toEqual([server]);
     // the mcp- key files by name, the provider's left out
     expect(list.keys).toEqual(["mcp-github"]);
+    expect(list.callTimeoutMs).toBe(20_000);
     expect(typeof list.loadedAt).toBe("number");
   });
 

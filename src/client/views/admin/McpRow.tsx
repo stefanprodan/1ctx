@@ -394,7 +394,7 @@ export function ServerRow({
           <Group label="Unusable" tools={groups.unusable} />
           <div class="mcp-instructions">
             <span class="mcp-instructions-head">
-              <span class="label">Instructions for the model</span>
+              <span class="label">Instructions for the agent</span>
               {instructionsOn.value && server.instructions !== "" && (
                 <span class="hint">{characters(box.count)}</span>
               )}
