@@ -153,6 +153,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     providers,
     skills,
+    tools: { offered: (now, agentId) => tools.offered(now, agentId) },
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
     automations: {

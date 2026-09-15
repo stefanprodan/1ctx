@@ -26,3 +26,13 @@ export type UserAccount = UserSummary & {
 };
 
 export type Profile = UserAccount & { about: string };
+
+// another user as their page shows them to any signed-in user: who they
+// are, how to reach them and when it is for them
+export type DirectoryUser = UserSummary & {
+  email: string;
+  tz: string;
+  about: string;
+  createdAt: number;
+  disabled: boolean;
+};

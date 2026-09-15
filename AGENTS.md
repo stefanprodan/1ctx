@@ -439,6 +439,28 @@ violation, and every rule has a rejected fixture under
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
   ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
+- **Every user and every agent has a page.** `/users/:username` and
+  `/agents/:name` (`views/people/`, addresses from `lib/hrefs.ts`) are
+  open to every signed-in user, read from `GET
+  /api/directory/users/:username` (`access/directory.ts`) and `GET
+  /api/directory/agents/:name` (`agents/directory.ts`), held in
+  `data/directory.ts`; the name in the path goes through the name
+  parser, so a malformed one is a 400. A user's page carries the email,
+  the zone, the about text and the team projects both users are
+  members of (an admin's view of every team does not count, a personal
+  project never shows); `UserSummary` still carries no email. An
+  agent's page carries the provider's name, the skills with their
+  descriptions and fetch times, the built-in tools the tools area would
+  offer a send now (none when the model takes no tools, websearch with
+  its search provider, the skill tools left out of the list), and
+  token counts for the prompt, the skill bodies together and every
+  offered schema as `wireTools()` puts it on the wire, the skill tools
+  included. Tokens are counted on the server by `lib/tokens.ts`,
+  gpt-tokenizer's `o200k_base` alone (each encoding carries its
+  vocabulary into the binary), exact only for OpenAI models; a skill
+  body's count is kept per skill until its digest moves. A name is a
+  link to its page wherever it is drawn, except inside a row that is
+  itself a link (a stream row's author, an automation row's agent).
 - **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
   column: `RowsOpen` for a row that opens in place, `RowsGo` for one
   that leads to its page, `RowsLine` for one that does neither,

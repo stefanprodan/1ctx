@@ -16,6 +16,11 @@ import {
   auth,
 } from "./auth.ts";
 import {
+  type ProjectsPort as DirectoryProjectsPort,
+  type UsersPort as DirectoryUsersPort,
+  directoryRoutes,
+} from "./directory.ts";
+import {
   type UsersPort as ProfileUsersPort,
   profileRoutes,
 } from "./profile.ts";
@@ -33,6 +38,7 @@ export {
   type Resolution,
   TOUCH_AFTER_MS,
 } from "./auth.ts";
+export { type DirectoryDeps, directoryRoutes } from "./directory.ts";
 export { type ProfileDeps, profileRoutes } from "./profile.ts";
 export { type RoutesDeps, routes } from "./routes.ts";
 export { type Login, LoginStore } from "./store.ts";
@@ -48,8 +54,12 @@ export type AccessDeps = {
   log: Log;
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
-  users: AuthUsersPort & LoginUsersPort & ProfileUsersPort & AdminUsersPort;
-  projects: AuthProjectsPort;
+  users: AuthUsersPort &
+    LoginUsersPort &
+    ProfileUsersPort &
+    AdminUsersPort &
+    DirectoryUsersPort;
+  projects: AuthProjectsPort & DirectoryProjectsPort;
 };
 
 export type Access = Auth & {
@@ -91,6 +101,7 @@ export function accessArea(deps: AccessDeps): Access {
         users: deps.users,
         clock: deps.clock,
       }),
+      ...directoryRoutes({ users: deps.users, projects: deps.projects }),
     ],
   };
 }

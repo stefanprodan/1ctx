@@ -532,6 +532,7 @@ describe("the pages", () => {
     );
     expect(html).toContain('class="rows-avatar">OM<');
     expect(html).toContain('class="rows-sub">@caelea<');
+    expect(html).toContain('class="rows-line rows-go" href="/users/caelea"');
     expect(html).toContain("Loading");
     projectAgents.value = [
       {
@@ -563,6 +564,7 @@ describe("the pages", () => {
       'class="rows-meta">128k · $0.14 / $0.28 · tools · reasoning<',
     );
     expect(html).not.toContain("rows-toggle");
+    expect(html).toContain('class="rows-line rows-go" href="/agents/coder"');
     projectAgents.value = [];
     expect(render(<Members params={{ id: "p1" }} />)).toContain(
       "No agents yet",

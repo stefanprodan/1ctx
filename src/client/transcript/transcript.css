@@ -68,6 +68,10 @@
     font-weight: 600;
     color: var(--dim);
   }
+  /* a name that leads to its page reads as the name, lit on hover */
+  .transcript-name-link:hover {
+    color: var(--fg);
+  }
 
   .transcript-when {
     font-family: var(--mono);

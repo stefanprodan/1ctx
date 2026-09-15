@@ -12,6 +12,7 @@ import type { Fetcher } from "./catalog.ts";
 import type {
   ChatEvent,
   ChatRequest,
+  ChatTool,
   ReasoningDetail,
   ToolCall,
 } from "./types.ts";
@@ -106,10 +107,7 @@ export function buildChatBody(
     body.reasoning_effort = req.reasoningEffort;
   }
   if (req.tools && req.tools.length > 0) {
-    body.tools = req.tools.map((tool) => ({
-      type: "function",
-      function: tool,
-    }));
+    body.tools = wireTools(req.tools);
     // the answer round keeps the schemas but forbids a call
     if (req.toolChoice === "none") body.tool_choice = "none";
   }
@@ -118,6 +116,14 @@ export function buildChatBody(
   if (req.cacheKey) body.prompt_cache_key = req.cacheKey;
   if (req.maxTokens != null) body.max_tokens = req.maxTokens;
   return body;
+}
+
+// the tools as the chat body carries them; a page counting what a
+// request costs serializes them the same way
+export function wireTools(
+  tools: readonly ChatTool[],
+): { type: "function"; function: ChatTool }[] {
+  return tools.map((tool) => ({ type: "function", function: tool }));
 }
 
 // Frames are returned as their joined data payload. Comments count as bytes

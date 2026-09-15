@@ -8,6 +8,11 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
+  directoryRoutes,
+  type SkillsListPort,
+  type ToolsPort,
+} from "./directory.ts";
+import {
   type AccessPort,
   type AutomationsPort,
   type ProvidersPort,
@@ -17,6 +22,12 @@ import {
 } from "./routes.ts";
 import { type AgentRow, AgentStore } from "./store.ts";
 
+export {
+  type DirectoryDeps,
+  directoryRoutes,
+  type SkillsListPort,
+  type ToolsPort,
+} from "./directory.ts";
 export {
   type AccessPort,
   type AutomationsPort,
@@ -32,7 +43,8 @@ export type AgentsDeps = {
   db: Db;
   clock: Clock;
   providers: ProvidersPort;
-  skills: SkillsPort & { assigned(agentId: string): string[] };
+  skills: SkillsPort & SkillsListPort & { assigned(agentId: string): string[] };
+  tools: ToolsPort;
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -51,15 +63,24 @@ export function agentsArea(deps: AgentsDeps): Agents {
     store,
     byId: (id) => store.byId(id),
     usesProvider: (providerId) => store.usesProvider(providerId),
-    routes: routes({
-      db: deps.db,
-      store,
-      providers: deps.providers,
-      skills: deps.skills,
-      access: deps.access,
-      sessions: deps.sessions,
-      automations: deps.automations,
-      clock: deps.clock,
-    }),
+    routes: [
+      ...routes({
+        db: deps.db,
+        store,
+        providers: deps.providers,
+        skills: deps.skills,
+        access: deps.access,
+        sessions: deps.sessions,
+        automations: deps.automations,
+        clock: deps.clock,
+      }),
+      ...directoryRoutes({
+        store,
+        providers: deps.providers,
+        skills: deps.skills,
+        tools: deps.tools,
+        clock: deps.clock,
+      }),
+    ],
   };
 }

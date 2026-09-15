@@ -174,6 +174,17 @@ export class SkillStore {
 
   // the skill body and its file paths, without loading any file content:
   // the `skill` tool reads the body but names the files, never reads them
+  // the SKILL.md text alone, for a count of its tokens
+  bodyText(id: string): string | null {
+    return (
+      this.db
+        .query<{ body: string }, [string]>(
+          "select body from skills where id = ?",
+        )
+        .get(id)?.body ?? null
+    );
+  }
+
   bodyOf(id: string): {
     id: string;
     name: string;
@@ -377,6 +388,26 @@ export class SkillStore {
         name: row.name,
         description: row.description,
         hasFiles: row.has_files === 1,
+      }));
+  }
+
+  // the agent's skills as its page needs them without their bodies: when
+  // each was fetched, and its digest, which moves with its content, so a
+  // count taken from the body can be kept until it does
+  versions(
+    agentId: string,
+  ): { id: string; digest: string; fetchedAt: number }[] {
+    return this.db
+      .query<{ id: string; digest: string; fetched_at: number }, [string]>(
+        `select s.id, s.digest, s.fetched_at
+           from skills s join agent_skills a on a.skill_id = s.id
+          where a.agent_id = ? order by s.name`,
+      )
+      .all(agentId)
+      .map((row) => ({
+        id: row.id,
+        digest: row.digest,
+        fetchedAt: row.fetched_at,
       }));
   }
 

@@ -38,6 +38,10 @@ export type Skills = {
   store: SkillStore;
   routes: RouteDescriptor[];
   forAgent(agentId: string): OfferedSkill[];
+  versions(
+    agentId: string,
+  ): { id: string; digest: string; fetchedAt: number }[];
+  bodyText(id: string): string | null;
   body(id: string, name: string): SkillBody | null;
   file(id: string, name: string, path: string): string | null;
   exists(id: string): boolean;
@@ -54,6 +58,8 @@ export function skillsArea(deps: SkillsDeps): Skills {
     store,
     routes: routes({ ...deps, store, shutdown: shutdown.signal, refreshing }),
     forAgent: (agentId) => store.forAgent(agentId),
+    versions: (agentId) => store.versions(agentId),
+    bodyText: (id) => store.bodyText(id),
     body(id, name) {
       const row = store.bodyOf(id);
       if (row === null || row.name !== name) return null;

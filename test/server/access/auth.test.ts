@@ -40,6 +40,7 @@ function build(secureCookie: boolean) {
       isMember: () => false,
       memberProjectIds: () => [],
       teamProjectIds: () => [],
+      visibleFor: () => [],
     },
   });
   return { db, user, users, access };

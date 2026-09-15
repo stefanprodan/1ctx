@@ -88,7 +88,9 @@ describe("Home", () => {
     expect(html).toContain('placeholder="Search sessions"');
     expect(html).toContain("Loading");
     // the aside: the agents, and the week once it answers
-    expect(html).toContain('class="split-name">assistant<');
+    expect(html).toContain(
+      'class="split-name split-name-link" href="/agents/assistant">assistant<',
+    );
     expect(html).toContain('class="split-faint">acme/small<');
     expect(html).not.toContain("Manage");
     week.value = {
