@@ -181,19 +181,19 @@ export function defaultLine(row: LimitRow): string {
   return `default ${show(row, row.default)}${word === "" ? "" : ` ${word}`}`;
 }
 
-// the key file of a provider and whether it is there; both providers
-// answer without one, so a missing file is a rate, not a fault
+// the key file of a provider and whether it is there; every provider
+// answers without one, so a missing file is a rate, not a fault
 export function keyLine(provider: SearchProvider, present: boolean): string {
   return `${provider}.key ${present ? "present" : "keyless"}`;
 }
 
-// what the search section says under the two providers
+// what the search section says under the providers
 export function searchLine(state: SearchState): string {
   if (state.provider === null) {
     return "Choose a provider. websearch is not offered until one is chosen.";
   }
   if (!state.keys[state.provider]) {
-    return `websearch runs on ${state.provider} without a key; ${state.provider}.key in the secrets directory raises the rate.`;
+    return `websearch runs on ${state.provider} keyless. Add ${state.provider}.key for a higher rate.`;
   }
   return `websearch runs on ${state.provider}.`;
 }

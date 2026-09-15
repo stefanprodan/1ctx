@@ -346,8 +346,8 @@ violation, and every rule has a rejected fixture under
   decided once per send in `runner/policy.ts` from the `tools` rows:
   every tool of the model accepts tools that an admin has not
   switched off, and websearch only once a search provider is chosen;
-  both providers answer keyless, a key file raises the rate, and the
-  runner never holds a key. A change on the
+  every provider (exa, firecrawl, tavily) answers keyless, a key file
+  raises the rate, and the runner never holds a key. A change on the
   Tools page applies to the next send; a send in flight keeps the
   caps and the set it started on. A round's calls run in parallel
   under the call timeout and the send's signal. A tool row is a message

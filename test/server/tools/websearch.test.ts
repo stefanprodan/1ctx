@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// websearch: the argument parsing, the two provider bodies and their
+// websearch: the argument parsing, the provider bodies and their
 // error mapping, the HTTP policy, the limits and cancellation, the
 // User-Agent, and the key read in the area (a key gone since offered() is
 // a failed result, never a switch). Hosts are the providers' own; the
@@ -19,8 +19,14 @@ import {
   FIRECRAWL_URL,
   parseAnswer as parseFirecrawlAnswer,
 } from "../../../src/server/tools/builtin/search/firecrawl.ts";
+import {
+  buildRequest as buildTavilyRequest,
+  parseAnswer as parseTavilyAnswer,
+  TAVILY_URL,
+} from "../../../src/server/tools/builtin/search/tavily.ts";
 import type { SearchProvider } from "../../../src/server/tools/builtin/search/types.ts";
 import {
+  makeWebsearchTool,
   parseArgs,
   retryAfterMs,
   type Search,
@@ -40,6 +46,9 @@ const exaFixture = await Bun.file(
 ).text();
 const firecrawlFixture = await Bun.file(
   new URL("../../fixtures/tools/firecrawl-search.json", import.meta.url),
+).text();
+const tavilyFixture = await Bun.file(
+  new URL("../../fixtures/tools/tavily-search.json", import.meta.url),
 ).text();
 const exaPayload = exaFixture
   .split(/\r?\n/u)
@@ -134,6 +143,12 @@ function firecrawlResponse(): Response {
   );
 }
 
+function tavilyResponse(): Response {
+  return streamResponse([JSON.stringify({ results: [] })], {
+    headers: { "content-type": "application/json" },
+  });
+}
+
 async function thrown(promise: Promise<unknown>): Promise<Error> {
   try {
     await promise;
@@ -145,11 +160,27 @@ async function thrown(promise: Promise<unknown>): Promise<Error> {
 
 describe("websearch arguments", () => {
   test("validates and normalizes query and domain", () => {
-    for (const value of [undefined, "", "   "]) {
+    for (const value of [undefined, 7]) {
       expect(() => parseArgs({ query: value })).toThrow(
-        "query must be a non-empty string",
+        "query must be a string",
       );
     }
+    for (const value of ["", "   ", "x", " x "]) {
+      expect(() => parseArgs({ query: value })).toThrow(
+        "query must be at least 2 characters",
+      );
+    }
+    expect(parseArgs({ query: " go " }).query).toBe("go");
+    // counted by code point: one emoji is one character, two are two
+    expect(() => parseArgs({ query: "\u{1f600}" })).toThrow(
+      "query must be at least 2 characters",
+    );
+    expect(parseArgs({ query: "\u{1f600}\u{1f600}" }).query).toBe(
+      "\u{1f600}\u{1f600}",
+    );
+    expect(parseArgs({ query: "\u{1f600}".repeat(500) }).query).toHaveLength(
+      1000,
+    );
     expect(() => parseArgs({ query: "x".repeat(501) })).toThrow(
       "query must be at most 500 characters",
     );
@@ -244,6 +275,7 @@ describe("provider requests", () => {
         { query: "latest kubernetes version", domain: null },
         null,
         "vtest",
+        10_000,
       ),
     ).toEqual({
       url: FIRECRAWL_URL,
@@ -261,13 +293,76 @@ describe("provider requests", () => {
       { query: "ssh", domain: "fluxcd.io" },
       "secret",
       "vtest",
+      30_000,
     );
     expect(restricted.headers.Authorization).toBe("Bearer secret");
     expect(JSON.parse(restricted.body)).toEqual({
       query: "ssh",
       limit: 5,
-      timeout: 8000,
+      timeout: 28_000,
       includeDomains: ["fluxcd.io"],
+    });
+  });
+
+  test("gives Firecrawl the deadline less its margin, a second at least", async () => {
+    const timeout = (deadlineMs: number) =>
+      JSON.parse(
+        buildFirecrawlRequest(
+          { query: "find", domain: null },
+          null,
+          "vtest",
+          deadlineMs,
+        ).body,
+      ).timeout;
+    expect(timeout(1000)).toBe(1000);
+    expect(timeout(2500)).toBe(1000);
+    expect(timeout(600_000)).toBe(598_000);
+    let sent: unknown;
+    const long = context(new AbortController().signal, budget(), 45_000);
+    long.caps = { ...long.caps, callTimeoutMs: 60_000 };
+    await searchWeb(
+      { query: "find" },
+      long,
+      search("firecrawl"),
+      "vtest",
+      dependencies(async (_input, init) => {
+        sent = JSON.parse(String(init?.body)).timeout;
+        return firecrawlResponse();
+      }),
+    );
+    expect(sent).toBe(43_000);
+  });
+
+  test("builds the exact Tavily body, keyless by header", () => {
+    expect(
+      buildTavilyRequest(
+        { query: "latest kubernetes version", domain: null },
+        null,
+        "vtest",
+      ),
+    ).toEqual({
+      url: TAVILY_URL,
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "1ctx/vtest",
+        "X-Tavily-Access-Mode": "keyless",
+      },
+      body: JSON.stringify({
+        query: "latest kubernetes version",
+        max_results: 5,
+      }),
+    });
+    const restricted = buildTavilyRequest(
+      { query: "ssh", domain: "fluxcd.io" },
+      "secret",
+      "vtest",
+    );
+    expect(restricted.headers.Authorization).toBe("Bearer secret");
+    expect(restricted.headers["X-Tavily-Access-Mode"]).toBeUndefined();
+    expect(JSON.parse(restricted.body)).toEqual({
+      query: "ssh",
+      max_results: 5,
+      include_domains: ["fluxcd.io"],
     });
   });
 
@@ -276,6 +371,7 @@ describe("provider requests", () => {
     for (const [provider, key] of [
       ["exa", "exa-key"],
       ["firecrawl", "firecrawl-key"],
+      ["tavily", "tavily-key"],
     ] as const) {
       await searchWeb(
         { query: "find" },
@@ -287,7 +383,11 @@ describe("provider requests", () => {
             url: String(input),
             headers: new Headers(init?.headers),
           });
-          return provider === "exa" ? exaResponse() : firecrawlResponse();
+          return provider === "exa"
+            ? exaResponse()
+            : provider === "firecrawl"
+              ? firecrawlResponse()
+              : tavilyResponse();
         }),
       );
     }
@@ -297,6 +397,9 @@ describe("provider requests", () => {
     expect(calls[1].url).toBe(FIRECRAWL_URL);
     expect(calls[1].headers.get("authorization")).toBe("Bearer firecrawl-key");
     expect(calls[1].headers.get("x-api-key")).toBeNull();
+    expect(calls[2].url).toBe(TAVILY_URL);
+    expect(calls[2].headers.get("authorization")).toBe("Bearer tavily-key");
+    expect(calls[2].headers.get("x-tavily-access-mode")).toBeNull();
   });
 });
 
@@ -411,9 +514,7 @@ describe("Firecrawl answers", () => {
           `${index + 1}. ${hit.title}\n${hit.url}\n${hit.description}`,
       )
       .join("\n\n");
-    expect(
-      parseFirecrawlAnswer(firecrawlFixture, "application/json", true),
-    ).toBe(expected);
+    expect(parseFirecrawlAnswer(firecrawlFixture)).toBe(expected);
   });
 
   test("skips missing URLs, keeps contiguous numbers and empty fields", () => {
@@ -427,34 +528,70 @@ describe("Firecrawl answers", () => {
         ],
       },
     });
-    expect(parseFirecrawlAnswer(answer, "application/json", false)).toBe(
+    expect(parseFirecrawlAnswer(answer)).toBe(
       "1. one\nhttps://one\nfirst\n\n2. \nhttps://three\n",
     );
     expect(
       parseFirecrawlAnswer(
         JSON.stringify({ success: true, data: { web: [] } }),
-        "application/json",
-        false,
       ),
     ).toBe("No results.");
   });
 
   test("reports provider and shape errors", () => {
     expect(() =>
-      parseFirecrawlAnswer(
-        JSON.stringify({ success: false, error: "denied" }),
-        "application/json",
-        false,
-      ),
+      parseFirecrawlAnswer(JSON.stringify({ success: false, error: "denied" })),
     ).toThrow("denied");
     for (const body of [
       "not json",
       JSON.stringify({ success: true }),
       JSON.stringify({ success: true, data: {} }),
     ]) {
-      expect(() =>
-        parseFirecrawlAnswer(body, "application/json", false),
-      ).toThrow("websearch answered with an unexpected shape");
+      expect(() => parseFirecrawlAnswer(body)).toThrow(
+        "websearch answered with an unexpected shape",
+      );
+    }
+  });
+});
+
+describe("Tavily answers", () => {
+  test("formats the recorded hits", () => {
+    const source = JSON.parse(tavilyFixture).results as Array<{
+      title: string;
+      url: string;
+      content: string;
+    }>;
+    expect(source.length).toBeGreaterThan(0);
+    const expected = source
+      .map(
+        (hit, index) =>
+          `${index + 1}. ${hit.title}\n${hit.url}\n${hit.content}`,
+      )
+      .join("\n\n");
+    expect(parseTavilyAnswer(tavilyFixture)).toBe(expected);
+  });
+
+  test("skips missing URLs, keeps contiguous numbers and empty fields", () => {
+    const answer = JSON.stringify({
+      results: [
+        { title: "one", url: "https://one", content: "first" },
+        { title: "drop", content: "missing URL" },
+        { title: 3, url: "https://three", content: 3 },
+      ],
+    });
+    expect(parseTavilyAnswer(answer)).toBe(
+      "1. one\nhttps://one\nfirst\n\n2. \nhttps://three\n",
+    );
+    expect(parseTavilyAnswer(JSON.stringify({ results: [] }))).toBe(
+      "No results.",
+    );
+  });
+
+  test("reports a shape error", () => {
+    for (const body of ["not json", "[]", JSON.stringify({ query: "x" })]) {
+      expect(() => parseTavilyAnswer(body)).toThrow(
+        "websearch answered with an unexpected shape",
+      );
     }
   });
 });
@@ -507,7 +644,7 @@ describe("websearch HTTP policy", () => {
   });
 
   test("maps HTTP errors for both providers", async () => {
-    for (const provider of ["exa", "firecrawl"] as const) {
+    for (const provider of ["exa", "firecrawl", "tavily"] as const) {
       const withText = await thrown(
         searchWeb(
           { query: "find" },
@@ -571,6 +708,44 @@ describe("websearch HTTP policy", () => {
     expect(rejected.message).toBe("websearch key rejected: Invalid API key");
   });
 
+  test("maps Tavily's nested words for a rejected key and a refusal", async () => {
+    const rejected = await thrown(
+      searchWeb(
+        { query: "find" },
+        context(),
+        search("tavily", "bad"),
+        "vtest",
+        dependencies(async () =>
+          streamResponse(
+            [
+              JSON.stringify({
+                detail: { error: "Unauthorized: missing or invalid API key." },
+              }),
+            ],
+            { status: 401 },
+          ),
+        ),
+      ),
+    );
+    expect(rejected.message).toBe(
+      "websearch key rejected: Unauthorized: missing or invalid API key.",
+    );
+    const refused = await thrown(
+      searchWeb(
+        { query: "find" },
+        context(),
+        search("tavily"),
+        "vtest",
+        dependencies(async () =>
+          streamResponse([JSON.stringify({ detail: { error: "Too many" } })], {
+            status: 403,
+          }),
+        ),
+      ),
+    );
+    expect(refused.message).toBe("websearch refused: Too many");
+  });
+
   test("cleans and bounds server error text", async () => {
     const dirty = ` first\nsecond\u0000\tthird ${"x".repeat(5000)}`;
     const error = await thrown(
@@ -613,6 +788,25 @@ describe("websearch limits and cancellation", () => {
     );
     expect(error.message).toBe("websearch answer over 1 MB");
     expect(cancelled).toBe(1);
+  });
+
+  test("names the cap an admin set when a body is over it", async () => {
+    const ctx = context();
+    ctx.caps = { ...ctx.caps, searchBodyBytes: 64 * 1024 };
+    const error = await thrown(
+      searchWeb(
+        { query: "find" },
+        ctx,
+        search("tavily"),
+        "vtest",
+        dependencies(async () =>
+          streamResponse([new Uint8Array(64 * 1024 + 1)], {
+            headers: { "content-type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    expect(error.message).toBe("websearch answer over 64 KB");
   });
 
   test("enforces three searches synchronously across parallel calls", async () => {
@@ -763,5 +957,114 @@ describe("the area reads the key at each call", () => {
     expect(sentKey).toBeNull();
     expect(result.error).toBe(true);
     expect(result.content).toContain("401");
+  });
+});
+
+describe("websearch review fixes", () => {
+  test("a key echoed in a successful answer is scrubbed", async () => {
+    const tool = makeWebsearchTool(
+      () => "tvly-secret",
+      "tavily",
+      "vtest",
+      dependencies(async () =>
+        streamResponse(
+          [
+            JSON.stringify({
+              results: [
+                {
+                  title: "tvly-secret",
+                  url: "https://one.example/?k=tvly-secret",
+                  content: "your key is tvly-secret",
+                },
+              ],
+            }),
+          ],
+          { headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+    const result = await tool.run({ query: "find" }, context());
+    expect(result).not.toContain("tvly-secret");
+    expect(result).toBe(
+      "1. [key]\nhttps://one.example/?k=[key]\nyour key is [key]",
+    );
+  });
+
+  test("a keyed 401 and a keyless 403 without readable words keep their meaning", async () => {
+    for (const body of ["", "<html>denied</html>"]) {
+      const rejected = await thrown(
+        searchWeb(
+          { query: "find" },
+          context(),
+          search("tavily", "bad"),
+          "vtest",
+          dependencies(async () => streamResponse([body], { status: 401 })),
+        ),
+      );
+      expect(rejected.message).toBe("websearch key rejected");
+      const refused = await thrown(
+        searchWeb(
+          { query: "find" },
+          context(),
+          search("firecrawl"),
+          "vtest",
+          dependencies(async () => streamResponse([body], { status: 403 })),
+        ),
+      );
+      expect(refused.message).toBe("websearch refused");
+    }
+    // a keyless 401 and a keyed 403 are plain failures
+    const keyless401 = await thrown(
+      searchWeb(
+        { query: "find" },
+        context(),
+        search("tavily"),
+        "vtest",
+        dependencies(async () => streamResponse([""], { status: 401 })),
+      ),
+    );
+    expect(keyless401.message).toBe("websearch failed (HTTP 401)");
+  });
+
+  test("the provider timeout and the retry wait follow a shorter call timeout", async () => {
+    const ctx = context(new AbortController().signal, budget(), 600_000);
+    ctx.caps = { ...ctx.caps, callTimeoutMs: 5000 };
+    let timeout: unknown;
+    await searchWeb(
+      { query: "find" },
+      ctx,
+      search("firecrawl"),
+      "vtest",
+      dependencies(async (_input, init) => {
+        timeout = JSON.parse(String(init?.body)).timeout;
+        return firecrawlResponse();
+      }),
+    );
+    expect(timeout).toBe(3000);
+
+    // a retry-after of 6 s fits the search deadline but not the call's
+    const sleeps: number[] = [];
+    const limited = await thrown(
+      searchWeb(
+        { query: "find" },
+        ctx,
+        search("tavily"),
+        "vtest",
+        dependencies(
+          async () =>
+            streamResponse([""], {
+              status: 429,
+              headers: { "retry-after": "6" },
+            }),
+          async (ms) => {
+            sleeps.push(ms);
+          },
+        ),
+      ),
+    );
+    expect(limited.message).toBe(
+      "websearch rate limited, try again in a moment",
+    );
+    expect(sleeps).toEqual([]);
   });
 });

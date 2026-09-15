@@ -8,6 +8,7 @@
 // from the secrets port, never carried here.
 
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
+import type { SearchProvider } from "../../shared/words.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { ChatTool } from "../providers/index.ts";
 
@@ -47,6 +48,6 @@ export type Tool = {
 // provider has a key
 export type Offered = {
   tools: ChatTool[];
-  search: "exa" | "firecrawl" | null;
+  search: SearchProvider | null;
   skills: { block: string; skills: OfferedSkill[] };
 };

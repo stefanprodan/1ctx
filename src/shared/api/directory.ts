@@ -20,7 +20,7 @@ export type DirectoryUserResponse = {
 export type DirectorySkill = OfferedSkill & { fetchedAt: number };
 
 // a built-in tool a send would offer, with the provider that answers
-// it when an admin picked one (websearch's exa or firecrawl)
+// it when an admin picked one (websearch's exa, firecrawl or tavily)
 export type DirectoryTool = { name: string; provider: string | null };
 
 // token counts in OpenAI's o200k_base encoding, an estimate for any

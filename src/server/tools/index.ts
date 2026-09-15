@@ -11,7 +11,7 @@
 // off mid-send is still run by a send that was offered it and a tool
 // the model names outside its set is a failed result. The runner holds
 // the snapshot on the policy and never a key: the key is read here from
-// the secrets port at each call, and both providers answer without one.
+// the secrets port at each call, and every provider answers without one.
 // Anything that reaches a provider goes through
 // the fetcher compose option, so a test passes a fake and the suite
 // never reaches a network.
@@ -184,6 +184,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         keys: {
           exa: deps.secret("exa") !== null,
           firecrawl: deps.secret("firecrawl") !== null,
+          tavily: deps.secret("tavily") !== null,
         },
       },
     };
@@ -209,7 +210,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     offered(now, agentId) {
       const rows = new Map(store.rows().map((row) => [row.name, row]));
       const searchRow = rows.get("websearch")!;
-      // the chosen provider, key or not: both answer keyless, so the
+      // the chosen provider, key or not: each answers keyless, so the
       // key file only raises the rate
       const search =
         searchRow.enabled && searchRow.provider !== null

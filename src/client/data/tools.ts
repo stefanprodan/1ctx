@@ -60,31 +60,40 @@ export async function loadTools(): Promise<void> {
   }
 }
 
+// a write answers the whole entity, so of two writes in flight only the
+// later one started may land: an earlier answer arriving last would put
+// back what the later write changed
+let toolWrites = 0;
+let limitWrites = 0;
+
 export async function patchTool(
   name: BuiltinTool,
   body: PatchToolRequest,
 ): Promise<void> {
   const forUser = owner;
+  const mine = ++toolWrites;
   const next = await api<ToolsResponse>(
     `/api/tools/${encodeURIComponent(name)}`,
     "PATCH",
     body,
   );
   turn++;
-  if (owner === forUser) tools.value = next;
+  if (owner === forUser && toolWrites === mine) tools.value = next;
 }
 
 export async function saveLimits(body: PutLimitsRequest): Promise<void> {
   const forUser = owner;
+  const mine = ++limitWrites;
   const next = await api<LimitsResponse>("/api/limits", "PUT", body);
   turn++;
-  if (owner === forUser) limits.value = next.limits;
+  if (owner === forUser && limitWrites === mine) limits.value = next.limits;
 }
 
 export async function resetLimits(): Promise<void> {
   const forUser = owner;
+  const mine = ++limitWrites;
   await api("/api/limits", "DELETE");
   const next = await api<LimitsResponse>("/api/limits");
   turn++;
-  if (owner === forUser) limits.value = next.limits;
+  if (owner === forUser && limitWrites === mine) limits.value = next.limits;
 }

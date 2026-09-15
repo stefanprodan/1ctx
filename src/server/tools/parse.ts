@@ -31,7 +31,7 @@ export function parseToolPatch(body: unknown): PatchToolRequest {
   }
   if (hasProvider) {
     if (input.provider !== null && !isSearchProvider(input.provider)) {
-      throw new BadRequest("provider must be exa, firecrawl or null");
+      throw new BadRequest("provider must be exa, firecrawl, tavily or null");
     }
     patch.provider = input.provider;
   }
