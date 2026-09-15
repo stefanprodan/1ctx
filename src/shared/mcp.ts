@@ -260,11 +260,22 @@ export type McpDigest = Record<
   { tools: Record<string, string>; instructions: string | null }
 >;
 
+function utf8Bytes(text: string): number {
+  let bytes = 0;
+  for (const char of text) {
+    const point = char.codePointAt(0)!;
+    if (point <= 0x7f) bytes += 1;
+    else if (point <= 0x7ff) bytes += 2;
+    else if (point <= 0xffff) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
+}
+
 function schemasBytes(server: PromptServer): number {
   let bytes = 0;
   for (const tool of server.tools) {
-    bytes +=
-      tool.wireName.length + tool.description.length + tool.schemaJson.length;
+    bytes += utf8Bytes(tool.wireName + tool.description + tool.schemaJson);
   }
   return bytes;
 }

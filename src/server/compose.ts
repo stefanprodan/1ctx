@@ -7,6 +7,7 @@
 // flags; the test helper calls it with a memory db and a fake clock,
 // so a test exercises the wiring the binary runs.
 
+import { MCP_KEY_PREFIX } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
@@ -15,6 +16,7 @@ import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
+import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import { type ProjectStore, projectsArea } from "./projects/index.ts";
 import {
   type Catalogs,
@@ -42,6 +44,9 @@ export type ComposeOptions = {
   db: Db;
   // the secrets port: the bare value or null
   secret: (name: string) => string | null;
+  // the names of the key files with a prefix, for a form's pick;
+  // absent when nothing lists them
+  secretNames?: (prefix: string) => string[];
   clock: Clock;
   // what reaches a provider; a test passes a fake
   fetcher?: Fetcher;
@@ -59,6 +64,7 @@ export type App = {
   users: UserStore;
   projects: ProjectStore;
   providers: ProviderStore;
+  mcp: McpServerStore;
   skills: SkillStore;
   agents: AgentStore;
   sessions: SessionStore;
@@ -75,6 +81,9 @@ export type App = {
   handle: Router;
   // drop expired logins; called at start and every hour
   sweep(): number;
+  // the hourly MCP refresh loop; main.ts starts it after the first
+  // sweep, a test only when it tests the pass
+  mcpStart(): void;
   // terminate every send and close every socket, in that order
   shutdown(): Promise<void>;
 };
@@ -106,6 +115,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret,
     fetcher: options.fetcher ?? fetch,
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
+  });
+  const mcp: Mcp = mcpArea({
+    db,
+    clock,
+    secret,
+    keys: () => options.secretNames?.(MCP_KEY_PREFIX) ?? [],
+    fetcher: options.fetcher ?? fetch,
+    log: options.log("mcp"),
+    version: options.version,
+    render: renderMarkdown,
   });
   const skills: Skills = skillsArea({
     db,
@@ -224,6 +243,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...usage.routes,
     ...limits.routes,
     ...providers.routes,
+    ...mcp.routes,
     ...skills.routes,
     ...projects.routes,
     ...access.routes,
@@ -244,6 +264,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users: users.store,
     projects: projects.store,
     providers: providers.store,
+    mcp: mcp.store,
     skills: skills.store,
     agents: agents.store,
     sessions: sessions.store,
@@ -258,10 +279,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     handle,
     sweep: () => access.sweep(),
+    mcpStart: () => mcp.start(),
+    // the runner first, whose ending calls may still ask for a refresh
+    // that the MCP close then refuses; nothing touches the db after
     async shutdown() {
       skills.close();
       automations.stop();
       await runner.shutdown();
+      await mcp.close();
       automations.dispose();
       socket.dispose();
     },

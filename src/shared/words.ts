@@ -166,6 +166,10 @@ export function isMcpMode(value: unknown): value is McpMode {
   return MCP_MODES.includes(value as McpMode);
 }
 
+// an MCP server's key file is named mcp-<something>.key, so the form
+// offers the files with the prefix and nothing else can be picked
+export const MCP_KEY_PREFIX = "mcp-";
+
 // an MCP server's own call timeout, null for the limits' callTimeoutMs
 export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;
 export const MAX_MCP_URL = 2048;

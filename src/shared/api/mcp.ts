@@ -5,9 +5,14 @@
 
 import type { McpServerSummary } from "../contracts/mcp.ts";
 
-// GET /api/mcp: the rows and when they were read, so a page can say
-// how old its preview is
-export type McpResponse = { servers: McpServerSummary[]; loadedAt: number };
+// GET /api/mcp: the rows, the names of the mcp- key files the form may
+// pick (names alone, never a value), and when they were read, so a page
+// can say how old its preview is
+export type McpResponse = {
+  servers: McpServerSummary[];
+  keys: string[];
+  loadedAt: number;
+};
 
 // POST /api/mcp, PATCH /api/mcp/:id and POST /api/mcp/:id/refresh
 export type McpServerResponse = { server: McpServerSummary };

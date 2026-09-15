@@ -229,6 +229,29 @@ violation, and every rule has a rejected fixture under
   rows or the Tools page, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
   summary, the user message names still-offered skills loaded before it.
+- **An MCP server is rows, discovered through the official SDK.** The
+  wire is `@modelcontextprotocol/client` v2 over Streamable HTTP in
+  `auto` negotiation (the modern stateless era, or the legacy
+  handshake); `mcp/client.ts` is its one importer, with one client per
+  discovery or call, every response under one byte budget per client,
+  the key from `mcp-<name>.key` sent as a bearer and scrubbed from every
+  string the server says, every server string cut. An admin registers a
+  server by name and URL (`isServerName`: the channel rule without the
+  underscore, at most 24, since the wire name is `mcp__<server>__<tool>`
+  inside the OpenAI rule) and picks the key from the `mcp-` files
+  `secrets.list()` names. Its tools are rows: discovered on add, on an
+  endpoint PATCH (url or keyName alone, the row kept on a 502), on
+  Refresh, on a call that sees the server's fingerprint move and hourly,
+  under the caps in `mcp/limits.ts`, with no approval step; a failed
+  refresh keeps the last good list and records `refreshError`. The
+  sides are the admin's patterns through `shared/mcp.ts` (`classify`:
+  unusable, excluded, read, write, in that order) and never stored;
+  `offered()` intersects the server's and the agent's switches. One
+  refresh coordinator per `mcpArea`, never module state, closed in
+  `shutdown()` after the runner; a delete aborts a discovery in flight
+  and is a 409 while an agent references the server. Every server
+  string is shown as text; `parametersHtml` is the one HTML, rendered on
+  the server. The name never changes.
 - **Writes that belong together go through `transact()`.** A transaction
   body returns its result and the bus events to publish; they are
   published after the outermost commit and never on a throw, so a

@@ -142,6 +142,10 @@ export async function testApp(
     db,
     secret: (name) =>
       name === "admin" ? adminPassword : (options.secrets?.[name] ?? null),
+    secretNames: (prefix) =>
+      Object.keys(options.secrets ?? {})
+        .filter((name) => name.startsWith(prefix))
+        .sort(),
     clock,
     fetcher: options.fetcher ?? fake.fetcher,
     log: () => silent,

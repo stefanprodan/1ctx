@@ -24,7 +24,8 @@ export type McpToolSummary = {
   unusable: string | null;
   // as the server sent it, cut at the discovery cap
   description: string;
-  // the stored input schema as JSON
+  // the stored input schema as an object and as JSON
+  parameters: object;
   schemaJson: string;
   // the schema pretty-printed inside a code fence, rendered on the server
   parametersHtml: string;

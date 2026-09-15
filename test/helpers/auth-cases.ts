@@ -292,6 +292,46 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/mcp",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/mcp",
+    // the fake fetch fails every host but the provider's, so discovery
+    // is the admin's 502
+    body: {
+      name: "flux",
+      url: "http://mcp.test/mcp",
+      keyName: null,
+      read: true,
+      write: false,
+      instructionsOn: true,
+      timeoutMs: null,
+      readPatterns: [],
+      writePatterns: [],
+      excludedPatterns: [],
+    },
+    expect: { anonymous: 401, member: 403, admin: 502 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/mcp/:id",
+    body: { read: true },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/mcp/:id/refresh",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/mcp/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/skills",
     expect: { anonymous: 401, member: 403, admin: 200 },
   },
