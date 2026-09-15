@@ -123,9 +123,17 @@ export function Rail({
   const here = path.value;
   const inProject = projectHere(here, session.value, automationProject.value);
   const hide = useRef<HTMLButtonElement>(null);
+  const nav = useRef<HTMLElement>(null);
   useEffect(() => {
     if (narrow) hide.current?.focus();
   }, [narrow]);
+  // the list scrolls inside the rail, so the project on screen is kept in
+  // view when it sits below the fold, after a reload or a link elsewhere
+  useEffect(() => {
+    nav.current
+      ?.querySelector(".rail-sub-on")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [here, inProject, projects.value]);
   const follow = narrow ? onHide : undefined;
   return (
     <aside class={`rail${narrow ? " rail-drawer" : ""}`}>
@@ -144,7 +152,7 @@ export function Rail({
             <Icon name={narrow ? "close" : "sidebar"} />
           </button>
         </div>
-        <nav class="rail-nav">
+        <nav ref={nav} class="rail-nav">
           {railRows(user.role).map((row) =>
             row.kind === "group" ? (
               <Group
