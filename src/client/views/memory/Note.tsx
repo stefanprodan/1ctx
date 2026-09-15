@@ -91,7 +91,7 @@ function Editor({
       {draft.value.map((text, index) => (
         <div class="note-box" key={index}>
           <textarea
-            class="input"
+            class="input note-box-text"
             aria-label={`Entry ${index + 1}`}
             rows={2}
             value={text}
