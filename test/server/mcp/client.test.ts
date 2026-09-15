@@ -13,6 +13,95 @@ const options = () => ({
   bodyBytes: 2 * 1024 * 1024,
 });
 
+const definition = {
+  name: "echo",
+  inputSchema: { type: "object", properties: {} },
+};
+
+// Reads a call's text through withClient, so a throw carries the mapped
+// error and a success carries the tool text.
+function runCall(
+  fetcher: typeof fetch,
+  key: string | null = null,
+  opts: Partial<ReturnType<typeof options>> = {},
+) {
+  return withClient(
+    { fetcher, version: "test" },
+    { url: URL },
+    key,
+    { ...options(), ...opts },
+    async (client) => {
+      const result = await client.callTool("echo", {}, definition, {
+        signal: options().signal,
+        timeoutMs: 2_000,
+      });
+      const part = result.content?.[0];
+      return typeof part?.text === "string" ? part.text : "";
+    },
+  );
+}
+
+function jsonRpc(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+// A modern fake whose tools/call is answered by onCall; other methods go
+// to the recorded server. `calls` counts the intercepted tools/call.
+function callFetch(
+  recorded: Awaited<ReturnType<typeof fixture>>,
+  onCall: (id: unknown) => Response,
+): { fetcher: typeof fetch; requests: { method: string }[]; calls: number[] } {
+  const fake = mcpFetch({ recorded });
+  const calls: number[] = [];
+  const fetcher = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const request =
+      input instanceof Request ? input : new Request(String(input), init);
+    if (request.method === "DELETE") return fake.fetcher(request);
+    const body = (await request.clone().json()) as {
+      method?: string;
+      id?: unknown;
+    };
+    if (body.method === "tools/call") {
+      calls.push(1);
+      return onCall(body.id);
+    }
+    return fake.fetcher(request);
+  }) as typeof fetch;
+  return { fetcher, requests: fake.requests, calls };
+}
+
+// A fetcher that aborts the shared controller when it first sees `method`,
+// then never resolves, so the request is only ended when the transport is
+// closed. `cancelled` reports that the closed transport aborted the request.
+function abortAt(
+  method: string,
+  base: typeof fetch,
+  controller: AbortController,
+  cancelled: { value: boolean },
+): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const request =
+      input instanceof Request ? input : new Request(String(input), init);
+    if (request.method === "DELETE") return base(request);
+    const body = (await request.clone().json()) as { method?: string };
+    if (body.method !== method) return base(request);
+    controller.abort(new Error("stopped"));
+    return new Promise<Response>((_resolve, reject) => {
+      const stop = () => {
+        cancelled.value = true;
+        reject(request.signal.reason);
+      };
+      if (request.signal.aborted) stop();
+      else request.signal.addEventListener("abort", stop, { once: true });
+    });
+  }) as typeof fetch;
+}
+
 describe("MCP SDK client", () => {
   test("negotiates the modern era and emits modern headers", async () => {
     const recorded = await fixture();
@@ -332,6 +421,275 @@ describe("MCP SDK client", () => {
       }),
     );
   });
+
+  test("declares no client capabilities on the wire", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({ recorded });
+    await withClient(
+      { fetcher: fake.fetcher, version: "test" },
+      { url: URL },
+      null,
+      options(),
+      async (client) => client.listTools(),
+    );
+    const probe = fake.requests.find(
+      (request) => request.method === "server/discover",
+    );
+    const meta = (probe?.body.params as Record<string, unknown> | undefined)
+      ?._meta as Record<string, unknown> | undefined;
+    const capabilities = meta?.["io.modelcontextprotocol/clientCapabilities"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(capabilities).toBeDefined();
+    expect(capabilities?.sampling).toBeUndefined();
+    expect(capabilities?.elicitation).toBeUndefined();
+    expect(capabilities?.roots).toBeUndefined();
+  });
+
+  test("uses a tool definition with no output schema, without listing tools", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({ recorded });
+    const toolDefinition = {
+      name: "repo",
+      inputSchema: {
+        type: "object",
+        properties: {
+          owner: { type: "string", "x-mcp-header": "owner" },
+        },
+      },
+    };
+    expect("outputSchema" in toolDefinition).toBeFalse();
+    await withClient(
+      { fetcher: fake.fetcher, version: "test" },
+      { url: URL },
+      null,
+      options(),
+      async (client) =>
+        client.callTool("repo", { owner: "acme" }, toolDefinition, {
+          signal: options().signal,
+          timeoutMs: 2_000,
+        }),
+    );
+    // The definition drove the Mcp-Param header, so no tools/list was needed.
+    expect(fake.requests.map((request) => request.method)).toEqual([
+      "server/discover",
+      "tools/call",
+    ]);
+    const call = fake.requests.find(
+      (request) => request.method === "tools/call",
+    );
+    expect(call?.headers.get("mcp-param-owner")).toBe("acme");
+  });
+
+  test("fails a call on a header mismatch without listing or retrying", async () => {
+    const recorded = await fixture();
+    const { fetcher, requests, calls } = callFetch(recorded, (id) =>
+      jsonRpc({
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32020, message: "header mismatch: owner" },
+      }),
+    );
+    await expect(
+      withClient(
+        { fetcher, version: "test" },
+        { url: URL },
+        null,
+        options(),
+        async (client) =>
+          client.callTool("echo", {}, definition, {
+            signal: options().signal,
+            timeoutMs: 2_000,
+          }),
+      ),
+    ).rejects.toThrow("header mismatch");
+    // The probe reached the fake; the mismatched call was answered once and
+    // never listed tools or retried.
+    expect(requests.map((request) => request.method)).toEqual([
+      "server/discover",
+    ]);
+    expect(
+      requests.some((request) => request.method === "tools/list"),
+    ).toBeFalse();
+    expect(calls.length).toBe(1);
+  });
+
+  test("fails an input_required result as a failed row", async () => {
+    const recorded = await fixture();
+    const { fetcher } = callFetch(recorded, (id) =>
+      jsonRpc({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          resultType: "input_required",
+          requestState: "resume-token",
+          inputRequests: {
+            confirm: {
+              request: {
+                method: "elicitation/create",
+                params: { message: "confirm?" },
+              },
+            },
+          },
+        },
+      }),
+    );
+    await expect(runCall(fetcher)).rejects.toThrow("input_required");
+  });
+
+  test("puts a non-401 status in the words", async () => {
+    for (const status of [404, 500]) {
+      const recorded = await fixture();
+      const { fetcher } = callFetch(
+        recorded,
+        () => new Response("boom", { status }),
+      );
+      await expect(runCall(fetcher)).rejects.toThrow(
+        `the server answered ${status}`,
+      );
+    }
+  });
+
+  test("maps a body that is not JSON-RPC to a failed row, cut", async () => {
+    const recorded = await fixture();
+    const { fetcher } = callFetch(recorded, () =>
+      jsonRpc({ hello: "world", nested: { of: "no jsonrpc shape" } }),
+    );
+    let message = "";
+    await runCall(fetcher).catch((error) => {
+      message = error instanceof Error ? error.message : String(error);
+    });
+    expect(message).not.toBe("");
+    expect(message).not.toContain("the server answered");
+    expect(message.length).toBeLessThanOrEqual(2_000);
+  });
+
+  test("cuts a 10 KB error text to 2000 characters", async () => {
+    const recorded = await fixture();
+    const { fetcher } = callFetch(recorded, (id) =>
+      jsonRpc({
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32000, message: "E".repeat(10_000) },
+      }),
+    );
+    let message = "";
+    await runCall(fetcher).catch((error) => {
+      message = error instanceof Error ? error.message : String(error);
+    });
+    expect(message.length).toBe(2_000);
+  });
+
+  test("aborts during the modern probe, closing the transport at once", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({ recorded });
+    const controller = new AbortController();
+    const cancelled = { value: false };
+    const fetcher = abortAt(
+      "server/discover",
+      fake.fetcher,
+      controller,
+      cancelled,
+    );
+    const started = Date.now();
+    await expect(
+      withClient(
+        { fetcher, version: "test" },
+        { url: URL },
+        null,
+        { ...options(), signal: controller.signal },
+        async (client) => client.listTools(),
+      ),
+    ).rejects.toThrow();
+    expect(cancelled.value).toBeTrue();
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  test("aborts during the legacy handshake, closing the transport at once", async () => {
+    const recorded = await fixture("flux-docs");
+    const fake = mcpFetch({ era: "legacy", recorded });
+    const controller = new AbortController();
+    const cancelled = { value: false };
+    const fetcher = abortAt("initialize", fake.fetcher, controller, cancelled);
+    const started = Date.now();
+    await expect(
+      withClient(
+        { fetcher, version: "test" },
+        { url: URL },
+        null,
+        { ...options(), signal: controller.signal },
+        async (client) => client.listTools(),
+      ),
+    ).rejects.toThrow();
+    expect(cancelled.value).toBeTrue();
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  test("aborts mid-call, closing the transport at once", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({ recorded });
+    const controller = new AbortController();
+    const cancelled = { value: false };
+    const fetcher = abortAt("tools/call", fake.fetcher, controller, cancelled);
+    const started = Date.now();
+    await expect(
+      withClient(
+        { fetcher, version: "test" },
+        { url: URL },
+        null,
+        { ...options(), signal: controller.signal },
+        async (client) =>
+          client.callTool("echo", {}, definition, {
+            signal: options().signal,
+            timeoutMs: 2_000,
+          }),
+      ),
+    ).rejects.toThrow();
+    expect(cancelled.value).toBeTrue();
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  test("a DELETE answered 405 does not change the outcome", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({
+      era: "legacy",
+      recorded,
+      sessionId: "session-1",
+      deleteStatus: 405,
+    });
+    const text = await runCall(fake.fetcher);
+    expect(text).toBe("called");
+    const deleted = fake.requests.at(-1);
+    expect(deleted?.method).toBe("DELETE");
+  });
+
+  test("a DELETE answered 500 does not change the outcome", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({
+      era: "legacy",
+      recorded,
+      sessionId: "session-1",
+      deleteStatus: 500,
+    });
+    const text = await runCall(fake.fetcher);
+    expect(text).toBe("called");
+    const deleted = fake.requests.at(-1);
+    expect(deleted?.method).toBe("DELETE");
+  });
+
+  test("a stateless server gets no DELETE", async () => {
+    const recorded = await fixture();
+    const fake = mcpFetch({ recorded });
+    const text = await runCall(fake.fetcher);
+    expect(text).toBe("called");
+    expect(
+      fake.requests.some((request) => request.method === "DELETE"),
+    ).toBeFalse();
+    expect(fake.requests.map((request) => request.method)).toEqual([
+      "server/discover",
+      "tools/call",
+    ]);
+  });
 });
 
 describe("MCP streamed response budget", () => {
@@ -366,5 +724,41 @@ describe("MCP streamed response budget", () => {
         async () => null,
       ),
     ).rejects.toThrow("the server's answer is over 100 bytes");
+  });
+
+  test("aborts an SSE stream that crosses the budget", async () => {
+    let transportClosed = false;
+    const fetcher = (async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const request =
+        input instanceof Request ? input : new Request(String(input), init);
+      request.signal.addEventListener(
+        "abort",
+        () => {
+          transportClosed = true;
+        },
+        { once: true },
+      );
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.enqueue(new Uint8Array(new Array(200).fill(120)));
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    }) as typeof fetch;
+    await expect(
+      withClient(
+        { fetcher, version: "test" },
+        { url: URL },
+        null,
+        { ...options(), bodyBytes: 100 },
+        async (client) => client.listTools(),
+      ),
+    ).rejects.toThrow("the server's answer is over 100 bytes");
+    expect(transportClosed).toBeTrue();
   });
 });

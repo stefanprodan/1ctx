@@ -132,6 +132,41 @@ describe("MCP discovery", () => {
     ).rejects.toThrow("over 512 KB");
   });
 
+  test("lets the SDK reject a tool without an input schema", async () => {
+    await expect(
+      run((method, result) =>
+        method === "tools/list"
+          ? { ...result, tools: [{ name: "noschema" }] }
+          : result,
+      ),
+    ).rejects.toThrow();
+  });
+
+  test("refuses two names that collide once the key is scrubbed", async () => {
+    const key = "secret";
+    await expect(
+      run(
+        (method, result) =>
+          method === "tools/list"
+            ? {
+                ...result,
+                tools: [
+                  {
+                    name: `read-${key}`,
+                    inputSchema: { type: "object", properties: {} },
+                  },
+                  {
+                    name: "read-[redacted]",
+                    inputSchema: { type: "object", properties: {} },
+                  },
+                ],
+              }
+            : result,
+        key,
+      ),
+    ).rejects.toThrow("twice");
+  });
+
   test("cuts descriptions, instructions and server identity", async () => {
     const { found } = await run((method, result) => {
       if (method === "server/discover") {
@@ -250,5 +285,89 @@ describe("MCP discovery pagination limit", () => {
     expect(
       fake.requests.filter((request) => request.method === "tools/list"),
     ).toHaveLength(64);
+  });
+
+  test("fails once the pages together cross the 8 MB budget", async () => {
+    const recorded = await fixture("flux-docs");
+    const big = "d".repeat(500 * 1024);
+    const fake = mcpFetch({
+      recorded,
+      mutateResult(method, result, body) {
+        if (method !== "tools/list") return result;
+        const page = Number((body.params as { cursor?: string }).cursor ?? "0");
+        return {
+          ...result,
+          tools: [
+            {
+              name: `page-${page}`,
+              description: big,
+              inputSchema: { type: "object", properties: {} },
+            },
+          ],
+          nextCursor: String(page + 1),
+        };
+      },
+    });
+    await expect(
+      discover(
+        { fetcher: fake.fetcher, version: "test", clock: () => 42 },
+        { url: URL },
+        null,
+      ),
+    ).rejects.toThrow("over 8 MB");
+    const pages = fake.requests.filter(
+      (request) => request.method === "tools/list",
+    ).length;
+    expect(pages).toBeGreaterThan(1);
+    expect(pages).toBeLessThan(64);
+  });
+
+  test("a server error partway leaves nothing returned", async () => {
+    const recorded = await fixture("flux-docs");
+    const fake = mcpFetch({
+      recorded,
+      mutateResult(method, result) {
+        return method === "tools/list"
+          ? {
+              ...result,
+              tools: [
+                {
+                  name: "first",
+                  inputSchema: { type: "object", properties: {} },
+                },
+              ],
+              nextCursor: "page-2",
+            }
+          : result;
+      },
+    });
+    let lists = 0;
+    const fetcher = (async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const request =
+        input instanceof Request ? input : new Request(String(input), init);
+      const body = (await request.clone().json()) as {
+        id?: unknown;
+        method?: string;
+      };
+      if (body.method === "tools/list" && ++lists === 2) {
+        return Response.json({
+          jsonrpc: "2.0",
+          id: body.id,
+          error: { code: -32_000, message: "page failed" },
+        });
+      }
+      return fake.fetcher(request);
+    }) as typeof fetch;
+    await expect(
+      discover(
+        { fetcher, version: "test", clock: () => 42 },
+        { url: URL },
+        null,
+      ),
+    ).rejects.toThrow("page failed");
+    expect(lists).toBe(2);
   });
 });

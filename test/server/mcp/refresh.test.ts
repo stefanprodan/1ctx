@@ -159,6 +159,141 @@ describe("MCP refresh coordinator", () => {
     db.close();
   });
 
+  test("holds for five minutes after a failed automatic discovery", async () => {
+    const db = memoryDb();
+    const time = fakeClock();
+    let calls = 0;
+    const fetcher = (async () => {
+      calls++;
+      return new Response("failed", { status: 500 });
+    }) as unknown as typeof fetch;
+    const area = mcpArea({
+      db,
+      fetcher,
+      secret: () => null,
+      keys: () => [],
+      clock: time.clock,
+      log: () => {},
+      version: "test",
+      render: (text) => text,
+    });
+    const row = area.store.create(fields(), found(time.clock()));
+    area.refreshSoon(row.id, "changed-once");
+    await settle();
+    expect(calls).toBe(1);
+    expect(area.store.byId(row.id)!.refreshError).not.toBeNull();
+    area.refreshSoon(row.id, "changed-twice");
+    await settle();
+    expect(calls).toBe(1);
+    time.advance(5 * 60 * 1_000 - 1);
+    area.refreshSoon(row.id, "changed-thrice");
+    await settle();
+    expect(calls).toBe(1);
+    time.advance(1);
+    area.refreshSoon(row.id, "changed-later");
+    await settle();
+    expect(calls).toBe(2);
+    await area.close();
+    db.close();
+  });
+
+  test("a pass refreshes each stale server once, in order, then waits an hour", async () => {
+    const db = memoryDb();
+    const time = fakeClock();
+    const discovered: string[] = [];
+    let inFlight = 0;
+    let release!: () => void;
+    let gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetcher = (async (input: string | URL | Request) => {
+      inFlight++;
+      expect(inFlight).toBe(1);
+      const url = input instanceof Request ? input.url : String(input);
+      discovered.push(new URL(url).host);
+      await gate;
+      gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      inFlight--;
+      return new Response("failed", { status: 500 });
+    }) as unknown as typeof fetch;
+    const area = mcpArea({
+      db,
+      fetcher,
+      secret: () => null,
+      keys: () => [],
+      clock: time.clock,
+      log: () => {},
+      version: "test",
+      render: (text) => text,
+    });
+    const stale = time.clock() - 60 * 60 * 1_000 - 10;
+    area.store.create(fields("alpha"), found(stale));
+    area.store.create(fields("bravo"), found(stale + 1));
+    area.store.create(fields("charlie"), found(stale + 2));
+    area.start();
+    time.advance(60 * 60 * 1_000);
+    await settle();
+    // one at a time: only the first is in flight until released
+    expect(discovered).toEqual(["alpha.test"]);
+    release();
+    await settle();
+    expect(discovered).toEqual(["alpha.test", "bravo.test"]);
+    release();
+    await settle();
+    expect(discovered).toEqual(["alpha.test", "bravo.test", "charlie.test"]);
+    release();
+    await settle();
+    // the pass is done; a short wait starts no new discovery
+    time.advance(60 * 60 * 1_000 - 1);
+    await settle();
+    expect(discovered).toHaveLength(3);
+    await area.close();
+    db.close();
+  });
+
+  test("close ends a discovery the pass launched, writing no failure", async () => {
+    const db = memoryDb();
+    const time = fakeClock();
+    let started = false;
+    let ended = false;
+    const fetcher = (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      started = true;
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          ended = true;
+          reject(new Error("aborted"));
+        });
+      });
+    }) as typeof fetch;
+    const area = mcpArea({
+      db,
+      fetcher,
+      secret: () => null,
+      keys: () => [],
+      clock: time.clock,
+      log: () => {},
+      version: "test",
+      render: (text) => text,
+    });
+    const row = area.store.create(
+      fields(),
+      found(time.clock() - 60 * 60 * 1_000 - 1),
+    );
+    area.start();
+    time.advance(60 * 60 * 1_000);
+    await settle();
+    expect(started).toBeTrue();
+    await area.close();
+    expect(ended).toBeTrue();
+    expect(area.store.byId(row.id)!.refreshError).toBeNull();
+    db.close();
+  });
+
   test("close aborts and awaits a running discovery without failure", async () => {
     const db = memoryDb();
     const time = fakeClock();
@@ -383,6 +518,116 @@ describe("MCP refresh routes", () => {
       ),
     ).rejects.toMatchObject({ status: 409 });
     await area.close();
+    db.close();
+  });
+
+  test("a second explicit refresh is 409 while the first still runs", async () => {
+    const db = memoryDb();
+    const time = fakeClock();
+    let began!: () => void;
+    const started = new Promise<void>((resolve) => {
+      began = resolve;
+    });
+    const fetcher = (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      began();
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new Error("stop")),
+        );
+      });
+    }) as typeof fetch;
+    const area = mcpArea({
+      db,
+      fetcher,
+      secret: () => null,
+      keys: () => [],
+      clock: time.clock,
+      log: () => {},
+      version: "test",
+      render: (text) => text,
+    });
+    const row = area.store.create(fields(), found(time.clock()));
+    const refresh = area.routes.find(
+      (item) => item.method === "POST" && item.path === "/api/mcp/:id/refresh",
+    )!;
+    const first = refresh.handle(
+      new Request(`https://app.test/api/mcp/${row.id}/refresh`, {
+        method: "POST",
+      }),
+      routeContext(row.id),
+    );
+    await started;
+    await expect(
+      refresh.handle(
+        new Request(`https://app.test/api/mcp/${row.id}/refresh`, {
+          method: "POST",
+        }),
+        routeContext(row.id),
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await area.close();
+    await expect(first).rejects.toBeDefined();
+    db.close();
+  });
+
+  test("an endpoint patch is 409 while a discovery for the server runs", async () => {
+    const db = memoryDb();
+    const time = fakeClock();
+    let began!: () => void;
+    const started = new Promise<void>((resolve) => {
+      began = resolve;
+    });
+    const fetcher = (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      began();
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new Error("stop")),
+        );
+      });
+    }) as typeof fetch;
+    const area = mcpArea({
+      db,
+      fetcher,
+      secret: () => null,
+      keys: () => [],
+      clock: time.clock,
+      log: () => {},
+      version: "test",
+      render: (text) => text,
+    });
+    const row = area.store.create(fields(), found(time.clock()));
+    const refresh = area.routes.find(
+      (item) => item.method === "POST" && item.path === "/api/mcp/:id/refresh",
+    )!;
+    const running = refresh.handle(
+      new Request(`https://app.test/api/mcp/${row.id}/refresh`, {
+        method: "POST",
+      }),
+      routeContext(row.id),
+    );
+    await started;
+    const patch = area.routes.find(
+      (item) => item.method === "PATCH" && item.path === "/api/mcp/:id",
+    )!;
+    await expect(
+      patch.handle(
+        new Request(`https://app.test/api/mcp/${row.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: "https://moved.test/mcp" }),
+        }),
+        routeContext(row.id),
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(area.store.byId(row.id)!.url).toBe(row.url);
+    await area.close();
+    await expect(running).rejects.toBeDefined();
     db.close();
   });
 
