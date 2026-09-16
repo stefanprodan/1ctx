@@ -51,6 +51,18 @@ describe("automation memory phase", () => {
       ),
     ).toEqual(["memory_edit"]);
     expect(JSON.stringify(edit.body.messages)).toContain("The check passed.");
+    const asked = (script: { body: { messages?: unknown } }) =>
+      (script.body.messages as { role: string; content: string }[]).at(-1)!;
+    const first = asked(edit);
+    expect(first.role).toBe("user");
+    expect(first.content).toContain("The run finished.");
+    expect(first.content).toContain(
+      "This automation's own memory is empty. Use add to write its first entry.",
+    );
+    expect(first.content).toContain(
+      "The project memory in the system prompt is a different note it never edits.",
+    );
+    expect(first.content).toContain("never the whole note");
     edit.toolRound([
       {
         id: "remember",
@@ -60,6 +72,9 @@ describe("automation memory phase", () => {
     ]);
     edit.end();
     const finish = await waitScript(chat.scripted, 3);
+    expect(asked(finish).content).toContain(
+      "This automation's own memory holds 1 entry, the version to edit:\n1. Last check passed.",
+    );
     finish.reply("Recorded.");
 
     expect((await settle(chat, run.sessionId))?.status).toBe("done");
@@ -512,13 +527,68 @@ describe("memory phase bounds", () => {
     const tool = chat.app.sessions
       .messages(run.sessionId)
       .find((row) => row.kind === "tool");
-    expect(tool).toMatchObject({ status: "stopped" });
+    expect(tool).toMatchObject({
+      status: "stopped",
+      content: "not run: the memory phase was on its last round",
+    });
     expect(
       chat.app.memory.read({
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
     ).toEqual([]);
+    await chat.app.shutdown();
+  });
+
+  test("runs its calls after the send spent its own call budget", async () => {
+    const chat = await chatApp();
+    const changed = await chat.admin.call("PUT", "/api/limits", {
+      body: { values: { ...DEFAULT_LIMITS, callsPerSend: 1 } },
+    });
+    expect(changed.status).toBe(200);
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    const clock = {
+      id: "t1",
+      name: "datetime",
+      arguments: '{"timezone":"UTC"}',
+    };
+    run.main.toolRound([clock]);
+    run.main.end();
+    const spent = await waitScript(chat.scripted, 2);
+    spent.toolRound([{ ...clock, id: "t2" }]);
+    spent.end();
+    const answer = await waitScript(chat.scripted, 3);
+    answer.reply("Done.");
+    const phase = await waitScript(chat.scripted, 4);
+    phase.toolRound([
+      {
+        id: "m1",
+        name: "memory_edit",
+        arguments: '{"action":"add","text":"Recorded all the same."}',
+      },
+    ]);
+    phase.end();
+    const phaseFinish = await waitScript(chat.scripted, 5);
+    phaseFinish.reply("Recorded.");
+    await settle(chat, run.sessionId);
+
+    const rows = chat.app.sessions
+      .messages(run.sessionId)
+      .filter((row) => row.kind === "tool");
+    expect(rows.map((row) => [row.toolName, row.status])).toEqual([
+      ["datetime", "done"],
+      ["datetime", "stopped"],
+      ["memory_edit", "done"],
+    ]);
+    expect(rows[1]?.content).toBe("not run: the tool budget was spent");
+    expect(rows[2]?.content).toContain("Saved for the end of the run");
+    expect(
+      chat.app.memory.read({
+        projectId: chat.projectId,
+        automationId: automation.id,
+      }).entries,
+    ).toEqual(["Recorded all the same."]);
     await chat.app.shutdown();
   });
 

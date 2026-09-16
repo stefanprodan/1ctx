@@ -69,11 +69,16 @@ describe("memory note rules", () => {
       }),
     ).toEqual({
       ok: false,
+      kind: "match",
       reason: "old_text is in entries 1 and 2, name one.",
     });
     expect(
       applyEdit(["alpha"], { action: "remove", oldText: "missing" }),
-    ).toEqual({ ok: false, reason: "No entry contains old_text." });
+    ).toEqual({
+      ok: false,
+      kind: "match",
+      reason: "No entry contains old_text.",
+    });
   });
 
   test("diffs replace, reorder and an empty previous version", () => {

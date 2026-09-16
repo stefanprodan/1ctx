@@ -1031,6 +1031,14 @@ describe("socket fixtures", () => {
     await settle(chat, 8);
     record("stop-during-tool", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
+    // a send with no memory phase stops its open tool row inside the
+    // terminal transaction, so the stop is one envelope, not two
+    const last = conn.frames.filter((f) => f.type === "session").at(-1)!;
+    expect(last.send?.cause).toBe("stop");
+    expect(last.messages.map((row) => [row.kind, row.status])).toContainEqual([
+      "tool",
+      "stopped",
+    ]);
     chat.app.socket.dispose();
   });
 

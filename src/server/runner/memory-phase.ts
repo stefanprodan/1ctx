@@ -6,7 +6,6 @@ import type {
   Message,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
-import { memoryBlock } from "../../shared/memory.ts";
 import type { SendCause } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -24,7 +23,7 @@ import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
 import { type ActiveSend, newRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
-import { CUT_SHORT, statusOf } from "./writer.ts";
+import { CUT_SHORT, NOT_RUN, statusOf } from "./writer.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
 export type MemoryCommitDeps = {
@@ -157,6 +156,18 @@ export function startMemory(
   send.round.slotMarked = true;
 }
 
+// the note as the phase holds it now, numbered, so old_text names a
+// real entry and add is the obvious move on an empty note
+function currentEntries(entries: readonly string[]): string {
+  if (entries.length === 0) {
+    return "This automation's own memory is empty. Use add to write its first entry.";
+  }
+  const lines = entries.map((entry, index) => `${index + 1}. ${entry}`);
+  return `This automation's own memory holds ${entries.length} ${
+    entries.length === 1 ? "entry" : "entries"
+  }, the version to edit:\n${lines.join("\n")}`;
+}
+
 function phaseInstruction(send: ActiveSend): string {
   const ending =
     send.cause === "deadline"
@@ -165,10 +176,13 @@ function phaseInstruction(send: ActiveSend): string {
         ? `The run failed${send.error === null ? "." : `: ${send.error}`}`
         : "The run finished.";
   const entries = send.policy.memoryOffered?.memory?.work.entries ?? [];
-  const note = memoryBlock("automation-memory", entries);
-  const current =
-    note === "" ? "The automation memory was empty when this run began." : note;
-  return `${ending}\n\n${current}\n\nUpdate this automation's memory with what the next run needs: what was found, what was done, where this run stopped, and what is left.`;
+  return [
+    ending,
+    currentEntries(entries),
+    "memory_edit writes this note and no other. The project memory in the system prompt is a different note it never edits.",
+    "Each entry is a separate item. add appends one entry. replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note.",
+    "Record what the next run needs: what was found, what was done, where this run stopped, and what is left.",
+  ].join("\n\n");
 }
 
 function groups(messages: ChatMessageIn[]): {
@@ -230,12 +244,17 @@ function cut(result: ToolResult, chars: number): ToolResult {
 
 const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
 
+// what the phase has spent, kept apart from the send's budget: the
+// main rounds may have spent theirs, which never cuts the phase
+type PhaseSpend = { calls: number; toolMs: number; resultBytes: number };
+
 async function runCalls(
   deps: MemoryPhaseDeps,
   send: ActiveSend,
   offered: Offered,
   calls: ToolCall[],
   signal: AbortSignal,
+  spend: PhaseSpend,
 ): Promise<void> {
   const startedAt = deps.clock();
   let writeError: unknown = null;
@@ -257,7 +276,7 @@ async function runCalls(
     }
     if (signal.aborted) return;
     const stored = cut(result, send.policy.toolCaps.resultCut);
-    send.budget.resultBytes += bytes(stored.content);
+    spend.resultBytes += bytes(stored.content);
     try {
       deps.writer.finishTool(send, call, stored);
     } catch (error) {
@@ -268,8 +287,33 @@ async function runCalls(
   send.tools = task;
   await task;
   send.tools = null;
-  send.budget.toolMs += deps.clock() - startedAt;
+  spend.toolMs += deps.clock() - startedAt;
   if (writeError !== null) throw writeError;
+}
+
+// what a call the phase would not run is recorded with
+const LAST_ROUND = "not run: the memory phase was on its last round";
+const OVER_ROUND = "not run: too many calls in one round";
+
+// the phase runs under the same caps as a send but counts its own
+// spend, so main rounds that spent the send's budget never cut it
+function overPhaseCap(
+  send: ActiveSend,
+  spend: PhaseSpend,
+  rounds: number,
+  calls: ToolCall[],
+): string | null {
+  const limits = send.policy.limits;
+  if (calls.length > limits.callsPerRound) return OVER_ROUND;
+  if (rounds >= limits.memoryPhaseRounds) return LAST_ROUND;
+  if (
+    spend.calls + calls.length > limits.callsPerSend ||
+    spend.toolMs >= limits.toolMs ||
+    spend.resultBytes >= limits.resultBytes
+  ) {
+    return NOT_RUN;
+  }
+  return null;
 }
 
 export type MemoryPhaseDeps = PhaseRowsDeps & {
@@ -312,6 +356,9 @@ export async function memoryPhase(
   void deps.pause(send.policy.limits.memoryPhaseMs).then(() => {
     if (!done) stop();
   });
+  // the phase counts its own rounds and calls; the send's budget is the
+  // run's and never cuts the phase
+  const spend: PhaseSpend = { calls: 0, toolMs: 0, resultBytes: 0 };
   let rounds = 1;
   try {
     while (!controller.signal.aborted) {
@@ -338,21 +385,20 @@ export async function memoryPhase(
       const round = send.round;
       if (round === null || round.calls.length === 0) return;
       const calls = round.calls;
-      if (
-        calls.length > send.policy.limits.callsPerRound ||
-        rounds >= send.policy.limits.memoryPhaseRounds
-      ) {
-        deps.writer.recordUnrun(send, "memory_limit", calls);
+      const stopWords = overPhaseCap(send, spend, rounds, calls);
+      if (stopWords !== null) {
+        deps.writer.recordUnrun(send, "memory_limit", calls, stopWords);
         send.round = null;
         return;
       }
       const names = calls.map(
         (call) => deps.tools.toolName?.(offered, call) ?? call.name,
       );
+      spend.calls += calls.length;
       send.budget.calls = deps.writer.finishRound(send, names).toolCalls;
       send.phase = "memory";
       send.round = null;
-      await runCalls(deps, send, offered, calls, controller.signal);
+      await runCalls(deps, send, offered, calls, controller.signal, spend);
       if (controller.signal.aborted) return;
       const reply = deps.writer.startRound(send);
       send.roundNo += 1;

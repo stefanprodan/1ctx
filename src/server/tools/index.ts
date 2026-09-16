@@ -129,6 +129,10 @@ export type ToolsArea = Tools & {
   routes: RouteDescriptor[];
 };
 
+// the memory phase is offered memory_edit and nothing else; a call to
+// anything the run had gets the reason rather than a bare not found
+const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
+
 function fillYear(tools: ChatTool[], now: number): ChatTool[] {
   const year = formatDatetime(now, DEFAULT_TIMEZONE).datetime.slice(0, 4);
   return tools.map((tool) => ({
@@ -448,6 +452,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           };
           return new Registry([failed]).run({ ...call, arguments: "{}" }, ctx);
         }
+      }
+      if (offered.memory?.note === "automation") {
+        return new Registry(base, () => PHASE_ONLY).run(call, ctx);
       }
       const runtime =
         offered.mcpCatalog === ""

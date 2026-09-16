@@ -38,6 +38,13 @@ export type MemorySessionsPort = {
   ): UnreadChats;
 };
 
+// the run has a round cap, so a list that read everything and recorded
+// nothing wastes the run: the list and each finished chat say so
+const LIST_TAIL =
+  "This run has a limited number of rounds. Record what you learned with memory_edit before reading more chats.";
+const READ_TAIL =
+  "Chat read. Record what matters with memory_edit before the next chat.";
+
 function throughQueue<T>(
   handle: MemoryHandle,
   run: () => T | Promise<T>,
@@ -67,7 +74,7 @@ function listTool(handle: MemoryHandle, sessions: MemorySessionsPort): Tool {
   return {
     name: "sessions_list",
     description:
-      "List unread chats available to this project memory task, oldest first.",
+      "List unread chats available to this project memory task, oldest first. Several chats may be read in parallel in one round.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     async run(args) {
       return throughQueue(handle, () => {
@@ -98,6 +105,7 @@ function listTool(handle: MemoryHandle, sessions: MemorySessionsPort): Tool {
         if (result.remaining > 0) {
           lines.push(`${result.remaining} more unread chats`);
         }
+        lines.push(LIST_TAIL);
         return lines.join("\n");
       });
     },
@@ -141,31 +149,44 @@ function readPage(
   }
   const snapshot = read.snapshot;
   const total = snapshot.markdown.length;
-  const available = ctx.caps.resultCut;
-  let end = Math.min(total, snapshot.cursor + available);
-  if (end < total) {
-    const digits = "9".repeat(String(total).length);
-    const reserve = `\n${digits} characters left, call again`.length;
-    end = Math.min(total, snapshot.cursor + Math.max(1, available - reserve));
-  }
+  // every page ends with a line, so the cut keeps room for the longer
+  // of the two whatever the page turns out to be
+  const digits = "9".repeat(String(total).length);
+  const reserve = Math.max(
+    `\n${digits} characters left, call again`.length,
+    READ_TAIL.length + 1,
+  );
+  const room = Math.max(1, ctx.caps.resultCut - reserve);
+  const end = Math.min(total, snapshot.cursor + room);
   const page = snapshot.markdown.slice(snapshot.cursor, end);
   snapshot.cursor = end;
   if (end === total) {
     read.marks.set(snapshot.id, snapshot.lastActivityAt);
     read.snapshot = null;
-    return page;
+    return `${page}\n${READ_TAIL}`;
   }
   return `${page}\n${total - end} characters left, call again`;
 }
 
+// what the tool says it edits, and what it says it leaves alone: a
+// memory task's prompt carries both notes and the tool has no target
+function notes(handle: MemoryHandle): { own: string; other: string } {
+  return handle.note === "project"
+    ? {
+        own: "the project's memory",
+        other: "this automation's own memory",
+      }
+    : {
+        own: "this automation's own memory",
+        other: "the project memory",
+      };
+}
+
 function editTool(handle: MemoryHandle): Tool {
-  const note =
-    handle.note === "project"
-      ? "the project's memory"
-      : "this automation's memory";
+  const { own, other } = notes(handle);
   return {
     name: "memory_edit",
-    description: `Edit ${note}. Changes are saved when the run ends.`,
+    description: `Edit ${own}. It is one note; ${other} in the system prompt is a different note this tool never edits. Its entries are separate items: add appends one entry, replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note. Changes are saved when the run ends.`,
     parameters: {
       type: "object",
       properties: {
@@ -179,21 +200,25 @@ function editTool(handle: MemoryHandle): Tool {
     async run(args) {
       return throughQueue(handle, () => {
         if (handle.work.failures >= MEMORY_EDIT_FAILURES) {
-          throw new Error(failure(handle, "Stop editing and finish."));
+          throw new Error(refusal(handle, "Stop editing and finish."));
         }
         const edit = parseEdit(args);
         const result = applyEdit(handle.work.entries, edit);
         if (!result.ok) {
           handle.work.failures++;
-          const suffix =
+          const advice =
             handle.work.failures >= MEMORY_EDIT_FAILURES
-              ? " Stop editing and finish."
-              : " Merge or remove entries and retry.";
-          throw new Error(failure(handle, `${result.reason}${suffix}`));
+              ? "Stop editing and finish."
+              : result.kind === "match"
+                ? "old_text must match text inside one entry, never the whole note."
+                : result.kind === "budget"
+                  ? "Merge or remove entries and retry."
+                  : "Retry with the arguments the action takes.";
+          throw new Error(refusal(handle, `${result.reason} ${advice}`));
         }
         handle.work.entries = result.entries;
         handle.work.operations.push(edit);
-        return `Saved for the end of the run in ${note}.`;
+        return `Saved for the end of the run in ${own}.`;
       });
     },
   };
@@ -215,11 +240,15 @@ function parseEdit(args: Record<string, unknown>): MemoryEdit {
   throw new Error("action must be add, replace or remove");
 }
 
-function failure(handle: MemoryHandle, reason: string): string {
-  const lines = handle.work.entries.map(
-    (entry, index) => `${index + 1}. ${entry}`,
-  );
-  return `${reason}\n${handle.work.entries.length} entries\n${lines.join("\n")}`;
+// every refusal hands back the note as it stands, so the next call names
+// an entry that is really there
+function refusal(handle: MemoryHandle, reason: string): string {
+  const entries = handle.work.entries;
+  if (entries.length === 0) {
+    return `${reason}\nThe note is empty, use add.`;
+  }
+  const lines = entries.map((entry, index) => `${index + 1}. ${entry}`);
+  return `${reason}\n${entries.length} entries\n${lines.join("\n")}`;
 }
 
 export function makeMemoryTools(

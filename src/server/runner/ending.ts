@@ -63,12 +63,15 @@ export async function endSend(
   if (send.cause === null) throw new Error("the send has no ending");
   try {
     if (send.tools !== null) await send.tools;
-    stopMainTools(deps.phase, send);
   } catch (error) {
     send.memoryError = words(error);
   }
   if (hasMemoryPhase(send) && !send.ending.signal.aborted) {
     try {
+      // the phase's first round replaces the open tool map, so the main
+      // round's rows are stopped first; without a phase finalizeSend
+      // stops them in its own transaction, as it always has
+      stopMainTools(deps.phase, send);
       await memoryPhase(deps.phase, send);
     } catch (error) {
       send.memoryError = words(error);

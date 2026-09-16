@@ -22,7 +22,12 @@ function describe(error: unknown, timeoutMs: number): string {
 export class Registry {
   private readonly byName = new Map<string, Tool>();
 
-  constructor(tools: Tool[]) {
+  // unknown() lets a caller whose set is not the send's usual one say
+  // what is on offer instead of the bare not-found line
+  constructor(
+    tools: Tool[],
+    private readonly unknown = (name: string) => `tool "${name}" not found.`,
+  ) {
     for (const tool of tools) this.byName.set(tool.name, tool);
   }
 
@@ -35,7 +40,7 @@ export class Registry {
     let timeoutSignal: AbortSignal | null = null;
     try {
       const tool = this.byName.get(call.name);
-      if (!tool) throw new Error(`tool "${call.name}" not found.`);
+      if (!tool) throw new Error(this.unknown(call.name));
       timeoutMs = tool.timeoutMs ?? ctx.caps.callTimeoutMs;
       let parsed: unknown;
       try {

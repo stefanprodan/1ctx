@@ -71,9 +71,13 @@ export type MemoryEdit =
   | { action: "replace"; oldText: string; text: string }
   | { action: "remove"; oldText: string };
 
+// why an edit was refused: old_text named no entry or more than one,
+// a text argument was empty, or the note would pass its budget
+export type EditRefusal = "match" | "text" | "budget";
+
 export type EditResult =
   | { ok: true; entries: string[] }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; kind: EditRefusal };
 
 // the entry old_text names: exactly one entry must contain it
 function locate(
@@ -85,7 +89,9 @@ function locate(
   const found = entries
     .map((entry, index) => (entry.includes(needle) ? index : -1))
     .filter((index) => index !== -1);
-  if (found.length === 0) return { reason: "No entry contains old_text." };
+  if (found.length === 0) {
+    return { reason: "No entry contains old_text." };
+  }
   if (found.length > 1) {
     const list = found.map((index) => `${index + 1}`).join(" and ");
     return { reason: `old_text is in entries ${list}, name one.` };
@@ -99,24 +105,33 @@ export function applyEdit(
   edit: MemoryEdit,
 ): EditResult {
   let next: string[];
+  const empty: EditResult = {
+    ok: false,
+    reason: "text is empty.",
+    kind: "text",
+  };
   if (edit.action === "add") {
     const text = sanitize(edit.text);
-    if (text === "") return { ok: false, reason: "text is empty." };
+    if (text === "") return empty;
     next = [...entries, text];
   } else {
     const at = locate(entries, edit.oldText);
-    if ("reason" in at) return { ok: false, reason: at.reason };
+    if ("reason" in at) {
+      return { ok: false, reason: at.reason, kind: "match" };
+    }
     if (edit.action === "remove") {
       next = entries.filter((_, index) => index !== at.index);
     } else {
       const text = sanitize(edit.text);
-      if (text === "") return { ok: false, reason: "text is empty." };
+      if (text === "") return empty;
       next = entries.map((entry, index) => (index === at.index ? text : entry));
     }
   }
   const normalized = normalize(next);
   const refusal = checkEntries(normalized);
-  if (refusal !== null) return { ok: false, reason: refusal };
+  if (refusal !== null) {
+    return { ok: false, reason: refusal, kind: "budget" };
+  }
   return { ok: true, entries: normalized };
 }
 

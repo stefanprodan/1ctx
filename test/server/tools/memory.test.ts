@@ -133,6 +133,47 @@ describe("memory offered sets", () => {
     });
     expect(noPhase.tools).toEqual([]);
   });
+
+  test("each edit tool names its note and how an entry is named", () => {
+    const tools = area();
+    const main = tools.offered(now, "agent", [], "auto", task);
+    const phase = tools.offered(now, "agent", [], "auto", {
+      ...task,
+      phase: "memory",
+    });
+    const edit = (offered: {
+      tools: { name: string; description: string }[];
+    }) =>
+      offered.tools.find((tool) => tool.name === "memory_edit")!.description;
+    expect(edit(main)).toContain("Edit the project's memory.");
+    expect(edit(main)).toContain("this automation's own memory");
+    expect(edit(phase)).toContain("Edit this automation's own memory.");
+    expect(edit(phase)).toContain("the project memory");
+    for (const text of [edit(main), edit(phase)]) {
+      expect(text).toContain("a different note this tool never edits");
+      expect(text).toContain("add appends one entry");
+      expect(text).toContain("never the whole note");
+    }
+    const list = main.tools.find((tool) => tool.name === "sessions_list")!;
+    expect(list.description).toContain("in parallel in one round");
+  });
+
+  test("a call the phase does not offer says what it offers", async () => {
+    const tools = area();
+    const phase = tools.offered(now, "agent", [], "auto", {
+      ...task,
+      phase: "memory",
+    });
+    const result = await tools.run(
+      phase,
+      { id: "c1", name: "session_read", arguments: '{"id":"s1"}' },
+      context(),
+    );
+    expect(result.error).toBe(true);
+    expect(result.content).toBe(
+      "Error: only memory_edit is offered in the memory phase.",
+    );
+  });
 });
 
 describe("memory tool handles", () => {
@@ -197,6 +238,32 @@ describe("memory tool handles", () => {
     expect(listed.content).toBe("Every chat is read.");
   });
 
+  test("each page ends with the line that asks for a record", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    const listed = await tools.run(
+      offered,
+      { id: "list", name: "sessions_list", arguments: "{}" },
+      context(),
+    );
+    expect(listed.content).toContain("s1 | A chat | @user");
+    expect(listed.content.split("\n").at(-1)).toBe(
+      "This run has a limited number of rounds. Record what you learned with memory_edit before reading more chats.",
+    );
+    const read = await tools.run(
+      offered,
+      { id: "read", name: "session_read", arguments: '{"id":"s1"}' },
+      context(),
+    );
+    expect(read.error).toBe(false);
+    expect(
+      read.content.endsWith(
+        "\nChat read. Record what matters with memory_edit before the next chat.",
+      ),
+    ).toBe(true);
+    expect(offered.memory?.read?.marks.get("s1")).toBe(20);
+  });
+
   test("returns the note on refusals and stops after the third failure", async () => {
     const tools = area();
     const offered = tools.offered(now, "agent", [], "auto", task);
@@ -210,7 +277,20 @@ describe("memory tool handles", () => {
         },
         context(),
       );
-    expect((await failed()).content).toContain("0 entries");
+    const first = (await failed()).content;
+    expect(first).toContain("The note is empty, use add.");
+    expect(first).toContain("never the whole note");
+    const added = await tools.run(
+      offered,
+      {
+        id: "add",
+        name: "memory_edit",
+        arguments: '{"action":"add","text":"one fact"}',
+      },
+      context(),
+    );
+    expect(added.error).toBe(false);
+    expect((await failed()).content).toContain("1 entries\n1. one fact");
     await failed();
     expect((await failed()).content).toContain("Stop editing and finish.");
     expect((await failed()).content).toContain("Stop editing and finish.");

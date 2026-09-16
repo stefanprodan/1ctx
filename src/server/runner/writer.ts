@@ -252,7 +252,12 @@ export class Writer {
   // a round the loop cut before its calls ran: the reply done as work
   // with the given finish reason, the calls written stopped with the
   // not-run text. One revision, one envelope with every row
-  recordUnrun(send: ActiveSend, finishReason: string, calls: ToolCall[]): void {
+  recordUnrun(
+    send: ActiveSend,
+    finishReason: string,
+    calls: ToolCall[],
+    content = NOT_RUN,
+  ): void {
     const round = send.round;
     if (round === null) return;
     const now = this.deps.clock();
@@ -270,7 +275,7 @@ export class Writer {
       const stopped = created.map(
         (row) =>
           this.deps.sessions.finishTool(row.id, {
-            content: NOT_RUN,
+            content,
             status: "stopped",
             error: null,
             finishedAt: now,
