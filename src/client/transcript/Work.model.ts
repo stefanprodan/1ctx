@@ -110,7 +110,15 @@ export function memorySummary(
   } else if (send?.memoryError != null) {
     text = `Memory not updated. ${send.memoryError}`;
   } else {
-    text = "Memory updated";
+    // the commit is the edits that went through; none means the note
+    // stayed as it was
+    const edits = node.rows.filter(
+      (row) =>
+        row.kind === "tool" &&
+        row.toolName === "memory_edit" &&
+        row.status === "done",
+    ).length;
+    text = edits === 0 ? "Memory unchanged" : "Memory updated";
     if (send?.memorySkipped != null && send.memorySkipped > 0) {
       text += `, ${send.memorySkipped} edits no longer applied`;
     }

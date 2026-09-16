@@ -149,6 +149,9 @@ describe("the Memory fold's line", () => {
   };
   test("says updated, the skipped count, or the error", () => {
     expect(memorySummary(node, false).text).toBe("Memory updated");
+    expect(memorySummary({ ...node, rows: [run[2]!] }, false).text).toBe(
+      "Memory unchanged",
+    );
     expect(
       memorySummary({ ...node, send: send({ memorySkipped: 2 }) }, false).text,
     ).toBe("Memory updated, 2 edits no longer applied");
