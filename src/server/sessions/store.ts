@@ -8,7 +8,6 @@ import type { McpDigest } from "../../shared/mcp.ts";
 import type {
   MessageStatus,
   RunFilter,
-  SendCause,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -39,16 +38,22 @@ import {
   MESSAGE_COLUMNS,
   message,
   type RawMessage,
-  type RawSend,
   type RawSession,
   type RepairedSession,
   type ReplyFinish,
   type SessionRow,
   STREAM_LIMIT,
-  send,
   session,
   type UsagePort,
 } from "./rows.ts";
+import {
+  bumpSendCounters,
+  endSendRow,
+  readLastSend,
+  readSend,
+  type SendCounters,
+  type SendEnd,
+} from "./sends.ts";
 
 export class SessionStore {
   constructor(
@@ -421,64 +426,21 @@ export class SessionStore {
   }
 
   send(id: string): SendSummary | null {
-    const raw = this.db
-      .query<RawSend, [string]>("select * from sends where id = ?")
-      .get(id);
-    return raw ? send(raw) : null;
+    return readSend(this.db, id);
   }
+
   lastSend(sessionId: string): SendSummary | null {
-    const raw = this.db
-      .query<RawSend, [string]>(
-        "select * from sends where session_id = ? order by started_at desc, rowid desc limit 1",
-      )
-      .get(sessionId);
-    return raw ? send(raw) : null;
+    return readLastSend(this.db, sessionId);
   }
-  finishSend(
-    id: string,
-    fields: {
-      status: Exclude<SessionStatus, "running">;
-      cause: SendCause;
-      error: string | null;
-      rounds: number;
-      toolCalls: number;
-      memoryError: string | null;
-      memorySkipped: number | null;
-      finishedAt: number;
-    },
-  ): SendSummary | null {
-    this.db
-      .query(
-        `update sends set status = ?, cause = ?, error = ?, rounds = ?,
-           tool_calls = ?, memory_error = ?, memory_skipped = ?, finished_at = ?
-         where id = ? and status = 'running'`,
-      )
-      .run(
-        fields.status,
-        fields.cause,
-        fields.error,
-        fields.rounds,
-        fields.toolCalls,
-        fields.memoryError,
-        fields.memorySkipped,
-        fields.finishedAt,
-        id,
-      );
-    return this.send(id);
+
+  finishSend(id: string, fields: SendEnd): SendSummary | null {
+    return endSendRow(this.db, id, fields);
   }
-  bumpCounters(
-    id: string,
-    fields: { rounds: number; toolCalls: number; memoryRound?: number },
-  ): SendSummary | null {
-    this.db
-      .query(
-        `update sends set rounds = ?, tool_calls = ?,
-           memory_round = coalesce(?, memory_round)
-         where id = ? and status = 'running'`,
-      )
-      .run(fields.rounds, fields.toolCalls, fields.memoryRound ?? null, id);
-    return this.send(id);
+
+  bumpCounters(id: string, fields: SendCounters): SendSummary | null {
+    return bumpSendCounters(this.db, id, fields);
   }
+
   // the rows are read back through this store so the envelope carries
   // them
   repair(now: number, error: string): RepairedSession[] {

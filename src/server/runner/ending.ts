@@ -61,18 +61,19 @@ export async function endSend(
   send: ActiveSend,
 ): Promise<boolean> {
   if (send.cause === null) throw new Error("the send has no ending");
-  try {
-    if (send.tools !== null) await send.tools;
-  } catch (error) {
-    send.memoryError = words(error);
-  }
-  if (hasMemoryPhase(send) && !send.ending.signal.aborted) {
+  if (hasMemoryPhase(send)) {
     try {
-      // the phase's first round replaces the open tool map, so the main
-      // round's rows are stopped first; without a phase finalizeSend
-      // stops them in its own transaction, as it always has
-      stopMainTools(deps.phase, send);
-      await memoryPhase(deps.phase, send);
+      // the phase writes rows of its own, so the main round's tools
+      // have to let go first and its open rows are stopped before the
+      // phase's first round replaces the map. A send with no phase
+      // finalizes at once and finalizeSend stops those rows, as it
+      // always has, so a tool that ignores the abort never holds the
+      // run open
+      if (send.tools !== null) await send.tools;
+      if (!send.ending.signal.aborted) {
+        stopMainTools(deps.phase, send);
+        await memoryPhase(deps.phase, send);
+      }
     } catch (error) {
       send.memoryError = words(error);
     }
