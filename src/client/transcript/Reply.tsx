@@ -135,7 +135,13 @@ export function Reply({
       </div>
       <div class="transcript-body">
         {!node.compact && (
-          <Work node={work} reply={m} live={live} running={running} />
+          // once the memory phase opens the turn's own work is over
+          <Work
+            node={work}
+            reply={m}
+            live={live}
+            running={running && node.send?.memoryRound == null}
+          />
         )}
         {html !== "" && (
           // the server renders the markdown with raw HTML off: render/

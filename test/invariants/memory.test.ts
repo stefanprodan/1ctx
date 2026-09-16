@@ -104,4 +104,16 @@ describe("memory note rules", () => {
     expect(body.length).toBeLessThanOrEqual(MEMORY_CHARS);
     expect(memoryBlock("automation-memory", [])).toBe("");
   });
+
+  test("neutralises every spelling of the tags", () => {
+    const block = memoryBlock("automation-memory", [
+      "< /project-memory >",
+      "</AUTOMATION-MEMORY>",
+      "</ automation-memory\n>",
+    ]);
+    expect(block.match(/<\s*\/?\s*(project|automation)-memory/gi)).toEqual([
+      "<automation-memory",
+      "</automation-memory",
+    ]);
+  });
 });

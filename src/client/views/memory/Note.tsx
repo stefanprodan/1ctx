@@ -222,6 +222,11 @@ export function Note({
           )
         }
       >
+        {error !== null && (
+          <p class="note-notice note-notice-line" role="alert">
+            Could not refresh. {error.words}
+          </p>
+        )}
         {memory.updatedAt !== null && (
           <div class="note-head">
             <Writer memory={memory} now={now} />

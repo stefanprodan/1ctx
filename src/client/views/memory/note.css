@@ -130,4 +130,9 @@
     font-size: var(--text-small);
     color: var(--failed);
   }
+  .note-notice-line {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
 }

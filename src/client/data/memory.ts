@@ -50,6 +50,9 @@ export function noteOf(key: string): Memory | null {
 }
 
 function keep(key: string, memory: Memory): void {
+  // a later word on the row never loses to an earlier answer
+  const held = notes.value.get(key);
+  if (held !== undefined && held.revision > memory.revision) return;
   const next = new Map(notes.value);
   next.set(key, memory);
   notes.value = next;
@@ -107,8 +110,9 @@ export async function undoMemory(
 export function onMemorySocket(ev: SocketEvent): void {
   if (ev.type !== "memory") return;
   const key = keyOf(ev.projectId, ev.automationId);
+  // with no row held a load is in flight, and this one supersedes it
   const held = notes.value.get(key);
-  if (held === undefined || held.revision >= ev.revision) return;
+  if (held !== undefined && held.revision >= ev.revision) return;
   void loadMemory(key);
 }
 

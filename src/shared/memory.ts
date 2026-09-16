@@ -173,7 +173,9 @@ export function memoryBlock(
 ): string {
   if (entries.length === 0) return "";
   const body = entries
-    .map((entry) => entry.replace(/<(?=\/?(project|automation)-memory>)/g, "‹"))
+    .map((entry) =>
+      entry.replace(/<(?=\s*\/?\s*(project|automation)-memory)/gi, "‹"),
+    )
     .join(MEMORY_SEPARATOR)
     .slice(0, MEMORY_CHARS);
   const words =

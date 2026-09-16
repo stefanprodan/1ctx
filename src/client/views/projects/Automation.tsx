@@ -103,6 +103,12 @@ function RunRow({
           {row.send?.memoryError != null && (
             <span class="automations-faint"> Memory not updated.</span>
           )}
+          {row.send?.memorySkipped != null && row.send.memorySkipped > 0 && (
+            <span class="automations-faint">
+              {" "}
+              {row.send.memorySkipped} edits no longer applied.
+            </span>
+          )}
         </span>
         <span class="automations-run-took">
           <span>{took === null ? "" : durationText(took)}</span>
