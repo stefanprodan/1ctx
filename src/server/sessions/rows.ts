@@ -30,6 +30,9 @@ export type CreateSession = {
   origin?: "chat" | "automation";
   automationId?: string | null;
   runSource?: EventSource | null;
+  forkedFromSessionId?: string | null;
+  forkedFromMessageId?: string | null;
+  status?: SessionStatus;
   title: string;
   now: number;
 };
@@ -52,6 +55,8 @@ export type RawSession = {
   origin: SessionOrigin;
   automation_id: string | null;
   run_source: EventSource | null;
+  forked_from_session_id: string | null;
+  forked_from_message_id: string | null;
   title: string;
   status: SessionStatus;
   revision: number;
@@ -76,6 +81,7 @@ export const session = (
   origin: raw.origin,
   automationId: raw.automation_id,
   runSource: raw.run_source,
+  forkedFromId: raw.forked_from_session_id,
   title: raw.title,
   status: raw.status,
   revision: raw.revision,

@@ -202,6 +202,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: options.log("sessions"),
     access,
+    agents: { byId: (id) => agents.byId(id) },
     live: (sessionId) => runner.live(sessionId),
     usage,
     isWrite: (name) => mcp.isWrite(name),

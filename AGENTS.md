@@ -359,6 +359,17 @@ violation, and every rule has a rejected fixture under
   rows after it, their send and its usage go, and the envelope names
   them in `removedMessageIds`; 409 while the session runs, 400 when
   the last message is the user's.
+  Fork (`POST /api/sessions/:id/fork`) copies the rows through a settled
+  turn and its following done summaries, never memory phase rows, into
+  a chat owned by the caller on the picked agent, recording the source
+  session and message ids without foreign keys; a user turn is left
+  unsent, and usage is not copied. The title is the body's, else
+  "Fork of <the source's>"; the composer's `/fork <name>` forks at the
+  last turn on the same agent under that name, and a run is forked
+  whole from its foot on the agent its chip names.
+  Reasoning details stay with their provider and model, and tool call
+  signatures with their model.
+  An agent is in use when sessions, sends or messages name it.
   Rename (`PATCH /api/sessions/:id`, the composer's `/rename <title>`)
   and delete are the session owner's or, in a team project, an admin's;
   a member who did not start the chat gets 403. Neither may change a

@@ -18,7 +18,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 9;
+export const PROTOCOL = 10;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }

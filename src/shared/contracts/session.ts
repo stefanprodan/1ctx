@@ -23,6 +23,7 @@ export type SessionSummary = {
   ownerId: string;
   agentId: string;
   origin: SessionOrigin;
+  forkedFromId: string | null;
   // the automation a run belongs to; null for a chat, and for a run
   // whose automation was deleted
   automationId: string | null;
@@ -166,6 +167,11 @@ export type LiveSend =
 
 export type SessionDetail = {
   session: SessionSummary;
+  forkedFrom: {
+    id: string;
+    title: string | null;
+    origin: SessionOrigin | null;
+  } | null;
   messages: Message[];
   // the send in flight, or the last one; null before the first
   send: SendSummary | null;

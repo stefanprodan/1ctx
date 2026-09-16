@@ -7,6 +7,7 @@
 
 import type {
   CreateSessionRequest,
+  ForkSessionRequest,
   RenameSessionRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
@@ -22,6 +23,7 @@ import { BadRequest } from "../lib/errors.ts";
 
 // the body cap: the message plus the JSON around it
 export const MAX_SESSION_BODY = MAX_MESSAGE_BYTES + 1024;
+export const MAX_SMALL_BODY = 1024;
 
 export function parseMessage(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") {
@@ -61,18 +63,31 @@ export function parseSendMessage(body: unknown): SendMessageRequest {
   return { message: parseMessage(b.message) };
 }
 
+export function parseForkSession(body: unknown): ForkSessionRequest {
+  const b = fields(body, ["messageId", "agentId", "title"]);
+  return {
+    messageId: parseMessageId(b.messageId),
+    agentId: id(b.agentId, "agentId"),
+    ...(b.title === undefined ? {} : { title: parseTitle(b.title) }),
+  };
+}
+
 // the title as the user typed it, trimmed at the ends; blank, a line
 // break or a length past the cap is refused
-export function parseRenameSession(body: unknown): RenameSessionRequest {
-  const b = fields(body, ["title"]);
-  if (typeof b.title !== "string") throw new BadRequest("title must be text");
-  const title = b.title.trim();
+function parseTitle(value: unknown): string {
+  if (typeof value !== "string") throw new BadRequest("title must be text");
+  const title = value.trim();
   if (title === "") throw new BadRequest("title must not be blank");
   if (hasLineBreak(title)) throw new BadRequest("title must be one line");
   if (title.length > MAX_TITLE) {
     throw new BadRequest(`title must be at most ${MAX_TITLE} characters`);
   }
-  return { title };
+  return title;
+}
+
+export function parseRenameSession(body: unknown): RenameSessionRequest {
+  const b = fields(body, ["title"]);
+  return { title: parseTitle(b.title) };
 }
 
 // ?project=&q=: an optional project id and an optional search

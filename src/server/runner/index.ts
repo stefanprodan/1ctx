@@ -117,8 +117,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     writer,
     lookups: {
       usernameOf: (userId) => deps.users.byId(userId)?.username ?? null,
-      reasoningDetailsOf: (messageId) =>
-        deps.sessions.reasoningDetails(messageId),
+      reasoningDetailsOf: (messageId, providerId, model) =>
+        deps.sessions.reasoningDetails(messageId, providerId, model),
     },
     clock: deps.clock,
   };

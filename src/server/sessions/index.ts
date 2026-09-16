@@ -6,6 +6,7 @@
 // runner below writes them through the store this area builds.
 
 import type { Memory } from "../../shared/contracts/memory.ts";
+import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -26,7 +27,9 @@ export { type MemorySnapshot, memorySnapshot } from "./memory.ts";
 export {
   lineFrom,
   MAX_SESSION_BODY,
+  MAX_SMALL_BODY,
   parseCreateSession,
+  parseForkSession,
   parseMessage,
   parseMessageId,
   parseRenameSession,
@@ -54,6 +57,7 @@ export type SessionsDeps = {
   clock: Clock;
   log: Log;
   access: AccessPort;
+  agents: { byId(id: string): AgentRow | null };
   live: LivePort;
   usage: UsagePort;
   isWrite: (name: string) => boolean;
@@ -145,6 +149,8 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     },
     routes: routes({
       db: deps.db,
+      clock: deps.clock,
+      agents: deps.agents,
       store,
       access: deps.access,
       live: deps.live,
