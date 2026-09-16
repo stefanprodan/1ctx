@@ -53,6 +53,7 @@ export type WriterDeps = {
     record(fields: UsageFields): unknown;
     deleteSend(sendId: string): boolean;
   };
+  commitMemory(send: ActiveSend, cause: SendCause): number | null;
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
@@ -320,7 +321,7 @@ export class Writer {
         }
         this.recordUsage(send, send.round, now);
       }
-      const reply = this.deps.sessions.addReply({
+      const created = this.deps.sessions.addReply({
         sessionId: send.sessionId,
         sendId: send.id,
         round: send.roundNo + 1,
@@ -328,6 +329,10 @@ export class Writer {
         model: send.policy.model,
         now,
       });
+      const reply =
+        send.phase === "memory"
+          ? (this.deps.sessions.markSlot(created.id, "work") ?? created)
+          : created;
       changed.push(reply);
       const sendRow = this.deps.sessions.bumpCounters(send.id, {
         rounds: send.roundNo + 1,
@@ -354,9 +359,24 @@ export class Writer {
     if (round === null) return null;
     // a round cut after its first call delta keeps work; otherwise the
     // reply is the answer, an empty stopped row included
-    const slot = send.summarizing ? null : round.slotMarked ? "work" : "answer";
+    const memory = send.phase === "memory";
+    const slot = memory
+      ? "work"
+      : send.summarizing
+        ? null
+        : round.slotMarked
+          ? "work"
+          : "answer";
+    const finalStatus = memory
+      ? send.memoryError !== null
+        ? "failed"
+        : send.memoryStopped
+          ? "stopped"
+          : "done"
+      : status;
+    const finalError = memory ? send.memoryError : error;
     this.recordUsage(send, round, now);
-    return this.finishReplyRow(round, status, error, slot, null, now);
+    return this.finishReplyRow(round, finalStatus, finalError, slot, null, now);
   }
 
   // called exactly once per send, by the winner of the terminal
@@ -371,6 +391,7 @@ export class Writer {
     const now = this.deps.clock();
     const status = statusOf(cause);
     const result = transact(this.deps.db, () => {
+      const memorySkipped = this.deps.commitMemory(send, cause);
       // a work reply is never finalized twice: finalizeRound runs only
       // when a round is streaming
       const reply =
@@ -395,6 +416,8 @@ export class Writer {
         error,
         rounds: send.roundNo,
         toolCalls: send.budget.calls,
+        memoryError: send.memoryError,
+        memorySkipped,
         finishedAt: now,
       })!;
       const session = this.deps.sessions.touch(send.sessionId, {
@@ -407,11 +430,12 @@ export class Writer {
           ? lastLine(reply, send.policy.agentName)
           : undefined;
       return {
-        result: { session, reply, send: row },
+        result: { session, reply, send: row, memorySkipped },
         events: [envelope(session, changed, row, [], last)],
       };
     });
     send.openTools = new Map();
+    send.memorySkipped = result.memorySkipped;
     return result;
   }
 }

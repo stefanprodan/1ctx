@@ -426,7 +426,6 @@ export class SessionStore {
       .get(id);
     return raw ? send(raw) : null;
   }
-
   lastSend(sessionId: string): SendSummary | null {
     const raw = this.db
       .query<RawSend, [string]>(
@@ -435,7 +434,6 @@ export class SessionStore {
       .get(sessionId);
     return raw ? send(raw) : null;
   }
-
   finishSend(
     id: string,
     fields: {
@@ -444,12 +442,16 @@ export class SessionStore {
       error: string | null;
       rounds: number;
       toolCalls: number;
+      memoryError: string | null;
+      memorySkipped: number | null;
       finishedAt: number;
     },
   ): SendSummary | null {
     this.db
       .query(
-        "update sends set status = ?, cause = ?, error = ?, rounds = ?, tool_calls = ?, finished_at = ? where id = ? and status = 'running'",
+        `update sends set status = ?, cause = ?, error = ?, rounds = ?,
+           tool_calls = ?, memory_error = ?, memory_skipped = ?, finished_at = ?
+         where id = ? and status = 'running'`,
       )
       .run(
         fields.status,
@@ -457,24 +459,26 @@ export class SessionStore {
         fields.error,
         fields.rounds,
         fields.toolCalls,
+        fields.memoryError,
+        fields.memorySkipped,
         fields.finishedAt,
         id,
       );
     return this.send(id);
   }
-
   bumpCounters(
     id: string,
-    fields: { rounds: number; toolCalls: number },
+    fields: { rounds: number; toolCalls: number; memoryRound?: number },
   ): SendSummary | null {
     this.db
       .query(
-        "update sends set rounds = ?, tool_calls = ? where id = ? and status = 'running'",
+        `update sends set rounds = ?, tool_calls = ?,
+           memory_round = coalesce(?, memory_round)
+         where id = ? and status = 'running'`,
       )
-      .run(fields.rounds, fields.toolCalls, id);
+      .run(fields.rounds, fields.toolCalls, fields.memoryRound ?? null, id);
     return this.send(id);
   }
-
   // the rows are read back through this store so the envelope carries
   // them
   repair(now: number, error: string): RepairedSession[] {

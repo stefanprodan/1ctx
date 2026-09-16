@@ -231,6 +231,8 @@ describe("GET /api/sessions", () => {
       error: "failed before a reply",
       rounds: 0,
       toolCalls: 0,
+      memoryError: null,
+      memorySkipped: null,
       finishedAt: chat.app.now.value,
     });
     store.touch(failed.id, { status: "failed", now: chat.app.now.value });
@@ -1319,6 +1321,8 @@ describe("the tool-loop store", () => {
       error: null,
       rounds: 2,
       toolCalls: 3,
+      memoryError: null,
+      memorySkipped: null,
       finishedAt: 5,
     })!;
     expect(ended).toMatchObject({ rounds: 2, toolCalls: 3, status: "done" });

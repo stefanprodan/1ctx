@@ -69,12 +69,17 @@ export type SendPolicy = {
   effort: Effort | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
+  memoryOffered: Offered | null;
+  projectMemory: string[];
+  automationMemory: string[];
   automation: {
     id: string;
     name: string;
     source: EventSource;
     dueAt: number;
     tz: string;
+    projectMemory: boolean;
+    ownMemory: boolean;
   } | null;
   deadlineMs: number | null;
   // the caps the send started on, the limits area's word at that moment
@@ -102,17 +107,35 @@ export function buildPolicy(input: {
   tools: ToolsPort | null;
   limits: Limits;
   automation?: SendPolicy["automation"];
+  projectMemory?: readonly string[];
+  automationMemory?: readonly string[];
   deadlineMs?: number | null;
 }): SendPolicy {
   const { user, agent } = input;
+  const automationScope =
+    input.automation === undefined || input.automation === null
+      ? null
+      : {
+          id: input.automation.id,
+          projectMemory: input.automation.projectMemory,
+          ownMemory: input.automation.ownMemory,
+        };
   const offered =
     input.tools !== null && agent.model.tools
       ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
           projectId: input.project.id,
-          automation: null,
+          automation: automationScope,
           phase: "main",
         })
       : NONE;
+  const memoryOffered =
+    input.tools !== null && agent.model.tools && automationScope?.ownMemory
+      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
+          projectId: input.project.id,
+          automation: automationScope,
+          phase: "memory",
+        })
+      : null;
   const thinking =
     agent.thinking === null ? agent.model.reasoning : agent.thinking === "on";
   return {
@@ -134,6 +157,9 @@ export function buildPolicy(input: {
     thinking,
     effort: thinking ? agent.effort : null,
     offered,
+    memoryOffered,
+    projectMemory: [...(input.projectMemory ?? [])],
+    automationMemory: [...(input.automationMemory ?? [])],
     automation: input.automation ?? null,
     deadlineMs: input.deadlineMs ?? null,
     limits: {

@@ -244,6 +244,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     providers,
     tools,
+    memory: {
+      read: (projectId, automationId) => memory.read(projectId, automationId),
+      commit: (work, sessionId) => memory.commit(work, sessionId),
+    },
+    markers: {
+      mark: (automationId, marks) => automations.mark(automationId, marks),
+    },
     limits,
     usage,
     render: renderMarkdown,

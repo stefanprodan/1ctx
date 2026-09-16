@@ -101,11 +101,14 @@ export async function runRound(
   deps: RoundDeps,
   send: ActiveSend,
   rows: Message[],
+  options: { request?: ChatRequest; signal?: AbortSignal } = {},
 ): Promise<void> {
   const round = send.round;
   if (round === null) return;
-  const req = buildRequest(send, rows, deps.lookups, deps.clock());
-  const events = deps.chat(send.policy.providerId, req, send.controller.signal);
+  const signal = options.signal ?? send.controller.signal;
+  const req =
+    options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
+  const events = deps.chat(send.policy.providerId, req, signal);
   const iterator = events[Symbol.asyncIterator]();
   let replyBytes = bytes(round.content) + bytes(round.reasoning);
   while (true) {
@@ -113,7 +116,7 @@ export async function runRound(
     if (next.kind === "idle") throw new Error("the provider went quiet");
     if (next.result.done) break;
     const event = next.result.value;
-    if (send.terminal !== null) return;
+    if (signal.aborted) return;
     switch (event.kind) {
       case "reasoning":
         if (send.summarizing) break;
@@ -161,7 +164,7 @@ export async function runRound(
         break;
     }
   }
-  if (send.terminal === null && round.finishReason === null) {
+  if (!signal.aborted && round.finishReason === null) {
     throw new Error("the stream ended early");
   }
 }

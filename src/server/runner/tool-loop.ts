@@ -77,9 +77,9 @@ export async function toolLoop(
 ): Promise<LoopEnd> {
   const limits = send.policy.limits;
   while (true) {
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
     await runRound(deps.round, send, deps.historyOf(send));
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
     const round = send.round;
     if (round === null) return finish();
     const calls = round.calls;
@@ -155,10 +155,10 @@ export async function toolLoop(
       (call) => deps.tools.toolName?.(send.policy.offered, call) ?? call.name,
     );
     send.budget.calls = deps.writer.finishRound(send, toolNames).toolCalls;
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
     goToTools(send);
     await runCalls(deps, send, calls);
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
 
     startNextRound(deps, send);
   }
@@ -208,7 +208,7 @@ async function runCalls(
     }
     // A terminal transaction may be between retries. Do not let a tool
     // that settled after the claim write into that rollback window.
-    if (send.terminal !== null) return;
+    if (send.cause !== null) return;
     const stored = cut(result, send.policy.toolCaps.resultCut);
     send.budget.resultBytes += bytes(stored.content);
     try {

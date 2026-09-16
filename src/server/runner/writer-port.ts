@@ -115,7 +115,7 @@ export type SessionsPort = {
   // the running counters as the loop advances, without ending the send
   bumpCounters(
     id: string,
-    fields: { rounds: number; toolCalls: number },
+    fields: { rounds: number; toolCalls: number; memoryRound?: number },
   ): SendSummary | null;
   finishSend(
     id: string,
@@ -125,6 +125,8 @@ export type SessionsPort = {
       error: string | null;
       rounds: number;
       toolCalls: number;
+      memoryError: string | null;
+      memorySkipped: number | null;
       finishedAt: number;
     },
   ): SendSummary | null;

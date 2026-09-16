@@ -165,6 +165,8 @@ export function history(
     | "userId"
     | "automation"
     | "offered"
+    | "projectMemory"
+    | "automationMemory"
   >,
   lookups: ContextLookups,
   now: number,

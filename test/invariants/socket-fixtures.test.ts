@@ -35,6 +35,7 @@ import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ToolCall } from "../../src/shared/contracts/tool.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
 import { ORIGIN, VERSION } from "../helpers/app.ts";
+import { createAutomation } from "../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
@@ -271,6 +272,41 @@ describe("socket fixtures", () => {
     await settle(chat);
     record("plain-reply", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.status).toBe("done");
+    chat.app.socket.dispose();
+  });
+
+  test("a memory phase after a run answer", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const conn = await watcher(chat);
+    const pending = chat.scripted.next();
+    const response = await chat.member.call(
+      "POST",
+      `/api/automations/${automation.id}/run`,
+    );
+    const detail = await response.json();
+    watch(chat, conn, detail.session.id);
+    const main = await pending;
+    main.reply("The task finished.");
+    const memory = await waitScript(chat.scripted, 2);
+    memory.toolRound([
+      {
+        id: "m1",
+        name: "memory_edit",
+        arguments: '{"action":"add","text":"The task finished."}',
+      },
+    ]);
+    memory.end();
+    const finish = await waitScript(chat.scripted, 3);
+    finish.reply("Recorded.");
+    await settle(chat, 10);
+    record("memory-phase", detail, conn);
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "done",
+      memoryRound: 2,
+      rounds: 3,
+      toolCalls: 1,
+    });
     chat.app.socket.dispose();
   });
 

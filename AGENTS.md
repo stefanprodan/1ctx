@@ -275,7 +275,8 @@ violation, and every rule has a rejected fixture under
   prompt is the agent's prompt, the project and user or automation
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
-  off per server), the date line, and last the change note. A send
+  off per server), the two memory blocks, the date line, and last the
+  change note. A send
   records a content-addressed digest of what it offered from MCP
   (`mcp_digests`, `sends.mcp`, null for a compact send, swept with the
   logins); `startSend` compares it with the session's previous send
@@ -367,6 +368,16 @@ violation, and every rule has a rejected fixture under
   `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
   send limits. History starts from the last done summary. Compact on
   demand is a send of kind `compact` under the same runner lock.
+- **A note is a working copy until the run ends.** Every send reads the
+  project's note once; a run with `ownMemory` reads its automation's too.
+  `projectMemory` gives a memory task the chat list, chat read and edit
+  tools in its main rounds; `ownMemory` opens a bounded final phase with
+  only the edit tool. The ending claims one cause, releases the main
+  round, runs that phase on finish, deadline or failure, then finalizes
+  once. A finished memory task commits its project edits and read marks
+  together; an edited automation copy commits on any cause after its
+  phase starts. Each changed note sends one frame. Project and automation
+  memory routes let anyone who sees the project read, save and undo.
 - **An automation fires runs, and a run is a session.** An automation
   is a row in its project (`automations/`): an agent, instructions, a
   five-field cron schedule in an IANA zone parsed by `Bun.cron.parse`
