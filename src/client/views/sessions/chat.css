@@ -23,6 +23,9 @@
     font-size: var(--text-small);
     color: var(--faint);
   }
+  .chat-run-label {
+    white-space: nowrap;
+  }
   .chat-run-link {
     color: var(--brand);
     text-decoration: none;
@@ -70,6 +73,20 @@
   }
   .chat-run-stop {
     color: var(--failed);
+  }
+  /* the fork of a finished run: the agent chip and the button, on
+     their own line under the state where the row is narrow */
+  .chat-run-fork {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+  }
+  @media (max-width: 719px) {
+    .chat-run-fork {
+      flex-basis: 100%;
+      margin-left: 0;
+    }
   }
 }
 

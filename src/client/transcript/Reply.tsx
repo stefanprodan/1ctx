@@ -7,15 +7,17 @@
 // so a code block in progress never breaks out of its element, then
 // the summary fold when the window filled. A compact turn is the
 // summary fold alone. Under a finished turn, why it was cut when it
-// was, Copy, Regenerate on the last turn, and when it was.
+// was, Copy, Fork, Regenerate on the last turn, and when it was.
 
-import { useEffect, useState } from "preact/hooks";
+import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { stamp } from "../lib/format.ts";
 import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
+import { CopyButton } from "./Copy.tsx";
+import { ForkButton, type OnFork } from "./Fork.tsx";
 import { endedBy, type ReplyNode, type WorkNode } from "./rows.ts";
 import { Summary } from "./Summary.tsx";
 import { type Live, leadIn, tail } from "./stream.ts";
@@ -46,42 +48,12 @@ export function cutReason(m: Message): { text: string; err: boolean } | null {
   return null;
 }
 
-async function copy(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // a page without clipboard access: the button does nothing
-    return false;
-  }
-}
-
-// the copy icon, a check for a moment after a copy
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1200);
-    return () => clearTimeout(timer);
-  }, [copied]);
-  return (
-    <button
-      type="button"
-      class={`transcript-act${copied ? " transcript-act-done" : ""}`}
-      title="Copy"
-      aria-label="Copy"
-      onClick={() => void copy(text).then((ok) => ok && setCopied(true))}
-    >
-      <Icon name={copied ? "check" : "copy"} size={14} />
-    </button>
-  );
-}
-
 export function Reply({
   node,
   live,
   agent,
   onRegenerate,
+  fork,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
@@ -89,6 +61,9 @@ export function Reply({
   // set on the last turn alone: regenerate drops it and sends its
   // user message again
   onRegenerate?: () => void;
+  // the fork action under a finished answer; absent where the session
+  // cannot be forked yet
+  fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
 }) {
   const m = node.message;
   const running = replyRunning(node, live);
@@ -178,6 +153,17 @@ export function Reply({
               </span>
             )}
             {content !== "" && <CopyButton text={content} />}
+            {fork !== undefined &&
+              m !== null &&
+              m.slot === "answer" &&
+              m.status !== "failed" && (
+                <ForkButton
+                  messageId={m.id}
+                  agents={fork.agents}
+                  agentId={fork.agentId}
+                  onFork={fork.onFork}
+                />
+              )}
             {onRegenerate !== undefined && (
               <button
                 type="button"

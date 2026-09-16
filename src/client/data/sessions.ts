@@ -150,7 +150,11 @@ export async function loadSession(id: string): Promise<void> {
 
 // the page left the chat: nothing of it is kept, so a late frame, a
 // deletion or a revocation of it moves the page nowhere
-export function leaveSession(): void {
+// the page leaves a chat: with the id it leaves, nothing happens when
+// the load of another chat already owns the entity, as it does on the
+// way from a chat to its fork, so that load is not thrown away
+export function leaveSession(id?: string): void {
+  if (id !== undefined && wanted.id !== "" && wanted.id !== id) return;
   wanted = { id: "", turn: wanted.turn + 1 };
   pending = null;
   stream = null;

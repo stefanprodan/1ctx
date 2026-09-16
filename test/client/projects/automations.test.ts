@@ -88,6 +88,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   origin: "automation",
   automationId: "au1",
   runSource: "schedule",
+  forkedFromId: null,
   title: "nightly",
   status: "running",
   revision: 1,

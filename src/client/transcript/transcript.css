@@ -187,6 +187,103 @@
   .transcript-after .transcript-cut {
     margin-right: var(--space-2);
   }
+  /* a user row's actions sit under its card */
+  .transcript-user .transcript-after {
+    margin-top: var(--space-1);
+  }
+
+  /* the fork menu hangs under its button, the agents as the composer's
+     chip lists them, the session's own first */
+  .transcript-fork {
+    position: relative;
+    display: inline-flex;
+  }
+  .transcript-fork-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 240px;
+    /* never past the phone's edge: the button sits past the row's
+       gutter and the agent's tile, so that much is taken off too */
+    max-width: min(420px, calc(100vw - 8 * var(--space-4)));
+    margin: 0;
+    padding: var(--space-1);
+    list-style: none;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    border: 1px solid var(--line-strong);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+  .transcript-fork-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    /* a finger's height */
+    height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+    text-align: left;
+    cursor: pointer;
+  }
+  .transcript-fork-menu-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+  }
+  .transcript-fork-option:hover,
+  .transcript-fork-option-on {
+    background: var(--line);
+  }
+  .transcript-fork-option:disabled {
+    cursor: default;
+    color: var(--faint);
+  }
+  .transcript-fork-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    color: var(--dim);
+    flex-shrink: 0;
+  }
+  .transcript-fork-name {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--fg);
+  }
+  .transcript-fork-model {
+    flex-shrink: 0;
+    color: var(--faint);
+    min-width: 0;
+    max-width: 60%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .transcript-fork-failure,
+  .transcript-fork-none {
+    padding: var(--space-1) var(--space-2);
+    color: var(--faint);
+  }
+  .transcript-fork-failure {
+    color: var(--failed);
+  }
 
   /* the arrow above the composer, see-through so the text under it
      still reads */

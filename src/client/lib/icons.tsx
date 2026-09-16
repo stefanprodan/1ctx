@@ -106,6 +106,8 @@ const PATHS: Record<string, string> = {
   spinner: "M13 8a5 5 0 1 1-2-4",
   trash: "M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5M6.8 7v4M9.2 7v4",
   redo: "M14 8a6 6 0 1 1-1.8-4.3M14 2v3.5h-3.5",
+  // a branch leaving the line: the fork of a chat
+  fork: "M5 3.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 15.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM11.5 6.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 3.5v9M11.5 6.5c0 3-6.5 2.5-6.5 6",
   clock: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8 4.5V8l2.5 1.5",
   // automation as a whole, whatever starts a run
   bolt: "M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z",
