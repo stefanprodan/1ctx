@@ -54,6 +54,11 @@ export type ToolsPort = {
     agentId: string,
     agentServers: AgentRow["servers"],
     mode: AgentRow["mcpMode"],
+    scope: {
+      projectId: string | null;
+      automation: null;
+      phase: "main";
+    },
   ): {
     tools: ChatTool[];
     search: string | null;
@@ -103,6 +108,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               agent.id,
               agent.servers,
               agent.mcpMode,
+              { projectId: null, automation: null, phase: "main" },
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };
         const versions = deps.skills.versions(agent.id);

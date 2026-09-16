@@ -303,6 +303,7 @@ describe("finishTool rollback", () => {
           mcp: [],
           mcpPrompt: { text: "", digest: {} },
           mcpCatalog: "",
+          memory: null,
           tools: [
             {
               name: "datetime",
@@ -414,6 +415,7 @@ describe("finalizeSend rollback", () => {
         mcp: [],
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
+        memory: null,
         tools: [
           {
             name: "datetime",
@@ -458,6 +460,7 @@ describe("finalizeSend rollback", () => {
       return original(id, fields);
     };
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    await tick();
     chat.app.now.value += FINALIZE_RETRY_MS;
     await tick();
     await tick();

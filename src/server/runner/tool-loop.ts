@@ -14,6 +14,7 @@ import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ToolCall } from "../providers/index.ts";
+import { isMemoryTool } from "../tools/index.ts";
 import type { ToolContext, ToolResult, ToolsPort } from "./policy.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
@@ -77,9 +78,9 @@ export async function toolLoop(
 ): Promise<LoopEnd> {
   const limits = send.policy.limits;
   while (true) {
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
     await runRound(deps.round, send, deps.historyOf(send));
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
     const round = send.round;
     if (round === null) return finish();
     const calls = round.calls;
@@ -155,10 +156,10 @@ export async function toolLoop(
       (call) => deps.tools.toolName?.(send.policy.offered, call) ?? call.name,
     );
     send.budget.calls = deps.writer.finishRound(send, toolNames).toolCalls;
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
     goToTools(send);
     await runCalls(deps, send, calls);
-    if (send.terminal !== null) return endFor(send.terminal);
+    if (send.cause !== null) return endFor(send.cause);
 
     startNextRound(deps, send);
   }
@@ -208,7 +209,7 @@ async function runCalls(
     }
     // A terminal transaction may be between retries. Do not let a tool
     // that settled after the claim write into that rollback window.
-    if (send.terminal !== null) return;
+    if (send.cause !== null) return;
     const stored = cut(result, send.policy.toolCaps.resultCut);
     send.budget.resultBytes += bytes(stored.content);
     try {
@@ -225,6 +226,11 @@ async function runCalls(
   const task = Promise.allSettled(settled).then(() => {});
   send.tools = task;
   await task;
+  const offered = send.policy.offered;
+  offered.memory?.settleRound();
+  if (offered.memory?.stopped) {
+    offered.tools = offered.tools.filter((tool) => !isMemoryTool(tool.name));
+  }
   send.tools = null;
   send.budget.toolMs += deps.clock() - startedAt;
   if (writeError !== null) throw writeError;

@@ -43,6 +43,8 @@ import {
   dirtyOf,
   draftOf,
   followDeadlineLimit,
+  MEMORY_MODES,
+  pickMemory,
   requestOf,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
@@ -122,6 +124,8 @@ function Editor({
   const busy = save.busy;
   const off = busy || !editable;
   const d = draft.value;
+  const takesTools =
+    agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
@@ -167,6 +171,56 @@ function Editor({
           </div>
           <FieldError save={save} field="instructions" />
           <FieldError save={save} field="agent" />
+        </div>
+      </Section>
+      <Section title="Memory" text="What a run remembers">
+        <div class="automations-stack">
+          <fieldset
+            class={`automations-seg${
+              invalid("memory") ? " automations-seg-invalid" : ""
+            }`}
+            aria-label="Memory"
+          >
+            {MEMORY_MODES.map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                name={mode.value === d.memory ? "memory" : undefined}
+                class={`automations-seg-option${
+                  d.memory === mode.value ? " automations-seg-on" : ""
+                }`}
+                aria-pressed={d.memory === mode.value}
+                disabled={off || (!takesTools && mode.value !== "none")}
+                onClick={() => set(pickMemory(d, mode.value))}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </fieldset>
+          <FieldError save={save} field="memory" />
+          {/* a refusal of the guidance keeps it in sight, or the save
+              fails with nothing to show */}
+          {((d.memory === "own" && takesTools) ||
+            invalid("memoryGuidance")) && (
+            <label class="field automations-guidance">
+              <textarea
+                name="memoryGuidance"
+                aria-label="What to remember"
+                rows={4}
+                placeholder="What to remember"
+                aria-invalid={invalid("memoryGuidance") || undefined}
+                disabled={off}
+                value={d.memoryGuidance}
+                onInput={(e) =>
+                  set({
+                    memoryGuidance: (e.currentTarget as HTMLTextAreaElement)
+                      .value,
+                  })
+                }
+              />
+              <FieldError save={save} field="memoryGuidance" />
+            </label>
+          )}
         </div>
       </Section>
       <Section title="When" text="In the time zone you pick">

@@ -17,6 +17,7 @@ import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadMcp } from "../data/mcp.ts";
+import { keyOf, loadMemory } from "../data/memory.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -58,6 +59,12 @@ export type Route = {
 
 // the icon of a group's row in the rail
 export const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
+
+// the automation's two tabs share one view, so a tab change keeps the
+// page mounted instead of drawing it again
+const automationView = lazy(() =>
+  import("../views/projects/Automation.tsx").then((m) => m.Automation),
+);
 
 export const ROUTES: Route[] = [
   {
@@ -149,6 +156,23 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/projects/:id/memory",
+    view: lazy(() =>
+      import("../views/projects/Memory.tsx").then((m) => m.Memory),
+    ),
+    title: () => "Memory",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+        loadRecentDays(),
+        loadMemory(keyOf(params.id, null)),
+      ]);
+    },
+  },
+  {
     path: "/projects/:id/automations/new",
     view: lazy(() =>
       import("../views/projects/AutomationEditor.tsx").then(
@@ -168,9 +192,7 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/automations/:id",
-    view: lazy(() =>
-      import("../views/projects/Automation.tsx").then((m) => m.Automation),
-    ),
+    view: automationView,
     title: () => "Automation",
     role: "authenticated",
     // ?runs=failed|manual narrows the runs
@@ -178,6 +200,14 @@ export const ROUTES: Route[] = [
       const filter = query.get("runs");
       return loadAutomationPage(params.id, isRunFilter(filter) ? filter : null);
     },
+  },
+  {
+    path: "/automations/:id/memory",
+    view: automationView,
+    title: () => "Memory",
+    role: "authenticated",
+    // the runs still load, for the tally in the aside
+    load: (params) => loadAutomationPage(params.id, null),
   },
   {
     path: "/automations/:id/edit",

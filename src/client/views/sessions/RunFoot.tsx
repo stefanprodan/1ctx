@@ -8,9 +8,10 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
-import { reason } from "../../lib/format.ts";
+import { count, reason } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
+import { durationOf, durationText } from "../projects/Automations.model.ts";
 
 export function RunFoot({
   row,
@@ -30,11 +31,17 @@ export function RunFoot({
     return () => clearInterval(timer);
   }, [running, now]);
   // a done row's line is the answer's first line, which the transcript
-  // above already shows; the foot says only that it is done
+  // above already shows; the foot says how long it took and what it cost
+  const took = durationOf(row, now.value);
   const text = running
     ? `${stateLine(row).text} · ${whenText(row, now.value)}`
     : row.session.status === "done"
-      ? "done"
+      ? [
+          took === null ? "done" : `done in ${durationText(took)}`,
+          ...(row.send === null || row.send.tokens === 0
+            ? []
+            : [`${count(row.send.tokens)} tokens`]),
+        ].join(" · ")
       : stateLine(row).text;
   return (
     <div class="chat-run-foot">

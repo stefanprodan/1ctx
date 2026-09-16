@@ -72,6 +72,7 @@ function fixedTools(content: string): Tools {
       mcp: [],
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
+      memory: null,
     }),
     run: () => Promise.resolve({ content, error: false }),
   };
@@ -230,6 +231,8 @@ describe("GET /api/sessions", () => {
       error: "failed before a reply",
       rounds: 0,
       toolCalls: 0,
+      memoryError: null,
+      memorySkipped: null,
       finishedAt: chat.app.now.value,
     });
     store.touch(failed.id, { status: "failed", now: chat.app.now.value });
@@ -1214,6 +1217,81 @@ describe("the tool-loop store", () => {
     db.close();
   });
 
+  test("repair places a memory-phase reply as work and records its error", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "memory-repair-send",
+      kind: "run",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "memory-repair-user",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "memory-repair-user",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "run",
+      now: 0,
+    });
+    const answer = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 1,
+      agentId: "a",
+      model: "m",
+      now: 0,
+    });
+    store.finishReply(answer.id, {
+      content: "answer",
+      reasoning: "",
+      reasoningDetails: [],
+      html: "",
+      status: "done",
+      error: null,
+      finishReason: "stop",
+      slot: "answer",
+      toolCalls: null,
+      ttftMs: null,
+      thinkingMs: null,
+      finishedAt: 1,
+    });
+    const phase = store.addReply({
+      sessionId: session.id,
+      sendId: send.id,
+      round: 2,
+      agentId: "a",
+      model: "m",
+      now: 2,
+    });
+    db.query("update sends set memory_round = 2 where id = ?").run(send.id);
+    store.touch(session.id, { status: "running", now: 2 });
+
+    const repaired = store.repair(3, "restart");
+
+    expect(repaired[0]!.messages).toEqual([
+      expect.objectContaining({
+        id: phase.id,
+        status: "failed",
+        slot: "work",
+      }),
+    ]);
+    expect(store.message(answer.id)).toMatchObject({
+      status: "done",
+      slot: "answer",
+    });
+    expect(repaired[0]!.send).toMatchObject({
+      cause: "restart",
+      memoryRound: 2,
+      memoryError: "restart",
+    });
+    db.close();
+  });
+
   test("finishSend records the counters", () => {
     const { db, store, session } = seededStore();
     const send = store.createSend({
@@ -1243,6 +1321,8 @@ describe("the tool-loop store", () => {
       error: null,
       rounds: 2,
       toolCalls: 3,
+      memoryError: null,
+      memorySkipped: null,
       finishedAt: 5,
     })!;
     expect(ended).toMatchObject({ rounds: 2, toolCalls: 3, status: "done" });

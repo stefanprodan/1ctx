@@ -73,6 +73,30 @@ function policy(
 }
 
 describe("send policy thinking", () => {
+  test("copies automation guidance instead of keeping the caller's object", () => {
+    const automation: NonNullable<SendPolicy["automation"]> = {
+      id: "automation",
+      name: "nightly",
+      source: "manual",
+      dueAt: 1,
+      tz: "UTC",
+      projectMemory: false,
+      ownMemory: true,
+      memoryGuidance: "Sources: failed hosts",
+    };
+    const send = buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent,
+      now: 1,
+      tools: null,
+      limits: DEFAULT_LIMITS,
+      automation,
+    });
+    automation.memoryGuidance = "Snapshot: latest result";
+    expect(send.automation?.memoryGuidance).toBe("Sources: failed hosts");
+  });
+
   test("copies the compaction limits onto the send", () => {
     expect(policy({}).limits).toMatchObject({
       contextReserve: 20_000,

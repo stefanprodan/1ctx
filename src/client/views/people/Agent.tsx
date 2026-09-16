@@ -5,7 +5,7 @@
 // The head is the model it runs on, then its system prompt as written,
 // its skills with what each is for, and the built-in tools a send
 // offers it now. The aside is the model's facts and the agent's
-// settings; where it is hidden, the head carries the provider and the
+// settings, with Manage for an admin; where it is hidden, the head carries the provider and the
 // model's meta line.
 
 import { useSignal } from "@preact/signals";
@@ -18,9 +18,11 @@ import {
 } from "../../agents/meta.ts";
 import type { Params } from "../../app/params.ts";
 import { agentPage, agentPageError } from "../../data/directory.ts";
+import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { ago, longDate } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { onResize } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -55,9 +57,7 @@ function Prompt({ text, tokens }: { text: string; tokens: number }) {
       if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
+    return onResize(node, measure);
   }, [text, open, long]);
   return (
     <RowsCard label="Prompt" hint={tokensText(tokens)}>
@@ -147,7 +147,19 @@ export function Agent({ params }: { params: Params }) {
                   </div>
                 )}
               </AsideSection>
-              <AsideSection label="Settings">
+              <AsideSection
+                label="Settings"
+                action={
+                  me.value?.role === "admin" ? (
+                    <a
+                      class="split-link"
+                      href={`/admin/agents?open=${encodeURIComponent(shown.agent.id)}`}
+                    >
+                      Manage
+                    </a>
+                  ) : undefined
+                }
+              >
                 <div class="split-line">
                   Thinking
                   <span class="split-strong">{thinkingText(shown.agent)}</span>

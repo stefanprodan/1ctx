@@ -4,21 +4,12 @@
 // The ordered tool lookup. Unknown names, malformed arguments and
 // throws become failed results so the runner only handles ToolResult.
 
+import { sanitize } from "../../shared/memory.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { Tool, ToolContext, ToolResult } from "./types.ts";
 
 function clean(text: string, cut: number): string {
-  let result = "";
-  for (let index = 0; index < text.length; index++) {
-    const code = text.charCodeAt(index);
-    const control =
-      (code < 32 && code !== 9 && code !== 10) ||
-      (code >= 127 && code <= 159) ||
-      (code >= 0x202a && code <= 0x202e) ||
-      (code >= 0x2066 && code <= 0x2069);
-    if (!control) result += text[index];
-  }
-  return result.slice(0, cut);
+  return sanitize(text).slice(0, cut);
 }
 
 function describe(error: unknown, timeoutMs: number): string {
@@ -31,7 +22,12 @@ function describe(error: unknown, timeoutMs: number): string {
 export class Registry {
   private readonly byName = new Map<string, Tool>();
 
-  constructor(tools: Tool[]) {
+  // unknown() lets a caller whose set is not the send's usual one say
+  // what is on offer instead of the bare not-found line
+  constructor(
+    tools: Tool[],
+    private readonly unknown = (name: string) => `tool "${name}" not found.`,
+  ) {
     for (const tool of tools) this.byName.set(tool.name, tool);
   }
 
@@ -42,9 +38,10 @@ export class Registry {
   async run(call: ToolCall, ctx: ToolContext): Promise<ToolResult> {
     let timeoutMs = ctx.caps.callTimeoutMs;
     let timeoutSignal: AbortSignal | null = null;
+    let started = 0;
     try {
       const tool = this.byName.get(call.name);
-      if (!tool) throw new Error(`tool "${call.name}" not found.`);
+      if (!tool) throw new Error(this.unknown(call.name));
       timeoutMs = tool.timeoutMs ?? ctx.caps.callTimeoutMs;
       let parsed: unknown;
       try {
@@ -59,6 +56,7 @@ export class Registry {
       ) {
         throw new Error(`arguments for tool "${call.name}" must be an object`);
       }
+      started = performance.now();
       timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
       const text = await tool.run(parsed as Record<string, unknown>, {
@@ -67,9 +65,15 @@ export class Registry {
       });
       return { content: clean(String(text), ctx.caps.resultCut), error: false };
     } catch (error) {
+      // a tool with its own timer of the same length (an MCP call) can
+      // throw its own words a moment before this one fires; past the
+      // limit, the failure is this timeout either way
+      const late =
+        timeoutSignal !== null &&
+        (timeoutSignal.aborted || performance.now() - started >= timeoutMs);
       const failure =
-        timeoutSignal?.aborted && !ctx.signal.aborted
-          ? timeoutSignal.reason
+        late && !ctx.signal.aborted
+          ? new DOMException("the tool call timed out", "TimeoutError")
           : error;
       const message = describe(failure, timeoutMs);
       return {

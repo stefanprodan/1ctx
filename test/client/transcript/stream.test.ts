@@ -5,7 +5,9 @@ import { describe, expect, test } from "bun:test";
 import {
   applyDelta,
   applyHtml,
+  LEAD_CHARS,
   type Live,
+  leadIn,
   liveOf,
   liveOfSnapshot,
   secs,
@@ -177,6 +179,24 @@ describe("live transcript buffers", () => {
 
   test("returns content after the rendered boundary", () => {
     expect(tail(live({ content: "abcdef", htmlAt: 3 }))).toBe("def");
+  });
+});
+
+describe("unslotted lead-in", () => {
+  test("keeps one short paragraph where a work round's words go", () => {
+    expect(leadIn("")).toBe(true);
+    expect(
+      leadIn(
+        "Round 1 data received. Now Round 2: fetching three articles.\n\n",
+      ),
+    ).toBe(true);
+    expect(leadIn("x".repeat(LEAD_CHARS))).toBe(true);
+  });
+
+  test("gives a second paragraph or a long one to the answer", () => {
+    expect(leadIn("All data collected.\n\n## Snapshot")).toBe(false);
+    expect(leadIn("All data collected.\n \n---")).toBe(false);
+    expect(leadIn("x".repeat(LEAD_CHARS + 1))).toBe(false);
   });
 });
 

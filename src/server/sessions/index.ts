@@ -5,12 +5,14 @@
 // rename, the deletion, and the boot repair of rows a crash left running. The
 // runner below writes them through the store this area builds.
 
+import type { Memory } from "../../shared/contracts/memory.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
+import type { MemorySnapshot } from "./memory.ts";
 import { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
@@ -20,6 +22,7 @@ export {
   type ExportRow,
   markdownFilename,
 } from "./markdown.ts";
+export { type MemorySnapshot, memorySnapshot } from "./memory.ts";
 export {
   lineFrom,
   MAX_SESSION_BODY,
@@ -53,6 +56,7 @@ export type SessionsDeps = {
   access: AccessPort;
   live: LivePort;
   usage: UsagePort;
+  isWrite: (name: string) => boolean;
 };
 
 export type Sessions = {
@@ -63,6 +67,8 @@ export type Sessions = {
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
   usesAgent(agentId: string): boolean;
+  runInfo(sessionId: string): Memory["run"];
+  memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -94,6 +100,28 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     usesAgent: (agentId) => store.usesAgent(agentId),
+    runInfo(sessionId) {
+      const row = deps.db
+        .query<
+          {
+            sessionId: string;
+            automationId: string | null;
+            automationName: string | null;
+          },
+          [string]
+        >(
+          `select sessions.id as sessionId,
+             automations.id as automationId,
+             automations.name as automationName
+           from sessions
+           left join automations on automations.id = sessions.automation_id
+           where sessions.id = ?`,
+        )
+        .get(sessionId);
+      return row ?? null;
+    },
+    memorySnapshot: (projectId, sessionId) =>
+      store.memorySnapshot(projectId, sessionId, deps.isWrite),
     repair() {
       const touched = transact(deps.db, () => {
         const rows = store.repair(deps.clock(), RESTART_ERROR);

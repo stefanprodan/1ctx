@@ -236,6 +236,23 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/projects/:id/memory",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PUT",
+    path: "/api/projects/:id/memory",
+    body: { entries: [], revision: 0 },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/memory/undo",
+    body: { revision: 0 },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/projects/:id/automations",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
@@ -255,12 +272,31 @@ export const AUTH_CASES: AuthCase[] = [
       tz: "UTC",
       deadlineMs: null,
       retentionDays: 30,
+      projectMemory: false,
+      ownMemory: false,
     },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "GET",
     path: "/api/automations/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/automations/:id/memory",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PUT",
+    path: "/api/automations/:id/memory",
+    body: { entries: [], revision: 0 },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/automations/:id/memory/undo",
+    body: { revision: 0 },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

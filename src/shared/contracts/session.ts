@@ -130,6 +130,14 @@ export type SendSummary = {
   rounds: number;
   // tool calls launched, not calls a cap cut
   toolCalls: number;
+  // the round the memory phase started at; null for a send without one
+  memoryRound: number | null;
+  // why the memory phase did not update the note, null when it did
+  memoryError: string | null;
+  // edits the commit skipped because the note moved during the run
+  memorySkipped: number | null;
+  // prompt plus completion tokens over every round the provider counted
+  tokens: number;
   startedAt: number;
   finishedAt: number | null;
 };

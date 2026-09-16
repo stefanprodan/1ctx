@@ -7,14 +7,26 @@ import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
+import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
 import type { SessionStore, UsagePort } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import {
+  type MemoryMark,
+  MemoryMarkerStore,
+  type UnreadChats,
+} from "./memory.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
 import { AutomationStore } from "./store.ts";
 
+export {
+  type MemoryMark,
+  MemoryMarkerStore,
+  type UnreadChat,
+  type UnreadChats,
+} from "./memory.ts";
 export { type AccessPort, type RoutesDeps, routes } from "./routes.ts";
 export {
   checkSchedule,
@@ -41,6 +53,7 @@ export type AutomationsDeps = {
   };
   agents: { byId(id: string): AgentRow | null };
   limits: { current(): Limits };
+  memory: Pick<MemoryCapability, "read" | "save" | "undo">;
   sessions: SessionStore;
   usage: UsagePort;
   runner: { startRun(event: Event): PreparedRun };
@@ -48,7 +61,15 @@ export type AutomationsDeps = {
 
 export type Automations = {
   store: AutomationStore;
+  markers: MemoryMarkerStore;
   scheduler: Scheduler;
+  unread(
+    automationId: string,
+    projectId: string,
+    cap: number,
+    exclude?: readonly string[],
+  ): UnreadChats;
+  mark(automationId: string, marks: readonly MemoryMark[]): number;
   usesAgent(agentId: string): boolean;
   start(): void;
   stop(): void;
@@ -58,11 +79,16 @@ export type Automations = {
 
 export function automationsArea(deps: AutomationsDeps): Automations {
   const store = new AutomationStore(deps.db);
+  const markers = new MemoryMarkerStore(deps.db);
   const scheduled = scheduler({ ...deps, store });
   store.setWake(scheduled.wake);
   return {
     store,
+    markers,
     scheduler: scheduled,
+    unread: (automationId, projectId, cap, exclude) =>
+      markers.unread(automationId, projectId, cap, exclude),
+    mark: (automationId, marks) => markers.mark(automationId, marks),
     usesAgent: (agentId) => store.usesAgent(agentId),
     start: scheduled.start,
     stop: scheduled.stop,

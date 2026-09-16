@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { Registry } from "../../../src/server/runner/index.ts";
+import { type Event, Registry } from "../../../src/server/runner/index.ts";
 import { automationBody, createAutomation } from "../../helpers/automations.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
 
@@ -18,6 +18,86 @@ async function settle(
 }
 
 describe("automation scheduler", () => {
+  test.each(["schedule", "manual"] as const)(
+    "%s runs snapshot guidance before later edits",
+    async (source) => {
+      const chat = await chatApp();
+      chat.app.automationScheduler.stop();
+      const events: Event[] = [];
+      const start = chat.app.runner.startRun;
+      chat.app.runner.startRun = (event) => {
+        events.push(event);
+        return start(event);
+      };
+      try {
+        const automation = await createAutomation(chat, {
+          ownMemory: true,
+          memoryGuidance: "Sources: remember failed hosts",
+        });
+        const launch = async () => {
+          const pending = chat.scripted.next();
+          if (source === "schedule") {
+            chat.app.db
+              .query("update automations set next_at = ? where id = ?")
+              .run(chat.app.now.value, automation.id);
+            const detail = await chat.app.automationScheduler.fire(
+              automation.id,
+            );
+            return { detail: detail!, script: await pending };
+          }
+          const response = await chat.member.call(
+            "POST",
+            `/api/automations/${automation.id}/run`,
+          );
+          expect(response.status).toBe(201);
+          return { detail: await response.json(), script: await pending };
+        };
+        const first = await launch();
+        const send = chat.app.runner.registry.get(first.detail.session.id)!;
+        const policy = send.policy;
+        expect(policy.automation).toMatchObject({
+          source,
+          ownMemory: true,
+          memoryGuidance: automation.memoryGuidance,
+        });
+        expect(events[0]?.automation.memoryGuidance).toBe(
+          automation.memoryGuidance,
+        );
+        expect(JSON.stringify(first.script.body.messages)).not.toContain(
+          automation.memoryGuidance,
+        );
+        const changed = await chat.member.call(
+          "PATCH",
+          `/api/automations/${automation.id}`,
+          { body: { memoryGuidance: "Snapshot: remember the latest result" } },
+        );
+        expect(changed.status).toBe(200);
+        expect(policy.automation?.memoryGuidance).toBe(
+          automation.memoryGuidance,
+        );
+        expect(events[0]?.automation.memoryGuidance).toBe(
+          automation.memoryGuidance,
+        );
+        await chat.member.call(
+          "POST",
+          `/api/sessions/${first.detail.session.id}/stop`,
+        );
+        await send.drained;
+        const second = await launch();
+        expect(
+          chat.app.runner.registry.get(second.detail.session.id)?.policy
+            .automation?.memoryGuidance,
+        ).toBe("Snapshot: remember the latest result");
+        expect(events[1]?.automation.memoryGuidance).toBe(
+          "Snapshot: remember the latest result",
+        );
+      } finally {
+        chat.app.runner.startRun = start;
+        await chat.app.shutdown();
+      }
+    },
+  );
+
   test("fires a due row once and skips a second fire while it runs", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();

@@ -37,6 +37,11 @@ export type BusEvents = {
     automation: AutomationSummary;
   };
   "automation.deleted": { projectId: string; automationId: string };
+  "memory.changed": {
+    projectId: string;
+    automationId: string | null;
+    revision: number;
+  };
   // what these users may see changed (a membership, a role, a team
   // project made or gone); null means everyone recomputes
   "access.changed": { userIds: string[] | null };

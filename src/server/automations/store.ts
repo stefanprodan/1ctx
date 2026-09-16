@@ -23,6 +23,9 @@ type Raw = {
   tz: string;
   deadline_ms: number | null;
   retention_days: number;
+  project_memory: number;
+  own_memory: number;
+  memory_guidance: string;
   suspended_at: number | null;
   suspended_by: string | null;
   suspended_by_name: string | null;
@@ -59,6 +62,9 @@ const row = (raw: Raw): AutomationSummary => ({
   tz: raw.tz,
   deadlineMs: raw.deadline_ms,
   retentionDays: raw.retention_days,
+  projectMemory: raw.project_memory === 1,
+  ownMemory: raw.own_memory === 1,
+  memoryGuidance: raw.memory_guidance,
   suspendedAt: raw.suspended_at,
   suspendedBy:
     raw.suspended_by === null
@@ -88,6 +94,9 @@ export type AutomationFields = Pick<
   | "tz"
   | "deadlineMs"
   | "retentionDays"
+  | "projectMemory"
+  | "ownMemory"
+  | "memoryGuidance"
 >;
 
 export class AutomationStore {
@@ -175,8 +184,10 @@ export class AutomationStore {
       .query(
         `insert into automations
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
-           tz, deadline_ms, retention_days, next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           tz, deadline_ms, retention_days, project_memory, own_memory,
+           memory_guidance,
+           next_at, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -189,6 +200,9 @@ export class AutomationStore {
         fields.tz,
         fields.deadlineMs,
         fields.retentionDays,
+        fields.projectMemory ? 1 : 0,
+        fields.ownMemory ? 1 : 0,
+        fields.memoryGuidance,
         fields.nextAt,
         fields.now,
         fields.now,
@@ -208,13 +222,17 @@ export class AutomationStore {
       | "deadlineMs"
       | "retentionDays"
       | "nextAt"
+      | "projectMemory"
+      | "ownMemory"
+      | "memoryGuidance"
     > & { now: number },
   ): AutomationSummary | null {
     this.db
       .query(
         `update automations set agent_id = ?, name = ?, instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
-           next_at = ?, revision = revision + 1, updated_at = ? where id = ?`,
+           next_at = ?, project_memory = ?, own_memory = ?, memory_guidance = ?,
+           revision = revision + 1, updated_at = ? where id = ?`,
       )
       .run(
         fields.agentId,
@@ -225,6 +243,9 @@ export class AutomationStore {
         fields.deadlineMs,
         fields.retentionDays,
         fields.nextAt,
+        fields.projectMemory ? 1 : 0,
+        fields.ownMemory ? 1 : 0,
+        fields.memoryGuidance,
         fields.now,
         id,
       );

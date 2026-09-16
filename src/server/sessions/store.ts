@@ -8,7 +8,6 @@ import type { McpDigest } from "../../shared/mcp.ts";
 import type {
   MessageStatus,
   RunFilter,
-  SendCause,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -27,6 +26,10 @@ import {
   lastMcpDigest as readLastMcpDigest,
   sweepMcpDigests,
 } from "./mcp.ts";
+import {
+  type MemorySnapshot,
+  memorySnapshot as readMemorySnapshot,
+} from "./memory.ts";
 import { addAgentMessage } from "./messages.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -35,16 +38,22 @@ import {
   MESSAGE_COLUMNS,
   message,
   type RawMessage,
-  type RawSend,
   type RawSession,
   type RepairedSession,
   type ReplyFinish,
   type SessionRow,
   STREAM_LIMIT,
-  send,
   session,
   type UsagePort,
 } from "./rows.ts";
+import {
+  bumpSendCounters,
+  endSendRow,
+  readLastSend,
+  readSend,
+  type SendCounters,
+  type SendEnd,
+} from "./sends.ts";
 
 export class SessionStore {
   constructor(
@@ -174,9 +183,15 @@ export class SessionStore {
 
   exportRows(sessionId: string): ExportRow[] {
     return this.db
-      .query<ExportRow, [string]>(
-        `select messages.send_id as sendId, messages.kind, messages.slot,
+      .query<
+        Omit<ExportRow, "toolCalls"> & { toolCalls: string | null },
+        [string]
+      >(
+        `select messages.send_id as sendId, messages.round,
+           sends.memory_round as memoryRound, messages.kind, messages.slot,
            messages.status, messages.error,
+           messages.tool_calls as toolCalls,
+           messages.tool_call_id as toolCallId, messages.tool_name as toolName,
            messages.finish_reason as finishReason,
            coalesce(users.username, agents.name) as author,
            case when messages.kind = 'user'
@@ -185,12 +200,25 @@ export class SessionStore {
            messages.created_at as createdAt,
            messages.finished_at as finishedAt
          from messages
+         join sends on sends.id = messages.send_id
          left join users on users.id = messages.user_id
          left join agents on agents.id = messages.agent_id
          where messages.session_id = ?
          order by messages.seq`,
       )
-      .all(sessionId);
+      .all(sessionId)
+      .map((row) => ({
+        ...row,
+        toolCalls: row.toolCalls === null ? null : JSON.parse(row.toolCalls),
+      }));
+  }
+
+  memorySnapshot(
+    projectId: string,
+    id: string,
+    isWrite: (name: string) => boolean,
+  ): MemorySnapshot | null {
+    return readMemorySnapshot(projectId, id, this, isWrite);
   }
 
   message(id: string): Message | null {
@@ -411,58 +439,19 @@ export class SessionStore {
   }
 
   send(id: string): SendSummary | null {
-    const raw = this.db
-      .query<RawSend, [string]>("select * from sends where id = ?")
-      .get(id);
-    return raw ? send(raw) : null;
+    return readSend(this.db, id);
   }
 
   lastSend(sessionId: string): SendSummary | null {
-    const raw = this.db
-      .query<RawSend, [string]>(
-        "select * from sends where session_id = ? order by started_at desc, rowid desc limit 1",
-      )
-      .get(sessionId);
-    return raw ? send(raw) : null;
+    return readLastSend(this.db, sessionId);
   }
 
-  finishSend(
-    id: string,
-    fields: {
-      status: Exclude<SessionStatus, "running">;
-      cause: SendCause;
-      error: string | null;
-      rounds: number;
-      toolCalls: number;
-      finishedAt: number;
-    },
-  ): SendSummary | null {
-    this.db
-      .query(
-        "update sends set status = ?, cause = ?, error = ?, rounds = ?, tool_calls = ?, finished_at = ? where id = ? and status = 'running'",
-      )
-      .run(
-        fields.status,
-        fields.cause,
-        fields.error,
-        fields.rounds,
-        fields.toolCalls,
-        fields.finishedAt,
-        id,
-      );
-    return this.send(id);
+  finishSend(id: string, fields: SendEnd): SendSummary | null {
+    return endSendRow(this.db, id, fields);
   }
 
-  bumpCounters(
-    id: string,
-    fields: { rounds: number; toolCalls: number },
-  ): SendSummary | null {
-    this.db
-      .query(
-        "update sends set rounds = ?, tool_calls = ? where id = ? and status = 'running'",
-      )
-      .run(fields.rounds, fields.toolCalls, id);
-    return this.send(id);
+  bumpCounters(id: string, fields: SendCounters): SendSummary | null {
+    return bumpSendCounters(this.db, id, fields);
   }
 
   // the rows are read back through this store so the envelope carries

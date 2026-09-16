@@ -10,12 +10,14 @@
 // same moment, copied onto the policy so a send runs under the caps it
 // started on whatever an admin changes later.
 
+import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { Effort, EventSource, ProjectKind } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type {
+  MemoryScope,
   Offered,
   ToolCaps,
   ToolContext,
@@ -41,6 +43,7 @@ export type ToolsPort = {
     agentId: string,
     agentServers: AgentRow["servers"],
     mode: AgentRow["mcpMode"],
+    scope: MemoryScope,
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
@@ -67,12 +70,18 @@ export type SendPolicy = {
   effort: Effort | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
+  memoryOffered: Offered | null;
+  projectMemory: MemoryEntry[];
+  automationMemory: MemoryEntry[];
   automation: {
     id: string;
     name: string;
     source: EventSource;
     dueAt: number;
     tz: string;
+    projectMemory: boolean;
+    ownMemory: boolean;
+    memoryGuidance: string;
   } | null;
   deadlineMs: number | null;
   // the caps the send started on, the limits area's word at that moment
@@ -87,6 +96,7 @@ const NONE: Offered = {
   mcp: [],
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
+  memory: null,
 };
 
 export function buildPolicy(input: {
@@ -99,13 +109,35 @@ export function buildPolicy(input: {
   tools: ToolsPort | null;
   limits: Limits;
   automation?: SendPolicy["automation"];
+  projectMemory?: readonly MemoryEntry[];
+  automationMemory?: readonly MemoryEntry[];
   deadlineMs?: number | null;
 }): SendPolicy {
   const { user, agent } = input;
+  const automationScope =
+    input.automation === undefined || input.automation === null
+      ? null
+      : {
+          id: input.automation.id,
+          projectMemory: input.automation.projectMemory,
+          ownMemory: input.automation.ownMemory,
+        };
   const offered =
     input.tools !== null && agent.model.tools
-      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode)
+      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
+          projectId: input.project.id,
+          automation: automationScope,
+          phase: "main",
+        })
       : NONE;
+  const memoryOffered =
+    input.tools !== null && agent.model.tools && automationScope?.ownMemory
+      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
+          projectId: input.project.id,
+          automation: automationScope,
+          phase: "memory",
+        })
+      : null;
   const thinking =
     agent.thinking === null ? agent.model.reasoning : agent.thinking === "on";
   return {
@@ -127,7 +159,12 @@ export function buildPolicy(input: {
     thinking,
     effort: thinking ? agent.effort : null,
     offered,
-    automation: input.automation ?? null,
+    memoryOffered,
+    projectMemory: (input.projectMemory ?? []).map((entry) => ({ ...entry })),
+    automationMemory: (input.automationMemory ?? []).map((entry) => ({
+      ...entry,
+    })),
+    automation: input.automation ? { ...input.automation } : null,
     deadlineMs: input.deadlineMs ?? null,
     limits: {
       rounds: input.limits.rounds,
@@ -137,6 +174,8 @@ export function buildPolicy(input: {
       resultBytes: input.limits.resultBytes,
       contextReserve: input.limits.contextReserve,
       summaryMaxTokens: input.limits.summaryMaxTokens,
+      memoryPhaseMs: input.limits.memoryPhaseMs,
+      memoryPhaseRounds: input.limits.memoryPhaseRounds,
     },
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,

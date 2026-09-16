@@ -18,7 +18,7 @@ import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { endedBy, type ReplyNode, type WorkNode } from "./rows.ts";
 import { Summary } from "./Summary.tsx";
-import { type Live, tail } from "./stream.ts";
+import { type Live, leadIn, tail } from "./stream.ts";
 import { Work } from "./Work.tsx";
 
 export type Agent = { name: string; avatar: Avatar };
@@ -95,6 +95,8 @@ export function Reply({
   const current = running && m !== null ? (live.get(m.id) ?? null) : null;
   const html = current?.html ?? m?.html ?? "";
   const content = current?.content ?? m?.content ?? "";
+  // unslotted words that may yet be a work round's stay in the fold
+  const lead = current !== null && m?.slot === null && leadIn(content);
   const ended = running ? null : endedBy(node);
   const cut = ended === null ? null : cutReason(ended);
   // the stamp is when the turn ended: the answer's end, else the last
@@ -135,9 +137,15 @@ export function Reply({
       </div>
       <div class="transcript-body">
         {!node.compact && (
-          <Work node={work} reply={m} live={live} running={running} />
+          // once the memory phase opens the turn's own work is over
+          <Work
+            node={work}
+            reply={m}
+            live={live}
+            running={running && node.send?.memoryRound == null}
+          />
         )}
-        {html !== "" && (
+        {html !== "" && !lead && (
           // the server renders the markdown with raw HTML off: render/
           // is the safety boundary
           <div
@@ -145,9 +153,20 @@ export function Reply({
             dangerouslySetInnerHTML={{ __html: html }}
           />
         )}
-        {current !== null && <div class="transcript-tail">{tail(current)}</div>}
+        {current !== null && !lead && (
+          <div class="transcript-tail">{tail(current)}</div>
+        )}
         {node.summary !== null && (
           <Summary message={node.summary} live={live} />
+        )}
+        {node.memory !== null && (
+          <Work
+            node={node.memory}
+            reply={null}
+            live={live}
+            running={running}
+            memory
+          />
         )}
         {!running && (
           <div class="transcript-after">

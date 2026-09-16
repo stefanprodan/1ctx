@@ -97,13 +97,13 @@ export function ScheduleField({
   );
   return (
     <div class="automations-schedule">
-      <fieldset class="automations-every" aria-label="Repeats">
+      <fieldset class="automations-seg" aria-label="Repeats">
         {EVERY.map((every) => (
           <button
             key={every}
             type="button"
-            class={`automations-every-option${
-              b.every === every ? " automations-every-on" : ""
+            class={`automations-seg-option${
+              b.every === every ? " automations-seg-on" : ""
             }`}
             aria-pressed={b.every === every}
             disabled={disabled}

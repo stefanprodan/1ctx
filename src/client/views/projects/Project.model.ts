@@ -59,6 +59,7 @@ export function tabsOf(
       href: `/projects/${id}/automations`,
       ...counted(counts.automations),
     },
+    { label: "Memory", href: `/projects/${id}/memory` },
     kind === "team"
       ? {
           label: "Members",

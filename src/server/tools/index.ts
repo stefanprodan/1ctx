@@ -30,7 +30,9 @@ import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
+import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, type ToolCall, wireTools } from "../providers/index.ts";
+import type { MemorySnapshot } from "../sessions/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
 import {
   DEFAULT_TIMEZONE,
@@ -42,6 +44,13 @@ import {
   mcpCallName,
   resolveMcpCall,
 } from "./builtin/mcp.ts";
+import {
+  isMemoryTool,
+  makeMemoryHandle,
+  makeMemoryTools,
+  runMemory,
+  type UnreadChats,
+} from "./builtin/memory.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import {
   type FetchDependencies,
@@ -54,13 +63,23 @@ import {
 import { Registry } from "./registry.ts";
 import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
-import type { Offered, Tool, ToolContext, ToolResult } from "./types.ts";
+import type {
+  MemoryHandle,
+  MemoryScope,
+  Offered,
+  Tool,
+  ToolContext,
+  ToolResult,
+} from "./types.ts";
 
 export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
+export { isMemoryTool, MEMORY_WRITE_RULES } from "./builtin/memory.ts";
 export { TOOL_CAPS } from "./limits.ts";
 export { parseToolName, parseToolPatch } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
 export type {
+  MemoryHandle,
+  MemoryScope,
   Offered,
   Tool,
   ToolBudget,
@@ -83,6 +102,18 @@ export type ToolsDeps = {
   render: (markdown: string, streaming: boolean) => string;
   skills: SkillsPort;
   mcp?: Pick<Mcp, "offered" | "call" | "validateArguments">;
+  memory?: Pick<MemoryCapability, "work">;
+  sessions?: {
+    memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
+  };
+  markers?: {
+    unread(
+      automationId: string,
+      projectId: string,
+      cap: number,
+      exclude: readonly string[],
+    ): UnreadChats;
+  };
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
 };
@@ -93,6 +124,7 @@ export type Tools = {
     agentId: string,
     agentServers?: AgentServer[],
     mode?: McpMode,
+    scope?: MemoryScope,
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
@@ -103,6 +135,10 @@ export type ToolsArea = Tools & {
   store: ToolStore;
   routes: RouteDescriptor[];
 };
+
+// the memory phase is offered memory_edit and nothing else; a call to
+// anything the run had gets the reason rather than a bare not found
+const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
 
 function fillYear(tools: ChatTool[], now: number): ChatTool[] {
   const year = formatDatetime(now, DEFAULT_TIMEZONE).datetime.slice(0, 4);
@@ -160,6 +196,42 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       throw new Error("MCP is not configured");
     },
     validateArguments: () => null,
+  };
+  const memorySessions = {
+    snapshot: (projectId: string, sessionId: string) =>
+      deps.sessions?.memorySnapshot(projectId, sessionId) ?? null,
+    unread: (
+      automationId: string,
+      projectId: string,
+      cap: number,
+      exclude: readonly string[],
+    ) =>
+      deps.markers?.unread(automationId, projectId, cap, exclude) ?? {
+        chats: [],
+        remaining: 0,
+      },
+  };
+  const memoryFor = (scope?: MemoryScope): MemoryHandle | null => {
+    if (
+      scope === undefined ||
+      scope.projectId === null ||
+      scope.automation === null ||
+      deps.memory === undefined
+    ) {
+      return null;
+    }
+    if (scope.phase === "memory") {
+      if (!scope.automation.ownMemory) return null;
+      return makeMemoryHandle(
+        deps.memory.work(scope.projectId, scope.automation.id),
+        scope.automation.id,
+      );
+    }
+    if (!scope.automation.projectMemory) return null;
+    return makeMemoryHandle(
+      deps.memory.work(scope.projectId, null),
+      scope.automation.id,
+    );
   };
   const fetchDeps: FetchDependencies = deps.fetchDeps ?? {
     fetch: deps.fetcher,
@@ -263,7 +335,21 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const area: ToolsArea = {
     store,
     routes: [],
-    offered(now, agentId, agentServers = [], requestedMode = "auto") {
+    offered(now, agentId, agentServers = [], requestedMode = "auto", scope) {
+      const memory = memoryFor(scope);
+      if (scope?.phase === "memory") {
+        const phaseTools =
+          memory === null ? [] : makeMemoryTools(memory, memorySessions);
+        return {
+          tools: fillYear(phaseTools.map(schema), now),
+          search: null,
+          skills: { block: "", skills: [] },
+          mcp: [],
+          mcpPrompt: { text: "", digest: {} },
+          mcpCatalog: "",
+          memory,
+        };
+      }
       const rows = new Map(store.rows().map((row) => [row.name, row]));
       const searchRow = rows.get("websearch")!;
       const search =
@@ -289,6 +375,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
             allowed.has(tool.name as BuiltinTool),
           ),
           ...makeSkillTools(skills.skills, skillStore),
+          ...(memory === null ? [] : makeMemoryTools(memory, memorySessions)),
         ].map(schema),
         now,
       );
@@ -326,12 +413,21 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         mcp,
         mcpPrompt,
         mcpCatalog: mcpCatalogText,
+        memory,
       };
     },
     toolName(offered, call) {
       return mcpCallName(offered.mcp, call) ?? call.name;
     },
     async run(offered, call, ctx) {
+      const memory = offered.memory;
+      if (
+        memory !== null &&
+        isMemoryTool(call.name) &&
+        (memory.stopped || memory.read !== null || call.name === "memory_edit")
+      ) {
+        return runMemory(memory, memorySessions, call, ctx);
+      }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const base = [
         ...toolsFor(offered.search ?? "exa").filter((tool) =>
@@ -359,6 +455,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           };
           return new Registry([failed]).run({ ...call, arguments: "{}" }, ctx);
         }
+      }
+      if (offered.memory?.note === "automation") {
+        return new Registry(base, () => PHASE_ONLY).run(call, ctx);
       }
       const runtime =
         offered.mcpCatalog === ""

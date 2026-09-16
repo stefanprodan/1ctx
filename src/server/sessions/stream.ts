@@ -11,7 +11,13 @@ import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { LastLine, RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { lineFrom } from "./parse.ts";
-import { type RawSend, type RawSession, send, session } from "./rows.ts";
+import {
+  type RawSend,
+  type RawSession,
+  send,
+  sendTokens,
+  session,
+} from "./rows.ts";
 
 type RawLastLine = {
   session_id: string;
@@ -25,7 +31,7 @@ function lastSends(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
     .query<RawSend, string[]>(
-      `select current.* from sends current
+      `select current.*, ${sendTokens("current")} from sends current
        where current.session_id in (${marks})
          and not exists (
            select 1 from sends later

@@ -95,3 +95,46 @@ export function workSummary(
   }
   return { live, toolCalls, failed, durationMs, text };
 }
+
+// the Memory fold's line: the phase running, then what it did
+export function memorySummary(
+  node: WorkNode,
+  live: boolean,
+  now = 0,
+): WorkSummary {
+  const base = workSummary(node, live, now);
+  const send = node.send;
+  let text: string;
+  if (live) {
+    text = `Updating memory ${clock(base.durationMs)}`;
+  } else if (send?.memoryError != null) {
+    text = `Memory not updated. ${send.memoryError}`;
+  } else {
+    // the commit is the edits that went through; a none changes nothing,
+    // and refused edits alone leave the note as it was
+    const calls = new Map(
+      node.rows.flatMap((row) =>
+        (row.toolCalls ?? []).map((call) => [call.id, call.arguments]),
+      ),
+    );
+    const edits = node.rows.filter(
+      (row) => row.kind === "tool" && row.toolName === "memory_edit",
+    );
+    const changed = edits.filter(
+      (row) =>
+        row.status === "done" &&
+        !/"action"\s*:\s*"none"/.test(calls.get(row.toolCallId ?? "") ?? ""),
+    ).length;
+    const refused = edits.filter((row) => row.status === "failed").length;
+    text =
+      changed > 0
+        ? `Memory updated in ${secs(base.durationMs)}`
+        : refused > 0
+          ? `Memory not updated, ${refused} ${refused === 1 ? "edit" : "edits"} refused`
+          : "Memory unchanged";
+    if (send?.memorySkipped != null && send.memorySkipped > 0) {
+      text += `, ${send.memorySkipped} edits no longer applied`;
+    }
+  }
+  return { ...base, text };
+}

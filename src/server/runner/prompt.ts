@@ -10,6 +10,7 @@
 // policy's offered snapshot; memory and knowledge arrive through ports
 // wired to empty until their slices.
 
+import { memoryBlock } from "../../shared/memory.ts";
 import type { SendPolicy } from "./policy.ts";
 
 // the calendar day in UTC; the user's zone comes with the profile later
@@ -75,6 +76,8 @@ export function systemPrompt(
     | "tz"
     | "automation"
     | "offered"
+    | "projectMemory"
+    | "automationMemory"
   >,
   now: number,
   mcpNote = "",
@@ -96,6 +99,11 @@ export function systemPrompt(
   }
   if (policy.offered.mcpPrompt.text !== "") {
     parts.push(policy.offered.mcpPrompt.text);
+  }
+  const projectMemory = memoryBlock("project-memory", policy.projectMemory);
+  if (projectMemory !== "") parts.push(projectMemory);
+  if (policy.automation?.ownMemory) {
+    parts.push(memoryBlock("automation-memory", policy.automationMemory));
   }
   parts.push(dateLine(now));
   if (mcpNote !== "") parts.push(mcpNote);

@@ -1,0 +1,26 @@
+{
+  "raw": [
+    { "topic": " Sources\nthat\twork\u0000 ", "text": " keeps a tab\there\nand a newline " },
+    { "topic": "\u202eSnapshot\u2066", "text": "drops controls\u0000\u0007\u0085\u202e but keeps text" }
+  ],
+  "normalized": [
+    { "topic": "Sources that work", "text": "keeps a tab\there\nand a newline" },
+    { "topic": "Snapshot", "text": "drops controls but keeps text" }
+  ],
+  "previous": [
+    { "topic": "First", "text": "one" },
+    { "topic": "Old name", "text": "two" },
+    { "topic": "Last", "text": "three" }
+  ],
+  "current": [
+    { "topic": "FIRST", "text": "changed" },
+    { "topic": "New name", "text": "two" },
+    { "topic": "Last", "text": "three" }
+  ],
+  "diff": [
+    { "topic": "FIRST", "text": "changed", "kind": "changed", "oldText": "one" },
+    { "topic": "Old name", "text": "two", "kind": "removed" },
+    { "topic": "New name", "text": "two", "kind": "added" },
+    { "topic": "Last", "text": "three", "kind": "kept" }
+  ]
+}

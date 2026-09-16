@@ -141,6 +141,10 @@ const sent: SendSummary = {
   firstMessageId: "m0",
   rounds: 1,
   toolCalls: 0,
+  memoryRound: null,
+  memoryError: null,
+  memorySkipped: null,
+  tokens: 0,
   startedAt: 10,
   finishedAt: null,
 };

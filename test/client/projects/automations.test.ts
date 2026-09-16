@@ -19,6 +19,7 @@ import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
 import {
+  automationFieldOf,
   canChange,
   type Draft,
   deadlineShare,
@@ -29,6 +30,9 @@ import {
   durationText,
   eventNote,
   followDeadlineLimit,
+  OWN_MEMORY_GUIDANCE,
+  PROJECT_MEMORY_TASK,
+  pickMemory,
   requestOf,
   rowState,
   scheduleTitle,
@@ -57,6 +61,9 @@ const automation = (
   tz: "Europe/Bucharest",
   deadlineMs: null,
   retentionDays: 30,
+  projectMemory: false,
+  ownMemory: false,
+  memoryGuidance: "",
   suspendedAt: null,
   suspendedBy: null,
   nextAt: now + 4 * HOUR,
@@ -252,6 +259,8 @@ describe("the form", () => {
       tz: "Europe/Bucharest",
       deadline: "10",
       retention: "30",
+      memory: "own",
+      memoryGuidance: OWN_MEMORY_GUIDANCE,
     });
   });
 
@@ -267,6 +276,9 @@ describe("the form", () => {
         tz: "UTC",
         deadlineMs: 300_000,
         retentionDays: 30,
+        projectMemory: false,
+        ownMemory: true,
+        memoryGuidance: OWN_MEMORY_GUIDANCE,
       },
     });
     const empty = requestOf(filled({ deadline: "" }), LIMIT);
@@ -317,6 +329,53 @@ describe("the form", () => {
     const shown = draftOf(none, "ignored", "ignored", LIMIT);
     expect(shown.deadline).toBe("10");
     expect(dirtyOf(shown, none, LIMIT)).toBe(false);
+  });
+
+  test("memory is one of none, own and project, never both notes", () => {
+    const mode = (projectMemory: boolean, ownMemory: boolean) =>
+      draftOf(automation({ projectMemory, ownMemory }), "a1", "UTC", LIMIT)
+        .memory;
+    expect(mode(false, false)).toBe("none");
+    expect(mode(false, true)).toBe("own");
+    expect(mode(true, false)).toBe("project");
+    const flags = (memory: Draft["memory"]) => {
+      const sent = requestOf(filled({ memory }), LIMIT);
+      return "body" in sent
+        ? [sent.body.projectMemory, sent.body.ownMemory]
+        : null;
+    };
+    expect(flags("none")).toEqual([false, false]);
+    expect(flags("own")).toEqual([false, true]);
+    expect(flags("project")).toEqual([true, false]);
+    expect(
+      automationFieldOf("ownMemory and projectMemory cannot both be on"),
+    ).toBe("memory");
+  });
+
+  test("a mode fills its empty box with a suggestion and takes it back unchanged", () => {
+    const fresh = draftOf(null, "a1", "UTC", LIMIT);
+    const project = pickMemory(fresh, "project");
+    expect(project).toMatchObject({
+      memory: "project",
+      instructions: PROJECT_MEMORY_TASK,
+      memoryGuidance: "",
+    });
+    expect(pickMemory(project, "none")).toMatchObject({
+      instructions: "",
+      memoryGuidance: "",
+    });
+    expect(pickMemory(project, "own")).toMatchObject({
+      instructions: "",
+      memoryGuidance: OWN_MEMORY_GUIDANCE,
+    });
+    // what someone typed stays, in the box and across modes
+    const typed = { ...fresh, instructions: "Check the clusters" };
+    expect(pickMemory(typed, "project").instructions).toBe(
+      "Check the clusters",
+    );
+    const edited = { ...fresh, memoryGuidance: "Keep the versions" };
+    expect(pickMemory(edited, "none").memoryGuidance).toBe("Keep the versions");
+    expect(pickMemory(edited, "own")).toBe(edited);
   });
 
   test("an untouched deadline follows a limit changed under the form", () => {
@@ -393,6 +452,10 @@ describe("the run log", () => {
       firstMessageId: "m1",
       rounds: 1,
       toolCalls: 0,
+      memoryRound: null,
+      memoryError: null,
+      memorySkipped: null,
+      tokens: 0,
       startedAt: now - 250_000,
       finishedAt: null,
     };

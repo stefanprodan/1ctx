@@ -28,6 +28,7 @@ import type { RunFilter } from "../../shared/words.ts";
 import { type Failure, failure, reason } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { keyOf, loadMemory } from "./memory.ts";
 import { loadProject } from "./projects.ts";
 import { loadProjectAgents } from "./sessions.ts";
 import { onSocketEvent } from "./socket.ts";
@@ -238,6 +239,7 @@ export async function loadAutomationPage(
     loadProject(row.projectId),
     loadProjectAgents(row.projectId),
     filter === undefined ? undefined : loadRuns(id, filter),
+    loadMemory(keyOf(row.projectId, id)),
   ]);
   // a list answered before the row was made lacks it; the row just read
   // joins by the revision rule

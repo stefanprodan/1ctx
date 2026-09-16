@@ -192,6 +192,49 @@ export function canChange(
   return a.ownerId === user.id || (kind === "team" && user.role === "admin");
 }
 
+// A task keeps no memory, its own note, or the project's note from the
+// chats it reads, never both notes.
+export type MemoryMode = "none" | "own" | "project";
+
+export const MEMORY_MODES: { value: MemoryMode; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "own", label: "Own memory" },
+  { value: "project", label: "Project memory" },
+];
+
+// A starting prompt for each memory mode, since a good one is hard to
+// write from nothing: own memory's goes in What to remember, project
+// memory's is the task itself. Both stay domain-neutral.
+export const OWN_MEMORY_GUIDANCE =
+  "Keep a few topics that each hold a short list, and update them in place: what worked and what failed and why, where the information lives, what the last run found that the next one should build on, and what was already covered. Add an item to its list instead of making a topic for it, and drop the oldest items when the note is full. Leave out the answer itself, anything copied from the task, and errors that went away.";
+
+export const PROJECT_MEMORY_TASK =
+  "Read the chats you have not read. Keep facts that later chats in this project need: the systems, services and tools people work with and how they are set up, decisions that were made, and how people here want answers. Write each as a short fact, not an instruction, under a topic that says what it is about, and update a topic that exists instead of adding one. Leave out one-off questions, work in progress, fixes the chat did not confirm, and anything that will be stale within a week. If a chat has nothing worth keeping, record nothing.";
+
+// Picking a mode fills its empty box with the suggestion, and leaving a
+// mode takes back a suggestion nobody changed, so it is never saved
+// under a mode it was not written for.
+export function pickMemory(d: Draft, memory: MemoryMode): Draft {
+  if (memory === d.memory) return d;
+  let { instructions, memoryGuidance } = d;
+  if (d.memory === "own" && memoryGuidance === OWN_MEMORY_GUIDANCE) {
+    memoryGuidance = "";
+  }
+  if (d.memory === "project" && instructions === PROJECT_MEMORY_TASK) {
+    instructions = "";
+  }
+  if (memory === "own" && memoryGuidance.trim() === "") {
+    memoryGuidance = OWN_MEMORY_GUIDANCE;
+  }
+  if (memory === "project" && instructions.trim() === "") {
+    instructions = PROJECT_MEMORY_TASK;
+  }
+  return { ...d, memory, instructions, memoryGuidance };
+}
+
+const modeOf = (a: Pick<AutomationSummary, "projectMemory" | "ownMemory">) =>
+  a.ownMemory ? "own" : a.projectMemory ? "project" : "none";
+
 export type Draft = {
   name: string;
   agentId: string;
@@ -203,6 +246,9 @@ export type Draft = {
   deadline: string;
   // days as typed
   retention: string;
+  memory: MemoryMode;
+  // what the run's own note keeps, as typed
+  memoryGuidance: string;
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -225,6 +271,8 @@ export function draftOf(
       tz,
       deadline: minutesOf(limitMs),
       retention: "30",
+      memory: "own",
+      memoryGuidance: OWN_MEMORY_GUIDANCE,
     };
   }
   return {
@@ -235,6 +283,8 @@ export function draftOf(
     tz: a.tz,
     deadline: minutesOf(a.deadlineMs ?? limitMs),
     retention: String(a.retentionDays),
+    memory: modeOf(a),
+    memoryGuidance: a.memoryGuidance,
   };
 }
 
@@ -261,7 +311,9 @@ export type AutomationField =
   | "schedule"
   | "tz"
   | "deadline"
-  | "retention";
+  | "retention"
+  | "memory"
+  | "memoryGuidance";
 
 // which field a server refusal of the automation routes names; a cap on
 // the project or a run still going is the form's
@@ -275,6 +327,8 @@ export function automationFieldOf(
   if (message.includes("time zone")) return "tz";
   if (message.startsWith("deadlineMs")) return "deadline";
   if (message.startsWith("retention")) return "retention";
+  if (message.startsWith("memoryGuidance")) return "memoryGuidance";
+  if (/^(ownMemory|projectMemory)/.test(message)) return "memory";
   return undefined;
 }
 
@@ -318,6 +372,9 @@ export function requestOf(
       // the limit when an admin moves it
       deadlineMs: ms === limitMs ? null : ms,
       retentionDays: Number(days),
+      projectMemory: d.memory === "project",
+      ownMemory: d.memory === "own",
+      memoryGuidance: d.memoryGuidance.trim(),
     },
   };
 }
@@ -330,9 +387,13 @@ export function dirtyOf(
 ): boolean {
   if (a === null) return true;
   const base = draftOf(a, a.agentId, a.tz, limitMs);
-  return (Object.keys(base) as (keyof Draft)[]).some(
-    (k) => d[k].trim() !== base[k].trim(),
-  );
+  return (Object.keys(base) as (keyof Draft)[]).some((k) => {
+    const left = d[k];
+    const right = base[k];
+    return typeof left === "string" && typeof right === "string"
+      ? left.trim() !== right.trim()
+      : left !== right;
+  });
 }
 
 // the viewer's zone, where a new automation starts

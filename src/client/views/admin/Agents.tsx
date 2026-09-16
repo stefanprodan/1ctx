@@ -3,16 +3,18 @@
 //
 // The agents: a card of rows, each the name, the model and, faint, the
 // provider with the model's window and prices. A row opens in place
-// into its form; New agent opens an empty one at the top. Under it the
+// into its form, or starts open when `?open=` names it; New agent opens an empty one at the top. Under it the
 // card of providers the agents run on: added through New provider,
 // deleted in place, never edited. The forms are AgentForm.tsx and
 // ProviderForm.tsx.
 
 import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
 import type { Wire } from "../../../shared/words.ts";
 import { AgentRow as Head } from "../../agents/AgentRow.tsx";
+import { query } from "../../app/router.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import {
   deleteProvider,
@@ -149,7 +151,13 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 export function Agents() {
   const list = agents.value;
   const rows = providers.value;
-  const open = useSignal<string | null>(null);
+  // ?open=<id> is the agent page's Manage: that row starts open
+  const asked = new URLSearchParams(query.value).get("open");
+  const open = useSignal<string | null>(asked);
+  // a Manage link followed while the page is up names another row
+  useEffect(() => {
+    if (asked !== null) open.value = asked;
+  }, [asked, open]);
   const adding = useSignal(false);
   const addingProvider = useSignal(false);
   const error = agentsError.value ?? providersError.value;

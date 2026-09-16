@@ -49,7 +49,7 @@ export type Budget = {
 
 // the phase of a send: talking to the provider, running a round's
 // tools with no row streaming, or ended
-export type SendPhase = "provider" | "tools" | "terminal";
+export type SendPhase = "provider" | "tools" | "memory" | "terminal";
 
 export type ActiveSend = {
   id: string;
@@ -86,7 +86,18 @@ export type ActiveSend = {
   // the stream sequence, per send, from 1
   seq: number;
   controller: AbortController;
+  // Stop and shutdown reach the ending even after another cause won.
+  ending: AbortController;
+  cause: SendCause | null;
+  error: string | null;
+  memoryRound: number | null;
+  memoryError: string | null;
+  memorySkipped: number | null;
+  memoryStopped: boolean;
   terminal: SendCause | null;
+  // every caller of terminate observes the ending run by run().
+  ended: Promise<boolean>;
+  end: (finalized: boolean) => void;
   // resolved when the stream and the tools have let go and the lock may
   // be released
   drained: Promise<void>;
@@ -131,6 +142,10 @@ export function newSend(fields: {
   const drained = new Promise<void>((resolve) => {
     letGo = resolve;
   });
+  let end = (_finalized: boolean) => {};
+  const ended = new Promise<boolean>((resolve) => {
+    end = resolve;
+  });
   return {
     id: fields.id,
     sessionId: fields.sessionId,
@@ -152,17 +167,30 @@ export function newSend(fields: {
     tools: null,
     seq: 0,
     controller: new AbortController(),
+    ending: new AbortController(),
+    cause: null,
+    error: null,
+    memoryRound: null,
+    memoryError: null,
+    memorySkipped: null,
+    memoryStopped: false,
     terminal: null,
+    ended,
+    end,
     drained,
     letGo,
   };
 }
 
 // the first caller wins; a later one gets false and does nothing
-export function claim(send: ActiveSend, cause: SendCause): boolean {
-  if (send.terminal !== null) return false;
-  send.terminal = cause;
-  send.phase = "terminal";
+export function claim(
+  send: ActiveSend,
+  cause: SendCause,
+  error: string | null = null,
+): boolean {
+  if (send.cause !== null) return false;
+  send.cause = cause;
+  send.error = error;
   send.controller.abort();
   return true;
 }

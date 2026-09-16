@@ -197,9 +197,19 @@ export type RawSend = {
   first_message_id: string;
   rounds: number;
   tool_calls: number;
+  memory_round: number | null;
+  memory_error: string | null;
+  memory_skipped: number | null;
+  tokens: number;
   started_at: number;
   finished_at: number | null;
 };
+
+// the send's token count, from its usage rows, for a query over sends
+// under the given name
+export const sendTokens = (table: string) =>
+  `(select coalesce(sum(usage.prompt_tokens + usage.completion_tokens), 0)
+     from usage where usage.send_id = ${table}.id) as tokens`;
 
 export const send = (raw: RawSend): SendSummary => ({
   id: raw.id,
@@ -215,6 +225,10 @@ export const send = (raw: RawSend): SendSummary => ({
   firstMessageId: raw.first_message_id,
   rounds: raw.rounds,
   toolCalls: raw.tool_calls,
+  memoryRound: raw.memory_round,
+  memoryError: raw.memory_error,
+  memorySkipped: raw.memory_skipped,
+  tokens: raw.tokens,
   startedAt: raw.started_at,
   finishedAt: raw.finished_at,
 });

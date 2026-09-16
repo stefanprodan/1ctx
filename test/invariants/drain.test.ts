@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { chatApp, startChat, tick } from "../helpers/chat.ts";
 
 describe("drain", () => {
-  test("a stop ends the rows at once and the lock a moment later", async () => {
+  test("a stop claims at once and ends after the stream lets go", async () => {
     const chat = await chatApp();
     const { detail, script, sessionId } = await startChat(chat);
     script.content("part");
@@ -19,16 +19,15 @@ describe("drain", () => {
       `/api/sessions/${sessionId}/stop`,
     );
     expect(stop.status).toBe(200);
-    // the rows are final from the stop
+    expect(script.aborted).toBe(true);
+    await tick();
+    // the rows end after the provider iteration lets go
     const reply = chat.app.sessions.message(detail.messages[1].id)!;
     expect(reply.status).toBe("stopped");
     expect(reply.content).toBe("part");
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
     expect(chat.app.sessions.byId(sessionId)!.status).toBe("stopped");
-    // the stream was told
-    expect(script.aborted).toBe(true);
-    // and once it has let go the lock is free
-    await tick();
+    // once it has let go the lock is free
     await tick();
     expect(chat.app.runner.registry.get(sessionId)).toBeNull();
     const next = chat.scripted.next();
@@ -73,7 +72,11 @@ describe("drain", () => {
     const before = frames.length;
     script.content("after");
     await tick();
-    expect(frames.length).toBe(before);
+    expect(
+      frames
+        .slice(before)
+        .some((frame) => (frame as { type?: string }).type === "delta"),
+    ).toBe(false);
     expect(chat.app.sessions.message(detail.messages[1].id)!.content).toBe(
       "before",
     );
@@ -106,7 +109,8 @@ describe("drain", () => {
     });
     await tick();
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    // the rows are final at once
+    await tick();
+    // the rows end once the claimed main round releases
     const reply = chat.app.sessions.message(detail.messages[1].id)!;
     expect(reply.status).toBe("stopped");
     expect(reply.slot).toBe("work");

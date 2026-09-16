@@ -10,6 +10,7 @@
 import { type Signal, useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { DaysUsageResponse, DayUsage } from "../../../shared/api/usage.ts";
+import { onResize } from "../../lib/resize.ts";
 import { RowsCard } from "../../ui/Rows.tsx";
 import {
   type ActivityCell,
@@ -259,19 +260,7 @@ export function Activity({
       weeks.value = fitWeeks(grid.clientWidth - LABELS, model.columns.length);
     };
     measure();
-    // the weeks change the card's height, so a measure inside the
-    // observer's callback would resize what it observes; the next frame
-    // is outside it
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
-    });
-    observer.observe(el);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
+    return onResize(el, measure);
   }, [model, weeks]);
 
   const shown = lastWeekColumns(model.columns, weeks.value);

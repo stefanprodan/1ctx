@@ -79,16 +79,30 @@ function invariant(name: string, step: number): void {
       .filter((message) => message.sendId === sendId)
       .toSorted((left, right) => left.seq - right.seq);
     const sendNodes = nodes.filter((node) => nodeSendId(node) === sendId);
+    // the rows from the memory round on are the phase's, in the Memory
+    // fold; the boundary is the send's word
+    const boundary =
+      detail.send?.id === sendId ? (detail.send.memoryRound ?? null) : null;
+    const inPhase = (row: Message) =>
+      boundary !== null && row.round >= boundary;
     const workRows = rows.filter(
       (row) =>
-        (row.kind === "reply" && row.slot === "work") || row.kind === "tool",
+        ((row.kind === "reply" && row.slot === "work") ||
+          row.kind === "tool") &&
+        !inPhase(row),
+    );
+    const phaseRows = rows.filter(
+      (row) => (row.kind === "reply" || row.kind === "tool") && inPhase(row),
     );
     const answer = rows.find(
       (row) => row.kind === "reply" && row.slot === "answer",
     );
     const streaming = rows.find(
       (row) =>
-        row.kind === "reply" && row.slot === null && row.status === "streaming",
+        row.kind === "reply" &&
+        row.slot === null &&
+        row.status === "streaming" &&
+        !inPhase(row),
     );
     const expectedReply = answer ?? streaming;
     const expectedUser = rows.find((row) => row.kind === "user");
@@ -154,6 +168,10 @@ function invariant(name: string, step: number): void {
       }
     }
 
+    const memory = reply?.kind === "reply" ? reply.memory : null;
+    expect(memory?.rows.map((row) => row.id) ?? []).toEqual(
+      phaseRows.map((row) => row.id),
+    );
     const work = reply?.kind === "reply" ? reply.work : null;
     if (workRows.length === 0) {
       expect(work).toBeNull();

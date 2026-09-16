@@ -5,8 +5,9 @@
 // zone, which agent is asked, then the instructions as the agent gets
 // them, cut to a few lines. Suspend or Resume and Run now, which anyone
 // in the project presses, and Edit for whoever may change it, sit over
-// the runs, which follow as a log: what started each, when, the answer's first line,
-// and how long it took against its deadline, with Stop while it runs.
+// two tabs. Runs is a log: what started each run, when, the answer's
+// first line, and how long it took against its deadline, with Stop while
+// it runs. Memory is the automation's own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
@@ -17,6 +18,7 @@ import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
+import { navigate, path } from "../../app/router.ts";
 import {
   automationError,
   automationProject,
@@ -30,15 +32,19 @@ import {
   runs,
 } from "../../data/automations.ts";
 import { me } from "../../data/me.ts";
+import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents, stopSession } from "../../data/sessions.ts";
 import { longDate, reason, stamp, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { onResize } from "../../lib/resize.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsNote } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Tabs } from "../../ui/Tabs.tsx";
+import { Note } from "../memory/Note.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
   browserZone,
@@ -97,6 +103,15 @@ function RunRow({
             <span class="automations-agent">@{line.author} </span>
           )}
           {failure.value ?? line.text}
+          {row.send?.memoryError != null && (
+            <span class="automations-faint"> Memory not updated.</span>
+          )}
+          {row.send?.memorySkipped != null && row.send.memorySkipped > 0 && (
+            <span class="automations-faint">
+              {" "}
+              {row.send.memorySkipped} edits no longer applied.
+            </span>
+          )}
         </span>
         <span class="automations-run-took">
           <span>{took === null ? "" : durationText(took)}</span>
@@ -151,9 +166,7 @@ function Instructions({
       if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
+    return onResize(node, measure);
   }, [text, open, long]);
   return (
     <>
@@ -213,9 +226,20 @@ function NextRuns({ automation }: { automation: AutomationSummary }) {
   );
 }
 
+// Both tabs' routes name this one view, so a tab change keeps the page
+// mounted: the brief, the aside and the runs stay while only the tab's
+// content changes.
 export function Automation({ params }: { params: Params }) {
   const id = params.id ?? "";
   const row = automations.value?.find((a) => a.id === id) ?? null;
+  // the Memory tab is there only while the automation keeps its own note
+  const memoryPath = path.value.endsWith("/memory");
+  const tab = memoryPath && row?.ownMemory ? "memory" : "runs";
+  useEffect(() => {
+    if (memoryPath && row !== null && !row.ownMemory) {
+      navigate(`/automations/${id}`, true);
+    }
+  }, [memoryPath, row?.ownMemory, id]);
   const found = automationProject.value;
   const projectId = found?.id === id ? found.projectId : null;
   const shown =
@@ -238,6 +262,8 @@ export function Automation({ params }: { params: Params }) {
   }, [tick, now]);
   // the runs are this page's; once it goes, no frame moves them
   useEffect(() => () => closeRunsOf(id), [id]);
+  const noteKey = keyOf(projectId ?? "", id);
+  const memoryNote = notes.value.get(noteKey) ?? null;
   // the next fires move with the schedule, and past each fire
   useEffect(() => {
     if (row === null || row.suspendedAt !== null) return;
@@ -374,48 +400,82 @@ export function Automation({ params }: { params: Params }) {
               {failure.value}
             </p>
           )}
-          <RowsCard
-            label="Runs"
-            action={
-              <nav class="automations-filters" aria-label="Filter runs">
-                {FILTERS.map((f) => (
-                  <a
-                    key={f.label}
-                    class={`automations-filter${
-                      f.value === filter ? " automations-filter-on" : ""
-                    }`}
-                    aria-current={f.value === filter ? "page" : undefined}
-                    href={`/automations/${id}${
-                      f.value === null ? "" : `?runs=${f.value}`
-                    }`}
-                  >
-                    {f.label}
-                  </a>
-                ))}
-              </nav>
+          <Tabs
+            tabs={[
+              {
+                label: "Runs",
+                href: `/automations/${id}`,
+                ...(tally === null ? {} : { count: total }),
+              },
+              ...(row.ownMemory
+                ? [
+                    {
+                      label: "Memory",
+                      href: `/automations/${id}/memory`,
+                      ...(memoryNote === null
+                        ? {}
+                        : { count: memoryNote.entries.length }),
+                    },
+                  ]
+                : []),
+            ]}
+            active={
+              tab === "runs"
+                ? `/automations/${id}`
+                : `/automations/${id}/memory`
             }
-          >
-            {held === null || held.rows === null ? (
-              <RowsNote>Loading</RowsNote>
-            ) : held.rows.length === 0 ? (
-              <RowsNote>
-                {filter === "failed"
-                  ? "No failed runs."
-                  : filter === "manual"
-                    ? "No manual runs."
-                    : "No runs yet."}
-              </RowsNote>
-            ) : (
-              held.rows.map((r) => (
-                <RunRow
-                  key={r.session.id}
-                  row={r}
-                  deadlineMs={deadlineMs}
-                  now={now.value}
-                />
-              ))
-            )}
-          </RowsCard>
+          />
+          {tab === "memory" ? (
+            <Note
+              memory={memoryNote}
+              memoryKey={noteKey}
+              error={noteErrors.value.get(noteKey) ?? null}
+              empty="No memory yet. The next run writes it."
+            />
+          ) : (
+            <RowsCard
+              label="Runs"
+              action={
+                <nav class="automations-filters" aria-label="Filter runs">
+                  {FILTERS.map((f) => (
+                    <a
+                      key={f.label}
+                      class={`automations-filter${
+                        f.value === filter ? " automations-filter-on" : ""
+                      }`}
+                      aria-current={f.value === filter ? "page" : undefined}
+                      href={`/automations/${id}${
+                        f.value === null ? "" : `?runs=${f.value}`
+                      }`}
+                    >
+                      {f.label}
+                    </a>
+                  ))}
+                </nav>
+              }
+            >
+              {held === null || held.rows === null ? (
+                <RowsNote>Loading</RowsNote>
+              ) : held.rows.length === 0 ? (
+                <RowsNote>
+                  {filter === "failed"
+                    ? "No failed runs."
+                    : filter === "manual"
+                      ? "No manual runs."
+                      : "No runs yet."}
+                </RowsNote>
+              ) : (
+                held.rows.map((r) => (
+                  <RunRow
+                    key={r.session.id}
+                    row={r}
+                    deadlineMs={deadlineMs}
+                    now={now.value}
+                  />
+                ))
+              )}
+            </RowsCard>
+          )}
         </Split>
       )}
     </Page>

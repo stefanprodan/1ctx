@@ -165,14 +165,25 @@ export function history(
     | "userId"
     | "automation"
     | "offered"
+    | "projectMemory"
+    | "automationMemory"
   >,
   lookups: ContextLookups,
   now: number,
   mcpNote = "",
 ): ChatMessageIn[] {
-  const out: ChatMessageIn[] = [
+  return [
     { role: "system", content: systemPrompt(policy, now, mcpNote) },
+    ...historyMessages(rows, policy, lookups),
   ];
+}
+
+export function historyMessages(
+  rows: Message[],
+  policy: Pick<SendPolicy, "username" | "userId" | "offered">,
+  lookups: ContextLookups,
+): ChatMessageIn[] {
+  const out: ChatMessageIn[] = [];
   let start = 0;
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i]!;

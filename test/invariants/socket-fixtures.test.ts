@@ -35,6 +35,7 @@ import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ToolCall } from "../../src/shared/contracts/tool.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
 import { ORIGIN, VERSION } from "../helpers/app.ts";
+import { createAutomation } from "../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
@@ -207,6 +208,7 @@ function fakeTools(plans: Record<string, ToolPlan>): { tools: FakeToolsCap } {
         mcp: [],
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
+        memory: null,
       }),
       async run(_offered, c, ctx) {
         const plan = plans[c.id] ?? {
@@ -270,6 +272,85 @@ describe("socket fixtures", () => {
     await settle(chat);
     record("plain-reply", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.status).toBe("done");
+    chat.app.socket.dispose();
+  });
+
+  test("a memory phase after a run answer", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const conn = await watcher(chat);
+    const pending = chat.scripted.next();
+    const response = await chat.member.call(
+      "POST",
+      `/api/automations/${automation.id}/run`,
+    );
+    const detail = await response.json();
+    watch(chat, conn, detail.session.id);
+    const main = await pending;
+    main.reply("The task finished.");
+    const memory = await waitScript(chat.scripted, 2);
+    memory.toolRound([
+      {
+        id: "m1",
+        name: "memory_edit",
+        arguments:
+          '{"action":"set","topic":"Status","text":"The task finished."}',
+      },
+    ]);
+    // a round whose edits all succeed ends the phase
+    memory.end();
+    await settle(chat, 10);
+    record("memory-phase", detail, conn);
+    expect(chat.scripted.scripts).toHaveLength(2);
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "done",
+      memoryRound: 2,
+      rounds: 2,
+      toolCalls: 1,
+    });
+    chat.app.socket.dispose();
+  });
+
+  test("a stop during the memory phase", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const conn = await watcher(chat);
+    const pending = chat.scripted.next();
+    const response = await chat.member.call(
+      "POST",
+      `/api/automations/${automation.id}/run`,
+    );
+    const detail = await response.json();
+    watch(chat, conn, detail.session.id);
+    const main = await pending;
+    main.reply("The task finished.");
+    const memory = await waitScript(chat.scripted, 2);
+    memory.toolRound([
+      {
+        id: "m1",
+        name: "memory_edit",
+        arguments:
+          '{"action":"set","topic":"Status","text":"Stopped before the note was done."}',
+      },
+      // refused, so the phase asks again and the stop lands in that request
+      {
+        id: "m2",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
+      },
+    ]);
+    memory.end();
+    const open = await waitScript(chat.scripted, 3);
+    await chat.member.call("POST", `/api/sessions/${detail.session.id}/stop`);
+    await settle(chat, 10);
+    record("stop-during-memory", detail, conn);
+    expect(open.aborted).toBe(true);
+    // the stop ends the fold, not the run: the cause the run claimed stands
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "done",
+      cause: "finish",
+      memoryRound: 2,
+    });
     chat.app.socket.dispose();
   });
 
@@ -994,6 +1075,14 @@ describe("socket fixtures", () => {
     await settle(chat, 8);
     record("stop-during-tool", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
+    // a send with no memory phase stops its open tool row inside the
+    // terminal transaction, so the stop is one envelope, not two
+    const last = conn.frames.filter((f) => f.type === "session").at(-1)!;
+    expect(last.send?.cause).toBe("stop");
+    expect(last.messages.map((row) => [row.kind, row.status])).toContainEqual([
+      "tool",
+      "stopped",
+    ]);
     chat.app.socket.dispose();
   });
 

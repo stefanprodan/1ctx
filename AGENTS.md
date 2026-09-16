@@ -275,14 +275,14 @@ violation, and every rule has a rejected fixture under
   prompt is the agent's prompt, the project and user or automation
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
-  off per server), the date line, and last the change note. A send
-  records a content-addressed digest of what it offered from MCP
-  (`mcp_digests`, `sends.mcp`, null for a compact send, swept with the
-  logins); `startSend` compares it with the session's previous send
-  (a regenerated turn against the turn before it), and a difference
-  is the note after the date line naming added, removed and changed
-  wire names, so the stable prefix stays cacheable. A running send
-  never changes its set.
+  off per server), the two memory blocks, the date line, and last the
+  change note. A send records a content-addressed digest of what it
+  offered from MCP (`mcp_digests`, `sends.mcp`, null for a compact
+  send, swept with the logins); `startSend` compares it with the
+  session's previous send (a regenerated turn against the turn before
+  it), and a difference is the note after the date line naming added,
+  removed and changed wire names, so the stable prefix stays cacheable.
+  A running send never changes its set.
 - **The MCP page shows the loaded rows as a send would carry them.**
   `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
   by `shapeServerName()`, the key a `Select` of the `mcp-` files the
@@ -367,6 +367,57 @@ violation, and every rule has a rejected fixture under
   `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
   send limits. History starts from the last done summary. Compact on
   demand is a send of kind `compact` under the same runner lock.
+- **A note is a working copy until the run ends.** Every send reads the
+  project's note once; a run with `ownMemory` reads its automation's too.
+  An automation enables neither memory flag, `ownMemory` alone or
+  `projectMemory` alone. Create and PATCH refuse both on with a 400;
+  PATCH checks the merged row, so one patch can switch between them.
+  `projectMemory` gives a memory task the chat list, chat read and edit
+  tools in its main rounds; `ownMemory` opens a bounded final phase with
+  only the edit tool. A memory chat snapshot adds `Tools:` receipts
+  before each answer, in call order: name, one-line arguments capped
+  at 200 characters including `...`, and done, failed or not run.
+  MCP writes use the server's current patterns; missing servers and
+  unknown tools have no write mark. Tool results, tool errors, work,
+  running turns and runs stay out. Download Markdown has no receipts.
+  Receipts count toward the snapshot's server-paged text.
+  The ending claims one cause, releases the main
+  round, runs that phase on finish, deadline or failure, then finalizes
+  once. Its own-note block appears even when empty and says a separate
+  step after the answer updates it. Two settled rounds with edits but no
+  success stop the memory tools; a success resets the count, reads leave
+  it, and main rounds and the phase count apart. The phase stops without
+  another request; main rounds lose all three tools, and stopped calls
+  fail. A completed chat read is pending until a successful project edit
+  or `none` keeps it. A finished memory task commits its project edits
+  and kept marks together, dropping marks whose edit replay skips;
+  pending marks are dropped at the limit or the end. An edited automation
+  copy commits on any cause after its phase starts. Each changed note
+  sends one frame. Project and automation memory routes let anyone who
+  sees the project read, save and undo. Entries are `{topic, text}`;
+  `shared/memory.ts` owns sanitizing, topic equality, diff and the
+  rendered count (60 characters per topic, 500 per text, 2,200 per note).
+  `memory_edit` takes `set`, `remove` or `none`, naming a topic.
+  The server's memory writing rules live in the edit tool description
+  and the phase ask, not the system prompt.
+  Replay checks the text each operation expected and skips conflicts
+  with a hand edit or Undo. If a topic's first operation expected text
+  but the topic is absent at replay start, every set of it is skipped.
+  Refusals carry the working entries' texts, their sizes and the total;
+  an oversized text asks for separate topics, one set call each.
+  An automation's `memoryGuidance` is at most 2,000 bytes, snapshotted
+  with the run and used only in its own-note
+  phase instruction, never the system prompt or the project note.
+  The phase's input is built in `runner/memory-packet.ts`; it never
+  resends main-round history or the run's system prompt, which says to
+  do the task: the phase has its own (`memorySystem()`), and the task,
+  the answer and the tool calls go as a record inside tags. The ask
+  calls for memory_edit calls only, all in one ordered round, and, with
+  guidance, one entry per named topic. A round whose calls are all
+  successful edits ends the phase without another request.
+  Only phase rows follow the packet. Its room check
+  counts the schemas too and keeps the note whole; unknown windows
+  skip counting. Packet caps live in the server, not the note contract.
 - **An automation fires runs, and a run is a session.** An automation
   is a row in its project (`automations/`): an agent, instructions, a
   five-field cron schedule in an IANA zone parsed by `Bun.cron.parse`
@@ -533,7 +584,9 @@ violation, and every rule has a rejected fixture under
   included. Tokens are counted on the server by `lib/tokens.ts`,
   gpt-tokenizer's `o200k_base` alone (each encoding carries its
   vocabulary into the binary), exact only for OpenAI models; a skill
-  body's count is kept per skill until its digest moves. A name is a
+  body's count is kept per skill until its digest moves. For an admin
+  the agent's Settings aside has Manage, which opens its row on
+  `/admin/agents?open=<id>`. A name is a
   link to its page wherever it is drawn, except inside a row that is
   itself a link (a stream row's author, an automation row's agent).
 - **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
@@ -559,9 +612,12 @@ violation, and every rule has a rejected fixture under
   unknown), each leading to the automation's page, `/automations/:id`,
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
-  Show more), then Suspend or Resume, Edit and Run now over the runs, a
-  log with their source, length against the deadline and Stop, filtered
-  by `?runs=`, and the aside of next fires, the tally and the setup. The editor is a page of
+  Show more), then Suspend or Resume, Edit and Run now over two tabs:
+  Runs, a log with their source, length against the deadline and Stop,
+  filtered by `?runs=` and counted by the tally, and, only
+  with `ownMemory`, Memory, `/automations/:id/memory`, the own note
+  counted by its entries (both routes name one view, so a tab change
+  keeps the page mounted); and the aside of next fires, the tally and the setup. The editor is a page of
   `ui/Section.tsx` steps, `/projects/:id/automations/new` and
   `/automations/:id/edit` (read-only for whoever may not edit): the task
   is a box with the composer's `AgentPicker`, the schedule is built in
@@ -573,7 +629,9 @@ violation, and every rule has a rejected fixture under
   rows. `data/automations.ts` keeps the list, the runs and the tally
   current from the frames. A run's chat page names its automation over
   the transcript and has no composer, no Regenerate and no `/compact`;
-  its foot is the state with Stop while it runs (`RunFoot.tsx`).
+  its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
+  done run's length and its send's `tokens` (prompt plus completion over
+  its counted rounds, summed from `usage` by the send queries).
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -609,6 +667,10 @@ violation, and every rule has a rejected fixture under
   the view on the page head's row. The width is `NARROW` in `shell.ts`
   and the same number in `shell.css`. The rail never becomes a header
   row and there is no top bar.
+  No box that comes and goes inside the shell's scroll box scrolls on
+  its own: one that does (a tool value under a fold) leaves Chrome's
+  stuck head and foot riding with the rows until a reload, so a long
+  value is cut with `overflow: clip` and opens with Show all.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

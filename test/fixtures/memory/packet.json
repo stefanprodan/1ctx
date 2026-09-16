@@ -1,0 +1,73 @@
+{
+  "guidance": "Sources: keep failed hosts and how they failed.",
+  "entries": [
+    {
+      "topic": "Sources",
+      "text": "Try the public feed next."
+    }
+  ],
+  "rows": [
+    {
+      "kind": "user",
+      "content": "Check the daily report."
+    },
+    {
+      "kind": "reply",
+      "slot": "work",
+      "content": "I will check both sources.",
+      "reasoning": "Main reasoning must not return.",
+      "toolCalls": [
+        {
+          "id": "blocked",
+          "name": "webfetch",
+          "arguments": "{\n  \"url\": \"https://blocked.example/report\"\n}"
+        },
+        {
+          "id": "consent",
+          "name": "webfetch",
+          "arguments": "{\"url\":\"https://consent.example/report\"}"
+        }
+      ]
+    },
+    {
+      "kind": "tool",
+      "toolName": "webfetch",
+      "toolCallId": "blocked",
+      "status": "failed",
+      "error": "HTTP 403: access denied",
+      "content": "HTTP 403: access denied"
+    },
+    {
+      "kind": "tool",
+      "toolName": "webfetch",
+      "toolCallId": "consent",
+      "content": "Consent required."
+    },
+    {
+      "kind": "reply",
+      "slot": "answer",
+      "round": 2,
+      "content": "Both sources were blocked."
+    },
+    {
+      "kind": "reply",
+      "slot": "work",
+      "round": 3,
+      "content": "Phase work must not enter the packet.",
+      "toolCalls": [
+        {
+          "id": "edit",
+          "name": "memory_edit",
+          "arguments": "{\"action\":\"none\"}"
+        }
+      ]
+    },
+    {
+      "kind": "tool",
+      "round": 3,
+      "toolName": "memory_edit",
+      "toolCallId": "edit",
+      "content": "Phase result must not enter the packet."
+    }
+  ]
+}

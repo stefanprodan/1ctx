@@ -102,6 +102,17 @@ export function applyHtml(live: Live, frame: HtmlFrame): Live {
 
 export const tail = (live: Live): string => live.content.slice(live.htmlAt);
 
+// A reply streams without a slot until its first call or its end, and
+// the words a model says before calling a tool arrive first: shown as
+// the answer, they would jump into the fold a moment later. While the
+// text is one short paragraph it is drawn where a work round's words
+// go; a second paragraph or a longer one is the answer.
+export const LEAD_CHARS = 400;
+
+export function leadIn(content: string): boolean {
+  return content.length <= LEAD_CHARS && !/\n\s*\n\s*\S/.test(content);
+}
+
 // the word and the time apart: the row shows them at its two ends. The
 // word never changes, like a tool's name; the time tells the state
 export function thinkParts(

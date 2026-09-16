@@ -18,7 +18,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 8;
+export const PROTOCOL = 9;
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -42,6 +42,14 @@ export type SocketEvent =
   // an automation's row after a write, by the same revision rule
   | { type: "automation"; projectId: string; automation: AutomationSummary }
   | { type: "automationDeleted"; projectId: string; automationId: string }
+  // a note was written: the client refetches it when the revision is
+  // above the one held
+  | {
+      type: "memory";
+      projectId: string;
+      automationId: string | null;
+      revision: number;
+    }
   // the connection may now see the project
   | { type: "granted"; projectId: string }
   // the connection may no longer see the project

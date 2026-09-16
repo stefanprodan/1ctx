@@ -1,0 +1,181 @@
+/* The memory note card: the head's count and writer, the entries as
+   plain lines or as the diff, and the editor's boxes. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .note-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  .note-head-count {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .note-head-link {
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .note-head-link:hover {
+    text-decoration: underline;
+  }
+  .note-switch {
+    display: inline-flex;
+    gap: var(--space-1);
+    margin-left: auto;
+  }
+  .note-switch-tab {
+    padding: 2px var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    font-size: var(--text-small);
+    color: var(--dim);
+    cursor: pointer;
+  }
+  .note-switch-tab:disabled {
+    color: var(--faint);
+    cursor: default;
+  }
+  .note-switch-on {
+    background: var(--inset);
+    color: var(--fg);
+  }
+  .note-entries {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .note-entry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line);
+    font-size: var(--text-body);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .note-entry-topic {
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .note-entry-text,
+  .note-entry-old {
+    white-space: pre-wrap;
+  }
+  .note-entry-old {
+    color: var(--faint);
+    text-decoration: line-through;
+  }
+  .note-entry:last-child {
+    border-bottom: 0;
+  }
+  .note-entry-added {
+    background: var(--inset);
+  }
+  .note-entry-added .note-entry-topic::before,
+  .note-entry-changed .note-entry-topic::before {
+    content: "+ ";
+    color: var(--done);
+    font-family: var(--mono);
+  }
+  /* struck through word by word, so the marker before the topic is not */
+  .note-entry-removed {
+    color: var(--faint);
+  }
+  .note-entry-removed .note-entry-topic,
+  .note-entry-removed .note-entry-text {
+    text-decoration: line-through;
+  }
+  .note-entry-changed .note-entry-topic::before {
+    content: "~ ";
+    color: var(--dim);
+  }
+  .note-entry-removed .note-entry-topic {
+    color: inherit;
+  }
+  /* an inline block is never decorated by its parent's line-through */
+  .note-entry-removed .note-entry-topic::before {
+    content: "- ";
+    display: inline-block;
+    white-space: pre;
+    font-family: var(--mono);
+  }
+  .note-empty {
+    margin: 0;
+    padding: var(--space-4);
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+  .note-actions {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+  .note-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .note-box {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+  .note-box-fields {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .note-box-size {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+  .note-box-size-over {
+    color: var(--failed);
+  }
+  /* level with the Topic field, under its label */
+  .note-box-remove {
+    margin-top: 22px;
+  }
+  .note-form-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .note-form-count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .note-form-count-over {
+    color: var(--failed);
+  }
+  .note-notice {
+    align-self: center;
+    font-size: var(--text-small);
+    color: var(--failed);
+  }
+  .note-notice-line {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+}

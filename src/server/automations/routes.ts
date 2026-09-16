@@ -7,6 +7,11 @@ import type {
   AutomationsResponse,
   SchedulePreviewResponse,
 } from "../../shared/api/automations.ts";
+import type {
+  MemoryResponse,
+  SaveMemoryRequest,
+  UndoMemoryRequest,
+} from "../../shared/api/memory.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import { PREVIEW_FIRES } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
@@ -16,6 +21,12 @@ import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { Limits } from "../limits/index.ts";
+import {
+  MAX_MEMORY_BODY,
+  type MemoryCapability,
+  parseSaveMemory,
+  parseUndoMemory,
+} from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
@@ -48,6 +59,7 @@ export type RoutesDeps = {
   users: { byId(id: string): UserRow | null };
   limits: { current(): Limits };
   sessions: SessionStore;
+  memory: Pick<MemoryCapability, "read" | "save" | "undo">;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
@@ -116,6 +128,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         );
         agent(body.agentId);
         deadline(body.deadlineMs);
+        if (body.ownMemory && body.projectMemory) {
+          throw new BadRequest("ownMemory and projectMemory cannot both be on");
+        }
         const now = deps.clock();
         const nextAt = checkSchedule(body.schedule, body.tz, now);
         const automation = transact(deps.db, () => {
@@ -152,6 +167,58 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
+      method: "GET",
+      path: "/api/automations/:id/memory",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const automation = visible(ctx.principal!, ctx.params.id);
+        const body: MemoryResponse = {
+          memory: deps.memory.read(automation.projectId, automation.id),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "PUT",
+      path: "/api/automations/:id/memory",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const automation = visible(ctx.principal!, ctx.params.id);
+        const request: SaveMemoryRequest = parseSaveMemory(
+          await jsonBody(req, MAX_MEMORY_BODY),
+        );
+        const body: MemoryResponse = {
+          memory: deps.memory.save(
+            automation.projectId,
+            automation.id,
+            request,
+            ctx.principal!.userId,
+          ),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/automations/:id/memory/undo",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const automation = visible(ctx.principal!, ctx.params.id);
+        const request: UndoMemoryRequest = parseUndoMemory(
+          await jsonBody(req, MAX_MEMORY_BODY),
+        );
+        const body: MemoryResponse = {
+          memory: deps.memory.undo(
+            automation.projectId,
+            automation.id,
+            request,
+            ctx.principal!.userId,
+          ),
+        };
+        return json(body);
+      },
+    },
+    {
       method: "PATCH",
       path: "/api/automations/:id",
       policy: "authenticated",
@@ -166,6 +233,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const current = visible(principal, found.id);
           editable(principal, current);
           const next = { ...current, ...patch };
+          if (next.ownMemory && next.projectMemory) {
+            throw new BadRequest(
+              "ownMemory and projectMemory cannot both be on",
+            );
+          }
           agent(next.agentId);
           deadline(next.deadlineMs);
           if (deps.store.nameTaken(current.projectId, next.name, current.id)) {
@@ -189,6 +261,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             deadlineMs: next.deadlineMs,
             retentionDays: next.retentionDays,
             nextAt,
+            projectMemory: next.projectMemory,
+            ownMemory: next.ownMemory,
+            memoryGuidance: next.memoryGuidance,
             now,
           })!;
           return { result: updated, events: [changed(updated)] };

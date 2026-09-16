@@ -78,11 +78,15 @@ function callFetch(
 // A fetcher that aborts the shared controller when it first sees `method`,
 // then never resolves, so the request is only ended when the transport is
 // closed. `cancelled` reports that the closed transport aborted the request.
+// when the abort fired: an abort is timed from there, since the
+// requests before it slow down with the machine, not with the abort
+type Cancelled = { value: boolean; at: number };
+
 function abortAt(
   method: string,
   base: typeof fetch,
   controller: AbortController,
-  cancelled: { value: boolean },
+  cancelled: Cancelled,
 ): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const request =
@@ -90,6 +94,7 @@ function abortAt(
     if (request.method === "DELETE") return base(request);
     const body = (await request.clone().json()) as { method?: string };
     if (body.method !== method) return base(request);
+    cancelled.at = Date.now();
     controller.abort(new Error("stopped"));
     return new Promise<Response>((_resolve, reject) => {
       const stop = () => {
@@ -584,14 +589,13 @@ describe("MCP SDK client", () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const controller = new AbortController();
-    const cancelled = { value: false };
+    const cancelled: Cancelled = { value: false, at: 0 };
     const fetcher = abortAt(
       "server/discover",
       fake.fetcher,
       controller,
       cancelled,
     );
-    const started = Date.now();
     await expect(
       withClient(
         { fetcher, version: "test" },
@@ -602,16 +606,15 @@ describe("MCP SDK client", () => {
       ),
     ).rejects.toThrow();
     expect(cancelled.value).toBeTrue();
-    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
   test("aborts during the legacy handshake, closing the transport at once", async () => {
     const recorded = await fixture("flux-docs");
     const fake = mcpFetch({ era: "legacy", recorded });
     const controller = new AbortController();
-    const cancelled = { value: false };
+    const cancelled: Cancelled = { value: false, at: 0 };
     const fetcher = abortAt("initialize", fake.fetcher, controller, cancelled);
-    const started = Date.now();
     await expect(
       withClient(
         { fetcher, version: "test" },
@@ -622,16 +625,15 @@ describe("MCP SDK client", () => {
       ),
     ).rejects.toThrow();
     expect(cancelled.value).toBeTrue();
-    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
   test("aborts mid-call, closing the transport at once", async () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const controller = new AbortController();
-    const cancelled = { value: false };
+    const cancelled: Cancelled = { value: false, at: 0 };
     const fetcher = abortAt("tools/call", fake.fetcher, controller, cancelled);
-    const started = Date.now();
     await expect(
       withClient(
         { fetcher, version: "test" },
@@ -646,7 +648,7 @@ describe("MCP SDK client", () => {
       ),
     ).rejects.toThrow();
     expect(cancelled.value).toBeTrue();
-    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
   test("a DELETE answered 405 does not change the outcome", async () => {

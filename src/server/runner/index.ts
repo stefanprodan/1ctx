@@ -20,6 +20,7 @@ import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
+import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
   type SessionRow,
@@ -28,7 +29,9 @@ import {
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
+import { commitMemory } from "./memory-phase.ts";
 import { buildPolicy, type ToolsPort } from "./policy.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { Registry } from "./registry.ts";
@@ -52,8 +55,7 @@ export {
 
 // how long shutdown waits for the streams to let go
 export const SHUTDOWN_DRAIN_MS = 5000;
-export const FINALIZE_ATTEMPTS = 3;
-export const FINALIZE_RETRY_MS = 100;
+export { FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS };
 
 export type RunnerDeps = {
   db: Db;
@@ -66,6 +68,13 @@ export type RunnerDeps = {
   users: { byId(id: string): UserRow | null };
   providers: { chat: RoundDeps["chat"] };
   tools: ToolsPort;
+  memory: Pick<MemoryCapability, "read" | "commit">;
+  markers: {
+    mark(
+      automationId: string,
+      marks: readonly { sessionId: string; readActivityAt: number }[],
+    ): number;
+  };
   limits: { current(): Limits };
   usage: WriterDeps["usage"];
   render: WriterDeps["render"];
@@ -98,6 +107,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     clock: deps.clock,
     sessions: deps.sessions,
     usage: deps.usage,
+    commitMemory: (send, cause) =>
+      commitMemory({ memory: deps.memory, markers: deps.markers }, send, cause),
     render: deps.render,
     stream: deps.stream,
   });
@@ -114,46 +125,21 @@ export function runnerArea(deps: RunnerDeps): Runner {
   const pause =
     deps.clock.sleep ??
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const finalizations = new WeakMap<ActiveSend, Promise<boolean>>();
+  const historyOf = (send: ActiveSend) =>
+    deps.sessions
+      .messages(send.sessionId)
+      .filter((row) => row.id !== send.round?.messageId);
 
-  const finalize = async (
-    send: ActiveSend,
-    cause: SendCause,
-    error: string | null,
-  ): Promise<boolean> => {
-    let lastError: unknown = null;
-    for (let attempt = 0; attempt < FINALIZE_ATTEMPTS; attempt++) {
-      try {
-        writer.finalizeSend(send, cause, error);
-        return true;
-      } catch (err) {
-        lastError = err;
-      }
-      if (attempt + 1 < FINALIZE_ATTEMPTS) await pause(FINALIZE_RETRY_MS);
-    }
-    deps.log(
-      `chat ${send.sessionId} could not be finalized: ${String(lastError)}`,
-    );
-    return false;
-  };
-
-  // the first cause owns the retries, so every caller observes the same end
+  // The first cause wins. Stop and shutdown still abort a phase opened
+  // after another cause claimed the send.
   const terminate = (
     send: ActiveSend,
     cause: SendCause,
     error: string | null = null,
   ): Promise<boolean> => {
-    const active = finalizations.get(send);
-    if (active) return active;
-    if (!claim(send, cause)) return Promise.resolve(false);
-    const task = finalize(send, cause, error).then((finalized) => {
-      deps.log(
-        `chat ${send.sessionId} ${cause}${error === null ? "" : `: ${error}`}`,
-      );
-      return finalized;
-    });
-    finalizations.set(send, task);
-    return task;
+    if (cause === "stop" || cause === "shutdown") send.ending.abort();
+    claim(send, cause, error);
+    return send.ended;
   };
 
   const loopDeps: LoopDeps = {
@@ -161,17 +147,20 @@ export function runnerArea(deps: RunnerDeps): Runner {
     writer,
     tools: deps.tools,
     clock: deps.clock,
-    // the reply row in flight is the last one; everything before it is
-    // history the wire takes
-    historyOf: (send) =>
-      deps.sessions
-        .messages(send.sessionId)
-        .filter((row) => row.id !== send.round?.messageId),
-    // Claim failure before waiting for sibling tools, so their shared
-    // signal aborts while allSettled still holds the session lock.
+    historyOf,
     fail: (send, error) => {
       void terminate(send, "failure", error);
     },
+  };
+  const phaseDeps = {
+    db: deps.db,
+    clock: deps.clock,
+    sessions: deps.sessions,
+    round: roundDeps,
+    writer,
+    tools: deps.tools,
+    historyOf,
+    pause,
   };
 
   const run = async (send: ActiveSend): Promise<void> => {
@@ -182,16 +171,21 @@ export function runnerArea(deps: RunnerDeps): Runner {
       });
     }
     try {
-      const end = await toolLoop(loopDeps, send);
-      finalized = await terminate(send, end.cause, end.error);
-    } catch (err) {
-      finalized = await terminate(
+      try {
+        const end = await toolLoop(loopDeps, send);
+        void terminate(send, end.cause, end.error);
+      } catch (error) {
+        void terminate(
+          send,
+          "failure",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+      finalized = await endSend(
+        { writer, phase: phaseDeps, pause, log: deps.log },
         send,
-        "failure",
-        err instanceof Error ? err.message : String(err),
       );
     } finally {
-      // the lock is let go only after the round's tools have settled too
       if (send.tools !== null) await send.tools.catch(() => {});
       send.letGo();
       if (finalized) registry.free(send);
@@ -206,6 +200,14 @@ export function runnerArea(deps: RunnerDeps): Runner {
     offerTools = true,
   ) => {
     const limits = deps.limits.current();
+    const automation =
+      event === null
+        ? null
+        : {
+            ...event.automation,
+            source: event.source,
+            dueAt: event.dueAt,
+          };
     return buildPolicy({
       project,
       user,
@@ -213,14 +215,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
       now: deps.clock(),
       tools: offerTools && agent.model.tools ? deps.tools : null,
       limits,
-      automation:
-        event === null
-          ? null
-          : {
-              ...event.automation,
-              source: event.source,
-              dueAt: event.dueAt,
-            },
+      automation,
+      projectMemory: deps.memory.read(project.id, null).entries,
+      automationMemory:
+        automation?.ownMemory === true
+          ? deps.memory.read(project.id, automation.id).entries
+          : [],
       deadlineMs:
         event === null
           ? null

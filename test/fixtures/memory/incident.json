@@ -1,0 +1,96 @@
+{
+  "title": "Checkout returns 503",
+  "readPatterns": ["get_*"],
+  "toolNames": [
+    "get_kubernetes_resources",
+    "get_kubernetes_logs",
+    "delete_kubernetes_resource",
+    "patch_kubernetes_resource"
+  ],
+  "rows": [
+    {
+      "kind": "user",
+      "author": "caelea",
+      "content": "Checkout returns 503. Investigate and fix it."
+    },
+    {
+      "kind": "reply",
+      "slot": "work",
+      "author": "coder",
+      "content": "WORK_MUST_NOT_APPEAR",
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        {
+          "id": "resources",
+          "name": "mcp__flux__get_kubernetes_resources",
+          "arguments": "{\n  \"kind\": \"Pod\",\t\"namespace\": \"checkout\"\n}"
+        },
+        {
+          "id": "logs",
+          "name": "mcp__flux__get_kubernetes_logs",
+          "arguments": "{\"name\":\"checkout-0\",\"namespace\":\"checkout\"}"
+        }
+      ]
+    },
+    {
+      "kind": "tool",
+      "toolCallId": "logs",
+      "toolName": "mcp__flux__get_kubernetes_logs",
+      "status": "failed",
+      "content": "TOOL_RESULT_MUST_NOT_APPEAR",
+      "error": "TOOL_ERROR_MUST_NOT_APPEAR"
+    },
+    {
+      "kind": "tool",
+      "toolCallId": "resources",
+      "toolName": "mcp__flux__get_kubernetes_resources",
+      "content": "TOOL_RESULT_MUST_NOT_APPEAR"
+    },
+    {
+      "kind": "reply",
+      "slot": "work",
+      "round": 2,
+      "author": "coder",
+      "content": "WORK_MUST_NOT_APPEAR",
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        {
+          "id": "delete",
+          "name": "mcp__flux__delete_kubernetes_resource",
+          "arguments": "{\"kind\":\"Pod\",\"name\":\"checkout-0\",\"namespace\":\"checkout\"}"
+        },
+        {
+          "id": "patch",
+          "name": "mcp__flux__patch_kubernetes_resource",
+          "arguments": "{\"kind\":\"Deployment\",\"name\":\"checkout\"}"
+        }
+      ]
+    },
+    {
+      "kind": "tool",
+      "round": 2,
+      "toolCallId": "delete",
+      "toolName": "mcp__flux__delete_kubernetes_resource",
+      "content": "TOOL_RESULT_MUST_NOT_APPEAR"
+    },
+    {
+      "kind": "reply",
+      "slot": "answer",
+      "round": 3,
+      "author": "coder",
+      "content": "A stuck pod caused the 503s. Deleting checkout-0 restored service; no deployment change was needed.",
+      "finishedAt": 1789552920000
+    }
+  ],
+  "receipts": [
+    "- mcp__flux__get_kubernetes_resources { \"kind\": \"Pod\", \"namespace\": \"checkout\" } : done",
+    "- mcp__flux__get_kubernetes_logs {\"name\":\"checkout-0\",\"namespace\":\"checkout\"} : failed",
+    "- mcp__flux__delete_kubernetes_resource {\"kind\":\"Pod\",\"name\":\"checkout-0\",\"namespace\":\"checkout\"} : done (write)",
+    "- mcp__flux__patch_kubernetes_resource {\"kind\":\"Deployment\",\"name\":\"checkout\"} : not run (write)"
+  ],
+  "absent": [
+    "WORK_MUST_NOT_APPEAR",
+    "TOOL_RESULT_MUST_NOT_APPEAR",
+    "TOOL_ERROR_MUST_NOT_APPEAR"
+  ]
+}

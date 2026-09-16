@@ -17,6 +17,11 @@ import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
+import {
+  type MemoryArea,
+  type MemoryStore,
+  memoryArea,
+} from "./memory/index.ts";
 import { type ProjectStore, projectsArea } from "./projects/index.ts";
 import {
   type Catalogs,
@@ -67,6 +72,7 @@ export type App = {
   mcp: McpServerStore;
   skills: SkillStore;
   agents: AgentStore;
+  memory: MemoryStore;
   sessions: SessionStore;
   automations: Automations["store"];
   automationScheduler: Automations["scheduler"];
@@ -175,14 +181,21 @@ export async function compose(options: ComposeOptions): Promise<App> {
     skills,
     mcp,
     tools: {
-      offered: (now, agentId, agentServers, mode) =>
-        tools.offered(now, agentId, agentServers, mode),
+      offered: (now, agentId, agentServers, mode, scope) =>
+        tools.offered(now, agentId, agentServers, mode, scope),
     },
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
     automations: {
       usesAgent: (agentId) => automations.usesAgent(agentId),
     },
+  });
+  const memory: MemoryArea = memoryArea({
+    db,
+    clock,
+    access,
+    users,
+    runs: { runInfo: (sessionId) => sessions.runInfo(sessionId) },
   });
   sessions = sessionsArea({
     db,
@@ -191,6 +204,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     live: (sessionId) => runner.live(sessionId),
     usage,
+    isWrite: (name) => mcp.isWrite(name),
   });
   const tools =
     options.tools ??
@@ -204,6 +218,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
       render: renderMarkdown,
       skills,
       mcp,
+      memory,
+      sessions: {
+        memorySnapshot: (projectId, sessionId) =>
+          sessions.memorySnapshot(projectId, sessionId),
+      },
+      markers: {
+        unread: (automationId, projectId, cap, exclude) =>
+          automations.unread(automationId, projectId, cap, exclude),
+      },
     });
   const socket = socketArea({
     refresh: (principal) => access.refresh(principal),
@@ -222,6 +245,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     providers,
     tools,
+    memory: {
+      read: (projectId, automationId) => memory.read(projectId, automationId),
+      commit: (work, sessionId) => memory.commit(work, sessionId),
+    },
+    markers: {
+      mark: (automationId, marks) => automations.mark(automationId, marks),
+    },
     limits,
     usage,
     render: renderMarkdown,
@@ -237,6 +267,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects,
     agents,
     limits,
+    memory,
     sessions: sessions.store,
     usage,
     runner,
@@ -254,6 +285,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...projects.routes,
     ...access.routes,
     ...agents.routes,
+    ...memory.routes,
     ...sessions.routes,
     ...(tools.routes ?? []),
     ...runner.routes,
@@ -273,6 +305,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     mcp: mcp.store,
     skills: skills.store,
     agents: agents.store,
+    memory: memory.store,
     sessions: sessions.store,
     automations: automations.store,
     automationScheduler: automations.scheduler,

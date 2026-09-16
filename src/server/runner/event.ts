@@ -8,7 +8,14 @@ import type { UserRow } from "../users/index.ts";
 
 export type Event = {
   source: EventSource;
-  automation: { id: string; name: string; tz: string };
+  automation: {
+    id: string;
+    name: string;
+    tz: string;
+    projectMemory: boolean;
+    ownMemory: boolean;
+    memoryGuidance: string;
+  };
   instructions: string;
   dueAt: number;
   receivedAt: number;
