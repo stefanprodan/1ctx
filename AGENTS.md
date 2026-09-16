@@ -576,7 +576,9 @@ violation, and every rule has a rejected fixture under
   included. Tokens are counted on the server by `lib/tokens.ts`,
   gpt-tokenizer's `o200k_base` alone (each encoding carries its
   vocabulary into the binary), exact only for OpenAI models; a skill
-  body's count is kept per skill until its digest moves. A name is a
+  body's count is kept per skill until its digest moves. For an admin
+  the agent's Settings aside has Manage, which opens its row on
+  `/admin/agents?open=<id>`. A name is a
   link to its page wherever it is drawn, except inside a row that is
   itself a link (a stream row's author, an automation row's agent).
 - **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
