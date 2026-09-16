@@ -24,7 +24,7 @@ import {
 import "./agents.css";
 
 export function ProviderForm({ onDone }: { onDone: () => void }) {
-  const wire = useSignal<Wire>("openrouter");
+  const wire = useSignal<Wire>(PRESETS[0]!.wire);
   const name = useSignal(preset(wire.value).name);
   const baseUrl = useSignal("");
   const keyName = useSignal(preset(wire.value).name);
@@ -103,7 +103,6 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             aria-required="true"
             autocomplete="off"
             spellcheck={false}
-            placeholder="openrouter"
             aria-invalid={invalid("name") || undefined}
             disabled={busy}
             value={name.value}
@@ -150,13 +149,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
               value={baseUrl.value}
               onInput={bind(baseUrl)}
             />
-            {invalid("baseUrl") ? (
-              <FieldError save={save} field="baseUrl" />
-            ) : (
-              <span class="hint">
-                /models and /chat/completions are under it.
-              </span>
-            )}
+            <FieldError save={save} field="baseUrl" />
           </label>
         )}
       </div>

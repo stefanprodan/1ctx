@@ -5,28 +5,6 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  .agents-name {
-    flex-shrink: 0;
-    width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    font-weight: 500;
-    color: var(--fg);
-  }
-  .agents-desc {
-    flex-grow: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-small);
-    color: var(--dim);
-  }
-
   .agents-ask {
     display: flex;
     align-items: center;
@@ -382,15 +360,6 @@
   }
 
   @media (max-width: 719px) {
-    .agents-name {
-      width: auto;
-      flex-grow: 1;
-    }
-    .agents-desc {
-      flex-basis: 100%;
-      order: 5;
-      padding-left: calc(28px + var(--space-3));
-    }
     .agents-ask {
       flex-basis: 100%;
       order: 7;

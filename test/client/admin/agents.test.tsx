@@ -129,6 +129,8 @@ describe("the words", () => {
     expect(nameProblem("coder")).toBeNull();
     expect(preset("openrouter").baseUrl).toContain("/api/v1");
     expect(preset("openai-compatible").baseUrl).toBeNull();
+    expect(preset("gemini").baseUrl).toContain("/v1beta");
+    expect(preset("gemini").name).toBe("gemini");
   });
 
   test("thinking and effort: the default and the wire's levels", () => {
@@ -148,6 +150,12 @@ describe("the words", () => {
       "xhigh",
     ]);
     expect(effortChoices("openai-compatible").map((c) => c.value)).toEqual([
+      null,
+      "low",
+      "medium",
+      "high",
+    ]);
+    expect(effortChoices("gemini").map((c) => c.value)).toEqual([
       null,
       "low",
       "medium",
