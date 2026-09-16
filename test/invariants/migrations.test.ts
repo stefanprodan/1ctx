@@ -8,7 +8,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { migrate, open } from "../../src/server/db/index.ts";
 import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
-import { EFFORTS } from "../../src/shared/words.ts";
+import { EFFORTS, WIRES } from "../../src/shared/words.ts";
 import { fileDb } from "../helpers/db.ts";
 
 describe("migrations", () => {
@@ -103,6 +103,23 @@ describe("the schema", () => {
     `);
     return db;
   }
+
+  test("a provider accepts every known wire and refuses anything else", () => {
+    const db = seed();
+    try {
+      for (const wire of WIRES) {
+        db.query("update providers set wire = ? where id = 'pr'").run(wire);
+        expect(
+          db.query("select wire from providers where id = 'pr'").get(),
+        ).toEqual({ wire });
+      }
+      expect(() =>
+        db.query("update providers set wire = 'unknown'").run(),
+      ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
 
   test("a send's rows hold their shape, uniques and cascade", () => {
     const db = seed();
@@ -315,6 +332,7 @@ describe("additive migrations", () => {
       "0008-search-tavily",
       "0009-mcp",
       "0010-memory",
+      "0011-gemini",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -361,6 +379,7 @@ describe("0005", () => {
       "0008-search-tavily",
       "0009-mcp",
       "0010-memory",
+      "0011-gemini",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -416,6 +435,7 @@ describe("rebuild migrations", () => {
       "0008-search-tavily",
       "0009-mcp",
       "0010-memory",
+      "0011-gemini",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -504,6 +524,7 @@ describe("0006 skills migration", () => {
       "0008-search-tavily",
       "0009-mcp",
       "0010-memory",
+      "0011-gemini",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -551,6 +572,7 @@ describe("0007 user tz migration", () => {
       "0008-search-tavily",
       "0009-mcp",
       "0010-memory",
+      "0011-gemini",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -574,7 +596,7 @@ describe("0009 mcp migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a9', 'agent9', 'p9', 'm', 'M', 0);
     `);
-    expect(migrate(db)).toEqual(["0009-mcp", "0010-memory"]);
+    expect(migrate(db)).toEqual(["0009-mcp", "0010-memory", "0011-gemini"]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
     ).toEqual({ mcp_mode: "auto" });
@@ -623,6 +645,7 @@ describe("0008 search tavily migration", () => {
       "0008-search-tavily",
       "0009-mcp",
       "0010-memory",
+      "0011-gemini",
     ]);
     expect(
       db
@@ -644,5 +667,66 @@ describe("0008 search tavily migration", () => {
         .run(),
     ).toThrow();
     db.close();
+  });
+
+  describe("0011 Gemini migration", () => {
+    test("widens the wire check and keeps providers, agents and their constraints", () => {
+      const db = new Database(":memory:");
+      db.exec("pragma foreign_keys = on");
+      try {
+        migrate(db, MIGRATIONS.slice(0, 10));
+        db.exec(`
+          insert into providers (id, name, wire, base_url, key_name, created_at)
+            values ('pr11', 'router', 'openrouter', 'http://models.test/v1', 'router', 17),
+                   ('local11', 'local', 'openai-compatible', 'http://local.test/v1', null, 18);
+          insert into agents
+            (id, name, avatar, provider_id, model, model_name, context_length,
+             prompt_price, completion_price, tools, reasoning, prompt, thinking,
+             effort, created_at, mcp_mode)
+            values ('a11', 'agent', 'dome', 'pr11', 'model', 'Model', 100000,
+                    1.5, 2.5, 1, 1, 'Be brief', 'on', 'high', 19, 'catalog');
+        `);
+        const providers = db.query("select * from providers order by id").all();
+        const agents = db.query("select * from agents").all();
+        expect(() =>
+          db
+            .query("update providers set wire = 'gemini' where id = 'local11'")
+            .run(),
+        ).toThrow();
+        expect(migrate(db)).toEqual(["0011-gemini"]);
+        expect(db.query("select * from providers order by id").all()).toEqual(
+          providers,
+        );
+        expect(db.query("select * from agents").all()).toEqual(agents);
+        db.exec(`
+          insert into providers (id, name, wire, base_url, key_name, created_at)
+            values ('gemini11', 'gemini', 'gemini', 'http://models.test/v1beta', 'gemini', 20);
+          insert into agents
+            (id, name, provider_id, model, model_name, created_at)
+            values ('g11', 'gemini-agent', 'gemini11', 'gemini-3.8-flash', 'Gemini 3.8 Flash', 21);
+        `);
+        expect(() =>
+          db.query("update providers set wire = 'unknown'").run(),
+        ).toThrow();
+        expect(() =>
+          db
+            .query("update providers set name = 'router' where id = 'gemini11'")
+            .run(),
+        ).toThrow();
+        expect(() =>
+          db.query("delete from providers where id = 'pr11'").run(),
+        ).toThrow();
+        expect(() =>
+          db.query("delete from providers where id = 'gemini11'").run(),
+        ).toThrow();
+        expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+        expect(db.query("pragma foreign_keys").get()).toEqual({
+          foreign_keys: 1,
+        });
+        expect(migrate(db)).toEqual([]);
+      } finally {
+        db.close();
+      }
+    });
   });
 });

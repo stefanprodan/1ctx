@@ -10,7 +10,11 @@
 // so the runner has one channel to finish a round on; a stop by the
 // caller's signal ends the stream with no event, since the caller knows.
 
-import type { Fetcher } from "./catalog.ts";
+import {
+  buildChatBody as buildGeminiChatBody,
+  geminiError,
+  geminiEvents,
+} from "./gemini.ts";
 import {
   buildChatBody as buildOpenAiChatBody,
   chatEvents,
@@ -22,7 +26,7 @@ import {
   openRouterEvents,
 } from "./openrouter.ts";
 import type { ProviderRow } from "./store.ts";
-import type { ChatEvent, ChatRequest, Provider } from "./types.ts";
+import type { ChatEvent, ChatRequest, Fetcher, Provider } from "./types.ts";
 
 export type ProviderDeps = {
   fetcher: Fetcher;
@@ -36,8 +40,10 @@ const OPENROUTER_HEADERS = {
 };
 
 export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
-  const url = `${row.baseUrl.replace(/\/+$/, "")}/chat/completions`;
   const openRouter = row.wire === "openrouter";
+  const gemini = row.wire === "gemini";
+  const path = gemini ? "/openai/chat/completions" : "/chat/completions";
+  const url = `${row.baseUrl.replace(/\/+$/, "")}${path}`;
   return {
     id: row.id,
     wire: row.wire,
@@ -59,11 +65,17 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
       };
       const body = openRouter
         ? buildOpenRouterChatBody(req)
-        : buildOpenAiChatBody(req);
+        : gemini
+          ? buildGeminiChatBody(req)
+          : buildOpenAiChatBody(req);
       const scrub = (message: string) =>
         key === null ? message : message.replaceAll(key, "[key]");
       const events = streamChat(deps.fetcher, url, body, signal, {
-        mapEvents: openRouter ? openRouterEvents : chatEvents,
+        mapEvents: openRouter
+          ? openRouterEvents
+          : gemini
+            ? geminiEvents()
+            : chatEvents,
         headers,
       });
       try {
@@ -75,7 +87,11 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
           yield {
             kind: "error",
             message: scrub(
-              openRouter ? openRouterError(event.message) : event.message,
+              openRouter
+                ? openRouterError(event.message)
+                : gemini
+                  ? geminiError(event.message)
+                  : event.message,
             ),
           };
         }

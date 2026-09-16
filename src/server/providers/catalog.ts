@@ -1,26 +1,23 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A provider's catalog: GET /models under its base URL, in the shape
-// OpenRouter and every OpenAI-compatible server answer. Parsed once
-// into what the wire carries, cached an hour per provider, searched
-// server-side so the browser never sees the whole list. The key goes
-// out as a bearer and nowhere else.
+// Catalogs are parsed once, cached an hour per provider and searched
+// server-side so the browser never sees the whole list. The wire picks
+// the catalog's shape and authentication.
 
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Clock } from "../lib/clock.ts";
+import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
 import type { ProviderRow } from "./store.ts";
+import { CatalogError, type Fetcher } from "./types.ts";
+
+export { CatalogError, type Fetcher } from "./types.ts";
 
 export const CATALOG_TTL_MS = 60 * 60 * 1000;
 export const CATALOG_TIMEOUT_MS = 10_000;
 export const SEARCH_LIMIT = 20;
 // more than a catalog: what is dropped unread past it
 export const MAX_CATALOG_BYTES = 8 * 1024 * 1024;
-
-export type Fetcher = typeof fetch;
-
-// the catalog could not be read: unreachable, refused, or not a catalog
-export class CatalogError extends Error {}
 
 // OpenRouter prices are USD per token as a string; the wire carries
 // USD per million tokens, or null when the catalog did not say
@@ -83,13 +80,21 @@ async function readCapped(res: Response, max: number): Promise<string> {
 
 export async function fetchCatalog(
   fetcher: Fetcher,
-  baseUrl: string,
+  provider: Pick<ProviderRow, "wire" | "baseUrl">,
   key: string | null,
 ): Promise<CatalogMatch[]> {
   let res: Response;
+  const gemini = provider.wire === "gemini";
+  const path = gemini ? "/models?pageSize=1000" : "/models";
+  const headers: Record<string, string> =
+    key === null
+      ? {}
+      : gemini
+        ? { "x-goog-api-key": key }
+        : { authorization: `Bearer ${key}` };
   try {
-    res = await fetcher(`${baseUrl}/models`, {
-      headers: key === null ? {} : { authorization: `Bearer ${key}` },
+    res = await fetcher(`${provider.baseUrl.replace(/\/+$/, "")}${path}`, {
+      headers,
       signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
     });
   } catch (err) {
@@ -105,7 +110,7 @@ export async function fetchCatalog(
     if (err instanceof CatalogError) throw err;
     throw new CatalogError("the provider did not answer with JSON");
   }
-  const models = parseCatalog(body);
+  const models = gemini ? parseGeminiCatalog(body) : parseCatalog(body);
   if (models.length === 0) throw new CatalogError("the catalog is empty");
   return models;
 }
@@ -161,7 +166,7 @@ export class Catalogs {
       provider.keyName === null ? null : this.deps.secret(provider.keyName);
     // kept only while it is still the fetch wanted: a forget() while it
     // ran means the provider is gone and nothing is cached for it
-    const run = fetchCatalog(this.deps.fetcher, provider.baseUrl, key)
+    const run = fetchCatalog(this.deps.fetcher, provider, key)
       .then((models) => {
         if (this.inflight.get(provider.id) === run) {
           this.cached.set(provider.id, { at: this.deps.clock(), models });

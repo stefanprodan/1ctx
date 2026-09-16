@@ -12,6 +12,8 @@
 // after the policy was built is a failed result.
 
 import { describe, expect, test } from "bun:test";
+import { geminiEvents } from "../../src/server/providers/index.ts";
+import { parseSse } from "../../src/server/providers/openai.ts";
 import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
 import {
   type ChatApp,
@@ -225,6 +227,89 @@ describe("the tool loop", () => {
     });
     answerNodes(chat, sessionId);
     chat.app.socket.dispose();
+  });
+
+  test("a Gemini call ending with stop runs and echoes its stored signature in the answer request", async () => {
+    const recorded = await Bun.file(
+      new URL("../fixtures/providers/gemini/chat-tools.sse", import.meta.url),
+    ).text();
+    const events = parseSse("", recorded).frames.flatMap(geminiEvents());
+    const call = events.find((event) => event.kind === "toolCallDelta")!;
+    expect(call.signature).toEqual(expect.any(String));
+    expect(events.find((event) => event.kind === "finish")).toMatchObject({
+      reason: "stop",
+    });
+    const chat = await chatApp({ wire: "gemini" });
+    try {
+      const { detail, script, sessionId } = await startChat(
+        chat,
+        "what time is it",
+      );
+      script.reasoning("<thought>check the clock");
+      script.toolCall({
+        id: call.id!,
+        name: call.name!,
+        arguments: call.arguments!,
+        signature: call.signature,
+      });
+      script.finish("stop");
+      script.usage();
+      script.end();
+      const next = await waitScript(chat.scripted, 2);
+      const messages = next.body.messages as Record<string, unknown>[];
+      expect(messages.find((message) => message.role === "assistant")).toEqual({
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: call.id,
+            type: "function",
+            function: { name: call.name, arguments: call.arguments },
+            extra_content: { google: { thought_signature: call.signature } },
+          },
+        ],
+      });
+      expect(messages.find((message) => message.role === "tool")).toMatchObject(
+        {
+          tool_call_id: call.id,
+          content: expect.stringContaining('"timezone":"UTC"'),
+        },
+      );
+      next.reply("It is noon.");
+      await settle(chat);
+      const rows = chat.app.sessions.messages(sessionId);
+      expect(rows[1]).toMatchObject({
+        slot: "work",
+        status: "done",
+        finishReason: "stop",
+        reasoning: "check the clock",
+        toolCalls: [
+          {
+            id: call.id,
+            name: call.name,
+            arguments: call.arguments,
+            signature: call.signature,
+          },
+        ],
+      });
+      expect(rows[2]).toMatchObject({ kind: "tool", status: "done" });
+      expect(rows[3]).toMatchObject({
+        slot: "answer",
+        round: 2,
+        status: "done",
+      });
+      expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+        status: "done",
+        cause: "finish",
+        rounds: 2,
+        toolCalls: 1,
+        tokens: 30,
+      });
+      answerNodes(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
   });
 
   test("two tool rounds then an answer: a new reply id in round 2 and round 3", async () => {

@@ -16,6 +16,7 @@ import { m0007 } from "./0007-user-tz.ts";
 import { m0008 } from "./0008-search-tavily.ts";
 import { m0009 } from "./0009-mcp.ts";
 import { m0010 } from "./0010-memory.ts";
+import { m0011 } from "./0011-gemini.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -28,4 +29,5 @@ export const MIGRATIONS: Migration[] = [
   m0008,
   m0009,
   m0010,
+  m0011,
 ];

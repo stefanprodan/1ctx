@@ -22,7 +22,7 @@ import {
   providersError,
 } from "../../data/providers.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { WireMark } from "../../lib/marks.tsx";
+import { hasMark, WireMark } from "../../lib/marks.tsx";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -35,6 +35,7 @@ import {
   RowsNew,
   RowsNote,
   RowsOpen,
+  RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { AgentForm } from "./AgentForm.tsx";
@@ -48,7 +49,7 @@ import { reason } from "../../lib/format.ts";
 function Tile({ wire }: { wire: Wire }) {
   return (
     <RowsAvatar>
-      {wire === "openrouter" ? (
+      {hasMark(wire) ? (
         <WireMark wire={wire} size={15} />
       ) : (
         <Icon name="providers" size={15} />
@@ -101,8 +102,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
   return (
     <RowsLine>
       <Tile wire={provider.wire} />
-      <span class="agents-name">{provider.name}</span>
-      <span class="agents-desc">{provider.baseUrl}</span>
+      <RowsTitle mono name={provider.name} sub={provider.baseUrl} />
       <RowsMeta bad={keyMissing}>
         {provider.wire} · {keyLine(provider.keyName, provider.hasKey)}
       </RowsMeta>

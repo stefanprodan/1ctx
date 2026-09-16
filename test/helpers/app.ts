@@ -19,6 +19,7 @@ export const ORIGIN = "http://1ctx.test";
 // where a test's provider lives: the fake fetch answers it and nothing
 // else, so the suite never reaches a network
 export const PROVIDER_URL = "http://models.test/v1";
+export const GEMINI_URL = "http://models.test/v1beta";
 
 const fixture = (...parts: string[]) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
@@ -33,6 +34,20 @@ const chatBody = (body: string | null) =>
   body?.includes('"stream_options"')
     ? fixture("providers", "openai", "chat-reply.sse")
     : fixture("providers", "openrouter", "chat-stream.sse");
+
+const geminiChatBody = (body: string | null) => {
+  const request = JSON.parse(body ?? "{}");
+  const tools =
+    request.tools?.length > 0 &&
+    !request.messages?.some(
+      (message: { role: string }) => message.role === "tool",
+    );
+  return fixture(
+    "providers",
+    "gemini",
+    tools ? "chat-tools.sse" : "chat-stream.sse",
+  );
+};
 
 export type FakeCall = {
   url: string;
@@ -63,6 +78,16 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
     }
     if (url === `${PROVIDER_URL}/chat/completions`) {
       return new Response(chatBody(body), {
+        headers: { "content-type": "text/event-stream" },
+      });
+    }
+    if (url === `${GEMINI_URL}/models?pageSize=1000`) {
+      return new Response(fixture("providers", "gemini", "models.json"), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === `${GEMINI_URL}/openai/chat/completions`) {
+      return new Response(geminiChatBody(body), {
         headers: { "content-type": "text/event-stream" },
       });
     }

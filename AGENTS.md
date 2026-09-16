@@ -191,18 +191,29 @@ violation, and every rule has a rejected fixture under
   directory, read by the holder, never logged, never returned by a
   route, never a database row.
 - **A provider is added and deleted, never changed.** Its wire is
-  `openrouter` or `openai-compatible`; both answer `GET /models` under
-  the base URL, parsed by `providers/catalog.ts` into the one shape the
-  wire carries. The catalog is cached an hour per provider and searched
-  on the server; the browser never gets the whole list. Anything that
-  reaches a provider goes through the `fetcher` compose option, so a
-  test passes a fake and the suite never reaches a network. A chat
-  request goes out through the providers capability's `chat()`, over
-  the row's wire (`providers/openai.ts`, the OpenRouter rules in
-  `providers/openrouter.ts`), as one `ChatEvent` stream; the key is
-  read from the secrets port at each request and scrubbed from every
-  error, and the recorded frames under `test/fixtures/providers/` are
-  what the tests and the fake fetch answer with. An agent
+  `openrouter`, `openai-compatible` or `gemini`. The first two answer
+  `GET /models` under the base URL; `gemini` is Google AI Studio, whose
+  catalog is the native `GET /models?pageSize=1000` under
+  `/v1beta` with the key in `x-goog-api-key`, kept to the models that
+  chat (`providers/gemini.ts`), and whose chat is the OpenAI-compatible
+  `/openai/chat/completions` under the same base. `providers/catalog.ts`
+  picks the path, the header and the parser by the wire and parses into
+  the one shape the wire carries. The catalog is cached an hour per
+  provider and searched on the server; the browser never gets the whole
+  list. Anything that reaches a provider goes through the `fetcher`
+  compose option, so a test passes a fake and the suite never reaches a
+  network. A chat request goes out through the providers capability's
+  `chat()`, over the row's wire (`providers/openai.ts`, the OpenRouter
+  rules in `providers/openrouter.ts`, the Gemini rules in
+  `providers/gemini.ts`: no unknown fields, thinking as
+  `thinking_config` or `reasoning_effort: none`, thought frames to
+  reasoning, `completionTokens` counting the thoughts), as one
+  `ChatEvent` stream; the key is read from the secrets port at each
+  request and scrubbed from every error, and the recorded frames under
+  `test/fixtures/providers/` are what the tests and the fake fetch
+  answer with. A `ToolCall` may carry `signature`, an opaque token the
+  provider put on the call (Gemini 3 refuses a tool round without it),
+  stored with the call and sent back as received, never shown. An agent
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider an agent runs on is a 409 to
   delete. An agent carries `thinking` and `effort`, null for the provider's

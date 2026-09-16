@@ -26,8 +26,9 @@ import {
   type Wire,
 } from "../../../shared/words.ts";
 
-// what New provider offers: OpenRouter, whose address is known, or any
-// server speaking the plain OpenAI chat shape, whose address is typed
+// what New provider offers: any server speaking the plain OpenAI chat
+// shape, whose address is typed, then OpenRouter and Google AI Studio,
+// whose addresses are known
 export type Preset = {
   wire: Wire;
   label: string;
@@ -39,6 +40,13 @@ export type Preset = {
 };
 export const PRESETS: Preset[] = [
   {
+    wire: "openai-compatible",
+    label: "OpenAI-compatible server",
+    text: "GPT, mlx-serve, llama-server, vLLM, Ollama: any /chat/completions.",
+    baseUrl: null,
+    name: "",
+  },
+  {
     wire: "openrouter",
     label: "OpenRouter",
     text: "Every model on openrouter.ai, priced from its catalog.",
@@ -46,11 +54,11 @@ export const PRESETS: Preset[] = [
     name: "openrouter",
   },
   {
-    wire: "openai-compatible",
-    label: "OpenAI-compatible server",
-    text: "mlx-serve, llama-server, vLLM, Ollama: any /chat/completions.",
-    baseUrl: null,
-    name: "",
+    wire: "gemini",
+    label: "Google AI Studio",
+    text: "Gemini, with the key from aistudio.google.com.",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    name: "gemini",
   },
 ];
 export const preset = (wire: Wire): Preset =>

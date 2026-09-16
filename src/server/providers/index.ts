@@ -24,6 +24,12 @@ export {
   parseCatalog,
   search,
 } from "./catalog.ts";
+export {
+  buildChatBody as buildGeminiChatBody,
+  geminiError,
+  geminiEvents,
+  parseCatalog as parseGeminiCatalog,
+} from "./gemini.ts";
 export { wireTools } from "./openai.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseKeyName, RESERVED_KEYS } from "./parse.ts";
