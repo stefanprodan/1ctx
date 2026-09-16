@@ -59,6 +59,7 @@ describe("automation memory flags", () => {
     expect(chat.app.automations.byId("old-auto")).toMatchObject({
       projectMemory: false,
       ownMemory: false,
+      memoryGuidance: "",
     });
     await chat.app.shutdown();
   });

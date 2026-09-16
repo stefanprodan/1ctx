@@ -4,9 +4,12 @@
 // The durable note and the pure replay used when its revision moved while a
 // run held a working copy.
 
+import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import {
   applyEdit,
   checkEntries,
+  entriesEqual,
+  entryEqual,
   type MemoryEdit,
   normalize,
 } from "../../shared/memory.ts";
@@ -19,19 +22,23 @@ export type MemoryTarget = {
 };
 
 export type MemoryRow = MemoryTarget & {
-  entries: string[];
-  previous: string[] | null;
+  entries: MemoryEntry[];
+  previous: MemoryEntry[] | null;
   revision: number;
   updatedAt: number | null;
   updatedBy: string | null;
   sessionId: string | null;
 };
 
+export type MemoryOperation =
+  | { action: "none" }
+  | (Exclude<MemoryEdit, { action: "none" }> & { expected: string | null });
+
 export type MemoryWork = {
   target: MemoryTarget;
   baseRevision: number;
-  entries: string[];
-  operations: MemoryEdit[];
+  entries: MemoryEntry[];
+  operations: MemoryOperation[];
   failedRounds: number;
 };
 
@@ -53,12 +60,21 @@ type Raw = {
   session_id: string | null;
 };
 
-function entries(value: string): string[] {
+function entries(value: string): MemoryEntry[] {
   const parsed: unknown = JSON.parse(value);
-  return Array.isArray(parsed) &&
-    parsed.every((entry) => typeof entry === "string")
-    ? parsed
-    : [];
+  if (!Array.isArray(parsed)) throw new Error("invalid stored memory entries");
+  return parsed.map((entry: unknown) => {
+    if (
+      typeof entry !== "object" ||
+      entry === null ||
+      !("topic" in entry) ||
+      typeof entry.topic !== "string" ||
+      !("text" in entry) ||
+      typeof entry.text !== "string"
+    )
+      throw new Error("invalid stored memory entry");
+    return { topic: entry.topic, text: entry.text };
+  });
 }
 
 function row(raw: Raw): MemoryRow {
@@ -76,12 +92,31 @@ function row(raw: Raw): MemoryRow {
 }
 
 export function replay(
-  current: readonly string[],
-  operations: readonly MemoryEdit[],
-): { entries: string[]; skipped: number; skippedOperations: number[] } {
+  current: readonly MemoryEntry[],
+  operations: readonly MemoryOperation[],
+): { entries: MemoryEntry[]; skipped: number; skippedOperations: number[] } {
   let entries = [...current];
   const skippedOperations: number[] = [];
   for (const [index, operation] of operations.entries()) {
+    if (operation.action === "none") continue;
+    const current = entries.find(
+      (entry) => entry.topic.toLowerCase() === operation.topic.toLowerCase(),
+    );
+    const resultThere =
+      operation.action === "remove"
+        ? current === undefined
+        : current !== undefined && entryEqual(current, operation);
+    if (resultThere) continue;
+    const expected = operation.expected;
+    const matches =
+      expected === null
+        ? current === undefined
+        : current !== undefined &&
+          entryEqual(current, { topic: operation.topic, text: expected });
+    if (!matches) {
+      skippedOperations.push(index);
+      continue;
+    }
     const result = applyEdit(entries, operation);
     if (result.ok) entries = result.entries;
     else skippedOperations.push(index);
@@ -124,7 +159,7 @@ export class MemoryStore {
 
   save(
     target: MemoryTarget,
-    next: readonly string[],
+    next: readonly MemoryEntry[],
     revision: number,
     userId: string,
     now: number,
@@ -161,7 +196,7 @@ export class MemoryStore {
         : replay(current.entries, work.operations);
     if (
       work.operations.length === 0 ||
-      same(current.entries, applied.entries)
+      entriesEqual(current.entries, applied.entries)
     ) {
       return {
         row: current,
@@ -195,7 +230,7 @@ export class MemoryStore {
   private write(
     target: MemoryTarget,
     current: MemoryRow,
-    next: readonly string[],
+    next: readonly MemoryEntry[],
     userId: string | null,
     sessionId: string | null,
     now: number,
@@ -237,10 +272,4 @@ export class MemoryStore {
       ).changes;
     if (changed === 0) throw new Conflict("memory changed");
   }
-}
-
-function same(left: readonly string[], right: readonly string[]): boolean {
-  return (
-    left.length === right.length && left.every((value, i) => value === right[i])
-  );
 }

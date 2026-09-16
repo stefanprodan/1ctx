@@ -11,6 +11,8 @@ import {
   MEMORY_SESSIONS_PER_RUN,
   type MemoryEdit,
   memorySize,
+  normalizeTopic,
+  sanitize,
 } from "../../../shared/memory.ts";
 import type { MemoryWork } from "../../memory/index.ts";
 import type { ToolCall } from "../../providers/index.ts";
@@ -48,7 +50,7 @@ export type MemorySessionsPort = {
 const LIST_TAIL =
   "This run has a limited number of rounds. Record what you learned with memory_edit before reading more chats.";
 const READ_TAIL =
-  "Chat read. Record what matters with memory_edit, or call it with action none when there is nothing, before reading the next chat.";
+  "Chat read. Record what matters with memory_edit action set, or action none when there is nothing, before reading the next chat.";
 
 export function makeMemoryHandle(
   work: MemoryWork,
@@ -262,13 +264,13 @@ function editTool(handle: MemoryHandle): Tool {
   const { own, other } = notes(handle);
   return {
     name: "memory_edit",
-    description: `Edit ${own}. It is one note; ${other} in the system prompt is a different note this tool never edits. Its entries are separate items: add appends one entry, replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note. none changes nothing and keeps pending chat reads when there is nothing to record. Changes are saved when the run ends.`,
+    description: `Edit ${own}. It is one note; ${other} in the system prompt is a different note this tool never edits. A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. none changes nothing and keeps pending chat reads when there is nothing to record. Changes are saved when the run ends.`,
     parameters: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["add", "replace", "remove", "none"] },
+        action: { type: "string", enum: ["set", "remove", "none"] },
+        topic: { type: "string" },
         text: { type: "string" },
-        old_text: { type: "string" },
       },
       required: ["action"],
       additionalProperties: false,
@@ -279,14 +281,25 @@ function editTool(handle: MemoryHandle): Tool {
       if (!result.ok) {
         const advice =
           result.kind === "match"
-            ? "old_text must match text inside one entry, never the whole note."
+            ? "Use one of the topics in the note."
             : result.kind === "budget"
               ? "Merge or remove entries and retry."
               : "Retry with the arguments the action takes.";
         throw new Error(`${result.reason} ${advice}`);
       }
+      const operation =
+        edit.action === "none"
+          ? edit
+          : {
+              ...edit,
+              expected:
+                handle.work.entries.find(
+                  (entry) =>
+                    entry.topic.toLowerCase() === edit.topic.toLowerCase(),
+                )?.text ?? null,
+            };
       handle.work.entries = result.entries;
-      handle.work.operations.push(edit);
+      handle.work.operations.push(operation);
       const read = handle.read;
       if (read !== null) {
         const operation = handle.work.operations.length - 1;
@@ -303,18 +316,17 @@ function editTool(handle: MemoryHandle): Tool {
 function parseEdit(args: Record<string, unknown>): MemoryEdit {
   const action = args.action;
   if (action === "none") return { action };
-  if (action === "add") return { action, text: text(args, "text") };
-  if (action === "replace") {
+  if (action === "set") {
     return {
       action,
-      oldText: text(args, "old_text"),
-      text: text(args, "text"),
+      topic: normalizeTopic(text(args, "topic")),
+      text: sanitize(text(args, "text")),
     };
   }
   if (action === "remove") {
-    return { action, oldText: text(args, "old_text") };
+    return { action, topic: normalizeTopic(text(args, "topic")) };
   }
-  throw new Error("action must be add, replace, remove or none");
+  throw new Error("action must be set, remove or none");
 }
 
 // every refusal hands back the note as it stands, so the next call names
@@ -323,12 +335,10 @@ function refusal(handle: MemoryHandle, reason: string): string {
   const entries = handle.work.entries;
   const size = `${memorySize(entries)} characters.`;
   if (entries.length === 0) {
-    return `${reason}\nThe note is empty, use add.\n${size}`;
+    return `${reason}\nThe note is empty, use set.\n${size}`;
   }
   const lines = entries.map((entry, index) => {
-    const first = entry.split("\n", 1)[0]!;
-    const start = first.length > 64 ? `${first.slice(0, 61)}...` : first;
-    return `${index + 1}. ${start} [${entry.length}/${MEMORY_ENTRY_CHARS}]`;
+    return `${index + 1}. ${entry.topic} [${entry.text.length}/${MEMORY_ENTRY_CHARS}]`;
   });
   return `${reason}\n${size}\n${lines.join("\n")}`;
 }

@@ -14,6 +14,7 @@ export type Event = {
     tz: string;
     projectMemory: boolean;
     ownMemory: boolean;
+    memoryGuidance: string;
   };
   instructions: string;
   dueAt: number;

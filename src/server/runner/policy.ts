@@ -10,6 +10,7 @@
 // same moment, copied onto the policy so a send runs under the caps it
 // started on whatever an admin changes later.
 
+import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { Effort, EventSource, ProjectKind } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
@@ -70,8 +71,8 @@ export type SendPolicy = {
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
   memoryOffered: Offered | null;
-  projectMemory: string[];
-  automationMemory: string[];
+  projectMemory: MemoryEntry[];
+  automationMemory: MemoryEntry[];
   automation: {
     id: string;
     name: string;
@@ -80,6 +81,7 @@ export type SendPolicy = {
     tz: string;
     projectMemory: boolean;
     ownMemory: boolean;
+    memoryGuidance: string;
   } | null;
   deadlineMs: number | null;
   // the caps the send started on, the limits area's word at that moment
@@ -107,8 +109,8 @@ export function buildPolicy(input: {
   tools: ToolsPort | null;
   limits: Limits;
   automation?: SendPolicy["automation"];
-  projectMemory?: readonly string[];
-  automationMemory?: readonly string[];
+  projectMemory?: readonly MemoryEntry[];
+  automationMemory?: readonly MemoryEntry[];
   deadlineMs?: number | null;
 }): SendPolicy {
   const { user, agent } = input;
@@ -158,9 +160,11 @@ export function buildPolicy(input: {
     effort: thinking ? agent.effort : null,
     offered,
     memoryOffered,
-    projectMemory: [...(input.projectMemory ?? [])],
-    automationMemory: [...(input.automationMemory ?? [])],
-    automation: input.automation ?? null,
+    projectMemory: (input.projectMemory ?? []).map((entry) => ({ ...entry })),
+    automationMemory: (input.automationMemory ?? []).map((entry) => ({
+      ...entry,
+    })),
+    automation: input.automation ? { ...input.automation } : null,
     deadlineMs: input.deadlineMs ?? null,
     limits: {
       rounds: input.limits.rounds,

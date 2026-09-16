@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { contextReserve } from "../../shared/compaction.ts";
+import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type {
   Message,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
+import { MEMORY_ENTRY_CHARS, memorySize } from "../../shared/memory.ts";
 import type { SendCause } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -160,16 +162,17 @@ export function startMemory(
   send.round.slotMarked = true;
 }
 
-// the note as the phase holds it now, numbered, so old_text names a
-// real entry and add is the obvious move on an empty note
-function currentEntries(entries: readonly string[]): string {
+function currentEntries(entries: readonly MemoryEntry[]): string {
   if (entries.length === 0) {
-    return "This automation's own memory is empty. Use add to write its first entry.";
+    return `This automation's own memory is empty. Use set to write its first entry.\n${memorySize(entries)} characters.`;
   }
-  const lines = entries.map((entry, index) => `${index + 1}. ${entry}`);
+  const lines = entries.map(
+    (entry, index) =>
+      `${index + 1}. ${entry.topic} [${entry.text.length}/${MEMORY_ENTRY_CHARS}]\n${entry.text}`,
+  );
   return `This automation's own memory holds ${entries.length} ${
     entries.length === 1 ? "entry" : "entries"
-  }, the version to edit:\n${lines.join("\n")}`;
+  }, the version to edit:\n${lines.join("\n\n")}\n${memorySize(entries)} characters.`;
 }
 
 function phaseInstruction(send: ActiveSend): string {
@@ -180,11 +183,13 @@ function phaseInstruction(send: ActiveSend): string {
         ? `The run failed${send.error === null ? "." : `: ${send.error}`}`
         : "The run finished.";
   const entries = send.policy.memoryOffered?.memory?.work.entries ?? [];
+  const guidance = send.policy.automation?.memoryGuidance ?? "";
   return [
     ending,
+    ...(guidance === "" ? [] : [`What to remember:\n${guidance}`]),
     currentEntries(entries),
     "memory_edit writes this note and no other. The project memory in the system prompt is a different note it never edits.",
-    "Each entry is a separate item. add appends one entry. replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note. Use none when there is nothing to record.",
+    "A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. Use none when there is nothing to record.",
     "Record what the next run needs: what was found, what was done, where this run stopped, and what is left.",
   ].join("\n\n");
 }

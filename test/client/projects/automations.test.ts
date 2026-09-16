@@ -59,6 +59,7 @@ const automation = (
   retentionDays: 30,
   projectMemory: false,
   ownMemory: false,
+  memoryGuidance: "",
   suspendedAt: null,
   suspendedBy: null,
   nextAt: now + 4 * HOUR,
@@ -256,6 +257,7 @@ describe("the form", () => {
       retention: "30",
       projectMemory: false,
       ownMemory: true,
+      memoryGuidance: "",
     });
   });
 
@@ -273,6 +275,7 @@ describe("the form", () => {
         retentionDays: 30,
         projectMemory: false,
         ownMemory: true,
+        memoryGuidance: "",
       },
     });
     const empty = requestOf(filled({ deadline: "" }), LIMIT);

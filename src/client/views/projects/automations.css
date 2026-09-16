@@ -266,6 +266,10 @@
     flex-direction: column;
     gap: 6px;
   }
+  /* the guidance under its box, apart from the next box */
+  .automations-guidance {
+    margin: var(--space-1) 0 var(--space-2);
+  }
   .automations-switch {
     display: inline-flex;
     align-items: center;

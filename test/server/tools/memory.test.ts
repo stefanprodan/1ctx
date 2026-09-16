@@ -12,6 +12,7 @@ import {
 } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
+import { memoryChars } from "../../../src/shared/memory.ts";
 import parallelEdits from "../../fixtures/memory/parallel-edits.json";
 import { memoryDb } from "../../helpers/db.ts";
 
@@ -135,7 +136,7 @@ describe("memory offered sets", () => {
     expect(noPhase.tools).toEqual([]);
   });
 
-  test("each edit tool names its note and how an entry is named", () => {
+  test("each edit tool names its note and what a topic means", () => {
     const tools = area();
     const main = tools.offered(now, "agent", [], "auto", task);
     const phase = tools.offered(now, "agent", [], "auto", {
@@ -152,11 +153,40 @@ describe("memory offered sets", () => {
     expect(edit(phase)).toContain("the project memory");
     for (const text of [edit(main), edit(phase)]) {
       expect(text).toContain("a different note this tool never edits");
-      expect(text).toContain("add appends one entry");
-      expect(text).toContain("never the whole note");
+      expect(text).toContain(
+        "A topic names what an entry is about, never one fact.",
+      );
+      expect(text).toMatch(/set creates.*replaces/i);
     }
     const list = main.tools.find((tool) => tool.name === "sessions_list")!;
     expect(list.description).toContain("in parallel in one round");
+  });
+
+  test("each edit schema offers only set, remove and none by topic", () => {
+    const tools = area();
+    for (const phase of ["main", "memory"] as const) {
+      const offered = tools.offered(now, "agent", [], "auto", {
+        ...task,
+        phase,
+      });
+      const edit = offered.tools.find((tool) => tool.name === "memory_edit")!;
+      expect(edit.parameters).toMatchObject({
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["set", "remove", "none"] },
+          topic: { type: "string" },
+          text: { type: "string" },
+        },
+        required: ["action"],
+        additionalProperties: false,
+      });
+      expect(
+        Object.keys(
+          (edit.parameters as { properties: Record<string, unknown> })
+            .properties,
+        ).sort(),
+      ).toEqual(["action", "text", "topic"]);
+    }
   });
 
   test("a call the phase does not offer says what it offers", async () => {
@@ -178,7 +208,7 @@ describe("memory offered sets", () => {
 });
 
 describe("memory tool handles", () => {
-  test("accepts valid corrections after a round of parallel refusals", async () => {
+  test("five parallel edits with two failures allow later valid corrections", async () => {
     const tools = area();
     const offered = tools.offered(now, "agent", [], "auto", {
       ...task,
@@ -201,20 +231,24 @@ describe("memory tool handles", () => {
         ),
       );
       errors.push(results.map((result) => result.error));
+      expect(offered.memory!.stopped).toBe(false);
       offered.memory!.settleRound();
+      expect(offered.memory!.work.failedRounds).toBe(0);
     }
     expect(errors).toEqual([
-      [true, true, true, true, true],
-      [false, false, true],
-      [true, true, false],
-      [true],
+      [true, true, false, false, false],
+      [false, false],
+      [false, false, false],
+      [false],
     ]);
     expect(offered.memory!.work.entries).toEqual([
       ...parallelEdits.entries.slice(0, 2),
-      parallelEdits.rounds[1]![0]!.text,
-      parallelEdits.rounds[1]![1]!.text,
-      parallelEdits.rounds[2]![2]!.text,
+      ...parallelEdits.rounds[2]!.map(({ topic, text }) => {
+        if (text === undefined) throw new Error("Expected a set edit.");
+        return { topic, text };
+      }),
     ]);
+    expect(offered.memory!.work.operations).toHaveLength(9);
     expect(offered.memory!.stopped).toBe(false);
   });
 
@@ -226,7 +260,7 @@ describe("memory tool handles", () => {
       {
         id: "c1",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"first"}',
+        arguments: '{"action":"set","topic":"Order","text":"first"}',
       },
       context(),
     );
@@ -235,7 +269,7 @@ describe("memory tool handles", () => {
       {
         id: "c2",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"second"}',
+        arguments: '{"action":"set","topic":"ORDER","text":"second"}',
       },
       context(),
     );
@@ -243,8 +277,74 @@ describe("memory tool handles", () => {
       expect.objectContaining({ error: false }),
       expect.objectContaining({ error: false }),
     ]);
-    expect(offered.memory?.work.entries).toEqual(["first", "second"]);
-    expect(offered.memory?.work.operations).toHaveLength(2);
+    expect(offered.memory?.work.entries).toEqual([
+      { topic: "ORDER", text: "second" },
+    ]);
+    expect(offered.memory?.work.operations).toEqual([
+      { action: "set", topic: "Order", text: "first", expected: null },
+      { action: "set", topic: "ORDER", text: "second", expected: "first" },
+    ]);
+  });
+
+  test("captures prior text and sanitized topic spelling for each operation", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    const handle = offered.memory!;
+    handle.work.entries = [{ topic: "Run status", text: "first" }];
+    const call = (args: object) =>
+      tools.run(
+        offered,
+        {
+          id: crypto.randomUUID(),
+          name: "memory_edit",
+          arguments: JSON.stringify(args),
+        },
+        context(),
+      );
+    expect(
+      (
+        await call({
+          action: "set",
+          topic: " \u202eRUN\tSTATUS\n",
+          text: " \u0000second\u202e\n\tkept\u0007 ",
+        })
+      ).error,
+    ).toBe(false);
+    expect(handle.work.entries).toEqual([
+      { topic: "RUN STATUS", text: "second\n\tkept" },
+    ]);
+    expect(
+      (await call({ action: "set", topic: "Run Status", text: "third" })).error,
+    ).toBe(false);
+    expect(
+      (await call({ action: "remove", topic: " run\tstatus\u202e " })).error,
+    ).toBe(false);
+    expect(handle.work.entries).toEqual([]);
+    expect(
+      (await call({ action: "set", topic: " Run status ", text: "fourth" }))
+        .error,
+    ).toBe(false);
+    expect((await call({ action: "none" })).error).toBe(false);
+    expect(handle.work.entries).toEqual([
+      { topic: "Run status", text: "fourth" },
+    ]);
+    expect(handle.work.operations).toEqual([
+      {
+        action: "set",
+        topic: "RUN STATUS",
+        text: "second\n\tkept",
+        expected: "first",
+      },
+      {
+        action: "set",
+        topic: "Run Status",
+        text: "third",
+        expected: "second\n\tkept",
+      },
+      { action: "remove", topic: "run status", expected: "third" },
+      { action: "set", topic: "Run status", text: "fourth", expected: null },
+      { action: "none" },
+    ]);
   });
 
   test("owns the read cursor and marks only the last page", async () => {
@@ -300,7 +400,7 @@ describe("memory tool handles", () => {
     expect(read.error).toBe(false);
     expect(
       read.content.endsWith(
-        "\nChat read. Record what matters with memory_edit, or call it with action none when there is nothing, before reading the next chat.",
+        "\nChat read. Record what matters with memory_edit action set, or action none when there is nothing, before reading the next chat.",
       ),
     ).toBe(true);
     expect(offered.memory?.read?.pending.get("s1")).toBe(20);
@@ -331,11 +431,11 @@ describe("memory tool handles", () => {
     handle.settleRound();
     expect(handle.work.failedRounds).toBe(1);
     const results = await Promise.all([
-      edit('{"action":"remove","old_text":"missing"}'),
-      edit('{"action":"replace"}'),
-      edit('{"action":"add","text":"first"}'),
-      edit('{"action":"replace","old_text":"first","text":"second"}'),
-      edit('{"action":"add","text":"third"}'),
+      edit('{"action":"remove","topic":"missing"}'),
+      edit('{"action":"set"}'),
+      edit('{"action":"set","topic":"Order","text":"first"}'),
+      edit('{"action":"set","topic":"Order","text":"second"}'),
+      edit('{"action":"set","topic":"Other","text":"third"}'),
     ]);
     expect(results.map((result) => result.error)).toEqual([
       true,
@@ -347,7 +447,15 @@ describe("memory tool handles", () => {
     handle.settleRound();
     expect(handle.work.failedRounds).toBe(0);
     expect(handle.stopped).toBe(false);
-    expect(handle.work.entries).toEqual(["second", "third"]);
+    expect(handle.work.entries).toEqual([
+      { topic: "Order", text: "second" },
+      { topic: "Other", text: "third" },
+    ]);
+    expect(handle.work.operations).toEqual([
+      { action: "set", topic: "Order", text: "first", expected: null },
+      { action: "set", topic: "Order", text: "second", expected: "first" },
+      { action: "set", topic: "Other", text: "third", expected: null },
+    ]);
     expect(handle.read!.marks.get("s1")).toEqual({
       readActivityAt: 20,
       operation: 0,
@@ -366,7 +474,7 @@ describe("memory tool handles", () => {
       );
     await call("session_read", '{"id":"s1"}');
     expect(handle.read!.pending.size).toBe(1);
-    for (const args of ["[]", '{"action":"replace"}']) {
+    for (const args of ["[]", '{"action":"set"}']) {
       expect((await call("memory_edit", args)).error).toBe(true);
       handle.settleRound();
     }
@@ -377,7 +485,10 @@ describe("memory tool handles", () => {
     for (const [name, args] of [
       ["sessions_list", "{}"],
       ["session_read", '{"id":"s2"}'],
-      ["memory_edit", '{"action":"add","text":"must not land"}'],
+      [
+        "memory_edit",
+        '{"action":"set","topic":"Order","text":"must not land"}',
+      ],
       ["memory_edit", '{"action":"none"}'],
       ["memory_edit", "{"],
     ]) {
@@ -405,20 +516,27 @@ describe("memory tool handles", () => {
         { id: crypto.randomUUID(), name, arguments: args },
         context(),
       );
-    await call("memory_edit", '{"action":"add","text":"one fact"}');
+    await call(
+      "memory_edit",
+      '{"action":"set","topic":"Facts","text":"one fact"}',
+    );
     handle.settleRound();
     await call("session_read", '{"id":"s1"}');
-    await call("memory_edit", '{"action":"remove","old_text":"missing"}');
+    await call("memory_edit", '{"action":"remove","topic":"missing"}');
     handle.settleRound();
     expect(handle.work.failedRounds).toBe(1);
     expect(handle.read!.marks.size).toBe(0);
     const none = await call("memory_edit", '{"action":"none"}');
     expect(none.error).toBe(false);
     expect(none.content).toContain("Saved for the end of the run");
-    expect(none.content).toContain("8 of 2,200");
+    expect(none.content).toContain("17 of 2,200");
     expect(none.content).not.toContain("one fact");
     handle.settleRound();
-    expect(handle.work.entries).toEqual(["one fact"]);
+    expect(handle.work.entries).toEqual([{ topic: "Facts", text: "one fact" }]);
+    expect(handle.work.operations).toEqual([
+      { action: "set", topic: "Facts", text: "one fact", expected: null },
+      { action: "none" },
+    ]);
     expect(handle.work.failedRounds).toBe(0);
     expect(handle.read!.marks.get("s1")).toEqual({
       readActivityAt: 20,
@@ -430,13 +548,13 @@ describe("memory tool handles", () => {
     expect(handle.read!.pending.get("s2")).toBe(20);
     expect(handle.read!.marks.has("s2")).toBe(false);
     for (let round = 0; round < 2; round++) {
-      await call("memory_edit", '{"action":"remove","old_text":"missing"}');
+      await call("memory_edit", '{"action":"remove","topic":"missing"}');
       handle.settleRound();
     }
     expect(handle.stopped).toBe(true);
     expect(handle.read!.pending.size).toBe(0);
     expect([...handle.read!.marks.keys()]).toEqual(["s1"]);
-    expect(handle.work.entries).toEqual(["one fact"]);
+    expect(handle.work.entries).toEqual([{ topic: "Facts", text: "one fact" }]);
   });
 
   test("refusals show current entry sizes, totals and the required cuts", async () => {
@@ -444,11 +562,12 @@ describe("memory tool handles", () => {
     const offered = tools.offered(now, "agent", [], "auto", task);
     const handle = offered.memory!;
     const entries = [
-      "a".repeat(500),
-      "b".repeat(500),
-      "Last snapshot: NVDA 18".padEnd(346, "x"),
-      `Fourth\n${"d".repeat(379)}`,
+      { topic: "First", text: "a".repeat(500) },
+      { topic: "Second", text: "b".repeat(500) },
+      { topic: "Last snapshot", text: "NVDA 18".padEnd(346, "x") },
+      { topic: "Fourth", text: `Fourth\n${"d".repeat(336)}` },
     ];
+    expect(memoryChars(entries)).toBe(1741);
     handle.work.entries = [...entries];
     const call = (args: string) =>
       tools.run(
@@ -457,50 +576,59 @@ describe("memory tool handles", () => {
         context(),
       );
     const oversized = await call(
-      JSON.stringify({ action: "add", text: "x".repeat(612) }),
+      JSON.stringify({
+        action: "set",
+        topic: "Last snapshot",
+        text: "x".repeat(612),
+      }),
     );
     expect(oversized.error).toBe(true);
     expect(oversized.content).toContain(
-      "An entry is 612 characters, the limit is 500, cut 112.",
+      "The text of Last snapshot is 612 characters, the limit is 500, cut 112.",
     );
     expect(oversized.content).toContain("1,741 of 2,200");
-    expect(oversized.content).toContain("[346/500]");
-    expect(oversized.content).toContain("3. Last snapshot: NVDA 18");
-    expect(oversized.content).toContain("4. Fourth [386/500]");
+    expect(oversized.content).toContain("3. Last snapshot [346/500]");
+    expect(oversized.content).toContain("4. Fourth [343/500]");
     expect(oversized.content).not.toContain("x".repeat(100));
     expect(oversized.content).not.toContain("x".repeat(612));
     handle.work.entries = [
-      "a".repeat(500),
-      "b".repeat(500),
-      "c".repeat(500),
-      "d".repeat(441),
+      { topic: "First", text: "a".repeat(500) },
+      { topic: "Second", text: "b".repeat(500) },
+      { topic: "Third", text: "c".repeat(500) },
+      { topic: "Fourth", text: "d".repeat(406) },
     ];
+    expect(memoryChars(handle.work.entries)).toBe(1950);
     const full = await call(
-      JSON.stringify({ action: "add", text: "e".repeat(497) }),
+      JSON.stringify({ action: "set", topic: "Fifth", text: "e".repeat(489) }),
     );
     expect(full.content).toContain(
       "The note would be 2,450 of 2,200, free 250.",
     );
     expect(full.content).toContain("1,950 of 2,200");
-    expect(full.content).not.toContain("e".repeat(497));
+    expect(full.error).toBe(true);
+    expect(full.content).not.toContain("e".repeat(489));
     handle.work.entries = [...entries];
     for (const args of [
       "{",
       "[]",
       "null",
-      '{"action":"replace"}',
+      '{"action":"set"}',
       '{"action":"invalid"}',
-      '{"action":"remove","old_text":"missing"}',
+      '{"action":"set","topic":"","text":"fact"}',
+      '{"action":"set","topic":"Facts","text":""}',
+      '{"action":"remove","topic":"missing"}',
     ]) {
       const result = await call(args);
       expect(result.error).toBe(true);
       expect(result.content).toContain("1,741 of 2,200");
       for (const [index, entry] of entries.entries()) {
-        expect(result.content).toContain(`${index + 1}. `);
-        expect(result.content).toContain(`[${entry.length}/500]`);
+        expect(result.content).toContain(
+          `${index + 1}. ${entry.topic} [${entry.text.length}/500]`,
+        );
       }
       expect(result.content.length).toBeLessThanOrEqual(TOOL_CAPS.resultCut);
       expect(handle.work.entries).toEqual(entries);
+      expect(handle.work.operations).toEqual([]);
     }
     const saved = await call('{"action":"none"}');
     expect(saved).toEqual({

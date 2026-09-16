@@ -1,78 +1,87 @@
 {
   "entries": [
-    "finance.yahoo.com (consent). digitimes.com (paywall). barrons.com/marketwatch.com/wsj.com/reuters.com/bloomberg.com/seekingalpha.com/gurufocus.com (blocked). investing.com (timeout). benzinga.com (404). investors.com (budget).",
-    "finviz.com/quote.ashx?t=NVDA. stockanalysis.com/stocks/nvda/statistics. finviz.com/news internal article links. finbold.com real article slugs.",
-    "2026-09-16 5:39AM: Price 213.30 prev 213.20; SMA20 -2.38% SMA50 -0.13% SMA200 +7.75% RSI14 46.17; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26. Below 20/50D above 200D. Verdict mixed low. New rows: 09-14 Bernstein Maint $400, Goldman Maint $300.",
-    "09-15 Sharp JPY250B Foxconn NVDA servers by FY2030 (DigiTimes paywall->headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked->headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked->headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall->headline). 09-14 Bernstein Maintains $400 (search->headline).",
-    "Need 2+ strongly NVDA-specific reads from non-blocked hosts for high confidence; working-host NVDA reads are mostly weak (buy-the-dip/dividend/AI-prediction), so this run got only 1 \u2192 low."
+    {
+      "topic": "Sources that fail",
+      "text": "finance.yahoo.com (consent). digitimes.com (paywall). barrons.com/marketwatch.com/wsj.com/reuters.com/bloomberg.com/seekingalpha.com/gurufocus.com (blocked). investing.com (timeout). benzinga.com (404). investors.com (budget)."
+    },
+    {
+      "topic": "Sources that work",
+      "text": "finviz.com/quote.ashx?t=NVDA. stockanalysis.com/stocks/nvda/statistics. finviz.com/news internal article links. finbold.com real article slugs."
+    },
+    {
+      "topic": "Last snapshot",
+      "text": "2026-09-16 5:39AM: Price 213.30 prev 213.20; SMA20 -2.38% SMA50 -0.13% SMA200 +7.75% RSI14 46.17; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26. Below 20/50D above 200D. Verdict mixed low. New rows: 09-14 Bernstein Maint $400, Goldman Maint $300."
+    },
+    {
+      "topic": "Reported drivers",
+      "text": "09-15 Sharp JPY250B Foxconn NVDA servers by FY2030 (DigiTimes paywall->headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked->headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked->headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall->headline). 09-14 Bernstein Maintains $400 (search->headline)."
+    },
+    {
+      "topic": "Lessons",
+      "text": "Need 2+ strongly NVDA-specific reads from non-blocked hosts for high confidence; working-host NVDA reads are mostly weak (buy-the-dip/dividend/AI-prediction), so this run got only 1 \u2192 low."
+    }
   ],
   "rounds": [
     [
       {
-        "action": "replace",
-        "text": "Sources that fail: finance.yahoo.com (consent). digitimes.com (paywall). barrons.com/marketwatch.com/wsj.com/reuters.com/bloomberg.com/seekingalpha.com/gurufocus.com (blocked). investing.com (timeout). benzinga.com (404). investors.com (budget).",
-        "old_text": "Sources that fail:"
+        "action": "set",
+        "topic": "Last snapshot",
+        "text": "2026-09-16 5:39AM: Price 213.30 prev 213.20; SMA20 -2.38% SMA50 -0.13% SMA200 +7.75% RSI14 46.17; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26. Below 20/50D above 200D. Verdict mixed low. New rows: 09-14 Bernstein Maint $400, Goldman Maint $300.\n2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310."
       },
       {
-        "action": "replace",
-        "text": "Sources that work: finviz.com/quote.ashx?t=NVDA. stockanalysis.com/stocks/nvda/statistics. finviz.com/news internal article links. finbold.com real article slugs.",
-        "old_text": "Sources that work:"
+        "action": "remove",
+        "topic": "Retired sources"
       },
       {
-        "action": "replace",
-        "text": "Last snapshot: 2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310.",
-        "old_text": "Last snapshot:"
+        "action": "set",
+        "topic": "Sources that fail",
+        "text": "finance.yahoo.com (consent). digitimes.com (paywall). barrons.com/marketwatch.com/wsj.com/reuters.com/bloomberg.com/seekingalpha.com/gurufocus.com (blocked). investing.com (timeout). benzinga.com (404). investors.com (budget)."
       },
       {
-        "action": "replace",
-        "text": "Reported drivers: 09-15 KeyBanc raises NVDA target to $330 from $310 (finbold -> read). 09-15 Sharp JPY250B Foxconn NVDA servers (DigiTimes paywall -> headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked -> headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked -> headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall -> headline).",
-        "old_text": "Reported drivers:"
+        "action": "set",
+        "topic": "Sources that work",
+        "text": "finviz.com/quote.ashx?t=NVDA. stockanalysis.com/stocks/nvda/statistics. finviz.com/news internal article links. finbold.com real article slugs."
       },
       {
-        "action": "replace",
-        "text": "Lessons: 1) finbold.com real article slugs load fully - use them for NVDA analyst reads over blocked hosts. 2) The finviz.com/news list is mostly blocked-host entries - only fetch internal article links, never the list page. 3) Search budget is small - a query returning nothing wastes a call, so use targeted queries.",
-        "old_text": "Lessons:"
+        "action": "set",
+        "topic": "Reported drivers",
+        "text": "09-15 KeyBanc raises NVDA target to $330 from $310 (finbold -> read). 09-15 Sharp JPY250B Foxconn NVDA servers (DigiTimes paywall -> headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked -> headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked -> headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall -> headline)."
       }
     ],
     [
       {
-        "action": "replace",
-        "text": "2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310.",
-        "old_text": "2026-09-16 5:39AM: Price 213.30 prev 213.20; SMA20 -2.38% SMA50 -0.13% SMA200 +7.75% RSI14 46.17; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26. Below 20/50D above 200D. Verdict mixed low. New rows: 09-14 Bernstein Maint $400, Goldman Maint $300."
+        "action": "set",
+        "topic": "Last snapshot",
+        "text": "2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310."
       },
       {
-        "action": "replace",
-        "text": "09-15 KeyBanc raises NVDA target to $330 from $310 (finbold -> read). 09-15 Sharp JPY250B Foxconn NVDA servers (DigiTimes paywall -> headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked -> headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked -> headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall -> headline).",
-        "old_text": "09-15 Sharp JPY250B Foxconn NVDA servers by FY2030 (DigiTimes paywall->headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked->headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked->headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall->headline). 09-14 Bernstein Maintains $400 (search->headline)."
-      },
-      {
-        "action": "replace",
-        "text": "KeyBanc raises NVDA target to $330 from $310 (finbold read) is a strong NVDA-specific read; paired with Schaeffer's buy-the-dip (finviz read), two reads loaded -> high confidence. Use finbold.com real article slugs for analyst target actions, not the finviz news list which is mostly blocked-host entries.",
-        "old_text": "Need 2+ strongly NVDA-specific reads from non-blocked hosts for high confidence; working-host NVDA reads are mostly weak (buy-the-dip/dividend/AI-prediction), so this run got only 1 -> low."
+        "action": "set",
+        "topic": "Lessons",
+        "text": "1) finbold.com real article slugs load fully - use them for NVDA analyst reads over blocked hosts. 2) The finviz.com/news list is mostly blocked-host entries - only fetch internal article links, never the list page. 3) Search budget is small - a query returning nothing wastes a call, so use targeted queries."
       }
     ],
     [
       {
-        "action": "replace",
-        "text": "2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310.",
-        "old_text": "2026-09-16 5:39AM:"
+        "action": "set",
+        "topic": "Last snapshot",
+        "text": "2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310."
       },
       {
-        "action": "replace",
-        "text": "09-15 KeyBanc raises NVDA target to $330 from $310 (finbold -> read). 09-15 Sharp JPY250B Foxconn NVDA servers (DigiTimes paywall -> headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked -> headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked -> headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall -> headline).",
-        "old_text": "09-15 Sharp JPY250B Foxconn NVDA servers by FY2030"
+        "action": "set",
+        "topic": "Reported drivers",
+        "text": "09-15 KeyBanc raises NVDA target to $330 from $310 (finbold -> read). 09-15 Sharp JPY250B Foxconn NVDA servers (DigiTimes paywall -> headline). 09-15 Pinterest+NVDA AI shopping partnership (Yahoo blocked -> headline). 09-15 Schaeffer's buy-the-dip trendline setup (read). 09-14 Trump calls AI safety 'hoax' w/ Huang (Yahoo blocked -> headline). 09-14 NVHBM=cHBM extension (DigiTimes paywall -> headline)."
       },
       {
-        "action": "replace",
-        "text": "KeyBanc raises NVDA target to $330 from $310 (finbold read) is a strong NVDA-specific read; paired with Schaeffer's buy-the-dip (finviz read), two reads loaded -> high confidence. Use finbold.com real article slugs for analyst target actions, not the finviz news list which is mostly blocked-host entries.",
-        "old_text": "so this run got only 1 \u2192 low."
+        "action": "set",
+        "topic": "Lessons",
+        "text": "KeyBanc raises NVDA target to $330 from $310 (finbold read) is a strong NVDA-specific read; paired with Schaeffer's buy-the-dip (finviz read), two reads loaded -> high confidence. Use finbold.com real article slugs for analyst target actions, not the finviz news list which is mostly blocked-host entries."
       }
     ],
     [
       {
-        "action": "replace",
-        "text": "2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310.",
-        "old_text": "SMA50 -0.13% SMA200 +7.75% RSI14 46.17; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26. Below 20/50D above 200D. Verdict mixed low. New rows: 09-14 Bernstein Maint $400, Goldman Maint $300."
+        "action": "set",
+        "topic": "Last snapshot",
+        "text": "2026-09-16 5:46AM: Price 213.32; SMA20 -2.37% SMA50 -0.12% SMA200 +7.76% RSI14 46.19; 52W 236.54/164.27; Recom 1.20 Target 334.49. stockanalysis 50D 213.24 200D 197.79; ear Aug26; At close Sep 15 4PM. Below 20/50D above 200D. Verdict mixed. New row: KeyBanc raises target to $330 from $310."
       }
     ]
   ]

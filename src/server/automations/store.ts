@@ -25,6 +25,7 @@ type Raw = {
   retention_days: number;
   project_memory: number;
   own_memory: number;
+  memory_guidance: string;
   suspended_at: number | null;
   suspended_by: string | null;
   suspended_by_name: string | null;
@@ -63,6 +64,7 @@ const row = (raw: Raw): AutomationSummary => ({
   retentionDays: raw.retention_days,
   projectMemory: raw.project_memory === 1,
   ownMemory: raw.own_memory === 1,
+  memoryGuidance: raw.memory_guidance,
   suspendedAt: raw.suspended_at,
   suspendedBy:
     raw.suspended_by === null
@@ -94,6 +96,7 @@ export type AutomationFields = Pick<
   | "retentionDays"
   | "projectMemory"
   | "ownMemory"
+  | "memoryGuidance"
 >;
 
 export class AutomationStore {
@@ -182,8 +185,9 @@ export class AutomationStore {
         `insert into automations
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
            tz, deadline_ms, retention_days, project_memory, own_memory,
+           memory_guidance,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -198,6 +202,7 @@ export class AutomationStore {
         fields.retentionDays,
         fields.projectMemory ? 1 : 0,
         fields.ownMemory ? 1 : 0,
+        fields.memoryGuidance,
         fields.nextAt,
         fields.now,
         fields.now,
@@ -219,13 +224,14 @@ export class AutomationStore {
       | "nextAt"
       | "projectMemory"
       | "ownMemory"
+      | "memoryGuidance"
     > & { now: number },
   ): AutomationSummary | null {
     this.db
       .query(
         `update automations set agent_id = ?, name = ?, instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
-           next_at = ?, project_memory = ?, own_memory = ?,
+           next_at = ?, project_memory = ?, own_memory = ?, memory_guidance = ?,
            revision = revision + 1, updated_at = ? where id = ?`,
       )
       .run(
@@ -239,6 +245,7 @@ export class AutomationStore {
         fields.nextAt,
         fields.projectMemory ? 1 : 0,
         fields.ownMemory ? 1 : 0,
+        fields.memoryGuidance,
         fields.now,
         id,
       );

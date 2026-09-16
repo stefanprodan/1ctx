@@ -29,6 +29,7 @@ export type AutomationSummary = {
   projectMemory: boolean;
   // its runs end with a memory phase that keeps the automation's note
   ownMemory: boolean;
+  memoryGuidance: string;
   // an epoch while suspended; nextAt is null exactly then
   suspendedAt: number | null;
   // who suspended it, an admin outside the project included; null while

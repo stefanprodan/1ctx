@@ -20,7 +20,7 @@ export type AutomationsResponse = {
 // POST /api/automations/:id/suspend|resume answer the row
 export type AutomationResponse = { automation: AutomationSummary };
 
-// POST /api/projects/:id/automations: every field; PATCH
+// POST /api/projects/:id/automations: guidance defaults to empty; PATCH
 // /api/automations/:id: any of them, each given one checked
 export type SaveAutomationRequest = {
   name: string;
@@ -33,6 +33,7 @@ export type SaveAutomationRequest = {
   retentionDays: number;
   projectMemory: boolean;
   ownMemory: boolean;
+  memoryGuidance?: string;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 

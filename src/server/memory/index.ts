@@ -156,6 +156,7 @@ export {
 export { type AccessPort, type RoutesDeps, routes } from "./routes.ts";
 export {
   type MemoryCommit,
+  type MemoryOperation,
   type MemoryRow,
   MemoryStore,
   type MemoryTarget,

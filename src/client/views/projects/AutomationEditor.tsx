@@ -187,6 +187,33 @@ function Editor({
             />
             Keeps its own memory
           </label>
+          {d.ownMemory && takesTools && (
+            <label class="field automations-guidance">
+              <span class="label">What to remember</span>
+              <textarea
+                name="memoryGuidance"
+                rows={4}
+                placeholder="Sources that fail: hosts and why"
+                aria-invalid={invalid("memoryGuidance") || undefined}
+                disabled={off}
+                value={d.memoryGuidance}
+                onInput={(e) =>
+                  set({
+                    memoryGuidance: (e.currentTarget as HTMLTextAreaElement)
+                      .value,
+                  })
+                }
+              />
+              {invalid("memoryGuidance") ? (
+                <FieldError save={save} field="memoryGuidance" />
+              ) : (
+                <span class="hint">
+                  Name the topics the note keeps, one per line. Only the step
+                  after the answer reads this.
+                </span>
+              )}
+            </label>
+          )}
           <label class="automations-switch">
             <input
               type="checkbox"

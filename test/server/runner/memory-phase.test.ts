@@ -19,6 +19,55 @@ import {
 import { frames, watcher } from "../../helpers/socket.ts";
 
 describe("automation memory phase", () => {
+  test("snapshots guidance and uses it only in the own-note phase instruction", async () => {
+    const chat = await chatApp();
+    const guidance = "Sources: keep failed hosts and how they failed.";
+    const automation = await createAutomation(chat, {
+      ownMemory: true,
+      projectMemory: true,
+      memoryGuidance: guidance,
+    });
+    const run = await startRun(chat, automation.id);
+    const active = chat.app.runner.registry.get(run.sessionId)!;
+    expect(active.policy.automation?.memoryGuidance).toBe(guidance);
+    expect(JSON.stringify(run.main.body.messages)).not.toContain(guidance);
+    const edited = await chat.member.call(
+      "PATCH",
+      `/api/automations/${automation.id}`,
+      {
+        body: { memoryGuidance: "New guidance for later runs." },
+      },
+    );
+    expect(edited.status).toBe(200);
+    expect(active.policy.automation?.memoryGuidance).toBe(guidance);
+    run.main.reply("The check passed.");
+    const phase = await waitScript(chat.scripted, 2);
+    const messages = phase.body.messages as { role: string; content: string }[];
+    const instruction = messages.at(-1)!;
+    expect(instruction).toMatchObject({ role: "user" });
+    expect(instruction.content).toContain(`What to remember:\n${guidance}`);
+    expect(instruction.content).toContain(
+      "A topic names what an entry is about, never one fact.",
+    );
+    expect(JSON.stringify(messages.slice(0, -1))).not.toContain(guidance);
+    expect(JSON.stringify(messages)).not.toContain(
+      "New guidance for later runs.",
+    );
+    phase.reply("No change.");
+    await settle(chat, run.sessionId);
+    const next = await startRun(chat, automation.id);
+    expect(
+      chat.app.runner.registry.get(next.sessionId)?.policy.automation
+        ?.memoryGuidance,
+    ).toBe("New guidance for later runs.");
+    expect(JSON.stringify(next.main.body.messages)).not.toContain(
+      "New guidance for later runs.",
+    );
+    await chat.member.call("POST", `/api/sessions/${next.sessionId}/stop`);
+    await settle(chat, next.sessionId);
+    await chat.app.shutdown();
+  });
+
   test("opens after an answer, keeps one answer and commits its work", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });
@@ -38,23 +87,26 @@ describe("automation memory phase", () => {
     expect(first.role).toBe("user");
     expect(first.content).toContain("The run finished.");
     expect(first.content).toContain(
-      "This automation's own memory is empty. Use add to write its first entry.",
+      "This automation's own memory is empty. Use set to write its first entry.",
     );
     expect(first.content).toContain(
       "The project memory in the system prompt is a different note it never edits.",
     );
-    expect(first.content).toContain("never the whole note");
+    expect(first.content).toContain(
+      "A topic names what an entry is about, never one fact.",
+    );
     edit.toolRound([
       {
         id: "remember",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"Last check passed."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"Last check passed."}',
       },
     ]);
     edit.end();
     const finish = await waitScript(chat.scripted, 3);
     expect(asked(finish).content).toContain(
-      "This automation's own memory holds 1 entry, the version to edit:\n1. Last check passed.",
+      "This automation's own memory holds 1 entry, the version to edit:\n1. Note [18/500]\nLast check passed.",
     );
     finish.reply("Recorded.");
 
@@ -81,7 +133,7 @@ describe("automation memory phase", () => {
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
-    ).toEqual(["Last check passed."]);
+    ).toEqual([{ topic: "Note", text: "Last check passed." }]);
     const usage = chat.app.db
       .query<{ round: number }, [string]>(
         "select round from usage where send_id = ? order by round",
@@ -144,7 +196,8 @@ describe("automation memory phase", () => {
       {
         id: "remember",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"Resume from step two."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"Resume from step two."}',
       },
     ]);
     edit.end();
@@ -163,7 +216,7 @@ describe("automation memory phase", () => {
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
-    ).toEqual(["Resume from step two."]);
+    ).toEqual([{ topic: "Note", text: "Resume from step two." }]);
     await chat.app.shutdown();
   });
 
@@ -218,7 +271,8 @@ describe("memory task run", () => {
       {
         id: "project-memory",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"The cluster is in eu-west-1."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"The cluster is in eu-west-1."}',
       },
     ]);
     projectEdit.end();
@@ -229,7 +283,8 @@ describe("memory task run", () => {
       {
         id: "own-memory",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"The first memory pass completed."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"The first memory pass completed."}',
       },
     ]);
     ownEdit.end();
@@ -242,13 +297,13 @@ describe("memory task run", () => {
         projectId: chat.projectId,
         automationId: null,
       }).entries,
-    ).toEqual(["The cluster is in eu-west-1."]);
+    ).toEqual([{ topic: "Note", text: "The cluster is in eu-west-1." }]);
     expect(
       chat.app.memory.read({
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
-    ).toEqual(["The first memory pass completed."]);
+    ).toEqual([{ topic: "Note", text: "The first memory pass completed." }]);
     expect(
       chat.app.db
         .query<{ count: number }, [string, string]>(
@@ -312,7 +367,7 @@ async function readAndEdit(
     {
       id: "edit",
       name: "memory_edit",
-      arguments: '{"action":"add","text":"A pending fact."}',
+      arguments: '{"action":"set","topic":"Note","text":"A pending fact."}',
     },
   ]);
   edit.end();
@@ -347,7 +402,8 @@ describe("project memory working copy", () => {
       {
         id: "edit",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"The cluster is in eu-west-1."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"The cluster is in eu-west-1."}',
       },
     ]);
     run.main.end();
@@ -370,7 +426,8 @@ describe("project memory working copy", () => {
       {
         id: "own",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"The first pass is done."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"The first pass is done."}',
       },
     ]);
     phase.end();
@@ -379,11 +436,11 @@ describe("project memory working copy", () => {
     await settle(chat, run.sessionId);
 
     expect(notes(chat, null)).toMatchObject({
-      entries: ["The cluster is in eu-west-1."],
+      entries: [{ topic: "Note", text: "The cluster is in eu-west-1." }],
       revision: 1,
     });
     expect(notes(chat, automation.id)).toMatchObject({
-      entries: ["The first pass is done."],
+      entries: [{ topic: "Note", text: "The first pass is done." }],
       revision: 1,
     });
     // one frame per note, each carrying the revision it committed
@@ -474,7 +531,7 @@ describe("project memory working copy", () => {
       {
         id: "edit",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"A pending fact."}',
+        arguments: '{"action":"set","topic":"Note","text":"A pending fact."}',
       },
     ]);
     edit.end();
@@ -510,7 +567,9 @@ describe("project memory working copy", () => {
     const saved = await chat.member.call(
       "PUT",
       `/api/projects/${chat.projectId}/memory`,
-      { body: { entries: ["old entry"], revision: 0 } },
+      {
+        body: { entries: [{ topic: "Note", text: "old entry" }], revision: 0 },
+      },
     );
     expect(saved.status).toBe(200);
     const automation = await createAutomation(chat, {
@@ -522,8 +581,7 @@ describe("project memory working copy", () => {
       {
         id: "edit",
         name: "memory_edit",
-        arguments:
-          '{"action":"replace","old_text":"old entry","text":"run entry"}',
+        arguments: '{"action":"set","topic":"Note","text":"run entry"}',
       },
     ]);
     run.main.end();
@@ -533,11 +591,16 @@ describe("project memory working copy", () => {
         projectId: chat.projectId,
         automationId: null,
       }),
-    ).toMatchObject({ entries: ["old entry"], revision: 1 });
+    ).toMatchObject({
+      entries: [{ topic: "Note", text: "old entry" }],
+      revision: 1,
+    });
     const hand = await chat.member.call(
       "PUT",
       `/api/projects/${chat.projectId}/memory`,
-      { body: { entries: ["hand entry"], revision: 1 } },
+      {
+        body: { entries: [{ topic: "Note", text: "hand entry" }], revision: 1 },
+      },
     );
     expect(hand.status).toBe(200);
     finish.reply("Finished.");
@@ -552,7 +615,10 @@ describe("project memory working copy", () => {
         projectId: chat.projectId,
         automationId: null,
       }),
-    ).toMatchObject({ entries: ["hand entry"], revision: 2 });
+    ).toMatchObject({
+      entries: [{ topic: "Note", text: "hand entry" }],
+      revision: 2,
+    });
     await chat.app.shutdown();
   });
 });
@@ -648,7 +714,7 @@ describe("memory phase bounds", () => {
       {
         id: "over-cap",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"not applied"}',
+        arguments: '{"action":"set","topic":"Note","text":"not applied"}',
       },
     ]);
     phase.end();
@@ -701,7 +767,8 @@ describe("memory phase bounds", () => {
       {
         id: "m1",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"Recorded all the same."}',
+        arguments:
+          '{"action":"set","topic":"Note","text":"Recorded all the same."}',
       },
     ]);
     phase.end();
@@ -724,7 +791,7 @@ describe("memory phase bounds", () => {
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
-    ).toEqual(["Recorded all the same."]);
+    ).toEqual([{ topic: "Note", text: "Recorded all the same." }]);
     await chat.app.shutdown();
   });
 

@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The pure rules of a memory note, shared by the server, the tool and
-// the page: the budget, the sanitizer every text goes through, the
-// edits with their refusals, the diff between two versions and
-// the block a note takes in a system prompt. A note is an array of
-// entries; the separator exists only in the prompt, so an entry may
-// hold any text. Environment neutral: no Bun, no DOM, no packages.
+// the page: the budget, the sanitizer every topic and text goes through,
+// the edits by topic with their refusals, the equality, the diff between
+// two versions and the block a note takes in a system prompt. A note is
+// an array of entries, each a topic and its text. Environment neutral:
+// no Bun, no DOM, no packages.
+
+import type { MemoryEntry } from "./contracts/memory.ts";
 
 // the whole note, counted as the prompt renders it
 export const MEMORY_CHARS = 2200;
+export const MEMORY_TOPIC_CHARS = 60;
 // one entry never fills the budget alone
 export const MEMORY_ENTRY_CHARS = 500;
-export const MEMORY_SEPARATOR = "\n§\n";
 // unread chats a memory task lists per run
 export const MEMORY_SESSIONS_PER_RUN = 20;
 // consecutive edit rounds without a success before the tools stop
@@ -36,157 +38,196 @@ export function sanitize(text: string): string {
   return out.trim();
 }
 
-// every entry sanitized, empty ones dropped, exact duplicates collapsed
-export function normalize(entries: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of entries) {
-    const entry = sanitize(raw);
-    if (entry === "" || seen.has(entry)) continue;
-    seen.add(entry);
-    out.push(entry);
-  }
-  return out;
+// a topic is one line, so it reads as a heading
+export function normalizeTopic(topic: string): string {
+  return sanitize(topic)
+    .replace(/[\n\t]/g, " ")
+    .trim();
 }
 
-export function memoryChars(entries: readonly string[]): number {
-  return entries.join(MEMORY_SEPARATOR).length;
+export function normalize(entries: readonly MemoryEntry[]): MemoryEntry[] {
+  return entries.map(({ topic, text }) => ({
+    topic: normalizeTopic(topic),
+    text: sanitize(text),
+  }));
 }
 
-export function memorySize(entries: readonly string[]): string {
+// the one equality the diff, Undo, the commit and the page use: a topic
+// in another case is the same topic
+export function entryEqual(left: MemoryEntry, right: MemoryEntry): boolean {
+  return (
+    left.topic.toLowerCase() === right.topic.toLowerCase() &&
+    left.text === right.text
+  );
+}
+
+export function entriesEqual(
+  left: readonly MemoryEntry[],
+  right: readonly MemoryEntry[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((entry, index) => entryEqual(entry, right[index]!))
+  );
+}
+
+function neutralize(text: string): string {
+  return text.replace(/<(?=\s*\/?\s*(project|automation)-memory)/gi, "‹");
+}
+
+// Length-preserving escapes keep the prompt and the editor's counts equal.
+export function renderEntries(entries: readonly MemoryEntry[]): string {
+  return entries
+    .map(
+      ({ topic, text }) =>
+        `## ${neutralize(topic)}\n${neutralize(text).replace(/^## /gm, "#: ")}`,
+    )
+    .join("\n\n");
+}
+
+export function memoryChars(entries: readonly MemoryEntry[]): number {
+  return renderEntries(entries).length;
+}
+
+export function memorySize(entries: readonly MemoryEntry[]): string {
   return `${memoryChars(entries).toLocaleString("en-US")} of ${MEMORY_CHARS.toLocaleString("en-US")}`;
 }
 
-// the refusal a save or an edit gets, null when the entries fit
-export function checkEntries(entries: readonly string[]): string | null {
-  const long = entries.find((entry) => entry.length > MEMORY_ENTRY_CHARS);
-  if (long !== undefined) {
-    return `An entry is ${long.length} characters, the limit is ${MEMORY_ENTRY_CHARS}, cut ${long.length - MEMORY_ENTRY_CHARS}.`;
-  }
-  const chars = memoryChars(entries);
-  if (chars > MEMORY_CHARS) {
-    return `The note would be ${memorySize(entries)}, free ${(chars - MEMORY_CHARS).toLocaleString("en-US")}.`;
+// the refusal a save or an edit gets, naming the entry and the numbers
+// of the fix; null when the entries fit
+export function checkEntries(entries: readonly MemoryEntry[]): string | null {
+  const topics = new Set<string>();
+  for (const [index, entry] of entries.entries()) {
+    const name = entry.topic || `entry ${index + 1}`;
+    if (entry.topic.length === 0) return `The topic of ${name} is empty.`;
+    if (entry.topic.length > MEMORY_TOPIC_CHARS) {
+      return `The topic of ${name} is ${entry.topic.length} characters, the limit is ${MEMORY_TOPIC_CHARS}, cut ${entry.topic.length - MEMORY_TOPIC_CHARS}.`;
+    }
+    const key = entry.topic.toLowerCase();
+    if (topics.has(key)) return `The topic ${name} is repeated.`;
+    topics.add(key);
+    if (entry.text.length === 0) return `The text of ${name} is empty.`;
+    if (entry.text.length > MEMORY_ENTRY_CHARS) {
+      return `The text of ${name} is ${entry.text.length} characters, the limit is ${MEMORY_ENTRY_CHARS}, cut ${entry.text.length - MEMORY_ENTRY_CHARS}.`;
+    }
+    const chars = memoryChars(entries.slice(0, index + 1));
+    if (chars > MEMORY_CHARS) {
+      return `The note would be ${memorySize(entries)}, free ${(memoryChars(entries) - MEMORY_CHARS).toLocaleString("en-US")}. Cut or remove ${name}.`;
+    }
   }
   return null;
 }
 
 export type MemoryEdit =
-  | { action: "add"; text: string }
-  | { action: "replace"; oldText: string; text: string }
-  | { action: "remove"; oldText: string }
+  | { action: "set"; topic: string; text: string }
+  | { action: "remove"; topic: string }
   | { action: "none" };
 
-// why an edit was refused: old_text named no entry or more than one,
-// a text argument was empty, or the note would pass its budget
 export type EditRefusal = "match" | "text" | "budget";
-
 export type EditResult =
-  | { ok: true; entries: string[] }
+  | { ok: true; entries: MemoryEntry[] }
   | { ok: false; reason: string; kind: EditRefusal };
 
-// the entry old_text names: exactly one entry must contain it
-function locate(
-  entries: readonly string[],
-  oldText: string,
-): { index: number } | { reason: string } {
-  const needle = sanitize(oldText);
-  if (needle === "") return { reason: "old_text is empty." };
-  const found = entries
-    .map((entry, index) => (entry.includes(needle) ? index : -1))
-    .filter((index) => index !== -1);
-  if (found.length === 0) {
-    return { reason: "No entry contains old_text." };
-  }
-  if (found.length > 1) {
-    const list = found.map((index) => `${index + 1}`).join(" and ");
-    return { reason: `old_text is in entries ${list}, name one.` };
-  }
-  return { index: found[0]! };
-}
-
-// one edit on a note; the result is the new entries or the words
 export function applyEdit(
-  entries: readonly string[],
+  entries: readonly MemoryEntry[],
   edit: MemoryEdit,
 ): EditResult {
   if (edit.action === "none") return { ok: true, entries: [...entries] };
-  let next: string[];
-  const empty: EditResult = {
-    ok: false,
-    reason: "text is empty.",
-    kind: "text",
-  };
-  if (edit.action === "add") {
-    const text = sanitize(edit.text);
-    if (text === "") return empty;
-    next = [...entries, text];
+  const topic = normalizeTopic(edit.topic);
+  const invalidTopic = checkEntries([{ topic, text: "x" }]);
+  if (invalidTopic !== null) {
+    return { ok: false, reason: invalidTopic, kind: "text" };
+  }
+  const index = entries.findIndex(
+    (entry) => entry.topic.toLowerCase() === topic.toLowerCase(),
+  );
+  let next: MemoryEntry[];
+  if (edit.action === "remove") {
+    if (index === -1) {
+      return {
+        ok: false,
+        reason: `No entry has topic ${topic}. Topics: ${entries.map((entry) => entry.topic).join(", ") || "(none)"}.`,
+        kind: "match",
+      };
+    }
+    next = entries.filter((_, at) => at !== index);
   } else {
-    const at = locate(entries, edit.oldText);
-    if ("reason" in at) {
-      return { ok: false, reason: at.reason, kind: "match" };
-    }
-    if (edit.action === "remove") {
-      next = entries.filter((_, index) => index !== at.index);
-    } else {
-      const text = sanitize(edit.text);
-      if (text === "") return empty;
-      next = entries.map((entry, index) => (index === at.index ? text : entry));
-    }
+    const entry = { topic, text: sanitize(edit.text) };
+    const problem = checkEntries([entry]);
+    if (problem !== null) return { ok: false, reason: problem, kind: "text" };
+    next =
+      index === -1
+        ? [...entries, entry]
+        : entries.map((current, at) => (at === index ? entry : current));
   }
-  const normalized = normalize(next);
-  const refusal = checkEntries(normalized);
-  if (refusal !== null) {
-    return { ok: false, reason: refusal, kind: "budget" };
-  }
-  return { ok: true, entries: normalized };
+  const refusal = checkEntries(next);
+  return refusal === null
+    ? { ok: true, entries: next }
+    : { ok: false, reason: refusal, kind: "budget" };
 }
 
-export type DiffEntry = { text: string; kind: "kept" | "added" | "removed" };
+export type DiffEntry = MemoryEntry &
+  (
+    | { kind: "kept" | "added" | "removed" }
+    | { kind: "changed"; oldText: string }
+  );
 
-// the current order, removals at the place they held
+// by topic, in the current order with removals at the place they held;
+// a renamed topic is removed and added
 export function diffEntries(
-  previous: readonly string[],
-  current: readonly string[],
+  previous: readonly MemoryEntry[],
+  current: readonly MemoryEntry[],
 ): DiffEntry[] {
-  const now = new Set(current);
+  const now = new Set(current.map((entry) => entry.topic.toLowerCase()));
   const out: DiffEntry[] = [];
   let cursor = 0;
   const flushRemoved = (upTo: number) => {
     for (; cursor < upTo; cursor++) {
-      const text = previous[cursor]!;
-      if (!now.has(text)) out.push({ text, kind: "removed" });
+      const entry = previous[cursor]!;
+      if (!now.has(entry.topic.toLowerCase())) {
+        out.push({ ...entry, kind: "removed" });
+      }
     }
   };
-  for (const text of current) {
-    const at = previous.indexOf(text);
+  for (const entry of current) {
+    const at = previous.findIndex(
+      (old) => old.topic.toLowerCase() === entry.topic.toLowerCase(),
+    );
     if (at === -1) {
-      out.push({ text, kind: "added" });
+      while (
+        cursor < previous.length &&
+        !now.has(previous[cursor]!.topic.toLowerCase())
+      ) {
+        flushRemoved(cursor + 1);
+      }
+      out.push({ ...entry, kind: "added" });
       continue;
     }
     if (at >= cursor) flushRemoved(at);
-    out.push({ text, kind: "kept" });
+    const old = previous[at]!;
+    out.push(
+      entryEqual(old, entry)
+        ? { ...entry, kind: "kept" }
+        : { ...entry, kind: "changed", oldText: old.text },
+    );
     if (at >= cursor) cursor = at + 1;
   }
   flushRemoved(previous.length);
   return out;
 }
 
-// An entry cannot close the block, and the block never passes the budget.
-// Even a first run needs to know its note is written after the answer.
+// An entry cannot close the block or fake a topic, and the block never
+// passes the budget. Even a first run needs to know its note is written
+// after the answer.
 export function memoryBlock(
   tag: MemoryTag,
-  entries: readonly string[],
+  entries: readonly MemoryEntry[],
 ): string {
   if (entries.length === 0 && tag === "project-memory") return "";
-  const body = entries
-    .map((entry) =>
-      entry.replace(/<(?=\s*\/?\s*(project|automation)-memory)/gi, "‹"),
-    )
-    .join(MEMORY_SEPARATOR)
-    .slice(0, MEMORY_CHARS);
+  const body = renderEntries(normalize(entries)).slice(0, MEMORY_CHARS);
   const words =
     tag === "project-memory"
-      ? "Project memory, notes kept from past chats."
+      ? "Project memory, notes a memory task keeps from past chats."
       : "Automation memory, notes kept from past runs.";
   const step =
     tag === "automation-memory"

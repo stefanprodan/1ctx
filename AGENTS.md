@@ -384,7 +384,14 @@ violation, and every rule has a rejected fixture under
   pending marks are dropped at the limit or the end. An edited automation
   copy commits on any cause after its phase starts. Each changed note
   sends one frame. Project and automation memory routes let anyone who
-  sees the project read, save and undo.
+  sees the project read, save and undo. Entries are `{topic, text}`;
+  `shared/memory.ts` owns sanitizing, topic equality, diff and the
+  rendered count (60 characters per topic, 500 per text, 2,200 per note).
+  `memory_edit` takes `set`, `remove` or `none`, naming a topic.
+  Replay checks the text each operation expected and skips conflicts
+  with a hand edit or Undo. An automation's `memoryGuidance` is at most
+  2,000 bytes, snapshotted with the run and used only in its own-note
+  phase instruction, never the system prompt or the project note.
 - **An automation fires runs, and a run is a session.** An automation
   is a row in its project (`automations/`): an agent, instructions, a
   five-field cron schedule in an IANA zone parsed by `Bun.cron.parse`

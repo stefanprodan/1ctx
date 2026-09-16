@@ -12,6 +12,9 @@ import {
   countLine,
   draftDirty,
   draftEntries,
+  draftProblem,
+  noteFieldOf,
+  textSize,
   writerOf,
 } from "../../../src/client/views/memory/Note.model.ts";
 import { memoryWords } from "../../../src/client/views/projects/Automations.model.ts";
@@ -168,9 +171,12 @@ describe("the note card", () => {
   const memory = (changes: Partial<Memory> = {}): Memory => ({
     projectId: "p1",
     automationId: null,
-    entries: ["one", "two"],
-    previous: ["one"],
-    chars: 9,
+    entries: [
+      { topic: "One", text: "one" },
+      { topic: "Two", text: "two" },
+    ],
+    previous: [{ topic: "One", text: "one" }],
+    chars: 22,
     limit: 2200,
     revision: 2,
     updatedAt: now - 60_000,
@@ -204,12 +210,67 @@ describe("the note card", () => {
     });
   });
 
+  const one = { topic: "One", text: "one" };
+  const two = { topic: "Two", text: "two" };
+
   test("counts as the prompt renders and cleans the draft", () => {
-    expect(countLine(["ab", "cd"])).toBe("7 of 2200 characters");
-    expect(draftEntries([" a ", "", "a", "b"])).toEqual(["a", "b"]);
-    expect(draftDirty(["one", "two"], ["one", "two"])).toBe(false);
-    expect(draftDirty(["one", "two", ""], ["one", "two"])).toBe(false);
-    expect(draftDirty(["two", "one"], ["one", "two"])).toBe(true);
+    expect(countLine([one, two])).toBe("22 of 2,200 characters");
+    expect(textSize(" one ")).toBe("3/500");
+    expect(
+      draftEntries([
+        { topic: " One\nthing ", text: " one " },
+        { topic: "", text: " " },
+      ]),
+    ).toEqual([{ topic: "One thing", text: "one" }]);
+    expect(draftDirty([one, two], [one, two])).toBe(false);
+    expect(draftDirty([one, two, { topic: "", text: "" }], [one, two])).toBe(
+      false,
+    );
+    expect(draftDirty([two, one], [one, two])).toBe(true);
+    // a topic's case is saved, though the diff reads it as the same topic
+    expect(draftDirty([{ ...one, topic: "ONE" }, two], [one, two])).toBe(true);
+  });
+
+  test("pins a draft's refusal to the entry it names", () => {
+    const blank = { topic: "", text: "" };
+    expect(draftProblem([one, blank, two])).toBeNull();
+    expect(draftProblem([one, blank, { topic: "", text: "x" }])).toMatchObject({
+      field: "topic-3",
+    });
+    expect(draftProblem([one, { topic: "one", text: "again" }])).toMatchObject({
+      field: "topic-2",
+    });
+    expect(
+      draftProblem([one, { topic: "Long", text: "x".repeat(501) }]),
+    ).toEqual({
+      field: "text-2",
+      error: "The text of Long is 501 characters, the limit is 500, cut 1.",
+    });
+    const full = Array.from({ length: 5 }, (_, i) => ({
+      topic: `Topic ${i}`,
+      text: "x".repeat(480),
+    }));
+    expect(draftProblem(full)?.field).toBe("text-5");
+  });
+
+  test("finds the entry a server refusal names", () => {
+    const draft = [{ topic: "", text: "" }, one, two];
+    expect(noteFieldOf("entries: The text of two is empty.", draft)).toBe(
+      "text-3",
+    );
+    expect(noteFieldOf("entries: The topic of entry 1 is empty.", draft)).toBe(
+      "topic-2",
+    );
+    expect(noteFieldOf("entries: The topic One is repeated.", draft)).toBe(
+      "topic-2",
+    );
+    expect(
+      noteFieldOf(
+        "entries: The note would be 2,300 of 2,200, free 100. Cut or remove Two.",
+        draft,
+      ),
+    ).toBe("text-3");
+    expect(noteFieldOf("revision is stale", draft)).toBeUndefined();
   });
 });
 

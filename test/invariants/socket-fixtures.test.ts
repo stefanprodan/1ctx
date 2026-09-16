@@ -293,7 +293,8 @@ describe("socket fixtures", () => {
       {
         id: "m1",
         name: "memory_edit",
-        arguments: '{"action":"add","text":"The task finished."}',
+        arguments:
+          '{"action":"set","topic":"Status","text":"The task finished."}',
       },
     ]);
     memory.end();
@@ -329,7 +330,7 @@ describe("socket fixtures", () => {
         id: "m1",
         name: "memory_edit",
         arguments:
-          '{"action":"add","text":"Stopped before the note was done."}',
+          '{"action":"set","topic":"Status","text":"Stopped before the note was done."}',
       },
     ]);
     memory.end();

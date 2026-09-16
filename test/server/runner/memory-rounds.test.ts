@@ -62,8 +62,8 @@ describe("memory round settlement", () => {
     const first = await waitScript(chat.scripted, 2);
     round(first, [
       call("memory_edit", "{"),
-      call("memory_edit", { action: "remove", old_text: "missing" }),
-      call("memory_edit", { action: "replace" }),
+      call("memory_edit", { action: "remove", topic: "missing" }),
+      call("memory_edit", { action: "set" }),
     ]);
     const second = await waitScript(chat.scripted, 3);
     expect(handle.work.failedRounds).toBe(1);
@@ -111,12 +111,12 @@ describe("memory round settlement", () => {
     const usual = names(run.main).filter((name) => !isMemoryTool(name));
     round(run.main, [
       call("session_read", { id: read.id }),
-      call("memory_edit", { action: "remove", old_text: "missing" }),
+      call("memory_edit", { action: "remove", topic: "missing" }),
     ]);
     const second = await waitScript(chat.scripted, 3);
     expect(main.work.failedRounds).toBe(1);
     expect(main.read!.pending.has(read.id)).toBe(true);
-    round(second, [call("memory_edit", { action: "replace" })]);
+    round(second, [call("memory_edit", { action: "set" })]);
     const stopped = await waitScript(chat.scripted, 4);
     expect(names(stopped)).toEqual(usual);
     expect(main.stopped).toBe(true);
@@ -126,7 +126,11 @@ describe("memory round settlement", () => {
     const stale = [
       call("sessions_list", {}),
       call("session_read", { id: read.id }),
-      call("memory_edit", { action: "add", text: "Must not be saved." }),
+      call("memory_edit", {
+        action: "set",
+        topic: "Note",
+        text: "Must not be saved.",
+      }),
     ];
     round(stopped, stale);
     const answer = await waitScript(chat.scripted, 5);
@@ -146,7 +150,11 @@ describe("memory round settlement", () => {
     const phase = await waitScript(chat.scripted, 6);
     expect(names(phase)).toEqual(["memory_edit"]);
     round(phase, [
-      call("memory_edit", { action: "add", text: "Own note still works." }),
+      call("memory_edit", {
+        action: "set",
+        topic: "Note",
+        text: "Own note still works.",
+      }),
     ]);
     const finish = await waitScript(chat.scripted, 7);
     finish.reply("Recorded.");
@@ -164,15 +172,15 @@ describe("memory round settlement", () => {
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
-    ).toEqual(["Own note still works."]);
+    ).toEqual([{ topic: "Note", text: "Own note still works." }]);
     await chat.app.shutdown();
   });
 });
 
 describe("pending memory read marks", () => {
   for (const action of [
-    "add",
-    "replace",
+    "create",
+    "set",
     "remove",
     "none",
     "failed",
@@ -185,7 +193,7 @@ describe("pending memory read marks", () => {
       const target = { projectId: chat.projectId, automationId: null };
       chat.app.memory.save(
         target,
-        ["old entry"],
+        [{ topic: "Note", text: "old entry" }],
         0,
         chat.memberId,
         chat.app.now.value,
@@ -199,11 +207,21 @@ describe("pending memory read marks", () => {
           ? []
           : [
               call("memory_edit", {
-                action: action === "failed" ? "remove" : action,
+                action:
+                  action === "failed"
+                    ? "remove"
+                    : action === "create"
+                      ? "set"
+                      : action,
                 ...(action === "none"
                   ? {}
                   : {
-                      old_text: action === "failed" ? "missing" : "old entry",
+                      topic:
+                        action === "failed"
+                          ? "missing"
+                          : action === "create"
+                            ? "New"
+                            : "Note",
                       text: "new entry",
                     }),
               }),
@@ -238,7 +256,7 @@ describe("pending memory read marks", () => {
       await settleRun(chat, next.sessionId);
       if (action === "none" || !kept) {
         expect(chat.app.memory.read(target)).toMatchObject({
-          entries: ["old entry"],
+          entries: [{ topic: "Note", text: "old entry" }],
           revision: 1,
         });
       }
@@ -253,7 +271,7 @@ describe("pending memory read marks", () => {
     const target = { projectId: chat.projectId, automationId: null };
     chat.app.memory.save(
       target,
-      ["old entry"],
+      [{ topic: "Note", text: "old entry" }],
       0,
       chat.memberId,
       chat.app.now.value,
@@ -264,8 +282,8 @@ describe("pending memory read marks", () => {
     round(run.main, [
       call("session_read", { id: skippedRead.id }),
       call("memory_edit", {
-        action: "replace",
-        old_text: "old entry",
+        action: "set",
+        topic: "Note",
         text: "run entry",
       }),
       call("session_read", { id: keptRead.id }),
@@ -275,7 +293,7 @@ describe("pending memory read marks", () => {
     const work = active.policy.offered.memory!.work;
     chat.app.memory.save(
       target,
-      ["hand entry"],
+      [{ topic: "Note", text: "hand entry" }],
       1,
       chat.memberId,
       chat.app.now.value,
@@ -298,7 +316,7 @@ describe("pending memory read marks", () => {
     await settleRun(chat, run.sessionId);
 
     expect(chat.app.memory.read(target)).toMatchObject({
-      entries: ["hand entry"],
+      entries: [{ topic: "Note", text: "hand entry" }],
       revision: 2,
     });
     expect(chat.app.sessions.lastSend(run.sessionId)?.memorySkipped).toBe(1);

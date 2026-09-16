@@ -255,6 +255,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             nextAt,
             projectMemory: next.projectMemory,
             ownMemory: next.ownMemory,
+            memoryGuidance: next.memoryGuidance,
             now,
           })!;
           return { result: updated, events: [changed(updated)] };

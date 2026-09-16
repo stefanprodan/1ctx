@@ -439,10 +439,11 @@ describe("automation rights", () => {
     expect(
       (
         await otherClient.call("PATCH", `/api/automations/${automation.id}`, {
-          body: { instructions: "change" },
+          body: { instructions: "change", memoryGuidance: "change" },
         })
       ).status,
     ).toBe(403);
+    expect(chat.app.automations.byId(automation.id)?.memoryGuidance).toBe("");
     expect(
       (await otherClient.call("DELETE", `/api/automations/${automation.id}`))
         .status,

@@ -119,6 +119,7 @@ describe("automation run deadlines", () => {
             tz: "UTC",
             projectMemory: false,
             ownMemory: false,
+            memoryGuidance: "",
           },
           instructions: "check",
           dueAt: chat.app.now.value,

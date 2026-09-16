@@ -39,6 +39,8 @@ export const m0010: Migration = {
         default 0 check (project_memory in (0, 1));
       alter table automations add column own_memory integer not null
         default 0 check (own_memory in (0, 1));
+      alter table automations add column memory_guidance text not null
+        default '';
 
       alter table sends add column memory_round integer;
       alter table sends add column memory_error text;

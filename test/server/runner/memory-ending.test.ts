@@ -20,7 +20,7 @@ import { frames, watch, watcher } from "../../helpers/socket.ts";
 const EDIT = {
   id: "m1",
   name: "memory_edit",
-  arguments: '{"action":"add","text":"Stopped at step two."}',
+  arguments: '{"action":"set","topic":"Note","text":"Stopped at step two."}',
 };
 
 describe("the memory phase boundary", () => {
@@ -96,7 +96,7 @@ describe("the memory phase boundary", () => {
         projectId: chat.projectId,
         automationId: automation.id,
       }).entries,
-    ).toEqual(["Stopped at step two."]);
+    ).toEqual([{ topic: "Note", text: "Stopped at step two." }]);
   });
 
   test("a restart ends the run without a phase of its own", async () => {

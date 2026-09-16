@@ -141,7 +141,7 @@ describe("the socket", () => {
     const saved = await chat.member.call(
       "PUT",
       `/api/projects/${chat.projectId}/memory`,
-      { body: { entries: ["remember"], revision: 0 } },
+      { body: { entries: [{ topic: "Note", text: "remember" }], revision: 0 } },
     );
 
     expect(saved.status).toBe(200);

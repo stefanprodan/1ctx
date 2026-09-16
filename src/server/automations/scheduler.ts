@@ -118,6 +118,7 @@ export function scheduler(deps: Deps): Scheduler {
       tz: row.tz,
       projectMemory: row.projectMemory,
       ownMemory: row.ownMemory,
+      memoryGuidance: row.memoryGuidance,
     },
     instructions: row.instructions,
     dueAt,

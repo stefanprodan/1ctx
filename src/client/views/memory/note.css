@@ -56,12 +56,26 @@
     list-style: none;
   }
   .note-entry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
     padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--line);
     font-size: var(--text-body);
     line-height: 1.45;
-    white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+  .note-entry-topic {
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .note-entry-text,
+  .note-entry-old {
+    white-space: pre-wrap;
+  }
+  .note-entry-old {
+    color: var(--faint);
+    text-decoration: line-through;
   }
   .note-entry:last-child {
     border-bottom: 0;
@@ -69,19 +83,33 @@
   .note-entry-added {
     background: var(--inset);
   }
-  .note-entry-added::before {
+  .note-entry-added .note-entry-topic::before,
+  .note-entry-changed .note-entry-topic::before {
     content: "+ ";
     color: var(--done);
     font-family: var(--mono);
   }
+  /* struck through word by word, so the marker before the topic is not */
   .note-entry-removed {
     color: var(--faint);
+  }
+  .note-entry-removed .note-entry-topic,
+  .note-entry-removed .note-entry-text {
     text-decoration: line-through;
   }
-  .note-entry-removed::before {
+  .note-entry-changed .note-entry-topic::before {
+    content: "~ ";
+    color: var(--dim);
+  }
+  .note-entry-removed .note-entry-topic {
+    color: inherit;
+  }
+  /* an inline block is never decorated by its parent's line-through */
+  .note-entry-removed .note-entry-topic::before {
     content: "- ";
+    display: inline-block;
+    white-space: pre;
     font-family: var(--mono);
-    text-decoration: none;
   }
   .note-empty {
     margin: 0;
@@ -105,11 +133,26 @@
     display: flex;
     gap: var(--space-2);
     align-items: flex-start;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--line);
   }
-  .note-box-text {
+  .note-box-fields {
+    display: flex;
     flex: 1;
-    min-height: 44px;
-    resize: vertical;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .note-box-size {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+  .note-box-size-over {
+    color: var(--failed);
+  }
+  /* level with the Topic field, under its label */
+  .note-box-remove {
+    margin-top: 22px;
   }
   .note-form-foot {
     display: flex;

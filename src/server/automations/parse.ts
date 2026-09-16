@@ -5,9 +5,11 @@ import type {
   PatchAutomationRequest,
   SaveAutomationRequest,
 } from "../../shared/api/automations.ts";
+import { sanitize } from "../../shared/memory.ts";
 import {
   isName,
   isRunFilter,
+  MAX_MEMORY_GUIDANCE,
   MAX_MESSAGE_BYTES,
   MAX_SCHEDULE,
   MAX_TZ,
@@ -17,7 +19,8 @@ import {
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export const MAX_AUTOMATION_BODY = MAX_MESSAGE_BYTES + 2048;
+export const MAX_AUTOMATION_BODY =
+  MAX_MESSAGE_BYTES + MAX_MEMORY_GUIDANCE + 2048;
 const KEYS = [
   "name",
   "agentId",
@@ -94,20 +97,37 @@ function parseValues(
     }
     out.ownMemory = body.ownMemory;
   }
+  if (take("memoryGuidance")) {
+    const value = Object.hasOwn(body, "memoryGuidance")
+      ? body.memoryGuidance
+      : "";
+    if (typeof value !== "string") {
+      throw new BadRequest("memoryGuidance must be text");
+    }
+    const guidance = sanitize(value);
+    if (new TextEncoder().encode(guidance).length > MAX_MEMORY_GUIDANCE) {
+      throw new BadRequest(
+        `memoryGuidance must be at most ${MAX_MEMORY_GUIDANCE} bytes`,
+      );
+    }
+    out.memoryGuidance = guidance;
+  }
   return out;
 }
 
-export function parseSaveAutomation(body: unknown): SaveAutomationRequest {
-  const parsed = fields(body, KEYS);
+export function parseSaveAutomation(
+  body: unknown,
+): Required<SaveAutomationRequest> {
+  const parsed = fields(body, [...KEYS, "memoryGuidance"]);
   for (const key of KEYS) {
     if (!Object.hasOwn(parsed, key))
       throw new BadRequest(`missing field ${key}`);
   }
-  return parseValues(parsed, true) as SaveAutomationRequest;
+  return parseValues(parsed, true) as Required<SaveAutomationRequest>;
 }
 
 export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
-  const parsed = fields(body, KEYS);
+  const parsed = fields(body, [...KEYS, "memoryGuidance"]);
   if (Object.keys(parsed).length === 0) throw new BadRequest("empty patch");
   return parseValues(parsed, false);
 }

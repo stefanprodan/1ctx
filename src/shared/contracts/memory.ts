@@ -8,13 +8,15 @@
 
 import type { UserSummary } from "./user.ts";
 
+export type MemoryEntry = { topic: string; text: string };
+
 export type Memory = {
   projectId: string;
   // null for the project's own note
   automationId: string | null;
-  entries: string[];
+  entries: MemoryEntry[];
   // the version before the last write; null before the first
-  previous: string[] | null;
+  previous: MemoryEntry[] | null;
   chars: number;
   limit: number;
   revision: number;

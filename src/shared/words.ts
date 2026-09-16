@@ -281,6 +281,7 @@ export function isTimeZone(value: unknown): value is string {
 }
 // how long an automation's runs are kept, in days
 export const RETENTION_DAYS = { min: 1, max: 365, default: 30 } as const;
+export const MAX_MEMORY_GUIDANCE = 2000;
 
 export const MESSAGE_KINDS = ["user", "reply", "tool", "summary"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];

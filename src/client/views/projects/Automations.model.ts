@@ -205,6 +205,8 @@ export type Draft = {
   retention: string;
   projectMemory: boolean;
   ownMemory: boolean;
+  // what the run's own note keeps, as typed
+  memoryGuidance: string;
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -229,6 +231,7 @@ export function draftOf(
       retention: "30",
       projectMemory: false,
       ownMemory: true,
+      memoryGuidance: "",
     };
   }
   return {
@@ -241,6 +244,7 @@ export function draftOf(
     retention: String(a.retentionDays),
     projectMemory: a.projectMemory,
     ownMemory: a.ownMemory,
+    memoryGuidance: a.memoryGuidance,
   };
 }
 
@@ -267,7 +271,8 @@ export type AutomationField =
   | "schedule"
   | "tz"
   | "deadline"
-  | "retention";
+  | "retention"
+  | "memoryGuidance";
 
 // which field a server refusal of the automation routes names; a cap on
 // the project or a run still going is the form's
@@ -281,6 +286,7 @@ export function automationFieldOf(
   if (message.includes("time zone")) return "tz";
   if (message.startsWith("deadlineMs")) return "deadline";
   if (message.startsWith("retention")) return "retention";
+  if (message.startsWith("memoryGuidance")) return "memoryGuidance";
   return undefined;
 }
 
@@ -326,6 +332,7 @@ export function requestOf(
       retentionDays: Number(days),
       projectMemory: d.projectMemory,
       ownMemory: d.ownMemory,
+      memoryGuidance: d.memoryGuidance.trim(),
     },
   };
 }
