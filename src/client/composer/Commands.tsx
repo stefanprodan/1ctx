@@ -16,31 +16,35 @@ export function Commands({
 }: {
   matches: Command[];
   chosen: number;
-  block: string | null;
+  // why a command cannot run now, per command; null when it can
+  block: (command: Command) => string | null;
   onPick: (command: Command) => void;
 }) {
   return (
     <ul class="composer-cmds" aria-label="Commands">
-      {matches.map((command, index) => (
-        <li key={command.name}>
-          <button
-            type="button"
-            class={`composer-cmd${index === chosen ? " composer-cmd-on" : ""}${
-              block === null ? "" : " composer-cmd-blocked"
-            }`}
-            // mousedown would blur the box before the click lands
-            onMouseDown={(ev) => ev.preventDefault()}
-            onClick={() => onPick(command)}
-          >
-            <span class="composer-cmd-name">/{command.name}</span>
-            {command.arg !== null && (
-              <span class="composer-cmd-arg">{command.arg}</span>
-            )}
-            <span class="composer-cmd-text">{command.text}</span>
-            {block !== null && <span class="composer-cmd-block">{block}</span>}
-          </button>
-        </li>
-      ))}
+      {matches.map((command, index) => {
+        const why = block(command);
+        return (
+          <li key={command.name}>
+            <button
+              type="button"
+              class={`composer-cmd${index === chosen ? " composer-cmd-on" : ""}${
+                why === null ? "" : " composer-cmd-blocked"
+              }`}
+              // mousedown would blur the box before the click lands
+              onMouseDown={(ev) => ev.preventDefault()}
+              onClick={() => onPick(command)}
+            >
+              <span class="composer-cmd-name">/{command.name}</span>
+              {command.arg !== null && (
+                <span class="composer-cmd-arg">{command.arg}</span>
+              )}
+              <span class="composer-cmd-text">{command.text}</span>
+              {why !== null && <span class="composer-cmd-block">{why}</span>}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

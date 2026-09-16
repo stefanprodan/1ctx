@@ -44,7 +44,11 @@ export const SUMMARY_LEAD =
 export type ContextLookups = {
   // the author's username, for the name field on the wire
   usernameOf(userId: string): string | null;
-  reasoningDetailsOf(messageId: string): ReasoningDetail[] | null;
+  reasoningDetailsOf(
+    messageId: string,
+    providerId: string,
+    model: string,
+  ): ReasoningDetail[] | null;
 };
 
 // the tool result rows of one (sendId, round), in call order
@@ -85,11 +89,17 @@ function userMessage(
 function workMessage(
   row: Message,
   calls: ToolCall[],
+  policy: Pick<SendPolicy, "providerId" | "model">,
   lookups: ContextLookups,
 ): ChatMessageIn {
-  const details = lookups.reasoningDetailsOf(row.id);
+  const details = lookups.reasoningDetailsOf(
+    row.id,
+    policy.providerId,
+    policy.model,
+  );
   return {
     role: "assistant",
+    model: row.model ?? undefined,
     content: row.content === "" ? null : row.content,
     toolCalls: calls,
     ...(details ? { reasoningDetails: details } : {}),
@@ -163,6 +173,8 @@ export function history(
     | "tz"
     | "username"
     | "userId"
+    | "providerId"
+    | "model"
     | "automation"
     | "offered"
     | "projectMemory"
@@ -180,7 +192,10 @@ export function history(
 
 export function historyMessages(
   rows: Message[],
-  policy: Pick<SendPolicy, "username" | "userId" | "offered">,
+  policy: Pick<
+    SendPolicy,
+    "username" | "userId" | "providerId" | "model" | "offered"
+  >,
   lookups: ContextLookups,
 ): ChatMessageIn[] {
   const out: ChatMessageIn[] = [];
@@ -230,7 +245,7 @@ export function historyMessages(
           return result !== undefined && result.toolCallId === call.id;
         });
       if (complete) {
-        out.push(workMessage(row, calls, lookups));
+        out.push(workMessage(row, calls, policy, lookups));
         calls.forEach((call, index) => {
           out.push({
             role: "tool",
@@ -243,14 +258,23 @@ export function historyMessages(
       // the round is incomplete: send it without its calls and without
       // its structured reasoning, as plain text if it has any, else skip
       if (row.content !== "") {
-        out.push({ role: "assistant", content: row.content });
+        out.push({
+          role: "assistant",
+          model: row.model ?? undefined,
+          content: row.content,
+        });
       }
       continue;
     }
     if (row.content === "") continue;
-    const details = lookups.reasoningDetailsOf(row.id);
+    const details = lookups.reasoningDetailsOf(
+      row.id,
+      policy.providerId,
+      policy.model,
+    );
     out.push({
       role: "assistant",
+      model: row.model ?? undefined,
       content: row.content,
       ...(details ? { reasoningDetails: details } : {}),
     });

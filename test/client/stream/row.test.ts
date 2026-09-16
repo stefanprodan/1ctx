@@ -34,6 +34,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   origin: "chat",
   automationId: null,
   runSource: null,
+  forkedFromId: null,
   title: "Which pods restarted",
   status: "done",
   revision: 3,

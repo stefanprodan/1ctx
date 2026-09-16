@@ -284,13 +284,19 @@ describe("Gemini chat body", () => {
     },
   );
 
-  test("echoes only call signatures, never assistant reasoning, without changing history", () => {
+  test("echoes only same-model call signatures, never assistant reasoning, without changing history", () => {
     const history: ChatRequest = {
       ...request,
       messages: [
-        { role: "assistant", content: "hello", reasoning: "greet" },
         {
           role: "assistant",
+          content: "hello",
+          reasoning: "greet",
+          reasoningDetails: [{ type: "reasoning.encrypted", data: "opaque" }],
+        },
+        {
+          role: "assistant",
+          model: request.model,
           content: "",
           reasoning: "check",
           reasoningDetails: [{ type: "reasoning.text", text: "check" }],
@@ -331,6 +337,80 @@ describe("Gemini chat body", () => {
     ]);
     expect(history).toEqual(before);
   });
+
+  test.each(["gemini-2.5-flash", "org/other-model", undefined])(
+    "drops signatures from %s but keeps its calls and results",
+    (model) => {
+      const history: ChatRequest = {
+        ...request,
+        messages: [
+          {
+            role: "assistant",
+            model,
+            content: "checking",
+            reasoning: "private",
+            reasoningDetails: [{ type: "reasoning.text", text: "private" }],
+            toolCalls: [
+              {
+                id: "old",
+                name: "datetime",
+                arguments: "{}",
+                signature: "old-signature",
+              },
+            ],
+          },
+          { role: "tool", toolCallId: "old", content: "noon" },
+          { role: "user", content: "check again" },
+          {
+            role: "assistant",
+            model: request.model,
+            content: null,
+            toolCalls: [
+              {
+                id: "new",
+                name: "datetime",
+                arguments: "{}",
+                signature: "new-signature",
+              },
+            ],
+          },
+          { role: "tool", toolCallId: "new", content: "one" },
+        ],
+      };
+      const before = structuredClone(history);
+      expect(buildChatBody(history).messages).toEqual([
+        {
+          role: "assistant",
+          content: "checking",
+          tool_calls: [
+            {
+              id: "old",
+              type: "function",
+              function: { name: "datetime", arguments: "{}" },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "old", content: "noon" },
+        { role: "user", content: "check again" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "new",
+              type: "function",
+              function: { name: "datetime", arguments: "{}" },
+              extra_content: {
+                google: { thought_signature: "new-signature" },
+              },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "new", content: "one" },
+      ]);
+      expect(history).toEqual(before);
+    },
+  );
 });
 
 describe("Gemini stream", () => {

@@ -91,8 +91,13 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   messages.forEach((message, index) => {
     if (message.role !== "assistant") return;
     delete message.reasoning_content;
+    delete message.reasoning_details;
     const source = req.messages[index]!;
-    if (source.role !== "assistant" || !Array.isArray(message.tool_calls)) {
+    if (
+      source.role !== "assistant" ||
+      source.model !== req.model ||
+      !Array.isArray(message.tool_calls)
+    ) {
       return;
     }
     message.tool_calls.forEach((call: Record<string, unknown>, at) => {

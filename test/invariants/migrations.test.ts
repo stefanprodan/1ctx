@@ -74,10 +74,10 @@ describe("migrations", () => {
 describe("the schema", () => {
   // a fresh schema with a user, a project, an agent, a session and two
   // sends, each with its user message and its answer
-  function seed() {
+  function seed(migrations = MIGRATIONS) {
     const db = new Database(":memory:");
     db.exec("pragma foreign_keys = on");
-    migrate(db);
+    migrate(db, migrations);
     db.exec(`
       insert into users (id, username, full_name, email, role, password_hash, created_at)
         values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
@@ -103,6 +103,53 @@ describe("the schema", () => {
     `);
     return db;
   }
+
+  test("0012 adds nullable fork source ids without references or a rebuild", () => {
+    const db = seed(MIGRATIONS.slice(0, 11));
+    try {
+      const session = db
+        .query<Record<string, string | number | null>, []>(
+          "select * from sessions",
+        )
+        .get();
+      const messages = db.query("select * from messages order by seq").all();
+      const sends = db.query("select * from sends order by id").all();
+      expect(migrate(db)).toEqual(["0012-fork"]);
+      expect(MIGRATIONS.at(-1)?.rebuild).toBeUndefined();
+      expect(db.query("select * from sessions").get()).toEqual({
+        ...session,
+        forked_from_session_id: null,
+        forked_from_message_id: null,
+      });
+      expect(db.query("select * from messages order by seq").all()).toEqual(
+        messages,
+      );
+      expect(db.query("select * from sends order by id").all()).toEqual(sends);
+      const columns = db
+        .query<{ name: string; type: string; notnull: number }, []>(
+          "pragma table_info(sessions)",
+        )
+        .all();
+      const foreignKeys = db
+        .query<{ from: string }, []>("pragma foreign_key_list(sessions)")
+        .all();
+      for (const name of ["forked_from_session_id", "forked_from_message_id"]) {
+        expect(columns.find((column) => column.name === name)).toMatchObject({
+          type: "TEXT",
+          notnull: 0,
+        });
+        expect(foreignKeys.some((key) => key.from === name)).toBe(false);
+      }
+      db.exec(`
+        update sessions set forked_from_session_id = 'deleted-session',
+          forked_from_message_id = 'deleted-message';
+      `);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
 
   test("a provider accepts every known wire and refuses anything else", () => {
     const db = seed();
@@ -333,6 +380,7 @@ describe("additive migrations", () => {
       "0009-mcp",
       "0010-memory",
       "0011-gemini",
+      "0012-fork",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -380,6 +428,7 @@ describe("0005", () => {
       "0009-mcp",
       "0010-memory",
       "0011-gemini",
+      "0012-fork",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -436,6 +485,7 @@ describe("rebuild migrations", () => {
       "0009-mcp",
       "0010-memory",
       "0011-gemini",
+      "0012-fork",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -525,6 +575,7 @@ describe("0006 skills migration", () => {
       "0009-mcp",
       "0010-memory",
       "0011-gemini",
+      "0012-fork",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -573,6 +624,7 @@ describe("0007 user tz migration", () => {
       "0009-mcp",
       "0010-memory",
       "0011-gemini",
+      "0012-fork",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -596,7 +648,12 @@ describe("0009 mcp migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a9', 'agent9', 'p9', 'm', 'M', 0);
     `);
-    expect(migrate(db)).toEqual(["0009-mcp", "0010-memory", "0011-gemini"]);
+    expect(migrate(db)).toEqual([
+      "0009-mcp",
+      "0010-memory",
+      "0011-gemini",
+      "0012-fork",
+    ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
     ).toEqual({ mcp_mode: "auto" });
@@ -646,6 +703,7 @@ describe("0008 search tavily migration", () => {
       "0009-mcp",
       "0010-memory",
       "0011-gemini",
+      "0012-fork",
     ]);
     expect(
       db
@@ -693,7 +751,7 @@ describe("0008 search tavily migration", () => {
             .query("update providers set wire = 'gemini' where id = 'local11'")
             .run(),
         ).toThrow();
-        expect(migrate(db)).toEqual(["0011-gemini"]);
+        expect(migrate(db)).toEqual(["0011-gemini", "0012-fork"]);
         expect(db.query("select * from providers order by id").all()).toEqual(
           providers,
         );

@@ -39,6 +39,7 @@ export type ChatMessageIn =
   | { role: "user"; content: string; name?: string }
   | {
       role: "assistant";
+      model?: string;
       content: string | null;
       reasoning?: string;
       reasoningDetails?: ReasoningDetail[];

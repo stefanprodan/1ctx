@@ -55,5 +55,13 @@ export type SendMessageRequest = { message: string };
 // PATCH /api/sessions/:id: a new title, one line up to the title cap
 export type RenameSessionRequest = { title: string };
 
+// POST /api/sessions/:id/fork: the turn to fork at, the agent the fork
+// runs on, and its title, "Fork of <the source's>" when absent
+export type ForkSessionRequest = {
+  messageId: string;
+  agentId: string;
+  title?: string;
+};
+
 // GET /api/projects/:id/agents: the agents the composer offers
 export type ProjectAgentsResponse = { agents: AgentSummary[] };

@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ChatMessageIn } from "../../../src/server/providers/index.ts";
 import {
+  type ContextLookups,
   EXHAUSTED_LINE,
   history,
   request,
@@ -22,6 +23,7 @@ import { dateLine, systemPrompt } from "../../../src/server/runner/prompt.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/index.ts";
 import { compactsAt, contextReserve } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
+import { chatApp, FLASH, startChat, tick } from "../../helpers/chat.ts";
 
 const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
 
@@ -92,10 +94,12 @@ const row = (
   promptTokens: fields.promptTokens ?? null,
 });
 
-const lookups = {
+const lookups: ContextLookups = {
   usernameOf: (id: string) => (id === "u2" ? "mihai" : null),
-  reasoningDetailsOf: (id: string) =>
-    id === "r2" ? [{ type: "reasoning.text", text: "t" }] : null,
+  reasoningDetailsOf: (id: string, providerId: string, model: string) =>
+    id === "r2" && providerId === policy.providerId && model === policy.model
+      ? [{ type: "reasoning.text", text: "t" }]
+      : null,
 };
 
 describe("compaction threshold", () => {
@@ -314,6 +318,104 @@ describe("systemPrompt", () => {
 });
 
 describe("history", () => {
+  test.each([
+    ["same provider and model", "pr", "org/model", true],
+    ["another provider", "other-provider", "org/model", false],
+    ["another model", "pr", "org/other-model", false],
+  ] as const)(
+    "scopes reasoning details to %s",
+    (_, providerId, model, kept) => {
+      const calls = [{ id: "c1", name: "datetime", arguments: "{}" }];
+      for (const slot of ["work", "answer"] as const) {
+        const rows = [
+          row({
+            id: "r2",
+            kind: "reply",
+            slot,
+            content: "both",
+            model: policy.model,
+            toolCalls: slot === "work" ? calls : null,
+          }),
+          ...(slot === "work"
+            ? [
+                row({
+                  id: "t1",
+                  kind: "tool",
+                  toolCallId: "c1",
+                  content: "noon",
+                }),
+              ]
+            : []),
+        ];
+        const out = history(
+          rows,
+          { ...policy, providerId, model },
+          lookups,
+          NOW,
+        );
+        expect(out[1]).toEqual({
+          role: "assistant",
+          content: "both",
+          model: policy.model,
+          ...(slot === "work" ? { toolCalls: calls } : {}),
+          ...(kept
+            ? { reasoningDetails: [{ type: "reasoning.text", text: "t" }] }
+            : {}),
+        });
+        if (slot === "work") {
+          expect(out[2]).toEqual({
+            role: "tool",
+            toolCallId: "c1",
+            content: "noon",
+          });
+        }
+      }
+    },
+  );
+
+  test("stored reasoning details follow the source send's provider and model", async () => {
+    const chat = await chatApp({ wire: "openrouter" });
+    try {
+      const { script, sessionId } = await startChat(chat);
+      script.reply("the answer");
+      await tick();
+      await tick();
+      const rows = chat.app.sessions
+        .messages(sessionId)
+        .filter((message) => message.kind === "reply");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.status).toBe("done");
+      const details = [{ type: "reasoning.encrypted", data: "opaque" }];
+      chat.app.db
+        .query("update messages set reasoning_details = ? where id = ?")
+        .run(JSON.stringify(details), rows[0]!.id);
+      const stored: ContextLookups = {
+        ...lookups,
+        reasoningDetailsOf: (id, providerId, model) =>
+          chat.app.sessions.reasoningDetails(id, providerId, model),
+      };
+      for (const [providerId, model, kept] of [
+        [chat.providerId, FLASH, true],
+        ["another-provider", FLASH, false],
+        [chat.providerId, "another-model", false],
+      ] as const) {
+        expect(
+          history(rows, { ...policy, providerId, model }, stored, NOW)[1],
+        ).toEqual({
+          role: "assistant",
+          content: "the answer",
+          model: FLASH,
+          ...(kept ? { reasoningDetails: details } : {}),
+        });
+      }
+      expect(
+        chat.app.sessions.reasoningDetails(rows[0]!.id, chat.providerId, FLASH),
+      ).toEqual(details);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("names the author, sends replies with something to say, skips the rest", () => {
     const rows = [
       row({ id: "u", kind: "user", userId: "u1", content: "hi" }),
@@ -473,6 +575,7 @@ describe("history", () => {
         kind: "reply",
         agentId: "a",
         content: "trying",
+        model: "source/model",
         slot: "work",
         toolCalls: calls,
       }),
@@ -486,7 +589,9 @@ describe("history", () => {
       }),
     ];
     const out = history(rows, policy, lookups, NOW);
-    expect(out.slice(1)).toEqual([{ role: "assistant", content: "trying" }]);
+    expect(out.slice(1)).toEqual([
+      { role: "assistant", content: "trying", model: "source/model" },
+    ]);
   });
 
   test("an incomplete work round with no text is skipped", () => {

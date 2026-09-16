@@ -9,7 +9,7 @@
 // runs from the first word, and a sentence that happens to start with
 // a bare command's word is a message.
 
-export type CommandName = "compact" | "rename";
+export type CommandName = "compact" | "rename" | "fork";
 
 export type Command = {
   name: CommandName;
@@ -18,11 +18,17 @@ export type Command = {
   arg: string | null;
 };
 
+// by name, the order the menu shows
 export const COMMANDS: readonly Command[] = [
   {
     name: "compact",
     text: "Free up context by summarizing the conversation",
     arg: null,
+  },
+  {
+    name: "fork",
+    text: "Copy the chat so far into a new one with this name",
+    arg: "name",
   },
   {
     name: "rename",
@@ -78,6 +84,8 @@ export function moveHighlight(
 export type CommandHandlers = {
   onCompact?: () => Promise<void>;
   onRename?: (title: string) => Promise<void>;
+  // /fork <name>: the chat so far, on the same agent, under the name
+  onFork?: (title: string) => Promise<void>;
 };
 
 // what Enter does with a command: refused with the block's reason, or
@@ -88,13 +96,21 @@ export async function runCommand(
   block: string | null,
   handlers: CommandHandlers,
 ): Promise<void> {
-  const { onCompact, onRename } = handlers;
-  if (block !== null || onCompact === undefined || onRename === undefined) {
+  const { onCompact, onRename, onFork } = handlers;
+  if (
+    block !== null ||
+    onCompact === undefined ||
+    onRename === undefined ||
+    onFork === undefined
+  ) {
     throw new Error(`/${named.command.name}: ${block ?? "not now"}`);
   }
   if (named.command.name === "rename") {
     if (named.arg === "") throw new Error("/rename needs a title");
     await onRename(named.arg);
+  } else if (named.command.name === "fork") {
+    if (named.arg === "") throw new Error("/fork needs a name");
+    await onFork(named.arg);
   } else await onCompact();
 }
 
@@ -105,9 +121,13 @@ export type CommandState = {
 };
 
 // why a command is greyed in the menu and refused on Enter: every
-// command needs a started chat with nothing running
-export function commandBlock(state: CommandState): string | null {
+// command needs a started chat, and all but rename wait for a running
+// reply, since a title is never the send's to write
+export function commandBlock(
+  state: CommandState,
+  command: Command,
+): string | null {
   if (!state.started) return "the chat has not started";
-  if (state.running) return "a reply is running";
+  if (state.running && command.name !== "rename") return "a reply is running";
   return null;
 }

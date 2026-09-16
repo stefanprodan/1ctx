@@ -6,15 +6,18 @@
 // server allows; /rename in the composer
 // changes the title; the transcript
 // flows down the page and the composer stays at the bottom of the
-// window in the transcript's foot. A run names its automation over the
-// transcript and has no composer, no Regenerate and no /compact: its
-// foot is its state, with Stop while it runs. Leaving the page ends the
-// watch on its session.
+// window in the transcript's foot. A fork names its source over the
+// transcript. A run names its automation there and has no composer, no
+// Regenerate and no /compact: its foot is its state, with Stop while it
+// runs, and Fork waits until it is done or stopped. Leaving the page
+// ends the watch on its session, unless the next chat's load already
+// owns the entity, as it does when a chat moves to its fork.
 
 import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { automations } from "../../data/automations.ts";
+import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
 import {
@@ -44,7 +47,7 @@ export function Chat({ params }: { params: Params }) {
   const id = params.id ?? "";
   const detail = session.value;
   const shown = detail !== null && detail.session.id === id ? detail : null;
-  useEffect(() => () => leaveSession(), [id]);
+  useEffect(() => () => leaveSession(id), [id]);
   const projectId = shown?.session.projectId ?? null;
   const row = project.value;
   const listed =
@@ -63,9 +66,15 @@ export function Chat({ params }: { params: Params }) {
       ? { name: "someone", username: null }
       : { name: known.fullName, username: known.username };
   };
-  const agent =
-    projectAgents.value?.find((a) => a.id === shown?.session.agentId) ?? null;
+  const agents = projectAgents.value ?? [];
+  const agentOf = (agentId: string | null) =>
+    agents.find((a) => a.id === (agentId ?? shown?.session.agentId)) ?? null;
   const run = shown?.session.origin === "automation";
+  // a run is forked whole from its foot, a chat at any settled turn
+  const lastTurn = shown?.messages.findLast(
+    (m) => m.kind === "user" || (m.kind === "reply" && m.slot === "answer"),
+  );
+  const from = shown?.forkedFrom ?? null;
   const automation = run
     ? (automations.value?.find((a) => a.id === shown?.session.automationId) ??
       null)
@@ -88,6 +97,12 @@ export function Chat({ params }: { params: Params }) {
                 ? () => deleteSession(shown.session.id, shown.session.projectId)
                 : undefined
             }
+            onRename={
+              !run &&
+              (user?.id === shown.session.ownerId || user?.role === "admin")
+                ? (title) => renameSession(shown.session.id, title)
+                : undefined
+            }
           />
         ) : undefined
       }
@@ -97,10 +112,25 @@ export function Chat({ params }: { params: Params }) {
     >
       {shown && (
         <div class="chat">
+          {from !== null && (
+            <p class="chat-run">
+              <Icon name="fork" size={12} />
+              <span class="chat-run-label">Forked from</span>
+              {from.title === null ? (
+                <span>
+                  a deleted {from.origin === "automation" ? "run" : "chat"}
+                </span>
+              ) : (
+                <a class="chat-run-link" href={`/chat/${from.id}`}>
+                  {from.title}
+                </a>
+              )}
+            </p>
+          )}
           {run && (
             <p class="chat-run">
               <Icon name="clock" size={12} />
-              <span>Run of</span>
+              <span class="chat-run-label">Run of</span>
               {automation === null ? (
                 <span>
                   {shown.session.automationId === null ||
@@ -119,12 +149,22 @@ export function Chat({ params }: { params: Params }) {
             sessionId={shown.session.id}
             nodes={groupRows(shown.messages, shown.send)}
             live={live.value}
-            agent={agent}
+            agentOf={agentOf}
             authorOf={authorOf}
             onRegenerate={
               run || shown.session.status === "running" || sending.value
                 ? undefined
                 : () => void regenerateSession(shown.session.id)
+            }
+            fork={
+              run
+                ? undefined
+                : {
+                    agents,
+                    agentId: shown.session.agentId,
+                    onFork: (messageId, agentId) =>
+                      forkSession(shown.session.id, messageId, agentId),
+                  }
             }
             foot={
               run ? (
@@ -137,6 +177,15 @@ export function Chat({ params }: { params: Params }) {
                     runBy: null,
                   }}
                   onStop={() => stopSession(shown.session.id)}
+                  fork={
+                    lastTurn === undefined
+                      ? undefined
+                      : {
+                          agents,
+                          onFork: (agentId) =>
+                            forkSession(shown.session.id, lastTurn.id, agentId),
+                        }
+                  }
                 />
               ) : (
                 <Composer
@@ -150,6 +199,16 @@ export function Chat({ params }: { params: Params }) {
                   onStop={() => stopSession(shown.session.id)}
                   onCompact={() => compactSession(shown.session.id)}
                   onRename={(title) => renameSession(shown.session.id, title)}
+                  onFork={(title) =>
+                    lastTurn === undefined
+                      ? Promise.reject(new Error("nothing to fork yet"))
+                      : forkSession(
+                          shown.session.id,
+                          lastTurn.id,
+                          shown.session.agentId,
+                          title,
+                        )
+                  }
                 />
               )
             }

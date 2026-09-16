@@ -150,7 +150,11 @@ export async function loadSession(id: string): Promise<void> {
 
 // the page left the chat: nothing of it is kept, so a late frame, a
 // deletion or a revocation of it moves the page nowhere
-export function leaveSession(): void {
+// the page leaves a chat: with the id it leaves, nothing happens when
+// the load of another chat already owns the entity, as it does on the
+// way from a chat to its fork, so that load is not thrown away
+export function leaveSession(id?: string): void {
+  if (id !== undefined && wanted.id !== "" && wanted.id !== id) return;
   wanted = { id: "", turn: wanted.turn + 1 };
   pending = null;
   stream = null;
@@ -286,20 +290,16 @@ export async function stopSession(id: string): Promise<void> {
   await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
 }
 
-// one at a time, as a send: the composer is busy until the answer
+// a rename is not a send: it goes under a reply too, and the composer
+// stays free while it is on its way
 export async function renameSession(id: string, title: string): Promise<void> {
-  sending.value = true;
-  try {
-    const body: RenameSessionRequest = { title };
-    const detail = await api<SessionResponse>(
-      `/api/sessions/${encodeURIComponent(id)}`,
-      "PATCH",
-      body,
-    );
-    take(detail);
-  } finally {
-    sending.value = false;
-  }
+  const body: RenameSessionRequest = { title };
+  const detail = await api<SessionResponse>(
+    `/api/sessions/${encodeURIComponent(id)}`,
+    "PATCH",
+    body,
+  );
+  take(detail);
 }
 
 // the row goes from the list and, when it is the chat on screen or

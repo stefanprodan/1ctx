@@ -42,6 +42,7 @@ const session: SessionRow = {
   ownerId: "user",
   agentId: "agent",
   origin: "chat",
+  forkedFromId: null,
   automationId: null,
   runSource: null,
   title: incident.title,

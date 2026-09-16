@@ -5,7 +5,8 @@
 // start or stop a send live in the runner, which sits below this area.
 // What may be seen is access's call: a session in a project the caller
 // may not see is the same 404 as one that is not there. A team chat's
-// rename and delete belong to its owner or an admin, neither while it runs.
+// rename and delete belong to its owner or an admin; a delete waits for
+// the chat to end, a rename does not.
 
 import type {
   SessionResponse,
@@ -13,14 +14,18 @@ import type {
   ToolResultResponse,
 } from "../../shared/api/sessions.ts";
 import type { LiveSend } from "../../shared/contracts/session.ts";
+import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
-import { Conflict, Forbidden, NotFound } from "../lib/errors.ts";
+import type { Clock } from "../lib/clock.ts";
+import { BadRequest, Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import {
+  MAX_SMALL_BODY,
+  parseForkSession,
   parseMessageId,
   parseRenameSession,
   parseStreamQuery,
@@ -38,11 +43,10 @@ export type AccessPort = {
 // after this area
 export type LivePort = (sessionId: string) => LiveSend | null;
 
-// the rename body: the title plus the JSON around it
-const MAX_RENAME_BODY = 1024;
-
 export type RoutesDeps = {
   db: Db;
+  clock: Clock;
+  agents: { byId(id: string): AgentRow | null };
   store: SessionStore;
   access: AccessPort;
   live: LivePort;
@@ -58,6 +62,7 @@ export function detail(
 ): SessionResponse {
   return {
     session,
+    forkedFrom: store.forkedFrom(session.id),
     messages: store.messages(session.id).map(offWire),
     send: store.lastSend(session.id),
     live,
@@ -138,6 +143,43 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
+      method: "POST",
+      path: "/api/sessions/:id/fork",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const principal = ctx.principal!;
+        deps.visible(principal, ctx.params.id);
+        const fields = parseForkSession(await jsonBody(req, MAX_SMALL_BODY));
+        const body = transact(deps.db, () => {
+          const source = deps.visible(principal, ctx.params.id);
+          if (deps.agents.byId(fields.agentId) === null) {
+            throw new BadRequest("no such agent");
+          }
+          const { session, messages } = deps.store.fork({
+            source,
+            ...fields,
+            ownerId: principal.userId,
+            now: deps.clock(),
+          });
+          return {
+            result: detail(deps.store, session, null),
+            events: [
+              {
+                type: "session.changed" as const,
+                data: {
+                  projectId: session.projectId,
+                  session,
+                  messages: messages.map(offWire),
+                  send: null,
+                },
+              },
+            ],
+          };
+        });
+        return json(body, 201);
+      },
+    },
+    {
       method: "PATCH",
       path: "/api/sessions/:id",
       policy: "authenticated",
@@ -151,15 +193,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           throw new Forbidden("only the owner or an admin renames a chat");
         }
         const { title } = parseRenameSession(
-          await jsonBody(req, MAX_RENAME_BODY),
+          await jsonBody(req, MAX_SMALL_BODY),
         );
         const renamed = transact(deps.db, () => {
-          // nothing changes under a send: the row is the truth for that
+          // a send never writes the title, so a rename under one is
+          // safe: one more revision on the row, one envelope
           const current = deps.store.byId(session.id);
           if (current === null) throw new NotFound("no such chat");
-          if (current.status === "running") {
-            throw new Conflict("the chat is running, stop it first");
-          }
           const row = deps.store.rename(session.id, title)!;
           return {
             result: row,

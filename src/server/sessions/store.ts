@@ -18,6 +18,12 @@ import {
   automationRuns,
   expiredAutomationRuns,
 } from "./automation.ts";
+import {
+  copyRows,
+  type ForkFields,
+  forkedFrom as readForkedFrom,
+  readForkPoint,
+} from "./fork.ts";
 import { listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
 import {
@@ -31,6 +37,7 @@ import {
   memorySnapshot as readMemorySnapshot,
 } from "./memory.ts";
 import { addAgentMessage } from "./messages.ts";
+import { titleFrom } from "./parse.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
 import {
@@ -50,9 +57,11 @@ import {
   bumpSendCounters,
   endSendRow,
   readLastSend,
+  readReasoningDetails,
   readSend,
   type SendCounters,
   type SendEnd,
+  usesAgent,
 } from "./sends.ts";
 
 export class SessionStore {
@@ -91,8 +100,8 @@ export class SessionStore {
       .query(
         `insert into sessions (id, project_id, owner_id, agent_id, origin,
            automation_id, run_source, title, status, revision, created_at,
-           last_activity_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, 'running', 0, ?, ?)`,
+           last_activity_at, forked_from_session_id, forked_from_message_id)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -103,10 +112,38 @@ export class SessionStore {
         fields.automationId ?? null,
         fields.runSource ?? null,
         fields.title,
+        fields.status ?? "running",
         fields.now,
         fields.now,
+        fields.forkedFromSessionId ?? null,
+        fields.forkedFromMessageId ?? null,
       );
     return this.byId(id)!;
+  }
+
+  fork(fields: ForkFields): { session: SessionRow; messages: Message[] } {
+    const { source, messageId } = fields;
+    const point = readForkPoint(this.db, source.id, messageId);
+    const session = this.create({
+      projectId: source.projectId,
+      title: fields.title ?? titleFrom(`Fork of ${source.title}`),
+      ownerId: fields.ownerId,
+      agentId: fields.agentId,
+      now: fields.now,
+      status: "done",
+      forkedFromSessionId: source.id,
+      forkedFromMessageId: messageId,
+    });
+    copyRows(this.db, {
+      sessionId: session.id,
+      rows: point.rows,
+      now: fields.now,
+    });
+    return { session, messages: this.messages(session.id) };
+  }
+
+  forkedFrom(id: string) {
+    return readForkedFrom(this.db, id);
   }
 
   touch(
@@ -163,13 +200,7 @@ export class SessionStore {
   }
 
   usesAgent(agentId: string): boolean {
-    return (
-      this.db
-        .query<{ n: number }, [string]>(
-          "select count(*) as n from sessions where agent_id = ?",
-        )
-        .get(agentId)!.n > 0
-    );
+    return usesAgent(this.db, agentId);
   }
 
   messages(sessionId: string): Message[] {
@@ -230,19 +261,12 @@ export class SessionStore {
     return raw ? message(raw) : null;
   }
 
-  reasoningDetails(id: string): ReasoningDetail[] | null {
-    const raw = this.db
-      .query<{ reasoning_details: string | null }, [string]>(
-        "select reasoning_details from messages where id = ?",
-      )
-      .get(id);
-    if (!raw?.reasoning_details) return null;
-    try {
-      const parsed = JSON.parse(raw.reasoning_details);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-    } catch {
-      return null;
-    }
+  reasoningDetails(
+    id: string,
+    providerId: string,
+    model: string,
+  ): ReasoningDetail[] | null {
+    return readReasoningDetails(this.db, id, providerId, model);
   }
 
   addUserMessage(fields: {

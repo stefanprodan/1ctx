@@ -12,9 +12,11 @@
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
 import { copyCode } from "./copy.ts";
+import type { OnFork } from "./Fork.tsx";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
@@ -27,15 +29,18 @@ export function Transcript({
   sessionId,
   nodes,
   live,
-  agent,
+  agentOf,
   authorOf,
   onRegenerate,
+  fork,
   foot,
 }: {
   sessionId: string;
   nodes: Node[];
   live: ReadonlyMap<string, Live>;
-  agent: Agent | null;
+  // the agent a reply names, by the row's agent id; null for one no
+  // longer listed, and for a turn with no row yet the session's
+  agentOf: (agentId: string | null) => Agent | null;
   // the name of a user row's author
   // the author's name, and the username for the link to their page
   authorOf: (userId: string | null) => {
@@ -44,6 +49,8 @@ export function Transcript({
   };
   // the last turn's Regenerate; absent while a send runs
   onRegenerate?: () => void;
+  // Fork under every finished answer; absent in a run
+  fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   foot?: ComponentChildren;
 }) {
   const rows = useRef<HTMLDivElement>(null);
@@ -138,8 +145,13 @@ export function Transcript({
                 key={`reply:${node.sendId}`}
                 node={node}
                 live={live}
-                agent={agent}
+                agent={agentOf(
+                  node.message?.agentId ??
+                    node.rows.find((row) => row.kind === "reply")?.agentId ??
+                    null,
+                )}
                 onRegenerate={last ? onRegenerate : undefined}
+                fork={fork}
               />
             );
           })}

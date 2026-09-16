@@ -17,6 +17,7 @@ import { m0008 } from "./0008-search-tavily.ts";
 import { m0009 } from "./0009-mcp.ts";
 import { m0010 } from "./0010-memory.ts";
 import { m0011 } from "./0011-gemini.ts";
+import { m0012 } from "./0012-fork.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -30,4 +31,5 @@ export const MIGRATIONS: Migration[] = [
   m0009,
   m0010,
   m0011,
+  m0012,
 ];

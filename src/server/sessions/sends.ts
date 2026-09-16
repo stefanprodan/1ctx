@@ -7,6 +7,7 @@
 import type { SendSummary } from "../../shared/contracts/session.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import type { ReasoningDetail } from "../providers/index.ts";
 import { type RawSend, send, sendTokens } from "./rows.ts";
 
 export type SendEnd = {
@@ -43,6 +44,41 @@ export function readLastSend(db: Db, sessionId: string): SendSummary | null {
     )
     .get(sessionId);
   return raw ? send(raw) : null;
+}
+
+export function usesAgent(db: Db, agentId: string): boolean {
+  return (
+    db
+      .query<{ n: number }, [string, string, string]>(
+        `select
+         (select count(*) from sessions where agent_id = ?) +
+         (select count(*) from sends where agent_id = ?) +
+         (select count(*) from messages where agent_id = ?) as n`,
+      )
+      .get(agentId, agentId, agentId)!.n > 0
+  );
+}
+
+export function readReasoningDetails(
+  db: Db,
+  id: string,
+  providerId: string,
+  model: string,
+): ReasoningDetail[] | null {
+  const raw = db
+    .query<{ reasoning_details: string | null }, [string, string, string]>(
+      `select messages.reasoning_details from messages
+       join sends on sends.id = messages.send_id
+       where messages.id = ? and sends.provider_id = ? and sends.model = ?`,
+    )
+    .get(id, providerId, model);
+  if (!raw?.reasoning_details) return null;
+  try {
+    const parsed = JSON.parse(raw.reasoning_details);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 // the one end of a send, guarded by its running status

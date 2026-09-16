@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { path, query } from "../../../src/client/app/router.ts";
+import { forking, forkSession } from "../../../src/client/data/fork.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   BUFFER_MAX,
@@ -39,6 +40,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
     origin: "chat",
     automationId: null,
     runSource: null,
+    forkedFromId: null,
     title: "Chat",
     status: "done",
     revision: 1,
@@ -98,6 +100,7 @@ function detail(
 ): SessionDetail {
   return {
     session: summary({ id }),
+    forkedFrom: null,
     messages: [],
     send: null,
     live: null,
@@ -598,13 +601,97 @@ describe("the sessions entity", () => {
     };
     await renameSession("s1", "Kept As Typed");
     expect(hit).toBe("PATCH /api/sessions/s1");
-    // the composer is busy for the call, as for a send
-    expect(busy).toBe(true);
+    // a rename is not a send: the composer stays free
+    expect(busy).toBe(false);
     expect(sending.value).toBe(false);
     expect(sent).toEqual({ title: "Kept As Typed" });
     expect(session.value?.session.title).toBe("Kept As Typed");
     expect(session.value?.session.revision).toBe(5);
   });
+
+  test.serial(
+    "fork posts the turn and the agent, then opens the new chat",
+    async () => {
+      session.value = detail("s1", {
+        messages: [message({ id: "m1", kind: "user", content: "again?" })],
+      });
+      path.value = "/chat/s1";
+      const rows = new Map<string, string>();
+      const realStorage = Object.getOwnPropertyDescriptor(
+        globalThis,
+        "localStorage",
+      );
+      Object.defineProperty(globalThis, "localStorage", {
+        configurable: true,
+        value: {
+          getItem: (key: string) => rows.get(key) ?? null,
+          setItem: (key: string, value: string) => rows.set(key, value),
+          removeItem: (key: string) => rows.delete(key),
+        },
+      });
+      try {
+        let hit = "";
+        let sent: unknown = null;
+        let busy = false;
+        answer = (url, init) => {
+          hit = `${init?.method ?? "GET"} ${url}`;
+          sent = JSON.parse(String(init?.body));
+          busy = forking.value;
+          return Response.json(detail("s9"));
+        };
+        await forkSession("s1", "m1", "a2");
+        expect(hit).toBe("POST /api/sessions/s1/fork");
+        expect(sent).toEqual({ messageId: "m1", agentId: "a2" });
+        expect(busy).toBe(true);
+        expect(forking.value).toBe(false);
+        expect(path.value).toBe("/chat/s9");
+        // a user message's text is the fork's draft
+        expect(rows.get("draft:chat:s9")).toBe("again?");
+      } finally {
+        if (realStorage === undefined) {
+          Reflect.deleteProperty(globalThis, "localStorage");
+        } else {
+          Object.defineProperty(globalThis, "localStorage", realStorage);
+        }
+      }
+    },
+  );
+
+  test.serial("leaving a chat for another keeps the next load", async () => {
+    const gates: ((value: SessionDetail) => void)[] = [];
+    answer = () =>
+      new Promise<Response>((resolve) => {
+        gates.push((value) => resolve(Response.json(value)));
+      });
+    const first = loadSession("s1");
+    gates[0]!(detail("s1"));
+    await first;
+    expect(session.value?.session.id).toBe("s1");
+    // the next chat's load starts, then the page leaves the first
+    const second = loadSession("s2");
+    leaveSession("s1");
+    gates[1]!(detail("s2"));
+    await second;
+    expect(session.value?.session.id).toBe("s2");
+    // leaving the chat the load is for drops it
+    const third = loadSession("s3");
+    leaveSession("s3");
+    gates[2]!(detail("s3"));
+    await third;
+    expect(session.value).toBeNull();
+  });
+
+  test.serial(
+    "a fork refused leaves the page and frees the buttons",
+    async () => {
+      session.value = detail();
+      path.value = "/chat/s1";
+      answer = () => Response.json({ error: "not a turn" }, { status: 400 });
+      await expect(forkSession("s1", "m1", "a2")).rejects.toThrow();
+      expect(forking.value).toBe(false);
+      expect(path.value).toBe("/chat/s1");
+    },
+  );
 
   test("delete drops the row, leaves the chat and opens its project", async () => {
     session.value = liveDetail();
