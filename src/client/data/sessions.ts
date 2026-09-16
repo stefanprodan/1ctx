@@ -290,20 +290,16 @@ export async function stopSession(id: string): Promise<void> {
   await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
 }
 
-// one at a time, as a send: the composer is busy until the answer
+// a rename is not a send: it goes under a reply too, and the composer
+// stays free while it is on its way
 export async function renameSession(id: string, title: string): Promise<void> {
-  sending.value = true;
-  try {
-    const body: RenameSessionRequest = { title };
-    const detail = await api<SessionResponse>(
-      `/api/sessions/${encodeURIComponent(id)}`,
-      "PATCH",
-      body,
-    );
-    take(detail);
-  } finally {
-    sending.value = false;
-  }
+  const body: RenameSessionRequest = { title };
+  const detail = await api<SessionResponse>(
+    `/api/sessions/${encodeURIComponent(id)}`,
+    "PATCH",
+    body,
+  );
+  take(detail);
 }
 
 // the row goes from the list and, when it is the chat on screen or

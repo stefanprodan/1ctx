@@ -372,17 +372,21 @@ violation, and every rule has a rejected fixture under
   An agent is in use when sessions, sends or messages name it.
   Rename (`PATCH /api/sessions/:id`, the composer's `/rename <title>`)
   and delete are the session owner's or, in a team project, an admin's;
-  a member who did not start the chat gets 403. Neither may change a
-  running chat; a rename is one revision and one envelope without rows,
-  and a delete removes its usage rows.
+  a member who did not start the chat gets 403. A rename is one
+  revision and one envelope without rows and is allowed while the chat
+  runs, since a send never writes the title; a delete waits for the
+  end and removes its usage rows.
   `GET /api/sessions/:id/markdown?tz=` is the chat as a file for
   anyone who sees it (`sessions/markdown.ts`, pure): the title, then
   per send the user message and the agent's turn under `@author
   YYYY-MM-DD HH:mm` in the zone, the answer with the transcript's cut
   line (stopped, the error, cut at max tokens); no work, tools,
   summaries or running turns, and the title and errors escaped. The
-  chat menu offers Download to everyone and Delete to the owner and
-  admins; its `<h1>` is the title button alone.
+  chat menu offers Download to everyone and, to the owner and admins,
+  Rename and Delete; its `<h1>` is the title button alone, or, while
+  Rename is open, the title box in the button's place and type (Enter
+  saves, Escape or leaving the box gives the title back). A run's menu
+  has no Rename.
 - **Compaction is a final provider round.** A summary is a message of
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through

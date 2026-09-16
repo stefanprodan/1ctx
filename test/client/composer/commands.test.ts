@@ -93,13 +93,21 @@ describe("slash commands", () => {
   });
 
   test("a command is blocked before the chat starts and while it runs", () => {
-    expect(commandBlock({ started: false, running: false })).toBe(
+    const compact = COMMANDS.find((c) => c.name === "compact")!;
+    const rename = COMMANDS.find((c) => c.name === "rename")!;
+    const fork = COMMANDS.find((c) => c.name === "fork")!;
+    expect(commandBlock({ started: false, running: false }, compact)).toBe(
       "the chat has not started",
     );
-    expect(commandBlock({ started: true, running: true })).toBe(
+    expect(commandBlock({ started: true, running: true }, compact)).toBe(
       "a reply is running",
     );
-    expect(commandBlock({ started: true, running: false })).toBeNull();
+    expect(commandBlock({ started: true, running: false }, compact)).toBeNull();
+    // a title is never the send's, so a rename runs under a reply
+    expect(commandBlock({ started: true, running: true }, rename)).toBeNull();
+    expect(commandBlock({ started: true, running: true }, fork)).toBe(
+      "a reply is running",
+    );
   });
 });
 

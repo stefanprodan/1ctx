@@ -121,9 +121,13 @@ export type CommandState = {
 };
 
 // why a command is greyed in the menu and refused on Enter: every
-// command needs a started chat with nothing running
-export function commandBlock(state: CommandState): string | null {
+// command needs a started chat, and all but rename wait for a running
+// reply, since a title is never the send's to write
+export function commandBlock(
+  state: CommandState,
+  command: Command,
+): string | null {
   if (!state.started) return "the chat has not started";
-  if (state.running) return "a reply is running";
+  if (state.running && command.name !== "rename") return "a reply is running";
   return null;
 }

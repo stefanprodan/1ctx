@@ -601,8 +601,8 @@ describe("the sessions entity", () => {
     };
     await renameSession("s1", "Kept As Typed");
     expect(hit).toBe("PATCH /api/sessions/s1");
-    // the composer is busy for the call, as for a send
-    expect(busy).toBe(true);
+    // a rename is not a send: the composer stays free
+    expect(busy).toBe(false);
     expect(sending.value).toBe(false);
     expect(sent).toEqual({ title: "Kept As Typed" });
     expect(session.value?.session.title).toBe("Kept As Typed");

@@ -40,6 +40,7 @@ describe("the chat menu", () => {
     expect(busy).toEqual({
       open: true,
       asking: true,
+      editing: false,
       busy: true,
       failure: null,
     });
@@ -53,10 +54,26 @@ describe("the chat menu", () => {
     expect(failed).toEqual({
       open: true,
       asking: true,
+      editing: false,
       busy: false,
       failure: "409",
     });
     expect(menuStep(failed, "start").failure).toBeNull();
     expect(menuStep(failed, "keep")).toEqual({ ...CLOSED, open: true });
+  });
+
+  test("Rename shuts the menu and opens the box; a save or Escape shuts it", () => {
+    expect(after("toggle", "edit")).toEqual({ ...CLOSED, editing: true });
+    expect(after("toggle", "edit", "dismiss")).toEqual(CLOSED);
+    const saving = after("toggle", "edit", "start");
+    expect(saving).toEqual({ ...CLOSED, editing: true, busy: true });
+    expect(menuStep(saving, "dismiss")).toBe(saving);
+    expect(menuStep(saving, "saved")).toEqual(CLOSED);
+    expect(menuStep(saving, { failed: "409" })).toEqual({
+      ...CLOSED,
+      editing: true,
+      failure: "409",
+    });
+    expect(menuStep(saving, "edit")).toBe(saving);
   });
 });

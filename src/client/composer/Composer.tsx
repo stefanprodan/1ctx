@@ -16,6 +16,7 @@ import { Icon } from "../lib/icons.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
 import { Commands } from "./Commands.tsx";
 import {
+  type Command,
   commandBlock,
   commandFill,
   commandMatches,
@@ -113,7 +114,8 @@ export function Composer({
   const ready = agent !== null && !busy && !running;
   const started =
     onCompact !== undefined && onRename !== undefined && onFork !== undefined;
-  const block = commandBlock({ started, running });
+  const block = (command: Command) =>
+    commandBlock({ started, running }, command);
   const matches = shut.value ? [] : commandMatches(text.value);
   // the highlight follows the list as it shrinks
   const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
@@ -126,7 +128,11 @@ export function Composer({
     const sent = text.value;
     try {
       if (named !== null) {
-        await runCommand(named, block, { onCompact, onRename, onFork });
+        await runCommand(named, block(named.command), {
+          onCompact,
+          onRename,
+          onFork,
+        });
       } else await onSend(content, agent);
       // what was typed while the send was on its way stays
       if (text.value === sent) {

@@ -97,6 +97,12 @@ export function Chat({ params }: { params: Params }) {
                 ? () => deleteSession(shown.session.id, shown.session.projectId)
                 : undefined
             }
+            onRename={
+              !run &&
+              (user?.id === shown.session.ownerId || user?.role === "admin")
+                ? (title) => renameSession(shown.session.id, title)
+                : undefined
+            }
           />
         ) : undefined
       }

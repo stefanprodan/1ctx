@@ -518,17 +518,23 @@ describe("GET /api/sessions/:id", () => {
 
 describe("PATCH /api/sessions/:id", () => {
   test.serial(
-    "refuses a running chat, then renames with a revision and an envelope",
+    "renames a running chat too, with a revision and an envelope",
     async () => {
       const chat = await chatApp();
       const started = await startChat(chat);
+      // a send never writes the title, so a rename under one goes
+      // through and the reply still lands
       const running = await chat.member.call(
         "PATCH",
         `/api/sessions/${started.sessionId}`,
-        { body: { title: "Too Soon" } },
+        { body: { title: "Named Early" } },
       );
-      expect(running.status).toBe(409);
+      expect(running.status).toBe(200);
+      expect((await running.json()).session.status).toBe("running");
       await finish(started.script);
+      expect(chat.app.sessions.byId(started.sessionId)?.title).toBe(
+        "Named Early",
+      );
       const before = chat.app.sessions.byId(started.sessionId)!.revision;
       const events: BusEvent[] = [];
       const off = subscribe((event) => events.push(event));

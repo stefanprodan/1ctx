@@ -93,14 +93,18 @@
 @layer owners {
   /* the title as the button, the chevron after it, the card hanging
      under it from the title's left edge, as wide as its items */
+  /* the menu takes the crumb's remaining room, so the title box can
+     fill it; the title button itself keeps its content's width */
   .chat-menu {
     position: relative;
     display: flex;
+    flex: 1 1 auto;
     min-width: 0;
   }
   /* the heading is the title alone; it takes the crumb's type */
   .chat-menu-heading {
     display: flex;
+    flex: 1 1 auto;
     min-width: 0;
     margin: 0;
     font-size: inherit;
@@ -127,6 +131,27 @@
   .chat-menu-button:hover,
   .chat-menu-button[aria-expanded="true"] {
     background: var(--line);
+  }
+  /* the box takes the button's place and its exact box, so the head
+     keeps its height and the logo's row; the type is the crumb's */
+  .chat-menu-input {
+    width: 100%;
+    min-width: 0;
+    height: 24px;
+    margin-block: calc((1lh - 24px) / 2);
+    margin-left: calc(-1 * var(--space-1));
+    padding: 0 var(--space-1);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--inset);
+    color: var(--fg);
+    outline: none;
+  }
+  .chat-menu-input:focus {
+    border-color: var(--brand);
+  }
+  .chat-menu-input[aria-invalid="true"] {
+    border-color: var(--failed);
   }
   .chat-menu-title {
     min-width: 0;
@@ -170,6 +195,11 @@
     font-weight: 400;
     letter-spacing: 0;
     text-transform: none;
+  }
+  /* the rename's refusal, in the card's box with the ask's type */
+  .chat-menu-card.chat-menu-failure {
+    padding: var(--space-2) 10px;
+    font-size: var(--text-small);
   }
   .chat-menu-item {
     display: flex;

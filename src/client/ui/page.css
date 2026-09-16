@@ -62,8 +62,11 @@
   /* one line: the section dim, the slash fainter, the title lit. Its
      line height is the label's, so it sits on the rail's logo row the
      way the Home label does */
+  /* the crumb takes the head's room up to the aside, so a title box
+     in it can fill the row; its items keep their content's width */
   .page-crumb {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
@@ -102,8 +105,11 @@
 
   /* a view's control in the title's place: it cuts its own text, and
      what it opens must show past the edge */
+  /* the menu takes the crumb's remaining room, so a title being
+     edited can fill it; the title button keeps its content's width */
   .page-crumb-menu {
     display: flex;
+    flex: 1 1 auto;
     overflow: visible;
   }
 

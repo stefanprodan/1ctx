@@ -5,7 +5,8 @@
 // start or stop a send live in the runner, which sits below this area.
 // What may be seen is access's call: a session in a project the caller
 // may not see is the same 404 as one that is not there. A team chat's
-// rename and delete belong to its owner or an admin, neither while it runs.
+// rename and delete belong to its owner or an admin; a delete waits for
+// the chat to end, a rename does not.
 
 import type {
   SessionResponse,
@@ -195,12 +196,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           await jsonBody(req, MAX_SMALL_BODY),
         );
         const renamed = transact(deps.db, () => {
-          // nothing changes under a send: the row is the truth for that
+          // a send never writes the title, so a rename under one is
+          // safe: one more revision on the row, one envelope
           const current = deps.store.byId(session.id);
           if (current === null) throw new NotFound("no such chat");
-          if (current.status === "running") {
-            throw new Conflict("the chat is running, stop it first");
-          }
           const row = deps.store.rename(session.id, title)!;
           return {
             result: row,
