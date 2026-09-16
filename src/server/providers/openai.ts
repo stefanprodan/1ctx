@@ -8,11 +8,11 @@
 // the caller passes, so a test hands it recorded frames and the suite
 // never reaches a network.
 
-import type { Fetcher } from "./catalog.ts";
 import type {
   ChatEvent,
   ChatRequest,
   ChatTool,
+  Fetcher,
   ReasoningDetail,
   ToolCall,
 } from "./types.ts";
@@ -243,6 +243,7 @@ type TrackedCall = {
   id: string;
   name: string;
   arguments: string;
+  signature?: string;
   order: number;
 };
 
@@ -290,6 +291,7 @@ export class ToolCallTracker {
     }
     if (delta.name !== undefined) call.name = delta.name;
     if (delta.arguments !== undefined) call.arguments += delta.arguments;
+    if (delta.signature !== undefined) call.signature = delta.signature;
     this.latest = call;
   }
 
@@ -306,6 +308,7 @@ export class ToolCallTracker {
       id: call.id || `call_${index}`,
       name: call.name,
       arguments: call.arguments,
+      ...(call.signature === undefined ? {} : { signature: call.signature }),
     }));
   }
 }

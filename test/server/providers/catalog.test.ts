@@ -128,8 +128,8 @@ describe("search", () => {
 describe("fetchCatalog", () => {
   test("sends the key as a bearer and nothing without one", async () => {
     const fake = fakeFetch();
-    await fetchCatalog(fake.fetcher, PROVIDER_URL, "sk-test");
-    await fetchCatalog(fake.fetcher, PROVIDER_URL, null);
+    await fetchCatalog(fake.fetcher, provider, "sk-test");
+    await fetchCatalog(fake.fetcher, provider, null);
     expect(fake.calls.map((c) => c.headers.authorization ?? "none")).toEqual([
       "Bearer sk-test",
       "none",
@@ -141,7 +141,7 @@ describe("fetchCatalog", () => {
     const answer = (res: () => Response | Promise<Response>) =>
       fetchCatalog(
         (async () => res()) as unknown as typeof fetch,
-        "http://x",
+        provider,
         null,
       );
     await expect(
@@ -214,7 +214,7 @@ describe("Catalogs", () => {
   test("a catalog past the byte cap is refused", async () => {
     const big = `{"data":[${'{"id":"m"},'.repeat(900_000)}{"id":"z"}]}`;
     const fetcher = (async () => new Response(big)) as unknown as typeof fetch;
-    await expect(fetchCatalog(fetcher, "http://x", null)).rejects.toThrow(
+    await expect(fetchCatalog(fetcher, provider, null)).rejects.toThrow(
       "too large",
     );
   });

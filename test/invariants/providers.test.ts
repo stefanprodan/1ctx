@@ -12,7 +12,7 @@ import {
   parseProvider,
   parseQuery,
 } from "../../src/server/providers/parse.ts";
-import { PROVIDER_URL, testApp } from "../helpers/app.ts";
+import { GEMINI_URL, PROVIDER_URL, testApp } from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
 
 const admin = async (options?: Parameters<typeof testApp>[0]) => {
@@ -172,6 +172,71 @@ describe("the providers", () => {
 });
 
 describe("GET /api/providers/:id/catalog", () => {
+  test("creates a Gemini provider and searches its native catalog with the key header", async () => {
+    const { app, client } = await admin({
+      secrets: { gemini: "gemini-test-key" },
+    });
+    try {
+      const created = await client.call("POST", "/api/providers", {
+        body: {
+          name: "gemini",
+          wire: "gemini",
+          baseUrl: GEMINI_URL,
+          keyName: "gemini",
+        },
+      });
+      expect(created.status).toBe(201);
+      const { provider } = await created.json();
+      expect(provider).toMatchObject({ wire: "gemini", hasKey: true });
+      const result = await client.call(
+        "GET",
+        `/api/providers/${provider.id}/catalog?q=flash`,
+      );
+      expect(result.status).toBe(200);
+      const { matches } = await result.json();
+      expect(matches.map((model: { id: string }) => model.id)).toEqual([
+        "gemini-3.8-flash",
+        "gemini-2.5-flash",
+      ]);
+      expect(matches[0]).toEqual({
+        id: "gemini-3.8-flash",
+        name: "Gemini 3.8 Flash",
+        contextLength: 1048576,
+        promptPrice: null,
+        completionPrice: null,
+        tools: true,
+        reasoning: true,
+      });
+      const agent = await client.call("POST", "/api/agents", {
+        body: {
+          name: "gemini-agent",
+          providerId: provider.id,
+          model: matches[0].id,
+          thinking: "on",
+          effort: "high",
+          servers: [],
+          mcpMode: "auto",
+        },
+      });
+      expect(agent.status).toBe(201);
+      expect((await agent.json()).agent).toMatchObject({
+        model: matches[0],
+        thinking: "on",
+        effort: "high",
+      });
+      expect(app.fetched).toEqual([
+        {
+          url: `${GEMINI_URL}/models?pageSize=1000`,
+          headers: { "x-goog-api-key": "gemini-test-key" },
+          body: null,
+        },
+      ]);
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
   test("answers the matches for what was typed, from one fetch with the key", async () => {
     const { app, client } = await admin({ secrets: { router: "sk-router" } });
     const { provider } = await (

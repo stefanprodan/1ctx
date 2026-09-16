@@ -8,23 +8,23 @@
 // app with it, a provider, an agent and a member, and signs the member
 // in.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import { hashPassword } from "../../src/server/users/index.ts";
-import { PROVIDER_URL, type TestApp, testApp } from "./app.ts";
+import type { Wire } from "../../src/shared/words.ts";
+import {
+  fakeFetch,
+  GEMINI_URL,
+  PROVIDER_URL,
+  type TestApp,
+  testApp,
+} from "./app.ts";
 
 export const FLASH = "deepseek/deepseek-v4.1-flash";
+export const GEMINI_FLASH = "gemini-3.8-flash";
 // the one catalog model whose row has no tools flag: a send on it is
 // offered no tools and behaves as before
 export const NO_TOOLS = "deepseek/deepseek-r1-distill-llama-70b";
-
-const catalogBody = () =>
-  readFileSync(
-    join(import.meta.dir, "..", "fixtures", "providers", "models.json"),
-    "utf8",
-  );
 
 // one tool call the provider streams, as the OpenAI wire carries it: an
 // index, an id, the name and the arguments as one JSON string
@@ -33,6 +33,7 @@ export type ToolCallFrame = {
   id: string;
   name: string;
   arguments: string;
+  signature?: string;
 };
 
 // one chat request's stream, as the test drives it
@@ -73,6 +74,7 @@ export type Scripted = {
 };
 
 export function scriptedFetch(fallback?: typeof fetch): Scripted {
+  const catalog = fakeFetch().fetcher;
   const scripts: Script[] = [];
   const waiting: ((s: Script) => void)[] = [];
   let refusal: { status: number; body: string } | null = null;
@@ -81,12 +83,14 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
     init?: RequestInit,
   ) => {
     const url = String(input instanceof Request ? input.url : input);
-    if (url === `${PROVIDER_URL}/models`) {
-      return new Response(catalogBody(), {
-        headers: { "content-type": "application/json" },
-      });
+    if (
+      url === `${PROVIDER_URL}/models` ||
+      url === `${GEMINI_URL}/models?pageSize=1000`
+    ) {
+      return catalog(input, init);
     }
-    if (url !== `${PROVIDER_URL}/chat/completions`) {
+    const gemini = url === `${GEMINI_URL}/openai/chat/completions`;
+    if (!gemini && url !== `${PROVIDER_URL}/chat/completions`) {
       if (fallback !== undefined) return fallback(input, init);
       throw new TypeError("unable to connect");
     }
@@ -115,7 +119,18 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
       aborted: false,
       content: (text) => frame({ choices: [{ delta: { content: text } }] }),
       reasoning: (text) =>
-        frame({ choices: [{ delta: { reasoning_content: text } }] }),
+        frame({
+          choices: [
+            {
+              delta: gemini
+                ? {
+                    content: text,
+                    extra_content: { google: { thought: true } },
+                  }
+                : { reasoning_content: text },
+            },
+          ],
+        }),
       toolCall: (call) =>
         frame({
           choices: [
@@ -127,6 +142,13 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
                     id: call.id,
                     type: "function",
                     function: { name: call.name, arguments: call.arguments },
+                    ...(call.signature === undefined
+                      ? {}
+                      : {
+                          extra_content: {
+                            google: { thought_signature: call.signature },
+                          },
+                        }),
                   },
                 ],
               },
@@ -149,6 +171,7 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
           usage: {
             prompt_tokens: fields.prompt ?? 10,
             completion_tokens: fields.completion ?? 5,
+            total_tokens: (fields.prompt ?? 10) + (fields.completion ?? 5),
           },
         }),
       end: () => {
@@ -237,6 +260,7 @@ export async function chatApp(
     // the agent's model; the default has the tools flag, so a send on it
     // is offered the built-ins
     model?: string;
+    wire?: Wire;
     tools?: Tools;
     fetcher?: typeof fetch;
   } = {},
@@ -255,8 +279,8 @@ export async function chatApp(
     await admin.call("POST", "/api/providers", {
       body: {
         name: "local",
-        wire: "openai-compatible",
-        baseUrl: PROVIDER_URL,
+        wire: options.wire ?? "openai-compatible",
+        baseUrl: options.wire === "gemini" ? GEMINI_URL : PROVIDER_URL,
         keyName: null,
       },
     })
@@ -283,7 +307,7 @@ export async function chatApp(
   };
   const agentId = await makeAgent({
     name: "coder",
-    model: options.model ?? FLASH,
+    model: options.model ?? (options.wire === "gemini" ? GEMINI_FLASH : FLASH),
   });
   const user = app.createUser({
     username: "caelea",

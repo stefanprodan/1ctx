@@ -18,6 +18,9 @@ export type ToolCall = {
   name: string;
   // the arguments as the provider's JSON string, kept as received
   arguments: string;
+  // an opaque token a provider put on the call, sent back as received,
+  // never shown
+  signature?: string;
 };
 
 // a built-in as the tools page shows it: the schema the model gets,

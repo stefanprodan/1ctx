@@ -11,6 +11,11 @@ import type { Effort, Wire } from "../../shared/words.ts";
 // the browser and the runner name one shape; the wire re-exports it
 export type { ToolCall };
 
+export type Fetcher = typeof fetch;
+
+// Shared by the catalog readers without importing their dispatch.
+export class CatalogError extends Error {}
+
 export type ChatTool = {
   name: string;
   description: string;
@@ -81,6 +86,7 @@ export type ChatEvent =
       id?: string;
       name?: string;
       arguments?: string;
+      signature?: string;
     }
   | { kind: "toolCalls"; calls: ToolCall[] }
   | { kind: "finish"; reason: string; details: string | null }
