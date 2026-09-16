@@ -373,10 +373,18 @@ violation, and every rule has a rejected fixture under
   tools in its main rounds; `ownMemory` opens a bounded final phase with
   only the edit tool. The ending claims one cause, releases the main
   round, runs that phase on finish, deadline or failure, then finalizes
-  once. A finished memory task commits its project edits and read marks
-  together; an edited automation copy commits on any cause after its
-  phase starts. Each changed note sends one frame. Project and automation
-  memory routes let anyone who sees the project read, save and undo.
+  once. Its own-note block appears even when empty and says a separate
+  step after the answer updates it. Two settled rounds with edits but no
+  success stop the memory tools; a success resets the count, reads leave
+  it, and main rounds and the phase count apart. The phase stops without
+  another request; main rounds lose all three tools, and stopped calls
+  fail. A completed chat read is pending until a successful project edit
+  or `none` keeps it. A finished memory task commits its project edits
+  and kept marks together, dropping marks whose edit replay skips;
+  pending marks are dropped at the limit or the end. An edited automation
+  copy commits on any cause after its phase starts. Each changed note
+  sends one frame. Project and automation memory routes let anyone who
+  sees the project read, save and undo.
 - **An automation fires runs, and a run is a session.** An automation
   is a row in its project (`automations/`): an agent, instructions, a
   five-field cron schedule in an IANA zone parsed by `Bun.cron.parse`

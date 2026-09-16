@@ -54,6 +54,7 @@ export type MemoryCapability = {
   ): {
     memory: Memory;
     skipped: number;
+    skippedOperations: number[];
   };
 };
 
@@ -133,6 +134,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
           result: {
             memory: present(committed.row),
             skipped: committed.skipped,
+            skippedOperations: committed.skippedOperations,
           },
           events: committed.changed ? [changed(committed.row)] : [],
         };

@@ -14,6 +14,7 @@ import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ToolCall } from "../providers/index.ts";
+import { isMemoryTool } from "../tools/index.ts";
 import type { ToolContext, ToolResult, ToolsPort } from "./policy.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
@@ -225,6 +226,11 @@ async function runCalls(
   const task = Promise.allSettled(settled).then(() => {});
   send.tools = task;
   await task;
+  const offered = send.policy.offered;
+  offered.memory?.settleRound();
+  if (offered.memory?.stopped) {
+    offered.tools = offered.tools.filter((tool) => !isMemoryTool(tool.name));
+  }
   send.tools = null;
   send.budget.toolMs += deps.clock() - startedAt;
   if (writeError !== null) throw writeError;

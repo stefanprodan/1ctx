@@ -40,21 +40,27 @@ describe("memory note rules", () => {
   test("holds the entry and whole-note boundaries", () => {
     expect(checkEntries(["x".repeat(MEMORY_ENTRY_CHARS)])).toBeNull();
     expect(checkEntries(["x".repeat(MEMORY_ENTRY_CHARS + 1)])).toContain(
-      "over 500",
+      "501 characters, the limit is 500, cut 1",
     );
     const at = ["x".repeat(MEMORY_CHARS)];
     expect(memoryChars(at)).toBe(MEMORY_CHARS);
-    expect(checkEntries(at)).toContain("over 500");
+    expect(checkEntries(at)).toContain("2200 characters, the limit is 500");
     const many = Array.from(
       { length: 5 },
       (_, i) => `${i}${"x".repeat(i < 3 ? 437 : 436)}`,
     );
     expect(memoryChars(many)).toBe(MEMORY_CHARS);
     expect(checkEntries(many)).toBeNull();
-    expect(checkEntries([...many, "z"])).toContain("the limit is 2200");
+    expect(checkEntries([...many, "z"])).toContain(
+      "The note would be 2,204 of 2,200, free 4.",
+    );
   });
 
   test("applies add, whole-entry replace and remove by one match", () => {
+    expect(applyEdit(["alpha"], { action: "none" })).toEqual({
+      ok: true,
+      entries: ["alpha"],
+    });
     expect(
       applyEdit(["alpha twice twice", "beta"], {
         action: "replace",
@@ -102,7 +108,21 @@ describe("memory note rules", () => {
       .split("\n<project-memory>\n")[1]!
       .split("\n</project-memory>")[0]!;
     expect(body.length).toBeLessThanOrEqual(MEMORY_CHARS);
-    expect(memoryBlock("automation-memory", [])).toBe("");
+    expect(memoryBlock("project-memory", [])).toBe("");
+  });
+
+  test("announces the separate own-note step even when the note is empty", () => {
+    for (const entries of [[], ["one fact"]]) {
+      const block = memoryBlock("automation-memory", entries);
+      expect(block).toContain(
+        "A separate step after your answer updates this note.",
+      );
+      expect(block).toContain("<automation-memory>");
+      expect(block).toContain("</automation-memory>");
+    }
+    expect(memoryBlock("automation-memory", [])).toContain(
+      "The note is empty. The step after your answer writes it.",
+    );
   });
 
   test("neutralises every spelling of the tags", () => {

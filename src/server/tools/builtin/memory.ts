@@ -6,12 +6,17 @@
 
 import {
   applyEdit,
-  MEMORY_EDIT_FAILURES,
+  MEMORY_EDIT_FAILED_ROUNDS,
+  MEMORY_ENTRY_CHARS,
   MEMORY_SESSIONS_PER_RUN,
   type MemoryEdit,
+  memorySize,
 } from "../../../shared/memory.ts";
+import type { MemoryWork } from "../../memory/index.ts";
+import type { ToolCall } from "../../providers/index.ts";
 import type { MemorySnapshot } from "../../sessions/index.ts";
-import type { MemoryHandle, Tool, ToolContext } from "../types.ts";
+import { Registry } from "../registry.ts";
+import type { MemoryHandle, Tool, ToolContext, ToolResult } from "../types.ts";
 
 export type UnreadChat = {
   id: string;
@@ -43,7 +48,80 @@ export type MemorySessionsPort = {
 const LIST_TAIL =
   "This run has a limited number of rounds. Record what you learned with memory_edit before reading more chats.";
 const READ_TAIL =
-  "Chat read. Record what matters with memory_edit before the next chat.";
+  "Chat read. Record what matters with memory_edit, or call it with action none when there is nothing, before reading the next chat.";
+
+export function makeMemoryHandle(
+  work: MemoryWork,
+  automationId: string,
+): MemoryHandle {
+  let attempted = false;
+  let succeeded = false;
+  const project = work.target.automationId === null;
+  const handle: MemoryHandle = {
+    note: project ? "project" : "automation",
+    work,
+    read: project
+      ? {
+          projectId: work.target.projectId,
+          automationId,
+          pending: new Map(),
+          marks: new Map(),
+          snapshot: null,
+        }
+      : null,
+    queue: Promise.resolve(),
+    stopped: false,
+    recordEdit(success) {
+      if (handle.stopped) return;
+      attempted = true;
+      succeeded ||= success;
+    },
+    settleRound() {
+      if (handle.stopped) return;
+      if (succeeded) work.failedRounds = 0;
+      else if (attempted) work.failedRounds++;
+      attempted = false;
+      succeeded = false;
+      if (work.failedRounds >= MEMORY_EDIT_FAILED_ROUNDS) {
+        handle.stopped = true;
+        handle.read?.pending.clear();
+        if (handle.read !== null) handle.read.snapshot = null;
+      }
+    },
+  };
+  return handle;
+}
+
+export function isMemoryTool(name: string): boolean {
+  return (
+    name === "sessions_list" ||
+    name === "session_read" ||
+    name === "memory_edit"
+  );
+}
+
+export function runMemory(
+  handle: MemoryHandle,
+  sessions: MemorySessionsPort,
+  call: ToolCall,
+  ctx: ToolContext,
+): Promise<ToolResult> {
+  return throughQueue(handle, async () => {
+    const result = handle.stopped
+      ? {
+          error: true,
+          content: `Error: Memory tools stopped after ${MEMORY_EDIT_FAILED_ROUNDS} failed rounds. Finish without memory tools.`,
+        }
+      : await new Registry(makeMemoryTools(handle, sessions)).run(call, ctx);
+    if (call.name === "memory_edit") handle.recordEdit(!result.error);
+    return result.error
+      ? {
+          error: true,
+          content: refusal(handle, result.content).slice(0, ctx.caps.resultCut),
+        }
+      : result;
+  });
+}
 
 function throughQueue<T>(
   handle: MemoryHandle,
@@ -77,37 +155,35 @@ function listTool(handle: MemoryHandle, sessions: MemorySessionsPort): Tool {
       "List unread chats available to this project memory task, oldest first. Several chats may be read in parallel in one round.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     async run(args) {
-      return throughQueue(handle, () => {
-        noArgs(args);
-        const read = handle.read!;
-        const result = sessions.unread(
-          read.automationId,
-          read.projectId,
-          MEMORY_SESSIONS_PER_RUN,
-          [...read.marks.keys()],
-        );
-        if (result.chats.length === 0) return "Every chat is read.";
-        const lines = result.chats.map((chat) => {
-          const state = chat.readBefore
-            ? chat.changedSince
-              ? "read before, changed since"
-              : "read before"
-            : "not read before";
-          return [
-            chat.id,
-            chat.title,
-            `@${chat.author}`,
-            new Date(chat.lastActivityAt).toISOString(),
-            `${chat.userMessages} user messages`,
-            state,
-          ].join(" | ");
-        });
-        if (result.remaining > 0) {
-          lines.push(`${result.remaining} more unread chats`);
-        }
-        lines.push(LIST_TAIL);
-        return lines.join("\n");
+      noArgs(args);
+      const read = handle.read!;
+      const result = sessions.unread(
+        read.automationId,
+        read.projectId,
+        MEMORY_SESSIONS_PER_RUN,
+        [...read.marks.keys(), ...read.pending.keys()],
+      );
+      if (result.chats.length === 0) return "Every chat is read.";
+      const lines = result.chats.map((chat) => {
+        const state = chat.readBefore
+          ? chat.changedSince
+            ? "read before, changed since"
+            : "read before"
+          : "not read before";
+        return [
+          chat.id,
+          chat.title,
+          `@${chat.author}`,
+          new Date(chat.lastActivityAt).toISOString(),
+          `${chat.userMessages} user messages`,
+          state,
+        ].join(" | ");
       });
+      if (result.remaining > 0) {
+        lines.push(`${result.remaining} more unread chats`);
+      }
+      lines.push(LIST_TAIL);
+      return lines.join("\n");
     },
   };
 }
@@ -124,9 +200,7 @@ function readTool(handle: MemoryHandle, sessions: MemorySessionsPort): Tool {
       additionalProperties: false,
     },
     async run(args, ctx) {
-      return throughQueue(handle, () =>
-        readPage(handle, sessions, text(args, "id"), ctx),
-      );
+      return readPage(handle, sessions, text(args, "id"), ctx);
     },
   };
 }
@@ -141,7 +215,9 @@ function readPage(
   if (read.snapshot !== null && read.snapshot.id !== id) {
     throw new Error(`finish reading ${read.snapshot.id} first`);
   }
-  if (read.marks.has(id)) throw new Error(`${id} was already read`);
+  if (read.marks.has(id) || read.pending.has(id)) {
+    throw new Error(`${id} was already read`);
+  }
   if (read.snapshot === null) {
     const snapshot = sessions.snapshot(read.projectId, id);
     if (snapshot === null) throw new Error("chat is unavailable");
@@ -161,7 +237,7 @@ function readPage(
   const page = snapshot.markdown.slice(snapshot.cursor, end);
   snapshot.cursor = end;
   if (end === total) {
-    read.marks.set(snapshot.id, snapshot.lastActivityAt);
+    read.pending.set(snapshot.id, snapshot.lastActivityAt);
     read.snapshot = null;
     return `${page}\n${READ_TAIL}`;
   }
@@ -186,11 +262,11 @@ function editTool(handle: MemoryHandle): Tool {
   const { own, other } = notes(handle);
   return {
     name: "memory_edit",
-    description: `Edit ${own}. It is one note; ${other} in the system prompt is a different note this tool never edits. Its entries are separate items: add appends one entry, replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note. Changes are saved when the run ends.`,
+    description: `Edit ${own}. It is one note; ${other} in the system prompt is a different note this tool never edits. Its entries are separate items: add appends one entry, replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note. none changes nothing and keeps pending chat reads when there is nothing to record. Changes are saved when the run ends.`,
     parameters: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["add", "replace", "remove"] },
+        action: { type: "string", enum: ["add", "replace", "remove", "none"] },
         text: { type: "string" },
         old_text: { type: "string" },
       },
@@ -198,34 +274,35 @@ function editTool(handle: MemoryHandle): Tool {
       additionalProperties: false,
     },
     async run(args) {
-      return throughQueue(handle, () => {
-        if (handle.work.failures >= MEMORY_EDIT_FAILURES) {
-          throw new Error(refusal(handle, "Stop editing and finish."));
+      const edit = parseEdit(args);
+      const result = applyEdit(handle.work.entries, edit);
+      if (!result.ok) {
+        const advice =
+          result.kind === "match"
+            ? "old_text must match text inside one entry, never the whole note."
+            : result.kind === "budget"
+              ? "Merge or remove entries and retry."
+              : "Retry with the arguments the action takes.";
+        throw new Error(`${result.reason} ${advice}`);
+      }
+      handle.work.entries = result.entries;
+      handle.work.operations.push(edit);
+      const read = handle.read;
+      if (read !== null) {
+        const operation = handle.work.operations.length - 1;
+        for (const [id, readActivityAt] of read.pending) {
+          read.marks.set(id, { readActivityAt, operation });
         }
-        const edit = parseEdit(args);
-        const result = applyEdit(handle.work.entries, edit);
-        if (!result.ok) {
-          handle.work.failures++;
-          const advice =
-            handle.work.failures >= MEMORY_EDIT_FAILURES
-              ? "Stop editing and finish."
-              : result.kind === "match"
-                ? "old_text must match text inside one entry, never the whole note."
-                : result.kind === "budget"
-                  ? "Merge or remove entries and retry."
-                  : "Retry with the arguments the action takes.";
-          throw new Error(refusal(handle, `${result.reason} ${advice}`));
-        }
-        handle.work.entries = result.entries;
-        handle.work.operations.push(edit);
-        return `Saved for the end of the run in ${own}.`;
-      });
+        read.pending.clear();
+      }
+      return `Saved for the end of the run in ${own}. ${memorySize(result.entries)} characters.`;
     },
   };
 }
 
 function parseEdit(args: Record<string, unknown>): MemoryEdit {
   const action = args.action;
+  if (action === "none") return { action };
   if (action === "add") return { action, text: text(args, "text") };
   if (action === "replace") {
     return {
@@ -237,18 +314,23 @@ function parseEdit(args: Record<string, unknown>): MemoryEdit {
   if (action === "remove") {
     return { action, oldText: text(args, "old_text") };
   }
-  throw new Error("action must be add, replace or remove");
+  throw new Error("action must be add, replace, remove or none");
 }
 
 // every refusal hands back the note as it stands, so the next call names
 // an entry that is really there
 function refusal(handle: MemoryHandle, reason: string): string {
   const entries = handle.work.entries;
+  const size = `${memorySize(entries)} characters.`;
   if (entries.length === 0) {
-    return `${reason}\nThe note is empty, use add.`;
+    return `${reason}\nThe note is empty, use add.\n${size}`;
   }
-  const lines = entries.map((entry, index) => `${index + 1}. ${entry}`);
-  return `${reason}\n${entries.length} entries\n${lines.join("\n")}`;
+  const lines = entries.map((entry, index) => {
+    const first = entry.split("\n", 1)[0]!;
+    const start = first.length > 64 ? `${first.slice(0, 61)}...` : first;
+    return `${index + 1}. ${start} [${entry.length}/${MEMORY_ENTRY_CHARS}]`;
+  });
+  return `${reason}\n${size}\n${lines.join("\n")}`;
 }
 
 export function makeMemoryTools(

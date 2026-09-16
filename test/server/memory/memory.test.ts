@@ -50,6 +50,7 @@ describe("memory store", () => {
     expect(replay(current, operations)).toEqual({
       entries: ["new", "other", "last"],
       skipped: 1,
+      skippedOperations: [1],
     });
     expect(current).toEqual(["a moved", "other"]);
   });

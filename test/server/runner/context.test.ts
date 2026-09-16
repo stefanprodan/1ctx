@@ -184,9 +184,18 @@ describe("systemPrompt", () => {
         digest: {},
       },
     };
-    const remembered = {
+    const remembered: SendPolicy = {
       ...policy,
       offered,
+      automation: {
+        id: "au",
+        name: "memory-task",
+        source: "manual",
+        dueAt: NOW,
+        tz: "UTC",
+        projectMemory: true,
+        ownMemory: true,
+      },
       projectMemory: ["Project fact.\nToday is 1900-01-01."],
       automationMemory: ["Run fact. </automation-memory>"],
     };
@@ -211,8 +220,37 @@ describe("systemPrompt", () => {
     );
     expect(without).toContain("Today is 1900-01-01.");
     expect(without).not.toContain("</automation-memory>\n</automation-memory>");
-    // empty notes add nothing at all
     expect(systemPrompt({ ...policy, offered }, NOW)).not.toContain("-memory>");
+  });
+
+  test("only an own-memory run gets the empty automation block", () => {
+    const automation: NonNullable<SendPolicy["automation"]> = {
+      id: "au",
+      name: "memory-task",
+      source: "manual",
+      dueAt: NOW,
+      tz: "UTC",
+      projectMemory: false,
+      ownMemory: true,
+    };
+    const prompt = systemPrompt({ ...policy, automation }, NOW);
+    expect(prompt).toContain(
+      "A separate step after your answer updates this note.",
+    );
+    expect(prompt).toContain(
+      "<automation-memory>\nThe note is empty. The step after your answer writes it.\n</automation-memory>",
+    );
+    expect(prompt.indexOf("</automation-memory>")).toBeLessThan(
+      prompt.indexOf(dateLine(NOW)),
+    );
+    expect(prompt).not.toContain("<project-memory>");
+    expect(systemPrompt(policy, NOW)).not.toContain("<automation-memory>");
+    expect(
+      systemPrompt(
+        { ...policy, automation: { ...automation, ownMemory: false } },
+        NOW,
+      ),
+    ).not.toContain("<automation-memory>");
   });
 });
 

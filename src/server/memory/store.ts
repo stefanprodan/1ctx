@@ -32,12 +32,13 @@ export type MemoryWork = {
   baseRevision: number;
   entries: string[];
   operations: MemoryEdit[];
-  failures: number;
+  failedRounds: number;
 };
 
 export type MemoryCommit = {
   row: MemoryRow;
   skipped: number;
+  skippedOperations: number[];
   changed: boolean;
 };
 
@@ -77,15 +78,15 @@ function row(raw: Raw): MemoryRow {
 export function replay(
   current: readonly string[],
   operations: readonly MemoryEdit[],
-): { entries: string[]; skipped: number } {
+): { entries: string[]; skipped: number; skippedOperations: number[] } {
   let entries = [...current];
-  let skipped = 0;
-  for (const operation of operations) {
+  const skippedOperations: number[] = [];
+  for (const [index, operation] of operations.entries()) {
     const result = applyEdit(entries, operation);
     if (result.ok) entries = result.entries;
-    else skipped++;
+    else skippedOperations.push(index);
   }
-  return { entries, skipped };
+  return { entries, skipped: skippedOperations.length, skippedOperations };
 }
 
 export function memoryWork(row: MemoryRow): MemoryWork {
@@ -94,7 +95,7 @@ export function memoryWork(row: MemoryRow): MemoryWork {
     baseRevision: row.revision,
     entries: [...row.entries],
     operations: [],
-    failures: 0,
+    failedRounds: 0,
   };
 }
 
@@ -156,19 +157,25 @@ export class MemoryStore {
     const current = this.read(work.target);
     const applied =
       current.revision === work.baseRevision
-        ? { entries: [...work.entries], skipped: 0 }
+        ? { entries: [...work.entries], skipped: 0, skippedOperations: [] }
         : replay(current.entries, work.operations);
     if (
       work.operations.length === 0 ||
       same(current.entries, applied.entries)
     ) {
-      return { row: current, skipped: applied.skipped, changed: false };
+      return {
+        row: current,
+        skipped: applied.skipped,
+        skippedOperations: applied.skippedOperations,
+        changed: false,
+      };
     }
     this.assertTarget(work.target);
     this.write(work.target, current, applied.entries, null, sessionId, now);
     return {
       row: this.read(work.target),
       skipped: applied.skipped,
+      skippedOperations: applied.skippedOperations,
       changed: true,
     };
   }

@@ -53,10 +53,14 @@ export type MemoryHandle = {
   read: {
     projectId: string;
     automationId: string;
-    marks: Map<string, number>;
+    pending: Map<string, number>;
+    marks: Map<string, { readActivityAt: number; operation: number }>;
     snapshot: (MemorySnapshot & { cursor: number }) | null;
   } | null;
   queue: Promise<void>;
+  stopped: boolean;
+  recordEdit(success: boolean): void;
+  settleRound(): void;
 };
 
 export type Offered = {

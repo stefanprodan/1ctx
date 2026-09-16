@@ -44,7 +44,13 @@ import {
   mcpCallName,
   resolveMcpCall,
 } from "./builtin/mcp.ts";
-import { makeMemoryTools, type UnreadChats } from "./builtin/memory.ts";
+import {
+  isMemoryTool,
+  makeMemoryHandle,
+  makeMemoryTools,
+  runMemory,
+  type UnreadChats,
+} from "./builtin/memory.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import {
   type FetchDependencies,
@@ -67,6 +73,7 @@ import type {
 } from "./types.ts";
 
 export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
+export { isMemoryTool } from "./builtin/memory.ts";
 export { TOOL_CAPS } from "./limits.ts";
 export { parseToolName, parseToolPatch } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
@@ -215,25 +222,16 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     }
     if (scope.phase === "memory") {
       if (!scope.automation.ownMemory) return null;
-      return {
-        note: "automation",
-        work: deps.memory.work(scope.projectId, scope.automation.id),
-        read: null,
-        queue: Promise.resolve(),
-      };
+      return makeMemoryHandle(
+        deps.memory.work(scope.projectId, scope.automation.id),
+        scope.automation.id,
+      );
     }
     if (!scope.automation.projectMemory) return null;
-    return {
-      note: "project",
-      work: deps.memory.work(scope.projectId, null),
-      read: {
-        projectId: scope.projectId,
-        automationId: scope.automation.id,
-        marks: new Map(),
-        snapshot: null,
-      },
-      queue: Promise.resolve(),
-    };
+    return makeMemoryHandle(
+      deps.memory.work(scope.projectId, null),
+      scope.automation.id,
+    );
   };
   const fetchDeps: FetchDependencies = deps.fetchDeps ?? {
     fetch: deps.fetcher,
@@ -422,15 +420,20 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       return mcpCallName(offered.mcp, call) ?? call.name;
     },
     async run(offered, call, ctx) {
+      const memory = offered.memory;
+      if (
+        memory !== null &&
+        isMemoryTool(call.name) &&
+        (memory.stopped || memory.read !== null || call.name === "memory_edit")
+      ) {
+        return runMemory(memory, memorySessions, call, ctx);
+      }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const base = [
         ...toolsFor(offered.search ?? "exa").filter((tool) =>
           allowed.has(tool.name),
         ),
         ...makeSkillTools(offered.skills.skills, skillStore),
-        ...(offered.memory === null
-          ? []
-          : makeMemoryTools(offered.memory, memorySessions)),
       ];
       const direct = mcpTools(offered.mcp, ctx);
       if (call.name === "mcp_call" && allowed.has("mcp_call")) {

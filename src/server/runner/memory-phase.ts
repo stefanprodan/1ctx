@@ -44,14 +44,18 @@ export function commitMemory(
   let skipped = 0;
   const project = send.policy.offered.memory;
   if (cause === "finish" && project?.note === "project") {
-    skipped += deps.memory.commit(project.work, send.sessionId).skipped;
+    const committed = deps.memory.commit(project.work, send.sessionId);
+    skipped += committed.skipped;
+    const dropped = new Set(committed.skippedOperations);
     if (project.read !== null) {
       deps.markers.mark(
         project.read.automationId,
-        [...project.read.marks].map(([sessionId, readActivityAt]) => ({
-          sessionId,
-          readActivityAt,
-        })),
+        [...project.read.marks]
+          .filter(([, mark]) => !dropped.has(mark.operation))
+          .map(([sessionId, mark]) => ({
+            sessionId,
+            readActivityAt: mark.readActivityAt,
+          })),
       );
     }
   }
@@ -180,7 +184,7 @@ function phaseInstruction(send: ActiveSend): string {
     ending,
     currentEntries(entries),
     "memory_edit writes this note and no other. The project memory in the system prompt is a different note it never edits.",
-    "Each entry is a separate item. add appends one entry. replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note.",
+    "Each entry is a separate item. add appends one entry. replace and remove name one existing entry by a fragment of its text in old_text, which must match text inside one entry, never the whole note. Use none when there is nothing to record.",
     "Record what the next run needs: what was found, what was done, where this run stopped, and what is left.",
   ].join("\n\n");
 }
@@ -286,6 +290,7 @@ async function runCalls(
   const task = Promise.allSettled(settled).then(() => {});
   send.tools = task;
   await task;
+  offered.memory?.settleRound();
   send.tools = null;
   spend.toolMs += deps.clock() - startedAt;
   if (writeError !== null) throw writeError;
@@ -399,7 +404,7 @@ export async function memoryPhase(
       send.phase = "memory";
       send.round = null;
       await runCalls(deps, send, offered, calls, controller.signal, spend);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || offered.memory.stopped) return;
       const reply = deps.writer.startRound(send);
       send.roundNo += 1;
       rounds += 1;

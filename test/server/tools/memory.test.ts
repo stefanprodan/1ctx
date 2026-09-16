@@ -12,6 +12,7 @@ import {
 } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
+import parallelEdits from "../../fixtures/memory/parallel-edits.json";
 import { memoryDb } from "../../helpers/db.ts";
 
 const now = Date.UTC(2026, 8, 16, 0, 0, 0);
@@ -40,7 +41,7 @@ function area(): ToolsArea {
           baseRevision: 0,
           entries: [],
           operations: [],
-          failures: 0,
+          failedRounds: 0,
         };
       },
     },
@@ -177,6 +178,46 @@ describe("memory offered sets", () => {
 });
 
 describe("memory tool handles", () => {
+  test("accepts valid corrections after a round of parallel refusals", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", {
+      ...task,
+      phase: "memory",
+    });
+    offered.memory!.work.entries = [...parallelEdits.entries];
+    const errors: boolean[][] = [];
+    for (const calls of parallelEdits.rounds) {
+      const results = await Promise.all(
+        calls.map((args, index) =>
+          tools.run(
+            offered,
+            {
+              id: `edit-${index}`,
+              name: "memory_edit",
+              arguments: JSON.stringify(args),
+            },
+            context(),
+          ),
+        ),
+      );
+      errors.push(results.map((result) => result.error));
+      offered.memory!.settleRound();
+    }
+    expect(errors).toEqual([
+      [true, true, true, true, true],
+      [false, false, true],
+      [true, true, false],
+      [true],
+    ]);
+    expect(offered.memory!.work.entries).toEqual([
+      ...parallelEdits.entries.slice(0, 2),
+      parallelEdits.rounds[1]![0]!.text,
+      parallelEdits.rounds[1]![1]!.text,
+      parallelEdits.rounds[2]![2]!.text,
+    ]);
+    expect(offered.memory!.stopped).toBe(false);
+  });
+
   test("applies parallel edit calls in call order", async () => {
     const tools = area();
     const offered = tools.offered(now, "agent", [], "auto", task);
@@ -217,19 +258,20 @@ describe("memory tool handles", () => {
           name: "session_read",
           arguments: JSON.stringify({ id }),
         },
-        context(45),
+        context(150),
       );
     const first = await call("s1");
     expect(first.error).toBe(false);
     expect(first.content).toMatch(/characters left, call again$/);
-    expect(offered.memory?.read?.marks.size).toBe(0);
+    expect(offered.memory?.read?.pending.size).toBe(0);
     const other = await call("s2");
     expect(other).toMatchObject({ error: true });
     expect(other.content).toContain("finish reading s1 first");
-    while (offered.memory?.read?.marks.size === 0) {
+    while (offered.memory?.read?.pending.size === 0) {
       expect((await call("s1")).error).toBe(false);
     }
-    expect(offered.memory?.read?.marks.get("s1")).toBe(20);
+    expect(offered.memory?.read?.pending.get("s1")).toBe(20);
+    expect(offered.memory?.read?.marks.size).toBe(0);
     const listed = await tools.run(
       offered,
       { id: "list", name: "sessions_list", arguments: "{}" },
@@ -258,42 +300,213 @@ describe("memory tool handles", () => {
     expect(read.error).toBe(false);
     expect(
       read.content.endsWith(
-        "\nChat read. Record what matters with memory_edit before the next chat.",
+        "\nChat read. Record what matters with memory_edit, or call it with action none when there is nothing, before reading the next chat.",
       ),
     ).toBe(true);
-    expect(offered.memory?.read?.marks.get("s1")).toBe(20);
+    expect(offered.memory?.read?.pending.get("s1")).toBe(20);
   });
 
-  test("returns the note on refusals and stops after the third failure", async () => {
+  test("counts failed rounds, leaves reads alone and resets on any success", async () => {
     const tools = area();
     const offered = tools.offered(now, "agent", [], "auto", task);
-    const failed = async () =>
+    const handle = offered.memory!;
+    const edit = (args: string) =>
       tools.run(
         offered,
         {
           id: crypto.randomUUID(),
           name: "memory_edit",
-          arguments: '{"action":"remove","old_text":"missing"}',
+          arguments: args,
         },
         context(),
       );
-    const first = (await failed()).content;
-    expect(first).toContain("The note is empty, use add.");
-    expect(first).toContain("never the whole note");
-    const added = await tools.run(
+    expect((await edit("{")).content).toContain("invalid JSON arguments");
+    handle.settleRound();
+    expect(handle.work.failedRounds).toBe(1);
+    await tools.run(
       offered,
-      {
-        id: "add",
-        name: "memory_edit",
-        arguments: '{"action":"add","text":"one fact"}',
-      },
+      { id: "read", name: "session_read", arguments: '{"id":"s1"}' },
       context(),
     );
-    expect(added.error).toBe(false);
-    expect((await failed()).content).toContain("1 entries\n1. one fact");
-    await failed();
-    expect((await failed()).content).toContain("Stop editing and finish.");
-    expect((await failed()).content).toContain("Stop editing and finish.");
-    expect(offered.memory?.work.failures).toBe(3);
+    handle.settleRound();
+    expect(handle.work.failedRounds).toBe(1);
+    const results = await Promise.all([
+      edit('{"action":"remove","old_text":"missing"}'),
+      edit('{"action":"replace"}'),
+      edit('{"action":"add","text":"first"}'),
+      edit('{"action":"replace","old_text":"first","text":"second"}'),
+      edit('{"action":"add","text":"third"}'),
+    ]);
+    expect(results.map((result) => result.error)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+    handle.settleRound();
+    expect(handle.work.failedRounds).toBe(0);
+    expect(handle.stopped).toBe(false);
+    expect(handle.work.entries).toEqual(["second", "third"]);
+    expect(handle.read!.marks.get("s1")).toEqual({
+      readActivityAt: 20,
+      operation: 0,
+    });
+  });
+
+  test("two failed rounds stop every memory call and drop pending reads", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    const handle = offered.memory!;
+    const call = (name: string, args: string) =>
+      tools.run(
+        offered,
+        { id: crypto.randomUUID(), name, arguments: args },
+        context(),
+      );
+    await call("session_read", '{"id":"s1"}');
+    expect(handle.read!.pending.size).toBe(1);
+    for (const args of ["[]", '{"action":"replace"}']) {
+      expect((await call("memory_edit", args)).error).toBe(true);
+      handle.settleRound();
+    }
+    expect(handle.work.failedRounds).toBe(2);
+    expect(handle.stopped).toBe(true);
+    expect(handle.read!.pending.size).toBe(0);
+    expect(handle.read!.marks.size).toBe(0);
+    for (const [name, args] of [
+      ["sessions_list", "{}"],
+      ["session_read", '{"id":"s2"}'],
+      ["memory_edit", '{"action":"add","text":"must not land"}'],
+      ["memory_edit", '{"action":"none"}'],
+      ["memory_edit", "{"],
+    ]) {
+      const result = await call(name!, args!);
+      expect(result.error).toBe(true);
+      expect(result.content).toContain("stopped after 2 failed rounds");
+      expect(result.content).toContain("0 of 2,200");
+    }
+    handle.settleRound();
+    expect(handle.work.entries).toEqual([]);
+    expect(handle.work.operations).toEqual([]);
+    expect(handle.work.failedRounds).toBe(2);
+    expect(handle.read!.snapshot).toBeNull();
+    expect(handle.read!.pending.size).toBe(0);
+    expect(handle.read!.marks.size).toBe(0);
+  });
+
+  test("none keeps pending reads without changing the note and resets a failed round", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    const handle = offered.memory!;
+    const call = (name: string, args: string) =>
+      tools.run(
+        offered,
+        { id: crypto.randomUUID(), name, arguments: args },
+        context(),
+      );
+    await call("memory_edit", '{"action":"add","text":"one fact"}');
+    handle.settleRound();
+    await call("session_read", '{"id":"s1"}');
+    await call("memory_edit", '{"action":"remove","old_text":"missing"}');
+    handle.settleRound();
+    expect(handle.work.failedRounds).toBe(1);
+    expect(handle.read!.marks.size).toBe(0);
+    const none = await call("memory_edit", '{"action":"none"}');
+    expect(none.error).toBe(false);
+    expect(none.content).toContain("Saved for the end of the run");
+    expect(none.content).toContain("8 of 2,200");
+    expect(none.content).not.toContain("one fact");
+    handle.settleRound();
+    expect(handle.work.entries).toEqual(["one fact"]);
+    expect(handle.work.failedRounds).toBe(0);
+    expect(handle.read!.marks.get("s1")).toEqual({
+      readActivityAt: 20,
+      operation: 1,
+    });
+    expect(handle.read!.pending.size).toBe(0);
+    await call("session_read", '{"id":"s2"}');
+    handle.settleRound();
+    expect(handle.read!.pending.get("s2")).toBe(20);
+    expect(handle.read!.marks.has("s2")).toBe(false);
+    for (let round = 0; round < 2; round++) {
+      await call("memory_edit", '{"action":"remove","old_text":"missing"}');
+      handle.settleRound();
+    }
+    expect(handle.stopped).toBe(true);
+    expect(handle.read!.pending.size).toBe(0);
+    expect([...handle.read!.marks.keys()]).toEqual(["s1"]);
+    expect(handle.work.entries).toEqual(["one fact"]);
+  });
+
+  test("refusals show current entry sizes, totals and the required cuts", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    const handle = offered.memory!;
+    const entries = [
+      "a".repeat(500),
+      "b".repeat(500),
+      "Last snapshot: NVDA 18".padEnd(346, "x"),
+      `Fourth\n${"d".repeat(379)}`,
+    ];
+    handle.work.entries = [...entries];
+    const call = (args: string) =>
+      tools.run(
+        offered,
+        { id: "edit", name: "memory_edit", arguments: args },
+        context(),
+      );
+    const oversized = await call(
+      JSON.stringify({ action: "add", text: "x".repeat(612) }),
+    );
+    expect(oversized.error).toBe(true);
+    expect(oversized.content).toContain(
+      "An entry is 612 characters, the limit is 500, cut 112.",
+    );
+    expect(oversized.content).toContain("1,741 of 2,200");
+    expect(oversized.content).toContain("[346/500]");
+    expect(oversized.content).toContain("3. Last snapshot: NVDA 18");
+    expect(oversized.content).toContain("4. Fourth [386/500]");
+    expect(oversized.content).not.toContain("x".repeat(100));
+    expect(oversized.content).not.toContain("x".repeat(612));
+    handle.work.entries = [
+      "a".repeat(500),
+      "b".repeat(500),
+      "c".repeat(500),
+      "d".repeat(441),
+    ];
+    const full = await call(
+      JSON.stringify({ action: "add", text: "e".repeat(497) }),
+    );
+    expect(full.content).toContain(
+      "The note would be 2,450 of 2,200, free 250.",
+    );
+    expect(full.content).toContain("1,950 of 2,200");
+    expect(full.content).not.toContain("e".repeat(497));
+    handle.work.entries = [...entries];
+    for (const args of [
+      "{",
+      "[]",
+      "null",
+      '{"action":"replace"}',
+      '{"action":"invalid"}',
+      '{"action":"remove","old_text":"missing"}',
+    ]) {
+      const result = await call(args);
+      expect(result.error).toBe(true);
+      expect(result.content).toContain("1,741 of 2,200");
+      for (const [index, entry] of entries.entries()) {
+        expect(result.content).toContain(`${index + 1}. `);
+        expect(result.content).toContain(`[${entry.length}/500]`);
+      }
+      expect(result.content.length).toBeLessThanOrEqual(TOOL_CAPS.resultCut);
+      expect(handle.work.entries).toEqual(entries);
+    }
+    const saved = await call('{"action":"none"}');
+    expect(saved).toEqual({
+      error: false,
+      content:
+        "Saved for the end of the run in the project's memory. 1,741 of 2,200 characters.",
+    });
   });
 });

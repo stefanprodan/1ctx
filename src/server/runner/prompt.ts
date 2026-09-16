@@ -102,11 +102,9 @@ export function systemPrompt(
   }
   const projectMemory = memoryBlock("project-memory", policy.projectMemory);
   if (projectMemory !== "") parts.push(projectMemory);
-  const automationMemory = memoryBlock(
-    "automation-memory",
-    policy.automationMemory,
-  );
-  if (automationMemory !== "") parts.push(automationMemory);
+  if (policy.automation?.ownMemory) {
+    parts.push(memoryBlock("automation-memory", policy.automationMemory));
+  }
   parts.push(dateLine(now));
   if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");
