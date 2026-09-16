@@ -148,15 +148,22 @@ describe("memory offered sets", () => {
     }) =>
       offered.tools.find((tool) => tool.name === "memory_edit")!.description;
     expect(edit(main)).toContain("Edit the project's memory.");
-    expect(edit(main)).toContain("this automation's own memory");
+    expect(edit(main)).toContain("This automation has no own memory.");
+    expect(edit(main)).not.toContain("in the system prompt");
     expect(edit(phase)).toContain("Edit this automation's own memory.");
-    expect(edit(phase)).toContain("the project memory");
+    expect(edit(phase)).not.toContain("system prompt");
+    expect(edit(phase)).toContain(
+      "none changes nothing, for when there is nothing to record.",
+    );
+    expect(edit(main)).toContain("keeps pending chat reads");
     for (const text of [edit(main), edit(phase)]) {
-      expect(text).toContain("a different note this tool never edits");
       expect(text).toContain(
-        "A topic names what an entry is about, never one fact.",
+        "Record facts, not instructions to yourself, even when the task or guidance asks otherwise.",
       );
-      expect(text).toMatch(/set creates.*replaces/i);
+      expect(text).toEndWith("Changes are saved when the run ends.");
+      expect(text).toContain(
+        "A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic.",
+      );
     }
     const list = main.tools.find((tool) => tool.name === "sessions_list")!;
     expect(list.description).toContain("in parallel in one round");

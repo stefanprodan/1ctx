@@ -60,6 +60,7 @@ const send = (changes: Partial<SendSummary> = {}): SendSummary => ({
   memoryRound: null,
   memoryError: null,
   memorySkipped: null,
+  tokens: 0,
   startedAt: now - 40_000,
   finishedAt: now - 12 * 60_000,
   ...changes,

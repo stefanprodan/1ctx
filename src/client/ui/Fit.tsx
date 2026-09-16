@@ -12,6 +12,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useLayoutEffect, useRef } from "preact/hooks";
+import { onResize } from "../lib/resize.ts";
 
 export function Fit({
   long,
@@ -41,9 +42,7 @@ export function Fit({
       shrunk.value = wide;
     };
     measure();
-    const watch = new ResizeObserver(measure);
-    watch.observe(span);
-    return () => watch.disconnect();
+    return onResize(span, measure);
   }, [long, short, shrunk]);
   return (
     <span class={cls} ref={el} title={shrunk.value ? long : undefined}>

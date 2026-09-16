@@ -163,7 +163,7 @@ function memoryRequest(
   lookups: ContextLookups,
 ): ChatRequest | null {
   if (
-    send.systemPrompt === null ||
+    send.policy.automation === null ||
     send.memoryRound === null ||
     send.cause === null
   ) {
@@ -171,6 +171,7 @@ function memoryRequest(
   }
   const messages = memoryMessages(
     {
+      automation: send.policy.automation.name,
       sendId: send.id,
       memoryRound: send.memoryRound,
       cause: send.cause,
@@ -180,7 +181,6 @@ function memoryRequest(
       entries: offered.memory?.work.entries ?? [],
     },
     {
-      system: send.systemPrompt,
       phase: historyMessages(
         rows.filter(
           (row) => row.sendId === send.id && row.round >= send.memoryRound!,
@@ -224,9 +224,10 @@ async function runCalls(
   calls: ToolCall[],
   signal: AbortSignal,
   spend: PhaseSpend,
-): Promise<void> {
+): Promise<boolean> {
   const startedAt = deps.clock();
   let writeError: unknown = null;
+  let clean = true;
   const settled = calls.map(async (call) => {
     const ctx: ToolContext = {
       signal,
@@ -244,6 +245,7 @@ async function runCalls(
       };
     }
     if (signal.aborted) return;
+    if (result.error || call.name !== "memory_edit") clean = false;
     const stored = cut(result, send.policy.toolCaps.resultCut);
     spend.resultBytes += bytes(stored.content);
     try {
@@ -259,6 +261,7 @@ async function runCalls(
   send.tools = null;
   spend.toolMs += deps.clock() - startedAt;
   if (writeError !== null) throw writeError;
+  return clean;
 }
 
 // what a call the phase would not run is recorded with
@@ -361,8 +364,19 @@ export async function memoryPhase(
       send.budget.calls = deps.writer.finishRound(send, names).toolCalls;
       send.phase = "memory";
       send.round = null;
-      await runCalls(deps, send, offered, calls, controller.signal, spend);
-      if (controller.signal.aborted || offered.memory.stopped) return;
+      const clean = await runCalls(
+        deps,
+        send,
+        offered,
+        calls,
+        controller.signal,
+        spend,
+      );
+      // A round whose edits all succeeded is the phase's work done; asking
+      // again only invites a model to go back to the run's task.
+      if (clean || controller.signal.aborted || offered.memory.stopped) {
+        return;
+      }
       const reply = deps.writer.startRound(send);
       send.roundNo += 1;
       rounds += 1;

@@ -297,15 +297,15 @@ describe("socket fixtures", () => {
           '{"action":"set","topic":"Status","text":"The task finished."}',
       },
     ]);
+    // a round whose edits all succeed ends the phase
     memory.end();
-    const finish = await waitScript(chat.scripted, 3);
-    finish.reply("Recorded.");
     await settle(chat, 10);
     record("memory-phase", detail, conn);
+    expect(chat.scripted.scripts).toHaveLength(2);
     expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
       status: "done",
       memoryRound: 2,
-      rounds: 3,
+      rounds: 2,
       toolCalls: 1,
     });
     chat.app.socket.dispose();
@@ -331,6 +331,12 @@ describe("socket fixtures", () => {
         name: "memory_edit",
         arguments:
           '{"action":"set","topic":"Status","text":"Stopped before the note was done."}',
+      },
+      // refused, so the phase asks again and the stop lands in that request
+      {
+        id: "m2",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
       },
     ]);
     memory.end();

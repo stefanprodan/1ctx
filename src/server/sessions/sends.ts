@@ -7,7 +7,7 @@
 import type { SendSummary } from "../../shared/contracts/session.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
-import { type RawSend, send } from "./rows.ts";
+import { type RawSend, send, sendTokens } from "./rows.ts";
 
 export type SendEnd = {
   status: Exclude<SessionStatus, "running">;
@@ -28,7 +28,9 @@ export type SendCounters = {
 
 export function readSend(db: Db, id: string): SendSummary | null {
   const raw = db
-    .query<RawSend, [string]>("select * from sends where id = ?")
+    .query<RawSend, [string]>(
+      `select *, ${sendTokens("sends")} from sends where id = ?`,
+    )
     .get(id);
   return raw ? send(raw) : null;
 }
@@ -36,7 +38,7 @@ export function readSend(db: Db, id: string): SendSummary | null {
 export function readLastSend(db: Db, sessionId: string): SendSummary | null {
   const raw = db
     .query<RawSend, [string]>(
-      `select * from sends where session_id = ?
+      `select *, ${sendTokens("sends")} from sends where session_id = ?
        order by started_at desc, rowid desc limit 1`,
     )
     .get(sessionId);

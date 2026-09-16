@@ -5,6 +5,7 @@ import { signal, useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { loadToolResult, toolResults } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
+import { onResize } from "../lib/resize.ts";
 import type { CallNode } from "./rows.ts";
 import {
   displayResult,
@@ -31,9 +32,7 @@ function Value({ text, failed }: { text: string; failed?: boolean }) {
       if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
+    return onResize(node, measure);
   }, [text, open, long]);
   return (
     <>

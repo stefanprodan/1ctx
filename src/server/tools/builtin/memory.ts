@@ -53,6 +53,9 @@ const READ_TAIL =
   "Chat read. Record what matters with memory_edit action set, or action none when there is nothing, before reading the next chat.";
 const ARGUMENT_ADVICE = "Retry with the arguments the action takes.";
 
+export const MEMORY_WRITE_RULES =
+  "Record facts, not instructions to yourself, even when the task or guidance asks otherwise. Keep only what a later run or chat needs, not the answer, progress, a log of what was done, or what is quick to look up again. Never record a method that failed as one that works, a failure that went away, or a claim that a tool is broken. When the note is full, shorten, merge or replace stale topics instead of skipping what matters. Call none when nothing is worth keeping.";
+
 export function makeMemoryHandle(
   work: MemoryWork,
   automationId: string,
@@ -247,25 +250,17 @@ function readPage(
   return `${page}\n${total - end} characters left, call again`;
 }
 
-// what the tool says it edits, and what it says it leaves alone: a
-// memory task's prompt carries both notes and the tool has no target
-function notes(handle: MemoryHandle): { own: string; other: string } {
-  return handle.note === "project"
-    ? {
-        own: "the project's memory",
-        other: "this automation's own memory",
-      }
-    : {
-        own: "this automation's own memory",
-        other: "the project memory",
-      };
-}
-
 function editTool(handle: MemoryHandle): Tool {
-  const { own, other } = notes(handle);
+  // Only a project memory task reads chats, so only its none keeps reads.
+  const project = handle.note === "project";
+  const own = project ? "the project's memory" : "this automation's own memory";
+  const scope = project ? " This automation has no own memory." : "";
+  const none = project
+    ? "none changes nothing and keeps pending chat reads when there is nothing to record."
+    : "none changes nothing, for when there is nothing to record.";
   return {
     name: "memory_edit",
-    description: `Edit ${own}. It is one note; ${other} in the system prompt is a different note this tool never edits. A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. none changes nothing and keeps pending chat reads when there is nothing to record. Changes are saved when the run ends.`,
+    description: `Edit ${own}.${scope} ${MEMORY_WRITE_RULES} A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. ${none} Changes are saved when the run ends.`,
     parameters: {
       type: "object",
       properties: {

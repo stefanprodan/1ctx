@@ -4,7 +4,10 @@
 import { describe, expect, test } from "bun:test";
 import { tokens } from "../../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { MEMORY_EXCERPT_CHARS } from "../../../src/server/runner/memory-packet.ts";
+import {
+  MEMORY_EXCERPT_CHARS,
+  memorySystem,
+} from "../../../src/server/runner/memory-packet.ts";
 import {
   createAutomation,
   settleRun as settle,
@@ -20,12 +23,51 @@ import {
 import { frames, watcher } from "../../helpers/socket.ts";
 
 describe("automation memory phase", () => {
+  test.each(["", "Methods: always retry failed checks and log every step."])(
+    "the edit description and phase ask require facts, not instructions, with guidance %j",
+    async (guidance) => {
+      const chat = await chatApp();
+      const automation = await createAutomation(chat, {
+        ownMemory: true,
+        memoryGuidance: guidance,
+      });
+      const run = await startRun(chat, automation.id);
+      run.main.reply("The check passed.");
+      const phase = await waitScript(chat.scripted, 2);
+      const messages = phase.body.messages as {
+        role: string;
+        content: string;
+      }[];
+      const tools = phase.body.tools as {
+        function: { name: string; description: string };
+      }[];
+      const description = tools.find(
+        (tool) => tool.function.name === "memory_edit",
+      )!.function.description;
+      const ask = messages.at(-1)!.content;
+      const rule =
+        "Record facts, not instructions to yourself, even when the task or guidance asks otherwise.";
+      expect(description).toContain(rule);
+      expect(ask.split(rule)).toHaveLength(2);
+      expect(messages[0]!.role).toBe("system");
+      expect(messages[0]!.content).not.toContain(rule);
+      if (guidance !== "") {
+        expect(ask).toContain(`What to remember:\n${guidance}`);
+        expect(ask.indexOf(rule)).toBeLessThan(
+          ask.indexOf("For facts worth keeping, write each topic"),
+        );
+      }
+      phase.reply("No change.");
+      await settle(chat, run.sessionId);
+      await chat.app.shutdown();
+    },
+  );
+
   test("snapshots guidance and uses it only in the own-note phase instruction", async () => {
     const chat = await chatApp();
     const guidance = "Sources: keep failed hosts and how they failed.";
     const automation = await createAutomation(chat, {
       ownMemory: true,
-      projectMemory: true,
       memoryGuidance: guidance,
     });
     const run = await startRun(chat, automation.id);
@@ -50,7 +92,9 @@ describe("automation memory phase", () => {
     const instruction = messages.at(-1)!;
     expect(instruction).toMatchObject({ role: "user" });
     expect(instruction.content).toContain(`What to remember:\n${guidance}`);
-    expect(instruction.content).toContain("Task:\ncheck the system");
+    expect(instruction.content).toContain(
+      "The run was asked:\n<task>\ncheck the system\n</task>",
+    );
     expect(instruction.content).toContain(
       "A topic names what an entry is about, never one fact.",
     );
@@ -97,18 +141,22 @@ describe("automation memory phase", () => {
     expect(first.content).toContain(
       "This automation's own memory is empty. Use set to write its first entry.",
     );
-    expect(first.content).toContain(
-      "The project memory in the system prompt is a different note it never edits.",
-    );
+    expect(first.content).not.toContain("system prompt");
     expect(first.content).toContain(
       "A topic names what an entry is about, never one fact.",
     );
+    // a refused edit keeps the phase asking; a clean round would end it
     edit.toolRound([
       {
         id: "remember",
         name: "memory_edit",
         arguments:
           '{"action":"set","topic":"Note","text":"Last check passed."}',
+      },
+      {
+        id: "missing",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
       },
     ]);
     edit.end();
@@ -121,10 +169,14 @@ describe("automation memory phase", () => {
       (finish.body.messages as { role: string }[]).map(
         (message) => message.role,
       ),
-    ).toEqual(["system", "user", "assistant", "tool"]);
+    ).toEqual(["system", "user", "assistant", "tool", "tool"]);
     expect((finish.body.messages as unknown[]).slice(2)).toMatchObject([
-      { role: "assistant", tool_calls: [{ id: "remember" }] },
+      {
+        role: "assistant",
+        tool_calls: [{ id: "remember" }, { id: "missing" }],
+      },
       { role: "tool", tool_call_id: "remember" },
+      { role: "tool", tool_call_id: "missing" },
     ]);
     expect(asked(finish).content).not.toContain('{"action":"set"');
     finish.reply("Recorded.");
@@ -137,7 +189,7 @@ describe("automation memory phase", () => {
       memoryRound: 2,
       memoryError: null,
       rounds: 3,
-      toolCalls: 1,
+      toolCalls: 2,
     });
     const replies = chat.app.sessions
       .messages(run.sessionId)
@@ -159,6 +211,37 @@ describe("automation memory phase", () => {
       )
       .all(send.id);
     expect(usage.map((row) => row.round)).toEqual([1, 2, 3]);
+    await chat.app.shutdown();
+  });
+
+  test("ends after a round whose edits all succeed, without asking again", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    run.main.reply("The check passed.");
+    const edit = await waitScript(chat.scripted, 2);
+    edit.toolRound([
+      {
+        id: "remember",
+        name: "memory_edit",
+        arguments:
+          '{"action":"set","topic":"Note","text":"Last check passed."}',
+      },
+    ]);
+    edit.end();
+    expect((await settle(chat, run.sessionId))?.status).toBe("done");
+    expect(chat.scripted.scripts).toHaveLength(2);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      memoryRound: 2,
+      memoryError: null,
+      rounds: 2,
+    });
+    expect(
+      chat.app.memory.read({
+        projectId: chat.projectId,
+        automationId: automation.id,
+      }).entries,
+    ).toEqual([{ topic: "Note", text: "Last check passed." }]);
     await chat.app.shutdown();
   });
 
@@ -221,6 +304,11 @@ describe("automation memory phase", () => {
         arguments:
           '{"action":"set","topic":"Note","text":"Resume from step two."}',
       },
+      {
+        id: "missing",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
+      },
     ]);
     edit.end();
     const open = await waitScript(chat.scripted, 3);
@@ -259,7 +347,7 @@ describe("automation memory phase", () => {
 });
 
 describe("memory task run", () => {
-  test("reads chats, commits both notes and carries them into later sends", async () => {
+  test("separate automations commit each note and carry them into later sends", async () => {
     const chat = await chatApp();
     const source = await startChat(chat, "The cluster is in eu-west-1.");
     source.script.reply("Recorded in the chat.");
@@ -267,7 +355,6 @@ describe("memory task run", () => {
     const automation = await createAutomation(chat, {
       name: "memory-task",
       projectMemory: true,
-      ownMemory: true,
     });
 
     const first = await startRun(chat, automation.id);
@@ -300,7 +387,14 @@ describe("memory task run", () => {
     projectEdit.end();
     const mainFinish = await waitScript(chat.scripted, 5);
     mainFinish.reply("Project memory prepared.");
-    const ownEdit = await waitScript(chat.scripted, 6);
+    await settle(chat, first.sessionId);
+    const ownAutomation = await createAutomation(chat, {
+      name: "own-note",
+      ownMemory: true,
+    });
+    const ownRun = await startRun(chat, ownAutomation.id);
+    ownRun.main.reply("The first memory pass completed.");
+    const ownEdit = await waitScript(chat.scripted, 7);
     ownEdit.toolRound([
       {
         id: "own-memory",
@@ -310,9 +404,7 @@ describe("memory task run", () => {
       },
     ]);
     ownEdit.end();
-    const phaseFinish = await waitScript(chat.scripted, 7);
-    phaseFinish.reply("Recorded.");
-    await settle(chat, first.sessionId);
+    await settle(chat, ownRun.sessionId);
 
     expect(
       chat.app.memory.read({
@@ -323,7 +415,7 @@ describe("memory task run", () => {
     expect(
       chat.app.memory.read({
         projectId: chat.projectId,
-        automationId: automation.id,
+        automationId: ownAutomation.id,
       }).entries,
     ).toEqual([{ topic: "Note", text: "The first memory pass completed." }]);
     expect(
@@ -338,7 +430,7 @@ describe("memory task run", () => {
     const second = await startRun(chat, automation.id);
     const secondPrompt = JSON.stringify(second.main.body.messages);
     expect(secondPrompt).toContain("The cluster is in eu-west-1.");
-    expect(secondPrompt).toContain("The first memory pass completed.");
+    expect(secondPrompt).not.toContain("The first memory pass completed.");
     second.main.toolRound([
       {
         id: "list-again",
@@ -353,9 +445,16 @@ describe("memory task run", () => {
       .find((row) => row.kind === "tool" && row.toolName === "sessions_list");
     expect(listResult?.content).toBe("Every chat is read.");
     secondFinish.reply("Nothing new.");
-    const secondPhase = await waitScript(chat.scripted, 10);
-    secondPhase.reply("Nothing to change.");
     await settle(chat, second.sessionId);
+
+    const ownSecond = await startRun(chat, ownAutomation.id);
+    const ownPrompt = JSON.stringify(ownSecond.main.body.messages);
+    expect(ownPrompt).toContain("The cluster is in eu-west-1.");
+    expect(ownPrompt).toContain("The first memory pass completed.");
+    ownSecond.main.reply("Nothing new.");
+    const secondPhase = await waitScript(chat.scripted, 11);
+    secondPhase.reply("Nothing to change.");
+    await settle(chat, ownSecond.sessionId);
 
     const later = await startChat(chat, "Where is the cluster?");
     expect(JSON.stringify(later.script.body.messages)).toContain(
@@ -417,7 +516,6 @@ describe("project memory working copy", () => {
     const automation = await createAutomation(chat, {
       name: "note-task",
       projectMemory: true,
-      ownMemory: true,
     });
     const run = await startRun(chat, automation.id);
     run.main.toolRound([
@@ -443,7 +541,14 @@ describe("project memory working copy", () => {
 
     const mainFinish = await waitScript(chat.scripted, 2);
     mainFinish.reply("Project memory prepared.");
-    const phase = await waitScript(chat.scripted, 4);
+    await settle(chat, run.sessionId);
+    const ownAutomation = await createAutomation(chat, {
+      name: "own-note",
+      ownMemory: true,
+    });
+    const ownRun = await startRun(chat, ownAutomation.id);
+    ownRun.main.reply("The first pass is done.");
+    const phase = await waitScript(chat.scripted, 5);
     phase.toolRound([
       {
         id: "own",
@@ -451,17 +556,35 @@ describe("project memory working copy", () => {
         arguments:
           '{"action":"set","topic":"Note","text":"The first pass is done."}',
       },
+      // refused, so the phase asks again and its edit waits for the end
+      {
+        id: "missing",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
+      },
     ]);
     phase.end();
-    const phaseFinish = await waitScript(chat.scripted, 5);
+    const phaseFinish = await waitScript(chat.scripted, 6);
+    expect(notes(chat, ownAutomation.id)).toMatchObject({
+      entries: [],
+      revision: 0,
+    });
+    expect(frames(conn, "memory")).toEqual([
+      {
+        type: "memory",
+        projectId: chat.projectId,
+        automationId: null,
+        revision: 1,
+      },
+    ]);
     phaseFinish.reply("Recorded.");
-    await settle(chat, run.sessionId);
+    await settle(chat, ownRun.sessionId);
 
     expect(notes(chat, null)).toMatchObject({
       entries: [{ topic: "Note", text: "The cluster is in eu-west-1." }],
       revision: 1,
     });
-    expect(notes(chat, automation.id)).toMatchObject({
+    expect(notes(chat, ownAutomation.id)).toMatchObject({
       entries: [{ topic: "Note", text: "The first pass is done." }],
       revision: 1,
     });
@@ -476,7 +599,7 @@ describe("project memory working copy", () => {
       {
         type: "memory",
         projectId: chat.projectId,
-        automationId: automation.id,
+        automationId: ownAutomation.id,
         revision: 1,
       },
     ]);
@@ -735,8 +858,13 @@ describe("memory phase room", () => {
       }),
     );
     active.policy.limits.contextReserve = 0;
+    // refused, so the phase needs a second request
     phase.toolRound([
-      { id: "none", name: "memory_edit", arguments: '{"action":"none"}' },
+      {
+        id: "missing",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
+      },
     ]);
     phase.end();
     await settle(chat, run.sessionId);
@@ -752,7 +880,7 @@ describe("memory phase room", () => {
 });
 
 describe("memory phase input", () => {
-  test("sends only a packet and phase calls, with full-row receipts and the original prompt", async () => {
+  test("sends only a packet and phase calls, with full-row receipts under its own prompt", async () => {
     const page = `Consent required. ${"Page body. ".repeat(2500)}`;
     const chat = await chatApp({
       fetcher: (async (input) => {
@@ -769,10 +897,6 @@ describe("memory phase input", () => {
       }) as typeof fetch,
     });
     chat.app.automationScheduler.stop();
-    const day = 24 * 60 * 60 * 1000;
-    chat.app.now.value =
-      Math.floor(chat.app.now.value / day) * day + day - 1000;
-    const startedDay = new Date(chat.app.now.value).toISOString().slice(0, 10);
     const updated = await chat.admin.call(
       "PATCH",
       `/api/agents/${chat.agentId}`,
@@ -818,12 +942,14 @@ describe("memory phase input", () => {
     const phase = await waitScript(chat.scripted, 3);
     const messages = phase.body.messages as { role: string; content: string }[];
     expect(messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(messages[0]).toEqual(
-      (run.main.body.messages as { role: string; content: string }[])[0],
-    );
-    expect(messages[0]!.content).toContain(`Today is ${startedDay}.`);
-    expect(new Date(chat.app.now.value).toISOString().slice(0, 10)).not.toBe(
-      startedDay,
+    // never the run's prompt, which tells the model to do the task
+    expect(messages[0]).toEqual({
+      role: "system",
+      content: memorySystem(automation.name),
+    });
+    expect(messages[0]!.content).not.toBe(
+      (run.main.body.messages as { role: string; content: string }[])[0]!
+        .content,
     );
     expect(messages[1]!.content).toContain(`failed: ${mainTools[0]!.error}`);
     expect(messages[1]!.content).toContain(
@@ -840,7 +966,11 @@ describe("memory phase input", () => {
     expect(phase.body.enable_thinking).toBe(true);
     expect(phase.body.reasoning_effort).toBe("high");
     phase.toolRound([
-      { id: "none", name: "memory_edit", arguments: '{"action":"none"}' },
+      {
+        id: "missing",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
+      },
     ]);
     phase.end();
     const finish = await waitScript(chat.scripted, 4);
@@ -856,10 +986,10 @@ describe("memory phase input", () => {
     ]);
     expect(continued.slice(0, 2)).toEqual(messages);
     expect(continued.slice(2)).toMatchObject([
-      { role: "assistant", tool_calls: [{ id: "none" }] },
-      { role: "tool", tool_call_id: "none" },
+      { role: "assistant", tool_calls: [{ id: "missing" }] },
+      { role: "tool", tool_call_id: "missing" },
     ]);
-    expect(continued[1]!.content).not.toContain('{"action":"none"}');
+    expect(continued[1]!.content).not.toContain('{"action":"remove"');
     finish.reply("No change.");
     await settle(chat, run.sessionId);
     expect(
@@ -887,7 +1017,7 @@ describe("memory phase input", () => {
     const messages = phase.body.messages as { role: string; content: string }[];
     expect(messages.map((message) => message.role)).toEqual(["system", "user"]);
     expect(messages[1]!.content).toContain(
-      "Last work text:\nThe report is complete, but its call could not run.",
+      "Last work text:\n<answer>\nThe report is complete, but its call could not run.\n</answer>",
     );
     expect(messages[1]!.content).toContain("failed: not run:");
     expect(messages[1]!.content).not.toContain("Run's answer:");
@@ -996,8 +1126,6 @@ describe("memory phase bounds", () => {
       },
     ]);
     phase.end();
-    const phaseFinish = await waitScript(chat.scripted, 5);
-    phaseFinish.reply("Recorded.");
     await settle(chat, run.sessionId);
 
     const rows = chat.app.sessions

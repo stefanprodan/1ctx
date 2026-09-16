@@ -104,17 +104,20 @@ describe("memory round settlement", () => {
     await chat.app.shutdown();
   });
 
-  test("main rounds lose all memory tools and stale calls cannot change either copy", async () => {
+  test("stopped project tools refuse stale calls without stopping another automation's own memory", async () => {
     const chat = await chatApp();
     const read = await source(chat);
     const automation = await createAutomation(chat, {
       projectMemory: true,
+    });
+    const ownAutomation = await createAutomation(chat, {
+      name: "own-note",
       ownMemory: true,
     });
     const run = await startRun(chat, automation.id);
     const active = chat.app.runner.registry.get(run.sessionId)!;
     const main = active.policy.offered.memory!;
-    const own = active.policy.memoryOffered!.memory!;
+    expect(active.policy.memoryOffered).toBeNull();
     const usual = names(run.main).filter((name) => !isMemoryTool(name));
     round(run.main, [
       call("session_read", { id: read.id }),
@@ -128,8 +131,6 @@ describe("memory round settlement", () => {
     expect(names(stopped)).toEqual(usual);
     expect(main.stopped).toBe(true);
     expect(main.read!.pending.size).toBe(0);
-    expect(own.stopped).toBe(false);
-    expect(own.work.failedRounds).toBe(0);
     const stale = [
       call("sessions_list", {}),
       call("session_read", { id: read.id }),
@@ -154,7 +155,15 @@ describe("memory round settlement", () => {
     expect(main.read!.pending.size).toBe(0);
     expect(main.read!.marks.size).toBe(0);
     answer.reply("Done without memory.");
-    const phase = await waitScript(chat.scripted, 6);
+    await settleRun(chat, run.sessionId);
+    const ownRun = await startRun(chat, ownAutomation.id);
+    const ownActive = chat.app.runner.registry.get(ownRun.sessionId)!;
+    expect(ownActive.policy.offered.memory).toBeNull();
+    const own = ownActive.policy.memoryOffered!.memory!;
+    expect(own.stopped).toBe(false);
+    expect(own.work.failedRounds).toBe(0);
+    ownRun.main.reply("Done.");
+    const phase = await waitScript(chat.scripted, 7);
     expect(names(phase)).toEqual(["memory_edit"]);
     round(phase, [
       call("memory_edit", {
@@ -163,9 +172,7 @@ describe("memory round settlement", () => {
         text: "Own note still works.",
       }),
     ]);
-    const finish = await waitScript(chat.scripted, 7);
-    finish.reply("Recorded.");
-    await settleRun(chat, run.sessionId);
+    await settleRun(chat, ownRun.sessionId);
     expect(own.work.failedRounds).toBe(0);
     expect(marks(chat, automation.id)).toEqual([]);
     expect(
@@ -177,7 +184,7 @@ describe("memory round settlement", () => {
     expect(
       chat.app.memory.read({
         projectId: chat.projectId,
-        automationId: automation.id,
+        automationId: ownAutomation.id,
       }).entries,
     ).toEqual([{ topic: "Note", text: "Own note still works." }]);
     await chat.app.shutdown();

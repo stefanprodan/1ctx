@@ -108,12 +108,6 @@ export async function runRound(
   const signal = options.signal ?? send.controller.signal;
   const req =
     options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
-  if (send.systemPrompt === null) {
-    const system = req.messages.find((message) => message.role === "system");
-    if (system === undefined)
-      throw new Error("the request has no system prompt");
-    send.systemPrompt = system.content;
-  }
   const events = deps.chat(send.policy.providerId, req, signal);
   const iterator = events[Symbol.asyncIterator]();
   let replyBytes = bytes(round.content) + bytes(round.reasoning);

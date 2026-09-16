@@ -369,6 +369,9 @@ violation, and every rule has a rejected fixture under
   demand is a send of kind `compact` under the same runner lock.
 - **A note is a working copy until the run ends.** Every send reads the
   project's note once; a run with `ownMemory` reads its automation's too.
+  An automation enables neither memory flag, `ownMemory` alone or
+  `projectMemory` alone. Create and PATCH refuse both on with a 400;
+  PATCH checks the merged row, so one patch can switch between them.
   `projectMemory` gives a memory task the chat list, chat read and edit
   tools in its main rounds; `ownMemory` opens a bounded final phase with
   only the edit tool. A memory chat snapshot adds `Tools:` receipts
@@ -395,6 +398,8 @@ violation, and every rule has a rejected fixture under
   `shared/memory.ts` owns sanitizing, topic equality, diff and the
   rendered count (60 characters per topic, 500 per text, 2,200 per note).
   `memory_edit` takes `set`, `remove` or `none`, naming a topic.
+  The server's memory writing rules live in the edit tool description
+  and the phase ask, not the system prompt.
   Replay checks the text each operation expected and skips conflicts
   with a hand edit or Undo. If a topic's first operation expected text
   but the topic is absent at replay start, every set of it is skipped.
@@ -404,9 +409,12 @@ violation, and every rule has a rejected fixture under
   with the run and used only in its own-note
   phase instruction, never the system prompt or the project note.
   The phase's input is built in `runner/memory-packet.ts`; it never
-  resends main-round history. With guidance, its ask calls for one entry
-  per named topic and all set calls in one ordered round.
-  `ActiveSend.systemPrompt` keeps the first request's prompt.
+  resends main-round history or the run's system prompt, which says to
+  do the task: the phase has its own (`memorySystem()`), and the task,
+  the answer and the tool calls go as a record inside tags. The ask
+  calls for memory_edit calls only, all in one ordered round, and, with
+  guidance, one entry per named topic. A round whose calls are all
+  successful edits ends the phase without another request.
   Only phase rows follow the packet. Its room check
   counts the schemas too and keeps the note whole; unknown windows
   skip counting. Packet caps live in the server, not the note contract.
@@ -621,7 +629,9 @@ violation, and every rule has a rejected fixture under
   rows. `data/automations.ts` keeps the list, the runs and the tally
   current from the frames. A run's chat page names its automation over
   the transcript and has no composer, no Regenerate and no `/compact`;
-  its foot is the state with Stop while it runs (`RunFoot.tsx`).
+  its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
+  done run's length and its send's `tokens` (prompt plus completion over
+  its counted rounds, summed from `usage` by the send queries).
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),

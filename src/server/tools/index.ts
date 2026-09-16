@@ -73,7 +73,7 @@ import type {
 } from "./types.ts";
 
 export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
-export { isMemoryTool } from "./builtin/memory.ts";
+export { isMemoryTool, MEMORY_WRITE_RULES } from "./builtin/memory.ts";
 export { TOOL_CAPS } from "./limits.ts";
 export { parseToolName, parseToolPatch } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";

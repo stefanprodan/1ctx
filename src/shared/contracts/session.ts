@@ -136,6 +136,8 @@ export type SendSummary = {
   memoryError: string | null;
   // edits the commit skipped because the note moved during the run
   memorySkipped: number | null;
+  // prompt plus completion tokens over every round the provider counted
+  tokens: number;
   startedAt: number;
   finishedAt: number | null;
 };

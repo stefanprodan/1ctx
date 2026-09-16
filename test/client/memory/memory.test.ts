@@ -72,6 +72,7 @@ function send(changes: Partial<SendSummary> = {}): SendSummary {
     memoryRound: 3,
     memoryError: null,
     memorySkipped: null,
+    tokens: 0,
     startedAt: 9_000,
     finishedAt: 40_000,
     ...changes,
@@ -149,8 +150,8 @@ describe("the Memory fold's line", () => {
     answer: null,
     send: send(),
   };
-  test("says updated, the skipped count, or the error", () => {
-    expect(memorySummary(node, false).text).toBe("Memory updated");
+  test("says updated with its time, the skipped count, or the error", () => {
+    expect(memorySummary(node, false).text).toBe("Memory updated in 30 s");
     expect(memorySummary({ ...node, rows: [run[2]!] }, false).text).toBe(
       "Memory unchanged",
     );
@@ -169,7 +170,7 @@ describe("the Memory fold's line", () => {
     ).toBe("Memory not updated, 2 edits refused");
     expect(
       memorySummary({ ...node, send: send({ memorySkipped: 2 }) }, false).text,
-    ).toBe("Memory updated, 2 edits no longer applied");
+    ).toBe("Memory updated in 30 s, 2 edits no longer applied");
     expect(
       memorySummary({ ...node, send: send({ memoryError: "no room" }) }, false)
         .text,

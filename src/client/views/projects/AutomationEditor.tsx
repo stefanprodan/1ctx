@@ -43,6 +43,8 @@ import {
   dirtyOf,
   draftOf,
   followDeadlineLimit,
+  MEMORY_MODES,
+  pickMemory,
   requestOf,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
@@ -173,29 +175,39 @@ function Editor({
       </Section>
       <Section title="Memory" text="What a run remembers">
         <div class="automations-stack">
-          <label class="automations-switch">
-            <input
-              type="checkbox"
-              name="ownMemory"
-              checked={d.ownMemory}
-              disabled={off || !takesTools}
-              onChange={(e) =>
-                set({
-                  ownMemory: (e.currentTarget as HTMLInputElement).checked,
-                })
-              }
-            />
-            Keeps its own memory
-          </label>
+          <fieldset
+            class={`automations-seg${
+              invalid("memory") ? " automations-seg-invalid" : ""
+            }`}
+            aria-label="Memory"
+          >
+            {MEMORY_MODES.map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                name={mode.value === d.memory ? "memory" : undefined}
+                class={`automations-seg-option${
+                  d.memory === mode.value ? " automations-seg-on" : ""
+                }`}
+                aria-pressed={d.memory === mode.value}
+                disabled={off || (!takesTools && mode.value !== "none")}
+                onClick={() => set(pickMemory(d, mode.value))}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </fieldset>
+          <FieldError save={save} field="memory" />
           {/* a refusal of the guidance keeps it in sight, or the save
               fails with nothing to show */}
-          {((d.ownMemory && takesTools) || invalid("memoryGuidance")) && (
+          {((d.memory === "own" && takesTools) ||
+            invalid("memoryGuidance")) && (
             <label class="field automations-guidance">
-              <span class="label">What to remember</span>
               <textarea
                 name="memoryGuidance"
+                aria-label="What to remember"
                 rows={4}
-                placeholder="Sources that fail: hosts and why"
+                placeholder="What to remember"
                 aria-invalid={invalid("memoryGuidance") || undefined}
                 disabled={off}
                 value={d.memoryGuidance}
@@ -206,35 +218,9 @@ function Editor({
                   })
                 }
               />
-              {invalid("memoryGuidance") ? (
-                <FieldError save={save} field="memoryGuidance" />
-              ) : (
-                <span class="hint">
-                  Name the topics the note keeps, one per line. Only the step
-                  after the answer reads this.
-                </span>
-              )}
+              <FieldError save={save} field="memoryGuidance" />
             </label>
           )}
-          <label class="automations-switch">
-            <input
-              type="checkbox"
-              name="projectMemory"
-              checked={d.projectMemory}
-              disabled={off || !takesTools}
-              onChange={(e) =>
-                set({
-                  projectMemory: (e.currentTarget as HTMLInputElement).checked,
-                })
-              }
-            />
-            Updates project memory from chats
-          </label>
-          <span class="hint">
-            {takesTools
-              ? "Its own memory is kept at the end of every run. A task that updates project memory reads the chats it has not read and edits the note on the Memory tab."
-              : "This agent's model takes no tools, so it keeps no memory."}
-          </span>
         </div>
       </Section>
       <Section title="When" text="In the time zone you pick">

@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import type { WorkNode } from "./rows.ts";
-import type { Live } from "./stream.ts";
+import { type Live, leadIn } from "./stream.ts";
 import { Think } from "./Think.tsx";
 import { Tool } from "./Tool.tsx";
 import { memorySummary, workJustEnded, workSummary } from "./Work.model.ts";
@@ -64,6 +64,15 @@ export function Work({
   const replyLive =
     running && reply !== null ? (live.get(reply.id) ?? null) : null;
   const replyReasoning = replyLive?.reasoning ?? reply?.reasoning ?? "";
+  // the reply's words while they may still be a work round's, the ones
+  // Reply leaves out
+  const replyLead =
+    replyLive !== null &&
+    reply?.slot === null &&
+    leadIn(replyLive.content) &&
+    replyLive.content.trim() !== ""
+      ? replyLive.content
+      : "";
 
   return (
     <details
@@ -108,9 +117,13 @@ export function Work({
             </div>
           );
         })}
-        {reply !== null && replyReasoning !== "" && (
+        {reply !== null && (replyReasoning !== "" || replyLead !== "") && (
           <div class="transcript-work-round">
-            <Think message={reply} live={replyLive} />
+            <Think message={reply} live={replyLive}>
+              {replyLead !== "" && (
+                <div class="transcript-work-plain">{replyLead}</div>
+              )}
+            </Think>
           </div>
         )}
       </div>

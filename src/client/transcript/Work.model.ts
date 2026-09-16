@@ -128,7 +128,7 @@ export function memorySummary(
     const refused = edits.filter((row) => row.status === "failed").length;
     text =
       changed > 0
-        ? "Memory updated"
+        ? `Memory updated in ${secs(base.durationMs)}`
         : refused > 0
           ? `Memory not updated, ${refused} ${refused === 1 ? "edit" : "edits"} refused`
           : "Memory unchanged";

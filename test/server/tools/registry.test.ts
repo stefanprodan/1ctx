@@ -71,4 +71,21 @@ describe("the registry's result cleaning", () => {
       error: true,
     });
   });
+
+  test("names a timeout past the limit when the tool threw its own words first", async () => {
+    const tool: Tool = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      timeoutMs: 20,
+      run: async () => {
+        await Bun.sleep(30);
+        throw new Error("MCP request timed out");
+      },
+    };
+    expect(await new Registry([tool]).run(call, context())).toEqual({
+      content: "Error: tool timed out after 0 seconds",
+      error: true,
+    });
+  });
 });

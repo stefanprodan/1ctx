@@ -77,8 +77,6 @@ export type ActiveSend = {
   used: number | null;
   // the change since the previous non-compact send, fixed for its life
   mcpNote: string;
-  // The phase reuses the first request's prompt even across midnight.
-  systemPrompt: string | null;
   // the current round's launched tool rows still streaming, keyed by
   // the call object so duplicate provider call ids remain distinct
   openTools: Map<ToolCall, string>;
@@ -165,7 +163,6 @@ export function newSend(fields: {
     summarizing: fields.summarizing ?? false,
     used: fields.used ?? null,
     mcpNote: "",
-    systemPrompt: null,
     openTools: new Map(),
     tools: null,
     seq: 0,

@@ -38,6 +38,7 @@ export class Registry {
   async run(call: ToolCall, ctx: ToolContext): Promise<ToolResult> {
     let timeoutMs = ctx.caps.callTimeoutMs;
     let timeoutSignal: AbortSignal | null = null;
+    let started = 0;
     try {
       const tool = this.byName.get(call.name);
       if (!tool) throw new Error(this.unknown(call.name));
@@ -55,6 +56,7 @@ export class Registry {
       ) {
         throw new Error(`arguments for tool "${call.name}" must be an object`);
       }
+      started = performance.now();
       timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
       const text = await tool.run(parsed as Record<string, unknown>, {
@@ -63,9 +65,15 @@ export class Registry {
       });
       return { content: clean(String(text), ctx.caps.resultCut), error: false };
     } catch (error) {
+      // a tool with its own timer of the same length (an MCP call) can
+      // throw its own words a moment before this one fires; past the
+      // limit, the failure is this timeout either way
+      const late =
+        timeoutSignal !== null &&
+        (timeoutSignal.aborted || performance.now() - started >= timeoutMs);
       const failure =
-        timeoutSignal?.aborted && !ctx.signal.aborted
-          ? timeoutSignal.reason
+        late && !ctx.signal.aborted
+          ? new DOMException("the tool call timed out", "TimeoutError")
           : error;
       const message = describe(failure, timeoutMs);
       return {

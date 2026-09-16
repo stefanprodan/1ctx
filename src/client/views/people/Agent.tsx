@@ -22,6 +22,7 @@ import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { ago, longDate } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { onResize } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -56,9 +57,7 @@ function Prompt({ text, tokens }: { text: string; tokens: number }) {
       if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
+    return onResize(node, measure);
   }, [text, open, long]);
   return (
     <RowsCard label="Prompt" hint={tokensText(tokens)}>

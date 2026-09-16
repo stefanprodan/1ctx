@@ -22,6 +22,12 @@ const EDIT = {
   name: "memory_edit",
   arguments: '{"action":"set","topic":"Note","text":"Stopped at step two."}',
 };
+// refused, so the phase asks again and has an open request to end
+const REFUSED = {
+  id: "m2",
+  name: "memory_edit",
+  arguments: '{"action":"remove","topic":"Missing"}',
+};
 
 describe("the memory phase boundary", () => {
   test("opens the phase in the envelope that closes the answer", async () => {
@@ -80,7 +86,7 @@ describe("the memory phase boundary", () => {
     const run = await startRun(chat, automation.id);
     run.main.reply("Done.");
     const phase = await waitScript(chat.scripted, 2);
-    phase.toolRound([EDIT]);
+    phase.toolRound([EDIT, REFUSED]);
     phase.end();
     const open = await waitScript(chat.scripted, 3);
     await chat.app.shutdown();
@@ -105,7 +111,7 @@ describe("the memory phase boundary", () => {
     const run = await startRun(chat, automation.id);
     run.main.reply("Done.");
     const phase = await waitScript(chat.scripted, 2);
-    phase.toolRound([EDIT]);
+    phase.toolRound([EDIT, REFUSED]);
     phase.end();
     await waitScript(chat.scripted, 3);
     // the process is gone before the phase ends: a fresh app over the

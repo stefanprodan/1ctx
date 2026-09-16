@@ -4,11 +4,11 @@
 import { describe, expect, test } from "bun:test";
 import { MemoryMarkerStore } from "../../../src/server/automations/memory.ts";
 import { parseSaveAutomation } from "../../../src/server/automations/parse.ts";
-import { createAutomation } from "../../helpers/automations.ts";
+import { automationBody, createAutomation } from "../../helpers/automations.ts";
 import { chatApp } from "../../helpers/chat.ts";
 
 describe("automation memory flags", () => {
-  test("requires both flags on create and stores either flag on patch", async () => {
+  test("requires both flags on create", () => {
     expect(() =>
       parseSaveAutomation({
         name: "memory-task",
@@ -20,6 +20,55 @@ describe("automation memory flags", () => {
         retentionDays: 30,
       }),
     ).toThrow("missing field projectMemory");
+  });
+
+  test("refuses both memory flags on create without storing a row", async () => {
+    const chat = await chatApp();
+    const response = await chat.member.call(
+      "POST",
+      `/api/projects/${chat.projectId}/automations`,
+      {
+        body: automationBody(chat, {
+          projectMemory: true,
+          ownMemory: true,
+        }),
+      },
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "ownMemory and projectMemory cannot both be on",
+    });
+    expect(chat.app.automations.byProject(chat.projectId)).toEqual([]);
+    await chat.app.shutdown();
+  });
+
+  test.each([
+    { projectMemory: true, ownMemory: false },
+    { projectMemory: false, ownMemory: true },
+  ])(
+    "refuses a patch that enables the other memory flag: %j",
+    async (flags) => {
+      const chat = await chatApp();
+      const automation = await createAutomation(chat, flags);
+      const response = await chat.member.call(
+        "PATCH",
+        `/api/automations/${automation.id}`,
+        {
+          body: flags.projectMemory
+            ? { ownMemory: true }
+            : { projectMemory: true },
+        },
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "ownMemory and projectMemory cannot both be on",
+      });
+      expect(chat.app.automations.byId(automation.id)).toEqual(automation);
+      await chat.app.shutdown();
+    },
+  );
+
+  test("switches from project memory to own memory in one patch", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, {
       projectMemory: true,
@@ -29,10 +78,15 @@ describe("automation memory flags", () => {
     const changed = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
-      { body: { ownMemory: true } },
+      { body: { projectMemory: false, ownMemory: true } },
     );
+    expect(changed.status).toBe(200);
     expect((await changed.json()).automation).toMatchObject({
-      projectMemory: true,
+      projectMemory: false,
+      ownMemory: true,
+    });
+    expect(chat.app.automations.byId(automation.id)).toMatchObject({
+      projectMemory: false,
       ownMemory: true,
     });
     await chat.app.shutdown();

@@ -62,6 +62,7 @@ function send(status: SendSummary["status"]): SendSummary {
     memoryRound: null,
     memoryError: null,
     memorySkipped: null,
+    tokens: 0,
     startedAt: 10_000,
     finishedAt: status === "running" ? null : 20_000,
   };

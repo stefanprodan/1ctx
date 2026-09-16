@@ -144,6 +144,7 @@ const sent: SendSummary = {
   memoryRound: null,
   memoryError: null,
   memorySkipped: null,
+  tokens: 0,
   startedAt: 10,
   finishedAt: null,
 };

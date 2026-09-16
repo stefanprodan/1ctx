@@ -38,6 +38,7 @@ import { projectAgents, stopSession } from "../../data/sessions.ts";
 import { longDate, reason, stamp, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { onResize } from "../../lib/resize.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsNote } from "../../ui/Rows.tsx";
@@ -165,9 +166,7 @@ function Instructions({
       if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
+    return onResize(node, measure);
   }, [text, open, long]);
   return (
     <>

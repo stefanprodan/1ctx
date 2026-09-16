@@ -7,6 +7,12 @@
 // cost a local model tens of seconds before its first token and the
 // phase needs only what each call came back as. Pure, over the rows and a
 // token count.
+//
+// The phase has its own system prompt, never the run's: the run's says
+// to do the task, and a model that reads the task again under it goes
+// back to the task, fetching with tools it no longer has and writing the
+// answer again. The run is given as a record inside tags for the same
+// reason.
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
@@ -18,6 +24,7 @@ import {
   type ChatTool,
   wireTools,
 } from "../providers/index.ts";
+import { MEMORY_WRITE_RULES } from "../tools/index.ts";
 
 // These caps bound provider input, not the note or its public contract.
 export const MEMORY_ANSWER_CHARS = 8000;
@@ -26,6 +33,8 @@ export const MEMORY_EXCERPT_CHARS = 400;
 const MEMORY_ARGUMENT_CHARS = 400;
 
 export type MemoryPacket = {
+  // the automation whose note the phase edits, named in its system prompt
+  automation: string;
   sendId: string;
   memoryRound: number;
   cause: SendCause;
@@ -36,7 +45,6 @@ export type MemoryPacket = {
 };
 
 type MemoryContext = {
-  system: string;
   phase: ChatMessageIn[];
   tools: ChatTool[];
   contextLength: number | null;
@@ -110,9 +118,18 @@ function lastReceipts(items: Receipt[]): Receipt[] {
   return items.slice(start);
 }
 
+export function memorySystem(automation: string): string {
+  return `You keep the memory of the ${automation} automation. Its run is over. You do not do its task, call any tool other than memory_edit, or write an answer. You read the record of the run and edit the note with memory_edit calls, and nothing else.`;
+}
+
+// a closing tag inside the record would end it early
+function fenced(tag: string, text: string): string {
+  const body = text.replace(new RegExp(`<(?=\\s*/?\\s*${tag}\\b)`, "gi"), "‹");
+  return `<${tag}>\n${body}\n</${tag}>`;
+}
+
 function currentEntries(entries: readonly MemoryEntry[]): string {
-  const version =
-    "This is the version to edit; the system prompt's copy is the one the run started on.";
+  const version = "This is the version to edit.";
   if (entries.length === 0) {
     return `This automation's own memory is empty. Use set to write its first entry.\n${memorySize(entries)} characters.\n${version}`;
   }
@@ -139,24 +156,27 @@ function phaseInstruction(
         ? `The run failed${packet.error === null ? "." : `: ${packet.error}`}`
         : "The run finished.";
   return [
-    ending,
-    `Task:\n${task}`,
-    ...(answer === "" ? [] : [`${answerLabel}:\n${answer}`]),
+    `${ending}\nWhat follows is the record of the run, to read, not to do again.`,
+    `The run was asked:\n${fenced("task", task)}`,
+    ...(answer === "" ? [] : [`${answerLabel}:\n${fenced("answer", answer)}`]),
     ...(items.length === 0
       ? []
-      : [`Tool receipts:\n${items.map(receiptText).join("\n\n")}`]),
+      : [
+          `The run's tool calls:\n${fenced("tool_calls", items.map(receiptText).join("\n\n"))}`,
+        ]),
     ...(packet.guidance === ""
       ? []
       : [`What to remember:\n${packet.guidance}`]),
     currentEntries(packet.entries),
-    "memory_edit writes this note and no other. The project memory in the system prompt is a different note it never edits.",
-    "A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. Use none when there is nothing to record.",
+    "A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic.",
+    MEMORY_WRITE_RULES,
     ...(packet.guidance === ""
       ? []
       : [
-          "Write each topic named in What to remember as its own entry with its own set call. Calls in one round run in order, so send them all in one round.",
+          "For facts worth keeping, write each topic named in What to remember as its own entry with its own set call.",
         ]),
-    "Record what the next run needs: what was found, what was done, where this run stopped, and what is left.",
+    "Before sending, check each text is under 500 characters and the note stays under 2,200; remove or shorten topics in the same round.",
+    "Reply with memory_edit calls only, no text. Calls in one round run in order, so send every edit in one round; the phase ends after a round whose edits all succeed.",
   ].join("\n\n");
 }
 
@@ -181,7 +201,7 @@ export function memoryMessages(
   let answer = cut(answerRow?.content ?? "", MEMORY_ANSWER_CHARS);
   let items = lastReceipts(receipts(rows));
   const build = (): ChatMessageIn[] => [
-    { role: "system", content: context.system },
+    { role: "system", content: memorySystem(packet.automation) },
     {
       role: "user",
       content: phaseInstruction(
