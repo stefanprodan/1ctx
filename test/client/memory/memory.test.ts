@@ -155,6 +155,19 @@ describe("the Memory fold's line", () => {
     expect(memorySummary({ ...node, rows: [run[2]!] }, false).text).toBe(
       "Memory unchanged",
     );
+    const none = message({
+      ...run[2]!,
+      toolCalls: [
+        { id: "c1", name: "memory_edit", arguments: '{"action":"none"}' },
+      ],
+    });
+    expect(memorySummary({ ...node, rows: [none, run[3]!] }, false).text).toBe(
+      "Memory unchanged",
+    );
+    const refused = message({ ...run[3]!, status: "failed" });
+    expect(
+      memorySummary({ ...node, rows: [run[2]!, refused, refused] }, false).text,
+    ).toBe("Memory not updated, 2 edits refused");
     expect(
       memorySummary({ ...node, send: send({ memorySkipped: 2 }) }, false).text,
     ).toBe("Memory updated, 2 edits no longer applied");

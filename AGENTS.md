@@ -389,12 +389,18 @@ violation, and every rule has a rejected fixture under
   rendered count (60 characters per topic, 500 per text, 2,200 per note).
   `memory_edit` takes `set`, `remove` or `none`, naming a topic.
   Replay checks the text each operation expected and skips conflicts
-  with a hand edit or Undo. An automation's `memoryGuidance` is at most
-  2,000 bytes, snapshotted with the run and used only in its own-note
+  with a hand edit or Undo. If a topic's first operation expected text
+  but the topic is absent at replay start, every set of it is skipped.
+  Refusals carry the working entries' texts, their sizes and the total;
+  an oversized text asks for separate topics, one set call each.
+  An automation's `memoryGuidance` is at most 2,000 bytes, snapshotted
+  with the run and used only in its own-note
   phase instruction, never the system prompt or the project note.
   The phase's input is built in `runner/memory-packet.ts`; it never
-  resends main-round history. `ActiveSend.systemPrompt` keeps the first
-  request's prompt. Only phase rows follow the packet. Its room check
+  resends main-round history. With guidance, its ask calls for one entry
+  per named topic and all set calls in one ordered round.
+  `ActiveSend.systemPrompt` keeps the first request's prompt.
+  Only phase rows follow the packet. Its room check
   counts the schemas too and keeps the note whole; unknown windows
   skip counting. Packet caps live in the server, not the note contract.
 - **An automation fires runs, and a run is a session.** An automation

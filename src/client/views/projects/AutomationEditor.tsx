@@ -187,7 +187,9 @@ function Editor({
             />
             Keeps its own memory
           </label>
-          {d.ownMemory && takesTools && (
+          {/* a refusal of the guidance keeps it in sight, or the save
+              fails with nothing to show */}
+          {((d.ownMemory && takesTools) || invalid("memoryGuidance")) && (
             <label class="field automations-guidance">
               <span class="label">What to remember</span>
               <textarea

@@ -151,6 +151,11 @@ function phaseInstruction(
     currentEntries(packet.entries),
     "memory_edit writes this note and no other. The project memory in the system prompt is a different note it never edits.",
     "A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. Use none when there is nothing to record.",
+    ...(packet.guidance === ""
+      ? []
+      : [
+          "Write each topic named in What to remember as its own entry with its own set call. Calls in one round run in order, so send them all in one round.",
+        ]),
     "Record what the next run needs: what was found, what was done, where this run stopped, and what is left.",
   ].join("\n\n");
 }

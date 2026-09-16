@@ -62,10 +62,57 @@ describe("memory store", () => {
     });
     expect(JSON.stringify({ current, operations })).toBe(before);
   });
+
+  test.each(["Undo", "hand removal", "hand rename"])(
+    "remove then set never resurrects a topic after %s",
+    async (change) => {
+      const chat = await chatApp();
+      try {
+        const target = { projectId: chat.projectId, automationId: null };
+        const store = chat.app.memory;
+        store.save(
+          target,
+          [{ topic: "Note", text: "old" }],
+          0,
+          chat.memberId,
+          chat.app.now.value,
+        );
+        const work = memoryWork(store.read(target));
+        work.entries = [{ topic: "NOTE", text: "run" }];
+        work.operations = [
+          { action: "remove", topic: "Note", expected: "old" },
+          { action: "set", topic: "NOTE", text: "run", expected: null },
+        ];
+        if (change === "Undo") {
+          store.undo(target, 1, chat.memberId, chat.app.now.value);
+        } else {
+          store.save(
+            target,
+            change === "hand rename" ? [{ topic: "Renamed", text: "old" }] : [],
+            1,
+            chat.memberId,
+            chat.app.now.value,
+          );
+        }
+        const current = store.read(target);
+        const before = structuredClone(work);
+        expect(store.commit(work, "unused", chat.app.now.value)).toEqual({
+          row: current,
+          skipped: 1,
+          skippedOperations: [1],
+          changed: false,
+        });
+        expect(store.read(target)).toEqual(current);
+        expect(work).toEqual(before);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
 });
 
 describe("memory routes", () => {
-  test("names invalid topics, texts and the entry that crosses the budget", async () => {
+  test("names invalid topics, texts and the cuts that meet the budget", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat);
     const invalid: { entries: unknown; words: string }[] = [
@@ -102,7 +149,7 @@ describe("memory routes", () => {
           topic: `Topic ${i + 1}`,
           text: "x".repeat(500),
         })),
-        words: "Cut or remove Topic 5",
+        words: "free 363. Cut or remove Topic 5.",
       },
     ];
     for (const path of [

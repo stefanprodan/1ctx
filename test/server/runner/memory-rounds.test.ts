@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import type {
+  MemoryCommit,
+  MemoryRow,
+} from "../../../src/server/memory/index.ts";
 import type { ToolCall } from "../../../src/server/providers/index.ts";
+import { FINALIZE_RETRY_MS } from "../../../src/server/runner/index.ts";
 import { isMemoryTool } from "../../../src/server/tools/index.ts";
 import {
   createAutomation,
@@ -14,6 +20,7 @@ import {
   chatApp,
   type Script,
   startChat,
+  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 
@@ -178,6 +185,152 @@ describe("memory round settlement", () => {
 });
 
 describe("pending memory read marks", () => {
+  test.serial(
+    "a stale-revision write rolls back and retries without resurrecting an undone topic",
+    async () => {
+      const chat = await chatApp();
+      const skippedRead = await source(chat);
+      const keptRead = await source(chat);
+      const target = { projectId: chat.projectId, automationId: null };
+      const store = chat.app.memory;
+      const previous = [{ topic: "Other", text: "hand" }];
+      store.save(target, previous, 0, chat.memberId, chat.app.now.value);
+      store.save(
+        target,
+        [...previous, { topic: "Note", text: "old" }],
+        1,
+        chat.memberId,
+        chat.app.now.value,
+      );
+      const automation = await createAutomation(chat, { projectMemory: true });
+      const run = await startRun(chat, automation.id);
+      const active = chat.app.runner.registry.get(run.sessionId)!;
+      round(run.main, [
+        call("memory_edit", { action: "remove", topic: "Note" }),
+        call("session_read", { id: skippedRead.id }),
+        call("memory_edit", { action: "set", topic: "NOTE", text: "run" }),
+        call("session_read", { id: keptRead.id }),
+        call("memory_edit", { action: "set", topic: "New", text: "keep" }),
+      ]);
+      const answer = await waitScript(chat.scripted, 4);
+      const work = active.policy.offered.memory!.work;
+      expect(work.baseRevision).toBe(2);
+      expect(
+        active.policy.offered.memory!.read!.marks.get(skippedRead.id)
+          ?.operation,
+      ).toBe(1);
+      expect(
+        active.policy.offered.memory!.read!.marks.get(keptRead.id)?.operation,
+      ).toBe(2);
+      const before = structuredClone(work);
+      const undone = store.undo(target, 2, chat.memberId, chat.app.now.value);
+      expect(undone.entries).toEqual(previous);
+      const commits: MemoryCommit[] = [];
+      const writes: {
+        inTransaction: boolean;
+        row: MemoryRow;
+        marks: ReturnType<typeof marks>;
+      }[] = [];
+      const seen: BusEvent[] = [];
+      const stop = subscribe((event) => {
+        if (
+          event.type === "memory.changed" &&
+          event.data.projectId === chat.projectId
+        ) {
+          seen.push(event);
+        }
+      });
+      const commit = store.commit.bind(store);
+      const finish = chat.app.sessions.finishSend.bind(chat.app.sessions);
+      store.commit = (...args) => {
+        const result = commit(...args);
+        commits.push(structuredClone(result));
+        return result;
+      };
+      chat.app.sessions.finishSend = (...args) => {
+        writes.push({
+          inTransaction: chat.app.db.inTransaction,
+          row: store.read(target),
+          marks: marks(chat, automation.id),
+        });
+        if (commits.length === 1) {
+          throw new Error("rollback after the memory write");
+        }
+        return finish(...args);
+      };
+      try {
+        answer.reply("Done.");
+        await tick();
+        expect(commits).toHaveLength(1);
+        expect(writes).toEqual([
+          {
+            inTransaction: true,
+            row: commits[0]!.row,
+            marks: [
+              {
+                session_id: keptRead.id,
+                read_activity_at: keptRead.lastActivityAt,
+              },
+            ],
+          },
+        ]);
+        expect(writes[0]!.row).toMatchObject({
+          revision: 4,
+          previous,
+          entries: [...previous, { topic: "New", text: "keep" }],
+        });
+        expect(store.read(target)).toEqual(undone);
+        expect(marks(chat, automation.id)).toEqual([]);
+        expect(seen).toEqual([]);
+        expect(work).toEqual(before);
+
+        chat.app.now.value += FINALIZE_RETRY_MS;
+        await settleRun(chat, run.sessionId);
+        expect(commits).toHaveLength(2);
+        expect(writes).toHaveLength(2);
+        for (const result of commits) {
+          expect(result).toMatchObject({
+            changed: true,
+            skipped: 1,
+            skippedOperations: [1],
+            row: {
+              entries: [...previous, { topic: "New", text: "keep" }],
+              previous,
+              revision: 4,
+              updatedBy: null,
+              sessionId: run.sessionId,
+            },
+          });
+        }
+        expect(store.read(target)).toEqual(commits[1]!.row);
+        expect(writes[1]!.inTransaction).toBe(true);
+        expect(seen).toEqual([
+          {
+            type: "memory.changed",
+            data: { ...target, revision: 4 },
+          },
+        ]);
+        expect(marks(chat, automation.id)).toEqual([
+          {
+            session_id: keptRead.id,
+            read_activity_at: keptRead.lastActivityAt,
+          },
+        ]);
+        expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+          status: "done",
+          memorySkipped: 1,
+        });
+        expect(work).toEqual(before);
+      } finally {
+        store.commit = commit;
+        chat.app.sessions.finishSend = finish;
+        stop();
+        chat.app.now.value += FINALIZE_RETRY_MS;
+        await chat.app.shutdown();
+      }
+    },
+  );
+
   for (const action of [
     "create",
     "set",

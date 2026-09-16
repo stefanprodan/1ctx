@@ -110,15 +110,28 @@ export function memorySummary(
   } else if (send?.memoryError != null) {
     text = `Memory not updated. ${send.memoryError}`;
   } else {
-    // the commit is the edits that went through; none means the note
-    // stayed as it was
+    // the commit is the edits that went through; a none changes nothing,
+    // and refused edits alone leave the note as it was
+    const calls = new Map(
+      node.rows.flatMap((row) =>
+        (row.toolCalls ?? []).map((call) => [call.id, call.arguments]),
+      ),
+    );
     const edits = node.rows.filter(
+      (row) => row.kind === "tool" && row.toolName === "memory_edit",
+    );
+    const changed = edits.filter(
       (row) =>
-        row.kind === "tool" &&
-        row.toolName === "memory_edit" &&
-        row.status === "done",
+        row.status === "done" &&
+        !/"action"\s*:\s*"none"/.test(calls.get(row.toolCallId ?? "") ?? ""),
     ).length;
-    text = edits === 0 ? "Memory unchanged" : "Memory updated";
+    const refused = edits.filter((row) => row.status === "failed").length;
+    text =
+      changed > 0
+        ? "Memory updated"
+        : refused > 0
+          ? `Memory not updated, ${refused} ${refused === 1 ? "edit" : "edits"} refused`
+          : "Memory unchanged";
     if (send?.memorySkipped != null && send.memorySkipped > 0) {
       text += `, ${send.memorySkipped} edits no longer applied`;
     }

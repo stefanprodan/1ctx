@@ -97,10 +97,25 @@ export function replay(
 ): { entries: MemoryEntry[]; skipped: number; skippedOperations: number[] } {
   let entries = [...current];
   const skippedOperations: number[] = [];
+  const initialTopics = new Set(
+    current.map((entry) => entry.topic.toLowerCase()),
+  );
+  const firstExpected = new Map<string, string | null>();
   for (const [index, operation] of operations.entries()) {
     if (operation.action === "none") continue;
+    const topic = operation.topic.toLowerCase();
+    if (!firstExpected.has(topic)) firstExpected.set(topic, operation.expected);
+    // A no-op remove must not let a later set resurrect a hand-deleted topic.
+    if (
+      operation.action === "set" &&
+      firstExpected.get(topic) !== null &&
+      !initialTopics.has(topic)
+    ) {
+      skippedOperations.push(index);
+      continue;
+    }
     const current = entries.find(
-      (entry) => entry.topic.toLowerCase() === operation.topic.toLowerCase(),
+      (entry) => entry.topic.toLowerCase() === topic,
     );
     const resultThere =
       operation.action === "remove"

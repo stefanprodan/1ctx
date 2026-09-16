@@ -51,6 +51,7 @@ const LIST_TAIL =
   "This run has a limited number of rounds. Record what you learned with memory_edit before reading more chats.";
 const READ_TAIL =
   "Chat read. Record what matters with memory_edit action set, or action none when there is nothing, before reading the next chat.";
+const ARGUMENT_ADVICE = "Retry with the arguments the action takes.";
 
 export function makeMemoryHandle(
   work: MemoryWork,
@@ -139,13 +140,13 @@ function throughQueue<T>(
 
 function noArgs(args: Record<string, unknown>): void {
   if (Object.keys(args).length !== 0)
-    throw new Error("arguments must be empty");
+    throw new Error(`arguments must be empty. ${ARGUMENT_ADVICE}`);
 }
 
 function text(args: Record<string, unknown>, name: string): string {
   const value = args[name];
   if (typeof value !== "string" || value === "") {
-    throw new Error(`${name} must be text`);
+    throw new Error(`${name} must be text. ${ARGUMENT_ADVICE}`);
   }
   return value;
 }
@@ -279,13 +280,22 @@ function editTool(handle: MemoryHandle): Tool {
       const edit = parseEdit(args);
       const result = applyEdit(handle.work.entries, edit);
       if (!result.ok) {
+        // The shared words are also the page's, so the advice that names
+        // the tool's calls is added here.
         const advice =
-          result.kind === "match"
-            ? "Use one of the topics in the note."
+          result.kind === "match" && handle.work.entries.length > 0
+            ? " Use one of the topics in the note."
             : result.kind === "budget"
-              ? "Merge or remove entries and retry."
-              : "Retry with the arguments the action takes.";
-        throw new Error(`${result.reason} ${advice}`);
+              ? " Shorten or remove entries, or leave out what the next run does not need."
+              : /^The text of .+ the limit is/.test(result.reason)
+                ? " Split it into several topics, one set call each, or cut it."
+                : "";
+        // the page names the entry to cut; a run is told what to leave out
+        const reason =
+          result.kind === "budget"
+            ? result.reason.replace(/ Cut or remove .+\.$/, "")
+            : result.reason;
+        throw new Error(`${reason}${advice}`);
       }
       const operation =
         edit.action === "none"
@@ -326,7 +336,7 @@ function parseEdit(args: Record<string, unknown>): MemoryEdit {
   if (action === "remove") {
     return { action, topic: normalizeTopic(text(args, "topic")) };
   }
-  throw new Error("action must be set, remove or none");
+  throw new Error(`action must be set, remove or none. ${ARGUMENT_ADVICE}`);
 }
 
 // every refusal hands back the note as it stands, so the next call names
@@ -335,12 +345,12 @@ function refusal(handle: MemoryHandle, reason: string): string {
   const entries = handle.work.entries;
   const size = `${memorySize(entries)} characters.`;
   if (entries.length === 0) {
-    return `${reason}\nThe note is empty, use set.\n${size}`;
+    return `${reason}\n${size}`;
   }
   const lines = entries.map((entry, index) => {
-    return `${index + 1}. ${entry.topic} [${entry.text.length}/${MEMORY_ENTRY_CHARS}]`;
+    return `${index + 1}. ${entry.topic} [${entry.text.length}/${MEMORY_ENTRY_CHARS}]\n${entry.text}`;
   });
-  return `${reason}\n${size}\n${lines.join("\n")}`;
+  return `${reason}\n${lines.join("\n\n")}\n${size}`;
 }
 
 export function makeMemoryTools(

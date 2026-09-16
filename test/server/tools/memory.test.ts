@@ -583,13 +583,15 @@ describe("memory tool handles", () => {
       }),
     );
     expect(oversized.error).toBe(true);
-    expect(oversized.content).toContain(
-      "The text of Last snapshot is 612 characters, the limit is 500, cut 112.",
+    const currentNote = entries
+      .map(
+        (entry, index) =>
+          `${index + 1}. ${entry.topic} [${entry.text.length}/500]\n${entry.text}`,
+      )
+      .join("\n\n");
+    expect(oversized.content).toBe(
+      `Error: The text of Last snapshot is 612 characters, the limit is 500, cut 112. Split it into several topics, one set call each, or cut it.\n${currentNote}\n1,741 of 2,200 characters.`,
     );
-    expect(oversized.content).toContain("1,741 of 2,200");
-    expect(oversized.content).toContain("3. Last snapshot [346/500]");
-    expect(oversized.content).toContain("4. Fourth [343/500]");
-    expect(oversized.content).not.toContain("x".repeat(100));
     expect(oversized.content).not.toContain("x".repeat(612));
     handle.work.entries = [
       { topic: "First", text: "a".repeat(500) },
@@ -601,10 +603,16 @@ describe("memory tool handles", () => {
     const full = await call(
       JSON.stringify({ action: "set", topic: "Fifth", text: "e".repeat(489) }),
     );
-    expect(full.content).toContain(
-      "The note would be 2,450 of 2,200, free 250.",
+    const fullNote = handle.work.entries
+      .map(
+        (entry, index) =>
+          `${index + 1}. ${entry.topic} [${entry.text.length}/500]\n${entry.text}`,
+      )
+      .join("\n\n");
+    expect(full.content).toBe(
+      `Error: The note would be 2,450 of 2,200, free 250. Shorten or remove entries, or leave out what the next run does not need.\n${fullNote}\n1,950 of 2,200 characters.`,
     );
-    expect(full.content).toContain("1,950 of 2,200");
+    expect(full.content).not.toContain("retry");
     expect(full.error).toBe(true);
     expect(full.content).not.toContain("e".repeat(489));
     handle.work.entries = [...entries];
@@ -620,12 +628,9 @@ describe("memory tool handles", () => {
     ]) {
       const result = await call(args);
       expect(result.error).toBe(true);
-      expect(result.content).toContain("1,741 of 2,200");
-      for (const [index, entry] of entries.entries()) {
-        expect(result.content).toContain(
-          `${index + 1}. ${entry.topic} [${entry.text.length}/500]`,
-        );
-      }
+      expect(result.content).toEndWith(
+        `\n${currentNote}\n1,741 of 2,200 characters.`,
+      );
       expect(result.content.length).toBeLessThanOrEqual(TOOL_CAPS.resultCut);
       expect(handle.work.entries).toEqual(entries);
       expect(handle.work.operations).toEqual([]);
@@ -635,6 +640,73 @@ describe("memory tool handles", () => {
       error: false,
       content:
         "Saved for the end of the run in the project's memory. 1,741 of 2,200 characters.",
+    });
+  });
+
+  test("empty-note refusals give the right fix without asking for another set", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    const cases = [
+      {
+        args: { action: "set", topic: "NVDA run notes", text: "x".repeat(913) },
+        reason:
+          "The text of NVDA run notes is 913 characters, the limit is 500, cut 413. Split it into several topics, one set call each, or cut it.",
+      },
+      {
+        args: { action: "remove", topic: "Note" },
+        reason: "No entry has topic Note. Topics: (none).",
+      },
+      {
+        args: { action: "invalid" },
+        reason:
+          "action must be set, remove or none. Retry with the arguments the action takes.",
+      },
+      {
+        args: { action: "set" },
+        reason:
+          "topic must be text. Retry with the arguments the action takes.",
+      },
+    ];
+    for (const fixture of cases) {
+      const result = await tools.run(
+        offered,
+        {
+          id: "edit",
+          name: "memory_edit",
+          arguments: JSON.stringify(fixture.args),
+        },
+        context(),
+      );
+      expect(result).toEqual({
+        error: true,
+        content: `Error: ${fixture.reason}\n0 of 2,200 characters.`,
+      });
+      expect(offered.memory!.work.entries).toEqual([]);
+      expect(offered.memory!.work.operations).toEqual([]);
+    }
+  });
+
+  test("an absent topic returns the working texts and the whole refusal stays under the result cut", async () => {
+    const tools = area();
+    const offered = tools.offered(now, "agent", [], "auto", task);
+    offered.memory!.work.entries = [
+      { topic: "Sources", text: "Use the feed." },
+    ];
+    const call = {
+      id: "edit",
+      name: "memory_edit",
+      arguments: '{"action":"remove","topic":"Note"}',
+    };
+    const expected =
+      "Error: No entry has topic Note. Topics: Sources. Use one of the topics in the note.\n1. Sources [13/500]\nUse the feed.\n24 of 2,200 characters.";
+    expect(await tools.run(offered, call, context())).toEqual({
+      error: true,
+      content: expected,
+    });
+    const cut = 120;
+    expect(await tools.run(offered, call, context(cut))).toEqual({
+      error: true,
+      content: expected.slice(0, cut),
     });
   });
 });
