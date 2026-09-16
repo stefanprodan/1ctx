@@ -187,11 +187,6 @@
   .transcript-after .transcript-cut {
     margin-right: var(--space-2);
   }
-  /* a user row's actions sit under its card */
-  .transcript-user .transcript-after {
-    margin-top: var(--space-1);
-  }
-
   /* the fork menu hangs under its button, the agents as the composer's
      chip lists them, the session's own first */
   .transcript-fork {

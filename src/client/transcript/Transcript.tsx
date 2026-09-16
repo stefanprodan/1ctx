@@ -49,7 +49,7 @@ export function Transcript({
   };
   // the last turn's Regenerate; absent while a send runs
   onRegenerate?: () => void;
-  // Fork under every settled turn; absent while a run runs
+  // Fork under every finished answer; absent in a run
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   foot?: ComponentChildren;
 }) {
@@ -137,7 +137,6 @@ export function Transcript({
                   key={node.message.id}
                   message={node.message}
                   author={authorOf(node.message.userId)}
-                  fork={fork}
                 />
               );
             }

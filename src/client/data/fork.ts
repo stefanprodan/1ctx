@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A fork: a new chat from the rows up to a turn, on the picked agent.
-// The page moves to it and its load fetches the detail. A user
-// message's text becomes the fork's draft, so it can be edited before
-// it goes. The turn is read before the call, since the answer may land
-// after the user left; nothing happens once nobody is signed in.
+// The page moves to it and its load fetches the detail. The route takes
+// a user message too, whose text then becomes the fork's draft; the
+// page offers the action on answers alone. The turn is read before the
+// call, since the answer may land after the user left.
 
 import { effect, signal } from "@preact/signals";
 import type {
