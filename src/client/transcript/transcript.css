@@ -373,14 +373,32 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
+  /* cut, never scrolled: a scroll box that comes and goes inside the
+     shell's scroll box leaves Chrome's stuck head and foot riding with
+     the rows until a reload, so a long value opens with Show all */
   .transcript-tool-value {
     max-height: 240px;
-    overflow: auto;
+    overflow: clip;
     font-family: var(--mono);
     font-size: var(--text-mono);
     line-height: 1.5;
     color: var(--dim);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+  .transcript-tool-value-all {
+    max-height: none;
+  }
+  .transcript-tool-more {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .transcript-tool-more:hover {
+    color: var(--fg);
   }
 }

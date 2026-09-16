@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { signal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { signal, useSignal } from "@preact/signals";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { loadToolResult, toolResults } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import type { CallNode } from "./rows.ts";
@@ -16,6 +16,50 @@ import {
 } from "./Tool.model.ts";
 
 const opened = signal<ReadonlySet<string>>(new Set());
+
+// a value is cut to a few lines with Show all under it, never a scroll
+// box of its own: a scroll box that comes and goes inside the shell's
+// scroll box leaves Chrome's stuck head and foot riding with the rows
+function Value({ text, failed }: { text: string; failed?: boolean }) {
+  const open = useSignal(false);
+  const long = useSignal(false);
+  const el = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (node === null) return;
+    const measure = () => {
+      if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [text, open, long]);
+  return (
+    <>
+      <div
+        ref={el}
+        class={`transcript-tool-value${
+          open.value ? " transcript-tool-value-all" : ""
+        }${failed ? " transcript-tool-failed" : ""}`}
+      >
+        {text}
+      </div>
+      {long.value && (
+        <button
+          type="button"
+          class="transcript-tool-more"
+          aria-expanded={open.value}
+          onClick={() => {
+            open.value = !open.value;
+          }}
+        >
+          {open.value ? "Show less" : "Show all"}
+        </button>
+      )}
+    </>
+  );
+}
 
 export function Tool({ node }: { node: CallNode }) {
   const open = opened.value.has(node.key);
@@ -65,17 +109,9 @@ export function Tool({ node }: { node: CallNode }) {
       </summary>
       <div class="transcript-tool-detail">
         <div class="transcript-tool-label">arguments</div>
-        <div class="transcript-tool-value">
-          {prettyArguments(node.call.arguments)}
-        </div>
+        <Value text={prettyArguments(node.call.arguments)} />
         <div class="transcript-tool-label">{shown.label}</div>
-        <div
-          class={`transcript-tool-value${
-            shown.err ? " transcript-tool-failed" : ""
-          }`}
-        >
-          {shown.text}
-        </div>
+        <Value text={shown.text} failed={shown.err} />
       </div>
     </details>
   );

@@ -619,6 +619,10 @@ violation, and every rule has a rejected fixture under
   the view on the page head's row. The width is `NARROW` in `shell.ts`
   and the same number in `shell.css`. The rail never becomes a header
   row and there is no top bar.
+  No box that comes and goes inside the shell's scroll box scrolls on
+  its own: one that does (a tool value under a fold) leaves Chrome's
+  stuck head and foot riding with the rows until a reload, so a long
+  value is cut with `overflow: clip` and opens with Show all.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state
