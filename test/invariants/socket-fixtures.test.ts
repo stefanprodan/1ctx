@@ -310,6 +310,43 @@ describe("socket fixtures", () => {
     chat.app.socket.dispose();
   });
 
+  test("a stop during the memory phase", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const conn = await watcher(chat);
+    const pending = chat.scripted.next();
+    const response = await chat.member.call(
+      "POST",
+      `/api/automations/${automation.id}/run`,
+    );
+    const detail = await response.json();
+    watch(chat, conn, detail.session.id);
+    const main = await pending;
+    main.reply("The task finished.");
+    const memory = await waitScript(chat.scripted, 2);
+    memory.toolRound([
+      {
+        id: "m1",
+        name: "memory_edit",
+        arguments:
+          '{"action":"add","text":"Stopped before the note was done."}',
+      },
+    ]);
+    memory.end();
+    const open = await waitScript(chat.scripted, 3);
+    await chat.member.call("POST", `/api/sessions/${detail.session.id}/stop`);
+    await settle(chat, 10);
+    record("stop-during-memory", detail, conn);
+    expect(open.aborted).toBe(true);
+    // the stop ends the fold, not the run: the cause the run claimed stands
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "done",
+      cause: "finish",
+      memoryRound: 2,
+    });
+    chat.app.socket.dispose();
+  });
+
   test("thinking then an answer", async () => {
     const chat = await chatApp();
     const conn = await watcher(chat);

@@ -5,37 +5,18 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { memoryRequest } from "../../../src/server/runner/memory-phase.ts";
 import { newSend } from "../../../src/server/runner/send.ts";
-import { createAutomation } from "../../helpers/automations.ts";
+import {
+  createAutomation,
+  settleRun as settle,
+  startRun,
+} from "../../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
   startChat,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
-
-async function startRun(chat: ChatApp, automationId: string) {
-  const pending = chat.scripted.next();
-  const response = await chat.member.call(
-    "POST",
-    `/api/automations/${automationId}/run`,
-  );
-  expect(response.status).toBe(201);
-  const detail = await response.json();
-  return {
-    sessionId: detail.session.id as string,
-    main: await pending,
-  };
-}
-
-async function settle(chat: ChatApp, sessionId: string) {
-  for (let i = 0; i < 200; i++) {
-    const session = chat.app.sessions.byId(sessionId);
-    if (session?.status !== "running") return session;
-    await tick();
-  }
-  throw new Error("run did not settle");
-}
+import { frames, watcher } from "../../helpers/socket.ts";
 
 describe("automation memory phase", () => {
   test("opens after an answer, keeps one answer and commits its work", async () => {
@@ -102,11 +83,11 @@ describe("automation memory phase", () => {
       }).entries,
     ).toEqual(["Last check passed."]);
     const usage = chat.app.db
-      .query<{ count: number }, [string]>(
-        "select count(*) as count from usage where send_id = ?",
+      .query<{ round: number }, [string]>(
+        "select round from usage where send_id = ? order by round",
       )
-      .get(send.id)!;
-    expect(usage.count).toBe(3);
+      .all(send.id);
+    expect(usage.map((row) => row.round)).toEqual([1, 2, 3]);
     await chat.app.shutdown();
   });
 
@@ -309,7 +290,162 @@ describe("memory task run", () => {
   });
 });
 
+// a memory task run that reads one chat and edits the project note,
+// left open on its third round for the caller to end
+async function readAndEdit(
+  chat: ChatApp,
+  automationId: string,
+  sourceId: string,
+) {
+  const run = await startRun(chat, automationId);
+  const first = chat.scripted.scripts.length;
+  run.main.toolRound([
+    {
+      id: "read",
+      name: "session_read",
+      arguments: JSON.stringify({ id: sourceId }),
+    },
+  ]);
+  run.main.end();
+  const edit = await waitScript(chat.scripted, first + 1);
+  edit.toolRound([
+    {
+      id: "edit",
+      name: "memory_edit",
+      arguments: '{"action":"add","text":"A pending fact."}',
+    },
+  ]);
+  edit.end();
+  await waitScript(chat.scripted, first + 2);
+  return run;
+}
+
+function notes(chat: ChatApp, automationId: string | null) {
+  return chat.app.memory.read({ projectId: chat.projectId, automationId });
+}
+
+function marks(chat: ChatApp, automationId: string): number {
+  return chat.app.db
+    .query<{ count: number }, [string]>(
+      `select count(*) as count from automation_memory_reads
+       where automation_id = ?`,
+    )
+    .get(automationId)!.count;
+}
+
 describe("project memory working copy", () => {
+  test("writes nothing and sends no frame before the run ends", async () => {
+    const chat = await chatApp();
+    const conn = await watcher(chat);
+    const automation = await createAutomation(chat, {
+      name: "note-task",
+      projectMemory: true,
+      ownMemory: true,
+    });
+    const run = await startRun(chat, automation.id);
+    run.main.toolRound([
+      {
+        id: "edit",
+        name: "memory_edit",
+        arguments: '{"action":"add","text":"The cluster is in eu-west-1."}',
+      },
+    ]);
+    run.main.end();
+    await waitScript(chat.scripted, 2);
+    expect(notes(chat, null)).toMatchObject({ entries: [], revision: 0 });
+    expect(frames(conn, "memory")).toEqual([]);
+
+    // a chat that starts between two edits reads the note as it stands
+    const between = await startChat(chat, "where is the cluster?");
+    expect(JSON.stringify(between.script.body.messages)).not.toContain(
+      "eu-west-1",
+    );
+    between.script.reply("I do not know.");
+    await settle(chat, between.sessionId);
+
+    const mainFinish = await waitScript(chat.scripted, 2);
+    mainFinish.reply("Project memory prepared.");
+    const phase = await waitScript(chat.scripted, 4);
+    phase.toolRound([
+      {
+        id: "own",
+        name: "memory_edit",
+        arguments: '{"action":"add","text":"The first pass is done."}',
+      },
+    ]);
+    phase.end();
+    const phaseFinish = await waitScript(chat.scripted, 5);
+    phaseFinish.reply("Recorded.");
+    await settle(chat, run.sessionId);
+
+    expect(notes(chat, null)).toMatchObject({
+      entries: ["The cluster is in eu-west-1."],
+      revision: 1,
+    });
+    expect(notes(chat, automation.id)).toMatchObject({
+      entries: ["The first pass is done."],
+      revision: 1,
+    });
+    // one frame per note, each carrying the revision it committed
+    expect(frames(conn, "memory")).toEqual([
+      {
+        type: "memory",
+        projectId: chat.projectId,
+        automationId: null,
+        revision: 1,
+      },
+      {
+        type: "memory",
+        projectId: chat.projectId,
+        automationId: automation.id,
+        revision: 1,
+      },
+    ]);
+    chat.app.socket.dispose();
+    await chat.app.shutdown();
+  });
+
+  test("drops edits and read marks when a run is stopped", async () => {
+    const chat = await chatApp();
+    const source = await startChat(chat, "Keep this fact.");
+    source.script.reply("The fact is in this chat.");
+    await settle(chat, source.sessionId);
+    const automation = await createAutomation(chat, {
+      name: "stopped-memory",
+      projectMemory: true,
+    });
+    const run = await readAndEdit(chat, automation.id, source.sessionId);
+    await chat.member.call("POST", `/api/sessions/${run.sessionId}/stop`);
+    await settle(chat, run.sessionId);
+
+    expect(chat.app.sessions.lastSend(run.sessionId)?.cause).toBe("stop");
+    expect(notes(chat, null).entries).toEqual([]);
+    expect(marks(chat, automation.id)).toBe(0);
+    await chat.app.shutdown();
+  });
+
+  test("drops edits and read marks when the run deadline cuts it", async () => {
+    const chat = await chatApp();
+    const source = await startChat(chat, "Keep this fact.");
+    source.script.reply("The fact is in this chat.");
+    await settle(chat, source.sessionId);
+    const automation = await createAutomation(chat, {
+      name: "cut-memory",
+      projectMemory: true,
+    });
+    const run = await readAndEdit(chat, automation.id, source.sessionId);
+    chat.app.now.value += DEFAULT_LIMITS.runDeadlineMs;
+    await settle(chat, run.sessionId);
+
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      cause: "deadline",
+      status: "stopped",
+    });
+    expect(notes(chat, null).entries).toEqual([]);
+    expect(marks(chat, automation.id)).toBe(0);
+    await chat.app.shutdown();
+  });
+
   test("drops edits and read marks when a memory task fails", async () => {
     const chat = await chatApp();
     const source = await startChat(chat, "Keep this fact.");

@@ -211,6 +211,8 @@ describe("systemPrompt", () => {
     );
     expect(without).toContain("Today is 1900-01-01.");
     expect(without).not.toContain("</automation-memory>\n</automation-memory>");
+    // empty notes add nothing at all
+    expect(systemPrompt({ ...policy, offered }, NOW)).not.toContain("-memory>");
   });
 });
 
