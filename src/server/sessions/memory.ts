@@ -21,6 +21,7 @@ export function memorySnapshot(
     byId(id: string): SessionRow | null;
     exportRows(id: string): ExportRow[];
   },
+  isWrite: (name: string) => boolean,
 ): MemorySnapshot | null {
   const session = reads.byId(id);
   if (
@@ -35,6 +36,11 @@ export function memorySnapshot(
     id: session.id,
     title: session.title,
     lastActivityAt: session.lastActivityAt,
-    markdown: chatMarkdown(session.title, reads.exportRows(session.id), "UTC"),
+    markdown: chatMarkdown(
+      session.title,
+      reads.exportRows(session.id),
+      "UTC",
+      isWrite,
+    ),
   };
 }

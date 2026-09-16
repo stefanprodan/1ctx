@@ -204,6 +204,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     live: (sessionId) => runner.live(sessionId),
     usage,
+    isWrite: (name) => mcp.isWrite(name),
   });
   const tools =
     options.tools ??

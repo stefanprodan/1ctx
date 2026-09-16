@@ -56,6 +56,7 @@ export type SessionsDeps = {
   access: AccessPort;
   live: LivePort;
   usage: UsagePort;
+  isWrite: (name: string) => boolean;
 };
 
 export type Sessions = {
@@ -120,7 +121,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       return row ?? null;
     },
     memorySnapshot: (projectId, sessionId) =>
-      store.memorySnapshot(projectId, sessionId),
+      store.memorySnapshot(projectId, sessionId, deps.isWrite),
     repair() {
       const touched = transact(deps.db, () => {
         const rows = store.repair(deps.clock(), RESTART_ERROR);

@@ -183,10 +183,15 @@ export class SessionStore {
 
   exportRows(sessionId: string): ExportRow[] {
     return this.db
-      .query<ExportRow, [string]>(
+      .query<
+        Omit<ExportRow, "toolCalls"> & { toolCalls: string | null },
+        [string]
+      >(
         `select messages.send_id as sendId, messages.round,
            sends.memory_round as memoryRound, messages.kind, messages.slot,
            messages.status, messages.error,
+           messages.tool_calls as toolCalls,
+           messages.tool_call_id as toolCallId, messages.tool_name as toolName,
            messages.finish_reason as finishReason,
            coalesce(users.username, agents.name) as author,
            case when messages.kind = 'user'
@@ -201,11 +206,19 @@ export class SessionStore {
          where messages.session_id = ?
          order by messages.seq`,
       )
-      .all(sessionId);
+      .all(sessionId)
+      .map((row) => ({
+        ...row,
+        toolCalls: row.toolCalls === null ? null : JSON.parse(row.toolCalls),
+      }));
   }
 
-  memorySnapshot(projectId: string, id: string): MemorySnapshot | null {
-    return readMemorySnapshot(projectId, id, this);
+  memorySnapshot(
+    projectId: string,
+    id: string,
+    isWrite: (name: string) => boolean,
+  ): MemorySnapshot | null {
+    return readMemorySnapshot(projectId, id, this, isWrite);
   }
 
   message(id: string): Message | null {

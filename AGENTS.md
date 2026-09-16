@@ -371,7 +371,14 @@ violation, and every rule has a rejected fixture under
   project's note once; a run with `ownMemory` reads its automation's too.
   `projectMemory` gives a memory task the chat list, chat read and edit
   tools in its main rounds; `ownMemory` opens a bounded final phase with
-  only the edit tool. The ending claims one cause, releases the main
+  only the edit tool. A memory chat snapshot adds `Tools:` receipts
+  before each answer, in call order: name, one-line arguments capped
+  at 200 characters including `...`, and done, failed or not run.
+  MCP writes use the server's current patterns; missing servers and
+  unknown tools have no write mark. Tool results, tool errors, work,
+  running turns and runs stay out. Download Markdown has no receipts.
+  Receipts count toward the snapshot's server-paged text.
+  The ending claims one cause, releases the main
   round, runs that phase on finish, deadline or failure, then finalizes
   once. Its own-note block appears even when empty and says a separate
   step after the answer updates it. Two settled rounds with edits but no

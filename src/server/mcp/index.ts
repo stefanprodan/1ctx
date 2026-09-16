@@ -3,10 +3,12 @@
 
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
+  classify,
   type McpDigest,
   offeredServers,
   type PromptServer,
   promptSnapshot,
+  splitWireName,
   wireName,
 } from "../../shared/mcp.ts";
 import type { Db } from "../db/index.ts";
@@ -91,6 +93,7 @@ export type Mcp = {
   store: McpServerStore;
   routes: RouteDescriptor[];
   offered(agentServers: AgentServer[]): McpOffer;
+  isWrite(name: string): boolean;
   refreshSoon(id: string, observed: string): void;
   start(): void;
   close(): Promise<void>;
@@ -221,6 +224,19 @@ export function mcpArea(deps: McpDeps): Mcp {
     store,
     routes: [],
     offered,
+    isWrite(name) {
+      const split = splitWireName(name);
+      if (split === null) return false;
+      const server = store.byName(split.server);
+      if (server === null) return false;
+      return (
+        classify(server.name, server.tools, {
+          read: server.readPatterns,
+          write: server.writePatterns,
+          excluded: server.excludedPatterns,
+        }).get(split.tool) === "write"
+      );
+    },
     refreshSoon: (id, observed) => coordinator.refreshSoon(id, observed),
     start: () => coordinator.start(),
     close: () => coordinator.close(),
