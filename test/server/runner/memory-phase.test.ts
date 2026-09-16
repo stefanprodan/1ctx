@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { tokens } from "../../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { memoryRequest } from "../../../src/server/runner/memory-phase.ts";
-import { newSend } from "../../../src/server/runner/send.ts";
+import { MEMORY_EXCERPT_CHARS } from "../../../src/server/runner/memory-packet.ts";
 import {
   createAutomation,
   settleRun as settle,
@@ -13,6 +13,7 @@ import {
 import {
   type ChatApp,
   chatApp,
+  FLASH,
   startChat,
   waitScript,
 } from "../../helpers/chat.ts";
@@ -35,7 +36,10 @@ describe("automation memory phase", () => {
       "PATCH",
       `/api/automations/${automation.id}`,
       {
-        body: { memoryGuidance: "New guidance for later runs." },
+        body: {
+          instructions: "A different task for later runs.",
+          memoryGuidance: "New guidance for later runs.",
+        },
       },
     );
     expect(edited.status).toBe(200);
@@ -46,12 +50,16 @@ describe("automation memory phase", () => {
     const instruction = messages.at(-1)!;
     expect(instruction).toMatchObject({ role: "user" });
     expect(instruction.content).toContain(`What to remember:\n${guidance}`);
+    expect(instruction.content).toContain("Task:\ncheck the system");
     expect(instruction.content).toContain(
       "A topic names what an entry is about, never one fact.",
     );
     expect(JSON.stringify(messages.slice(0, -1))).not.toContain(guidance);
     expect(JSON.stringify(messages)).not.toContain(
       "New guidance for later runs.",
+    );
+    expect(JSON.stringify(messages)).not.toContain(
+      "A different task for later runs.",
     );
     phase.reply("No change.");
     await settle(chat, run.sessionId);
@@ -82,7 +90,7 @@ describe("automation memory phase", () => {
     ).toEqual(["memory_edit"]);
     expect(JSON.stringify(edit.body.messages)).toContain("The check passed.");
     const asked = (script: { body: { messages?: unknown } }) =>
-      (script.body.messages as { role: string; content: string }[]).at(-1)!;
+      (script.body.messages as { role: string; content: string }[])[1]!;
     const first = asked(edit);
     expect(first.role).toBe("user");
     expect(first.content).toContain("The run finished.");
@@ -108,6 +116,17 @@ describe("automation memory phase", () => {
     expect(asked(finish).content).toContain(
       "This automation's own memory holds 1 entry, the version to edit:\n1. Note [18/500]\nLast check passed.",
     );
+    expect(asked(finish).content).toContain("26 of 2,200 characters.");
+    expect(
+      (finish.body.messages as { role: string }[]).map(
+        (message) => message.role,
+      ),
+    ).toEqual(["system", "user", "assistant", "tool"]);
+    expect((finish.body.messages as unknown[]).slice(2)).toMatchObject([
+      { role: "assistant", tool_calls: [{ id: "remember" }] },
+      { role: "tool", tool_call_id: "remember" },
+    ]);
+    expect(asked(finish).content).not.toContain('{"action":"set"');
     finish.reply("Recorded.");
 
     expect((await settle(chat, run.sessionId))?.status).toBe("done");
@@ -149,6 +168,9 @@ describe("automation memory phase", () => {
     const run = await startRun(chat, automation.id);
     run.main.end();
     const phase = await waitScript(chat.scripted, 2);
+    expect(
+      (phase.body.messages as { content: string }[])[1]!.content,
+    ).toContain("The run failed: stream ended early");
     phase.reply("Nothing to add.");
 
     expect((await settle(chat, run.sessionId))?.status).toBe("failed");
@@ -624,58 +646,257 @@ describe("project memory working copy", () => {
 });
 
 describe("memory phase room", () => {
-  test("drops old rounds, keeps the last and skips counting a null window", async () => {
+  test("counts tool schemas before sending and records a note that cannot fit", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const saved = await chat.member.call(
+      "PUT",
+      `/api/automations/${automation.id}/memory`,
+      {
+        body: {
+          entries: [{ topic: "Sources", text: "Try the public feed next." }],
+          revision: 0,
+        },
+      },
+    );
+    expect(saved.status).toBe(200);
+    const run = await startRun(chat, automation.id);
+    const active = chat.app.runner.registry.get(run.sessionId)!;
+    active.policy.contextLength = null;
+    run.main.reply("");
+    const phase = await waitScript(chat.scripted, 2);
+    const messagesOnly = tokens(
+      JSON.stringify({
+        messages: phase.body.messages,
+        tools: [],
+      }),
+    );
+    expect(
+      tokens(
+        JSON.stringify({
+          messages: phase.body.messages,
+          tools: phase.body.tools,
+        }),
+      ),
+    ).toBeGreaterThan(messagesOnly);
+    phase.reply("No change.");
+    await settle(chat, run.sessionId);
+
+    const next = await startRun(chat, automation.id);
+    const nextActive = chat.app.runner.registry.get(next.sessionId)!;
+    nextActive.policy.contextLength = messagesOnly;
+    nextActive.policy.limits.contextReserve = 0;
+    next.main.reply("");
+    await settle(chat, next.sessionId);
+    expect(chat.scripted.scripts).toHaveLength(3);
+    expect(chat.app.sessions.lastSend(next.sessionId)).toMatchObject({
+      cause: "finish",
+      status: "done",
+      memoryError: "the memory phase did not fit",
+    });
+    expect(
+      chat.app.memory.read({
+        projectId: chat.projectId,
+        automationId: automation.id,
+      }).entries,
+    ).toEqual([{ topic: "Sources", text: "Try the public feed next." }]);
+    await chat.app.shutdown();
+  });
+
+  test("a null window lets a provider refusal become memory_error", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });
     const run = await startRun(chat, automation.id);
     const active = chat.app.runner.registry.get(run.sessionId)!;
-    const probe = newSend({
-      id: "probe-send",
-      sessionId: "probe-session",
-      projectId: chat.projectId,
-      kind: "run",
-      policy: {
-        ...active.policy,
-        contextLength: null,
-        limits: { ...active.policy.limits, contextReserve: 0 },
-      },
-      firstMessageId: "probe-user",
-      replyId: "probe-reply",
-      now: 0,
-    });
-    probe.cause = "finish";
-    const old = `old round ${"x".repeat(800)}`;
-    const latest = `latest round ${"y".repeat(80)}`;
-    const messages = [
-      { role: "system" as const, content: "system" },
-      { role: "user" as const, content: "task" },
-      { role: "assistant" as const, content: old },
-      { role: "assistant" as const, content: latest },
-    ];
-    const offered = probe.policy.memoryOffered!;
-    expect(JSON.stringify(memoryRequest(probe, messages, offered))).toContain(
-      old,
-    );
-
-    let trimmed: ReturnType<typeof memoryRequest> = null;
-    for (let window = 1; window <= 2000; window++) {
-      probe.policy.contextLength = window;
-      const candidate = memoryRequest(probe, messages, offered);
-      if (
-        candidate !== null &&
-        !JSON.stringify(candidate.messages).includes(old)
-      ) {
-        trimmed = candidate;
-        break;
-      }
-    }
-    expect(JSON.stringify(trimmed?.messages)).toContain(latest);
-    expect(JSON.stringify(trimmed?.messages)).not.toContain(old);
-    probe.policy.contextLength = 1;
-    expect(memoryRequest(probe, messages, offered)).toBeNull();
-
-    await chat.member.call("POST", `/api/sessions/${run.sessionId}/stop`);
+    active.policy.contextLength = null;
+    chat.scripted.refuse(400, "context window exceeded");
+    run.main.reply("Done.");
     await settle(chat, run.sessionId);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      cause: "finish",
+      status: "done",
+      memoryError: expect.stringContaining("context window exceeded"),
+    });
+    await chat.app.shutdown();
+  });
+
+  test("recounts phase calls before a second request instead of dropping them", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    const active = chat.app.runner.registry.get(run.sessionId)!;
+    active.policy.contextLength = null;
+    run.main.reply("");
+    const phase = await waitScript(chat.scripted, 2);
+    active.policy.contextLength = tokens(
+      JSON.stringify({
+        messages: phase.body.messages,
+        tools: phase.body.tools,
+      }),
+    );
+    active.policy.limits.contextReserve = 0;
+    phase.toolRound([
+      { id: "none", name: "memory_edit", arguments: '{"action":"none"}' },
+    ]);
+    phase.end();
+    await settle(chat, run.sessionId);
+    expect(chat.scripted.scripts).toHaveLength(2);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      cause: "finish",
+      status: "done",
+      toolCalls: 1,
+      memoryError: "the memory phase did not fit",
+    });
+    await chat.app.shutdown();
+  });
+});
+
+describe("memory phase input", () => {
+  test("sends only a packet and phase calls, with full-row receipts and the original prompt", async () => {
+    const page = `Consent required. ${"Page body. ".repeat(2500)}`;
+    const chat = await chatApp({
+      fetcher: (async (input) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (url === "https://consent.example/report") {
+          return new Response(page, {
+            headers: { "content-type": "text/plain" },
+          });
+        }
+        if (url === "https://blocked.example/report") {
+          return new Response("access denied", { status: 403 });
+        }
+        throw new Error(`unexpected test fetch: ${url}`);
+      }) as typeof fetch,
+    });
+    chat.app.automationScheduler.stop();
+    const day = 24 * 60 * 60 * 1000;
+    chat.app.now.value =
+      Math.floor(chat.app.now.value / day) * day + day - 1000;
+    const startedDay = new Date(chat.app.now.value).toISOString().slice(0, 10);
+    const updated = await chat.admin.call(
+      "PATCH",
+      `/api/agents/${chat.agentId}`,
+      {
+        body: {
+          name: "coder",
+          providerId: chat.providerId,
+          model: FLASH,
+          thinking: "on",
+          effort: "high",
+          servers: [],
+          mcpMode: "auto",
+        },
+      },
+    );
+    expect(updated.status).toBe(200);
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    run.main.content("Main work that the packet does not need.");
+    run.main.reasoning("Main reasoning that the packet does not need.");
+    run.main.toolRound([
+      {
+        id: "bad",
+        name: "webfetch",
+        arguments: '{"url":"https://blocked.example/report"}',
+      },
+      {
+        id: "ok",
+        name: "webfetch",
+        arguments: '{"url":"https://consent.example/report"}',
+      },
+    ]);
+    run.main.end();
+    const answer = await waitScript(chat.scripted, 2);
+    const mainTools = chat.app.sessions
+      .messages(run.sessionId)
+      .filter((row) => row.kind === "tool");
+    expect(mainTools.map((row) => row.status)).toEqual(["failed", "done"]);
+    const success = mainTools[1]!;
+    expect(success.content.length).toBeGreaterThan(MEMORY_EXCERPT_CHARS);
+    chat.app.now.value += 2000;
+    answer.reply("Both sources were blocked.");
+    const phase = await waitScript(chat.scripted, 3);
+    const messages = phase.body.messages as { role: string; content: string }[];
+    expect(messages.map((message) => message.role)).toEqual(["system", "user"]);
+    expect(messages[0]).toEqual(
+      (run.main.body.messages as { role: string; content: string }[])[0],
+    );
+    expect(messages[0]!.content).toContain(`Today is ${startedDay}.`);
+    expect(new Date(chat.app.now.value).toISOString().slice(0, 10)).not.toBe(
+      startedDay,
+    );
+    expect(messages[1]!.content).toContain(`failed: ${mainTools[0]!.error}`);
+    expect(messages[1]!.content).toContain(
+      `done (${new TextEncoder().encode(success.content).length} bytes)`,
+    );
+    expect(messages[1]!.content).toContain(
+      `Excerpt: ${success.content.slice(0, MEMORY_EXCERPT_CHARS)}`,
+    );
+    expect(messages[1]!.content).not.toContain(
+      success.content.slice(0, MEMORY_EXCERPT_CHARS + 1),
+    );
+    expect(messages[1]!.content).not.toContain("Main work");
+    expect(JSON.stringify(messages)).not.toContain("Main reasoning");
+    expect(phase.body.enable_thinking).toBe(true);
+    expect(phase.body.reasoning_effort).toBe("high");
+    phase.toolRound([
+      { id: "none", name: "memory_edit", arguments: '{"action":"none"}' },
+    ]);
+    phase.end();
+    const finish = await waitScript(chat.scripted, 4);
+    const continued = finish.body.messages as {
+      role: string;
+      content: string;
+    }[];
+    expect(continued.map((message) => message.role)).toEqual([
+      "system",
+      "user",
+      "assistant",
+      "tool",
+    ]);
+    expect(continued.slice(0, 2)).toEqual(messages);
+    expect(continued.slice(2)).toMatchObject([
+      { role: "assistant", tool_calls: [{ id: "none" }] },
+      { role: "tool", tool_call_id: "none" },
+    ]);
+    expect(continued[1]!.content).not.toContain('{"action":"none"}');
+    finish.reply("No change.");
+    await settle(chat, run.sessionId);
+    expect(
+      chat.app.sessions
+        .messages(run.sessionId)
+        .filter((row) => row.kind === "user"),
+    ).toHaveLength(1);
+    await chat.app.shutdown();
+  });
+
+  test("an answerless run carries the report beside its unrun call", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    run.main.content("The report is complete, but its call could not run.");
+    run.main.toolCall({
+      id: "unrun",
+      name: "datetime",
+      arguments: '{"timezone":"UTC"}',
+    });
+    run.main.finish("length");
+    run.main.usage();
+    run.main.end();
+    const phase = await waitScript(chat.scripted, 2);
+    const messages = phase.body.messages as { role: string; content: string }[];
+    expect(messages.map((message) => message.role)).toEqual(["system", "user"]);
+    expect(messages[1]!.content).toContain(
+      "Last work text:\nThe report is complete, but its call could not run.",
+    );
+    expect(messages[1]!.content).toContain("failed: not run:");
+    expect(messages[1]!.content).not.toContain("Run's answer:");
+    phase.reply("No change.");
+    await settle(chat, run.sessionId);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      cause: "finish",
+      memoryError: null,
+    });
     await chat.app.shutdown();
   });
 });
@@ -688,6 +909,9 @@ describe("memory phase bounds", () => {
     chat.app.now.value += DEFAULT_LIMITS.runDeadlineMs;
     const phase = await waitScript(chat.scripted, 2);
     expect(run.main.aborted).toBe(true);
+    expect(
+      (phase.body.messages as { content: string }[])[1]!.content,
+    ).toContain("The run was cut by its deadline.");
     phase.reply("Recorded the cutoff.");
     await settle(chat, run.sessionId);
     expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({

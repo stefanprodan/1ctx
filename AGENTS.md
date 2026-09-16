@@ -392,6 +392,11 @@ violation, and every rule has a rejected fixture under
   with a hand edit or Undo. An automation's `memoryGuidance` is at most
   2,000 bytes, snapshotted with the run and used only in its own-note
   phase instruction, never the system prompt or the project note.
+  The phase's input is built in `runner/memory-packet.ts`; it never
+  resends main-round history. `ActiveSend.systemPrompt` keeps the first
+  request's prompt. Only phase rows follow the packet. Its room check
+  counts the schemas too and keeps the note whole; unknown windows
+  skip counting. Packet caps live in the server, not the note contract.
 - **An automation fires runs, and a run is a session.** An automation
   is a row in its project (`automations/`): an agent, instructions, a
   five-field cron schedule in an IANA zone parsed by `Bun.cron.parse`

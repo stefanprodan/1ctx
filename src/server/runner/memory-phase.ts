@@ -1,26 +1,20 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { contextReserve } from "../../shared/compaction.ts";
-import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type {
   Message,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
-import { MEMORY_ENTRY_CHARS, memorySize } from "../../shared/memory.ts";
 import type { SendCause } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
-import type {
-  ChatMessageIn,
-  ChatRequest,
-  ToolCall,
-} from "../providers/index.ts";
+import type { ChatRequest, ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
-import { history } from "./context.ts";
+import { type ContextLookups, historyMessages } from "./context.ts";
 import { envelope, lastLine } from "./envelope.ts";
+import { memoryMessages } from "./memory-packet.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
 import { type ActiveSend, newRound } from "./send.ts";
@@ -162,82 +156,48 @@ export function startMemory(
   send.round.slotMarked = true;
 }
 
-function currentEntries(entries: readonly MemoryEntry[]): string {
-  if (entries.length === 0) {
-    return `This automation's own memory is empty. Use set to write its first entry.\n${memorySize(entries)} characters.`;
-  }
-  const lines = entries.map(
-    (entry, index) =>
-      `${index + 1}. ${entry.topic} [${entry.text.length}/${MEMORY_ENTRY_CHARS}]\n${entry.text}`,
-  );
-  return `This automation's own memory holds ${entries.length} ${
-    entries.length === 1 ? "entry" : "entries"
-  }, the version to edit:\n${lines.join("\n\n")}\n${memorySize(entries)} characters.`;
-}
-
-function phaseInstruction(send: ActiveSend): string {
-  const ending =
-    send.cause === "deadline"
-      ? "The run was cut by its deadline."
-      : send.cause === "failure"
-        ? `The run failed${send.error === null ? "." : `: ${send.error}`}`
-        : "The run finished.";
-  const entries = send.policy.memoryOffered?.memory?.work.entries ?? [];
-  const guidance = send.policy.automation?.memoryGuidance ?? "";
-  return [
-    ending,
-    ...(guidance === "" ? [] : [`What to remember:\n${guidance}`]),
-    currentEntries(entries),
-    "memory_edit writes this note and no other. The project memory in the system prompt is a different note it never edits.",
-    "A topic names what an entry is about, never one fact. set creates or replaces the entry of that topic; put facts under an existing topic when they belong there. remove deletes a topic. Use none when there is nothing to record.",
-    "Record what the next run needs: what was found, what was done, where this run stopped, and what is left.",
-  ].join("\n\n");
-}
-
-function groups(messages: ChatMessageIn[]): {
-  head: ChatMessageIn[];
-  rounds: ChatMessageIn[][];
-} {
-  const firstUser = messages.findIndex((message) => message.role === "user");
-  if (firstUser < 0) return { head: messages, rounds: [] };
-  const head = messages.slice(0, firstUser + 1);
-  const rounds: ChatMessageIn[][] = [];
-  for (const message of messages.slice(firstUser + 1)) {
-    if (message.role === "assistant" || message.role === "user") {
-      rounds.push([message]);
-    } else if (rounds.length > 0) {
-      rounds.at(-1)!.push(message);
-    } else {
-      head.push(message);
-    }
-  }
-  return { head, rounds };
-}
-
-export function memoryRequest(
+function memoryRequest(
   send: ActiveSend,
-  messages: ChatMessageIn[],
+  rows: Message[],
   offered: Offered,
+  lookups: ContextLookups,
 ): ChatRequest | null {
-  const instruction: ChatMessageIn = {
-    role: "user",
-    content: phaseInstruction(send),
-  };
-  const split = groups(messages);
-  const rounds = [...split.rounds];
-  const build = () => [...split.head, ...rounds.flat(), instruction];
-  const window = send.policy.contextLength;
-  if (window !== null) {
-    const room =
-      window - contextReserve(window, send.policy.limits.contextReserve);
-    while (tokens(JSON.stringify(build())) > room && rounds.length > 1) {
-      rounds.shift();
-    }
-    if (tokens(JSON.stringify(build())) > room) return null;
+  if (
+    send.systemPrompt === null ||
+    send.memoryRound === null ||
+    send.cause === null
+  ) {
+    throw new Error("the memory phase has no run context");
   }
+  const messages = memoryMessages(
+    {
+      sendId: send.id,
+      memoryRound: send.memoryRound,
+      cause: send.cause,
+      error: send.error,
+      rows,
+      guidance: send.policy.automation?.memoryGuidance ?? "",
+      entries: offered.memory?.work.entries ?? [],
+    },
+    {
+      system: send.systemPrompt,
+      phase: historyMessages(
+        rows.filter(
+          (row) => row.sendId === send.id && row.round >= send.memoryRound!,
+        ),
+        send.policy,
+        lookups,
+      ),
+      tools: offered.tools,
+      contextLength: send.policy.contextLength,
+      reserve: send.policy.limits.contextReserve,
+    },
+    tokens,
+  );
+  if (messages === null) return null;
   return {
     model: send.policy.model,
-    messages: build(),
+    messages,
     thinking: send.policy.thinking,
     reasoningEffort: send.policy.effort,
     cacheKey: send.sessionId,
@@ -373,14 +333,7 @@ export async function memoryPhase(
   try {
     while (!controller.signal.aborted) {
       const rows = deps.historyOf(send);
-      const messages = history(
-        rows,
-        send.policy,
-        deps.round.lookups,
-        deps.clock(),
-        send.mcpNote,
-      );
-      const request = memoryRequest(send, messages, offered);
+      const request = memoryRequest(send, rows, offered, deps.round.lookups);
       if (request === null) throw new Error("the memory phase did not fit");
       try {
         await runRound(deps.round, send, rows, {
