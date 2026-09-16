@@ -357,14 +357,3 @@ export function dirtyOf(
 // the viewer's zone, where a new automation starts
 export const browserZone = (): string =>
   Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-// the brief's line for the memory boxes that are on; null when none is
-export function memoryWords(
-  a: Pick<AutomationSummary, "projectMemory" | "ownMemory">,
-): string | null {
-  const parts: string[] = [];
-  if (a.ownMemory) parts.push("Keeps its own memory");
-  if (a.projectMemory) parts.push("updates project memory");
-  if (parts.length === 0) return null;
-  return `${parts.join(" and ")}.`;
-}

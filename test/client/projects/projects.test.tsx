@@ -287,6 +287,7 @@ describe("the rail", () => {
     const task = { id: "au1", projectId: "p3" };
     expect(projectHere("/automations/au1", null, task)).toBe("p3");
     expect(projectHere("/automations/au1/edit", null, task)).toBe("p3");
+    expect(projectHere("/automations/au1/memory", null, task)).toBe("p3");
     expect(projectHere("/automations/au9", null, task)).toBeNull();
     expect(projectHere("/", chat)).toBeNull();
   });

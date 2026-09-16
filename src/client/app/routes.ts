@@ -60,6 +60,12 @@ export type Route = {
 // the icon of a group's row in the rail
 export const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
 
+// the automation's two tabs share one view, so a tab change keeps the
+// page mounted instead of drawing it again
+const automationView = lazy(() =>
+  import("../views/projects/Automation.tsx").then((m) => m.Automation),
+);
+
 export const ROUTES: Route[] = [
   {
     path: "/login",
@@ -186,9 +192,7 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/automations/:id",
-    view: lazy(() =>
-      import("../views/projects/Automation.tsx").then((m) => m.Automation),
-    ),
+    view: automationView,
     title: () => "Automation",
     role: "authenticated",
     // ?runs=failed|manual narrows the runs
@@ -196,6 +200,14 @@ export const ROUTES: Route[] = [
       const filter = query.get("runs");
       return loadAutomationPage(params.id, isRunFilter(filter) ? filter : null);
     },
+  },
+  {
+    path: "/automations/:id/memory",
+    view: automationView,
+    title: () => "Memory",
+    role: "authenticated",
+    // the runs still load, for the tally in the aside
+    load: (params) => loadAutomationPage(params.id, null),
   },
   {
     path: "/automations/:id/edit",

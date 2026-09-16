@@ -5,8 +5,9 @@
 // zone, which agent is asked, then the instructions as the agent gets
 // them, cut to a few lines. Suspend or Resume and Run now, which anyone
 // in the project presses, and Edit for whoever may change it, sit over
-// the runs, which follow as a log: what started each, when, the answer's first line,
-// and how long it took against its deadline, with Stop while it runs.
+// two tabs. Runs is a log: what started each run, when, the answer's
+// first line, and how long it took against its deadline, with Stop while
+// it runs. Memory is the automation's own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
@@ -17,6 +18,7 @@ import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
+import { navigate, path } from "../../app/router.ts";
 import {
   automationError,
   automationProject,
@@ -40,6 +42,7 @@ import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsNote } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
@@ -50,7 +53,6 @@ import {
   durationOf,
   durationText,
   eventNote,
-  memoryWords,
   scheduleTitle,
   sourceText,
   suspendedText,
@@ -225,9 +227,20 @@ function NextRuns({ automation }: { automation: AutomationSummary }) {
   );
 }
 
+// Both tabs' routes name this one view, so a tab change keeps the page
+// mounted: the brief, the aside and the runs stay while only the tab's
+// content changes.
 export function Automation({ params }: { params: Params }) {
   const id = params.id ?? "";
   const row = automations.value?.find((a) => a.id === id) ?? null;
+  // the Memory tab is there only while the automation keeps its own note
+  const memoryPath = path.value.endsWith("/memory");
+  const tab = memoryPath && row?.ownMemory ? "memory" : "runs";
+  useEffect(() => {
+    if (memoryPath && row !== null && !row.ownMemory) {
+      navigate(`/automations/${id}`, true);
+    }
+  }, [memoryPath, row?.ownMemory, id]);
   const found = automationProject.value;
   const projectId = found?.id === id ? found.projectId : null;
   const shown =
@@ -360,25 +373,18 @@ export function Automation({ params }: { params: Params }) {
             <Instructions
               text={row.instructions}
               foot={
-                <>
-                  {memoryWords(row) !== null && (
-                    <p class="automations-brief-next automations-faint">
-                      {memoryWords(row)}
-                    </p>
-                  )}
-                  {row.suspendedAt !== null ? (
-                    <p class="automations-brief-next">
-                      <Icon name="pause" size={14} />
-                      {suspendedText(row, now.value)}
-                    </p>
-                  ) : row.nextAt !== null ? (
-                    <p class="automations-brief-next">
-                      <Icon name="arrow-right" size={14} />
-                      Next run {fireLabel(row.nextAt, now.value, row.tz, true)},{" "}
-                      {until(row.nextAt, now.value)}
-                    </p>
-                  ) : null}
-                </>
+                row.suspendedAt !== null ? (
+                  <p class="automations-brief-next">
+                    <Icon name="pause" size={14} />
+                    {suspendedText(row, now.value)}
+                  </p>
+                ) : row.nextAt !== null ? (
+                  <p class="automations-brief-next">
+                    <Icon name="arrow-right" size={14} />
+                    Next run {fireLabel(row.nextAt, now.value, row.tz, true)},{" "}
+                    {until(row.nextAt, now.value)}
+                  </p>
+                ) : null
               }
             />
           </section>
@@ -395,60 +401,82 @@ export function Automation({ params }: { params: Params }) {
               {failure.value}
             </p>
           )}
-          {(row.ownMemory || (memoryNote?.entries.length ?? 0) > 0) && (
+          <Tabs
+            tabs={[
+              {
+                label: "Runs",
+                href: `/automations/${id}`,
+                ...(tally === null ? {} : { count: total }),
+              },
+              ...(row.ownMemory
+                ? [
+                    {
+                      label: "Memory",
+                      href: `/automations/${id}/memory`,
+                      ...(memoryNote === null
+                        ? {}
+                        : { count: memoryNote.entries.length }),
+                    },
+                  ]
+                : []),
+            ]}
+            active={
+              tab === "runs"
+                ? `/automations/${id}`
+                : `/automations/${id}/memory`
+            }
+          />
+          {tab === "memory" ? (
             <Note
               memory={memoryNote}
               memoryKey={noteKey}
               error={noteErrors.value.get(noteKey) ?? null}
-              empty={
-                row.ownMemory
-                  ? "No memory yet. The next run writes it."
-                  : "No memory."
-              }
+              empty="No memory yet. The next run writes it."
             />
+          ) : (
+            <RowsCard
+              label="Runs"
+              action={
+                <nav class="automations-filters" aria-label="Filter runs">
+                  {FILTERS.map((f) => (
+                    <a
+                      key={f.label}
+                      class={`automations-filter${
+                        f.value === filter ? " automations-filter-on" : ""
+                      }`}
+                      aria-current={f.value === filter ? "page" : undefined}
+                      href={`/automations/${id}${
+                        f.value === null ? "" : `?runs=${f.value}`
+                      }`}
+                    >
+                      {f.label}
+                    </a>
+                  ))}
+                </nav>
+              }
+            >
+              {held === null || held.rows === null ? (
+                <RowsNote>Loading</RowsNote>
+              ) : held.rows.length === 0 ? (
+                <RowsNote>
+                  {filter === "failed"
+                    ? "No failed runs."
+                    : filter === "manual"
+                      ? "No manual runs."
+                      : "No runs yet."}
+                </RowsNote>
+              ) : (
+                held.rows.map((r) => (
+                  <RunRow
+                    key={r.session.id}
+                    row={r}
+                    deadlineMs={deadlineMs}
+                    now={now.value}
+                  />
+                ))
+              )}
+            </RowsCard>
           )}
-          <RowsCard
-            label="Runs"
-            action={
-              <nav class="automations-filters" aria-label="Filter runs">
-                {FILTERS.map((f) => (
-                  <a
-                    key={f.label}
-                    class={`automations-filter${
-                      f.value === filter ? " automations-filter-on" : ""
-                    }`}
-                    aria-current={f.value === filter ? "page" : undefined}
-                    href={`/automations/${id}${
-                      f.value === null ? "" : `?runs=${f.value}`
-                    }`}
-                  >
-                    {f.label}
-                  </a>
-                ))}
-              </nav>
-            }
-          >
-            {held === null || held.rows === null ? (
-              <RowsNote>Loading</RowsNote>
-            ) : held.rows.length === 0 ? (
-              <RowsNote>
-                {filter === "failed"
-                  ? "No failed runs."
-                  : filter === "manual"
-                    ? "No manual runs."
-                    : "No runs yet."}
-              </RowsNote>
-            ) : (
-              held.rows.map((r) => (
-                <RunRow
-                  key={r.session.id}
-                  row={r}
-                  deadlineMs={deadlineMs}
-                  now={now.value}
-                />
-              ))
-            )}
-          </RowsCard>
         </Split>
       )}
     </Page>

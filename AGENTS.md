@@ -602,9 +602,12 @@ violation, and every rule has a rejected fixture under
   unknown), each leading to the automation's page, `/automations/:id`,
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
-  Show more), then Suspend or Resume, Edit and Run now over the runs, a
-  log with their source, length against the deadline and Stop, filtered
-  by `?runs=`, and the aside of next fires, the tally and the setup. The editor is a page of
+  Show more), then Suspend or Resume, Edit and Run now over two tabs:
+  Runs, a log with their source, length against the deadline and Stop,
+  filtered by `?runs=` and counted by the tally, and, only
+  with `ownMemory`, Memory, `/automations/:id/memory`, the own note
+  counted by its entries (both routes name one view, so a tab change
+  keeps the page mounted); and the aside of next fires, the tally and the setup. The editor is a page of
   `ui/Section.tsx` steps, `/projects/:id/automations/new` and
   `/automations/:id/edit` (read-only for whoever may not edit): the task
   is a box with the composer's `AgentPicker`, the schedule is built in

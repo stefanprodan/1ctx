@@ -16,7 +16,7 @@ export function projectHere(
   if (open !== null && chat?.session.id === decodeURIComponent(open[1])) {
     return chat.session.projectId;
   }
-  const task = /^\/automations\/([^/]+)(\/edit)?$/.exec(pathname);
+  const task = /^\/automations\/([^/]+)(\/edit|\/memory)?$/.exec(pathname);
   if (task !== null && automation?.id === decodeURIComponent(task[1])) {
     return automation.projectId;
   }

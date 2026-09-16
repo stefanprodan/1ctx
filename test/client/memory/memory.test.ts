@@ -17,7 +17,6 @@ import {
   textSize,
   writerOf,
 } from "../../../src/client/views/memory/Note.model.ts";
-import { memoryWords } from "../../../src/client/views/projects/Automations.model.ts";
 import type { Memory } from "../../../src/shared/contracts/memory.ts";
 import type {
   Message,
@@ -284,17 +283,5 @@ describe("the note card", () => {
       ),
     ).toBe("text-3");
     expect(noteFieldOf("revision is stale", draft)).toBeUndefined();
-  });
-});
-
-describe("the brief's memory line", () => {
-  test("names the boxes that are on", () => {
-    expect(memoryWords({ projectMemory: false, ownMemory: false })).toBeNull();
-    expect(memoryWords({ projectMemory: false, ownMemory: true })).toBe(
-      "Keeps its own memory.",
-    );
-    expect(memoryWords({ projectMemory: true, ownMemory: true })).toBe(
-      "Keeps its own memory and updates project memory.",
-    );
   });
 });
