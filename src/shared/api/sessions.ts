@@ -41,6 +41,11 @@ export type ToolResultResponse = {
   cut: boolean;
 };
 
+export type ToolVisualResponse = {
+  title: string;
+  html: string;
+};
+
 // POST /api/sessions: a chat in a project with an agent, and its first
 // message
 export type CreateSessionRequest = {

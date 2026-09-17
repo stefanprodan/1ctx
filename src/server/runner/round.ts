@@ -24,6 +24,7 @@ import {
   summaryRequest,
   withExhausted,
 } from "./context.ts";
+import { RoundVisuals } from "./round-visuals.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
@@ -47,29 +48,51 @@ type TimedNext =
 
 const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
 
-function nextEvent(
+function sleep(clock: Clock, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return {
+    promise:
+      clock.sleep?.(ms) ??
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ms);
+      }),
+    cancel: () => {
+      if (timer !== undefined) clearTimeout(timer);
+    },
+  };
+}
+
+async function nextEvent(
   iterator: AsyncIterator<ChatEvent>,
   clock: Clock,
+  visuals: RoundVisuals | null,
 ): Promise<TimedNext> {
-  if (clock.sleep) {
-    return Promise.race([
-      iterator.next().then((result) => ({ kind: "next" as const, result })),
-      clock.sleep(STREAM_IDLE_MS).then(() => ({ kind: "idle" as const })),
-    ]);
+  const read = iterator.next().then((result) => ({
+    kind: "next" as const,
+    result,
+  }));
+  const idle = sleep(clock, STREAM_IDLE_MS);
+  const quiet = idle.promise.then(() => ({ kind: "idle" as const }));
+  try {
+    while (true) {
+      const delay = visuals?.delay(clock()) ?? null;
+      if (delay === null) return await Promise.race([read, quiet]);
+      const paint = sleep(clock, delay);
+      try {
+        const next = await Promise.race([
+          read,
+          quiet,
+          paint.promise.then(() => ({ kind: "visual" as const })),
+        ]);
+        if (next.kind !== "visual") return next;
+        visuals?.flush();
+      } finally {
+        paint.cancel();
+      }
+    }
+  } finally {
+    idle.cancel();
   }
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => resolve({ kind: "idle" }), STREAM_IDLE_MS);
-    iterator.next().then(
-      (result) => {
-        clearTimeout(timer);
-        resolve({ kind: "next", result });
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 export function buildRequest(
@@ -110,9 +133,18 @@ export async function runRound(
     options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
   const events = deps.chat(send.policy.providerId, req, signal);
   const iterator = events[Symbol.asyncIterator]();
+  const visuals =
+    send.phase === "provider" &&
+    send.kind !== "compact" &&
+    !send.summarizing &&
+    !send.answering &&
+    req.toolChoice !== "none" &&
+    send.policy.offered.tools.some((tool) => tool.name === "visualize")
+      ? new RoundVisuals(send, round, deps.writer, signal)
+      : null;
   let replyBytes = bytes(round.content) + bytes(round.reasoning);
   while (true) {
-    const next = await nextEvent(iterator, deps.clock);
+    const next = await nextEvent(iterator, deps.clock, visuals);
     if (next.kind === "idle") throw new Error("the provider went quiet");
     if (next.result.done) break;
     const event = next.result.value;
@@ -142,10 +174,15 @@ export async function runRound(
         );
         break;
       case "toolCallDelta":
+        replyBytes += bytes(event.arguments ?? "");
+        if (replyBytes > MAX_REPLY_BYTES) {
+          throw new Error("the reply exceeded 1 MB");
+        }
         if (send.summarizing) break;
         // the server's earliest certain knowledge that this is a work
         // round: move the row into the fold once, guarded by the round
         markWork(deps, send, round);
+        visuals?.push(event, deps.clock());
         break;
       case "toolCalls":
         if (!send.summarizing) round.calls = event.calls;
@@ -167,6 +204,7 @@ export async function runRound(
   if (!signal.aborted && round.finishReason === null) {
     throw new Error("the stream ended early");
   }
+  visuals?.flush();
 }
 
 // the first tool call delta of a round marks it work, once; the round

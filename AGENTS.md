@@ -67,6 +67,8 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 structure/ holds one violating root per layout rule).
 scripts/        preview.sh, and brand.py which regenerates the brand SVGs
                 in site/ from the brand book (`uv run scripts/brand.py`).
+skills/         installable agent skills; visualize/ holds SKILL.md,
+                references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
                 by the app. site/README.md is the brand book.
 ```
@@ -219,6 +221,26 @@ violation, and every rule has a rejected fixture under
   delete. An agent carries `thinking` and `effort`, null for the provider's
   default; the levels per wire are `EFFORTS` in `shared/words.ts`, and the
   policy resolves both once per send.
+- **A visual is a sandboxed document.** The `visualize` web tool is on
+  by default, with script, style and font hosts cdnjs.cloudflare.com,
+  cdn.jsdelivr.net, unpkg.com and esm.sh; admins edit or empty the list.
+  The tool description carries the saved hosts. Watchers receive draft
+  `visual` frames by message and call index, in the send's sequence;
+  the live snapshot carries `drafts`. Preview is inert; final runs
+  scripts once, after the tool succeeds. `GET /api/visual` authenticates
+  and serves the fixed shell with a CSP sandbox and opaque origin,
+  the saved resource hosts and `connect-src 'none'`. The iframe grants
+  only `allow-scripts`; the page's CSP meta sets `frame-src 'self'`.
+  A MessageChannel port binds the parent to the first loaded document;
+  a later navigation closes it. The frame stays 680px wide, scrolling
+  on narrow screens and past 2,000px height. The stored fragment comes
+  from `GET /api/sessions/:id/messages/:messageId/calls/:index/visual`
+  after success; detail and envelopes replace its `html` with its size.
+  `tools/visual-theme.ts` alone defines the frame's colours; its CSS is
+  a separate document, outside the client stylesheet rules. The parent
+  supplies the theme; the frame sets `data-theme` and dispatches
+  `visualtheme`. Change `skills/visualize/` in the same commit as the frame's
+  names or the tool's contract.
 - **A skill is stored text, never executable.** An admin adds a `SKILL.md`
   and its text files from a GitHub directory, an archive, a discovery
   index or a raw file through the compose fetcher. An index digest is
@@ -349,7 +371,10 @@ violation, and every rule has a rejected fixture under
   runner, and
   `finalizeSend` runs exactly once; the lock is held until the stream
   has let go. A stream quiet for two minutes or a reply past 1 MB is
-  a failure (`runner/round.ts`). A `finalizeSend` that fails after
+  a failure (`runner/round.ts`). A chat send (a message, regenerate or
+  compact) past the `sendDeadlineMs` limit, thirty minutes by default, ends
+  with cause `deadline`, status `stopped`; a run has its own deadline.
+  A `finalizeSend` that fails after
   its retries keeps the lock, so the session answers 409 until a
   restart. At start `sessions.repair()` ends whatever a crash left
   running with cause `restart`. Shutdown terminates every send, waits
@@ -498,8 +523,9 @@ violation, and every rule has a rejected fixture under
   the defaults; `tools/` never imports `runner/`. The offered set is
   decided once per send in `runner/policy.ts` from the `tools` rows:
   a model that accepts tools always gets `datetime`, and the web tools
-  (`WEB_TOOLS`, the only rows and the only switches) that an admin has
-  not switched off, websearch only once a search provider is chosen;
+  (`WEB_TOOLS`: `webfetch`, `websearch`, `visualize`, the only rows and
+  switches) that an admin has not switched off, websearch only once a
+  search provider is chosen;
   every provider (exa, firecrawl, tavily) answers keyless, a key file
   raises the rate, and the runner never holds a key. The Tools page
   has three tabs, one view over `/admin/tools` (Built-in),
@@ -508,7 +534,9 @@ violation, and every rule has a rejected fixture under
   send's own factories with sample inputs (name enums empty,
   `memory_edit`'s own-note text as the variant), each row `RowsTitle`
   (the name over the first sentence) with its tokens by `wireTokens()`
-  as `RowsMeta`, read-only; Web's rows carry the switch and no tokens;
+  as `RowsMeta`, read-only; Web's rows carry the switch and no tokens,
+  websearch's provider and visualize's hosts with Add, Remove and Reset.
+  The hosts field warns that loaded URLs can send the visual's data;
   each card's head has its total. Limits is a form per scope, each
   saving the full set with the other scope's saved values. A change on
   the Tools page applies to the next send; a send in flight keeps the

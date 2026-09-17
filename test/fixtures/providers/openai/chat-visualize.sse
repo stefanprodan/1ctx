@@ -1,0 +1,10 @@
+data: {"id":"chatcmpl-visual","object":"chat.completion.chunk","model":"org/model","system_fingerprint":"mlx-serve","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}],"usage":null}
+
+data: {"id":"chatcmpl-visual","object":"chat.completion.chunk","model":"org/model","system_fingerprint":"mlx-serve","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_visual","type":"function","function":{"name":"visualize","arguments":"{\"title\":\"Greeting\",\"html\":\"<svg viewBox=\\\"0 0 680 80\\\"><text x=\\\"20\\\" y=\\\"40\\\">Hello</text></svg>\"}"}}]},"finish_reason":null}],"usage":null}
+
+data: {"id":"chatcmpl-visual","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":null}
+
+data: {"id":"chatcmpl-visual","object":"chat.completion.chunk","choices":[],"usage":{"prompt_tokens":328,"completion_tokens":90,"total_tokens":418,"prompt_tokens_details":{"cached_tokens":0}}}
+
+data: [DONE]
+

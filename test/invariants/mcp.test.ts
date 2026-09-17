@@ -472,6 +472,7 @@ describe("MCP tools in a send", () => {
     expect(directory.tools.map((tool: { name: string }) => tool.name)).toEqual([
       "datetime",
       "webfetch",
+      "visualize",
     ]);
     expect(directory.tokens.tools).toBe(
       tokens(JSON.stringify(started.script.body.tools ?? [])),
@@ -566,6 +567,7 @@ describe("MCP tools in a send", () => {
     expect(directory.tools.map((tool: { name: string }) => tool.name)).toEqual([
       "datetime",
       "webfetch",
+      "visualize",
     ]);
     expect(directory.tokens.tools).toBe(
       tokens(JSON.stringify(started.script.body.tools ?? [])),

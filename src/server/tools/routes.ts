@@ -11,15 +11,25 @@ import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { parseToolName, parseToolPatch } from "./parse.ts";
+import { visualShell } from "./visual-shell.ts";
 
 export type RoutesDeps = {
   clock: Clock;
   response(now: number): ToolsResponse;
   patch(name: WebTool, patch: PatchToolRequest, now: number): void;
+  visualHosts(): string[];
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   return [
+    {
+      method: "GET",
+      path: "/api/visual",
+      policy: "authenticated",
+      handle(req) {
+        return visualShell(deps.visualHosts(), req);
+      },
+    },
     {
       method: "GET",
       path: "/api/tools",
@@ -37,6 +47,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const patch = parseToolPatch(await jsonBody(req));
         if ("provider" in patch && name !== "websearch") {
           throw new BadRequest("provider is only valid on websearch");
+        }
+        if ("hosts" in patch && name !== "visualize") {
+          throw new BadRequest("hosts is only valid on visualize");
         }
         const now = deps.clock();
         deps.patch(name, patch, now);

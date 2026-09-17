@@ -32,9 +32,13 @@ export type ToolCaps = {
   searchBodyBytes: number;
   fetchDeadlineMs: number;
   searchDeadlineMs: number;
+  visualBytes: number;
+  visualSendBytes: number;
+  maxVisuals: number;
 };
 
-export type Limits = LoopLimits & ToolCaps & { runDeadlineMs: number };
+export type Limits = LoopLimits &
+  ToolCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -165,6 +169,34 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     unit: "ms",
     scope: "send",
   },
+  sendDeadlineMs: {
+    default: 1_800_000,
+    min: 60_000,
+    max: 14_400_000,
+    unit: "ms",
+    scope: "send",
+  },
+  visualBytes: {
+    default: 256 * 1024,
+    min: 16 * 1024,
+    max: 512 * 1024,
+    unit: "bytes",
+    scope: "call",
+  },
+  visualSendBytes: {
+    default: 1024 * 1024,
+    min: 64 * 1024,
+    max: 4 * 1024 * 1024,
+    unit: "bytes",
+    scope: "send",
+  },
+  maxVisuals: {
+    default: 2,
+    min: 1,
+    max: 10,
+    unit: "count",
+    scope: "call",
+  },
 };
 
 export const DEFAULT_LIMITS = Object.fromEntries(
@@ -195,4 +227,7 @@ export const TOOL_CAPS: ToolCaps = {
   searchBodyBytes: DEFAULT_LIMITS.searchBodyBytes,
   fetchDeadlineMs: DEFAULT_LIMITS.fetchDeadlineMs,
   searchDeadlineMs: DEFAULT_LIMITS.searchDeadlineMs,
+  visualBytes: DEFAULT_LIMITS.visualBytes,
+  visualSendBytes: DEFAULT_LIMITS.visualSendBytes,
+  maxVisuals: DEFAULT_LIMITS.maxVisuals,
 };

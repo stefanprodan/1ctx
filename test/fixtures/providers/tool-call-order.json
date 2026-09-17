@@ -1,0 +1,58 @@
+[
+  {
+    "name": "late name and id",
+    "deltas": [
+      {"index": 4, "arguments": "{\"html\":\"<p>"},
+      {"index": 4, "arguments": "hello</p>\",\"title\":\"Greeting\"}"},
+      {"id": "late", "name": "visualize"}
+    ],
+    "indexes": [0, 0, 0],
+    "calls": [
+      {"id": "late", "name": "visualize", "arguments": "{\"html\":\"<p>hello</p>\",\"title\":\"Greeting\"}"}
+    ]
+  },
+  {
+    "name": "interleaved sparse indexes with repeated and missing ids",
+    "deltas": [
+      {"index": 9, "id": "same", "name": "visualize", "arguments": "{\"title\":\"First\",\"html\":\"<p>"},
+      {"index": 2, "id": "same", "arguments": "{\"title\":\"Second\",\"html\":\"<p>"},
+      {"index": 9, "arguments": "first</p>\"}"},
+      {"index": 2, "name": "visualize", "arguments": "second</p>\"}"},
+      {"index": 18, "name": "visualize", "arguments": "{\"title\":\"Third\",\"html\":\"<p>third</p>\"}"}
+    ],
+    "indexes": [0, 1, 0, 1, 2],
+    "calls": [
+      {"id": "same", "name": "visualize", "arguments": "{\"title\":\"First\",\"html\":\"<p>first</p>\"}"},
+      {"id": "same", "name": "visualize", "arguments": "{\"title\":\"Second\",\"html\":\"<p>second</p>\"}"},
+      {"id": "call_2", "name": "visualize", "arguments": "{\"title\":\"Third\",\"html\":\"<p>third</p>\"}"}
+    ]
+  },
+  {
+    "name": "unindexed calls matched by id and latest",
+    "deltas": [
+      {"id": "first", "name": "visualize", "arguments": "{\"html\":\"<p>"},
+      {"id": "second", "name": "visualize", "arguments": "{\"html\":\"<p>"},
+      {"id": "first", "arguments": "first</p>\",\"title\":\"First\"}"},
+      {"id": "second", "arguments": "second</p>"},
+      {"arguments": "\",\"title\":\"Second\"}"}
+    ],
+    "indexes": [0, 1, 0, 1, 1],
+    "calls": [
+      {"id": "first", "name": "visualize", "arguments": "{\"html\":\"<p>first</p>\",\"title\":\"First\"}"},
+      {"id": "second", "name": "visualize", "arguments": "{\"html\":\"<p>second</p>\",\"title\":\"Second\"}"}
+    ]
+  },
+  {
+    "name": "late index on the first call",
+    "deltas": [
+      {"id": "first", "arguments": "{\"html\":\"<p>"},
+      {"index": 8, "id": "first", "name": "visualize", "arguments": "first</p>\",\"title\":\"First\"}"},
+      {"index": 1, "name": "visualize", "arguments": "{\"html\":\"<p>second</p>\",\"title\":\"Second\"}"}
+    ],
+    "indexes": [0, 0, 1],
+    "calls": [
+      {"id": "first", "name": "visualize", "arguments": "{\"html\":\"<p>first</p>\",\"title\":\"First\"}"},
+      {"id": "call_1", "name": "visualize", "arguments": "{\"html\":\"<p>second</p>\",\"title\":\"Second\"}"}
+    ]
+  }
+]

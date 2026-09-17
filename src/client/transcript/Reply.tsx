@@ -9,6 +9,7 @@
 // summary fold alone. Under a finished turn, why it was cut when it
 // was, Copy, Fork, Regenerate on the last turn, and when it was.
 
+import type { ComponentChildren } from "preact";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
@@ -48,16 +49,35 @@ export function cutReason(m: Message): { text: string; err: boolean } | null {
   return null;
 }
 
+// a turn that failed before it did anything: no rows, no thinking, no
+// calls and no words, so a fold would only say it worked for no time
+export function emptyFailure(
+  work: WorkNode,
+  answer: Message | null,
+  failure: string | null,
+  content: string,
+): boolean {
+  return (
+    failure !== null &&
+    content === "" &&
+    work.rows.length === 0 &&
+    (answer?.reasoning ?? "") === "" &&
+    (work.send?.toolCalls ?? 0) === 0
+  );
+}
+
 export function Reply({
   node,
   live,
   agent,
   onRegenerate,
   fork,
+  visuals,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
   agent: Agent | null;
+  visuals?: ComponentChildren;
   // set on the last turn alone: regenerate drops it and sends its
   // user message again
   onRegenerate?: () => void;
@@ -74,6 +94,8 @@ export function Reply({
   const lead = current !== null && m?.slot === null && leadIn(content);
   const ended = running ? null : endedBy(node);
   const cut = ended === null ? null : cutReason(ended);
+  // a failure says so in its own block, never squeezed into the actions
+  const failure = cut?.err === true ? cut.text : null;
   // the stamp is when the turn ended: the answer's end, else the last
   // row's, a stopped work round included
   const last = node.rows[node.rows.length - 1];
@@ -111,7 +133,7 @@ export function Reply({
         )}
       </div>
       <div class="transcript-body">
-        {!node.compact && (
+        {!node.compact && !emptyFailure(work, m, failure, content) && (
           // once the memory phase opens the turn's own work is over
           <Work
             node={work}
@@ -120,6 +142,7 @@ export function Reply({
             running={running && node.send?.memoryRound == null}
           />
         )}
+        {visuals}
         {html !== "" && !lead && (
           // the server renders the markdown with raw HTML off: render/
           // is the safety boundary
@@ -143,14 +166,15 @@ export function Reply({
             memory
           />
         )}
+        {!running && failure !== null && (
+          <p class="transcript-failure" role="alert">
+            {failure}
+          </p>
+        )}
         {!running && (
           <div class="transcript-after">
-            {cut && (
-              <span
-                class={`transcript-cut${cut.err ? " transcript-cut-err" : ""}`}
-              >
-                {cut.text}
-              </span>
+            {cut && failure === null && (
+              <span class="transcript-cut">{cut.text}</span>
             )}
             {content !== "" && <CopyButton text={content} />}
             {fork !== undefined &&

@@ -23,7 +23,12 @@ import type {
 } from "../../../src/server/tools/types.ts";
 
 function context(signal = new AbortController().signal): ToolContext {
-  const budget: ToolBudget = { fetches: 0, searches: 0 };
+  const budget: ToolBudget = {
+    fetches: 0,
+    searches: 0,
+    visualBytes: 0,
+    visuals: 0,
+  };
   return { signal, now: () => 0, budget, caps: TOOL_CAPS };
 }
 
@@ -146,6 +151,8 @@ describe("fetch URL guard", () => {
     const shared: ToolBudget = {
       fetches: TOOL_CAPS.maxFetches,
       searches: 0,
+      visualBytes: 0,
+      visuals: 0,
     };
     const ctx: ToolContext = {
       signal: new AbortController().signal,
@@ -323,7 +330,7 @@ describe("fetch deadline", () => {
     const ctx: ToolContext = {
       signal: new AbortController().signal,
       now: () => 0,
-      budget: { fetches: 0, searches: 0 },
+      budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
       caps: { ...TOOL_CAPS, fetchDeadlineMs: 20 },
     };
     const deps: FetchDependencies = {

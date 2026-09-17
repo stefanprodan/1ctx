@@ -1,0 +1,49 @@
+{
+  "clean": [
+    {"html": "<div>Hello</div>", "expected": "<div>Hello</div>"},
+    {"html": "<div>Hello</div><sp", "expected": "<div>Hello</div>"},
+    {"html": "<p>One</p><div data-x=\"a>b", "expected": "<p>One</p>"},
+    {"html": "<p data-x=\"a>b\">One</p>", "expected": "<p data-x=\"a>b\">One</p>"},
+    {"html": "<p>One</p><style>.box {", "expected": "<p>One</p>"},
+    {"html": "<style>.box {}</style><p>One</p>", "expected": "<style>.box {}</style><p>One</p>"},
+    {"html": "<p>One</p><STYLE>.box {}</STYLE", "expected": "<p>One</p>"},
+    {"html": "<p>One &am", "expected": "<p>One "},
+    {"html": "<p>One &#x1F", "expected": "<p>One "},
+    {"html": "<p>One &amp;", "expected": "<p>One &amp;"},
+    {"html": "<p>One</p><!-- <style>", "expected": "<p>One</p>"},
+    {"html": "<!-- <style> --><p>One</p>", "expected": "<!-- <style> --><p>One</p>"},
+    {"html": "<script>const tag = '<style>'</script><p>One</p>", "expected": "<script>const tag = '<style>'</script><p>One</p>"},
+    {"html": "<p>1 < 2</p>", "expected": "<p>1 < 2</p>"},
+    {"html": "<p>One</p><", "expected": "<p>One</p>"}
+  ],
+  "elements": [
+    {"name": "section", "attributes": {"onclick": "run()"}, "children": [
+      {"name": "img", "attributes": {"onerror": "run()", "src": "data:image/gif;base64,AA=="}},
+      {"name": "script", "text": "first()"},
+      {"name": "template", "content": [
+        {"name": "meta", "attributes": {"http-equiv": "refresh", "content": "0;url=https://outside.test"}},
+        {"name": "script", "attributes": {"src": "https://scripts.test/a.js"}},
+        {"name": "svg", "attributes": {"onload": "run()"}, "children": [
+          {"name": "a", "attributes": {"href": "javascript:run()", "xlink:href": " java\tscript:run()"}, "children": [
+            {"name": "animate", "attributes": {"onbegin": "run()", "dur": "1s"}}
+          ]},
+          {"name": "script", "attributes": {"href": "https://scripts.test/svg.js"}},
+          {"name": "script", "attributes": {"type": "module", "xlink:href": "https://scripts.test/module.js"}},
+          {"name": "foreignObject", "children": [
+            {"name": "base", "attributes": {"href": "https://outside.test"}},
+            {"name": "iframe", "attributes": {"src": "https://outside.test"}},
+            {"name": "form", "attributes": {"action": "https://outside.test"}, "children": [
+              {"name": "script", "text": "nested()"}
+            ]},
+            {"name": "button", "attributes": {"formaction": "\nJAVASCRIPT:run()", "onclick": "run()"}},
+            {"name": "object"},
+            {"name": "embed"},
+            {"name": "portal"},
+            {"name": "frame"}
+          ]}
+        ]}
+      ]},
+      {"name": "script", "attributes": {"type": "text/javascript"}, "text": "last()"}
+    ]}
+  ]
+}

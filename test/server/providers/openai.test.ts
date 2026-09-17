@@ -346,13 +346,13 @@ describe("ToolCallTracker", () => {
     ]);
   });
 
-  test("orders sparse indexed calls and synthesises missing ids", () => {
+  test("keeps first-seen order for sparse indexes and synthesises missing ids", () => {
     const tracker = new ToolCallTracker();
     tracker.push(delta({ index: 2, name: "later", arguments: "2" }));
     tracker.push(delta({ index: 0, name: "first", arguments: "0" }));
     expect(tracker.flush()).toEqual([
-      { id: "call_0", name: "first", arguments: "0" },
-      { id: "call_1", name: "later", arguments: "2" },
+      { id: "call_0", name: "later", arguments: "2" },
+      { id: "call_1", name: "first", arguments: "0" },
     ]);
   });
 });

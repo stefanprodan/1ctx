@@ -13,7 +13,7 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
-import type { SocketEvent } from "../../shared/socket.ts";
+import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -27,7 +27,7 @@ import {
   type StartFields,
   startSend as startSendRows,
 } from "./start.ts";
-import { streamDelta } from "./stream.ts";
+import { streamDelta, streamVisual } from "./stream.ts";
 import {
   type CompactFields,
   type StartedCompact,
@@ -93,6 +93,13 @@ export class Writer {
     event: Extract<ChatEvent, { kind: "reasoning" | "content" }>,
   ): void {
     streamDelta(this.deps, send, event);
+  }
+
+  visual(
+    send: ActiveSend,
+    piece: Pick<VisualFrame, "callIndex" | "title" | "html" | "htmlAt">,
+  ): void {
+    streamVisual(this.deps, send, piece);
   }
 
   private session(id: string, now: number): SessionSummary {
@@ -224,6 +231,7 @@ export class Writer {
     round.calls.forEach((call, i) => {
       send.openTools.set(call, result.rows[i]!.id);
     });
+    round.drafts.clear();
     return result;
   }
 
@@ -290,6 +298,7 @@ export class Writer {
         ],
       };
     });
+    round.drafts.clear();
   }
 
   // the next streaming reply and, on a cap transition, the work reply
@@ -300,7 +309,7 @@ export class Writer {
     transition?: { finishReason: string; calls: ToolCall[] },
   ): Message {
     const now = this.deps.clock();
-    return transact(this.deps.db, () => {
+    const reply = transact(this.deps.db, () => {
       const changed: Message[] = [];
       if (transition !== undefined && send.round !== null) {
         const previous = this.finishReplyRow(
@@ -349,6 +358,8 @@ export class Writer {
         events: [envelope(session, changed, sendRow)],
       };
     });
+    if (transition !== undefined) send.round?.drafts.clear();
+    return reply;
   }
 
   // the round's reply as it ends and its usage, inside the caller's

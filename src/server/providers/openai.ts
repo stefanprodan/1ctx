@@ -258,9 +258,10 @@ export class ToolCallTracker {
   private readonly byIndex = new Map<number, TrackedCall>();
   private readonly byId = new Map<string, TrackedCall>();
   private latest: TrackedCall | null = null;
-  private nextOrder = 0;
-
-  push(delta: Extract<ChatEvent, { kind: "toolCallDelta" }>): void {
+  push(delta: Extract<ChatEvent, { kind: "toolCallDelta" }>): {
+    callIndex: number;
+    name: string;
+  } {
     let call: TrackedCall | undefined;
     if (delta.index !== undefined) call = this.byIndex.get(delta.index);
     if (!call && delta.index === undefined && delta.id !== undefined) {
@@ -283,7 +284,7 @@ export class ToolCallTracker {
         id: delta.id ?? "",
         name: "",
         arguments: "",
-        order: this.nextOrder++,
+        order: this.calls.length,
       };
       this.calls.push(call);
     }
@@ -299,18 +300,12 @@ export class ToolCallTracker {
     if (delta.arguments !== undefined) call.arguments += delta.arguments;
     if (delta.signature !== undefined) call.signature = delta.signature;
     this.latest = call;
+    return { callIndex: call.order, name: call.name };
   }
 
   flush(): ToolCall[] {
-    const sorted = [...this.calls].sort((left, right) => {
-      if (left.index !== null && right.index !== null) {
-        return left.index - right.index;
-      }
-      if (left.index !== null) return -1;
-      if (right.index !== null) return 1;
-      return left.order - right.order;
-    });
-    return sorted.map((call, index) => ({
+    // A late sparse index must not move a call already streaming to a reader.
+    return this.calls.map((call, index) => ({
       id: call.id || `call_${index}`,
       name: call.name,
       arguments: call.arguments,
@@ -464,7 +459,10 @@ export async function* streamChat(
           break;
         }
         for (const event of mapEvents(frame)) {
-          if (event.kind === "toolCallDelta") tracker.push(event);
+          if (event.kind === "toolCallDelta") {
+            yield { ...event, ...tracker.push(event) };
+            continue;
+          }
           if (event.kind === "finish") sawFinish = true;
           yield event;
         }

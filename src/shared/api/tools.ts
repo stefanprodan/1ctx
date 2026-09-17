@@ -20,9 +20,10 @@ export type ToolsResponse = {
 };
 
 // PATCH /api/tools/:name, a web tool alone: the switch, and for
-// websearch the provider; a provider on webfetch is a 400, as is an
-// empty body
+// websearch the provider or for visualize the hosts. Settings on any
+// other tool and an empty body are a 400.
 export type PatchToolRequest = {
   enabled?: boolean;
   provider?: SearchProvider | null;
+  hosts?: string[];
 };

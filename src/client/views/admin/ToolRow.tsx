@@ -4,7 +4,8 @@
 // A tool's row, built like every admin row: the name over the first
 // sentence of its description, for a built-in the tokens its schema
 // costs as the row's meta, and for a web tool its switch. It opens in place to when a send
-// carries it, the text and the parameters the model gets, read-only.
+// carries it, the text and the parameters the model gets. The hosts
+// form keeps the server's list rather than normalizing a second copy.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -14,16 +15,25 @@ import type {
 } from "../../../shared/contracts/tool.ts";
 import { patchTool } from "../../data/tools.ts";
 import { reason } from "../../lib/format.ts";
+import { useFocusField, useSave } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
+import { Foot } from "../../ui/Foot.tsx";
 import {
   RowsEnd,
+  RowsLine,
+  RowsList,
+  RowsListHead,
   RowsMeta,
+  RowsNote,
   RowsOpen,
   RowsSwitch,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import {
+  editHosts,
   firstSentence,
+  hostsFieldOf,
   NAMES_WORDS,
   tokensText,
   WHEN_WORDS,
@@ -54,6 +64,114 @@ function Switch({ tool }: { tool: WebToolSummary }) {
         onClick={() => void flip()}
       />
     </RowsEnd>
+  );
+}
+
+function Hosts({ tool }: { tool: WebToolSummary }) {
+  const host = useSignal("");
+  const form = useRef<HTMLFormElement>(null);
+  const latest = useRef(tool);
+  latest.current = tool;
+  const save = useSave(async () => {
+    await patchTool("visualize", {
+      hosts: editHosts(latest.current.hosts, {
+        type: "add",
+        host: host.value,
+      }),
+    });
+    host.value = "";
+  }, hostsFieldOf);
+  useFocusField(save, form);
+  const busy = save.busy;
+  const invalid = save.fieldError("hosts") !== null;
+  return (
+    <form
+      class="tools-hosts"
+      ref={form}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (host.value.trim() !== "") void save.run(null);
+      }}
+    >
+      <div>
+        <RowsListHead label="Allowed hosts" />
+        <RowsList>
+          {tool.hosts.length === 0 ? (
+            <RowsNote>No hosts allowed. Visuals use inline code only.</RowsNote>
+          ) : (
+            tool.hosts.map((origin) => {
+              const action = `remove ${origin}`;
+              return (
+                <RowsLine key={origin} flush>
+                  <RowsTitle name={origin} mono />
+                  <RowsEnd>
+                    <button
+                      type="button"
+                      class="btn btn-small"
+                      aria-label={`Remove ${origin}`}
+                      disabled={busy}
+                      onClick={() =>
+                        void save.act(action, () =>
+                          patchTool("visualize", {
+                            hosts: editHosts(latest.current.hosts, {
+                              type: "remove",
+                              host: origin,
+                            }),
+                          }),
+                        )
+                      }
+                    >
+                      {save.pending.value === action ? "Removing" : "Remove"}
+                    </button>
+                  </RowsEnd>
+                </RowsLine>
+              );
+            })
+          )}
+        </RowsList>
+      </div>
+      <p class="hint">
+        Allowed hosts receive whatever a visual puts in its URLs.
+      </p>
+      <label class="field">
+        <span class="label">Host</span>
+        <input
+          name="hosts"
+          autocomplete="off"
+          spellcheck={false}
+          placeholder="https://cdn.example.com"
+          value={host.value}
+          disabled={busy}
+          aria-invalid={invalid || undefined}
+          onInput={(event) => {
+            host.value = (event.currentTarget as HTMLInputElement).value;
+            save.touch();
+          }}
+        />
+        {invalid && <FieldError save={save} field="hosts" />}
+      </label>
+      <Foot
+        save={save}
+        dirty={host.value.trim() !== ""}
+        label="Add"
+        start={
+          <button
+            type="button"
+            class="btn"
+            disabled={busy}
+            onClick={() =>
+              void save.act("reset the hosts", () =>
+                patchTool("visualize", {
+                  hosts: editHosts(latest.current.hosts, { type: "reset" }),
+                }),
+              )
+            }
+          >
+            {save.pending.value === "reset the hosts" ? "Resetting" : "Reset"}
+          </button>
+        }
+      />
+    </form>
   );
 }
 
@@ -95,6 +213,9 @@ export function ToolRow({
       end={"enabled" in tool ? <Switch tool={tool} /> : undefined}
     >
       <div class="tools-schema">
+        {"enabled" in tool && tool.name === "visualize" && (
+          <Hosts tool={tool} />
+        )}
         {builtin && (
           <>
             <div class="tools-label">When</div>

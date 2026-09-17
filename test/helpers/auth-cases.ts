@@ -139,6 +139,11 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 200 },
   },
   {
+    method: "GET",
+    path: "/api/visual",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
     method: "PATCH",
     path: "/api/tools/:name",
     body: { enabled: true },
@@ -432,6 +437,11 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "GET",
     path: "/api/sessions/:id/messages/:messageId/result",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/sessions/:id/messages/:messageId/calls/:index/visual",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

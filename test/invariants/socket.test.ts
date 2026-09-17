@@ -13,7 +13,7 @@ import {
   type Conn,
   type ConnData,
 } from "../../src/server/web/socket.ts";
-import type { SocketEvent } from "../../src/shared/socket.ts";
+import { PROTOCOL, type SocketEvent } from "../../src/shared/socket.ts";
 import { ORIGIN, type TestClient } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import {
@@ -102,11 +102,11 @@ function addTeam(chat: ChatApp, id: string) {
 }
 
 describe("the socket", () => {
-  test("open sends hello with protocol 10", async () => {
+  test("open sends hello with the current protocol", async () => {
     const chat = await chatApp();
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
-    expect(conn.frames).toEqual([{ type: "hello", protocol: 10 }]);
+    expect(conn.frames).toEqual([{ type: "hello", protocol: PROTOCOL }]);
     close(chat, conn);
   });
 

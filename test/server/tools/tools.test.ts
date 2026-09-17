@@ -60,7 +60,7 @@ function skillsPort(offered: OfferedSkill[] = []): SkillsPort {
 }
 
 function budget(): ToolBudget {
-  return { fetches: 0, searches: 0 };
+  return { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 };
 }
 
 function context(shared: ToolBudget = budget()): ToolContext {
@@ -116,12 +116,12 @@ describe("formatDatetime", () => {
 });
 
 describe("offered", () => {
-  test("offers time and webfetch always, websearch once chosen", () => {
+  test("offers time, webfetch and visualize, websearch once chosen", () => {
     expect(
       area()
         .offered(now, "")
         .tools.map((tool) => tool.name),
-    ).toEqual(["datetime", "webfetch"]);
+    ).toEqual(["datetime", "webfetch", "visualize"]);
     expect(area().offered(now, "").search).toBeNull();
 
     const withExa = area({ exa: "exa-key" }, "exa").offered(now, "");
@@ -129,6 +129,7 @@ describe("offered", () => {
       "datetime",
       "webfetch",
       "websearch",
+      "visualize",
     ]);
     expect(withExa.search).toBe("exa");
     // a chosen provider without its key file still answers, keyless
@@ -140,10 +141,12 @@ describe("offered", () => {
     expect(tools.store.rows().map((row) => row.name)).toEqual([
       "webfetch",
       "websearch",
+      "visualize",
     ]);
     tools.store.setEnabled("webfetch", false, now);
     expect(tools.offered(now, "").tools.map((tool) => tool.name)).toEqual([
       "datetime",
+      "visualize",
     ]);
   });
 

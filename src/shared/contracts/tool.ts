@@ -10,6 +10,13 @@
 
 import type { BuiltinTool, SearchProvider, WebTool } from "../words.ts";
 
+export const DEFAULT_VISUAL_HOSTS = [
+  "https://cdn.jsdelivr.net",
+  "https://cdnjs.cloudflare.com",
+  "https://esm.sh",
+  "https://unpkg.com",
+] as const;
+
 export type ToolCall = {
   // the id the model gave the call, echoed on the tool result
   id: string;
@@ -59,6 +66,7 @@ export type BuiltinToolSummary = ToolSchema & {
 export type WebToolSummary = ToolSchema & {
   name: WebTool;
   enabled: boolean;
+  hosts: string[];
   updatedAt: number;
 };
 
