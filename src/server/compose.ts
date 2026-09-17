@@ -163,6 +163,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage: {
       deleteProject: (projectId) => usage.deleteProject(projectId),
     },
+    // the knowledge area is built after projects; until it lands the
+    // detail counts nothing
+    knowledge: { counts: () => ({ files: 0, tokens: 0 }) },
   });
   const access: Access = accessArea({
     db,

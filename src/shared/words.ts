@@ -122,6 +122,22 @@ export function isName(value: unknown): value is string {
   );
 }
 
+// a knowledge file's name is a path: one to eight segments joined by
+// `/`, each 1 to 80 characters of ASCII letters, digits, dot, dash and
+// underscore, never `.` or `..`, 200 characters at most
+export const MAX_KNOWLEDGE_NAME = 200;
+export const MAX_KNOWLEDGE_SEGMENTS = 8;
+const KNOWLEDGE_SEGMENT_RE = /^[A-Za-z0-9._-]{1,80}$/;
+export function isKnowledgeName(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  if (value.length < 1 || value.length > MAX_KNOWLEDGE_NAME) return false;
+  const parts = value.split("/");
+  if (parts.length > MAX_KNOWLEDGE_SEGMENTS) return false;
+  return parts.every(
+    (part) => part !== "." && part !== ".." && KNOWLEDGE_SEGMENT_RE.test(part),
+  );
+}
+
 // an MCP server's name: the channel rule without the underscore, 2 to
 // 24. It makes the wire name mcp__<server>__<tool>, so with no `_` in
 // it the first `__` after `mcp__` always ends it, and at 24 the longest
@@ -369,6 +385,12 @@ export const LIMIT_NAMES = [
   "visualBytes",
   "visualSendBytes",
   "maxVisuals",
+  "knowledgeFileBytes",
+  "knowledgeFiles",
+  "knowledgeProjectBytes",
+  "knowledgeVersions",
+  "knowledgeHistoryBytes",
+  "knowledgeHistoryDays",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {
@@ -376,11 +398,19 @@ export function isLimitName(value: unknown): value is LimitName {
 }
 
 // what a limit's number counts; the page turns ms and bytes into words
-export const LIMIT_UNITS = ["count", "ms", "bytes", "chars", "tokens"] as const;
+export const LIMIT_UNITS = [
+  "count",
+  "ms",
+  "bytes",
+  "chars",
+  "tokens",
+  "days",
+] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
-// where a limit applies: over the whole send, or to one tool call
-export const LIMIT_SCOPES = ["send", "call"] as const;
+// where a limit applies: over the whole send, to one tool call, or to
+// a project's knowledge base, a storage cap read at each write
+export const LIMIT_SCOPES = ["send", "call", "knowledge"] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 
 // a skill's name, the Agent Skills rule: lowercase ASCII letters, digits

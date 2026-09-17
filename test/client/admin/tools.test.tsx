@@ -447,7 +447,8 @@ describe("the page", () => {
     const html = render(<Tools />);
     expect(html).toContain("Per send");
     expect(html).toContain("Per call");
-    expect(html.match(/<form/g)).toHaveLength(2);
+    expect(html).toContain("Knowledge");
+    expect(html.match(/<form/g)).toHaveLength(3);
     expect(html).not.toContain(">Limits</span>");
     expect(html).toContain('type="number"');
     expect(html).toContain('step="any"');

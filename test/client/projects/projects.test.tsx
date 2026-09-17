@@ -74,6 +74,7 @@ describe("the projects entity", () => {
         ...personal,
         description: "Scratch work",
         chats: 0,
+        knowledge: { files: 0, tokens: 0 },
         members: [caelea],
       };
       project.value = { ...saved, description: "" };
@@ -117,6 +118,7 @@ describe("the projects entity", () => {
       createdAt: 0,
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     me.value = null;
@@ -179,6 +181,7 @@ describe("the projects entity", () => {
                 createdAt: 0,
                 description: "",
                 chats: 0,
+                knowledge: { files: 0, tokens: 0 },
                 members: [],
               },
             }),
@@ -212,6 +215,7 @@ describe("the projects entity", () => {
                     createdAt: 0,
                     description: "",
                     chats: 0,
+                    knowledge: { files: 0, tokens: 0 },
                     members: [],
                   },
                 }),
@@ -424,6 +428,7 @@ describe("the pages", () => {
       createdAt: 0,
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     projectAgents.value = [];
@@ -456,6 +461,7 @@ describe("the pages", () => {
       kind: "team",
       description: "Incidents and pages",
       chats: 12,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     let html = render(<Project params={{ id: "p1" }} />);
@@ -474,6 +480,7 @@ describe("the pages", () => {
       ...personal,
       description: "Scratch work",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     let html = render(<Settings params={{ id: "p1" }} />);
@@ -498,6 +505,7 @@ describe("the pages", () => {
       ...personal,
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     projectAgents.value = [];
@@ -514,6 +522,7 @@ describe("the pages", () => {
         kind: "team",
         description: "",
         chats: 0,
+        knowledge: { files: 0, tokens: 0 },
         members: [caelea],
       };
       projectAgents.value = [];
@@ -531,6 +540,7 @@ describe("the pages", () => {
       kind: "team",
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     projectAgents.value = null;

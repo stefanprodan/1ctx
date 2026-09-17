@@ -6,6 +6,7 @@ import type {
   ProjectResponse,
   ProjectsResponse,
 } from "../../shared/api/projects.ts";
+import type { KnowledgeCounts } from "../../shared/contracts/knowledge.ts";
 import type { ProjectDetail } from "../../shared/contracts/project.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
@@ -40,6 +41,11 @@ export type UsagePort = {
   deleteProject(projectId: string): number;
 };
 
+// the knowledge base's counts for the detail, an area built later
+export type KnowledgePort = {
+  counts(projectId: string): KnowledgeCounts;
+};
+
 export type RoutesDeps = {
   db: Db;
   store: ProjectStore;
@@ -47,6 +53,7 @@ export type RoutesDeps = {
   users: UsersPort;
   sessions: SessionsPort;
   usage: UsagePort;
+  knowledge: KnowledgePort;
   clock: Clock;
 };
 
@@ -75,6 +82,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       description: project.description,
       members,
       chats: deps.sessions.count(project.id),
+      knowledge: deps.knowledge.counts(project.id),
     };
   };
   // a reserved name reads as taken, since a personal project holds it

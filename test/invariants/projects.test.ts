@@ -146,6 +146,7 @@ describe("GET /api/projects/:id", () => {
         memberCount: 1,
         description: "",
         chats: 0,
+        knowledge: { files: 0, tokens: 0 },
         members: [
           {
             id: admin.id,
