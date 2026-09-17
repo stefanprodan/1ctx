@@ -93,9 +93,27 @@ shrink an entire architecture until every label is unreadable.
 
 ## Final checks
 
-Trace every connector from its actual source edge to the right target.
-Check the longest title against its box, the lowest annotation against
-the viewBox, and every arrowhead against nearby text. Every connector
-path needs `fill="none"` or `arr`. Give all text `t`, `ts`, `th` or an
-explicit themed fill. Check a ramp's child shapes are ones it supports.
-Retain margins, align peer nodes and remove decorative crossings.
+Do these checks with numbers, not by eye, and fix the SVG before calling
+`visualize`. A diagram that fails one is not ready to send.
+
+1. Label fit. For every `text` inside a box, estimate its width: `th`
+   and `t` as character count times 8, `ts` as count times 7. The width
+   plus 24 must not exceed the box width. When it does, widen the box,
+   split the line into two `text` lines, or shorten the words. A line
+   like "Declarative YAML / Kustomize / Helm" (35 characters of `ts`, about
+   245 units) does not fit a 170-unit box.
+2. Label clearance. A connector label needs its estimated width plus 16
+   units of free space along the connector. When the gap between two
+   boxes is narrower, put the label above or below the gap, clear of
+   both boxes, or widen the gap. Never center a label on a short arrow
+   that ends at a box edge.
+3. No overlaps. No text crosses a shape edge, a connector or another
+   text. No connector runs through a box it does not connect.
+4. Connectors. Trace each one from its source edge to its target edge.
+   Every path has `fill="none"` or `arr`, and each arrowhead stops clear
+   of nearby text.
+5. Bounds. Every shape and label stays inside x=40 to x=640, and the
+   lowest one sits at least 40 units above the viewBox height.
+6. Theme. All text uses `t`, `ts`, `th` or an explicit themed fill, a
+   ramp's child shapes are ones it supports, peer nodes are aligned and
+   no crossing is only decoration.

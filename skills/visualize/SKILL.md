@@ -200,8 +200,10 @@ Use `skill_file` with this skill's name and the path.
 ## Check before sending
 
 Choose a visual only if it teaches more than the prose. Check the initial
-static state, label fit, connector routes, units, rounded numbers and
-data accuracy. Mark invented demonstration data as sample data. Keep the
+static state, units, rounded numbers and data accuracy. For an SVG
+diagram, run the numbered final checks in `references/svg-diagrams.md`:
+compute each label's width against its box and the space beside each
+connector, and fix every overlap before calling `visualize`. Mark invented demonstration data as sample data. Keep the
 style first, visible content next and scripts last, with no incomplete
 tags, placeholders or comments. Every control must do something local
 and be keyboard usable. Give animated content a pause control and
