@@ -21,9 +21,9 @@ Make failures explicit beside that content. Never use an empty catch.
 
 ## Mermaid relationships
 
-Mermaid is useful for an ERD, a sequence or a class relationship where
-automatic layout saves substantial work. Prefer hand-laid SVG for a small
-flowchart. Set `startOnLoad: false` so the final script owns rendering.
+Mermaid is useful for an ERD, a sequence, a class relationship or a graph
+too dense to place by hand. For a handful of boxes, the measured layout
+in `references/svg-diagrams.md` needs no dependency. Set `startOnLoad: false` so the final script owns rendering.
 Use strict content handling, no click actions and no HTML labels.
 Write the diagram source as a template literal with real line breaks.
 Never join lines with an escaped newline such as `\n`: inside the tool's

@@ -12,14 +12,16 @@ not from this skill: an administrator may change them or allow none.
 ## Choose a useful visual
 
 Draw to clarify a relationship, make a quantity comparable or let someone
-explore a variable. Ask whether the reader would screenshot the result
+explore a variable. Never place boxes by hand-computed coordinates when
+CSS or a library can lay them out. Ask whether the reader would screenshot the result
 for reference. If not, a short answer may be better.
 
 | Need | First choice |
 | --- | --- |
 | A fact, a definition or a short answer | Text |
 | Writing, editing, code or personal support | Text |
-| A process, architecture or physical mechanism | Inline SVG |
+| A process or an architecture | HTML boxes, connectors drawn by a script |
+| A physical mechanism or an annotated drawing | Inline SVG |
 | A comparison or a proposed interface | HTML grid or table |
 | A trend, ranking, proportion or distribution | Inline SVG chart |
 | A parameter, a cycle or a system's changing state | HTML controls and SVG |
@@ -190,7 +192,7 @@ Use `skill_file` with this skill's name and the path.
 
 | File | Read when |
 | --- | --- |
-| [references/svg-diagrams.md](references/svg-diagrams.md) | Laying out nodes, arrows, containers or annotated mechanisms |
+| [references/svg-diagrams.md](references/svg-diagrams.md) | Any diagram: which layout method to use, nodes, arrows, containers, mechanisms |
 | [references/ui-mockups.md](references/ui-mockups.md) | Drawing cards, metrics, records, comparisons, tables or controls |
 | [references/interactive.md](references/interactive.md) | Adding controls, steps, tabs, a simulation, plotter or animation |
 | [references/charts.md](references/charts.md) | Choosing a chart, sizing Chart.js or handling its theme and fallback |

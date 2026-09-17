@@ -84,10 +84,13 @@ function sourceFiles(): Map<string, string> {
   return files;
 }
 
+// the SVG namespace is a name, not an address: nothing is loaded from it
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 function externalUrls(text: string): string[] {
-  return [...text.matchAll(/https?:\/\/[^\s<>"'`)\]}]+/gi)].map(([url]) =>
-    url.replace(/[.,;]+$/, ""),
-  );
+  return [...text.matchAll(/https?:\/\/[^\s<>"'`)\]}]+/gi)]
+    .map(([url]) => url.replace(/[.,;]+$/, ""))
+    .filter((url) => url !== SVG_NS);
 }
 
 function checkUrls(text: string, path: string) {
