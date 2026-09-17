@@ -9,6 +9,7 @@
 // summary fold alone. Under a finished turn, why it was cut when it
 // was, Copy, Fork, Regenerate on the last turn, and when it was.
 
+import type { ComponentChildren } from "preact";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
@@ -54,10 +55,12 @@ export function Reply({
   agent,
   onRegenerate,
   fork,
+  visuals,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
   agent: Agent | null;
+  visuals?: ComponentChildren;
   // set on the last turn alone: regenerate drops it and sends its
   // user message again
   onRegenerate?: () => void;
@@ -120,6 +123,7 @@ export function Reply({
             running={running && node.send?.memoryRound == null}
           />
         )}
+        {visuals}
         {html !== "" && !lead && (
           // the server renders the markdown with raw HTML off: render/
           // is the safety boundary

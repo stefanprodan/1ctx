@@ -13,6 +13,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import { visualPreviews } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
 import { copyCode } from "./copy.ts";
@@ -21,6 +22,8 @@ import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
 import { UserRow } from "./UserRow.tsx";
+import { Visual } from "./Visual.tsx";
+import { visualCards } from "./visuals.ts";
 import "./transcript.css";
 import "./md.css";
 import "./hljs.css";
@@ -152,6 +155,9 @@ export function Transcript({
                 )}
                 onRegenerate={last ? onRegenerate : undefined}
                 fork={fork}
+                visuals={visualCards(node, visualPreviews.value).map((card) => (
+                  <Visual key={card.key} card={card} />
+                ))}
               />
             );
           })}

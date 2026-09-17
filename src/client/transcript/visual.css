@@ -1,0 +1,49 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .visual-card {
+    width: 100%;
+    max-width: 680px;
+    min-width: 0;
+    margin-block: var(--space-4);
+  }
+  .visual-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding-block-end: var(--space-2);
+  }
+  .visual-title {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--fg);
+    font-size: var(--text-ui);
+  }
+  .visual-state {
+    flex: none;
+    color: var(--faint);
+    font-size: var(--text-small);
+  }
+  .visual-scroll {
+    overflow: auto;
+    min-height: 80px;
+    max-height: 2000px;
+  }
+  .visual-frame {
+    display: block;
+    width: 680px;
+    min-width: 680px;
+    border: 0;
+  }
+  .visual-failed .visual-frame {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .visual-error {
+    padding-block-start: var(--space-2);
+    color: var(--failed);
+    font-size: var(--text-ui);
+    overflow-wrap: anywhere;
+  }
+}

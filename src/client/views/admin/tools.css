@@ -35,6 +35,13 @@
     padding: var(--space-4);
   }
 
+  .tools-hosts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
   /* the buttons under a hairline across the card, Reset under the
      labels and Save ending where the boxes end, before the unit slot
      and the column of defaults */

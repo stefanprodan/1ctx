@@ -41,15 +41,18 @@ export async function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
+      signal,
       method,
       headers: body === undefined ? {} : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
+    signal?.throwIfAborted();
     throw new ApiError(0, statusWords(0));
   }
   const data = (await res.json().catch(() => ({}))) as { error?: unknown };

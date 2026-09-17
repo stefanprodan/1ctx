@@ -8,7 +8,11 @@
 // search section, the tabs and when a send carries a built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
-import type { SearchState, ToolWhen } from "../../../shared/contracts/tool.ts";
+import {
+  DEFAULT_VISUAL_HOSTS,
+  type SearchState,
+  type ToolWhen,
+} from "../../../shared/contracts/tool.ts";
 import type {
   LimitName,
   LimitScope,
@@ -60,6 +64,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   searchBodyBytes: {
     label: "Search body",
     text: "Bytes a search answer is read up to.",
+  },
+  visualBytes: {
+    label: "Visual size",
+    text: "Bytes one visual's HTML may contain.",
+  },
+  visualSendBytes: {
+    label: "Visuals per send",
+    text: "Bytes of HTML a send may accept across its visuals.",
   },
   fetchDeadlineMs: {
     label: "Fetch deadline",
@@ -258,6 +270,26 @@ export function searchLine(state: SearchState): string {
     return `websearch runs on ${state.provider} keyless. Add ${state.provider}.key for a higher rate.`;
   }
   return `websearch runs on ${state.provider}.`;
+}
+
+export type HostEdit =
+  | { type: "add"; host: string }
+  | { type: "remove"; host: string }
+  | { type: "reset" };
+
+export function editHosts(hosts: readonly string[], edit: HostEdit): string[] {
+  switch (edit.type) {
+    case "add":
+      return [...hosts, edit.host.trim()];
+    case "remove":
+      return hosts.filter((host) => host !== edit.host);
+    case "reset":
+      return [...DEFAULT_VISUAL_HOSTS];
+  }
+}
+
+export function hostsFieldOf(message: string): "hosts" | undefined {
+  return message.startsWith("hosts ") ? "hosts" : undefined;
 }
 
 // the first sentence of a description, for the row

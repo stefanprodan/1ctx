@@ -1,17 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sessions entity: the chat on screen with the reply in flight
-// and the agents a composer offers; the stream's rows are data/stream.ts,
-// handed the frames from here. The
-// rows come from the routes; the socket keeps them current. A durable
-// envelope counts when its revision is above the one held, so the
-// answer of a write and the event of the same commit are one change
-// however they arrive. The stream frames are applied to the live map
-// through the transcript's reducers; a frame out of sequence means the
-// detail is fetched again, so the page is never stuck on a gap.
-// Every answer is kept only for the user, the id and the turn it was
-// asked for, as the projects entity does.
+// Durable revisions win over old loads. Stream gaps refetch a snapshot
+// rather than leaving a partly applied reply or visual on screen.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -20,13 +11,12 @@ import type {
   RenameSessionRequest,
   SendMessageRequest,
   SessionResponse,
-  ToolResultResponse,
 } from "../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
-import { type Failure, failure, reason } from "../lib/format.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import {
   applyDelta,
   applyHtml,
@@ -34,13 +24,25 @@ import {
   liveOf,
   liveOfSnapshot,
 } from "../transcript/stream.ts";
-import type { ToolResult } from "../transcript/Tool.model.ts";
+import {
+  applyVisual,
+  type Previews,
+  reconcileVisuals,
+  snapshotVisuals,
+} from "../transcript/visuals.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
 import { applyEnvelope, dropRow, revokeRows } from "./stream.ts";
 
+export {
+  loadToolResult,
+  loadVisual,
+  toolResults,
+  toolVisuals,
+} from "./session-values.ts";
 export { type ListFilter, list, loadList } from "./stream.ts";
 
 // frames kept while the watch is being answered; past this the
@@ -60,11 +62,10 @@ export const homeProjectId = signal<string | null>(null);
 // a send the composer asked for and the server has not answered
 export const sending = signal(false);
 
-// the tool results fetched so far, by message id, for the life of the
-// chat on screen
-export const toolResults = signal<ReadonlyMap<string, ToolResult>>(new Map());
+// A stored call keeps only a marker here. Its mounted frame keeps the paint.
+export const visualPreviews = signal<Previews>(new Map());
 
-type Frame = Extract<SocketEvent, { type: "delta" | "html" }>;
+type Frame = Extract<SocketEvent, { type: "delta" | "html" | "visual" }>;
 
 let owner: string | null = null;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
@@ -85,7 +86,8 @@ effect(() => {
   session.value = null;
   sessionError.value = null;
   live.value = new Map();
-  toolResults.value = new Map();
+  resetValues();
+  visualPreviews.value = new Map();
   projectAgents.value = null;
   agentsFor = null;
   homeProjectId.value = null;
@@ -94,21 +96,14 @@ effect(() => {
   stream = null;
 });
 
-// a result held for a row the chat no longer has is dropped with it
-function keepResults(keep: (id: string) => boolean): void {
-  if (toolResults.value.size === 0) return;
-  const next = new Map<string, ToolResult>();
-  for (const [id, value] of toolResults.value) {
-    if (keep(id)) next.set(id, value);
-  }
-  toolResults.value = next;
-}
-
 function show(detail: SessionDetail): void {
+  visualPreviews.value = snapshotVisuals(
+    reconcileVisuals(visualPreviews.value, detail),
+    detail,
+  );
   session.value = detail;
   live.value = liveFrom(detail);
-  const ids = new Set(detail.messages.map((m) => m.id));
-  keepResults((id) => ids.has(id));
+  syncValues(detail);
   stream =
     detail.live === null
       ? null
@@ -122,7 +117,8 @@ export async function loadSession(id: string): Promise<void> {
   if (session.value !== null && session.value.session.id !== id) {
     session.value = null;
     live.value = new Map();
-    toolResults.value = new Map();
+    resetValues();
+    visualPreviews.value = new Map();
   }
   try {
     const detail = await api<SessionResponse>(
@@ -160,34 +156,9 @@ export function leaveSession(id?: string): void {
   stream = null;
   session.value = null;
   live.value = new Map();
-  toolResults.value = new Map();
+  resetValues();
+  visualPreviews.value = new Map();
   watch(null);
-}
-
-function setToolResult(messageId: string, value: ToolResult): void {
-  const next = new Map(toolResults.value);
-  next.set(messageId, value);
-  toolResults.value = next;
-}
-
-// once per row: a result already held or in flight is not asked again
-export async function loadToolResult(messageId: string): Promise<void> {
-  const current = session.value;
-  if (current === null || toolResults.value.has(messageId)) return;
-  const id = current.session.id;
-  setToolResult(messageId, { status: "loading" });
-  try {
-    const answer = await api<ToolResultResponse>(
-      `/api/sessions/${encodeURIComponent(id)}/messages/${encodeURIComponent(
-        messageId,
-      )}/result`,
-    );
-    if (session.value?.session.id !== id) return;
-    setToolResult(messageId, { status: "done", ...answer });
-  } catch (err) {
-    if (session.value?.session.id !== id) return;
-    setToolResult(messageId, { status: "failed", error: reason(err) });
-  }
 }
 
 export function projectAgentCount(projectId: string): number | null {
@@ -343,7 +314,6 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   );
   const map = new Map(live.value);
   for (const id of removed) map.delete(id);
-  keepResults((id) => !removed.has(id));
   for (const m of ev.messages) {
     if (!streams(m)) continue;
     if (m.status === "streaming") {
@@ -356,6 +326,22 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     messages,
     send: ev.send ?? held.send,
   };
+  visualPreviews.value = reconcileVisuals(visualPreviews.value, session.value);
+  session.value = {
+    ...session.value,
+    live:
+      ev.session.status !== "running"
+        ? null
+        : session.value.live && {
+            ...session.value.live,
+            drafts: [...visualPreviews.value.values()].filter(
+              (draft) =>
+                draft.phase === "draft" &&
+                draft.sendId === session.value?.live?.sendId,
+            ),
+          },
+  };
+  syncValues(session.value);
   live.value = map;
 }
 
@@ -374,6 +360,35 @@ function applyFrame(frame: Frame): boolean {
   }
   if (frame.seq !== stream.seq + 1) return false;
   stream.seq = frame.seq;
+  if (frame.type === "visual") {
+    const row = held.messages.find((row) => row.id === frame.messageId);
+    if (!row || row.sendId !== frame.sendId) return false;
+    if (row.status !== "streaming") return true;
+    const result = applyVisual(visualPreviews.value, frame);
+    if (result.gap) return false;
+    visualPreviews.value = result.previews;
+    const snapshot =
+      held.live?.sendId === frame.sendId
+        ? held.live
+        : {
+            phase: "reply" as const,
+            sendId: frame.sendId,
+            messageId: row.id,
+            ...liveOf(row),
+            seq: frame.seq,
+          };
+    session.value = {
+      ...held,
+      live: {
+        ...snapshot,
+        seq: frame.seq,
+        drafts: [...result.previews.values()].filter(
+          (draft) => draft.sendId === frame.sendId && draft.phase === "draft",
+        ),
+      },
+    };
+    return true;
+  }
   const v = live.value.get(frame.messageId);
   if (v === undefined) return true;
   const map = new Map(live.value);
@@ -400,6 +415,11 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     refetch();
     return;
   }
+  visualPreviews.value = snapshotVisuals(visualPreviews.value, {
+    ...held,
+    live: ev.live,
+  });
+  session.value = { ...held, live: ev.live };
   if (ev.live === null) {
     // the rows say running and the runner has nothing: the end went by
     // before this connection heard it
@@ -455,6 +475,7 @@ export function onSocket(ev: SocketEvent): void {
       break;
     case "delta":
     case "html":
+    case "visual":
       if (pending !== null) {
         if (pending.buffer.length >= BUFFER_MAX) pending.overflow = true;
         else pending.buffer.push(ev);
