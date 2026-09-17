@@ -8,6 +8,7 @@
 // the caller passes, so a test hands it recorded frames and the suite
 // never reaches a network.
 
+import { tokens } from "../lib/tokens.ts";
 import type {
   ChatEvent,
   ChatRequest,
@@ -124,6 +125,11 @@ export function wireTools(
   tools: readonly ChatTool[],
 ): { type: "function"; function: ChatTool }[] {
   return tools.map((tool) => ({ type: "function", function: tool }));
+}
+
+// the tokens those schemas cost, the one count every page shows
+export function wireTokens(tools: readonly ChatTool[]): number {
+  return tools.length === 0 ? 0 : tokens(JSON.stringify(wireTools(tools)));
 }
 
 // Frames are returned as their joined data payload. Comments count as bytes

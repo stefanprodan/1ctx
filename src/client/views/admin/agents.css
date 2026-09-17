@@ -1,22 +1,13 @@
-/* Agents: a provider row's name, address and Delete question, and the
-   form an open agent row holds: the presets, the avatar and provider
-   pickers, and the model search. */
+/* Agents: the form an open agent row holds: the Delete question in its
+   foot, the presets, the avatar and provider pickers, and the model
+   search field. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .agents-ask {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex-shrink: 0;
-  }
   .agents-ask-words {
     font-size: var(--text-ui);
     color: var(--dim);
-  }
-  .agents-note {
-    font-size: var(--text-small);
   }
 
   .agents-form {
@@ -130,105 +121,6 @@
     font-size: var(--text-small);
   }
 
-  /* the skills: the label with the count at the right, then a list
-     like the catalog's matches, a line per skill with its box, the name
-     in mono over the description */
-  .agents-skills-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  .agents-skills-count {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
-  .agents-skills {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    overflow: hidden;
-  }
-  .agents-skill {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-width: 0;
-    min-height: 48px;
-    padding: var(--space-2) var(--space-3);
-    border-bottom: 1px solid var(--line);
-    cursor: pointer;
-  }
-  .agents-skill:last-child {
-    border-bottom: 0;
-  }
-  .agents-skill:hover {
-    background: var(--line);
-  }
-  .agents-skill-full {
-    cursor: default;
-  }
-  .agents-skill-full:hover {
-    background: transparent;
-  }
-  /* the native box stays for the keyboard and a screen reader, drawn
-     over by the owner's */
-  .agents-skill-input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .agents-skill-box {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius);
-    background: var(--card);
-    color: var(--page);
-  }
-  .agents-skill-on .agents-skill-box {
-    border-color: var(--brand);
-    background: var(--brand);
-  }
-  .agents-skill-input:focus-visible + .agents-skill-box {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
-  }
-  .agents-skill-title {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1 1 0;
-    min-width: 0;
-  }
-  .agents-skill-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    color: var(--fg);
-  }
-  .agents-skill-desc {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
-  .agents-skill-full .agents-skill-box,
-  .agents-skill-full .agents-skill-name {
-    opacity: 0.5;
-  }
-
   /* the model field: the glass at the left end of the search */
   .agents-search {
     position: relative;
@@ -271,113 +163,10 @@
     font-size: var(--text-input);
   }
 
-  .agents-matches {
-    display: flex;
-    flex-direction: column;
-    margin-top: var(--space-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    overflow: hidden;
-  }
-
-  /* one model per line: the name over the id, the meta at the right */
-  .agents-match,
-  .agents-picked {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    min-height: 48px;
-    padding: var(--space-2) var(--space-3);
-  }
-  .agents-match {
-    border: 0;
-    border-bottom: 1px solid var(--line);
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-  }
-  .agents-match:last-child {
-    border-bottom: 0;
-  }
-  .agents-match:hover {
-    background: var(--card);
-  }
-  .agents-picked {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-  }
-
-  .agents-model {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex-grow: 1;
-    min-width: 0;
-  }
-  .agents-model-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-ui);
-    color: var(--fg);
-  }
-  .agents-model-id {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
-  /* the picked model: its id where a match shows the name */
-  .agents-model-picked {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    color: var(--fg);
-  }
-  .agents-model-meta {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    white-space: nowrap;
-  }
-
-  .agents-state {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--text-ui);
-    color: var(--faint);
-  }
-  .agents-matches .agents-state {
-    padding: var(--space-3);
-  }
-
   @media (max-width: 719px) {
-    .agents-ask {
-      flex-basis: 100%;
-      order: 7;
-      justify-content: flex-end;
-    }
     .agents-presets,
     .agents-fields {
       grid-template-columns: 1fr;
-    }
-    .agents-match,
-    .agents-picked {
-      flex-wrap: wrap;
-    }
-    .agents-model {
-      flex-basis: 100%;
-    }
-    .agents-model-meta {
-      white-space: normal;
     }
   }
 }

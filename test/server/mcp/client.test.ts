@@ -728,7 +728,10 @@ describe("MCP streamed response budget", () => {
     ).rejects.toThrow("the MCP server's answer is over 100 bytes");
   });
 
-  test("aborts an SSE stream that crosses the budget", async () => {
+  // the deadline is far past the test's own timeout: an over-budget
+  // stream that only ended at the deadline fails here instead of
+  // holding the tests that run beside it
+  test("aborts an SSE stream that crosses the budget at once", async () => {
     let transportClosed = false;
     const fetcher = (async (
       input: string | URL | Request,
@@ -757,7 +760,7 @@ describe("MCP streamed response budget", () => {
         { fetcher, version: "test" },
         { url: URL },
         null,
-        { ...options(), bodyBytes: 100 },
+        { ...options(), bodyBytes: 100, timeoutMs: 60_000 },
         async (client) => client.listTools(),
       ),
     ).rejects.toThrow("the MCP server's answer is over 100 bytes");

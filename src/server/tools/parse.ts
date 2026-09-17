@@ -3,15 +3,15 @@
 
 import type { PatchToolRequest } from "../../shared/api/tools.ts";
 import {
-  type BuiltinTool,
-  isBuiltinTool,
   isSearchProvider,
+  isWebTool,
+  type WebTool,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export function parseToolName(value: unknown): BuiltinTool {
-  if (!isBuiltinTool(value)) throw new BadRequest("no such tool");
+export function parseToolName(value: unknown): WebTool {
+  if (!isWebTool(value)) throw new BadRequest("no such tool");
   return value;
 }
 

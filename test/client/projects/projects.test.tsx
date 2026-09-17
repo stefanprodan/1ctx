@@ -437,7 +437,7 @@ describe("the pages", () => {
     expect(html).not.toContain("Members");
     expect(html).not.toContain('<div class="split-line">Chats');
     expect(html).toContain(
-      'class="stream-filter stream-filter-on" aria-pressed="true">All<',
+      'class="rows-filter rows-filter-on" aria-pressed="true">All<',
     );
     expect(html).toContain('href="/projects/p1/settings"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');

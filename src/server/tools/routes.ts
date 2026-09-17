@@ -5,7 +5,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import type { BuiltinTool } from "../../shared/words.ts";
+import type { WebTool } from "../../shared/words.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -15,7 +15,7 @@ import { parseToolName, parseToolPatch } from "./parse.ts";
 export type RoutesDeps = {
   clock: Clock;
   response(now: number): ToolsResponse;
-  patch(name: BuiltinTool, patch: PatchToolRequest, now: number): void;
+  patch(name: WebTool, patch: PatchToolRequest, now: number): void;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {

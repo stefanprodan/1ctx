@@ -41,7 +41,17 @@ import { Icon } from "../../lib/icons.tsx";
 import { onResize } from "../../lib/resize.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
-import { RowsCard, RowsNote } from "../../ui/Rows.tsx";
+import {
+  RowsAvatar,
+  RowsCard,
+  RowsEnd,
+  RowsFilters,
+  RowsGo,
+  RowsHandle,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
@@ -83,66 +93,70 @@ function RunRow({
   const took = durationOf(row, now);
   const share = took === null ? 0 : deadlineShare(took, deadlineMs);
   return (
-    <div class="automations-run">
-      <a class="automations-run-link" href={`/chat/${session.id}`}>
+    <RowsGo
+      href={`/chat/${session.id}`}
+      end={
+        running ? (
+          <RowsEnd>
+            <button
+              type="button"
+              class="btn btn-small"
+              onClick={() => {
+                failure.value = null;
+                stopSession(session.id).catch((err) => {
+                  failure.value = reason(err);
+                });
+              }}
+            >
+              <Icon name="stop" size={12} />
+              Stop
+            </button>
+          </RowsEnd>
+        ) : undefined
+      }
+    >
+      <RowsAvatar>
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
-          size={16}
+          size={15}
           class={`automations-run-icon automations-icon-${session.status}`}
         />
-        <span class="automations-run-when">
-          <span>{stamp(row.send?.startedAt ?? session.createdAt)}</span>
-          <span class="automations-faint">{sourceText(row)}</span>
-        </span>
-        <span
-          class={`automations-run-said${
-            session.status === "failed" ? " automations-bad" : ""
-          }`}
-        >
-          {line.author !== null && (
-            <span class="automations-agent">@{line.author} </span>
-          )}
-          {failure.value ?? line.text}
-          {row.send?.memoryError != null && (
-            <span class="automations-faint"> Memory not updated.</span>
-          )}
-          {row.send?.memorySkipped != null && row.send.memorySkipped > 0 && (
-            <span class="automations-faint">
-              {" "}
-              {row.send.memorySkipped} edits no longer applied.
+      </RowsAvatar>
+      <RowsTitle
+        name={stamp(row.send?.startedAt ?? session.createdAt)}
+        bad={session.status === "failed" || failure.value !== null}
+        sub={
+          <>
+            {sourceText(row)}
+            {" · "}
+            {line.author !== null && (
+              <>
+                <RowsHandle name={line.author} />{" "}
+              </>
+            )}
+            {failure.value ?? line.text}
+            {row.send?.memoryError != null && " Memory not updated."}
+            {row.send?.memorySkipped != null &&
+              row.send.memorySkipped > 0 &&
+              ` ${row.send.memorySkipped} edits no longer applied.`}
+          </>
+        }
+      />
+      <RowsMeta>
+        <span class="automations-run-meta">
+          <span class="automations-took">
+            <span>{took === null ? "" : durationText(took)}</span>
+            <span class="automations-bar" aria-hidden="true">
+              <span
+                class={`automations-bar-fill automations-bar-${session.status}`}
+                style={{ width: `${Math.round(share * 100)}%` }}
+              />
             </span>
-          )}
-        </span>
-        <span class="automations-run-took">
-          <span>{took === null ? "" : durationText(took)}</span>
-          <span class="automations-bar" aria-hidden="true">
-            <span
-              class={`automations-bar-fill automations-bar-${session.status}`}
-              style={{ width: `${Math.round(share * 100)}%` }}
-            />
           </span>
+          {!running && <span>{whenText(row, now)}</span>}
         </span>
-      </a>
-      <span class="automations-run-end">
-        {running ? (
-          <button
-            type="button"
-            class="btn btn-small"
-            onClick={() => {
-              failure.value = null;
-              stopSession(session.id).catch((err) => {
-                failure.value = reason(err);
-              });
-            }}
-          >
-            <Icon name="stop" size={12} />
-            Stop
-          </button>
-        ) : (
-          <span class="automations-mono">{whenText(row, now)}</span>
-        )}
-      </span>
-    </div>
+      </RowsMeta>
+    </RowsGo>
   );
 }
 
@@ -436,22 +450,16 @@ export function Automation({ params }: { params: Params }) {
             <RowsCard
               label="Runs"
               action={
-                <nav class="automations-filters" aria-label="Filter runs">
-                  {FILTERS.map((f) => (
-                    <a
-                      key={f.label}
-                      class={`automations-filter${
-                        f.value === filter ? " automations-filter-on" : ""
-                      }`}
-                      aria-current={f.value === filter ? "page" : undefined}
-                      href={`/automations/${id}${
-                        f.value === null ? "" : `?runs=${f.value}`
-                      }`}
-                    >
-                      {f.label}
-                    </a>
-                  ))}
-                </nav>
+                <RowsFilters
+                  label="Filter runs"
+                  filters={FILTERS.map((f) => ({
+                    label: f.label,
+                    on: f.value === filter,
+                    href: `/automations/${id}${
+                      f.value === null ? "" : `?runs=${f.value}`
+                    }`,
+                  }))}
+                />
               }
             >
               {held === null || held.rows === null ? (

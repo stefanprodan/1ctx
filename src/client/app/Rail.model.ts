@@ -22,3 +22,8 @@ export function projectHere(
   }
   return null;
 }
+
+// a rail link is lit on its page and on the pages under it, a tab
+export function onPage(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}

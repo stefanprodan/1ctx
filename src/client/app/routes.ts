@@ -66,6 +66,11 @@ const automationView = lazy(() =>
   import("../views/projects/Automation.tsx").then((m) => m.Automation),
 );
 
+// the tools page's three tabs share one view the same way
+const toolsView = lazy<{ params: Params }>(() =>
+  import("../views/admin/Tools.tsx").then((m) => m.Tools),
+);
+
 export const ROUTES: Route[] = [
   {
     path: "/login",
@@ -320,11 +325,25 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/admin/tools",
-    view: lazy(() => import("../views/admin/Tools.tsx").then((m) => m.Tools)),
+    view: toolsView,
     title: () => "Tools",
     role: "admin",
     load: () => loadTools(),
     nav: { label: "Tools", icon: "tools", order: 11, group: "Admin" },
+  },
+  {
+    path: "/admin/tools/web",
+    view: toolsView,
+    title: () => "Web tools",
+    role: "admin",
+    load: () => loadTools(),
+  },
+  {
+    path: "/admin/tools/limits",
+    view: toolsView,
+    title: () => "Limits",
+    role: "admin",
+    load: () => loadTools(),
   },
   {
     path: "/admin/skills",

@@ -1,5 +1,5 @@
-/* A card of rows: the head, rows that open over the page's ground,
-   static rows lined up with them, and the parts of a row's head. */
+/* The one design of a list: a card of rows, the same rows inset in a
+   form or an open row, and every part of a row's head and end. */
 
 @layer tokens, base, owners;
 
@@ -41,6 +41,37 @@
   }
   .rows-add {
     margin-left: auto;
+  }
+  /* a head's filters: one segmented switch, the picked one filled */
+  .rows-filters {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+    margin-left: auto;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .rows-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--faint);
+    font-size: var(--text-small);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .rows-filter:hover {
+    color: var(--fg);
+  }
+  .rows-filter-on {
+    background: var(--line);
+    color: var(--fg);
   }
   .rows-note {
     margin: 0;
@@ -96,16 +127,39 @@
   .rows-toggle.rows-line:hover,
   .rows-line-end:hover,
   .rows-line-pick:hover,
-  .rows-go:hover {
+  .rows-go:hover,
+  .rows-button:hover {
     background: var(--line);
   }
   .rows-line-pick {
+    cursor: pointer;
+  }
+  .rows-item-off .rows-line-pick {
+    cursor: default;
+  }
+  .rows-item-off .rows-line-pick:hover {
+    background: transparent;
+  }
+  .rows-button {
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    text-align: left;
     cursor: pointer;
   }
 
   .rows-go {
     color: var(--dim);
     text-decoration: none;
+  }
+  /* the link part of a row with an end: the line's flex, its height */
+  .rows-go-part {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: 1 1 0;
+    min-width: 0;
+    align-self: stretch;
   }
   .rows-go-arrow {
     flex-shrink: 0;
@@ -210,18 +264,205 @@
     color: var(--failed);
   }
 
+  .rows-tag {
+    flex-shrink: 0;
+    padding: 0 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    font-weight: 400;
+    color: var(--faint);
+  }
+  .rows-handle {
+    color: var(--brand);
+  }
+  .rows-bad {
+    color: var(--failed);
+  }
+
+  /* an inset list: the same rows, tighter, on the field's ground */
+  .rows-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    overflow: hidden;
+  }
+  .rows-list .rows-line {
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+  }
+  .rows-list .rows-line-static {
+    padding-left: calc(var(--space-3) + 14px + var(--space-3));
+  }
+  .rows-list .rows-body {
+    padding: var(--space-3);
+  }
+  .rows-list .rows-body-chevron {
+    padding-left: calc(var(--space-3) + 14px + var(--space-3));
+  }
+  .rows-list .rows-item-open {
+    background: var(--card);
+  }
+  .rows-list .rows-note {
+    padding: var(--space-3);
+  }
+  .rows-list-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .rows-list-hint {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  .rows-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .rows-end {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+  .rows-end-words {
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  .rows-end-error {
+    font-size: var(--text-small);
+  }
+
+  /* the switch: a track with a knob, lit when on */
+  .rows-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-card);
+    background: var(--inset);
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .rows-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--faint);
+    transition:
+      transform 120ms,
+      background 120ms;
+  }
+  .rows-switch-on {
+    border-color: var(--brand);
+    background: var(--brand);
+  }
+  .rows-switch-on .rows-switch-knob {
+    transform: translateX(16px);
+    background: var(--page);
+  }
+  .rows-switch:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .rows-radio {
+    flex-shrink: 0;
+    width: 14px;
+    margin: 0;
+    accent-color: var(--brand);
+  }
+
+  .rows-check {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .rows-check-words {
+    gap: var(--space-2);
+    font-size: var(--text-small);
+    color: var(--dim);
+    cursor: pointer;
+  }
+  .rows-check-faint {
+    color: var(--faint);
+    cursor: default;
+  }
+  .rows-check-note {
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .rows-check-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .rows-check-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--page);
+  }
+  .rows-check-on {
+    border-color: var(--brand);
+    background: var(--brand);
+  }
+  .rows-check-input:focus-visible + .rows-check-box {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .rows-item-off .rows-check-box {
+    opacity: 0.5;
+  }
+
   @media (max-width: 719px) {
     .rows-line {
       padding-block: var(--space-3);
       row-gap: var(--space-1);
     }
     .rows-line,
-    .rows-toggle {
+    .rows-toggle,
+    .rows-go-part {
       flex-wrap: wrap;
     }
-    /* the end, a switch, stays beside the toggle */
-    .rows-line-end {
-      flex-wrap: nowrap;
+    /* the head keeps room for its name: an end that does not fit beside
+       it, a failure or a group of boxes, wraps to its own line at the
+       right and wraps inside itself, while a lone switch or button
+       stays on the head's line */
+    .rows-title {
+      min-width: min(160px, 100%);
+    }
+    .rows-line-end > .rows-toggle {
+      flex: 1 1 0;
+      min-width: min(200px, 100%);
+    }
+    .rows-end {
+      flex-shrink: 1;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      min-width: 0;
+      margin-left: auto;
     }
     .rows-line-static {
       padding-left: var(--space-4);
@@ -242,7 +483,8 @@
     .rows-go > .rows-meta {
       padding-left: 0;
     }
-    .rows-line:has(> .rows-avatar) > .rows-meta {
+    .rows-line:has(> .rows-avatar) > .rows-meta,
+    .rows-go-part:has(> .rows-avatar) > .rows-meta {
       padding-left: calc(28px + var(--space-3));
     }
     .rows-toggle:has(> .rows-avatar) > .rows-meta {
@@ -252,6 +494,21 @@
     .rows-body-avatar,
     .rows-body-chevron {
       padding: var(--space-4);
+    }
+    .rows-list .rows-line-static {
+      padding-left: var(--space-3);
+    }
+    .rows-list .rows-body,
+    .rows-list .rows-body-chevron {
+      padding: var(--space-3);
+    }
+    /* a row's question wraps below its head, at the right; buttons
+       alone stay on the head's line, and an open row's end beside its
+       toggle */
+    .rows-line:not(.rows-line-end) > .rows-end-ask {
+      flex-basis: 100%;
+      order: 7;
+      justify-content: flex-end;
     }
   }
 }

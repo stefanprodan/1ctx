@@ -14,6 +14,14 @@ import type {
 } from "../../../shared/contracts/mcp.ts";
 import type { McpMode } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
+import {
+  RowsCheck,
+  RowsEnd,
+  RowsLine,
+  RowsList,
+  RowsListHead,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   isModeValue,
@@ -57,27 +65,28 @@ export function McpPicker({
     const on = link?.[which] ?? false;
     const off = !server[which];
     return (
-      <label class={`mcp-pick-side${off ? " mcp-pick-off" : ""}`}>
-        <input
-          type="checkbox"
-          name={`${which}:${server.name}`}
-          checked={on}
-          disabled={busy}
-          onChange={() => onToggle(server.id, which)}
-        />
+      <RowsCheck
+        name={`${which}:${server.name}`}
+        checked={on}
+        disabled={busy}
+        faint={off}
+        note={off ? "off on the server" : undefined}
+        onChange={() => onToggle(server.id, which)}
+      >
         {label}
-        {off && <span class="mcp-pick-off-word">off on the server</span>}
-      </label>
+      </RowsCheck>
     );
   };
   return (
     <div class="field agents-field-wide">
-      <span class="mcp-pick-head">
-        <span class="label">MCP servers</span>
-        {loadedAt !== null && available !== null && (
-          <span class="hint">refreshed {ago(loadedAt, Date.now())}</span>
-        )}
-      </span>
+      <RowsListHead
+        label="MCP servers"
+        hint={
+          loadedAt !== null && available !== null
+            ? `refreshed ${ago(loadedAt, Date.now())}`
+            : undefined
+        }
+      />
       {available === null ? (
         <span class="hint">The servers did not load. Reload the page.</span>
       ) : available.length === 0 ? (
@@ -89,15 +98,17 @@ export function McpPicker({
         <span class="hint">This model takes no tools.</span>
       ) : (
         <>
-          <div class="mcp-picks">
+          <RowsList>
             {available.map((server) => (
-              <div key={server.id} class="mcp-pick">
-                <span class="mcp-pick-name">{server.name}</span>
-                {side(server, "read", "Read")}
-                {side(server, "write", "Write")}
-              </div>
+              <RowsLine key={server.id} flush>
+                <RowsTitle name={server.name} mono />
+                <RowsEnd>
+                  {side(server, "read", "Read")}
+                  {side(server, "write", "Write")}
+                </RowsEnd>
+              </RowsLine>
             ))}
-          </div>
+          </RowsList>
           <div class="field">
             <span class="label">Tool schemas</span>
             <Select

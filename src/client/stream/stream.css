@@ -1,32 +1,9 @@
-/* The stream: a card with the search in its head band, then rows with
-   a hairline between them. */
+/* The stream's session row: the one row outside Rows, a denser feed
+   line with a hairline under it inside the Rows card. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .stream {
-    display: flex;
-    flex-direction: column;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
-    overflow: hidden;
-  }
-
-  /* the head band is the search: the glass, then the text, no box of
-     its own inside the card */
-  .stream-head {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .stream-state {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    color: var(--faint);
-  }
-
   .stream-row {
     display: flex;
     align-items: center;
@@ -90,38 +67,6 @@
 
   .stream-author {
     color: var(--brand);
-  }
-
-  /* the head's filter beside the search: one segmented switch, All,
-     Chats or Tasks, the picked one filled */
-  .stream-filters {
-    display: flex;
-    flex-shrink: 0;
-    gap: 2px;
-    margin-right: var(--space-2);
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-  }
-  .stream-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-small);
-    cursor: pointer;
-  }
-  .stream-filter:hover {
-    color: var(--fg);
-  }
-  .stream-filter-on {
-    background: var(--line);
-    color: var(--fg);
   }
 
   .stream-when {

@@ -91,6 +91,11 @@ export function firstSentence(text: string): string {
   return end === -1 ? text : text.slice(0, end + 1);
 }
 
+// a count the server made in OpenAI's encoding: "1 token", "2.72k tokens"
+export function tokensText(n: number): string {
+  return `${count(n)} token${n === 1 ? "" : "s"}`;
+}
+
 // the words of a thrown value, for a failure line
 export function reason(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

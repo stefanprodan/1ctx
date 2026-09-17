@@ -99,6 +99,9 @@ type Budget = {
   limit: number;
   remaining: number;
   over: boolean;
+  // ends the transport: an SSE request the SDK waits on is not tied to
+  // the fetch's signal, so without this it would hold until the deadline
+  close: () => void;
 };
 
 function budgetWords(bytes: number): string {
@@ -110,6 +113,7 @@ function budgetWords(bytes: number): string {
 function overBudget(budget: Budget, controller: AbortController): never {
   budget.over = true;
   controller.abort(new Error("MCP response byte budget exceeded"));
+  budget.close();
   throw new Error("MCP response byte budget exceeded");
 }
 
@@ -139,6 +143,9 @@ function countedBody(
         consume(budget, next.value.byteLength, controller);
         stream.enqueue(next.value);
       } catch (error) {
+        // the source stops too, so nothing keeps reading a body over
+        // the budget
+        void reader.cancel(error).catch(() => undefined);
         stream.error(error);
       }
     },
@@ -322,6 +329,9 @@ export async function withClient<T>(
     limit: options.bodyBytes,
     remaining: options.bodyBytes,
     over: false,
+    close: () => {
+      void transport.close().catch(() => undefined);
+    },
   };
   const transport = new StreamableHTTPClientTransport(new URL(server.url), {
     fetch: budgetedFetch(deps.fetcher, budget, key),

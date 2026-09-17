@@ -4,7 +4,10 @@
 // The words on a user's page and an agent's page.
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import { ago, count } from "../../lib/format.ts";
+import { ago } from "../../lib/format.ts";
+
+export { tokensText } from "../../lib/format.ts";
+
 import { offsetOf } from "../../ui/Zone.model.ts";
 
 // "16:34 · GMT+3": the time where the user is, and how far that is from
@@ -22,11 +25,6 @@ export function localTime(tz: string, now: number): string {
   }
   const offset = offsetOf(tz, now);
   return offset === "" ? time : `${time} · ${offset}`;
-}
-
-// "2.72k tokens": a count the server made in OpenAI's encoding
-export function tokensText(n: number): string {
-  return `${count(n)} token${n === 1 ? "" : "s"}`;
 }
 
 // "on", "off", or what the provider does by default

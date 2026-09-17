@@ -18,27 +18,26 @@ import {
 } from "../../shared/mcp.ts";
 import { catalog } from "../../shared/skills.ts";
 import {
-  BUILTIN_TOOLS,
-  type BuiltinTool,
   type McpMode,
   type SearchProvider,
+  WEB_TOOLS,
+  type WebTool,
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
-import { tokens } from "../lib/tokens.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
-import { type ChatTool, type ToolCall, wireTools } from "../providers/index.ts";
+import {
+  type ChatTool,
+  type ToolCall,
+  wireTokens,
+} from "../providers/index.ts";
 import type { MemorySnapshot } from "../sessions/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
-import {
-  DEFAULT_TIMEZONE,
-  datetimeTool,
-  formatDatetime,
-} from "./builtin/datetime.ts";
+import { datetimeTool } from "./builtin/datetime.ts";
 import {
   makeMcpCatalogTools,
   mcpCallName,
@@ -60,6 +59,7 @@ import {
   makeWebsearchTool,
   type SearchDependencies,
 } from "./builtin/websearch.ts";
+import { builtinCatalog, fillYear, parametersHtml, schema } from "./catalog.ts";
 import { Registry } from "./registry.ts";
 import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
@@ -139,22 +139,6 @@ export type ToolsArea = Tools & {
 // the memory phase is offered memory_edit and nothing else; a call to
 // anything the run had gets the reason rather than a bare not found
 const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
-
-function fillYear(tools: ChatTool[], now: number): ChatTool[] {
-  const year = formatDatetime(now, DEFAULT_TIMEZONE).datetime.slice(0, 4);
-  return tools.map((tool) => ({
-    ...tool,
-    description: tool.description.replaceAll("{{year}}", year),
-  }));
-}
-
-function schema(tool: Tool): ChatTool {
-  return {
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters,
-  };
-}
 
 function promptServers(servers: OfferedServer[]): PromptServer[] {
   return servers.map((server) => ({
@@ -292,21 +276,22 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     const schemas = new Map(
       fillYear(toolsFor(selected), now).map((tool) => [tool.name, tool]),
     );
-    const tools = BUILTIN_TOOLS.map((name): ToolsResponse["tools"][number] => {
+    const web = WEB_TOOLS.map((name): ToolsResponse["web"][number] => {
       const row = rows.get(name)!;
       const tool = schemas.get(name)!;
-      const json = JSON.stringify(tool.parameters, null, 2);
       return {
         name,
         description: tool.description,
         parameters: tool.parameters,
-        parametersHtml: deps.render(`\`\`\`json\n${json}\n\`\`\``, false),
+        parametersHtml: parametersHtml(tool, deps.render),
+        tokens: wireTokens([tool]),
         enabled: row.enabled,
         updatedAt: row.updatedAt,
       };
     });
     return {
-      tools,
+      builtin: builtinCatalog(now, deps.render),
+      web,
       search: {
         provider: rows.get("websearch")!.provider,
         keys: {
@@ -319,7 +304,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   };
 
   const patch = (
-    name: BuiltinTool,
+    name: WebTool,
     change: PatchToolRequest,
     now: number,
   ): void => {
@@ -356,11 +341,13 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         searchRow.enabled && searchRow.provider !== null
           ? searchRow.provider
           : null;
-      const allowed = new Set(
-        [...rows.values()]
+      // datetime has no switch; a web tool has its row
+      const allowed = new Set<string>([
+        "datetime",
+        ...[...rows.values()]
           .filter((row) => row.enabled && (row.name !== "websearch" || search))
           .map((row) => row.name),
-      );
+      ]);
       const skillCatalog = catalog(skillStore.forAgent(agentId), CATALOG_CAP);
       for (const name of skillCatalog.leftOut) {
         deps.log(`skill ${name} left out of the catalog`);
@@ -371,9 +358,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       };
       const baseTools = fillYear(
         [
-          ...toolsFor(search ?? "exa").filter((tool) =>
-            allowed.has(tool.name as BuiltinTool),
-          ),
+          ...toolsFor(search ?? "exa").filter((tool) => allowed.has(tool.name)),
           ...makeSkillTools(skills.skills, skillStore),
           ...(memory === null ? [] : makeMemoryTools(memory, memorySessions)),
         ].map(schema),
@@ -387,7 +372,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       };
       let mcpCatalogText = "";
       const allSchemas = directSchemas(mcp);
-      const schemaTokens = tokens(JSON.stringify(wireTools(allSchemas)));
+      const schemaTokens = wireTokens(allSchemas);
       const mode = resolveMode(requestedMode, schemaTokens);
       let mcpSchemas = allSchemas;
       if (mode === "catalog" && mcp.length > 0) {

@@ -20,7 +20,6 @@ import {
   keyOptions,
   mcpFieldOf,
   NO_KEY,
-  timeoutHint,
   timeoutMs,
   timeoutProblem,
   timeoutText,
@@ -130,7 +129,7 @@ export function McpFields({
           </div>
         </div>
         <label class="field">
-          <span class="label">Call timeout</span>
+          <span class="label">Call timeout (seconds)</span>
           <input
             name="timeoutMs"
             class="mcp-mono"
@@ -144,11 +143,7 @@ export function McpFields({
               onChange("timeout", (e.currentTarget as HTMLInputElement).value)
             }
           />
-          {invalid("timeoutMs") ? (
-            <FieldError save={save} field="timeoutMs" />
-          ) : (
-            <span class="hint">{timeoutHint(callTimeoutMs.value)}</span>
-          )}
+          <FieldError save={save} field="timeoutMs" />
         </label>
       </div>
       <div class="mcp-field-wide mcp-pattern-row">

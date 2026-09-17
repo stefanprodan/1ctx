@@ -1,71 +1,8 @@
-/* Tools: a built-in's name, description and switch, the schema its
-   open row shows, the search radio, and the limits form. */
+/* Tools: the schema an open row shows, and the limits form. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .tools-name {
-    flex-shrink: 0;
-    width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    font-weight: 500;
-    color: var(--fg);
-  }
-  .tools-desc {
-    flex-grow: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-ui);
-    color: var(--dim);
-  }
-  .tools-note {
-    font-size: var(--text-small);
-  }
-
-  /* the switch: a track with a knob, lit when on */
-  .tools-switch {
-    position: relative;
-    flex-shrink: 0;
-    width: 36px;
-    height: 20px;
-    padding: 0;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-card);
-    background: var(--inset);
-    cursor: pointer;
-    transition: background 120ms;
-  }
-  .tools-switch-knob {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--faint);
-    transition:
-      transform 120ms,
-      background 120ms;
-  }
-  .tools-switch-on {
-    border-color: var(--brand);
-    background: var(--brand);
-  }
-  .tools-switch-on .tools-switch-knob {
-    transform: translateX(16px);
-    background: var(--page);
-  }
-  .tools-switch:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
   /* the schema, read-only, in the transcript's tool mono */
   .tools-schema {
     display: flex;
@@ -91,23 +28,21 @@
     overflow: auto;
   }
 
-  .tools-radio {
-    flex-shrink: 0;
-    width: 14px;
-    margin: 0;
-    accent-color: var(--brand);
-  }
-
   .tools-form {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
     padding: var(--space-4);
   }
-  .tools-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
+
+  /* the buttons under a hairline across the card, Reset under the
+     labels and Save ending where the boxes end, before the unit slot
+     and the column of defaults */
+  .tools-foot {
+    padding: var(--space-3)
+      calc(var(--space-4) + 120px + var(--space-3) + 44px + var(--space-2))
+      var(--space-3) var(--space-4);
+    border-top: 1px solid var(--line);
   }
 
   /* one limit: the words at the left, the field with its unit, and
@@ -184,18 +119,11 @@
   }
 
   @media (max-width: 719px) {
-    .tools-name {
-      width: auto;
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-    .tools-desc {
-      flex-basis: 100%;
-      padding-left: calc(14px + var(--space-3));
-      white-space: normal;
-    }
     .tools-limit {
       grid-template-columns: 1fr auto;
+    }
+    .tools-foot {
+      padding-right: calc(var(--space-4) + 44px + var(--space-2));
     }
     .tools-default {
       grid-column: 2;

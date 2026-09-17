@@ -59,19 +59,16 @@ import { McpPicker } from "./McpPicker.tsx";
 import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
 import { shapedInput } from "../../lib/names.ts";
-
-// one catalog line: the name over the id, the rest faint at the right
-function Line({ model }: { model: CatalogMatch }) {
-  return (
-    <>
-      <span class="agents-model">
-        <span class="agents-model-name">{model.name}</span>
-        <span class="agents-model-id">{model.id}</span>
-      </span>
-      <span class="agents-model-meta">{modelMeta(model)}</span>
-    </>
-  );
-}
+import {
+  RowsBad,
+  RowsButton,
+  RowsEnd,
+  RowsLine,
+  RowsList,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 
 // one row of chips, the chosen one lit, as the provider picker
 function Picks<T extends string | null>({
@@ -319,26 +316,29 @@ export function AgentForm({
         <div class="field agents-field-wide">
           <span class="label label-required">Model</span>
           {picked ? (
-            <div class="agents-picked">
-              <span class="agents-model">
-                <span class="agents-model-picked">{picked.id}</span>
-                {compacts !== "" && (
-                  <span class="agents-model-id">{compacts}</span>
-                )}
-              </span>
-              <span class="agents-model-meta">{modelMeta(picked)}</span>
-              <button
-                type="button"
-                class="btn btn-small"
-                disabled={busy}
-                onClick={() => {
-                  model.value = null;
-                  save.touch();
-                }}
-              >
-                Change
-              </button>
-            </div>
+            <RowsList>
+              <RowsLine flush>
+                <RowsTitle
+                  name={picked.id}
+                  sub={compacts === "" ? undefined : compacts}
+                  mono
+                />
+                <RowsMeta>{modelMeta(picked)}</RowsMeta>
+                <RowsEnd>
+                  <button
+                    type="button"
+                    class="btn btn-small"
+                    disabled={busy}
+                    onClick={() => {
+                      model.value = null;
+                      save.touch();
+                    }}
+                  >
+                    Change
+                  </button>
+                </RowsEnd>
+              </RowsLine>
+            </RowsList>
           ) : (
             <div class="agents-search">
               <Icon name="search" size={14} class="agents-search-icon" />
@@ -359,26 +359,24 @@ export function AgentForm({
             </div>
           )}
           {!picked && s.query.value.trim() !== "" && (
-            <div class="agents-matches">
+            <RowsList>
               {s.error.value ? (
-                <p class="agents-state error">{s.error.value}</p>
+                <RowsNote>
+                  <RowsBad>{s.error.value}</RowsBad>
+                </RowsNote>
               ) : s.busy.value ? (
-                <p class="agents-state">Searching</p>
+                <RowsNote>Searching</RowsNote>
               ) : s.matches.value.length === 0 ? (
-                <p class="agents-state">Nothing in the catalog matches.</p>
+                <RowsNote>Nothing in the catalog matches.</RowsNote>
               ) : (
                 s.matches.value.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    class="agents-match"
-                    onClick={() => pick(m)}
-                  >
-                    <Line model={m} />
-                  </button>
+                  <RowsButton key={m.id} onClick={() => pick(m)}>
+                    <RowsTitle name={m.name} sub={m.id} />
+                    <RowsMeta>{modelMeta(m)}</RowsMeta>
+                  </RowsButton>
                 ))
               )}
-            </div>
+            </RowsList>
           )}
           <FieldError save={save} field="model" />
         </div>

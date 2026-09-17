@@ -22,6 +22,7 @@ import {
   RowsNew,
   RowsNote,
   RowsOpen,
+  RowsTag,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
@@ -53,7 +54,7 @@ function UserRow({
             name={
               <>
                 {user.fullName}
-                {self && <span class="users-you">you</span>}
+                {self && <RowsTag>you</RowsTag>}
               </>
             }
             sub={metaLine(user)}
