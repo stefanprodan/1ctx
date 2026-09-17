@@ -35,16 +35,31 @@ stop() {
   rm -f "$PID"
 }
 
-start() {
+keys() {
   # the secrets are readable by the owner alone
   mkdir -p "$DIR/secrets"
   chmod 700 "$DIR/secrets"
-  if [ ! -f "$DIR/secrets/admin.key" ]; then
+  if [ ! -f "$DIR/secrets/user-admin.key" ]; then
     # the bootstrap password for the preview's admin; read once, when the
     # users table is empty, and hashed into the db
-    (umask 077 && printf 'admin-preview' >"$DIR/secrets/admin.key")
+    (umask 077 && printf 'admin-preview' >"$DIR/secrets/user-admin.key")
   fi
   chmod 600 "$DIR/secrets"/*.key
+}
+
+# applying needs the database to itself, so the preview is stopped first
+# and left stopped when a refusal ends the run
+provision() {
+  [ -n "${1:-}" ] || { echo "usage: $0 provision <file|dir>" >&2; exit 1; }
+  stop
+  keys
+  bun "$ENTRY" provision -f "$1" \
+    --db "$DIR/1ctx.sqlite" --secrets "$DIR/secrets"
+  start
+}
+
+start() {
+  keys
   ONECTX_DEV=1 nohup bun --watch "$ENTRY" \
     --listen "127.0.0.1:$PORT" --db "$DIR/1ctx.sqlite" \
     --secrets "$DIR/secrets" >"$LOG" 2>&1 &
@@ -66,8 +81,9 @@ case "${1:-restart}" in
   start) running && { echo "preview already up at $URL (pid $(cat "$PID"))"; exit 0; }; start ;;
   stop) stop; echo "preview stopped" ;;
   clean) stop; rm -rf "$DIR"; echo "preview stopped, $DIR removed" ;;
+  provision) provision "${2:-}" ;;
   restart) stop; start ;;
   status) if running; then echo "preview up at $URL (pid $(cat "$PID"))"; else echo "preview not running"; exit 1; fi ;;
   log) tail -n "${2:-40}" "$LOG" ;;
-  *) echo "usage: $0 start|stop|restart|status|clean|log [lines]" >&2; exit 1 ;;
+  *) echo "usage: $0 start|stop|restart|status|clean|provision <file>|log [lines]" >&2; exit 1 ;;
 esac

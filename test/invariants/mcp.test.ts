@@ -68,7 +68,15 @@ async function setup(
 describe("MCP servers over the routes", () => {
   test("a server is added, its tools listed, and the keys named", async () => {
     const { client, flux } = await setup({
-      secrets: { "mcp-github": "ghp", openrouter: "sk" },
+      secrets: {
+        "mcp-github": "ghp",
+        "provider-router": "sk",
+        "user-other": "password",
+        "search-exa": "search-key",
+        "mcp-": "invalid",
+        "mcp-Bad": "invalid",
+        ["mcp-too-long".padEnd(53, "a")]: "invalid",
+      },
     });
     const res = await client.call("POST", "/api/mcp", { body: create() });
     expect(res.status).toBe(201);
@@ -109,7 +117,7 @@ describe("MCP servers over the routes", () => {
       body: { ...create("other"), keyName: "github" },
     });
     expect(key.status).toBe(400);
-    expect((await key.json()).error).toBe("keyName must start with mcp-");
+    expect((await key.json()).error).toStartWith("keyName must be mcp-");
     const down = await client.call("POST", "/api/mcp", {
       body: { ...create("down"), url: "http://down.test/mcp" },
     });

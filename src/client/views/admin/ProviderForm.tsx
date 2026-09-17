@@ -8,14 +8,15 @@
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type { Wire } from "../../../shared/words.ts";
-import { createProvider } from "../../data/providers.ts";
+import { createProvider, keys } from "../../data/providers.ts";
 import { shapedInput } from "../../lib/names.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
+import { Select } from "../../ui/Select.tsx";
 import {
   baseUrlProblem,
-  keyNameProblem,
   nameProblem,
   PRESETS,
   preset,
@@ -27,7 +28,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
   const wire = useSignal<Wire>(PRESETS[0]!.wire);
   const name = useSignal(preset(wire.value).name);
   const baseUrl = useSignal("");
-  const keyName = useSignal(preset(wire.value).name);
+  const keyName = useSignal(NO_KEY);
   const chosen = preset(wire.value);
   // read from the signals at call time: the save keeps the callback of
   // the first render, and the preset may have changed since
@@ -40,7 +41,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
         p.baseUrl === null
           ? baseUrl.value.trim().replace(/\/+$/, "")
           : p.baseUrl,
-      keyName: keyName.value.trim() === "" ? null : keyName.value.trim(),
+      keyName: keyName.value === NO_KEY ? null : keyName.value,
     };
   };
   // a preset fills what the admin has not typed yet
@@ -50,9 +51,6 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
     const now = preset(next);
     if (name.value.trim() === "" || name.value === was.name) {
       name.value = now.name;
-    }
-    if (keyName.value.trim() === "" || keyName.value === was.name) {
-      keyName.value = now.name;
     }
     save.touch();
   };
@@ -74,8 +72,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
       at("name", nameProblem(name.value)) ??
         (chosen.baseUrl === null
           ? at("baseUrl", baseUrlProblem(baseUrl.value))
-          : null) ??
-        at("keyName", keyNameProblem(keyName.value)),
+          : null),
     );
   };
   return (
@@ -113,28 +110,32 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
           />
           <FieldError save={save} field="name" />
         </label>
-        <label class="field">
+        <div class="field">
           <span class="label">Key file</span>
-          <input
+          <Select
+            label="Key file"
             name="keyName"
-            autocomplete="off"
-            spellcheck={false}
-            placeholder="none"
-            aria-invalid={invalid("keyName") || undefined}
+            mono
+            invalid={invalid("keyName")}
             disabled={busy}
             value={keyName.value}
-            onInput={bind(keyName)}
+            options={keyOptions(
+              keys.value,
+              keyName.value === NO_KEY ? null : keyName.value,
+            )}
+            onChange={(value) => {
+              keyName.value = value;
+              save.touch();
+            }}
           />
           {invalid("keyName") ? (
             <FieldError save={save} field="keyName" />
           ) : (
             <span class="hint">
-              {keyName.value.trim() === ""
-                ? "Leave it empty for a server without a key."
-                : `${keyName.value.trim()}.key in the secrets directory.`}
+              A key file is provider-&lt;name&gt;.key in the secrets directory.
             </span>
           )}
-        </label>
+        </div>
         {chosen.baseUrl === null && (
           <label class="field agents-field-wide">
             <span class="label label-required">Base URL</span>
@@ -159,7 +160,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
         label="New provider"
         start={<span />}
         before={
-          <button type="button" class="btn" onClick={onDone}>
+          <button type="button" class="btn" disabled={busy} onClick={onDone}>
             Cancel
           </button>
         }

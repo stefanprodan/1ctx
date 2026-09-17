@@ -124,7 +124,7 @@ describe("offered", () => {
     ).toEqual(["datetime", "webfetch", "visualize"]);
     expect(area().offered(now, "").search).toBeNull();
 
-    const withExa = area({ exa: "exa-key" }, "exa").offered(now, "");
+    const withExa = area({ "search-exa": "exa-key" }, "exa").offered(now, "");
     expect(withExa.tools.map((tool) => tool.name)).toEqual([
       "datetime",
       "webfetch",
@@ -153,7 +153,7 @@ describe("offered", () => {
   test.each([...WEB_TOOLS])(
     "does not offer %s when its switch is off",
     (name) => {
-      const tools = area({ exa: "e" }, "exa");
+      const tools = area({ "search-exa": "e" }, "exa");
       tools.store.setEnabled(name, false, now);
       expect(
         tools.offered(now, "").tools.map((tool) => tool.name),
@@ -163,19 +163,22 @@ describe("offered", () => {
 
   test("uses only the chosen provider, whichever keys exist", () => {
     expect(
-      area({ exa: "e", firecrawl: "f" }, "firecrawl").offered(now, "").search,
+      area({ "search-exa": "e", "search-firecrawl": "f" }, "firecrawl").offered(
+        now,
+        "",
+      ).search,
     ).toBe("firecrawl");
-    expect(area({ exa: "e" }, "firecrawl").offered(now, "").search).toBe(
-      "firecrawl",
-    );
-    expect(area({ firecrawl: "f" }, "tavily").offered(now, "").search).toBe(
-      "tavily",
-    );
-    expect(area({ exa: "e" }).offered(now, "").search).toBeNull();
+    expect(
+      area({ "search-exa": "e" }, "firecrawl").offered(now, "").search,
+    ).toBe("firecrawl");
+    expect(
+      area({ "search-firecrawl": "f" }, "tavily").offered(now, "").search,
+    ).toBe("tavily");
+    expect(area({ "search-exa": "e" }).offered(now, "").search).toBeNull();
   });
 
   test("fills {{year}} in the websearch description in UTC", () => {
-    const websearch = area({ exa: "e" }, "exa")
+    const websearch = area({ "search-exa": "e" }, "exa")
       .offered(now, "")
       .tools.find((tool) => tool.name === "websearch");
     expect(websearch?.description).not.toContain("{{year}}");

@@ -30,7 +30,7 @@ const provider: ProviderRow = {
   name: "router",
   wire: "openrouter",
   baseUrl: PROVIDER_URL,
-  keyName: "router",
+  keyName: "provider-router",
   createdAt: 0,
 };
 
@@ -166,7 +166,7 @@ describe("Catalogs", () => {
     const catalogs = new Catalogs({
       fetcher: fake.fetcher,
       clock: () => now.value,
-      secret: (name) => (name === "router" ? "sk-router" : null),
+      secret: (name) => (name === "provider-router" ? "sk-router" : null),
     });
     const [a, b] = await Promise.all([
       catalogs.search(provider, "opus 5"),

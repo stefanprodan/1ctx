@@ -166,9 +166,21 @@ export function isMcpMode(value: unknown): value is McpMode {
   return MCP_MODES.includes(value as McpMode);
 }
 
-// an MCP server's key file is named mcp-<something>.key, so the form
-// offers the files with the prefix and nothing else can be picked
-export const MCP_KEY_PREFIX = "mcp-";
+// a secret file is named <kind>-<name>.key, so the directory says what
+// it holds and a form offers the files of its own kind and no others
+export const SECRET_KINDS = ["user-", "provider-", "search-", "mcp-"] as const;
+export type SecretKind = (typeof SECRET_KINDS)[number];
+export const MCP_KEY_PREFIX = "mcp-" satisfies SecretKind;
+
+export function isSecretName(kind: string, value: unknown): value is string {
+  return (
+    SECRET_KINDS.some((known) => known === kind) &&
+    typeof value === "string" &&
+    value === value.trim() &&
+    value.startsWith(kind) &&
+    /^[a-z0-9][a-z0-9-]{0,47}$/.test(value.slice(kind.length))
+  );
+}
 
 // an MCP server's own call timeout, null for the limits' callTimeoutMs
 export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;

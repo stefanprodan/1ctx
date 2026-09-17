@@ -72,7 +72,9 @@ describe("tools administration", () => {
   });
 
   test("a switch changes the next send and PATCH answers the full safe body", async () => {
-    const chat = await chatApp({ secrets: { exa: "never-return-this-key" } });
+    const chat = await chatApp({
+      secrets: { "search-exa": "never-return-this-key" },
+    });
     const first = await startChat(chat, "first");
     const active = chat.app.runner.registry.get(first.sessionId)!;
     expect(names(active.policy.offered)).toContain("webfetch");
@@ -110,7 +112,7 @@ describe("tools administration", () => {
   });
 
   test("websearch is offered once chosen, with or without its key", async () => {
-    const chat = await chatApp({ secrets: { exa: "exa-key" } });
+    const chat = await chatApp({ secrets: { "search-exa": "exa-key" } });
     const selected = await chat.admin.call("PATCH", "/api/tools/websearch", {
       body: { provider: "exa" },
     });

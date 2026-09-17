@@ -30,9 +30,7 @@ import {
   type McpMode,
 } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
-import type { Option } from "../../ui/Select.model.ts";
-
-export const NO_KEY = "";
+import { NO_KEY } from "../../lib/secrets.ts";
 
 // the head under the name: the tools and the last good check, or the
 // failure in red
@@ -197,17 +195,6 @@ export function timeoutProblem(text: string): string | null {
 export function timeoutMs(text: string): number | null {
   const trimmed = text.trim();
   return trimmed === "" ? null : Math.round(Number(trimmed) * 1000);
-}
-
-// the key select: No key first, the mcp- files, and the row's own name
-// when its file is gone, marked, so the row still shows what it names
-export function keyOptions(keys: string[], current: string | null): Option[] {
-  const options: Option[] = [{ value: NO_KEY, label: "No key" }];
-  for (const key of keys) options.push({ value: key, label: key });
-  if (current !== null && !keys.includes(current)) {
-    options.push({ value: current, label: current, detail: "missing" });
-  }
-  return options;
 }
 
 export const KEY_HINT = `A key file is ${MCP_KEY_PREFIX}<name>.key in the secrets directory, sent as a bearer token.`;

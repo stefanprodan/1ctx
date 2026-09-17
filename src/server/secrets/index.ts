@@ -8,6 +8,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { isSecretName, SECRET_KINDS } from "../../shared/words.ts";
 
 export type SecretsMode = "local" | "mounted";
 
@@ -16,11 +17,11 @@ export type Secrets = {
   readonly mode: SecretsMode;
   // the bare value with surrounding whitespace removed, or null when the
   // file is absent or empty
-  read(name: string): string | null;
-  has(name: string): boolean;
-  // the names of the key files starting with the prefix, sorted; the
-  // names alone, so a page can offer a pick without a value crossing
-  list(prefix: string): string[];
+  read(kind: string, name: string): string | null;
+  has(kind: string, name: string): boolean;
+  // the names alone, so a page can offer a pick without a value
+  // crossing
+  list(kind: string): string[];
 };
 
 // ../secrets next to the binary; .preview/secrets when run from source
@@ -32,30 +33,31 @@ export function defaultDir(main: string, execPath: string): string {
 }
 
 export function secrets(dir: string, mode: SecretsMode): Secrets {
-  const pathOf = (name: string) => {
-    if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new Error(`bad secret name`);
+  const pathOf = (kind: string, name: string) => {
+    if (!isSecretName(kind, name)) throw new Error("bad secret name");
     return join(dir, `${name}.key`);
   };
   return {
     dir,
     mode,
-    read(name) {
-      const path = pathOf(name);
+    read(kind, name) {
+      const path = pathOf(kind, name);
       if (!existsSync(path)) return null;
       const value = readFileSync(path, "utf8").trim();
       return value === "" ? null : value;
     },
-    has(name) {
-      return existsSync(pathOf(name));
+    has(kind, name) {
+      return existsSync(pathOf(kind, name));
     },
-    list(prefix) {
+    list(kind) {
+      if (!SECRET_KINDS.some((known) => known === kind)) {
+        throw new Error("bad secret kind");
+      }
       if (!existsSync(dir)) return [];
       return readdirSync(dir)
         .filter((file) => file.endsWith(".key"))
         .map((file) => file.slice(0, -".key".length))
-        .filter(
-          (name) => name.startsWith(prefix) && /^[a-z][a-z0-9-]*$/.test(name),
-        )
+        .filter((name) => isSecretName(kind, name))
         .sort();
     },
   };

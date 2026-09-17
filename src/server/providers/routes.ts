@@ -27,6 +27,7 @@ export type RoutesDeps = {
   catalogs: Catalogs;
   // the secrets port: whether the key file is there
   hasSecret: (name: string) => boolean;
+  keys: () => string[];
   agents: AgentsPort;
   clock: Clock;
 };
@@ -47,6 +48,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle() {
         const body: ProvidersResponse = {
           providers: deps.store.list().map(show),
+          keys: deps.keys(),
         };
         return json(body);
       },

@@ -38,7 +38,7 @@ const row: ProviderRow = {
   name: "router",
   wire: "openrouter",
   baseUrl: "http://router.test/api/v1/",
-  keyName: "router",
+  keyName: "provider-router",
   createdAt: 0,
 };
 
@@ -380,7 +380,7 @@ describe("OpenRouter stream", () => {
     const { events, url } = await stream(plainStream, 200, () => null);
     expect(url).toBe("");
     expect(events).toEqual([
-      { kind: "error", message: "router has no key file router.key" },
+      { kind: "error", message: "router has no key file provider-router.key" },
     ]);
   });
 

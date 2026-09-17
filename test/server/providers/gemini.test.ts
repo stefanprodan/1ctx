@@ -36,7 +36,7 @@ const row: ProviderRow = {
   name: "gemini",
   wire: "gemini",
   baseUrl: `${GEMINI_URL}/`,
-  keyName: "gemini",
+  keyName: "provider-gemini",
   createdAt: 0,
 };
 const request: ChatRequest = {

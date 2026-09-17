@@ -1,0 +1,21 @@
+%YAML 1.2
+---
+# Both separators in this block are text, not documents.
+apiVersion: config.1ctx.dev/v1
+kind: Agent
+metadata:
+  name: guide
+spec:
+  prompt: |-
+    First.
+    ---
+    Last.
+    ...
+...
+---
+apiVersion: config.1ctx.dev/v1
+kind: Project
+metadata:
+  name: nebula
+spec: {}
+...

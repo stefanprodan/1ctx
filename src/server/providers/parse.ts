@@ -6,6 +6,7 @@
 import type { CreateProviderRequest } from "../../shared/api/providers.ts";
 import {
   isName,
+  isSecretName,
   isWire,
   MAX_NAME,
   MIN_NAME,
@@ -15,12 +16,7 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export const MAX_BASE_URL = 256;
-export const MAX_KEY_NAME = 64;
 export const MAX_QUERY = 100;
-// the same rule the secrets directory applies to a file's name, and the
-// files that are the server's own, never a provider's key
-const KEY_NAME_RE = /^[a-z][a-z0-9-]*$/;
-export const RESERVED_KEYS = ["admin"];
 
 export function parseName(value: unknown): string {
   if (!isName(value)) {
@@ -62,17 +58,11 @@ export function parseBaseUrl(value: unknown): string {
 
 export function parseKeyName(value: unknown): string | null {
   if (value === null) return null;
-  if (
-    typeof value !== "string" ||
-    value.length > MAX_KEY_NAME ||
-    !KEY_NAME_RE.test(value)
-  ) {
+  if (!isSecretName("provider-", value)) {
     throw new BadRequest(
-      "keyName must be lowercase letters, digits and dashes, or null",
+      "keyName must be provider- followed by 1 to 48 lowercase letters, " +
+        "digits and dashes, starting with a letter or digit, or null",
     );
-  }
-  if (RESERVED_KEYS.includes(value)) {
-    throw new BadRequest(`${value}.key is not a provider key`);
   }
   return value;
 }

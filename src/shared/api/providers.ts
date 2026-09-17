@@ -7,7 +7,10 @@ import type { CatalogMatch, ProviderSummary } from "../contracts/provider.ts";
 import type { Wire } from "../words.ts";
 
 // GET /api/providers
-export type ProvidersResponse = { providers: ProviderSummary[] };
+export type ProvidersResponse = {
+  providers: ProviderSummary[];
+  keys: string[];
+};
 
 // POST /api/providers answers the row
 export type ProviderResponse = { provider: ProviderSummary };

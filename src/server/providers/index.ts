@@ -32,7 +32,7 @@ export {
 } from "./gemini.ts";
 export { wireTokens, wireTools } from "./openai.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
-export { parseKeyName, RESERVED_KEYS } from "./parse.ts";
+export { parseBaseUrl, parseKeyName } from "./parse.ts";
 export { type AgentsPort, type RoutesDeps, routes } from "./routes.ts";
 export { type ProviderRow, ProviderStore, summary } from "./store.ts";
 export type {
@@ -51,6 +51,7 @@ export type ProvidersDeps = {
   clock: Clock;
   // the secrets port: the bare value or null
   secret: (name: string) => string | null;
+  keys: () => string[];
   // what reaches a provider; a test passes a fake
   fetcher: Fetcher;
   agents: AgentsPort;
@@ -103,6 +104,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
       store,
       catalogs,
       hasSecret: (name) => deps.secret(name) !== null,
+      keys: deps.keys,
       agents: deps.agents,
       clock: deps.clock,
     }),

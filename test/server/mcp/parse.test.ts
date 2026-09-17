@@ -4,11 +4,13 @@
 import { describe, expect, test } from "bun:test";
 import {
   parseCreate,
+  parseMcpKeyName,
   parsePatch,
   parsePatterns,
   parseTimeout,
   parseUrl,
 } from "../../../src/server/mcp/parse.ts";
+import secretNames from "../../fixtures/secrets/names.json";
 
 const createBody = () => ({
   name: "cluster",
@@ -64,20 +66,31 @@ describe("MCP request parsing", () => {
     );
   });
 
-  test("uses the provider key-name rules, then the mcp- prefix", () => {
+  test("keys must have the mcp kind and a 1 to 48 character body", () => {
     expect(parsePatch({ keyName: "mcp-hands" })).toEqual({
       keyName: "mcp-hands",
     });
     expect(parsePatch({ keyName: null })).toEqual({ keyName: null });
-    expect(() => parsePatch({ keyName: "Bad_Key" })).toThrow(
-      "lowercase letters",
-    );
-    expect(() => parsePatch({ keyName: "admin" })).toThrow(
-      "not a provider key",
-    );
-    expect(() => parsePatch({ keyName: "hands-key" })).toThrow(
-      "must start with mcp-",
-    );
+    for (const body of secretNames.validBodies) {
+      expect(parseMcpKeyName(`mcp-${body}`)).toBe(`mcp-${body}`);
+    }
+    for (const name of [
+      ...secretNames.invalidBodies.map((body) => `mcp-${body}`),
+      ...secretNames.wrongNames,
+      "Bad_Key",
+      "hands-key",
+      "user-admin",
+      "provider-router",
+      "search-exa",
+      undefined,
+      1,
+      {},
+    ]) {
+      expect(() => parsePatch({ keyName: name })).toThrow("keyName must");
+      expect(() => parseCreate({ ...createBody(), keyName: name })).toThrow(
+        "keyName must",
+      );
+    }
   });
 
   test("validates the timeout floor, ceiling, null and integers", () => {

@@ -76,7 +76,7 @@ import type {
 export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
 export { isMemoryTool, MEMORY_WRITE_RULES } from "./builtin/memory.ts";
 export { TOOL_CAPS } from "./limits.ts";
-export { parseToolName, parseToolPatch } from "./parse.ts";
+export { parseHosts, parseToolName, parseToolPatch } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
 export type {
   MemoryHandle,
@@ -248,7 +248,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     datetimeTool,
     makeWebfetchTool(deps.version, fetchDeps),
     makeWebsearchTool(
-      () => deps.secret(search),
+      () => deps.secret(`search-${search}`),
       search,
       deps.version,
       searchDeps,
@@ -303,9 +303,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       search: {
         provider: rows.get("websearch")!.provider,
         keys: {
-          exa: deps.secret("exa") !== null,
-          firecrawl: deps.secret("firecrawl") !== null,
-          tavily: deps.secret("tavily") !== null,
+          exa: deps.secret("search-exa") !== null,
+          firecrawl: deps.secret("search-firecrawl") !== null,
+          tavily: deps.secret("search-tavily") !== null,
         },
       },
     };

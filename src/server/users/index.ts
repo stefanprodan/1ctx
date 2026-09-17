@@ -42,7 +42,7 @@ export type UserFields = {
 export const ADMIN_USERNAME = "admin";
 export const ADMIN_EMAIL = "admin@1ctx.dev";
 export const ADMIN_FULL_NAME = "Administrator";
-export const ADMIN_SECRET = "admin";
+export const ADMIN_SECRET = "user-admin";
 
 // the projects port: the personal project a user is made with, inside
 // the same transaction, so a user never exists without it
@@ -82,7 +82,7 @@ export function verifyPassword(
   return Bun.password.verify(password, hash);
 }
 
-// When the users table is empty and admin.key holds a password, create
+// When the users table is empty and user-admin.key holds a password, create
 // the admin with its hash and drop the plain value. A non-empty table
 // ignores the file, so it bootstraps and never resets.
 export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
@@ -144,7 +144,7 @@ export type Users = {
   setPasswordHash(id: string, hash: string): void;
   countAdmins(): number;
   createUser(fields: UserFields): UserRow;
-  // the first admin from admin.key, once the areas it is made with exist
+  // the first admin from user-admin.key, once the areas it is made with exist
   bootstrap(): Promise<UserRow | null>;
   routes: RouteDescriptor[];
 };

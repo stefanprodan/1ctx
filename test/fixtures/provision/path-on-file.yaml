@@ -1,0 +1,6 @@
+apiVersion: config.1ctx.dev/v1
+kind: Skill
+metadata:
+  name: paper-skill
+spec:
+  path: ""

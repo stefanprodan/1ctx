@@ -85,18 +85,29 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         const user = transact(deps.db, () => {
           usernameAvailable(parsed.username, null);
           emailAvailable(parsed.email, null);
-          return {
-            result: deps.users.createUser({
-              username: parsed.username,
-              fullName: parsed.fullName,
-              email: parsed.email,
-              role: parsed.role,
-              tz: parsed.tz,
-              passwordHash,
-              mustChangePassword: true,
-              now: deps.clock(),
-            }),
-          };
+          const created = deps.users.createUser({
+            username: parsed.username,
+            fullName: parsed.fullName,
+            email: parsed.email,
+            role: parsed.role,
+            tz: parsed.tz,
+            passwordHash,
+            mustChangePassword: parsed.mustChangePassword ?? true,
+            now: deps.clock(),
+          });
+          if (parsed.about !== undefined && parsed.about !== created.about) {
+            deps.users.setDetails(created.id, {
+              fullName: created.fullName,
+              about: parsed.about,
+            });
+          }
+          if (
+            parsed.disabled !== undefined &&
+            parsed.disabled !== created.disabled
+          ) {
+            deps.users.setDisabled(created.id, parsed.disabled);
+          }
+          return { result: find(created.id) };
         });
         const body: UserResponse = { user: account(user) };
         return json(body, 201);
@@ -122,13 +133,12 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             emailAvailable(patch.email, user.id);
             deps.users.setEmail(user.id, patch.email);
           }
-          if (
-            patch.fullName !== undefined &&
-            patch.fullName !== user.fullName
-          ) {
+          const fullName = patch.fullName ?? user.fullName;
+          const about = patch.about ?? user.about;
+          if (fullName !== user.fullName || about !== user.about) {
             deps.users.setDetails(user.id, {
-              fullName: patch.fullName,
-              about: user.about,
+              fullName,
+              about,
             });
           }
           if (patch.tz !== undefined && patch.tz !== user.tz) {

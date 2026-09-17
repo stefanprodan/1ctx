@@ -726,7 +726,8 @@ describe("boot repair", () => {
       const fake = fakeFetch();
       const repaired = await compose({
         db: chat.app.db,
-        secret: (name) => (name === "admin" ? "hunter2-test" : null),
+        secret: (kind, name) =>
+          kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
         clock: () => chat.app.now.value,
         fetcher: fake.fetcher,
         log: () => silent,

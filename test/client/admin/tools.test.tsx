@@ -277,11 +277,12 @@ describe("the limit words and units", () => {
   });
 
   test.serial("the search lines and the first sentence", () => {
-    expect(keyLine("exa", true)).toBe("exa.key present");
-    expect(keyLine("firecrawl", false)).toBe("firecrawl.key keyless");
+    expect(keyLine("exa", true)).toBe("search-exa.key present");
+    expect(keyLine("firecrawl", false)).toBe("search-firecrawl.key keyless");
     expect(searchLine(search)).toBe("websearch runs on exa.");
     expect(searchLine({ ...search, provider: "firecrawl" })).toBe(
-      "websearch runs on firecrawl keyless. Add firecrawl.key for a higher rate.",
+      "websearch runs on firecrawl keyless. " +
+        "Add search-firecrawl.key for a higher rate.",
     );
     expect(searchLine({ ...search, provider: null })).toContain("Choose");
     expect(firstSentence(time.description)).toBe(
@@ -431,9 +432,9 @@ describe("the page", () => {
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
     expect(html).not.toContain("datetime");
-    expect(html).toContain("exa.key present");
-    expect(html).toContain("firecrawl.key keyless");
-    expect(html).toContain("tavily.key keyless");
+    expect(html).toContain("search-exa.key present");
+    expect(html).toContain("search-firecrawl.key keyless");
+    expect(html).toContain("search-tavily.key keyless");
     expect(html).not.toContain("rows-meta-bad");
     expect(html).toContain("websearch runs on exa.");
     expect(html).not.toContain("Per send");

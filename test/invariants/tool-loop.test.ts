@@ -658,7 +658,7 @@ describe("the tool loop", () => {
   });
 
   test("the chosen search provider is snapshotted once per send", async () => {
-    const chat = await chatApp({ secrets: { exa: "exa-key" } });
+    const chat = await chatApp({ secrets: { "search-exa": "exa-key" } });
     await chooseSearch(chat, "exa");
     const { script } = await startChat(chat, "search please");
     const offered = (script.body.tools as { function: { name: string } }[]).map(
@@ -684,7 +684,7 @@ describe("the tool loop", () => {
   });
 
   test("with a chosen provider websearch is offered", async () => {
-    const chat = await chatApp({ secrets: { exa: "exa-key" } });
+    const chat = await chatApp({ secrets: { "search-exa": "exa-key" } });
     await chooseSearch(chat, "exa");
     const { script } = await startChat(chat, "search please");
     const tools = (script.body.tools as { function: { name: string } }[]).map(
