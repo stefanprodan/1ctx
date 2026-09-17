@@ -8,10 +8,10 @@
 // caller of finalizeSend. The lock is held until both the provider
 // iteration and the round's tools have let go, which drained says.
 
-import type { LiveSend } from "../../shared/contracts/session.ts";
+import type { LiveSend, VisualDraft } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
-import type { SendPolicy } from "./policy.ts";
+import type { SendPolicy, ToolBudget } from "./policy.ts";
 
 export type RoundState = {
   messageId: string;
@@ -34,6 +34,7 @@ export type RoundState = {
   // the tool calls the provider assembled this round, once the stream
   // ends normally; the loop reads them after the round
   calls: ToolCall[];
+  drafts: Map<number, VisualDraft>;
   // set to "work" at the first tool call delta, in its own transaction;
   // the round remembers so markRoundWork runs once
   slotMarked: boolean;
@@ -63,9 +64,9 @@ export type ActiveSend = {
   roundNo: number;
   phase: SendPhase;
   budget: Budget;
-  // the fetch and search counters the built-ins share across parallel
+  // the counters the built-ins share across parallel
   // calls and rounds
-  toolBudget: { fetches: number; searches: number };
+  toolBudget: ToolBudget;
   // the last three rounds' call signatures, for the loop check
   signatures: string[];
   // the answer round forbids tools with tool_choice none
@@ -122,6 +123,7 @@ export function newRound(messageId: string, now: number): RoundState {
     finishReason: null,
     usage: null,
     calls: [],
+    drafts: new Map(),
     slotMarked: false,
   };
 }
@@ -157,7 +159,7 @@ export function newSend(fields: {
     roundNo: 1,
     phase: "provider",
     budget: { calls: 0, toolMs: 0, resultBytes: 0 },
-    toolBudget: { fetches: 0, searches: 0 },
+    toolBudget: { fetches: 0, searches: 0, visualBytes: 0 },
     signatures: [],
     answering: false,
     summarizing: fields.summarizing ?? false,
@@ -212,5 +214,8 @@ export function live(send: ActiveSend): LiveSend {
     reasoning: round.reasoning,
     html: round.html,
     htmlAt: round.htmlAt,
+    ...(round.drafts.size > 0
+      ? { drafts: [...round.drafts.values()].map((draft) => ({ ...draft })) }
+      : {}),
   };
 }

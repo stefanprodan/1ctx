@@ -29,9 +29,11 @@ import {
   parseMessageId,
   parseRenameSession,
   parseStreamQuery,
+  parseVisualParams,
 } from "./parse.ts";
 import { cutResult, offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
+import { readVisual } from "./visual.ts";
 
 export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
@@ -140,6 +142,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           bytes: Buffer.byteLength(message.content, "utf8"),
         };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/sessions/:id/messages/:messageId/calls/:index/visual",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const session = deps.visible(ctx.principal!, ctx.params.id);
+        const params = parseVisualParams(ctx.params);
+        const message = deps.store.message(params.messageId);
+        const visual =
+          message?.sessionId === session.id
+            ? readVisual(deps.db, message, params.index)
+            : null;
+        if (visual === null) throw new NotFound("no such visual");
+        return json(visual);
       },
     },
     {

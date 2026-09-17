@@ -21,6 +21,12 @@ describe("the layout", () => {
     expect(networkCheck(import.meta.dir)).toEqual([]);
   });
 
+  test("a visual palette belongs only to visual-theme.ts", () => {
+    expect(
+      check(join(FIXTURES, "tokens-visual-shell")).map((v) => v.file),
+    ).toEqual(["server/tools/visual-shell.ts"]);
+  });
+
   for (const name of readdirSync(FIXTURES).sort()) {
     const rule = name.split("-")[0];
     test(`fixture ${name} is rejected for ${rule}`, () => {

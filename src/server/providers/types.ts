@@ -83,6 +83,8 @@ export type ChatEvent =
   | { kind: "content"; text: string }
   | {
       kind: "toolCallDelta";
+      // assigned by the tracker, stable through the stored call array
+      callIndex?: number;
       index?: number;
       id?: string;
       name?: string;

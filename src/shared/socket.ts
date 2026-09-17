@@ -18,7 +18,20 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 10;
+export const PROTOCOL = 11;
+
+export type VisualFrame = {
+  type: "visual";
+  sessionId: string;
+  sendId: string;
+  messageId: string;
+  callIndex: number;
+  seq: number;
+  title?: string;
+  html: string;
+  // the decoded piece's offset in UTF-16 code units
+  htmlAt: number;
+};
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -26,6 +39,7 @@ export type SocketCommand =
 
 export type SocketEvent =
   | { type: "hello"; protocol: number }
+  | VisualFrame
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
   // the stream's last line when the transaction wrote one
@@ -89,5 +103,40 @@ export function isSocketCommand(value: unknown): value is SocketCommand {
     typeof v.sessionId === "string" &&
     v.sessionId !== "" &&
     Object.keys(v).length === 2
+  );
+}
+
+export function isVisualFrame(value: unknown): value is VisualFrame {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const v = value as Record<string, unknown>;
+  const id = (value: unknown) => typeof value === "string" && value !== "";
+  const offset = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+  return (
+    v.type === "visual" &&
+    id(v.sessionId) &&
+    id(v.sendId) &&
+    id(v.messageId) &&
+    offset(v.callIndex) &&
+    offset(v.seq) &&
+    v.seq !== 0 &&
+    offset(v.htmlAt) &&
+    typeof v.html === "string" &&
+    (!Object.hasOwn(v, "title") || typeof v.title === "string") &&
+    Object.keys(v).every((key) =>
+      [
+        "type",
+        "sessionId",
+        "sendId",
+        "messageId",
+        "callIndex",
+        "seq",
+        "title",
+        "html",
+        "htmlAt",
+      ].includes(key),
+    )
   );
 }

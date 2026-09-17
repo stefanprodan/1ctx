@@ -151,6 +151,7 @@ const fetchTool: WebToolSummary = {
   parametersHtml: html,
   tokens: 2716,
   enabled: true,
+  hosts: [],
   updatedAt: 0,
 };
 const body = (web = fetchTool) => ({ builtin: [time], web: [web], search });

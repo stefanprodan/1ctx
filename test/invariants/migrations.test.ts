@@ -248,7 +248,7 @@ describe("the schema", () => {
     db.close();
   });
 
-  test("the two web tools start enabled and limits start empty", () => {
+  test("the web tools start enabled and limits start empty", () => {
     const db = new Database(":memory:");
     migrate(db);
     expect(
@@ -261,6 +261,7 @@ describe("the schema", () => {
     ).toEqual([
       { name: "webfetch", enabled: 1, provider: null, updated_at: 0 },
       { name: "websearch", enabled: 1, provider: null, updated_at: 0 },
+      { name: "visualize", enabled: 1, provider: null, updated_at: 0 },
     ]);
     expect(db.query("select count(*) as n from limits").get()).toEqual({
       n: 0,
@@ -376,6 +377,7 @@ describe("additive migrations", () => {
       "0011-gemini",
       "0012-fork",
       "0013-web-tools",
+      "0014-visualize",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -425,6 +427,7 @@ describe("0005", () => {
       "0011-gemini",
       "0012-fork",
       "0013-web-tools",
+      "0014-visualize",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -483,6 +486,7 @@ describe("rebuild migrations", () => {
       "0011-gemini",
       "0012-fork",
       "0013-web-tools",
+      "0014-visualize",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -574,6 +578,7 @@ describe("0006 skills migration", () => {
       "0011-gemini",
       "0012-fork",
       "0013-web-tools",
+      "0014-visualize",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -624,6 +629,7 @@ describe("0007 user tz migration", () => {
       "0011-gemini",
       "0012-fork",
       "0013-web-tools",
+      "0014-visualize",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -653,6 +659,7 @@ describe("0009 mcp migration", () => {
       "0011-gemini",
       "0012-fork",
       "0013-web-tools",
+      "0014-visualize",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -699,8 +706,8 @@ describe("0013 web tools migration", () => {
       update tools set provider = 'tavily', updated_at = 6
         where name = 'websearch';
     `);
-    expect(migrate(db)).toEqual(["0013-web-tools"]);
-    expect(MIGRATIONS.at(-1)?.rebuild).toBeUndefined();
+    expect(migrate(db, MIGRATIONS.slice(0, 13))).toEqual(["0013-web-tools"]);
+    expect(MIGRATIONS[12]?.rebuild).toBeUndefined();
     expect(
       db
         .query(
@@ -719,6 +726,54 @@ describe("0013 web tools migration", () => {
         .run(),
     ).toThrow();
     db.close();
+  });
+});
+
+describe("0014 visualize migration", () => {
+  test("preserves web settings and row order, adds the enabled visual and its hosts", () => {
+    const db = new Database(":memory:");
+    try {
+      db.exec("pragma foreign_keys = on");
+      migrate(db, MIGRATIONS.slice(0, 13));
+      db.exec(`
+        update tools set enabled = 0, updated_at = 5 where name = 'webfetch';
+        update tools set provider = 'tavily', updated_at = 6 where name = 'websearch';
+        update tools set rowid = 10 where name = 'webfetch';
+      `);
+      const before = db
+        .query<Record<string, string | number | null>, []>(
+          "select * from tools order by rowid",
+        )
+        .all();
+      expect(migrate(db)).toEqual(["0014-visualize"]);
+      expect(MIGRATIONS[13]?.rebuild).toBeUndefined();
+      const rows = db.query("select * from tools order by rowid").all();
+      expect(rows.slice(0, 2)).toEqual(
+        before.map((row) => ({
+          ...row,
+          hosts: "[]",
+        })),
+      );
+      expect(rows[2]).toEqual({
+        name: "visualize",
+        enabled: 1,
+        provider: null,
+        hosts: JSON.stringify([
+          "https://cdn.jsdelivr.net",
+          "https://cdnjs.cloudflare.com",
+          "https://esm.sh",
+          "https://unpkg.com",
+        ]),
+        updated_at: 0,
+      });
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
   });
 });
 
@@ -783,6 +838,7 @@ describe("0008 search tavily migration", () => {
           "0011-gemini",
           "0012-fork",
           "0013-web-tools",
+          "0014-visualize",
         ]);
         expect(db.query("select * from providers order by id").all()).toEqual(
           providers,

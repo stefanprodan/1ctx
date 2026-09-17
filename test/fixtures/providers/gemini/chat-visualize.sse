@@ -1,0 +1,6 @@
+data: {"choices":[{"delta":{"role":"assistant","tool_calls":[{"extra_content":{"google":{"thought_signature":"visual-signature"}},"function":{"arguments":"{\"title\":\"Greeting\",\"html\":\"<svg viewBox=\\\"0 0 680 80\\\"><text x=\\\"20\\\" y=\\\"40\\\">Hello</text></svg>\"}","name":"visualize"},"id":"call_visual","type":"function"}]},"index":0}],"id":"gemini-visual","model":"gemini-3.8-flash","object":"chat.completion.chunk","usage":{"completion_tokens":90,"prompt_tokens":56,"total_tokens":184}}
+
+data: {"choices":[{"delta":{"role":"assistant"},"finish_reason":"stop","index":0}],"id":"gemini-visual","model":"gemini-3.8-flash","object":"chat.completion.chunk","usage":{"completion_tokens":90,"prompt_tokens":56,"total_tokens":184}}
+
+data: [DONE]
+

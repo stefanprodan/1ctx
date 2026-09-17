@@ -304,7 +304,7 @@ export const MAX_SEARCH = 100;
 
 // the tools that reach the web, each with a server-wide switch on the
 // tools page
-export const WEB_TOOLS = ["webfetch", "websearch"] as const;
+export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;
 export type WebTool = (typeof WEB_TOOLS)[number];
 export function isWebTool(value: unknown): value is WebTool {
   return WEB_TOOLS.includes(value as WebTool);
@@ -353,6 +353,8 @@ export const LIMIT_NAMES = [
   "runDeadlineMs",
   "memoryPhaseMs",
   "memoryPhaseRounds",
+  "visualBytes",
+  "visualSendBytes",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {

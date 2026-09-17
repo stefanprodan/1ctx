@@ -51,6 +51,7 @@ import {
   type UnreadChats,
 } from "./builtin/memory.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
+import { makeVisualizeTool } from "./builtin/visualize.ts";
 import {
   type FetchDependencies,
   makeWebfetchTool,
@@ -240,7 +241,10 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       }),
   };
 
-  const toolsFor = (search: SearchProvider): Tool[] => [
+  const toolsFor = (
+    search: SearchProvider,
+    hosts: readonly string[],
+  ): Tool[] => [
     datetimeTool,
     makeWebfetchTool(deps.version, fetchDeps),
     makeWebsearchTool(
@@ -249,6 +253,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       deps.version,
       searchDeps,
     ),
+    makeVisualizeTool(hosts),
   ];
 
   const mcpTools = (servers: OfferedServer[], ctx: ToolContext): Tool[] =>
@@ -274,7 +279,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     const rows = new Map(store.rows().map((row) => [row.name, row]));
     const selected = rows.get("websearch")?.provider ?? "exa";
     const schemas = new Map(
-      fillYear(toolsFor(selected), now).map((tool) => [tool.name, tool]),
+      fillYear(toolsFor(selected, rows.get("visualize")!.hosts), now).map(
+        (tool) => [tool.name, tool],
+      ),
     );
     const web = WEB_TOOLS.map((name): ToolsResponse["web"][number] => {
       const row = rows.get(name)!;
@@ -286,6 +293,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         parametersHtml: parametersHtml(tool, deps.render),
         tokens: wireTokens([tool]),
         enabled: row.enabled,
+        hosts: row.hosts,
         updatedAt: row.updatedAt,
       };
     });
@@ -313,6 +321,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         store.setEnabled(name, change.enabled, now);
       }
       if ("provider" in change) store.setProvider(change.provider ?? null, now);
+      if (change.hosts !== undefined) store.setHosts(change.hosts, now);
       return { result: undefined };
     });
   };
@@ -358,7 +367,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       };
       const baseTools = fillYear(
         [
-          ...toolsFor(search ?? "exa").filter((tool) => allowed.has(tool.name)),
+          ...toolsFor(search ?? "exa", rows.get("visualize")!.hosts).filter(
+            (tool) => allowed.has(tool.name),
+          ),
           ...makeSkillTools(skills.skills, skillStore),
           ...(memory === null ? [] : makeMemoryTools(memory, memorySessions)),
         ].map(schema),
@@ -415,7 +426,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const base = [
-        ...toolsFor(offered.search ?? "exa").filter((tool) =>
+        ...toolsFor(offered.search ?? "exa", []).filter((tool) =>
           allowed.has(tool.name),
         ),
         ...makeSkillTools(offered.skills.skills, skillStore),
@@ -451,6 +462,12 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       return new Registry(runtime).run(call, ctx);
     },
   };
-  area.routes = routes({ clock: deps.clock, response, patch });
+  area.routes = routes({
+    clock: deps.clock,
+    response,
+    patch,
+    visualHosts: () =>
+      store.rows().find((row) => row.name === "visualize")!.hosts,
+  });
   return area;
 }

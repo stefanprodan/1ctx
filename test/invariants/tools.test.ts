@@ -84,7 +84,7 @@ describe("tools administration", () => {
     const text = await changed.text();
     expect(text).not.toContain("never-return-this-key");
     const body = JSON.parse(text);
-    expect(body.web).toHaveLength(2);
+    expect(body.web).toHaveLength(3);
     expect(body.builtin).toHaveLength(8);
     expect(body.search).toEqual({
       provider: null,
@@ -227,14 +227,14 @@ describe("tools administration", () => {
     chat.app.socket.dispose();
   });
 
-  test("the migrations leave exactly the two web tool rows", async () => {
+  test("the migrations leave exactly the three web tool rows", async () => {
     const chat = await chatApp();
     expect(
       chat.app.db
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["webfetch", "websearch"]);
+    ).toEqual(["webfetch", "websearch", "visualize"]);
     chat.app.socket.dispose();
   });
 });

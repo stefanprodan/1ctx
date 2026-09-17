@@ -18,6 +18,7 @@ export type { ToolCaps } from "../limits/index.ts";
 export type ToolBudget = {
   fetches: number;
   searches: number;
+  visualBytes: number;
 };
 
 export type ToolContext = {

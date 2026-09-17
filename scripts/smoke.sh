@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
 # Smoke test of the compiled binary: it starts, serves the page, answers
 # health, bootstraps the admin from admin.key and signs it in with a
-# cookie. Everything lives in a temp dir that goes when the script ends.
+# cookie. It runs outside the source directory and removes its files on exit.
 set -euo pipefail
 
 BIN=${1:-bin/1ctx}
+BIN=$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")
 PORT=${SMOKE_PORT:-1237}
 URL=http://127.0.0.1:$PORT
-TMP=$(mktemp -d)
-trap 'kill "${PID:-}" 2>/dev/null || true; rm -rf "$TMP"' EXIT
+RUN=bin/smoke-$$
+mkdir -p bin
+mkdir "$RUN"
+trap 'kill "${PID:-}" 2>/dev/null || true; rm -rf "$RUN"' EXIT
 
-mkdir -p "$TMP/secrets"
-printf 'smoke-pass' >"$TMP/secrets/admin.key"
-"$BIN" --listen "127.0.0.1:$PORT" --db "$TMP/1ctx.sqlite" \
-  --secrets "$TMP/secrets" >"$TMP/log" 2>&1 &
+mkdir -p "$RUN/secrets"
+printf 'smoke-pass' >"$RUN/secrets/admin.key"
+(cd "$RUN" && exec "$BIN" --listen "127.0.0.1:$PORT" --db 1ctx.sqlite \
+  --secrets secrets) >"$RUN/log" 2>&1 &
 PID=$!
 
 for _ in $(seq 1 50); do
   curl -sf -o /dev/null "$URL/api/health" && break
-  kill -0 "$PID" 2>/dev/null || { cat "$TMP/log"; exit 1; }
+  kill -0 "$PID" 2>/dev/null || { cat "$RUN/log"; exit 1; }
   sleep 0.2
 done
 
-fail() { echo "smoke: $1" >&2; cat "$TMP/log" >&2; exit 1; }
+fail() { echo "smoke: $1" >&2; cat "$RUN/log" >&2; exit 1; }
 
 # a body is read into a variable and grepped there: grep -q piped from
 # curl stops at the first match, curl then dies of the broken pipe, and
@@ -38,11 +41,20 @@ script=$(grep -o 'src="[^"]*\.js"' <<<"$page" | head -1 | cut -d'"' -f2)
 chunk=$(get "$URL$script")
 grep -q 'preact\|render' <<<"$chunk" || fail "the script did not serve"
 
-login=$(curl -s -o /dev/null -w '%{http_code} %{header_json}' \
+login=$(curl -s -c "$RUN/cookies" -o /dev/null -w '%{http_code} %{header_json}' \
   -H 'content-type: application/json' -H "origin: $URL" \
   -d '{"username":"admin","password":"smoke-pass"}' "$URL/api/login")
 [[ "$login" == 200* ]] || fail "login answered ${login%% *}"
 echo "$login" | grep -q 'login=' || fail "login set no cookie"
+
+curl -sf -b "$RUN/cookies" -D "$RUN/visual-headers" \
+  -o "$RUN/visual.html" "$URL/api/visual" || fail "visual shell did not answer"
+grep -q 'var Idiomorph=function' "$RUN/visual.html" \
+  || fail "the compiled visual shell has no Idiomorph"
+grep -qi 'content-security-policy: sandbox allow-scripts' "$RUN/visual-headers" \
+  || fail "the visual shell has no sandbox header"
+grep -qi 'connect-src.*none' "$RUN/visual-headers" \
+  || fail "the visual shell allows connections"
 
 wrong=$(curl -s -o /dev/null -w '%{http_code}' \
   -H 'content-type: application/json' -H "origin: $URL" \
@@ -54,5 +66,5 @@ cross=$(curl -s -o /dev/null -w '%{http_code}' \
   -d '{"username":"admin","password":"smoke-pass"}' "$URL/api/login")
 [[ "$cross" == 403 ]] || fail "a cross-origin write answered $cross"
 
-grep -q 'admin.key' "$TMP/log" || fail "admin.key was not read"
+grep -q 'admin.key' "$RUN/log" || fail "admin.key was not read"
 echo "smoke ok"

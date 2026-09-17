@@ -226,7 +226,7 @@ describe("memory chat receipts", () => {
     const ctx: ToolContext = {
       signal: new AbortController().signal,
       now: () => now,
-      budget: { fetches: 0, searches: 0 },
+      budget: { fetches: 0, searches: 0, visualBytes: 0 },
       caps: { ...TOOL_CAPS, resultCut: 400 },
     };
     const pages: string[] = [];

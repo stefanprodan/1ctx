@@ -43,10 +43,35 @@ function id(value: unknown, what: string): string {
 }
 
 export function parseMessageId(value: unknown): string {
+  return storedId(value, "messageId");
+}
+
+function storedId(value: unknown, name: string): string {
   if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
-    throw new BadRequest("messageId must be an id");
+    throw new BadRequest(`${name} must be an id`);
   }
   return value;
+}
+
+export function parseVisualParams(value: unknown): {
+  id: string;
+  messageId: string;
+  index: number;
+} {
+  const params = fields(value, ["id", "messageId", "index"]);
+  const index = params.index;
+  if (
+    typeof index !== "string" ||
+    !/^(0|[1-9][0-9]*)$/.test(index) ||
+    !Number.isSafeInteger(Number(index))
+  ) {
+    throw new BadRequest("index must be a non-negative integer");
+  }
+  return {
+    id: storedId(params.id, "id"),
+    messageId: parseMessageId(params.messageId),
+    index: Number(index),
+  };
 }
 
 export function parseCreateSession(body: unknown): CreateSessionRequest {

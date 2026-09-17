@@ -21,6 +21,7 @@ import type {
   SessionStatus,
 } from "../../shared/words.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
+import { offWireCall } from "./visual.ts";
 
 export type CreateSession = {
   id?: string;
@@ -171,9 +172,11 @@ export const message = (raw: RawMessage): Message => ({
 // which is the failed result's text. The size says what the result
 // route will answer
 export function offWire(row: Message): Message {
-  if (row.kind !== "tool") return { ...row, resultBytes: null };
+  const toolCalls = row.toolCalls?.map(offWireCall) ?? null;
+  if (row.kind !== "tool") return { ...row, toolCalls, resultBytes: null };
   return {
     ...row,
+    toolCalls,
     content: "",
     error: null,
     resultBytes: Buffer.byteLength(row.content, "utf8"),

@@ -148,7 +148,17 @@ export type SendSummary = {
 // send and the stream sequence but no row, and the client must accept
 // that without seeding a live row and without a refetch. The "reply"
 // variant is a reply streaming, as before
-export type LiveSend =
+export type VisualDraft = {
+  messageId: string;
+  callIndex: number;
+  title?: string;
+  html: string;
+};
+
+export type LiveSend = {
+  // the previews at seq, absent when no call is streaming a visual
+  drafts?: VisualDraft[];
+} & (
   | {
       phase: "reply";
       sendId: string;
@@ -163,7 +173,8 @@ export type LiveSend =
       phase: "tools";
       sendId: string;
       seq: number;
-    };
+    }
+);
 
 export type SessionDetail = {
   session: SessionSummary;

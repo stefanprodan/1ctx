@@ -4,7 +4,7 @@
 // The ephemeral reply stream and crash checkpoint. Durable placement and
 // round transitions stay in writer.ts.
 
-import type { SocketEvent } from "../../shared/socket.ts";
+import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent } from "../providers/index.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
@@ -22,6 +22,34 @@ export type StreamDeps = {
 };
 
 const bytes = (s: string) => new TextEncoder().encode(s).byteLength;
+
+export function streamVisual(
+  deps: StreamDeps,
+  send: ActiveSend,
+  piece: Pick<VisualFrame, "callIndex" | "title" | "html" | "htmlAt">,
+): void {
+  const round = send.round;
+  if (round === null) return;
+  const previous = round.drafts.get(piece.callIndex);
+  round.drafts.set(piece.callIndex, {
+    messageId: round.messageId,
+    callIndex: piece.callIndex,
+    ...(piece.title === undefined
+      ? previous?.title === undefined
+        ? {}
+        : { title: previous.title }
+      : { title: piece.title }),
+    html: (previous?.html ?? "") + piece.html,
+  });
+  deps.stream(send.sessionId, {
+    type: "visual",
+    sessionId: send.sessionId,
+    sendId: send.id,
+    messageId: round.messageId,
+    seq: ++send.seq,
+    ...piece,
+  });
+}
 
 function checkpoint(deps: StreamDeps, round: RoundState, now: number): void {
   const size = bytes(round.content) + bytes(round.reasoning);

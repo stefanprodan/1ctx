@@ -188,7 +188,12 @@ export function check(root: string): Violation[] {
         detail: `computed dynamic import on line ${line}`,
       });
     }
-    if (area === "client") {
+    if (
+      area === "client" ||
+      (rel.startsWith("server/tools/visual-") &&
+        rel.endsWith(".ts") &&
+        rel !== "server/tools/visual-theme.ts")
+    ) {
       for (const line of colourLiterals(code)) {
         out.push({
           file: rel,

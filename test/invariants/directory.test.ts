@@ -140,8 +140,9 @@ describe("the directory", () => {
     ).toEqual([
       { name: "datetime", provider: null },
       { name: "webfetch", provider: null },
+      { name: "visualize", provider: null },
     ]);
-    // the agent has no prompt and no skills; the two tool schemas cost,
+    // the agent has no prompt and no skills; the tool schemas cost,
     // and no MCP server is offered
     expect(body.mcp).toEqual({ servers: [], tokens: 0 });
     expect(body.tokens.prompt).toBe(0);
@@ -154,7 +155,7 @@ describe("the directory", () => {
     const after: DirectoryAgentResponse = await (
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();
-    expect(after.tools.map((t) => t.name)).toEqual(["datetime"]);
+    expect(after.tools.map((t) => t.name)).toEqual(["datetime", "visualize"]);
     // one schema fewer on the wire, fewer tokens
     expect(after.tokens.tools).toBeLessThan(body.tokens.tools);
     const search = await chat.admin.call("PATCH", "/api/tools/websearch", {
@@ -225,7 +226,11 @@ describe("the directory", () => {
       },
     ]);
     // the skill tools are left out of the list, never out of the count
-    expect(body.tools.map((t) => t.name)).toEqual(["datetime", "webfetch"]);
+    expect(body.tools.map((t) => t.name)).toEqual([
+      "datetime",
+      "webfetch",
+      "visualize",
+    ]);
     expect(body.tokens.tools).toBeGreaterThan(bare.tokens.tools);
     expect(body.tokens.skills).toBe(
       tokens("Read the runbook first.") + tokens("Do the plain thing."),

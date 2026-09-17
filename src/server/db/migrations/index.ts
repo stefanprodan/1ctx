@@ -19,6 +19,7 @@ import { m0010 } from "./0010-memory.ts";
 import { m0011 } from "./0011-gemini.ts";
 import { m0012 } from "./0012-fork.ts";
 import { m0013 } from "./0013-web-tools.ts";
+import { m0014 } from "./0014-visualize.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -34,4 +35,5 @@ export const MIGRATIONS: Migration[] = [
   m0011,
   m0012,
   m0013,
+  m0014,
 ];

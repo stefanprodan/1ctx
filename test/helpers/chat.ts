@@ -30,8 +30,8 @@ export const NO_TOOLS = "deepseek/deepseek-r1-distill-llama-70b";
 // index, an id, the name and the arguments as one JSON string
 export type ToolCallFrame = {
   index?: number;
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
   arguments: string;
   signature?: string;
 };
@@ -39,6 +39,7 @@ export type ToolCallFrame = {
 // one chat request's stream, as the test drives it
 export type Script = {
   body: Record<string, unknown>;
+  sse(text: string): void;
   content(text: string): void;
   reasoning(text: string): void;
   finish(reason?: string): void;
@@ -116,6 +117,9 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
     };
     const script: Script = {
       body: JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+      sse(text) {
+        controller.enqueue(encoder.encode(text));
+      },
       aborted: false,
       content: (text) => frame({ choices: [{ delta: { content: text } }] }),
       reasoning: (text) =>
