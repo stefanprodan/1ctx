@@ -29,6 +29,7 @@ import {
   Rows,
   RowsAdd,
   RowsCard,
+  RowsList,
   RowsMeta,
   RowsNew,
   RowsNote,
@@ -90,7 +91,7 @@ function FileRow({
       indent="chevron"
       head={
         <>
-          <span class="skills-path">{file.path}</span>
+          <RowsTitle name={file.path} mono />
           <RowsMeta>{bytesWord(file.bytes)}</RowsMeta>
         </>
       }
@@ -165,15 +166,12 @@ function SkillRow({
             // a refused refresh reads under the name, where a long reason
             // is cut to the row instead of pushing Refresh off it
             failure.value !== null && !asking.value ? (
-              <span class="error" role="alert">
-                {failure.value}
-              </span>
-            ) : meta.bad ? (
-              <span class="error">{meta.text}</span>
+              <span role="alert">{failure.value}</span>
             ) : (
               meta.text
             )
           }
+          bad={(failure.value !== null && !asking.value) || meta.bad}
           mono
         />
       }
@@ -227,7 +225,7 @@ function SkillRow({
         {skill.files.length > 0 && (
           <>
             <span class="label">Files</span>
-            <div class="skills-files">
+            <RowsList>
               {skill.files.map((file) => (
                 <FileRow
                   key={file.path}
@@ -240,7 +238,7 @@ function SkillRow({
                   }}
                 />
               ))}
-            </div>
+            </RowsList>
           </>
         )}
         {dropped !== "" && <p class="skills-state">{dropped}</p>}

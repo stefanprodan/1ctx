@@ -615,11 +615,25 @@ violation, and every rule has a rejected fixture under
   `/admin/agents?open=<id>`. A name is a
   link to its page wherever it is drawn, except inside a row that is
   itself a link (a stream row's author, an automation row's agent).
-- **An admin page is `ui/Rows.tsx`.** Cards of rows in a 960px
-  column: `RowsOpen` for a row that opens in place, `RowsGo` for one
-  that leads to its page, `RowsLine` for one that does neither,
-  `RowsAvatar`, `RowsTitle` (mono for an identifier) and `RowsMeta`
-  for its head, `RowsAdd` or `RowsLink` in a card's head. A card whose
+- **Every list is `ui/Rows.tsx`.** Cards of rows in a 960px column
+  on a page, and `RowsList` (under `RowsListHead`) for the same rows
+  inset in a form or an open row. A row is `RowsOpen` (opens in
+  place), `RowsGo` (a link, `end` for a button outside it),
+  `RowsButton` (an action) or `RowsLine` (neither; `as="label"` for a
+  pick, `off` when it cannot be picked). Its head is only
+  `RowsAvatar`, `RowsTitle` (mono for an identifier, `bad` for a
+  failed line) and `RowsMeta` (centred at the right), with
+  `RowsTag`, `RowsHandle` and `RowsBad` inside a line; its end is
+  `RowsEnd` (buttons, after the words that ask or the failure),
+  `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first
+  in a label row. A card's head holds `RowsAdd`, `RowsLink` or
+  `RowsFilters`; `RowsNote` says why a list is empty, `RowsBlock` is a
+  row of text. The controls live in `ui/RowsControls.tsx`, exported
+  through `Rows.tsx`. A view never draws a row, a head, a list box, a
+  switch, a box or filter chips of its own; its stylesheet holds only
+  what an open row's body or a meta holds. The stream's session row
+  (`stream/Row.tsx`) is the one row outside Rows, a denser feed line
+  inside a `RowsCard`. A card whose
   list grows (the Projects page, and Users, Projects, Agents and Skills
   under Admin) passes `ui/Search.tsx` as `RowsCard`'s `search`, in
   place of the label, and filters the loaded rows through `matches()`

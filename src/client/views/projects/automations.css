@@ -1,5 +1,5 @@
-/* The automation pages: what the tab's rows add, the automation page's
-   actions, brief, run log and filters, and the editor's task box,
+/* The automation pages: the icons and the run length the rows hold,
+   the automation page's actions and brief, and the editor's task box,
    schedule builder and its next run. */
 
 @layer tokens, base, owners;
@@ -117,85 +117,17 @@
   }
 
   /* the same segmented switch as the stream's head */
-  .automations-filters {
-    display: flex;
-    flex-shrink: 0;
-    gap: 2px;
-    margin-left: auto;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-  }
-  .automations-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 var(--space-2);
-    border-radius: var(--radius);
-    color: var(--faint);
-    font-size: var(--text-small);
-    text-decoration: none;
-  }
-  .automations-filter:hover {
-    color: var(--fg);
-  }
-  .automations-filter-on {
-    background: var(--line);
-    color: var(--fg);
-  }
-
-  .automations-run {
+  /* a run's meta: its length over its share of the deadline, then when */
+  .automations-run-meta {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding-right: var(--space-4);
-    border-bottom: 1px solid var(--line);
   }
-  .automations-run:last-child {
-    border-bottom: 0;
-  }
-  .automations-run:hover {
-    background: var(--line);
-  }
-  .automations-run-link {
-    display: grid;
-    grid-template-columns: 16px 116px minmax(0, 1fr) 84px;
-    align-items: center;
-    gap: var(--space-3);
-    flex-grow: 1;
-    min-width: 0;
-    padding: var(--space-3) 0 var(--space-3) 14px;
-    color: var(--dim);
-    text-decoration: none;
-  }
-  .automations-run-when {
-    display: flex;
-    flex-direction: column;
-    font-size: var(--text-ui);
-    color: var(--fg);
-    white-space: nowrap;
-  }
-  .automations-run-when .automations-faint {
-    font-size: var(--text-small);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .automations-run-said {
-    font-size: var(--text-ui);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .automations-run-link:hover .automations-run-said {
-    color: var(--fg);
-  }
-  .automations-run-took {
+  .automations-took {
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    font-family: var(--mono);
-    font-size: var(--text-small);
+    width: 84px;
   }
   .automations-bar {
     height: 3px;
@@ -214,14 +146,6 @@
   .automations-bar-failed {
     background: var(--failed);
   }
-  .automations-run-end {
-    flex: 0 0 64px;
-    display: flex;
-    justify-content: flex-end;
-    color: var(--faint);
-    white-space: nowrap;
-  }
-
   .automations-fire {
     justify-content: space-between;
     font-family: var(--mono);
@@ -409,13 +333,6 @@
   @media (max-width: 719px) {
     .automations-pair {
       grid-template-columns: 1fr;
-    }
-    .automations-run-link {
-      grid-template-columns: 16px minmax(0, 1fr) 64px;
-    }
-    .automations-run-said {
-      grid-column: 2 / -1;
-      grid-row: 2;
     }
   }
 }

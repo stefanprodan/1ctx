@@ -28,7 +28,14 @@ import { ago, firstSentence, reason } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
-import { RowsMeta, RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
+import {
+  RowsBad,
+  RowsList,
+  RowsListHead,
+  RowsMeta,
+  RowsOpen,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   changeLine,
@@ -97,17 +104,30 @@ function Fact({
 function ToolLine({
   tool,
   reason: why,
+  open,
+  onToggle,
 }: {
   tool: McpToolSummary;
   reason?: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <details class="mcp-tool">
-      <summary class="mcp-tool-head">
-        <span class="mcp-tool-name">{tool.name}</span>
-        <span class="mcp-tool-desc">{firstSentence(tool.description)}</span>
-        {why && <span class="mcp-tool-reason">{why}</span>}
-      </summary>
+    <RowsOpen
+      open={open}
+      onToggle={onToggle}
+      indent="chevron"
+      head={
+        <>
+          <RowsTitle
+            name={tool.name}
+            sub={firstSentence(tool.description) || undefined}
+            mono
+          />
+          {why && <RowsMeta bad>{why}</RowsMeta>}
+        </>
+      }
+    >
       <div class="mcp-tool-body">
         {tool.description !== "" && (
           <span class="mcp-tool-text">{tool.description}</span>
@@ -119,7 +139,7 @@ function ToolLine({
           dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
         />
       </div>
-    </details>
+    </RowsOpen>
   );
 }
 
@@ -130,18 +150,24 @@ function Group({
   label: string;
   tools: { tool: McpToolSummary; reason?: string }[];
 }) {
+  const open = useSignal<string | null>(null);
   if (tools.length === 0) return null;
   return (
     <div class="mcp-group">
-      <span class="mcp-group-head">
-        <span class="label">{label}</span>
-        <span class="mcp-group-count">{tools.length}</span>
-      </span>
-      <div class="mcp-tools">
+      <RowsListHead label={label} hint={String(tools.length)} />
+      <RowsList>
         {tools.map(({ tool, reason: why }) => (
-          <ToolLine key={tool.name} tool={tool} reason={why} />
+          <ToolLine
+            key={tool.name}
+            tool={tool}
+            reason={why}
+            open={open.value === tool.name}
+            onToggle={() => {
+              open.value = open.value === tool.name ? null : tool.name;
+            }}
+          />
         ))}
-      </div>
+      </RowsList>
     </div>
   );
 }
@@ -314,9 +340,7 @@ export function ServerRow({
           <RowsMeta>
             {`Read ${server.read ? "on" : "off"} · Write ${server.write ? "on" : "off"} · `}
             {/* only the failure is red, the switches keep their colour */}
-            <span class={meta.bad ? "rows-meta-bad" : undefined}>
-              {meta.text}
-            </span>
+            {meta.bad ? <RowsBad>{meta.text}</RowsBad> : meta.text}
           </RowsMeta>
         </>
       }

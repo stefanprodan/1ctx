@@ -1,19 +1,8 @@
-/* Users: the "you" mark in a row's name, and the forms an open row
-   holds. */
+/* Users: the forms an open row holds. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .users-you {
-    padding: 0 6px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    font-weight: 400;
-    color: var(--faint);
-  }
-
   .users-forms {
     display: flex;
     flex-direction: column;

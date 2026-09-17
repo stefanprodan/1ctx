@@ -1,6 +1,5 @@
-/* Skills: the add form's fields and the index's entries, and what an
-   open row holds: the facts, the body and a file as text, the files,
-   and the actions. */
+/* Skills: the add form's fields, and what an open row holds: the facts,
+   the body and a file as text, and the actions. */
 
 @layer tokens, base, owners;
 
@@ -20,52 +19,6 @@
     font-size: var(--text-small);
   }
 
-  /* an index's entries: a line each, the name in mono, Add at the end */
-  .skills-entries {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    overflow: hidden;
-  }
-  .skills-entry {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 48px;
-    padding: var(--space-2) var(--space-3);
-    border-bottom: 1px solid var(--line);
-  }
-  .skills-entry:last-child {
-    border-bottom: 0;
-  }
-  .skills-entry-name {
-    flex-shrink: 0;
-    width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    font-weight: 500;
-    color: var(--fg);
-  }
-  .skills-entry-desc {
-    flex-grow: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-ui);
-    color: var(--dim);
-  }
-  .skills-entry-added {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
   .skills-state {
     margin: 0;
     font-size: var(--text-ui);
@@ -121,23 +74,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* the files, a card of rows inside the open row */
-  .skills-files {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .skills-path {
-    flex-grow: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    color: var(--fg);
-  }
-
   .skills-actions {
     display: flex;
     align-items: center;
@@ -159,17 +95,6 @@
     }
     .skills-fact {
       margin-bottom: var(--space-2);
-    }
-    .skills-entry {
-      flex-wrap: wrap;
-    }
-    .skills-entry-name {
-      width: auto;
-      flex-grow: 1;
-    }
-    .skills-entry-desc {
-      flex-basis: 100%;
-      white-space: normal;
     }
   }
 }

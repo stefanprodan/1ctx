@@ -93,79 +93,17 @@
     font-family: var(--mono);
   }
 
-  /* a group of tools: its head with the count, a line per tool that
-     opens to the description and the parameters */
+  /* a group of tools: the list's head with the count, then a row per
+     tool that opens to the description and the parameters */
   .mcp-group {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
   }
-  .mcp-group-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
-  .mcp-group-count {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
-  .mcp-tools {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    overflow: hidden;
-  }
-  .mcp-tool {
-    border-bottom: 1px solid var(--line);
-  }
-  .mcp-tool:last-child {
-    border-bottom: 0;
-  }
-  .mcp-tool-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-3);
-    min-width: 0;
-    padding: var(--space-2) var(--space-3);
-    cursor: pointer;
-    list-style: none;
-  }
-  .mcp-tool-head::-webkit-details-marker {
-    display: none;
-  }
-  .mcp-tool-head:hover {
-    background: var(--line);
-  }
-  .mcp-tool-name {
-    flex-shrink: 0;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    color: var(--fg);
-  }
-  .mcp-tool-desc {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-small);
-    color: var(--dim);
-  }
-  .mcp-tool-reason {
-    margin-left: auto;
-    flex-shrink: 0;
-    font-size: var(--text-label);
-    color: var(--failed);
-  }
   .mcp-tool-body {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: 0 var(--space-3) var(--space-3);
     font-size: var(--text-small);
   }
   .mcp-tool-text {
@@ -210,57 +148,6 @@
     font-size: var(--text-small);
   }
 
-  /* the agent form's section: a line per server with its two boxes */
-  .mcp-pick-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  .mcp-picks {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    overflow: hidden;
-  }
-  .mcp-pick {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    min-height: 48px;
-    padding: var(--space-2) var(--space-3);
-    border-bottom: 1px solid var(--line);
-  }
-  .mcp-pick:last-child {
-    border-bottom: 0;
-  }
-  .mcp-pick-name {
-    flex: 1 1 0;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    color: var(--fg);
-  }
-  .mcp-pick-side {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-small);
-    cursor: pointer;
-  }
-  .mcp-pick-off {
-    color: var(--faint);
-    cursor: default;
-  }
-  .mcp-pick-off-word {
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
   .mcp-preview {
     display: flex;
     flex-direction: column;
@@ -274,25 +161,8 @@
     }
   }
   @media (max-width: 719px) {
-    .mcp-pick-head,
-    .mcp-instructions-head,
-    .mcp-tool-head,
-    .mcp-pick {
+    .mcp-instructions-head {
       flex-wrap: wrap;
-    }
-    .mcp-tool-desc {
-      order: 3;
-      flex-basis: 100%;
-    }
-    .mcp-pick-name {
-      flex-basis: 100%;
-    }
-    .mcp-pick-side {
-      flex: 1 1 120px;
-      flex-wrap: wrap;
-    }
-    .mcp-pick-off-word {
-      flex-basis: 100%;
     }
   }
 }

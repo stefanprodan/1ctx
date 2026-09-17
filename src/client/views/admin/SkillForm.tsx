@@ -15,6 +15,13 @@ import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import {
+  RowsEnd,
+  RowsLine,
+  RowsList,
+  RowsMeta,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
+import {
   firstSentence,
   formKind,
   pathProblem,
@@ -132,30 +139,33 @@ export function SkillForm({ onDone }: { onDone: () => void }) {
           (entries.value.length === 0 ? (
             <p class="skills-state">The index lists no skills.</p>
           ) : (
-            <div class="skills-entries">
+            <RowsList>
               {entries.value.map((entry) => (
-                <div key={entry.name} class="skills-entry">
-                  <span class="skills-entry-name">{entry.name}</span>
-                  <span class="skills-entry-desc">
-                    {firstSentence(entry.description)}
-                  </span>
+                <RowsLine key={entry.name} flush>
+                  <RowsTitle
+                    name={entry.name}
+                    sub={firstSentence(entry.description)}
+                    mono
+                  />
                   {have.has(entry.name) ? (
-                    <span class="skills-entry-added">Added</span>
+                    <RowsMeta>Added</RowsMeta>
                   ) : (
-                    <button
-                      type="button"
-                      class="btn btn-small"
-                      disabled={busy}
-                      onClick={() => void addEntry(entry)}
-                    >
-                      {save.pending.value === `add ${entry.name}`
-                        ? "Adding"
-                        : "Add"}
-                    </button>
+                    <RowsEnd>
+                      <button
+                        type="button"
+                        class="btn btn-small"
+                        disabled={busy}
+                        onClick={() => void addEntry(entry)}
+                      >
+                        {save.pending.value === `add ${entry.name}`
+                          ? "Adding"
+                          : "Add"}
+                      </button>
+                    </RowsEnd>
                   )}
-                </div>
+                </RowsLine>
               ))}
-            </div>
+            </RowsList>
           ))}
       </div>
       <Foot

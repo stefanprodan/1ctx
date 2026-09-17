@@ -365,7 +365,7 @@ describe("the page", () => {
       },
     ];
     expect(render(<Skills />)).toContain(
-      '<span class="rows-sub"><span class="error">Refresh failed',
+      '<span class="rows-sub rows-bad">Refresh failed',
     );
     skills.value = [];
     expect(render(<Skills />)).toContain("No skills yet");
@@ -383,9 +383,9 @@ describe("the page", () => {
       />,
     );
     expect(html).toContain(`1 of ${MAX_SKILLS_PER_AGENT}`);
-    expect(html).toContain('class="agents-skill agents-skill-on"');
+    expect(html).toContain('class="rows-check-box rows-check-on"');
     expect(html).toContain("Flux CD and Flux Operator expert.");
-    expect(html).not.toContain("agents-skill-full");
+    expect(html).not.toContain("rows-item-off");
     const ids = Array.from({ length: MAX_SKILLS_PER_AGENT }, (_, i) => `x${i}`);
     const full = render(
       <SkillPicker
@@ -395,7 +395,7 @@ describe("the page", () => {
         onToggle={toggle}
       />,
     );
-    expect(full).toContain('class="agents-skill agents-skill-full"');
+    expect(full).toContain('class="rows-item rows-item-off"');
     expect(full).toContain("disabled");
     expect(
       render(

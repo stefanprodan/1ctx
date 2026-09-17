@@ -28,6 +28,7 @@ import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAvatar,
+  RowsBlock,
   RowsCard,
   RowsLine,
   RowsMeta,
@@ -62,7 +63,7 @@ function Prompt({ text, tokens }: { text: string; tokens: number }) {
   return (
     <RowsCard label="Prompt" hint={tokensText(tokens)}>
       {/* the row holds the padding, so the cut ends on a whole line */}
-      <div class="rows-item people-prompt">
+      <RowsBlock>
         <pre
           ref={el}
           class={`people-prompt-text${open.value ? "" : " people-prompt-cut"}`}
@@ -81,7 +82,7 @@ function Prompt({ text, tokens }: { text: string; tokens: number }) {
             {open.value ? "Show less" : "Show more"}
           </button>
         )}
-      </div>
+      </RowsBlock>
     </RowsCard>
   );
 }
@@ -251,13 +252,8 @@ export function Agent({ params }: { params: Params }) {
                       </RowsAvatar>
                       <RowsTitle
                         name={server.name}
-                        sub={
-                          line.bad ? (
-                            <span class="people-bad">{line.text}</span>
-                          ) : (
-                            line.text
-                          )
-                        }
+                        sub={line.text}
+                        bad={line.bad}
                         mono
                       />
                       <RowsMeta>{serverMeta(server)}</RowsMeta>

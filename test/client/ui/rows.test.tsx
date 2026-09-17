@@ -7,9 +7,20 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
+  RowsBad,
+  RowsButton,
   RowsCard,
+  RowsCheck,
+  RowsEnd,
+  RowsFilters,
+  RowsGo,
+  RowsHandle,
   RowsLine,
+  RowsList,
+  RowsListHead,
   RowsOpen,
+  RowsSwitch,
+  RowsTag,
   RowsTitle,
 } from "../../../src/client/ui/Rows.tsx";
 
@@ -74,5 +85,109 @@ describe("the parts", () => {
     expect(render(<RowsTitle name="Oana" sub="@caelea" />)).toContain(
       '<span class="rows-sub">@caelea</span>',
     );
+  });
+});
+
+describe("the system's other parts", () => {
+  test("an inset list holds the same rows, under its head", () => {
+    const html = render(
+      <>
+        <RowsListHead label="Skills" hint="1 of 20" />
+        <RowsList>
+          <RowsButton onClick={noop}>
+            <RowsTitle name="m" sub="id" />
+          </RowsButton>
+        </RowsList>
+      </>,
+    );
+    expect(html).toContain('<span class="rows-list-hint">1 of 20</span>');
+    expect(html).toContain(
+      '<div class="rows-list"><div class="rows-item"><button type="button" class="rows-line rows-button">',
+    );
+  });
+
+  test("a failed line, a tag, a handle and a failed part", () => {
+    expect(render(<RowsTitle name="x" sub="broke" bad />)).toContain(
+      '<span class="rows-sub rows-bad">broke</span>',
+    );
+    expect(render(<RowsTag>you</RowsTag>)).toBe(
+      '<span class="rows-tag">you</span>',
+    );
+    expect(render(<RowsHandle name="memo" />)).toBe(
+      '<span class="rows-handle">@memo</span>',
+    );
+    expect(render(<RowsBad>failed</RowsBad>)).toBe(
+      '<span class="rows-bad">failed</span>',
+    );
+  });
+
+  test("a link row with an end keeps the button outside the link", () => {
+    const html = render(
+      <RowsGo href="/x" end={<button type="button">Stop</button>}>
+        <RowsTitle name="run" />
+      </RowsGo>,
+    );
+    expect(html).toContain(
+      '<div class="rows-line rows-line-end"><a class="rows-go rows-go-part" href="/x">',
+    );
+    expect(html).toContain("</a><button");
+    expect(render(<RowsGo href="/x">y</RowsGo>)).toContain(
+      '<a class="rows-line rows-go" href="/x">',
+    );
+  });
+
+  test("an end that asks wraps, one of buttons alone does not", () => {
+    expect(render(<RowsEnd words="Delete x?" />)).toContain(
+      'class="rows-end rows-end-ask"><span class="rows-end-words">Delete x?',
+    );
+    expect(render(<RowsEnd error="refused" words="Delete x?" />)).toContain(
+      '<span class="rows-end-error error" role="alert">refused</span>',
+    );
+    expect(render(<RowsEnd />)).toBe('<span class="rows-end"></span>');
+  });
+
+  test("a switch, a box with words and a line that cannot be picked", () => {
+    const on = render(<RowsSwitch on label="webfetch" onClick={noop} />);
+    expect(on).toContain('role="switch" aria-checked="true"');
+    expect(on).toContain('aria-label="webfetch on"');
+    const box = render(
+      <RowsCheck name="read:x" checked faint note="off" onChange={noop}>
+        Read
+      </RowsCheck>,
+    );
+    expect(box).toContain(
+      '<label class="rows-check rows-check-words rows-check-faint">',
+    );
+    expect(box).toContain("rows-check-box rows-check-on");
+    expect(box).toContain('<span class="rows-check-note">off</span>');
+    expect(
+      render(
+        <RowsLine as="label" flush off>
+          <RowsCheck name="s" checked={false} onChange={noop} />
+        </RowsLine>,
+      ),
+    ).toContain('<div class="rows-item rows-item-off"><label');
+  });
+
+  test("filters are links for an address, buttons for a pick", () => {
+    const links = render(
+      <RowsFilters
+        label="Filter runs"
+        filters={[
+          { label: "All", on: true, href: "/a" },
+          { label: "Failed", on: false, href: "/a?runs=failed" },
+        ]}
+      />,
+    );
+    expect(links).toContain(
+      '<a class="rows-filter rows-filter-on" href="/a" aria-current="page">All</a>',
+    );
+    const buttons = render(
+      <RowsFilters
+        label="Show"
+        filters={[{ label: "Chats", on: false, onPick: noop }]}
+      />,
+    );
+    expect(buttons).toContain('aria-pressed="false">Chats</button>');
   });
 });

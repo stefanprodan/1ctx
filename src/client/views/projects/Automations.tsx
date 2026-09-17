@@ -19,6 +19,7 @@ import {
   RowsAvatar,
   RowsCard,
   RowsGo,
+  RowsHandle,
   RowsMeta,
   RowsNote,
   RowsTitle,
@@ -87,9 +88,7 @@ export function Automations({ params }: { params: Params }) {
                         {scheduleWords(automation.schedule) ??
                           automation.schedule}
                         {" · "}
-                        <span class="automations-agent">
-                          @{agent?.name ?? "no agent"}
-                        </span>
+                        <RowsHandle name={agent?.name ?? "no agent"} />
                       </>
                     }
                   />

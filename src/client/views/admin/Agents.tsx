@@ -30,6 +30,7 @@ import {
   RowsAdd,
   RowsAvatar,
   RowsCard,
+  RowsEnd,
   RowsLine,
   RowsMeta,
   RowsNew,
@@ -107,12 +108,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
         {provider.wire} · {keyLine(provider.keyName, provider.hasKey)}
       </RowsMeta>
       {asking.value ? (
-        <span class="agents-ask">
-          {failure.value ? (
-            <span class="agents-note error">{failure.value}</span>
-          ) : (
-            <span class="agents-ask-words">Delete {provider.name}?</span>
-          )}
+        <RowsEnd words={`Delete ${provider.name}?`} error={failure.value}>
           <button
             type="button"
             class="btn btn-small btn-danger"
@@ -132,17 +128,19 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
           >
             Keep
           </button>
-        </span>
+        </RowsEnd>
       ) : (
-        <button
-          type="button"
-          class="btn btn-small"
-          onClick={() => {
-            asking.value = true;
-          }}
-        >
-          Delete
-        </button>
+        <RowsEnd>
+          <button
+            type="button"
+            class="btn btn-small"
+            onClick={() => {
+              asking.value = true;
+            }}
+          >
+            Delete
+          </button>
+        </RowsEnd>
       )}
     </RowsLine>
   );
