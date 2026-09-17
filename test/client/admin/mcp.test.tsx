@@ -38,7 +38,6 @@ import {
   metaLine,
   promptPreview,
   settingsDirty,
-  timeoutHint,
   timeoutMs,
   timeoutProblem,
   timeoutText,
@@ -213,12 +212,6 @@ describe("the model", () => {
     expect(timeoutProblem("abc")).toBe("A number of seconds");
     expect(timeoutProblem("0.5")).toBe("1 to 3600 seconds");
     expect(timeoutProblem("3601")).toBe("1 to 3600 seconds");
-    expect(timeoutHint(null)).toBe(
-      "Seconds. Empty uses the limits' call timeout.",
-    );
-    expect(timeoutHint(20_000)).toBe(
-      "Seconds. Empty uses the limits' call timeout, now 20.",
-    );
   });
 
   test.serial(
