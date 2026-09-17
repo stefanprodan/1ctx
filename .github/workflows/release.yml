@@ -67,8 +67,9 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           stage="$(mktemp -d)"
-          cp bin/1ctx LICENSE "$stage/"
-          tar -C "$stage" -czf dist/1ctx_darwin_arm64.tar.gz 1ctx LICENSE
+          cp bin/1ctx LICENSE THIRD_PARTY_LICENSES.md "$stage/"
+          tar -C "$stage" -czf dist/1ctx_darwin_arm64.tar.gz 1ctx LICENSE THIRD_PARTY_LICENSES.md
+          tar -tzf dist/1ctx_darwin_arm64.tar.gz | grep -Fx THIRD_PARTY_LICENSES.md
           rm -rf "$stage"
       - name: Generate checksums
         run: |
