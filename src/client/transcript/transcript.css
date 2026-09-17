@@ -74,6 +74,7 @@
   }
 
   .transcript-when {
+    white-space: nowrap;
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
@@ -157,8 +158,16 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
-  .transcript-cut-err {
+  .transcript-failure {
+    margin: var(--space-2) 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--failed-line);
+    border-radius: var(--radius-card);
+    background: var(--failed-wash);
     color: var(--failed);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
   /* an icon button on the line under a turn */
   .transcript-act {

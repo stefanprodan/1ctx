@@ -4,9 +4,13 @@
 import { describe, expect, test } from "bun:test";
 import {
   cutReason,
+  emptyFailure,
   replyRunning,
 } from "../../../src/client/transcript/Reply.tsx";
-import type { ReplyNode } from "../../../src/client/transcript/rows.ts";
+import type {
+  ReplyNode,
+  WorkNode,
+} from "../../../src/client/transcript/rows.ts";
 import { liveOf } from "../../../src/client/transcript/stream.ts";
 import type {
   Message,
@@ -112,5 +116,42 @@ describe("the line under an answer", () => {
     // a cap is the work fold's word, not this line's
     expect(cutReason(answer({ finishReason: "tool_limit" }))).toBeNull();
     expect(cutReason(answer({ finishReason: "tool_loop" }))).toBeNull();
+  });
+});
+
+describe("a failed turn's fold", () => {
+  const work = (changes: Partial<WorkNode> = {}): WorkNode => ({
+    sendId: "send-1",
+    rows: [],
+    rounds: [],
+    answer: null,
+    send: null,
+    ...changes,
+  });
+  const failed = answer({
+    status: "failed",
+    error: "OpenRouter 403: not available",
+    content: "",
+    html: "",
+  });
+
+  test("is left out when the send failed before doing anything", () => {
+    expect(emptyFailure(work(), failed, "OpenRouter 403", "")).toBeTrue();
+  });
+
+  test("stays when there is work, thinking, words or no failure", () => {
+    expect(
+      emptyFailure(work({ rows: [failed] }), failed, "OpenRouter 403", ""),
+    ).toBeFalse();
+    expect(
+      emptyFailure(
+        work(),
+        { ...failed, reasoning: "thinking" },
+        "OpenRouter 403",
+        "",
+      ),
+    ).toBeFalse();
+    expect(emptyFailure(work(), failed, "OpenRouter 403", "half")).toBeFalse();
+    expect(emptyFailure(work(), failed, null, "")).toBeFalse();
   });
 });
