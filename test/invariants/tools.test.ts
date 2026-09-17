@@ -40,7 +40,7 @@ describe("tools administration", () => {
     const res = await chat.admin.call("GET", "/api/tools");
     expect(res.status).toBe(200);
     const body = await res.json();
-    const tool = body.tools.find(
+    const tool = body.web.find(
       (candidate: { name: string }) => candidate.name === "webfetch",
     );
     expect(tool).toBeDefined();
@@ -54,6 +54,20 @@ describe("tools administration", () => {
     expect(tool.parametersHtml).toContain('class="md-block-code"');
     expect(tool.parametersHtml).toContain('class="hljs-attr"');
     expect(codeJson(tool.parametersHtml)).toEqual(tool.parameters);
+    expect(tool.tokens).toBeGreaterThan(0);
+    expect(body.builtin.map((t: { name: string }) => t.name)).toEqual([
+      "datetime",
+      "mcp_call",
+      "mcp_describe",
+      "memory_edit",
+      "session_read",
+      "sessions_list",
+      "skill",
+      "skill_file",
+    ]);
+    expect(codeJson(body.builtin[0].parametersHtml)).toEqual(
+      body.builtin[0].parameters,
+    );
     chat.app.socket.dispose();
   });
 
@@ -70,13 +84,14 @@ describe("tools administration", () => {
     const text = await changed.text();
     expect(text).not.toContain("never-return-this-key");
     const body = JSON.parse(text);
-    expect(body.tools).toHaveLength(3);
+    expect(body.web).toHaveLength(2);
+    expect(body.builtin).toHaveLength(8);
     expect(body.search).toEqual({
       provider: null,
       keys: { exa: true, firecrawl: false, tavily: false },
     });
     expect(
-      body.tools.find((tool: { name: string }) => tool.name === "webfetch"),
+      body.web.find((tool: { name: string }) => tool.name === "webfetch"),
     ).toMatchObject({
       enabled: false,
       description: expect.any(String),
@@ -122,6 +137,16 @@ describe("tools administration", () => {
       names(chat.app.runner.registry.get(unchosen.sessionId)!.policy.offered),
     ).not.toContain("websearch");
     await finish(chat, unchosen.script);
+    chat.app.socket.dispose();
+  });
+
+  test("a built-in has no switch to patch", async () => {
+    const chat = await chatApp();
+    const res = await chat.admin.call("PATCH", "/api/tools/datetime", {
+      body: { enabled: false },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "no such tool" });
     chat.app.socket.dispose();
   });
 
@@ -202,14 +227,14 @@ describe("tools administration", () => {
     chat.app.socket.dispose();
   });
 
-  test("the migration seeds exactly the three built-in rows", async () => {
+  test("the migrations leave exactly the two web tool rows", async () => {
     const chat = await chatApp();
     expect(
       chat.app.db
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["datetime", "webfetch", "websearch"]);
+    ).toEqual(["webfetch", "websearch"]);
     chat.app.socket.dispose();
   });
 });

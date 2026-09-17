@@ -114,8 +114,8 @@ describe("the schema", () => {
         .get();
       const messages = db.query("select * from messages order by seq").all();
       const sends = db.query("select * from sends order by id").all();
-      expect(migrate(db)).toEqual(["0012-fork"]);
-      expect(MIGRATIONS.at(-1)?.rebuild).toBeUndefined();
+      expect(migrate(db, MIGRATIONS.slice(0, 12))).toEqual(["0012-fork"]);
+      expect(MIGRATIONS[11]?.rebuild).toBeUndefined();
       expect(db.query("select * from sessions").get()).toEqual({
         ...session,
         forked_from_session_id: null,
@@ -145,7 +145,7 @@ describe("the schema", () => {
           forked_from_message_id = 'deleted-message';
       `);
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 12))).toEqual([]);
     } finally {
       db.close();
     }
@@ -248,7 +248,7 @@ describe("the schema", () => {
     db.close();
   });
 
-  test("the three built-in tools start enabled and limits start empty", () => {
+  test("the two web tools start enabled and limits start empty", () => {
     const db = new Database(":memory:");
     migrate(db);
     expect(
@@ -259,12 +259,6 @@ describe("the schema", () => {
         )
         .all(),
     ).toEqual([
-      {
-        name: "datetime",
-        enabled: 1,
-        provider: null,
-        updated_at: 0,
-      },
       { name: "webfetch", enabled: 1, provider: null, updated_at: 0 },
       { name: "websearch", enabled: 1, provider: null, updated_at: 0 },
     ]);
@@ -381,6 +375,7 @@ describe("additive migrations", () => {
       "0010-memory",
       "0011-gemini",
       "0012-fork",
+      "0013-web-tools",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -429,6 +424,7 @@ describe("0005", () => {
       "0010-memory",
       "0011-gemini",
       "0012-fork",
+      "0013-web-tools",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -486,6 +482,7 @@ describe("rebuild migrations", () => {
       "0010-memory",
       "0011-gemini",
       "0012-fork",
+      "0013-web-tools",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -576,6 +573,7 @@ describe("0006 skills migration", () => {
       "0010-memory",
       "0011-gemini",
       "0012-fork",
+      "0013-web-tools",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -625,6 +623,7 @@ describe("0007 user tz migration", () => {
       "0010-memory",
       "0011-gemini",
       "0012-fork",
+      "0013-web-tools",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -653,6 +652,7 @@ describe("0009 mcp migration", () => {
       "0010-memory",
       "0011-gemini",
       "0012-fork",
+      "0013-web-tools",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -688,6 +688,40 @@ describe("0009 mcp migration", () => {
   });
 });
 
+describe("0013 web tools migration", () => {
+  test("drops the datetime row, keeps the web rows and refuses datetime", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 12));
+    db.exec(`
+      update tools set enabled = 0, updated_at = 4 where name = 'datetime';
+      update tools set enabled = 0, updated_at = 5 where name = 'webfetch';
+      update tools set provider = 'tavily', updated_at = 6
+        where name = 'websearch';
+    `);
+    expect(migrate(db)).toEqual(["0013-web-tools"]);
+    expect(MIGRATIONS.at(-1)?.rebuild).toBeUndefined();
+    expect(
+      db
+        .query(
+          "select name, enabled, provider, updated_at from tools order by rowid",
+        )
+        .all(),
+    ).toEqual([
+      { name: "webfetch", enabled: 0, provider: null, updated_at: 5 },
+      { name: "websearch", enabled: 1, provider: "tavily", updated_at: 6 },
+    ]);
+    expect(() =>
+      db
+        .query(
+          "insert into tools (name, enabled, updated_at) values ('datetime', 1, 0)",
+        )
+        .run(),
+    ).toThrow();
+    db.close();
+  });
+});
+
 describe("0008 search tavily migration", () => {
   test("keeps the tool rows and accepts tavily", () => {
     const db = new Database(":memory:");
@@ -698,13 +732,7 @@ describe("0008 search tavily migration", () => {
       update tools set provider = 'firecrawl', updated_at = 6
         where name = 'websearch';
     `);
-    expect(migrate(db)).toEqual([
-      "0008-search-tavily",
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-    ]);
+    expect(migrate(db, MIGRATIONS.slice(0, 8))).toEqual(["0008-search-tavily"]);
     expect(
       db
         .query(
@@ -751,7 +779,11 @@ describe("0008 search tavily migration", () => {
             .query("update providers set wire = 'gemini' where id = 'local11'")
             .run(),
         ).toThrow();
-        expect(migrate(db)).toEqual(["0011-gemini", "0012-fork"]);
+        expect(migrate(db)).toEqual([
+          "0011-gemini",
+          "0012-fork",
+          "0013-web-tools",
+        ]);
         expect(db.query("select * from providers order by id").all()).toEqual(
           providers,
         );

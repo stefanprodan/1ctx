@@ -496,11 +496,21 @@ violation, and every rule has a rejected fixture under
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
   the defaults; `tools/` never imports `runner/`. The offered set is
   decided once per send in `runner/policy.ts` from the `tools` rows:
-  every tool of the model accepts tools that an admin has not
-  switched off, and websearch only once a search provider is chosen;
+  a model that accepts tools always gets `datetime`, and the web tools
+  (`WEB_TOOLS`, the only rows and the only switches) that an admin has
+  not switched off, websearch only once a search provider is chosen;
   every provider (exa, firecrawl, tavily) answers keyless, a key file
-  raises the rate, and the runner never holds a key. A change on the
-  Tools page applies to the next send; a send in flight keeps the
+  raises the rate, and the runner never holds a key. The Tools page
+  has three tabs, one view over `/admin/tools` (Built-in),
+  `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
+  `BUILTIN_TOOLS` schema by name from `tools/catalog.ts`, built by the
+  send's own factories with sample inputs (name enums empty,
+  `memory_edit`'s own-note text as the variant), each row `RowsTitle`
+  (the name over the first sentence) with its tokens by `wireTokens()`
+  as `RowsMeta`, read-only; Web's rows carry the switch and no tokens;
+  each card's head has its total. Limits is a form per scope, each
+  saving the full set with the other scope's saved values. A change on
+  the Tools page applies to the next send; a send in flight keeps the
   caps and the set it started on. A round's calls run in parallel
   under the call timeout and the send's signal. A tool row is a message
   of kind `tool`, and each tool's end is one transaction, one revision,
@@ -606,10 +616,11 @@ violation, and every rule has a rejected fixture under
   offer a send now (none when the model takes no tools, websearch with
   its search provider, the skill tools left out of the list), and
   token counts for the prompt, the skill bodies together and every
-  offered schema as `wireTools()` puts it on the wire, the skill tools
-  included. Tokens are counted on the server by `lib/tokens.ts`,
-  gpt-tokenizer's `o200k_base` alone (each encoding carries its
-  vocabulary into the binary), exact only for OpenAI models; a skill
+  offered schema by `wireTokens()` in `providers/`, the skill tools
+  included, the one count of schemas every page shows. Tokens are
+  counted on the server by `lib/tokens.ts`, gpt-tokenizer's
+  `o200k_base` alone (each encoding carries its vocabulary into the
+  binary), exact only for OpenAI models; a skill
   body's count is kept per skill until its digest moves. For an admin
   the agent's Settings aside has Manage, which opens its row on
   `/admin/agents?open=<id>`. A name is a

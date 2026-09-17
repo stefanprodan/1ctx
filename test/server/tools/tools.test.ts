@@ -8,8 +8,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
+import { wireTokens } from "../../../src/server/providers/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
 import { formatDatetime } from "../../../src/server/tools/builtin/datetime.ts";
+import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
 import type { SkillsPort } from "../../../src/server/tools/index.ts";
 import { type ToolsArea, toolsArea } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
@@ -21,6 +23,7 @@ import type { OfferedSkill } from "../../../src/shared/contracts/skill.ts";
 import {
   BUILTIN_TOOLS,
   type SearchProvider,
+  WEB_TOOLS,
 } from "../../../src/shared/words.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
@@ -132,7 +135,19 @@ describe("offered", () => {
     expect(area({}, "exa").offered(now, "").search).toBe("exa");
   });
 
-  test.each([...BUILTIN_TOOLS])(
+  test("offers datetime with no row, since it has no switch", () => {
+    const tools = area();
+    expect(tools.store.rows().map((row) => row.name)).toEqual([
+      "webfetch",
+      "websearch",
+    ]);
+    tools.store.setEnabled("webfetch", false, now);
+    expect(tools.offered(now, "").tools.map((tool) => tool.name)).toEqual([
+      "datetime",
+    ]);
+  });
+
+  test.each([...WEB_TOOLS])(
     "does not offer %s when its switch is off",
     (name) => {
       const tools = area({ exa: "e" }, "exa");
@@ -180,6 +195,59 @@ describe("offered", () => {
     expect(time?.parameters).toMatchObject({
       properties: { timezone: { default: "UTC" } },
     });
+  });
+});
+
+describe("the built-in catalog", () => {
+  const catalog = builtinCatalog(now, (md) => md);
+
+  test("lists every built-in by name, each with its tokens", () => {
+    expect(catalog.map((tool) => tool.name)).toEqual([...BUILTIN_TOOLS]);
+    expect([...BUILTIN_TOOLS]).toEqual([...BUILTIN_TOOLS].sort());
+    for (const tool of catalog) {
+      expect(tool.tokens).toBeGreaterThan(0);
+      expect(tool.tokens).toBe(
+        wireTokens([
+          {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters,
+          },
+        ]),
+      );
+      expect(tool.parametersHtml).toContain("```json");
+    }
+  });
+
+  test("a schema naming skills or MCP tools lists none", () => {
+    const named = catalog.filter((tool) => tool.names).map((t) => t.name);
+    expect(named).toEqual(["mcp_call", "mcp_describe", "skill", "skill_file"]);
+    for (const tool of catalog.filter((t) => t.names)) {
+      expect(
+        (tool.parameters as { properties: { name: { enum: string[] } } })
+          .properties.name.enum,
+      ).toEqual([]);
+    }
+  });
+
+  test("says when a send carries each, and memory_edit's own-note text", () => {
+    expect(Object.fromEntries(catalog.map((t) => [t.name, t.when]))).toEqual({
+      datetime: "always",
+      skill: "skills",
+      skill_file: "skillFiles",
+      mcp_describe: "mcpCatalog",
+      mcp_call: "mcpCatalog",
+      sessions_list: "projectMemory",
+      session_read: "projectMemory",
+      memory_edit: "memory",
+    });
+    const edit = catalog.find((tool) => tool.name === "memory_edit")!;
+    expect(edit.description).toContain("the project's memory");
+    expect(edit.variant?.description).toContain("this automation's own memory");
+    expect(edit.variant?.tokens).toBeGreaterThan(0);
+    expect(
+      catalog.filter((tool) => tool.variant !== null).map((t) => t.name),
+    ).toEqual(["memory_edit"]);
   });
 });
 

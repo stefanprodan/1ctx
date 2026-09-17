@@ -20,7 +20,7 @@ import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, reason } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
-import { projectHere } from "./Rail.model.ts";
+import { onPage, projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
 import "./rail.css";
@@ -28,7 +28,7 @@ import "./rail.css";
 function Sub({
   href,
   here,
-  on = here === href,
+  on = onPage(here, href),
   icon,
   follow,
   children,
@@ -76,7 +76,7 @@ function Group({
   here: string;
   follow?: () => void;
 }) {
-  const inside = routes.some((r) => r.path === here);
+  const inside = routes.some((r) => onPage(here, r.path));
   const open = useSignal(inside);
   useEffect(() => {
     if (inside) open.value = true;

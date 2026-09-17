@@ -9,13 +9,14 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { onPage } from "../../../src/client/app/Rail.model.ts";
+import { path } from "../../../src/client/app/router.ts";
 import { railRows } from "../../../src/client/app/routes.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   limits,
   loadTools,
   patchTool,
-  resetLimits,
   saveLimits,
   tools,
   toolsError,
@@ -23,6 +24,7 @@ import {
 import {
   collect,
   defaultLine,
+  defaultsOf,
   dirty,
   displayOf,
   draftOf,
@@ -32,13 +34,20 @@ import {
   problem,
   read,
   searchLine,
+  seedOf,
   show,
+  TOOLS_TABS,
+  toolsTab,
+  totalTokens,
+  WHEN_WORDS,
+  withSaved,
 } from "../../../src/client/views/admin/Tools.model.ts";
 import { Tools } from "../../../src/client/views/admin/Tools.tsx";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
 import type {
+  BuiltinToolSummary,
   SearchState,
-  ToolSummary,
+  WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 import { LIMIT_NAMES } from "../../../src/shared/words.ts";
@@ -119,19 +128,32 @@ const reserve = row({
 });
 const rows = [rounds, toolMs, resultBytes, timeout, searchBody, cut, reserve];
 
-const time: ToolSummary = {
+const html =
+  '<div class="md-block" data-lang="json"><div class="md-block-head">' +
+  '<span class="md-block-lang">json</span><button type="button" ' +
+  'class="md-copy">Copy</button></div><pre class="md-pre">' +
+  '<code class="md-block-code"><span class="hljs-punctuation">' +
+  "{}</span></code></pre></div>";
+const time: BuiltinToolSummary = {
   name: "datetime",
   description: "The current date and time in a timezone. Ask before math.",
   parameters: { type: "object", properties: {} },
-  parametersHtml:
-    '<div class="md-block" data-lang="json"><div class="md-block-head">' +
-    '<span class="md-block-lang">json</span><button type="button" ' +
-    'class="md-copy">Copy</button></div><pre class="md-pre">' +
-    '<code class="md-block-code"><span class="hljs-punctuation">' +
-    "{}</span></code></pre></div>",
+  parametersHtml: html,
+  tokens: 96,
+  when: "always",
+  names: false,
+  variant: null,
+};
+const fetchTool: WebToolSummary = {
+  name: "webfetch",
+  description: "Fetch a page by URL. Read it as text.",
+  parameters: { type: "object", properties: {} },
+  parametersHtml: html,
+  tokens: 2716,
   enabled: true,
   updatedAt: 0,
 };
+const body = (web = fetchTool) => ({ builtin: [time], web: [web], search });
 const search: SearchState = {
   provider: "exa",
   keys: { exa: true, firecrawl: false, tavily: false },
@@ -226,6 +248,33 @@ describe("the limit words and units", () => {
     expect(defaultLine(rounds)).toBe("default 10");
   });
 
+  test.serial("a scope's save carries the other scope's saved values", () => {
+    const sent = withSaved(rows, "call", {
+      callTimeoutMs: 2000,
+      searchBodyBytes: 1024 * 1024,
+      resultCut: 40_000,
+    });
+    expect(sent).toMatchObject({
+      rounds: 10,
+      toolMs: 600_000,
+      callTimeoutMs: 2000,
+      searchBodyBytes: 1024 * 1024,
+      resultCut: 40_000,
+    });
+    const reset = withSaved(
+      rows,
+      "call",
+      defaultsOf(rows.filter((r) => r.scope === "call")),
+    );
+    expect(reset.callTimeoutMs).toBe(20_000);
+    expect(reset.searchBodyBytes).toBe(1024 * 1024);
+    expect(withSaved(rows, "send", { rounds: 3 }).callTimeoutMs).toBe(1500);
+    expect(totalTokens([{ tokens: 96 }, { tokens: 2716 }])).toBe(2812);
+    // another form's save moves only the change times: no re-seed
+    expect(seedOf([{ ...timeout, changedAt: 99 }])).toBe(seedOf([timeout]));
+    expect(seedOf([{ ...timeout, value: 2000 }])).not.toBe(seedOf([timeout]));
+  });
+
   test.serial("the search lines and the first sentence", () => {
     expect(keyLine("exa", true)).toBe("exa.key present");
     expect(keyLine("firecrawl", false)).toBe("firecrawl.key keyless");
@@ -245,10 +294,11 @@ describe("the tools entity", () => {
   test.serial("loads both routes and keeps a failure", async () => {
     answer = (url) =>
       url === "/api/tools"
-        ? Response.json({ tools: [time], search })
+        ? Response.json(body())
         : Response.json({ limits: rows });
     await loadTools();
-    expect(tools.value?.tools[0]?.name).toBe("datetime");
+    expect(tools.value?.builtin[0]?.name).toBe("datetime");
+    expect(tools.value?.web[0]?.name).toBe("webfetch");
     expect(limits.value?.length).toBe(rows.length);
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadTools();
@@ -262,33 +312,22 @@ describe("the tools entity", () => {
       answer = (url, init) => {
         calls.push({ url, method: init?.method, body: init?.body as string });
         if (url.startsWith("/api/tools/")) {
-          return Response.json({
-            tools: [{ ...time, enabled: false }],
-            search,
-          });
+          return Response.json(body({ ...fetchTool, enabled: false }));
         }
-        if (init?.method === "DELETE")
-          return new Response(null, { status: 204 });
         return Response.json({
           limits: [{ ...rounds, value: 3, changedAt: 9 }],
         });
       };
-      await patchTool("datetime", { enabled: false });
-      expect(tools.value?.tools[0]?.enabled).toBe(false);
+      await patchTool("webfetch", { enabled: false });
+      expect(tools.value?.web[0]?.enabled).toBe(false);
       expect(calls[0]).toMatchObject({
-        url: "/api/tools/datetime",
+        url: "/api/tools/webfetch",
         method: "PATCH",
         body: '{"enabled":false}',
       });
       await saveLimits({ values: { rounds: 3 } as never });
       expect(limits.value?.[0]?.value).toBe(3);
-      await resetLimits();
-      expect(calls.map((c) => c.method)).toEqual([
-        "PATCH",
-        "PUT",
-        "DELETE",
-        "GET",
-      ]);
+      expect(calls.map((c) => c.method)).toEqual(["PATCH", "PUT"]);
     },
   );
 
@@ -298,27 +337,27 @@ describe("the tools entity", () => {
       const pending: Array<() => void> = [];
       answer = (_url, init) => {
         const enabled = JSON.parse(init?.body as string).enabled as boolean;
-        return Response.json({ tools: [{ ...time, enabled }], search });
+        return Response.json(body({ ...fetchTool, enabled }));
       };
       const realAnswer = answer;
       globalThis.fetch = (async (url: string, init?: RequestInit) => {
         await new Promise<void>((release) => pending.push(release));
         return realAnswer(url, init);
       }) as unknown as typeof fetch;
-      const first = patchTool("datetime", { enabled: false });
-      const second = patchTool("datetime", { enabled: true });
+      const first = patchTool("webfetch", { enabled: false });
+      const second = patchTool("webfetch", { enabled: true });
       while (pending.length < 2) await Promise.resolve();
       pending[1]();
       await second;
-      expect(tools.value?.tools[0]?.enabled).toBe(true);
+      expect(tools.value?.web[0]?.enabled).toBe(true);
       pending[0]();
       await first;
-      expect(tools.value?.tools[0]?.enabled).toBe(true);
+      expect(tools.value?.web[0]?.enabled).toBe(true);
     },
   );
 
   test.serial("the entities go with the signed-in user", () => {
-    tools.value = { tools: [time], search };
+    tools.value = body();
     me.value = { ...admin, id: "u2" };
     expect(tools.value).toBeNull();
   });
@@ -340,30 +379,82 @@ describe("the page", () => {
     expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
   });
 
-  test.serial(
-    "renders the rows, the switch, the providers and the fields",
-    () => {
-      tools.value = { tools: [time], search };
-      limits.value = rows;
-      const html = render(<Tools />);
-      expect(html).toContain("datetime");
-      expect(html).toContain('role="switch"');
-      expect(html).not.toContain("md-pre");
-      expect(html).toContain('aria-checked="true"');
-      expect(html).toContain("exa.key present");
-      expect(html).toContain("firecrawl.key keyless");
-      expect(html).toContain("tavily.key keyless");
-      expect(html).not.toContain("rows-meta-bad");
-      expect(html).toContain("websearch runs on exa.");
-      expect(html).toContain("Per send");
-      expect(html).toContain("Per call");
-      expect(html).toContain('type="number"');
-      expect(html).toContain('step="any"');
-      expect(html).toContain('value="1.5"');
-      expect(html).toContain("default 20 s");
-      expect(html).not.toContain("rows-hint");
-    },
-  );
+  test.serial("the tab is the address, and Tools stays lit on it", () => {
+    expect(toolsTab("/admin/tools")).toBe("builtin");
+    expect(toolsTab("/admin/tools/web")).toBe("web");
+    expect(toolsTab("/admin/tools/limits")).toBe("limits");
+    expect(TOOLS_TABS.map((t) => t.label)).toEqual([
+      "Built-in",
+      "Web",
+      "Limits",
+    ]);
+    expect(onPage("/admin/tools/web", "/admin/tools")).toBe(true);
+    expect(onPage("/admin/tools", "/admin/tools")).toBe(true);
+    expect(onPage("/admin/toolsx", "/admin/tools")).toBe(false);
+    expect(WHEN_WORDS.always).not.toBe("");
+  });
+
+  test.serial("Built-in renders the rows with tokens and no switch", () => {
+    tools.value = body();
+    limits.value = rows;
+    path.value = "/admin/tools";
+    const html = render(<Tools />);
+    expect(html).toContain('class="tabs"');
+    expect(html).toContain("Built-in");
+    expect(html).toContain("datetime");
+    expect(html).toContain("The current date and time in a timezone.");
+    expect(html).toContain("96 tokens");
+    expect(html).toMatch(/rows-hint[^>]*>96 tokens/);
+    // the admin rows' own pieces: the name over the sentence, the meta
+    expect(html).toContain('<span class="rows-name rows-name-mono">datetime');
+    expect(html).toContain(
+      '<span class="rows-sub">The current date and time in a timezone.',
+    );
+    expect(html).toContain('<span class="rows-meta">96 tokens');
+    expect(html).not.toContain('role="switch"');
+    expect(html).not.toContain("webfetch");
+    expect(html).not.toContain("md-pre");
+    expect(html).not.toContain("Per send");
+  });
+
+  test.serial("Web renders the switches and the providers", () => {
+    tools.value = body();
+    limits.value = rows;
+    path.value = "/admin/tools/web";
+    const html = render(<Tools />);
+    expect(html).toContain("webfetch");
+    // the total in the head, never a row's
+    expect(html.match(/2\.72k tokens/g)).toHaveLength(1);
+    expect(html).toMatch(/rows-hint[^>]*>2\.72k tokens/);
+    expect(html).not.toMatch(/rows-meta">[^<]*tokens/);
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-checked="true"');
+    expect(html).not.toContain("datetime");
+    expect(html).toContain("exa.key present");
+    expect(html).toContain("firecrawl.key keyless");
+    expect(html).toContain("tavily.key keyless");
+    expect(html).not.toContain("rows-meta-bad");
+    expect(html).toContain("websearch runs on exa.");
+    expect(html).not.toContain("Per send");
+  });
+
+  test.serial("Limits renders the fields", () => {
+    tools.value = body();
+    limits.value = rows;
+    path.value = "/admin/tools/limits";
+    const html = render(<Tools />);
+    expect(html).toContain("Per send");
+    expect(html).toContain("Per call");
+    expect(html.match(/<form/g)).toHaveLength(2);
+    expect(html).not.toContain(">Limits</span>");
+    expect(html).toContain('type="number"');
+    expect(html).toContain('step="any"');
+    expect(html).toContain('value="1.5"');
+    expect(html).toContain("default 20 s");
+    expect(html).not.toContain("rows-hint");
+    expect(html).not.toContain('role="switch"');
+    path.value = "/";
+  });
 
   test.serial("says it is loading, then the failure", () => {
     expect(render(<Tools />)).toContain("Loading");

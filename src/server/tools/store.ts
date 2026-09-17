@@ -1,18 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { BuiltinTool, SearchProvider } from "../../shared/words.ts";
+import type { SearchProvider, WebTool } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 
 export type ToolRow = {
-  name: BuiltinTool;
+  name: WebTool;
   enabled: boolean;
   provider: SearchProvider | null;
   updatedAt: number;
 };
 
 type Raw = {
-  name: BuiltinTool;
+  name: WebTool;
   enabled: number;
   provider: SearchProvider | null;
   updated_at: number;
@@ -38,7 +38,7 @@ export class ToolStore {
       .map(row);
   }
 
-  setEnabled(name: BuiltinTool, enabled: boolean, now: number): void {
+  setEnabled(name: WebTool, enabled: boolean, now: number): void {
     this.db
       .query("update tools set enabled = ?, updated_at = ? where name = ?")
       .run(enabled ? 1 : 0, now, name);

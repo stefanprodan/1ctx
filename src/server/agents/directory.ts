@@ -12,18 +12,20 @@
 
 import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { BUILTIN_TOOLS } from "../../shared/words.ts";
+import { WEB_TOOLS } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
-import { type ChatTool, wireTools } from "../providers/index.ts";
+import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseAgentName } from "./parse.ts";
 import type { ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
 
-const BUILTIN_NAMES = new Set<string>(BUILTIN_TOOLS);
+// the tools the page lists; the skill and MCP tools are shown as what
+// they carry
+const LISTED = new Set<string>(["datetime", ...WEB_TOOLS]);
 
 // the lean MCP schemas as the wire carries them in all mode, the count
 // the token cap reads whatever mode the send resolved to
@@ -35,7 +37,7 @@ function schemaTokens(servers: OfferedServer[]): number {
       parameters: tool.wireInputSchema,
     })),
   );
-  return schemas.length === 0 ? 0 : tokens(JSON.stringify(wireTools(schemas)));
+  return wireTokens(schemas);
 }
 
 export type SkillsListPort = {
@@ -121,7 +123,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             fetchedAt: fetched.get(skill.id) ?? 0,
           })),
           tools: offered.tools
-            .filter((tool) => BUILTIN_NAMES.has(tool.name))
+            .filter((tool) => LISTED.has(tool.name))
             .map((tool) => ({
               name: tool.name,
               provider: tool.name === "websearch" ? offered.search : null,
@@ -148,10 +150,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             ),
             // the schemas as the chat body carries them, skill tools
             // included
-            tools:
-              offered.tools.length === 0
-                ? 0
-                : tokens(JSON.stringify(wireTools(offered.tools))),
+            tools: wireTokens(offered.tools),
           },
         };
         return json(body);

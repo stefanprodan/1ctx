@@ -5,13 +5,13 @@
 // each limit, the unit each row is typed in (seconds for a
 // millisecond cap, KB or MB for a byte cap) and the conversion both
 // ways, the range check the server applies, and the lines of the
-// search section.
+// search section, the tabs and when a send carries a built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
-import type { SearchState } from "../../../shared/contracts/tool.ts";
+import type { SearchState, ToolWhen } from "../../../shared/contracts/tool.ts";
 import type {
-  BuiltinTool,
   LimitName,
+  LimitScope,
   SearchProvider,
 } from "../../../shared/words.ts";
 
@@ -91,11 +91,37 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
 };
 
-export const TOOL_WORDS: Record<BuiltinTool, string> = {
-  datetime: "The date and time, in UTC or any timezone.",
-  webfetch: "A page by URL, as text.",
-  websearch: "The web, through the chosen search provider.",
+// when a send carries a built-in, over its description
+export const WHEN_WORDS: Record<ToolWhen, string> = {
+  always: "Sent to every model that takes tools.",
+  skills: "Sent when the agent has skills.",
+  skillFiles: "Sent when one of the agent's skills has files.",
+  mcpCatalog: "Sent when the agent's MCP tools go as a catalog.",
+  projectMemory: "Sent in a run that reads the project's chats for its memory.",
+  memory:
+    "Sent in a run that updates the project's memory, and in the step after a run that updates its own memory.",
 };
+
+export const NAMES_WORDS =
+  "Shown without names. Each skill or tool name a send lists adds tokens.";
+
+// a card's tokens: every schema in it together
+export function totalTokens(rows: { tokens: number }[]): number {
+  return rows.reduce((n, row) => n + row.tokens, 0);
+}
+
+// the page's tabs, each an address
+export type ToolsTab = "builtin" | "web" | "limits";
+
+export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
+  { tab: "builtin", label: "Built-in", href: "/admin/tools" },
+  { tab: "web", label: "Web", href: "/admin/tools/web" },
+  { tab: "limits", label: "Limits", href: "/admin/tools/limits" },
+];
+
+export function toolsTab(pathname: string): ToolsTab {
+  return TOOLS_TABS.find((t) => t.href === pathname)?.tab ?? "builtin";
+}
 
 // the unit a row is typed in and how many of the runner's units it is
 export type Display = { word: string; factor: number };
@@ -172,6 +198,34 @@ export function collect(
   return { values };
 }
 
+// the full set the route takes: one scope's values, and the saved
+// value of every other row
+export function withSaved(
+  rows: LimitRow[],
+  scope: LimitScope,
+  values: Partial<Record<LimitName, number>>,
+): Record<LimitName, number> {
+  const out = {} as Record<LimitName, number>;
+  for (const row of rows) {
+    out[row.name] =
+      row.scope === scope ? (values[row.name] ?? row.value) : row.value;
+  }
+  return out;
+}
+
+// what re-seeds a form's fields: its rows' values alone, since every
+// save of the full set moves the change time of each kept override
+export function seedOf(rows: LimitRow[]): string {
+  return rows.map((row) => `${row.name}=${row.value}`).join(",");
+}
+
+// the defaults of the rows, a reset's values
+export function defaultsOf(
+  rows: LimitRow[],
+): Partial<Record<LimitName, number>> {
+  return Object.fromEntries(rows.map((row) => [row.name, row.default]));
+}
+
 // which limit a server refusal names: its words open with the name
 export function limitFieldOf(message: string): LimitName | undefined {
   const name = message.split(" ", 1)[0] as LimitName;
@@ -207,4 +261,4 @@ export function searchLine(state: SearchState): string {
 }
 
 // the first sentence of a description, for the row
-export { firstSentence } from "../../lib/format.ts";
+export { firstSentence, tokensText } from "../../lib/format.ts";

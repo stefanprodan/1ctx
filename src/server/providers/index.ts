@@ -30,7 +30,7 @@ export {
   geminiEvents,
   parseCatalog as parseGeminiCatalog,
 } from "./gemini.ts";
-export { wireTools } from "./openai.ts";
+export { wireTokens, wireTools } from "./openai.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseKeyName, RESERVED_KEYS } from "./parse.ts";
 export { type AgentsPort, type RoutesDeps, routes } from "./routes.ts";

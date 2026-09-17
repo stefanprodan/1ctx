@@ -302,12 +302,27 @@ export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
 // the stream's search box
 export const MAX_SEARCH = 100;
 
-// the built-in tools, each with a server-wide switch on the tools page
-export const BUILTIN_TOOLS = ["datetime", "webfetch", "websearch"] as const;
-export type BuiltinTool = (typeof BUILTIN_TOOLS)[number];
-export function isBuiltinTool(value: unknown): value is BuiltinTool {
-  return BUILTIN_TOOLS.includes(value as BuiltinTool);
+// the tools that reach the web, each with a server-wide switch on the
+// tools page
+export const WEB_TOOLS = ["webfetch", "websearch"] as const;
+export type WebTool = (typeof WEB_TOOLS)[number];
+export function isWebTool(value: unknown): value is WebTool {
+  return WEB_TOOLS.includes(value as WebTool);
 }
+
+// the tools the server writes itself, besides the web ones, by name;
+// none has a switch, each follows what its send has
+export const BUILTIN_TOOLS = [
+  "datetime",
+  "mcp_call",
+  "mcp_describe",
+  "memory_edit",
+  "session_read",
+  "sessions_list",
+  "skill",
+  "skill_file",
+] as const;
+export type BuiltinTool = (typeof BUILTIN_TOOLS)[number];
 
 // the services websearch can run on; the key file carries the name
 export const SEARCH_PROVIDERS = ["exa", "firecrawl", "tavily"] as const;

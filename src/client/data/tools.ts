@@ -1,10 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tools page's entities: the built-ins with the search state, and
-// the limits, both admin's, loaded when the page is reached and dropped
-// with the signed-in user. A write answers the server's rows, so what
-// shows is what was saved; a change applies to the next send.
+// The tools page's entities: the built-ins, the web tools with the
+// search state, and the limits, all admin's, loaded when the page is
+// reached and dropped with the signed-in user. A write answers the
+// server's rows, so what shows is what was saved; a change applies to
+// the next send.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -16,7 +17,7 @@ import type {
   ToolsResponse,
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
-import type { BuiltinTool } from "../../shared/words.ts";
+import type { WebTool } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
@@ -67,7 +68,7 @@ let toolWrites = 0;
 let limitWrites = 0;
 
 export async function patchTool(
-  name: BuiltinTool,
+  name: WebTool,
   body: PatchToolRequest,
 ): Promise<void> {
   const forUser = owner;
@@ -85,15 +86,6 @@ export async function saveLimits(body: PutLimitsRequest): Promise<void> {
   const forUser = owner;
   const mine = ++limitWrites;
   const next = await api<LimitsResponse>("/api/limits", "PUT", body);
-  turn++;
-  if (owner === forUser && limitWrites === mine) limits.value = next.limits;
-}
-
-export async function resetLimits(): Promise<void> {
-  const forUser = owner;
-  const mine = ++limitWrites;
-  await api("/api/limits", "DELETE");
-  const next = await api<LimitsResponse>("/api/limits");
   turn++;
   if (owner === forUser && limitWrites === mine) limits.value = next.limits;
 }
