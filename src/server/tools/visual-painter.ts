@@ -101,8 +101,10 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
   const root = document.getElementById("visual-root")!;
   let port: MessagePort | null = null;
   let state: "painting" | "finalizing" | "finalized" = "painting";
-  let paintFrame = 0;
-  let heightFrame = 0;
+  // timers, not animation frames: Chrome pauses frames in a cross-origin
+  // iframe off screen, so a visual below the fold never reported its height
+  let paintFrame: ReturnType<typeof setTimeout> | 0 = 0;
+  let heightFrame: ReturnType<typeof setTimeout> | 0 = 0;
   let pending = "";
   let lastHeight = -1;
   let errors = 0;
@@ -117,7 +119,7 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
   };
   const height = () => {
     if (heightFrame || !port) return;
-    heightFrame = requestAnimationFrame(() => {
+    heightFrame = setTimeout(() => {
       heightFrame = 0;
       const measured = helpers.measure(root);
       if (Number.isFinite(measured) && measured !== lastHeight) {
@@ -189,7 +191,7 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
   };
   const finalize = async (html: string) => {
     state = "finalizing";
-    cancelAnimationFrame(paintFrame);
+    clearTimeout(paintFrame);
     paintFrame = 0;
     pending = "";
     try {
@@ -228,7 +230,7 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
       } else {
         pending = message.html;
         if (!paintFrame) {
-          paintFrame = requestAnimationFrame(() => {
+          paintFrame = setTimeout(() => {
             paintFrame = 0;
             try {
               paint(pending, false);
@@ -292,8 +294,8 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
   document.addEventListener("load", height, true);
   window.addEventListener("resize", height);
   window.addEventListener("pagehide", () => {
-    cancelAnimationFrame(paintFrame);
-    cancelAnimationFrame(heightFrame);
+    clearTimeout(paintFrame);
+    clearTimeout(heightFrame);
     port?.close();
     port = null;
   });

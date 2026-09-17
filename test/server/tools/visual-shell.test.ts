@@ -327,8 +327,7 @@ function painter(scripts: VisualScript[]) {
   const start = new Function(
     "document",
     "window",
-    "requestAnimationFrame",
-    "cancelAnimationFrame",
+    "setTimeout",
     "ResizeObserver",
     "MessagePort",
     "Element",
@@ -343,13 +342,15 @@ function painter(scripts: VisualScript[]) {
       frames.set(id, callback);
       return id;
     },
-    (id: number) => frames.delete(id),
     class {
       observe() {}
     },
     Port,
     Element,
-    (id: number) => timers.delete(id),
+    (id: number) => {
+      frames.delete(id);
+      timers.delete(id);
+    },
   );
   boot(
     {
