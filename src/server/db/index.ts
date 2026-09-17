@@ -5,9 +5,11 @@
 // they go out only after the outermost commit and never on a throw.
 
 import { Database } from "bun:sqlite";
+import { existsSync } from "node:fs";
 import { type BusEvent, publish } from "../lib/bus.ts";
 import type { Migration } from "./migration.ts";
 import { MIGRATIONS } from "./migrations/index.ts";
+import { snapshot } from "./snapshot.ts";
 
 export type Db = Database;
 
@@ -20,6 +22,38 @@ export function open(path: string): Db {
   db.exec("pragma busy_timeout = 5000");
   migrate(db);
   return db;
+}
+
+// Whether this process can have the file to itself. A running server
+// keeps the database open, and it would not see a write from outside:
+// its caches, its runner locks and its open sockets all go on as they
+// were. An exclusive lock is refused while anyone else holds it, so
+// taking one and letting it go is the question being asked.
+export function heldByAnother(path: string): boolean {
+  if (path === ":memory:" || !existsSync(path)) return false;
+  const db = new Database(path, { strict: true });
+  try {
+    db.exec("pragma locking_mode = exclusive");
+    db.exec("begin immediate");
+    db.exec("commit");
+    return false;
+  } catch {
+    return true;
+  } finally {
+    db.close();
+  }
+}
+
+export function inspect(path: string): Db {
+  const db = snapshot(path);
+  try {
+    db.exec("pragma foreign_keys = on");
+    migrate(db);
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 }
 
 export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {

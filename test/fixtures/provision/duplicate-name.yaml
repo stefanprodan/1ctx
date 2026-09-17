@@ -1,0 +1,12 @@
+apiVersion: config.1ctx.dev/v1
+kind: Project
+metadata:
+  name: nebula
+spec: {}
+---
+apiVersion: config.1ctx.dev/v1
+kind: Project
+metadata:
+  name: nebula
+spec:
+  members: []

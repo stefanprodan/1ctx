@@ -1,0 +1,6 @@
+apiVersion: config.1ctx.dev/v1
+kind: User
+metadata:
+  name: zed-user
+spec:
+  role: member

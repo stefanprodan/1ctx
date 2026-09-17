@@ -1,0 +1,8 @@
+apiVersion: config.1ctx.dev/v1
+kind: Agent
+metadata:
+  name: guide
+spec:
+  provider: mock-provider
+  model: fake-model
+  prompts: Answer directly.

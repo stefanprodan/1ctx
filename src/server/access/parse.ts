@@ -135,9 +135,12 @@ export function parseNewUser(body: unknown): CreateUserRequest {
     "role",
     "tz",
     "password",
+    "about",
+    "disabled",
+    "mustChangePassword",
   ]);
   if (!isRole(b.role)) throw new BadRequest("role must be admin or member");
-  return {
+  const parsed: CreateUserRequest = {
     username: parseUsername(b.username),
     fullName: parseFullName(b.fullName),
     email: parseEmail(b.email),
@@ -145,12 +148,27 @@ export function parseNewUser(body: unknown): CreateUserRequest {
     tz: parseTz(b.tz),
     password: password(b.password, "password", MIN_PASSWORD),
   };
+  if (b.about !== undefined) parsed.about = parseAbout(b.about);
+  if (b.disabled !== undefined) {
+    if (typeof b.disabled !== "boolean") {
+      throw new BadRequest("disabled must be a boolean");
+    }
+    parsed.disabled = b.disabled;
+  }
+  if (b.mustChangePassword !== undefined) {
+    if (typeof b.mustChangePassword !== "boolean") {
+      throw new BadRequest("mustChangePassword must be a boolean");
+    }
+    parsed.mustChangePassword = b.mustChangePassword;
+  }
+  return parsed;
 }
 
 export function parseUserPatch(body: unknown): UpdateUserRequest {
   const b = fields(body, [
     "username",
     "fullName",
+    "about",
     "email",
     "role",
     "tz",
@@ -159,6 +177,7 @@ export function parseUserPatch(body: unknown): UpdateUserRequest {
   const patch: UpdateUserRequest = {};
   if (b.username !== undefined) patch.username = parseUsername(b.username);
   if (b.fullName !== undefined) patch.fullName = parseFullName(b.fullName);
+  if (b.about !== undefined) patch.about = parseAbout(b.about);
   if (b.email !== undefined) patch.email = parseEmail(b.email);
   if (b.tz !== undefined) patch.tz = parseTz(b.tz);
   if (b.role !== undefined) {

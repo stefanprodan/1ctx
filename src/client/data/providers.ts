@@ -24,6 +24,7 @@ import { api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const providers = signal<ProviderSummary[] | null>(null);
+export const keys = signal<string[]>([]);
 export const providersError = signal<Failure | null>(null);
 
 let owner: string | null = null;
@@ -33,6 +34,7 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   providers.value = null;
+  keys.value = [];
   providersError.value = null;
 });
 
@@ -48,7 +50,10 @@ export async function loadProviders(): Promise<void> {
   providersError.value = null;
   try {
     const body = await api<ProvidersResponse>("/api/providers");
-    if (owner === forUser && turn === mine) providers.value = body.providers;
+    if (owner === forUser && turn === mine) {
+      providers.value = body.providers;
+      keys.value = body.keys;
+    }
   } catch (err) {
     if (owner === forUser && turn === mine) providersError.value = failure(err);
   }

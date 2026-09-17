@@ -20,6 +20,7 @@ make preview        # (re)start the local preview on 127.0.0.1:1236, hot reload
 make preview-stop   # stop it
 make preview-log    # tail its log
 make preview-clean  # stop it and wipe its db, secrets, log and pid
+make preview-provision FILE=x.yaml  # stop it, apply the objects, start it
 make lint           # biome check --write, then tsc; run after any code change
 make test           # bun test, concurrent; run after any code change, before finishing
 make build          # standalone binary in bin/
@@ -29,8 +30,8 @@ make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 The preview runs the source with `ONECTX_DEV=1` (Bun's dev server: a
 CSS edit hot-reloads, a client edit reloads the page, a server edit
 restarts the process) against `.preview/1ctx.sqlite`, with the secrets
-directory `.preview/secrets/`. The first start writes `admin.key` there
-with the password `admin`. Look at a change in Chrome through the
+directory `.preview/secrets/`. The first start writes `user-admin.key` there
+with the password `admin-preview`. Look at a change in Chrome through the
 DevTools MCP at 1440 wide and 390 wide; the console must stay empty.
 Report what was verified and how. Do not commit unless asked.
 
@@ -85,6 +86,16 @@ factories in layer order. A port to an area built later in the list is
 a closure called only after the list is complete. An edge the layer
 order forbids is a port, never an import. A test that needs one area
 builds it with its factory and fakes for its ports.
+
+`provision/` is the CLI-only area after `automations/` and before
+`web/`. `1ctx provision -f <file|dir|->` combines YAML inputs, validates
+offline against a database snapshot, then applies through the composed
+router with one admin login. `compose({activate: false})` defers
+bootstrap and leaves session repair and the scheduler off; apply reports
+bootstrap first. No listener, sweep or MCP refresh loop runs. Stop the
+server before provisioning. Omitted fields stay, supplied membership
+lists replace, passwords and their change flag are creation-only, and
+objects not named are never deleted.
 
 ## Rules the structure test enforces
 
@@ -143,12 +154,15 @@ violation, and every rule has a rejected fixture under
   answer, a denial or an error included. The row holds
   a hash of the token; expired rows are swept at start and hourly.
   Passwords are argon2id through `Bun.password`, at most 1024 bytes,
-  the same cap for `admin.key`. The first admin comes from `admin.key`
-  in the secrets directory, read once when there are no users, with
-  `admin@1ctx.dev` as its email. Every user has an email, unique and
+  the same cap for `user-admin.key`. The first admin comes from
+  `user-admin.key` in the secrets directory, read once when there are no
+  users, with `admin@1ctx.dev` as its email. Every user has an email, unique and
   lowercased; an admin sets it with the username and the role on
   `/admin/users` (the routes in `access/users.ts`, since a reset needs
-  the login store), and the profile shows it. Every user has a time
+  the login store), and the profile shows it. The admin create API also
+  accepts `about`, `disabled` and `mustChangePassword`, defaulting to
+  empty, false and true; its PATCH accepts `about` but never a password
+  or its change flag. Every user has a time
   zone, `tz`, an IANA zone by `isTimeZone` in `shared/words.ts`: an
   admin picks it when creating the user (required, never guessed) and
   may change it, the user changes it on the profile, and the first
@@ -189,9 +203,15 @@ violation, and every rule has a rejected fixture under
   through `access.project(principal, id)`, which answers the same 404
   whether the project is missing or not theirs to see. The rule is
   `projects/visible.ts`, pure.
-- **Secrets are files.** One bare value per `<name>.key` in the secrets
-  directory, read by the holder, never logged, never returned by a
-  route, never a database row.
+- **Secrets are files.** One bare value per `<kind>-<name>.key` in the
+  secrets directory. The closed kinds are `user-`, `provider-`, `search-`
+  and `mcp-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
+  requires 1 to 48 lowercase ASCII letters, digits and dashes after the
+  prefix, starting with a letter or digit. The secrets port checks the
+  caller's kind on read, existence checks and listing; `compose.ts` binds
+  each area's reader to its kind. `has()` checks existence; `read()`
+  returns null for an absent or empty file. Values are never logged,
+  returned by a route or stored in the database.
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible` or `gemini`. The first two answer
   `GET /models` under the base URL; `gemini` is Google AI Studio, whose
@@ -221,6 +241,9 @@ violation, and every rule has a rejected fixture under
   delete. An agent carries `thinking` and `effort`, null for the provider's
   default; the levels per wire are `EFFORTS` in `shared/words.ts`, and the
   policy resolves both once per send.
+  `GET /api/providers` answers the `provider-` key names beside the rows.
+  The form picks one with `Select`, or No key; a missing file stays named
+  and marked on its provider row.
 - **A visual is a sandboxed document.** The `visualize` web tool is on
   by default, with script, style and font hosts cdnjs.cloudflare.com,
   cdn.jsdelivr.net, unpkg.com and esm.sh; admins edit or empty the list.
@@ -526,9 +549,9 @@ violation, and every rule has a rejected fixture under
   (`WEB_TOOLS`: `webfetch`, `websearch`, `visualize`, the only rows and
   switches) that an admin has not switched off, websearch only once a
   search provider is chosen;
-  every provider (exa, firecrawl, tavily) answers keyless, a key file
-  raises the rate, and the runner never holds a key. The Tools page
-  has three tabs, one view over `/admin/tools` (Built-in),
+  every provider (exa, firecrawl, tavily) answers keyless, its
+  `search-<provider>.key` file raises the rate, and the runner never holds
+  a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
   `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
   `BUILTIN_TOOLS` schema by name from `tools/catalog.ts`, built by the
   send's own factories with sample inputs (name enums empty,

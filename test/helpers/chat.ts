@@ -258,8 +258,8 @@ export type ChatApp = {
 export async function chatApp(
   options: {
     registry?: Registry;
-    // the secrets beside admin.key: a search provider key makes
-    // websearch offered (exa.key or firecrawl.key), decision 3
+    // the secrets beside user-admin.key: a search provider key makes
+    // websearch offered (search-exa.key or search-firecrawl.key), decision 3
     secrets?: Record<string, string>;
     // the agent's model; the default has the tools flag, so a send on it
     // is offered the built-ins

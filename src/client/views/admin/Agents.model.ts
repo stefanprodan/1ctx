@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the agent and provider forms check before they call (an empty
-// name, the base URL and the key file; the name rule is the server's),
+// name and the base URL; the name rule is the server's),
 // the presets a provider is made from, and the words a row shows for a
 // window, a price and a key.
 
@@ -35,7 +35,7 @@ export type Preset = {
   text: string;
   // the fixed base URL, or null when the admin types it
   baseUrl: string | null;
-  // the name and key file suggested when the fields are empty
+  // the name suggested when the field is empty
   name: string;
 };
 export const PRESETS: Preset[] = [
@@ -85,7 +85,6 @@ export function baseUrlProblem(value: string): string | null {
   return null;
 }
 
-// the key file's name, or empty for a server with no key
 // which field of the agent form a refusal names; a chat or an automation
 // running on the agent is the form's
 export function agentFieldOf(message: string): string | undefined {
@@ -105,17 +104,8 @@ export function providerFieldOf(message: string): string | undefined {
   if (message.startsWith("name") || message.startsWith("a provider named"))
     return "name";
   if (message.startsWith("baseUrl")) return "baseUrl";
-  if (message.includes(".key is not")) return "keyName";
+  if (message.startsWith("keyName")) return "keyName";
   return undefined;
-}
-
-export function keyNameProblem(value: string): string | null {
-  const v = value.trim();
-  if (v === "") return null;
-  if (!/^[a-z][a-z0-9-]*$/.test(v) || v.length > 64) {
-    return "A key name is lowercase letters, digits and dashes";
-  }
-  return null;
 }
 
 // the reserve the runner keeps, from the limits the tools page holds;

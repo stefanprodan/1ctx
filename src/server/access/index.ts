@@ -39,6 +39,14 @@ export {
   TOUCH_AFTER_MS,
 } from "./auth.ts";
 export { type DirectoryDeps, directoryRoutes } from "./directory.ts";
+export {
+  parseAbout,
+  parseEmail,
+  parseFullName,
+  parseTz,
+  parseUsername,
+  parseUserPassword,
+} from "./parse.ts";
 export { type ProfileDeps, profileRoutes } from "./profile.ts";
 export { type RoutesDeps, routes } from "./routes.ts";
 export { type Login, LoginStore } from "./store.ts";

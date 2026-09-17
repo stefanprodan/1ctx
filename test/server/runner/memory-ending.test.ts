@@ -119,7 +119,8 @@ describe("the memory phase boundary", () => {
     chat.app.socket.dispose();
     const fresh = await compose({
       db: chat.app.db,
-      secret: (name) => (name === "admin" ? "hunter2-test" : null),
+      secret: (kind, name) =>
+        kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
       clock: () => chat.app.now.value,
       fetcher: chat.scripted.fetcher,
       log: () => silent,

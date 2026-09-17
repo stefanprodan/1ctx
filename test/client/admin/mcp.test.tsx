@@ -24,6 +24,7 @@ import {
   serversError,
 } from "../../../src/client/data/mcp.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { keyOptions } from "../../../src/client/lib/secrets.ts";
 import {
   listedServers,
   sameServers,
@@ -33,7 +34,6 @@ import {
   changeLine,
   endpointDirty,
   instructionsBox,
-  keyOptions,
   mcpFieldOf,
   metaLine,
   promptPreview,

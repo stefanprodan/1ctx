@@ -1,0 +1,8 @@
+apiVersion: config.1ctx.dev/v1
+kind: Provider
+metadata:
+  name: mock-provider
+spec:
+  wire: openai-compatible
+  baseUrl: http://models.test/v1
+  keyFrom: provider-missing

@@ -887,7 +887,7 @@ describe("the area reads the key at each call", () => {
   }
 
   test("runs websearch with the exa key read from secrets", async () => {
-    const secrets: Record<string, string> = { exa: "exa-key" };
+    const secrets: Record<string, string> = { "search-exa": "exa-key" };
     let sentKey: string | null = null;
     const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       sentKey = new Headers(init?.headers).get("x-api-key");
@@ -907,7 +907,7 @@ describe("the area reads the key at each call", () => {
   });
 
   test("scrubs the selected key from an error", async () => {
-    const secrets: Record<string, string> = { exa: "exa-key" };
+    const secrets: Record<string, string> = { "search-exa": "exa-key" };
     const fetcher = (async () => {
       throw new Error("request with exa-key failed");
     }) as unknown as typeof fetch;
@@ -922,7 +922,7 @@ describe("the area reads the key at each call", () => {
     expect(result.content).not.toContain("exa-key");
   });
   test("a key removed since offered() runs keyless, never a switch", async () => {
-    const secrets: Record<string, string> = { exa: "exa-key" };
+    const secrets: Record<string, string> = { "search-exa": "exa-key" };
     let sentKey: string | null | undefined;
     const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       sentKey = new Headers(init?.headers).get("x-api-key");
@@ -945,7 +945,7 @@ describe("the area reads the key at each call", () => {
     const offered = area.offered(Date.now(), "");
     expect(offered.search).toBe("exa");
     // the file is gone before the call runs
-    delete secrets.exa;
+    delete secrets["search-exa"];
     const result = await area.run(
       offered,
       { id: "s", name: "websearch", arguments: '{"query":"find"}' },

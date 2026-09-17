@@ -89,7 +89,7 @@ describe("MCP server store", () => {
   test("clears refresh failure and moves only supplied endpoint fields", () => {
     const db = memoryDb();
     const store = new McpServerStore(db);
-    const row = store.create({ ...fields(), keyName: "old" }, found());
+    const row = store.create({ ...fields(), keyName: "mcp-old" }, found());
     store.recordFailure(row.id, "failed", 150);
     const moved = store.applyDiscovery(row.id, found(200), {
       url: "https://moved.test/mcp/",
@@ -150,11 +150,14 @@ describe("MCP server store", () => {
   test("renders summary parameters and reports key presence", () => {
     const db = memoryDb();
     const store = new McpServerStore(db);
-    const row = store.create({ ...fields(), keyName: "hands-key" }, found());
+    const row = store.create(
+      { ...fields(), keyName: "mcp-hands-key" },
+      found(),
+    );
     let markdown = "";
     const value = summary(
       row,
-      (name) => name === "hands-key",
+      (name) => name === "mcp-hands-key",
       (text) => {
         markdown = text;
         return "<pre>parameters</pre>";

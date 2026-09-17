@@ -1,0 +1,6 @@
+apiVersion: config.1ctx.dev/v1
+kind: Limits
+metadata:
+  name: rounds
+spec:
+  value: 10

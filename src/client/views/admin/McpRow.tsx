@@ -26,6 +26,7 @@ import {
 } from "../../data/mcp.ts";
 import { ago, firstSentence, reason } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import {
@@ -43,10 +44,8 @@ import {
   endpointDirty,
   instructionsBox,
   KEY_HINT,
-  keyOptions,
   mcpFieldOf,
   metaLine,
-  NO_KEY,
   patternText,
   servedLine,
   settingsDirty,

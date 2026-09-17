@@ -112,8 +112,127 @@ describe("admin users", () => {
     expect(response.status).toBe(201);
     const { user } = await response.json();
     expect(user.email).toBe("caelea@example.com");
-    expect(app.users.byId(user.id)?.email).toBe("caelea@example.com");
+    expect(user.disabled).toBe(false);
+    expect(user.mustChangePassword).toBe(true);
+    expect(app.users.byId(user.id)).toMatchObject({
+      email: "caelea@example.com",
+      about: "",
+      disabled: false,
+      mustChangePassword: true,
+    });
     expect(app.projects.personal(user.id)?.name).toBe("personal");
+  });
+
+  test("create accepts about and can leave the initial password usable", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const about = "First line.\nSecond line.";
+    const response = await client.call("POST", "/api/users", {
+      body: {
+        ...userBody("robin"),
+        about,
+        disabled: false,
+        mustChangePassword: false,
+      },
+    });
+    expect(response.status).toBe(201);
+    const { user } = await response.json();
+    expect(user).toMatchObject({
+      disabled: false,
+      mustChangePassword: false,
+    });
+    expect(app.users.byId(user.id)).toMatchObject({
+      about,
+      disabled: false,
+      mustChangePassword: false,
+    });
+    expect(app.projects.personal(user.id)?.name).toBe("personal");
+
+    const member = app.client();
+    const login = await member.login("robin", "longenough");
+    expect(login.status).toBe(200);
+    expect((await login.json()).user.mustChangePassword).toBe(false);
+    expect((await member.call("GET", "/api/projects")).status).toBe(200);
+    const profile = await member.call("GET", "/api/profile");
+    expect((await profile.json()).user.about).toBe(about);
+
+    const reset = await client.call("POST", `/api/users/${user.id}/password`, {
+      body: { password: "new-password" },
+    });
+    expect(reset.status).toBe(204);
+    expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
+  });
+
+  test("create can disable an account before any login", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const response = await client.call("POST", "/api/users", {
+      body: {
+        ...userBody("robin"),
+        about: "Unavailable.",
+        disabled: true,
+        mustChangePassword: false,
+      },
+    });
+    expect(response.status).toBe(201);
+    const { user } = await response.json();
+    expect(user.disabled).toBe(true);
+    expect(app.users.byId(user.id)).toMatchObject({
+      about: "Unavailable.",
+      disabled: true,
+      mustChangePassword: false,
+    });
+    expect(app.projects.personal(user.id)?.name).toBe("personal");
+    const member = app.client();
+    expect((await member.login("robin", "longenough")).status).toBe(401);
+    expect(member.cookie).toBeNull();
+    expect((await member.call("GET", "/api/profile")).status).toBe(401);
+  });
+
+  test("create rolls back details and the personal project if disabling fails", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const original = app.users.setDisabled.bind(app.users);
+    app.users.setDisabled = () => {
+      throw new Error("disabled write failed");
+    };
+    try {
+      await expect(
+        client.call("POST", "/api/users", {
+          body: {
+            ...userBody("robin"),
+            about: "Unavailable.",
+            disabled: true,
+            mustChangePassword: false,
+          },
+        }),
+      ).rejects.toThrow("disabled write failed");
+    } finally {
+      app.users.setDisabled = original;
+    }
+    expect(app.users.byUsername("robin")).toBeNull();
+    expect(app.db.query("select count(*) as n from projects").get()).toEqual({
+      n: 1,
+    });
+  });
+
+  test("malformed optional fields are refused before a user is created", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    for (const fields of [
+      { about: null },
+      { about: 1 },
+      { disabled: null },
+      { disabled: "false" },
+      { mustChangePassword: null },
+      { mustChangePassword: "false" },
+    ]) {
+      const response = await client.call("POST", "/api/users", {
+        body: { ...userBody("robin"), ...fields },
+      });
+      expect(response.status).toBe(400);
+      expect(app.users.byUsername("robin")).toBeNull();
+    }
   });
 
   test("a user is made in the zone the admin picked, and the admin moves it", async () => {
@@ -260,6 +379,69 @@ describe("admin users", () => {
       email: "caelea@example.com",
       about: "Actor.",
     });
+  });
+
+  test("patch updates full name and about together and preserves omitted details", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "robin");
+    const patch = (body: { fullName?: string; about?: string }) =>
+      client.call("PATCH", `/api/users/${user.id}`, { body });
+
+    const combined = await patch({
+      fullName: "Robin Example",
+      about: "First line.",
+    });
+    expect(combined.status).toBe(200);
+    expect(app.users.byId(user.id)).toMatchObject({
+      fullName: "Robin Example",
+      about: "First line.",
+    });
+    expect((await patch({ about: "Second line." })).status).toBe(200);
+    expect(app.users.byId(user.id)).toMatchObject({
+      fullName: "Robin Example",
+      about: "Second line.",
+    });
+    expect((await patch({ fullName: "Robin Sample" })).status).toBe(200);
+    expect(app.users.byId(user.id)).toMatchObject({
+      fullName: "Robin Sample",
+      about: "Second line.",
+    });
+    expect((await patch({ about: "" })).status).toBe(200);
+    expect(app.users.byId(user.id)).toMatchObject({
+      fullName: "Robin Sample",
+      about: "",
+    });
+  });
+
+  test("patch cannot set a password or change its initial requirement", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const user = await create(client, "robin");
+    const before = app.users.byId(user.id);
+    for (const body of [
+      { about: "Changed.", password: "new-password" },
+      { about: "Changed.", mustChangePassword: false },
+    ]) {
+      const response = await client.call("PATCH", `/api/users/${user.id}`, {
+        body,
+      });
+      expect(response.status).toBe(400);
+      expect(app.users.byId(user.id)).toEqual(before);
+    }
+  });
+
+  test("a refused own-account change rolls back full name and about", async () => {
+    const app = await testApp();
+    const client = await admin(app);
+    const before = app.users.byUsername("admin")!;
+    for (const change of [{ role: "member" }, { disabled: true }]) {
+      const response = await client.call("PATCH", `/api/users/${before.id}`, {
+        body: { ...change, fullName: "Other Name", about: "Changed." },
+      });
+      expect(response.status).toBe(409);
+      expect(app.users.byId(before.id)).toEqual(before);
+    }
   });
 
   test("own role and the last admin role are conflicts", async () => {

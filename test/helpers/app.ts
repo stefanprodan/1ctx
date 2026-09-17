@@ -12,7 +12,9 @@ import type { Db } from "../../src/server/db/index.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
+import { ADMIN_SECRET } from "../../src/server/users/index.ts";
 import { clientAddress } from "../../src/server/web/serve.ts";
+import { isSecretName, SECRET_KINDS } from "../../src/shared/words.ts";
 import { memoryDb } from "./db.ts";
 
 export const ORIGIN = "http://1ctx.test";
@@ -127,12 +129,13 @@ export async function testApp(
     adminPassword?: string | null;
     trustProxy?: boolean;
     fetcher?: typeof fetch;
-    // the secrets beside admin.key
+    // the secrets beside user-admin.key
     secrets?: Record<string, string>;
     // a fake tools capability for runner state-machine tests
     tools?: Tools;
     // a runner registry with its own caps
     registry?: Registry;
+    activate?: boolean;
   } = {},
 ): Promise<TestApp> {
   const db = memoryDb();
@@ -163,14 +166,22 @@ export async function testApp(
       ? "hunter2-test"
       : options.adminPassword;
   const fake = fakeFetch();
+  const values: Record<string, string> = { ...options.secrets };
+  if (adminPassword !== null) values[ADMIN_SECRET] = adminPassword;
   const app = await compose({
     db,
-    secret: (name) =>
-      name === "admin" ? adminPassword : (options.secrets?.[name] ?? null),
-    secretNames: (prefix) =>
-      Object.keys(options.secrets ?? {})
-        .filter((name) => name.startsWith(prefix))
-        .sort(),
+    secret: (kind, name) => {
+      if (!isSecretName(kind, name)) throw new Error("bad secret name");
+      return values[name]?.trim() || null;
+    },
+    secretNames: (kind) => {
+      if (!SECRET_KINDS.some((known) => known === kind)) {
+        throw new Error("bad secret kind");
+      }
+      return Object.keys(values)
+        .filter((name) => isSecretName(kind, name))
+        .sort();
+    },
     clock,
     fetcher: options.fetcher ?? fake.fetcher,
     log: () => silent,
@@ -179,6 +190,7 @@ export async function testApp(
     trustProxy,
     tools: options.tools,
     registry: options.registry,
+    activate: options.activate,
   });
   return {
     ...app,

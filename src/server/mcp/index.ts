@@ -35,6 +35,13 @@ import { resultText } from "./result.ts";
 import { routes } from "./routes.ts";
 import { type McpServerRow, McpServerStore } from "./store.ts";
 
+export {
+  parseMcpKeyName,
+  parsePatterns,
+  parseTimeout,
+  parseUrl,
+} from "./parse.ts";
+
 export type OfferedMcpTool = {
   name: string;
   wireName: string;

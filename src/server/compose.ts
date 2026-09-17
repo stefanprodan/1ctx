@@ -7,7 +7,7 @@
 // flags; the test helper calls it with a memory db and a fake clock,
 // so a test exercises the wiring the binary runs.
 
-import { MCP_KEY_PREFIX } from "../shared/words.ts";
+import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
@@ -30,6 +30,7 @@ import {
   type Providers,
   providersArea,
 } from "./providers/index.ts";
+import { type Provision, provisionArea } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
 import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
 import {
@@ -48,10 +49,10 @@ import { type Socket, socketArea } from "./web/socket.ts";
 export type ComposeOptions = {
   db: Db;
   // the secrets port: the bare value or null
-  secret: (name: string) => string | null;
-  // the names of the key files with a prefix, for a form's pick;
+  secret: (kind: SecretKind, name: string) => string | null;
+  // the names of the key files of a kind, for a form's pick;
   // absent when nothing lists them
-  secretNames?: (prefix: string) => string[];
+  secretNames?: (kind: SecretKind) => string[];
   clock: Clock;
   // what reaches a provider; a test passes a fake
   fetcher?: Fetcher;
@@ -63,6 +64,8 @@ export type ComposeOptions = {
   tools?: Tools;
   // a test's registry with its own caps
   registry?: Registry;
+  // Provisioning validates before bootstrap and never repairs or schedules.
+  activate?: boolean;
 };
 
 export type App = {
@@ -85,6 +88,7 @@ export type App = {
   socket: Socket;
   routes: RouteDescriptor[];
   handle: Router;
+  provision: Provision;
   // drop expired logins; called at start and every hour
   sweep(): number;
   // the hourly MCP refresh loop; main.ts starts it after the first
@@ -109,7 +113,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   let agents!: Agents;
   const users = usersArea({
     db,
-    secret,
+    secret: (name) => secret("user-", name),
     clock,
     log: options.log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
@@ -118,14 +122,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const providers = providersArea({
     db,
     clock,
-    secret,
+    secret: (name) => secret("provider-", name),
+    keys: () => options.secretNames?.("provider-") ?? [],
     fetcher: options.fetcher ?? fetch,
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
   });
   const mcp: Mcp = mcpArea({
     db,
     clock,
-    secret,
+    secret: (name) => secret(MCP_KEY_PREFIX, name),
     keys: () => options.secretNames?.(MCP_KEY_PREFIX) ?? [],
     callTimeoutMs: () => limits.current().callTimeoutMs,
     fetcher: options.fetcher ?? fetch,
@@ -212,7 +217,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     toolsArea({
       db,
       fetcher: options.fetcher ?? fetch,
-      secret,
+      secret: (name) => secret("search-", name),
       clock,
       log: options.log("tools"),
       version: options.version,
@@ -273,9 +278,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     runner,
   });
-  await users.bootstrap();
-  sessions.repair();
-  automations.start();
+  if (options.activate !== false) {
+    await users.bootstrap();
+    sessions.repair();
+    automations.start();
+  }
   const routes: RouteDescriptor[] = [
     ...users.routes,
     ...usage.routes,
@@ -299,6 +306,25 @@ export async function compose(options: ComposeOptions): Promise<App> {
     resolve: (req) => access.resolve(req),
     trustProxy: options.trustProxy,
   });
+  const provision = provisionArea({
+    handle,
+    secret,
+    bootstrap: async () => (await users.bootstrap()) !== null,
+    inventory: () => {
+      const names = users.list().map((row) => row.username);
+      return {
+        User: names.length ? names : ["admin"],
+        Project: projects.store
+          .teamProjectIds()
+          .map((id) => projects.store.byId(id)!.name),
+        Provider: providers.store.list().map((row) => row.name),
+        Skill: skills.store.summaries(() => []).map((row) => row.name),
+        McpServer: mcp.store.list().map((row) => row.name),
+        Agent: agents.store.list().map((row) => row.name),
+        Tool: ["webfetch", "websearch", "visualize"],
+      };
+    },
+  });
   return {
     users: users.store,
     projects: projects.store,
@@ -318,6 +344,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     socket,
     routes,
     handle,
+    provision,
     sweep: () => access.sweep() + sessions.store.sweepDigests(),
     mcpStart: () => mcp.start(),
     // the runner first, whose ending calls may still ask for a refresh

@@ -17,7 +17,8 @@
     "preview": "scripts/preview.sh restart",
     "preview-stop": "scripts/preview.sh stop",
     "preview-log": "scripts/preview.sh log",
-    "preview-clean": "scripts/preview.sh clean"
+    "preview-clean": "scripts/preview.sh clean",
+    "preview-provision": "scripts/preview.sh provision"
   },
   "license": "Apache-2.0",
   "engines": {

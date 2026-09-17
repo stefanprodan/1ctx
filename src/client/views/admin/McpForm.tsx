@@ -12,14 +12,13 @@ import { patternLines } from "../../../shared/mcp.ts";
 import { shapeServerName } from "../../../shared/words.ts";
 import { addServer, callTimeoutMs, keys } from "../../data/mcp.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   KEY_HINT,
-  keyOptions,
   mcpFieldOf,
-  NO_KEY,
   timeoutMs,
   timeoutProblem,
   timeoutText,

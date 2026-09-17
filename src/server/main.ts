@@ -10,11 +10,12 @@ import { dirname, join } from "node:path";
 import pkg from "../../package.json";
 import page from "../client/index.html";
 import { TOUCH_AFTER_MS } from "./access/index.ts";
-import { compose } from "./compose.ts";
-import { open } from "./db/index.ts";
+import { type ComposeOptions, compose } from "./compose.ts";
+import { heldByAnother, inspect, open } from "./db/index.ts";
 import { wallClock } from "./lib/clock.ts";
-import { logger } from "./lib/log.ts";
+import { logger, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
+import { parse, readSources } from "./provision/index.ts";
 import { defaultDir, type SecretsMode, secrets } from "./secrets/index.ts";
 import { serve } from "./web/serve.ts";
 
@@ -28,6 +29,13 @@ const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
 
 \x1b[1mUsage:\x1b[0m
   1ctx [options]
+  1ctx provision -f <file|dir|-> [-f ...] [--db <path>] [--secrets <dir>]
+
+\x1b[1mProvision:\x1b[0m
+  -f <file|dir|->        YAML file, directory (.yaml/.yml, not recursive),
+                         or stdin; repeat to combine inputs
+  Apply objects while the server is stopped. No objects are pruned.
+  Preflight is offline; applying skills, MCP servers and agents may fetch.
 
 \x1b[1mOptions:\x1b[0m
   --listen <host:port>   bind address (default: ${DEFAULT_LISTEN})
@@ -45,8 +53,11 @@ const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
   -h, --help             show this help
 
 \x1b[1mSecrets:\x1b[0m
-  admin.key              the first admin's password, read once when there
-                         are no users, hashed, and never read again`;
+  user-admin.key         the first admin's password, read once when there
+                         are no users; provision also uses it to sign in
+  <kind>-<name>.key      kinds: user, provider, search, mcp; the name is
+                         1 to 48 lowercase letters, digits and dashes,
+                         starting with a letter or a digit`;
 
 function fail(message: string): never {
   console.error(`error: ${message}\n\n${HELP}`);
@@ -61,6 +72,9 @@ let secureCookie = false;
 let trustProxy = false;
 
 const args = process.argv.slice(2);
+const provisioning = args[0] === "provision";
+if (provisioning) args.shift();
+const files: string[] = [];
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
   const next = () => {
@@ -68,7 +82,19 @@ for (let i = 0; i < args.length; i++) {
     if (v === undefined) fail(`${arg} needs a value`);
     return v;
   };
+  if (
+    provisioning &&
+    !["-f", "--db", "--secrets", "-v", "--version", "-h", "--help"].includes(
+      arg,
+    )
+  ) {
+    fail(`unknown provision option ${arg}`);
+  }
   switch (arg) {
+    case "-f":
+      if (!provisioning) fail("-f is only for provision");
+      files.push(next());
+      break;
     case "--listen":
       listen = next();
       break;
@@ -106,6 +132,62 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+if (provisioning && files.length === 0) fail("provision needs -f");
+
+if (provisioning) {
+  try {
+    if (heldByAnother(dbPath)) {
+      throw new Error(
+        `another process has ${dbPath} open; stop the server before provisioning`,
+      );
+    }
+    const documents = parse(await readSources(files));
+    const store = secrets(
+      secretsDir ?? defaultDir(Bun.main, process.execPath),
+      secretsMode,
+    );
+    const options: Omit<ComposeOptions, "db"> = {
+      secret: (kind, name) => store.read(kind, name),
+      secretNames: (kind) => store.list(kind),
+      clock: wallClock,
+      log: () => silent,
+      version: VERSION,
+      secureCookie: false,
+      trustProxy: false,
+      activate: false,
+    };
+    const snapshot = inspect(dbPath);
+    try {
+      const check = await compose({ ...options, db: snapshot });
+      try {
+        check.provision.validate(documents);
+      } finally {
+        await check.shutdown();
+      }
+    } finally {
+      snapshot.close();
+    }
+    if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
+    const db = open(dbPath);
+    try {
+      const app = await compose({ ...options, db });
+      try {
+        await app.provision.apply(documents);
+      } finally {
+        await app.shutdown();
+      }
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    console.error(
+      `error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
 const colon = listen.lastIndexOf(":");
 if (colon === -1) fail("--listen must be host:port");
 const hostname = listen.slice(0, colon);
@@ -125,8 +207,8 @@ log(`secrets: ${store.dir} (${store.mode})`);
 
 const app = await compose({
   db,
-  secret: (name) => store.read(name),
-  secretNames: (prefix) => store.list(prefix),
+  secret: (kind, name) => store.read(kind, name),
+  secretNames: (kind) => store.list(kind),
   clock: wallClock,
   log: logger,
   version: VERSION,

@@ -9,6 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { compose } from "../../src/server/compose.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { ChatEvent } from "../../src/server/providers/index.ts";
+import { isSecretName } from "../../src/shared/words.ts";
 import { fakeFetch, PROVIDER_URL, VERSION } from "../helpers/app.ts";
 import { memoryDb } from "../helpers/db.ts";
 
@@ -17,7 +18,10 @@ async function build(secrets: Record<string, string>) {
   const fake = fakeFetch();
   const app = await compose({
     db,
-    secret: (name) => secrets[name] ?? null,
+    secret: (kind, name) => {
+      if (!isSecretName(kind, name)) throw new Error("bad secret name");
+      return secrets[name]?.trim() || null;
+    },
     clock: () => 1_000_000,
     fetcher: fake.fetcher,
     log: () => silent,
@@ -36,12 +40,12 @@ const request = {
 
 describe("the chat wire through the app", () => {
   test("streams the recorded reply with the key from the secrets port", async () => {
-    const { app, fake } = await build({ local: "k-local" });
+    const { app, fake } = await build({ "provider-local": "k-local" });
     const row = app.providers.create({
       name: "local",
       wire: "openai-compatible",
       baseUrl: PROVIDER_URL,
-      keyName: "local",
+      keyName: "provider-local",
       now: 0,
     });
     const events: ChatEvent[] = [];
@@ -73,12 +77,12 @@ describe("the chat wire through the app", () => {
   });
 
   test("a tool round on the wire: null assistant content with calls, role tool, tool_choice none", async () => {
-    const { app, fake } = await build({ local: "k" });
+    const { app, fake } = await build({ "provider-local": "k" });
     const row = app.providers.create({
       name: "local",
       wire: "openai-compatible",
       baseUrl: PROVIDER_URL,
-      keyName: "local",
+      keyName: "provider-local",
       now: 0,
     });
     const calls = [

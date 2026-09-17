@@ -9,9 +9,11 @@ import { describe, expect, test } from "bun:test";
 import { BadRequest } from "../../src/server/lib/errors.ts";
 import {
   parseBaseUrl,
+  parseKeyName,
   parseProvider,
   parseQuery,
 } from "../../src/server/providers/parse.ts";
+import secretNames from "../fixtures/secrets/names.json";
 import { GEMINI_URL, PROVIDER_URL, testApp } from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
 
@@ -26,10 +28,29 @@ const router = {
   name: "router",
   wire: "openrouter" as const,
   baseUrl: PROVIDER_URL,
-  keyName: "router",
+  keyName: "provider-router",
 };
 
 describe("parseProvider", () => {
+  test("keys must have the provider kind and a 1 to 48 character body", () => {
+    expect(parseKeyName(null)).toBeNull();
+    for (const body of secretNames.validBodies) {
+      expect(parseKeyName(`provider-${body}`)).toBe(`provider-${body}`);
+    }
+    for (const name of [
+      ...secretNames.invalidBodies.map((body) => `provider-${body}`),
+      ...secretNames.wrongNames,
+      "user-admin",
+      "search-exa",
+      "mcp-github",
+      undefined,
+      1,
+      {},
+    ]) {
+      expect(() => parseKeyName(name)).toThrow(BadRequest);
+    }
+  });
+
   test("accepts a provider and trims the slash off its address", () => {
     expect(parseProvider({ ...router, baseUrl: `${PROVIDER_URL}/` })).toEqual(
       router,
@@ -84,7 +105,21 @@ describe("parseProvider", () => {
 
 describe("the providers", () => {
   test("are listed with whether the key file is there, never its value", async () => {
-    const { app, client } = await admin({ secrets: { router: "sk-secret" } });
+    const { app, client } = await admin({
+      secrets: {
+        "provider-router": "sk-secret",
+        "provider-empty": "",
+        "provider-unused": "unused-secret",
+        "mcp-github": "mcp-secret",
+        "search-exa": "search-secret",
+        "user-other": "password",
+        "provider-": "invalid",
+        "provider-Bad": "invalid",
+        [`provider-${"a".repeat(49)}`]: "invalid",
+        "unknown-token": "invalid",
+        bare: "invalid",
+      },
+    });
     const created = await client.call("POST", "/api/providers", {
       body: router,
     });
@@ -101,13 +136,22 @@ describe("the providers", () => {
     expect(local.status).toBe(201);
     app.now.value += 1000;
     const missing = await client.call("POST", "/api/providers", {
-      body: { ...router, name: "other", keyName: "other" },
+      body: { ...router, name: "other", keyName: "provider-other" },
     });
     expect(missing.status).toBe(201);
     const res = await client.call("GET", "/api/providers");
     const text = await res.text();
     expect(text).not.toContain("sk-secret");
-    const { providers } = JSON.parse(text);
+    const { providers, keys } = JSON.parse(text);
+    expect(keys).toEqual([
+      "provider-empty",
+      "provider-router",
+      "provider-unused",
+    ]);
+    expect(text).not.toContain("unused-secret");
+    expect(text).not.toContain("mcp-secret");
+    expect(text).not.toContain("search-secret");
+    expect(text).not.toContain("hunter2-test");
     expect(
       providers.map((p: { name: string; hasKey: boolean }) => [
         p.name,
@@ -123,6 +167,10 @@ describe("the providers", () => {
       ...router,
       hasKey: true,
       createdAt: expect.any(Number),
+    });
+    expect(providers[2]).toMatchObject({
+      keyName: "provider-other",
+      hasKey: false,
     });
   });
 
@@ -174,7 +222,7 @@ describe("the providers", () => {
 describe("GET /api/providers/:id/catalog", () => {
   test("creates a Gemini provider and searches its native catalog with the key header", async () => {
     const { app, client } = await admin({
-      secrets: { gemini: "gemini-test-key" },
+      secrets: { "provider-gemini": "gemini-test-key" },
     });
     try {
       const created = await client.call("POST", "/api/providers", {
@@ -182,7 +230,7 @@ describe("GET /api/providers/:id/catalog", () => {
           name: "gemini",
           wire: "gemini",
           baseUrl: GEMINI_URL,
-          keyName: "gemini",
+          keyName: "provider-gemini",
         },
       });
       expect(created.status).toBe(201);
@@ -238,7 +286,9 @@ describe("GET /api/providers/:id/catalog", () => {
   });
 
   test("answers the matches for what was typed, from one fetch with the key", async () => {
-    const { app, client } = await admin({ secrets: { router: "sk-router" } });
+    const { app, client } = await admin({
+      secrets: { "provider-router": "sk-router" },
+    });
     const { provider } = await (
       await client.call("POST", "/api/providers", { body: router })
     ).json();

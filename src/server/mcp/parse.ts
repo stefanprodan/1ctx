@@ -9,6 +9,7 @@ import type {
 } from "../../shared/api/mcp.ts";
 import {
   isPattern,
+  isSecretName,
   isServerName,
   MAX_MCP_URL,
   MAX_PATTERNS,
@@ -17,7 +18,6 @@ import {
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { parseKeyName } from "../providers/index.ts";
 
 const CREATE_FIELDS = [
   "name",
@@ -49,14 +49,15 @@ function boolean(value: unknown, name: string): boolean {
   return value;
 }
 
-// a provider's key rule, and then the prefix: an MCP key file is
-// mcp-<name>.key, so the form can list them and nothing else is picked
 export function parseMcpKeyName(value: unknown): string | null {
-  const name = parseKeyName(value);
-  if (name !== null && !name.startsWith(MCP_KEY_PREFIX)) {
-    throw new BadRequest(`keyName must start with ${MCP_KEY_PREFIX}`);
+  if (value === null) return null;
+  if (!isSecretName(MCP_KEY_PREFIX, value)) {
+    throw new BadRequest(
+      `keyName must be ${MCP_KEY_PREFIX} followed by 1 to 48 lowercase ` +
+        "letters, digits and dashes, starting with a letter or digit, or null",
+    );
   }
-  return name;
+  return value;
 }
 
 export function parseUrl(value: unknown): string {

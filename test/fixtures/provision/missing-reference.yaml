@@ -1,0 +1,7 @@
+apiVersion: config.1ctx.dev/v1
+kind: Agent
+metadata:
+  name: guide
+spec:
+  provider: missing-provider
+  model: fake-model

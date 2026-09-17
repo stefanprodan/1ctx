@@ -220,6 +220,23 @@ describe("parseNewUser", () => {
     });
   });
 
+  test.each([false, true])("accepts optional fields with %p flags", (flag) => {
+    expect(
+      parseNewUser({
+        ...body,
+        about: "First line.\nSecond line.",
+        disabled: flag,
+        mustChangePassword: flag,
+      }),
+    ).toEqual({
+      ...body,
+      email: "caelea@example.com",
+      about: "First line.\nSecond line.",
+      disabled: flag,
+      mustChangePassword: flag,
+    });
+  });
+
   refuses(
     [
       {},
@@ -230,6 +247,20 @@ describe("parseNewUser", () => {
       { ...body, tz: undefined },
       { ...body, tz: "Mars/Olympus" },
       { ...body, password: "short" },
+      { ...body, about: null },
+      { ...body, about: false },
+      { ...body, about: 1 },
+      { ...body, about: [] },
+      { ...body, about: {} },
+      { ...body, about: "a".repeat(2001) },
+      ...[null, "false", 0, [], {}].map((disabled) => ({
+        ...body,
+        disabled,
+      })),
+      ...[null, "false", 0, [], {}].map((mustChangePassword) => ({
+        ...body,
+        mustChangePassword,
+      })),
       { ...body, extra: true },
     ],
     parseNewUser,
@@ -244,6 +275,7 @@ describe("parseUserPatch", () => {
     expect(
       parseUserPatch({
         fullName: "Maria Popescu",
+        about: "First line.\nSecond line.",
         email: "MARIA@EXAMPLE.COM",
         role: "admin",
         tz: "Asia/Tokyo",
@@ -251,6 +283,7 @@ describe("parseUserPatch", () => {
       }),
     ).toEqual({
       fullName: "Maria Popescu",
+      about: "First line.\nSecond line.",
       email: "maria@example.com",
       role: "admin",
       tz: "Asia/Tokyo",
@@ -258,11 +291,21 @@ describe("parseUserPatch", () => {
     });
   });
 
+  test("accepts clearing about without a full name", () => {
+    expect(parseUserPatch({ about: "" })).toEqual({ about: "" });
+  });
+
   refuses(
     [
       {},
       { username: "no" },
       { fullName: "" },
+      { about: null },
+      { about: 1 },
+      { about: false },
+      { about: [] },
+      { about: {} },
+      { about: "a".repeat(2001) },
       { email: "a@b" },
       { role: "owner" },
       { tz: "" },
@@ -270,6 +313,9 @@ describe("parseUserPatch", () => {
       { disabled: 1 },
       { disabled: "true" },
       { disabled: null },
+      { password: "longenough" },
+      { mustChangePassword: false },
+      { mustChangePassword: true },
       { email: "a@b.co", extra: true },
     ],
     parseUserPatch,

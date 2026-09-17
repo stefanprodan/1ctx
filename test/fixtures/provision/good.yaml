@@ -1,0 +1,77 @@
+apiVersion: config.1ctx.dev/v1
+kind: User
+metadata:
+  name: zed-user
+spec:
+  role: member
+  fullName: Zed User
+  email: zed-user@people.test
+  tz: UTC
+  about: A test teammate.
+  disabled: false
+  passwordFrom: user-zed
+  mustChangePassword: false
+---
+apiVersion: config.1ctx.dev/v1
+kind: Project
+metadata:
+  name: nebula
+spec:
+  description: A test project.
+  members: [zed-user]
+---
+apiVersion: config.1ctx.dev/v1
+kind: Provider
+metadata:
+  name: mock-provider
+spec:
+  wire: openai-compatible
+  baseUrl: http://models.test/v1
+  keyFrom: null
+---
+apiVersion: config.1ctx.dev/v1
+kind: Skill
+metadata:
+  name: paper-skill
+spec:
+  url: https://skills.test/SKILL.md
+---
+apiVersion: config.1ctx.dev/v1
+kind: McpServer
+metadata:
+  name: toolbox
+spec:
+  url: https://mcp.test/mcp
+  keyFrom: null
+  read: true
+  write: false
+  instructionsOn: true
+  timeoutMs: null
+  readPatterns: ["get_*"]
+  writePatterns: ["set_*"]
+  excludedPatterns: []
+---
+apiVersion: config.1ctx.dev/v1
+kind: Agent
+metadata:
+  name: guide
+spec:
+  provider: mock-provider
+  model: fake-model
+  avatar: bot
+  thinking: null
+  effort: null
+  prompt: Answer directly.
+  skills: [paper-skill]
+  servers:
+    - name: toolbox
+      write: false
+  mcpMode: auto
+---
+apiVersion: config.1ctx.dev/v1
+kind: Tool
+metadata:
+  name: websearch
+spec:
+  enabled: true
+  provider: exa

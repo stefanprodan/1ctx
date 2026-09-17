@@ -13,10 +13,14 @@ export type CreateUserRequest = {
   role: Role;
   tz: string;
   password: string;
+  about?: string;
+  disabled?: boolean;
+  mustChangePassword?: boolean;
 };
 export type UpdateUserRequest = {
   username?: string;
   fullName?: string;
+  about?: string;
   email?: string;
   role?: Role;
   tz?: string;
