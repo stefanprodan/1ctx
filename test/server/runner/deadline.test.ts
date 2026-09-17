@@ -20,7 +20,7 @@ async function settle(
   throw new Error("run did not settle");
 }
 
-describe("automation run deadlines", () => {
+describe("send deadlines", () => {
   test("stops a run at its deadline", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat);
@@ -53,14 +53,42 @@ describe("automation run deadlines", () => {
     await chat.app.shutdown();
   });
 
-  test("does not apply a deadline to a chat or overwrite an ended run", async () => {
+  test("stops a chat turn at the send deadline", async () => {
     const chat = await chatApp();
     const started = await startChat(chat);
     expect(
       chat.app.runner.registry.get(started.sessionId)?.policy.deadlineMs,
-    ).toBeNull();
+    ).toBe(DEFAULT_LIMITS.sendDeadlineMs);
+    // a model that keeps thinking out loud never trips the quiet timer
+    const step = 60_000;
+    for (let spent = 0; spent < DEFAULT_LIMITS.sendDeadlineMs - 1; ) {
+      const ms = Math.min(step, DEFAULT_LIMITS.sendDeadlineMs - 1 - spent);
+      started.script.reasoning("still thinking");
+      await tick();
+      chat.app.now.value += ms;
+      spent += ms;
+      await tick();
+    }
+    expect(chat.app.sessions.byId(started.sessionId)?.status).toBe("running");
+    chat.app.now.value += 1;
+    expect((await settle(chat.app, started.sessionId))?.status).toBe("stopped");
+    expect(chat.app.sessions.lastSend(started.sessionId)).toMatchObject({
+      kind: "chat",
+      cause: "deadline",
+      status: "stopped",
+    });
+    expect(started.script.aborted).toBeTrue();
+    await chat.app.shutdown();
+  });
+
+  test("a chat that ends in time and an ended run keep their cause", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat);
     started.script.reply("done");
     await settle(chat.app, started.sessionId);
+    chat.app.now.value += DEFAULT_LIMITS.sendDeadlineMs;
+    await tick();
+    expect(chat.app.sessions.lastSend(started.sessionId)?.cause).toBe("finish");
 
     const automation = await createAutomation(chat, { name: "ended-run" });
     const pending = chat.scripted.next();

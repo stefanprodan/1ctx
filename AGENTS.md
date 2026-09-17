@@ -371,7 +371,10 @@ violation, and every rule has a rejected fixture under
   runner, and
   `finalizeSend` runs exactly once; the lock is held until the stream
   has let go. A stream quiet for two minutes or a reply past 1 MB is
-  a failure (`runner/round.ts`). A `finalizeSend` that fails after
+  a failure (`runner/round.ts`). A chat send (a message, regenerate or
+  compact) past the `sendDeadlineMs` limit, thirty minutes by default, ends
+  with cause `deadline`, status `stopped`; a run has its own deadline.
+  A `finalizeSend` that fails after
   its retries keeps the lock, so the session answers 409 until a
   restart. At start `sessions.repair()` ends whatever a crash left
   running with cause `restart`. Shutdown terminates every send, waits

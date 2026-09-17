@@ -105,6 +105,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Run deadline",
     text: "How long an automation's run may take. An automation may set less.",
   },
+  sendDeadlineMs: {
+    label: "Chat deadline",
+    text: "How long one chat turn may take, tools included.",
+  },
 };
 
 // when a send carries a built-in, over its description

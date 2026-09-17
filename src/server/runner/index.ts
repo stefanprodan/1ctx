@@ -223,7 +223,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
           : [],
       deadlineMs:
         event === null
-          ? null
+          ? limits.sendDeadlineMs
           : Math.min(
               event.deadlineMs ?? limits.runDeadlineMs,
               limits.runDeadlineMs,

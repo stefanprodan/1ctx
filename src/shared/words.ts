@@ -351,6 +351,7 @@ export const LIMIT_NAMES = [
   "fetchDeadlineMs",
   "searchDeadlineMs",
   "runDeadlineMs",
+  "sendDeadlineMs",
   "memoryPhaseMs",
   "memoryPhaseRounds",
   "visualBytes",
