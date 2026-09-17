@@ -74,7 +74,9 @@ ${root} svg .c-${name} text.ts { fill: ${border}; }`;
 ${classes.join("\n")}`;
 }
 
-export const VISUAL_THEME_CSS = `
+// in a layer, so any rule the visual writes wins over these defaults
+// whatever its specificity
+export const VISUAL_THEME_CSS = `@layer frame {
 :root {
   --color-background-primary: #ffffff;
   --color-background-secondary: #f7f6f3;
@@ -185,5 +187,6 @@ a:hover { text-decoration: underline; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
 }
 `;
