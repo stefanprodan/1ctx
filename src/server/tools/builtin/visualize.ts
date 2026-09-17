@@ -53,6 +53,11 @@ export function makeVisualizeTool(hosts: readonly string[]): Tool {
       if (typeof html !== "string" || html.trim() === "") {
         throw new Error("html must be a non-empty fragment");
       }
+      if (ctx.budget.visuals >= ctx.caps.maxVisuals) {
+        throw new Error(
+          `visual limit reached: a send may draw ${ctx.caps.maxVisuals} visuals. Answer in text instead`,
+        );
+      }
       const size = Buffer.byteLength(html, "utf8");
       if (size > ctx.caps.visualBytes) {
         throw new Error(`visual exceeds ${bytesWords(ctx.caps.visualBytes)}`);
@@ -63,6 +68,7 @@ export function makeVisualizeTool(hosts: readonly string[]): Tool {
         );
       }
       ctx.budget.visualBytes += size;
+      ctx.budget.visuals++;
       return `The visual "${title.trim()}" was accepted and is shown to the user. Do not call visualize again for it and do not repeat its source.`;
     },
   };

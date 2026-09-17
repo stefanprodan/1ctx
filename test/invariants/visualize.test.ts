@@ -170,6 +170,14 @@ describe("visual tool administration", () => {
             scope: "send",
             unit: "bytes",
           }),
+          expect.objectContaining({
+            name: "maxVisuals",
+            default: 2,
+            min: 1,
+            max: 10,
+            scope: "call",
+            unit: "count",
+          }),
         ]),
       );
       const first = await startChat(chat, "old caps");

@@ -62,7 +62,7 @@ const successEnvelope = JSON.stringify({
 });
 
 function budget(): ToolBudget {
-  return { fetches: 0, searches: 0, visualBytes: 0 };
+  return { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 };
 }
 
 function context(

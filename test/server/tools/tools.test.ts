@@ -60,7 +60,7 @@ function skillsPort(offered: OfferedSkill[] = []): SkillsPort {
 }
 
 function budget(): ToolBudget {
-  return { fetches: 0, searches: 0, visualBytes: 0 };
+  return { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 };
 }
 
 function context(shared: ToolBudget = budget()): ToolContext {

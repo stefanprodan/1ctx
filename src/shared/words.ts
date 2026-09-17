@@ -355,6 +355,7 @@ export const LIMIT_NAMES = [
   "memoryPhaseRounds",
   "visualBytes",
   "visualSendBytes",
+  "maxVisuals",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {

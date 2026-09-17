@@ -13,8 +13,8 @@ const registry = new Registry([makeVisualizeTool([])]);
 const context = (): ToolContext => ({
   signal: new AbortController().signal,
   now: () => 0,
-  budget: { fetches: 0, searches: 0, visualBytes: 0 },
-  caps: { ...TOOL_CAPS, visualBytes: 16, visualSendBytes: 24 },
+  budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+  caps: { ...TOOL_CAPS, visualBytes: 16, visualSendBytes: 24, maxVisuals: 10 },
 });
 const run = (args: unknown, ctx = context()) =>
   registry.run(
@@ -95,6 +95,20 @@ describe("visualize", () => {
     );
     expect(ctx.budget.visualBytes).toBe(24);
     expect((await run({ title: "New send", html: "c" })).error).toBe(false);
+  });
+
+  test("refuses a visual past the count cap without spending the budget", async () => {
+    const ctx = context();
+    ctx.caps = { ...ctx.caps, maxVisuals: 2 };
+    for (const html of ["a", "b"]) {
+      expect((await run({ title: "Chart", html }, ctx)).error).toBe(false);
+    }
+    expect(await run({ title: "Again", html: "c" }, ctx)).toEqual({
+      error: true,
+      content:
+        "Error: visual limit reached: a send may draw 2 visuals. Answer in text instead",
+    });
+    expect(ctx.budget).toMatchObject({ visuals: 2, visualBytes: 2 });
   });
 
   test.each([

@@ -159,7 +159,7 @@ export function newSend(fields: {
     roundNo: 1,
     phase: "provider",
     budget: { calls: 0, toolMs: 0, resultBytes: 0 },
-    toolBudget: { fetches: 0, searches: 0, visualBytes: 0 },
+    toolBudget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
     signatures: [],
     answering: false,
     summarizing: fields.summarizing ?? false,

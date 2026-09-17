@@ -70,8 +70,12 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     text: "Bytes one visual's HTML may contain.",
   },
   visualSendBytes: {
-    label: "Visuals per send",
+    label: "Visual bytes per send",
     text: "Bytes of HTML a send may accept across its visuals.",
+  },
+  maxVisuals: {
+    label: "Visuals per send",
+    text: "visualize calls a send may draw.",
   },
   fetchDeadlineMs: {
     label: "Fetch deadline",

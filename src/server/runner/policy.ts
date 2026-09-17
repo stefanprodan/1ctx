@@ -188,6 +188,7 @@ export function buildPolicy(input: {
       searchDeadlineMs: input.limits.searchDeadlineMs,
       visualBytes: input.limits.visualBytes,
       visualSendBytes: input.limits.visualSendBytes,
+      maxVisuals: input.limits.maxVisuals,
     },
   };
 }

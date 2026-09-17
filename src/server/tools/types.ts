@@ -19,6 +19,7 @@ export type ToolBudget = {
   fetches: number;
   searches: number;
   visualBytes: number;
+  visuals: number;
 };
 
 export type ToolContext = {
