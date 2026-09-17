@@ -25,6 +25,12 @@ Mermaid is useful for an ERD, a sequence or a class relationship where
 automatic layout saves substantial work. Prefer hand-laid SVG for a small
 flowchart. Set `startOnLoad: false` so the final script owns rendering.
 Use strict content handling, no click actions and no HTML labels.
+Write the diagram source as a template literal with real line breaks.
+Never join lines with an escaped newline such as `\n`: inside the tool's
+JSON argument it is easy to escape twice, and the script then gets a
+backslash and an `n`, which Mermaid refuses with a parse error on line 1.
+Show the error's message in the status line, so a failure says what
+went wrong.
 Read the app's scheme through `document.documentElement.dataset.theme`.
 Supply colours from the frame's variables and redraw on `visualtheme`.
 
@@ -50,6 +56,11 @@ diagram, or alone with a failure message if loading or rendering fails.
 const status = document.getElementById("relations-status");
 try {
   const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs");
+  // real line breaks in a template literal: a backslash n typed into the
+  // html argument can arrive as two characters and break the parse
+  const source = `flowchart LR
+Author -->|writes| Post
+Post -->|receives| Comment`;
   let version = 0;
   async function draw() {
     const ticket = ++version;
@@ -75,21 +86,20 @@ try {
       }
     });
     try {
-      const result = await mermaid.render(`relations-${ticket}`,
-        "flowchart LR\nAuthor -->|writes| Post\nPost -->|receives| Comment");
+      const result = await mermaid.render(`relations-${ticket}`, source);
       if (ticket !== version) return;
       document.getElementById("relations-diagram").innerHTML = result.svg;
       status.textContent = "Diagram and list show the same relationships.";
-    } catch {
+    } catch (error) {
       if (ticket === version) {
-        status.textContent = "Diagram unavailable; read the relationship list.";
+        status.textContent = `Diagram unavailable; read the relationship list. (${error.message})`;
       }
     }
   }
   window.addEventListener("visualtheme", draw);
   await draw();
-} catch {
-  status.textContent = "Layout library unavailable; read the relationship list.";
+} catch (error) {
+  status.textContent = `Layout library unavailable; read the relationship list. (${error.message})`;
 }
 </script>
 ```
@@ -236,8 +246,8 @@ try {
     material.dispose();
     renderer.dispose();
   });
-} catch {
-  status.textContent = "3D unavailable; the labeled top view shows the axes.";
+} catch (error) {
+  status.textContent = `3D unavailable; the labeled top view shows the axes. (${error.message})`;
 }
 </script>
 ```
@@ -307,8 +317,8 @@ The score stays visible if audio is unsupported or refused.
         button.disabled = false;
         status.textContent = "Finished.";
       }, 1200);
-    } catch {
-      status.textContent = "Audio refused; the score is still available.";
+    } catch (error) {
+      status.textContent = `Audio refused; the score is still available. (${error.message})`;
       button.disabled = false;
     }
   });
