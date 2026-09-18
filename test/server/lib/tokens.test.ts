@@ -25,4 +25,12 @@ describe("long text", () => {
     expect(tokens(word)).toBeGreaterThan(0);
     expect(performance.now() - started).toBeLessThan(2000);
   });
+
+  test("a long run of whitespace is counted in pieces too", () => {
+    // one pre-token to the encoder, whose merges are quadratic in it
+    const run = "\t\n".repeat(40_000);
+    const started = performance.now();
+    expect(tokens(run)).toBeGreaterThan(0);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
 });

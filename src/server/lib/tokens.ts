@@ -7,15 +7,17 @@
 // shown as an estimate. Only the one encoding is imported, since each
 // carries its whole vocabulary into the binary. The merge step is
 // quadratic in the length of one word: a knowledge file of one unbroken
-// 256 KiB word took twenty seconds whole and milliseconds in pieces, so
-// a text holding a word past the piece size is counted in pieces cut at
-// a line break where one is near; a count off by a token per piece is
-// within the estimate, and every other text is counted whole, exactly.
+// 256 KiB word took twenty seconds whole and milliseconds in pieces, and
+// a run of whitespace is one word too (80 KB of tabs and line breaks
+// took a second and a half), so a text holding either past the piece
+// size is counted in pieces cut at a line break where one is near; a
+// count off by a token per piece is within the estimate, and every
+// other text is counted whole, exactly.
 
 import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
 
 export const TOKEN_PIECE = 4096;
-const LONG_WORD = new RegExp(`\\S{${TOKEN_PIECE + 1}}`);
+const LONG_WORD = new RegExp(`\\S{${TOKEN_PIECE + 1}}|\\s{${TOKEN_PIECE + 1}}`);
 
 export function tokens(text: string): number {
   if (text === "") return 0;
