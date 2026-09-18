@@ -45,10 +45,14 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    container-type: inline-size;
   }
 
+  /* a phone has no room for both chips whole: they shrink, the model
+     first, so Send stays on the screen */
   .composer-agent {
     position: relative;
+    min-width: 0;
   }
 
   .composer-chip {
@@ -64,6 +68,7 @@
     font-size: var(--text-label);
     color: var(--dim);
     cursor: pointer;
+    max-width: 100%;
   }
   .composer-chip:disabled {
     cursor: default;
@@ -82,9 +87,15 @@
   }
   .composer-chip-name {
     color: var(--fg);
+    flex-shrink: 0;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .composer-chip-model {
     color: var(--faint);
+    min-width: 0;
     max-width: 160px;
     white-space: nowrap;
     overflow: hidden;
@@ -275,6 +286,8 @@
   /* the context readout: the number over a thin bar, on Send's axis */
   .composer-ctx {
     margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -298,6 +311,7 @@
   }
   .composer-send {
     margin-left: auto;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -323,6 +337,31 @@
   @media (max-width: 719px) {
     .composer-chip-model {
       max-width: 120px;
+    }
+    /* a chip near the right edge would carry its list off the screen,
+       so on a phone the lists span the card */
+    .composer .composer-agent {
+      position: static;
+    }
+    .composer .composer-menu {
+      right: 0;
+      min-width: 0;
+      max-width: none;
+    }
+    .composer .composer-menu .composer-chip-model {
+      max-width: none;
+    }
+  }
+
+  /* a phone's row has no room for the model beside two names: the chip
+     is the agent's name, cut only when it alone is too long, and the
+     list shows every model */
+  @container (max-width: 459px) {
+    .composer-row .composer-chip .composer-chip-model {
+      display: none;
+    }
+    .composer-row .composer-chip .composer-chip-name {
+      flex-shrink: 1;
     }
   }
 }
