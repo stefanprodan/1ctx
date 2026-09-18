@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The local preview: 1ctx from source on 127.0.0.1:1236, detached, with its
 # pid, db, secrets and log under .preview/ (`clean` stops it and removes
-# them). ONECTX_DEV=1 turns on Bun's dev server: CSS hot-reloads in the
+# them, `reset` does that and provisions it again). ONECTX_DEV=1 turns on Bun's dev server: CSS hot-reloads in the
 # browser, an edit under src/client/ reloads the page; --watch restarts the
 # process on server-side TypeScript changes.
 set -euo pipefail
@@ -58,6 +58,22 @@ provision() {
   start
 }
 
+# a fresh preview from a provision file: the db, the secrets and the log
+# go, the given secrets directory is copied in before the first start so
+# the admin comes from its user-admin.key, then the file is applied
+reset() {
+  [ -n "${1:-}" ] || { echo "usage: $0 reset <file|dir> [secrets-dir]" >&2; exit 1; }
+  if [ -n "${2:-}" ] && [ ! -d "$2" ]; then
+    echo "no secrets directory at $2" >&2
+    exit 1
+  fi
+  stop
+  rm -rf "$DIR"
+  mkdir -p "$DIR/secrets"
+  if [ -n "${2:-}" ]; then cp -R "$2"/. "$DIR/secrets/"; fi
+  provision "$1"
+}
+
 start() {
   keys
   ONECTX_DEV=1 nohup bun --watch "$ENTRY" \
@@ -82,8 +98,9 @@ case "${1:-restart}" in
   stop) stop; echo "preview stopped" ;;
   clean) stop; rm -rf "$DIR"; echo "preview stopped, $DIR removed" ;;
   provision) provision "${2:-}" ;;
+  reset) reset "${2:-}" "${3:-}" ;;
   restart) stop; start ;;
   status) if running; then echo "preview up at $URL (pid $(cat "$PID"))"; else echo "preview not running"; exit 1; fi ;;
   log) tail -n "${2:-40}" "$LOG" ;;
-  *) echo "usage: $0 start|stop|restart|status|clean|provision <file>|log [lines]" >&2; exit 1 ;;
+  *) echo "usage: $0 start|stop|restart|status|clean|provision <file>|reset <file> [secrets]|log [lines]" >&2; exit 1 ;;
 esac

@@ -8,7 +8,7 @@ export VERSION
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test build lint clean preview preview-stop preview-log preview-clean preview-provision smoke
+.PHONY: help start dev test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -49,3 +49,6 @@ preview-clean: ## Stop the local preview and remove its db, log and pid
 
 preview-provision: ## Apply a provision file to the preview (FILE=path.yaml)
 	@bun run preview-provision $(FILE)
+
+preview-reset: ## Wipe the preview and provision it again (FILE=path.yaml SECRETS=dir)
+	@bun run preview-reset $(FILE) $(SECRETS)

@@ -24,6 +24,7 @@ make preview-stop   # stop it
 make preview-log    # tail its log
 make preview-clean  # stop it and wipe its db, secrets, log and pid
 make preview-provision FILE=x.yaml  # stop it, apply the objects, start it
+make preview-reset FILE=x.yaml SECRETS=dir  # wipe it, copy the secrets in, provision
 make lint           # biome check --write, then tsc; run after any code change
 make test           # bun test, concurrent; run after any code change, before finishing
 make build          # standalone binary in bin/
