@@ -626,7 +626,9 @@ violation, and every rule has a rejected fixture under
   window threshold are checked before calls, forcing one answer round.
   The answer round sends the schemas unchanged and no `tool_choice`,
   which would miss a server's cached prefix; the exhausted line asks
-  for the answer, and a round that still calls is asked once more
+  for the answer. A round that still calls is asked again: on
+  `openai-compatible` first with the same request, which a local
+  server's cached prefix answers in seconds, then on every wire once
   without schemas.
   The crossing and answer rounds may pass the tool-work budget; summaries
   and memory have their own limits. Results that outgrow the remaining

@@ -288,13 +288,16 @@ describe("the tool loop", () => {
     );
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
-    // the answer round: the provider calls anyway, so the answer is asked
-    // once more with no schemas
+    // the answer round: the provider calls anyway, so a local server is
+    // asked the same way again, then once more with no schemas
     const answer = await chat.scripted.next();
     answer.toolRound([time("again")]);
     answer.end();
+    const repeat = await chat.scripted.next();
+    repeat.toolRound([time("twice")]);
+    repeat.end();
     const bare = await chat.scripted.next();
-    // a provider past both still ends the send on the cap
+    // a provider past all three still ends the send on the cap
     bare.toolRound([time("still")]);
     bare.end();
     await settle(chat, 10);
@@ -302,10 +305,11 @@ describe("the tool loop", () => {
     // the schemas stay untouched so the cached prefix holds
     expect((answerReq.tools as unknown[]).length).toBeGreaterThan(0);
     expect(asksAnswer(answerReq)).toBe(true);
-    const bareReq = chat.scripted.scripts[2].body;
+    expect(asksAnswer(chat.scripted.scripts[2].body)).toBe(true);
+    const bareReq = chat.scripted.scripts[3].body;
     expect(bareReq.tools).toBeUndefined();
     expect(bareReq.tool_choice).toBeUndefined();
-    expect(chat.scripted.scripts).toHaveLength(3);
+    expect(chat.scripted.scripts).toHaveLength(4);
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send.status).toBe("done");
     const lastReply = chat.app.sessions
@@ -314,6 +318,31 @@ describe("the tool loop", () => {
       .at(-1)!;
     expect(lastReply.finishReason).toBe("tool_limit");
     answerNodes(chat, sessionId);
+    chat.app.socket.dispose();
+  });
+
+  test("a hosted wire goes from the answer round straight to no schemas", async () => {
+    const chat = await chatApp({ wire: "gemini" });
+    const { sessionId } = await startChat(chat, "cap on gemini");
+    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
+      time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+    );
+    chat.scripted.scripts[0].toolRound(many);
+    chat.scripted.scripts[0].end();
+    const answer = await chat.scripted.next();
+    answer.toolRound([time("again")]);
+    answer.end();
+    const bare = await chat.scripted.next();
+    expect(bare.body.tools).toBeUndefined();
+    bare.reply("answered without tools");
+    await settle(chat, 10);
+    expect(chat.scripted.scripts).toHaveLength(3);
+    expect(
+      chat.app.sessions
+        .messages(sessionId)
+        .filter((r) => r.kind === "reply")
+        .map((r) => r.finishReason),
+    ).toEqual(["tool_limit", "tool_limit", "stop"]);
     chat.app.socket.dispose();
   });
 

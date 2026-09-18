@@ -67,6 +67,7 @@ const policy: SendPolicy = {
   agentId: "a",
   agentName: "coder",
   providerId: "pr",
+  wire: "openai-compatible",
   model: "org/model",
   contextLength: 1000,
   prompt: "You write Go.",

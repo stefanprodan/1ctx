@@ -12,7 +12,12 @@
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
-import type { Effort, EventSource, ProjectKind } from "../../shared/words.ts";
+import type {
+  Effort,
+  EventSource,
+  ProjectKind,
+  Wire,
+} from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -64,6 +69,9 @@ export type SendPolicy = {
   agentId: string;
   agentName: string;
   providerId: string;
+  // the provider's wire, null when its row is gone; the answer round's
+  // retries depend on whether a local server caches the conversation
+  wire: Wire | null;
   model: string;
   contextLength: number | null;
   prompt: string;
@@ -105,6 +113,7 @@ export function buildPolicy(input: {
   project: Pick<ProjectRow, "id" | "kind" | "name" | "description">;
   user: UserRow;
   agent: AgentRow;
+  wire?: Wire | null;
   now: number;
   // the tools area, or none when the model does not accept tools; the
   // one place the set is decided
@@ -156,6 +165,7 @@ export function buildPolicy(input: {
     agentId: agent.id,
     agentName: agent.name,
     providerId: agent.providerId,
+    wire: input.wire ?? null,
     model: agent.model.id,
     contextLength: agent.model.contextLength,
     prompt: agent.prompt,

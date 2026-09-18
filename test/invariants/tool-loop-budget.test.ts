@@ -162,9 +162,10 @@ test.each([
       expect(asksAnswer(answer.body)).toBe(true);
       answer.toolRound([time("forbidden")]);
       answer.end();
-      const bare = await waitScript(chat.scripted, 3);
-      expect(bare.body.tools).toBeUndefined();
-      bare.reply("answered");
+      // a local server is asked the same way again, on its cached prefix
+      const again = await waitScript(chat.scripted, 3);
+      expect(asksAnswer(again.body)).toBe(true);
+      again.reply("answered");
       await settleRun(chat, sessionId);
       const rows = chat.app.sessions.messages(sessionId);
       expect(

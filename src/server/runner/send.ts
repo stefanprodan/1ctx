@@ -75,8 +75,10 @@ export type ActiveSend = {
   signatures: string[];
   // the cap that forced the answer round, which asks for the answer in words
   answering: CapReason | null;
-  // a call in the answer round is asked once more with no schemas, so
-  // the provider has nothing left to call
+  // a call in the answer round is asked again: a local server first
+  // with the same request, which its cached prefix answers in seconds,
+  // then every wire with no schemas, which leaves nothing to call
+  repeated: boolean;
   bare: boolean;
   // summary rounds ignore calls and are always the send's last round
   summarizing: boolean;
@@ -175,6 +177,7 @@ export function newSend(fields: {
     },
     signatures: [],
     answering: null,
+    repeated: false,
     bare: false,
     summarizing: fields.summarizing ?? false,
     used: fields.used ?? null,

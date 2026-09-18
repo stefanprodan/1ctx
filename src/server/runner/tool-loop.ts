@@ -120,6 +120,14 @@ export async function toolLoop(
     // once more without schemas, then end
     if (send.answering) {
       deps.writer.recordUnrun(send, send.answering, calls);
+      // a request without schemas is a new prompt to a local server,
+      // minutes for a long chat, so the same request goes first there;
+      // a hosted wire's cache is not one conversation's to keep
+      if (!send.repeated && send.policy.wire === "openai-compatible") {
+        send.repeated = true;
+        startNextRound(deps, send);
+        continue;
+      }
       if (!send.bare) {
         send.bare = true;
         startNextRound(deps, send);
