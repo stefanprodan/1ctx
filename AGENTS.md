@@ -467,7 +467,9 @@ violation, and every rule has a rejected fixture under
   failure, shutdown, deadline) through one compare-and-set in the
   runner, and
   `finalizeSend` runs exactly once; the lock is held until the stream
-  has let go. A stream quiet for two minutes or a reply past 1 MB is
+  has let go. A stream quiet for two minutes after its first event
+  (the wait for the first is bounded only by the deadline, since a
+  local server reads a long prompt in silence) or a reply past 1 MB is
   a failure (`runner/round.ts`). A chat send (a message, regenerate or
   compact) past the `sendDeadlineMs` limit, thirty minutes by default, ends
   with cause `deadline`, status `stopped`; a run has its own deadline.
@@ -622,7 +624,10 @@ violation, and every rule has a rejected fixture under
   Main rounds spend prompt plus completion tokens, cached tokens included,
   or a request estimate without usage. The tool-work threshold and the
   window threshold are checked before calls, forcing one answer round.
-  An answer round that still calls is asked once more without schemas.
+  The answer round sends the schemas unchanged and no `tool_choice`,
+  which would miss a server's cached prefix; the exhausted line asks
+  for the answer, and a round that still calls is asked once more
+  without schemas.
   The crossing and answer rounds may pass the tool-work budget; summaries
   and memory have their own limits. Results that outgrow the remaining
   window are cut largest first before storage, keeping bash's exit and

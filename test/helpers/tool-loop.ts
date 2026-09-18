@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect } from "bun:test";
+import { EXHAUSTED_LINE } from "../../src/server/runner/context.ts";
 import { type ChatApp, tick } from "./chat.ts";
 
 // The fake clock lets a finalize retry resolve while the loop settles.
@@ -55,3 +56,17 @@ export const time = (id: string, tz = "UTC") => ({
   name: "datetime",
   arguments: JSON.stringify({ timezone: tz }),
 });
+
+// the answer round asks in words, on the last message, and keeps the
+// schemas as they were with no tool_choice, so the cached prefix holds
+export function asksAnswer(body: Record<string, unknown>): boolean {
+  const messages = body.messages as { content?: unknown }[];
+  const last = messages.at(-1)?.content;
+  return (
+    typeof last === "string" &&
+    last.includes(EXHAUSTED_LINE) &&
+    body.tool_choice === undefined &&
+    Array.isArray(body.tools) &&
+    body.tools.length > 0
+  );
+}

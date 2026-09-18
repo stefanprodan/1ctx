@@ -13,7 +13,13 @@ import { describe, expect, test } from "bun:test";
 import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
 import { settleRun } from "../helpers/automations.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
-import { answerNodes, settle, shape, time } from "../helpers/tool-loop.ts";
+import {
+  answerNodes,
+  asksAnswer,
+  settle,
+  shape,
+  time,
+} from "../helpers/tool-loop.ts";
 
 describe("the tool loop", () => {
   test("a plain reply on a tools model runs no round", async () => {
@@ -272,11 +278,11 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
-  test("the answer round keeps the schemas and forbids a call with tool_choice none", async () => {
+  test("the answer round keeps the schemas and asks for the answer in words", async () => {
     const chat = await chatApp();
     const { detail, sessionId } = await startChat(chat, "cap then answer");
     // over the per-round cap: the calls are recorded not run and the
-    // loop enters the answer round, which is sent tool_choice none
+    // loop enters the answer round, which asks for the answer in words
     const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
       time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
     );
@@ -293,9 +299,9 @@ describe("the tool loop", () => {
     bare.end();
     await settle(chat, 10);
     const answerReq = chat.scripted.scripts[1].body;
-    // the schemas stay so the cached prefix holds, tool_choice forbids
+    // the schemas stay untouched so the cached prefix holds
     expect((answerReq.tools as unknown[]).length).toBeGreaterThan(0);
-    expect(answerReq.tool_choice).toBe("none");
+    expect(asksAnswer(answerReq)).toBe(true);
     const bareReq = chat.scripted.scripts[2].body;
     expect(bareReq.tools).toBeUndefined();
     expect(bareReq.tool_choice).toBeUndefined();
@@ -366,10 +372,10 @@ describe("the tool loop", () => {
       for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
         const script = await waitScript(chat.scripted, round);
         if (round === LOOP_LIMITS.rounds) {
-          expect(script.body.tool_choice).toBe("none");
+          expect(asksAnswer(script.body)).toBe(true);
           script.reply("done after the cap");
         } else {
-          expect(script.body.tool_choice).not.toBe("none");
+          expect(asksAnswer(script.body)).toBe(false);
           script.toolRound([time(`c${round}`, `Etc/GMT+${(round % 12) + 1}`)]);
           script.end();
         }

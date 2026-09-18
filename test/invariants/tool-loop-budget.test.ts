@@ -12,6 +12,7 @@ import {
   startRun,
 } from "../helpers/automations.ts";
 import { chatApp, setLimits, startChat, waitScript } from "../helpers/chat.ts";
+import { asksAnswer } from "../helpers/tool-loop.ts";
 
 const time = (id: string) => ({
   id,
@@ -45,7 +46,7 @@ test("tool work counts final usage once, including cached tokens, and keeps the 
     second.end();
     const answer = await waitScript(chat.scripted, 3);
     expect(send.budget.tokens).toBe(10_000);
-    expect(answer.body.tool_choice).toBe("none");
+    expect(asksAnswer(answer.body)).toBe(true);
     expect(JSON.stringify(answer.body.messages)).toContain(EXHAUSTED_LINE);
     answer.content("The partial answer.");
     answer.finish("length");
@@ -125,7 +126,7 @@ test("rounds without usage accumulate the request estimate without fabricating u
     const answer = await waitScript(chat.scripted, 3);
     expect(send.budget.tokens).toBe(before + secondTokens);
     expect(send.budget.tokens).toBeGreaterThanOrEqual(10_000);
-    expect(answer.body.tool_choice).toBe("none");
+    expect(asksAnswer(answer.body)).toBe(true);
     expect(
       chat.app.sessions
         .messages(sessionId)
@@ -158,7 +159,7 @@ test.each([
       script.toolRound([time("first")], { prompt: 14_000, completion: 1000 });
       script.end();
       const answer = await waitScript(chat.scripted, 2);
-      expect(answer.body.tool_choice).toBe("none");
+      expect(asksAnswer(answer.body)).toBe(true);
       answer.toolRound([time("forbidden")]);
       answer.end();
       const bare = await waitScript(chat.scripted, 3);
@@ -203,7 +204,7 @@ test("usage estimates count opaque call signatures carried into the next request
     second.finish("stop");
     second.end();
     const answer = await waitScript(chat.scripted, 3);
-    expect(answer.body.tool_choice).toBe("none");
+    expect(asksAnswer(answer.body)).toBe(true);
     expect(
       chat.app.sessions
         .messages(sessionId)

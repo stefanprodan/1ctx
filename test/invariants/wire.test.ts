@@ -76,7 +76,7 @@ describe("the chat wire through the app", () => {
     ).toThrow("no such provider");
   });
 
-  test("a tool round on the wire: null assistant content with calls, role tool, tool_choice none", async () => {
+  test("a tool round on the wire: null assistant content with calls, role tool, no tool_choice", async () => {
     const { app, fake } = await build({ "provider-local": "k" });
     const row = app.providers.create({
       name: "local",
@@ -99,8 +99,6 @@ describe("the chat wire through the app", () => {
       ],
       thinking: false,
       tools: [{ name: "datetime", description: "d", parameters: {} }],
-      // the answer round forbids a call
-      toolChoice: "none" as const,
     };
     for await (const _ of app.chat(
       row.id,
@@ -111,9 +109,9 @@ describe("the chat wire through the app", () => {
     }
     const call = fake.calls.find((c) => c.url.endsWith("/chat/completions"))!;
     const body = JSON.parse(call.body ?? "{}");
-    // the schemas stay, the choice forbids a call
+    // the schemas go as they are; a tool_choice would miss the cache
     expect(body.tools).toHaveLength(1);
-    expect(body.tool_choice).toBe("none");
+    expect(body.tool_choice).toBeUndefined();
     const assistant = body.messages.find(
       (m: { role: string }) => m.role === "assistant",
     );

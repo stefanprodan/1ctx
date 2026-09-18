@@ -109,8 +109,6 @@ export function buildChatBody(
   }
   if (req.tools && req.tools.length > 0) {
     body.tools = wireTools(req.tools);
-    // the answer round keeps the schemas but forbids a call
-    if (req.toolChoice === "none") body.tool_choice = "none";
   }
   if (req.temperature != null) body.temperature = req.temperature;
   if (req.topP != null) body.top_p = req.topP;

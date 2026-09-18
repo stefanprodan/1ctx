@@ -101,9 +101,11 @@ describe("the terminal transition", () => {
     expect(chat.app.runner.registry.size).toBe(0);
   });
 
-  test("a quiet provider fails after the inactivity deadline", async () => {
+  test("a provider quiet after its first event fails after the inactivity deadline", async () => {
     const chat = await chatApp();
     const { detail, script } = await startChat(chat);
+    script.content("partial");
+    await tick();
     await tick();
     chat.app.now.value += STREAM_IDLE_MS;
     await tick();
@@ -114,6 +116,24 @@ describe("the terminal transition", () => {
       error: "the provider went quiet",
     });
     expect(script.aborted).toBe(true);
+  });
+
+  test("a provider reading a long prompt is waited for past the inactivity deadline", async () => {
+    const chat = await chatApp();
+    const { detail, script } = await startChat(chat);
+    await tick();
+    // a local server says nothing while it reads the prompt
+    chat.app.now.value += STREAM_IDLE_MS * 3;
+    await tick();
+    await tick();
+    expect(chat.app.sessions.send(detail.send.id)?.status).toBe("running");
+    script.reply("read it");
+    await tick();
+    await tick();
+    expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+      status: "done",
+      cause: "finish",
+    });
   });
 
   test("a reply over one megabyte fails at the cap", async () => {

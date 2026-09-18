@@ -19,6 +19,7 @@ import {
   tick,
   waitScript,
 } from "../helpers/chat.ts";
+import { asksAnswer } from "../helpers/tool-loop.ts";
 
 const time = (id: string) => ({
   id,
@@ -65,7 +66,7 @@ test.each(["chat", "automation"] as const)(
       script.toolRound([time("not-run")], { prompt: 14_000, completion: 1000 });
       script.end();
       const answer = await waitScript(chat.scripted, 2);
-      expect(answer.body.tool_choice).toBe("none");
+      expect(asksAnswer(answer.body)).toBe(true);
       expect(answer.body.tools).toEqual(script.body.tools);
       expect(JSON.stringify(answer.body.messages)).toContain(EXHAUSTED_LINE);
       expect(chat.app.sessions.messages(sessionId)[1]).toMatchObject({
@@ -115,7 +116,7 @@ test("a round without usage weighs its request estimate against the window", asy
     script.finish("tool_calls");
     script.end();
     const answer = await waitScript(chat.scripted, 2);
-    expect(answer.body.tool_choice).toBe("none");
+    expect(asksAnswer(answer.body)).toBe(true);
     expect(chat.app.sessions.messages(sessionId)[1]?.finishReason).toBe(
       "context_limit",
     );
@@ -276,7 +277,7 @@ test("oversized round results are stored cut with bash tails and the answer and 
     });
     script.end();
     const answer = await waitScript(chat.scripted, 2);
-    expect(answer.body.tool_choice).toBe("none");
+    expect(asksAnswer(answer.body)).toBe(true);
     const stored = chat.app.sessions.messages(sessionId);
     expect(stored[1]).toMatchObject({
       slot: "work",

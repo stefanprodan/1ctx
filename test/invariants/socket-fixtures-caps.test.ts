@@ -22,6 +22,7 @@ import {
   watch,
   watcher,
 } from "../helpers/socket-fixtures.ts";
+import { asksAnswer } from "../helpers/tool-loop.ts";
 
 describe("socket fixtures for caps", () => {
   test("the round cap", async () => {
@@ -41,7 +42,7 @@ describe("socket fixtures for caps", () => {
     for (let round = 1; round <= rounds; round++) {
       const script = await waitScript(chat.scripted, round);
       if (round === rounds) {
-        expect(script.body.tool_choice).toBe("none");
+        expect(asksAnswer(script.body)).toBe(true);
         script.reply("done after the cap");
       } else {
         toolRound(script, [

@@ -73,10 +73,10 @@ export type ActiveSend = {
   toolBudget: ToolBudget;
   // the last three rounds' call signatures, for the loop check
   signatures: string[];
-  // the cap that forced the answer round; its tool_choice none forbids a call
+  // the cap that forced the answer round, which asks for the answer in words
   answering: CapReason | null;
-  // a provider may call a tool under tool_choice none: the answer is then
-  // asked once more with no schemas at all, so it can only answer
+  // a call in the answer round is asked once more with no schemas, so
+  // the provider has nothing left to call
   bare: boolean;
   // summary rounds ignore calls and are always the send's last round
   summarizing: boolean;

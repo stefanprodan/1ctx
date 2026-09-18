@@ -11,6 +11,7 @@ import {
 } from "../../helpers/automations.ts";
 import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
 import { frames, watch, watcher } from "../../helpers/socket.ts";
+import { asksAnswer } from "../../helpers/tool-loop.ts";
 
 const partial = '{"title":"Drawing","html":"<p>partial';
 
@@ -73,7 +74,7 @@ describe("visual draft gates", () => {
       script.toolRound([{ name: "datetime", id: "time", arguments: "{}" }]);
       script.end();
       const answer = await waitScript(chat.scripted, 2);
-      expect(answer.body.tool_choice).toBe("none");
+      expect(asksAnswer(answer.body)).toBe(true);
       const conn = await watcher(chat);
       watch(chat, conn, sessionId);
       answer.toolCall({ name: "visualize", arguments: partial });
