@@ -7,6 +7,7 @@
 // publisher of durable changes; it publishes after commit.
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import type { KnowledgeFile } from "../../shared/contracts/knowledge.ts";
 import type {
   LastLine,
   Message,
@@ -41,6 +42,11 @@ export type BusEvents = {
     projectId: string;
     automationId: string | null;
     revision: number;
+  };
+  "knowledge.changed": {
+    projectId: string;
+    file: KnowledgeFile;
+    deleted: boolean;
   };
   // what these users may see changed (a membership, a role, a team
   // project made or gone); null means everyone recomputes

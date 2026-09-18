@@ -1,0 +1,9 @@
+[
+  {"name":"BOM","bytes":[239,187,191,104,105],"text":"\ufeffhi","expected":"hi","lines":1},
+  {"name":"invalid UTF-8","bytes":[195,40],"invalid":true},
+  {"name":"NUL","bytes":[104,0,105],"text":"h\u0000i","invalid":true},
+  {"name":"CRLF","bytes":[97,13,10,98,13,10],"text":"a\r\nb\r\n","expected":"a\r\nb\r\n","lines":2},
+  {"name":"replacement character","bytes":[239,191,189],"text":"\ufffd","invalid":true},
+  {"name":"lone surrogate","text":"\ud800","invalid":true},
+  {"name":"empty","bytes":[],"text":"","expected":"","lines":0}
+]

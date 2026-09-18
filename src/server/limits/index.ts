@@ -19,6 +19,7 @@ import { LimitStore } from "./store.ts";
 
 export {
   DEFAULT_LIMITS,
+  type KnowledgeCaps,
   LIMIT_DEFINITIONS,
   type LimitDefinition,
   type Limits,

@@ -12,6 +12,40 @@ import { parseLimits } from "../../../src/server/limits/parse.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 describe("limits area", () => {
+  test("round-trips all six knowledge caps with their scope and units", () => {
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100 });
+      const values = {
+        ...DEFAULT_LIMITS,
+        knowledgeFileBytes: 4096,
+        knowledgeFiles: 1,
+        knowledgeProjectBytes: 1024 * 1024,
+        knowledgeVersions: 1,
+        knowledgeHistoryBytes: 1024 * 1024,
+        knowledgeHistoryDays: 1,
+      };
+      expect(parseLimits({ values })).toEqual({ values });
+      area.set(values, 100);
+      expect(area.current()).toEqual(values);
+      const rows = area.rows().filter((row) => row.scope === "knowledge");
+      expect(rows).toHaveLength(6);
+      expect(
+        rows.find((row) => row.name === "knowledgeHistoryDays")?.unit,
+      ).toBe("days");
+      for (const row of rows) {
+        expect(() =>
+          parseLimits({ values: { ...values, [row.name]: row.min - 1 } }),
+        ).toThrow(BadRequest);
+        expect(() =>
+          parseLimits({ values: { ...values, [row.name]: row.max + 1 } }),
+        ).toThrow(BadRequest);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
   test("merges overrides and drops values restored to their defaults", () => {
     const db = memoryDb();
     const area = limitsArea({ db, clock: () => 100 });
