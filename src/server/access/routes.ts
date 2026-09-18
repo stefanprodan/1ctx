@@ -22,10 +22,10 @@ export const LOGIN_WINDOW_MS = 60 * 1000;
 
 // a hash to verify against when the name is unknown, so the work and the
 // time are the same as for a known name
-const NOBODY = await Bun.password.hash("nobody", { algorithm: "argon2id" });
 
 export type UsersPort = {
   byUsername(username: string): UserRow | null;
+  nobodyHash(): Promise<string>;
 };
 
 export type RoutesDeps = {
@@ -49,7 +49,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         }
         const { username, password } = parseLogin(await jsonBody(req));
         const user = deps.users.byUsername(username);
-        const ok = await verifyPassword(password, user?.passwordHash ?? NOBODY);
+        const ok = await verifyPassword(
+          password,
+          user?.passwordHash ?? (await deps.users.nobodyHash()),
+        );
         const wrong = new Unauthorized("wrong username or password");
         if (!ok || user === null || user.disabled) throw wrong;
         const opened = transact(deps.db, () => {

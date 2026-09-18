@@ -17,12 +17,7 @@ import type { Clock } from "../lib/clock.ts";
 import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import {
-  hashPassword,
-  profile,
-  type UserRow,
-  verifyPassword,
-} from "../users/index.ts";
+import { profile, type UserRow, verifyPassword } from "../users/index.ts";
 import { parsePasswordChange, parseProfile } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 import type { LoginStore } from "./store.ts";
@@ -35,6 +30,7 @@ export type UsersPort = {
   setDetails(id: string, fields: { fullName: string; about: string }): void;
   setTz(id: string, tz: string): void;
   setPasswordHash(id: string, hash: string): void;
+  hashPassword(password: string): Promise<string>;
   setMustChangePassword(id: string, required: boolean): void;
 };
 
@@ -101,7 +97,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
         const user = self(principal.userId);
         const wrong = new Forbidden("the current password is wrong");
         if (!(await verifyPassword(current, user.passwordHash))) throw wrong;
-        const hash = await hashPassword(next);
+        const hash = await deps.users.hashPassword(next);
         const updated = transact(deps.db, () => {
           // the proof was against the hash read before the awaits; two
           // changes racing with the same current password would otherwise

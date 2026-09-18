@@ -61,6 +61,7 @@ export type BootstrapDeps = UserDeps & {
   secret: (name: string) => string | null;
   clock: Clock;
   log: Log;
+  passwordCost?: PasswordCost;
 };
 
 export function createUser(deps: UserDeps, fields: UserFields): UserRow {
@@ -71,8 +72,18 @@ export function createUser(deps: UserDeps, fields: UserFields): UserRow {
   });
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  return Bun.password.hash(password, { algorithm: "argon2id" });
+// argon2id's cost, Bun's defaults written out; a test composes with the
+// least, since every test app hashes and checks the admin's password
+// and the cost is the whole run's time otherwise. A check reads the
+// cost from the hash, so it follows whatever made the hash
+export type PasswordCost = { memoryCost: number; timeCost: number };
+export const PASSWORD_COST: PasswordCost = { memoryCost: 65_536, timeCost: 2 };
+
+export async function hashPassword(
+  password: string,
+  cost: PasswordCost = PASSWORD_COST,
+): Promise<string> {
+  return Bun.password.hash(password, { algorithm: "argon2id", ...cost });
 }
 
 export function verifyPassword(
@@ -112,7 +123,7 @@ export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
     fullName: ADMIN_FULL_NAME,
     email: ADMIN_EMAIL,
     role: "admin",
-    passwordHash: await hashPassword(password),
+    passwordHash: await hashPassword(password, deps.passwordCost),
     mustChangePassword: false,
     now: deps.clock(),
   });
@@ -126,6 +137,7 @@ export type UsersDeps = {
   clock: Clock;
   log: Log;
   projects: ProjectsPort;
+  passwordCost?: PasswordCost;
 };
 
 export type Users = {
@@ -144,6 +156,11 @@ export type Users = {
   setPasswordHash(id: string, hash: string): void;
   countAdmins(): number;
   createUser(fields: UserFields): UserRow;
+  // a password's hash at the composed cost
+  hashPassword(password: string): Promise<string>;
+  // a hash no password was set for, at the same cost, so a login for a
+  // missing user costs what a wrong password does
+  nobodyHash(): Promise<string>;
   // the first admin from user-admin.key, once the areas it is made with exist
   bootstrap(): Promise<UserRow | null>;
   routes: RouteDescriptor[];
@@ -151,6 +168,8 @@ export type Users = {
 
 export function usersArea(deps: UsersDeps): Users {
   const store = new UserStore(deps.db);
+  const cost = deps.passwordCost ?? PASSWORD_COST;
+  let nobody: Promise<string> | null = null;
   const userDeps: UserDeps = { db: deps.db, store, projects: deps.projects };
   return {
     store,
@@ -169,7 +188,12 @@ export function usersArea(deps: UsersDeps): Users {
     setPasswordHash: (id, hash) => store.setPasswordHash(id, hash),
     countAdmins: () => store.countAdmins(),
     createUser: (fields) => createUser(userDeps, fields),
-    bootstrap: () => bootstrap({ ...userDeps, ...deps }),
+    hashPassword: (password) => hashPassword(password, cost),
+    nobodyHash: () => {
+      nobody ??= hashPassword("nobody", cost);
+      return nobody;
+    },
+    bootstrap: () => bootstrap({ ...userDeps, ...deps, passwordCost: cost }),
     routes: [],
   };
 }

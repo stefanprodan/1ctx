@@ -8,11 +8,10 @@ import {
   MAX_ARCHIVE_UPLOAD,
 } from "../../../src/server/knowledge/limits.ts";
 import { acquire } from "../../../src/server/knowledge/queue.ts";
-import { hashPassword } from "../../../src/server/users/index.ts";
 import { serve } from "../../../src/server/web/serve.ts";
 import type { KnowledgeUploadResult } from "../../../src/shared/contracts/knowledge.ts";
 import page from "../../fixtures/body.html";
-import { ORIGIN, testApp } from "../../helpers/app.ts";
+import { hashPassword, ORIGIN, testApp } from "../../helpers/app.ts";
 
 type Transport = "composed" | "listener";
 type Upload = {

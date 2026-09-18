@@ -7,7 +7,7 @@ import {
   memoryWork,
   replay,
 } from "../../../src/server/memory/index.ts";
-import { hashPassword } from "../../../src/server/users/index.ts";
+import { hashPassword } from "../../helpers/app.ts";
 import { createAutomation } from "../../helpers/automations.ts";
 import { chatApp } from "../../helpers/chat.ts";
 

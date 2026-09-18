@@ -12,12 +12,22 @@ import type { Db } from "../../src/server/db/index.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
-import { ADMIN_SECRET } from "../../src/server/users/index.ts";
+import {
+  ADMIN_SECRET,
+  hashPassword as hashAtCost,
+  type PasswordCost,
+} from "../../src/server/users/index.ts";
 import { clientAddress } from "../../src/server/web/serve.ts";
 import { isSecretName, SECRET_KINDS } from "../../src/shared/words.ts";
 import { memoryDb } from "./db.ts";
 
 export const ORIGIN = "http://1ctx.test";
+// argon2id's least cost: every test app hashes and checks passwords,
+// and at the production cost that was most of the suite's time
+export const TEST_PASSWORD_COST: PasswordCost = { memoryCost: 8, timeCost: 1 };
+// a password's hash for a user a test makes, at the test app's cost
+export const hashPassword = (password: string) =>
+  hashAtCost(password, TEST_PASSWORD_COST);
 // where a test's provider lives: the fake fetch answers it and nothing
 // else, so the suite never reaches a network
 export const PROVIDER_URL = "http://models.test/v1";
@@ -209,6 +219,7 @@ export async function testApp(
   if (adminPassword !== null) values[ADMIN_SECRET] = adminPassword;
   const app = await compose({
     db,
+    passwordCost: TEST_PASSWORD_COST,
     secret: (kind, name) => {
       if (!isSecretName(kind, name)) throw new Error("bad secret name");
       return values[name]?.trim() || null;
