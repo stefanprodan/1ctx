@@ -14,6 +14,7 @@ import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
+import type { KnowledgeCapability } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
@@ -69,6 +70,7 @@ export type RunnerDeps = {
   providers: { chat: RoundDeps["chat"] };
   tools: ToolsPort;
   memory: Pick<MemoryCapability, "read" | "commit">;
+  knowledge: Pick<KnowledgeCapability, "snapshot">;
   markers: {
     mark(
       automationId: string,
@@ -216,6 +218,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       tools: offerTools && agent.model.tools ? deps.tools : null,
       limits,
       automation,
+      knowledge: deps.knowledge.snapshot(project.id),
       projectMemory: deps.memory.read(project.id, null).entries,
       automationMemory:
         automation?.ownMemory === true

@@ -71,6 +71,7 @@ function context(
   deadlineMs = 10_000,
 ): ToolContext {
   return {
+    actor: null,
     signal,
     now: Date.now,
     budget: shared,

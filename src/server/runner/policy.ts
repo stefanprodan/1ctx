@@ -11,6 +11,7 @@
 // started on whatever an admin changes later.
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
+import type { RecentFile } from "../../shared/knowledge.ts";
 import type { Effort, EventSource, ProjectKind } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
@@ -73,6 +74,7 @@ export type SendPolicy = {
   memoryOffered: Offered | null;
   projectMemory: MemoryEntry[];
   automationMemory: MemoryEntry[];
+  knowledge: { files: number; recent: RecentFile[] };
   automation: {
     id: string;
     name: string;
@@ -108,6 +110,7 @@ export function buildPolicy(input: {
   // one place the set is decided
   tools: ToolsPort | null;
   limits: Limits;
+  knowledge: SendPolicy["knowledge"];
   automation?: SendPolicy["automation"];
   projectMemory?: readonly MemoryEntry[];
   automationMemory?: readonly MemoryEntry[];
@@ -164,6 +167,10 @@ export function buildPolicy(input: {
     automationMemory: (input.automationMemory ?? []).map((entry) => ({
       ...entry,
     })),
+    knowledge: {
+      files: input.knowledge.files,
+      recent: input.knowledge.recent.map((file) => ({ ...file })),
+    },
     automation: input.automation ? { ...input.automation } : null,
     deadlineMs: input.deadlineMs ?? null,
     limits: {

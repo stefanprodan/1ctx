@@ -65,6 +65,7 @@ function budget(): ToolBudget {
 
 function context(shared: ToolBudget = budget()): ToolContext {
   return {
+    actor: null,
     signal: new AbortController().signal,
     now: () => now,
     budget: shared,

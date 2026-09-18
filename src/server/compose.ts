@@ -255,6 +255,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     providers,
     tools,
+    knowledge,
     memory: {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),

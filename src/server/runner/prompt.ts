@@ -7,9 +7,10 @@
 // The project comes before the user, who changes with the author of a
 // team chat, and a day, not a time, so the prefix holds until midnight
 // and a provider's cache with it. The skills catalog arrives on the
-// policy's offered snapshot; memory and knowledge arrive through ports
-// wired to empty until their slices.
+// policy's offered snapshot; memory and knowledge are captured once per
+// send so a tool's writes cannot move the prefix between rounds.
 
+import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
 import type { SendPolicy } from "./policy.ts";
 
@@ -78,6 +79,7 @@ export function systemPrompt(
     | "offered"
     | "projectMemory"
     | "automationMemory"
+    | "knowledge"
   >,
   now: number,
   mcpNote = "",
@@ -105,6 +107,7 @@ export function systemPrompt(
   if (policy.automation?.ownMemory) {
     parts.push(memoryBlock("automation-memory", policy.automationMemory));
   }
+  parts.push(knowledgeBlock(policy.knowledge.files, policy.knowledge.recent));
   parts.push(dateLine(now));
   if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");

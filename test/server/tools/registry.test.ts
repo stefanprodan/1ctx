@@ -22,6 +22,7 @@ const SHALOM = char(0x5e9, 0x5dc, 0x5d5, 0x5dd);
 
 function context(): ToolContext {
   return {
+    actor: null,
     signal: new AbortController().signal,
     now: () => 0,
     budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },

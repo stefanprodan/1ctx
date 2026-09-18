@@ -224,6 +224,7 @@ describe("memory chat receipts", () => {
     });
     const read = tools.find((tool) => tool.name === "session_read")!;
     const ctx: ToolContext = {
+      actor: null,
       signal: new AbortController().signal,
       now: () => now,
       budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },

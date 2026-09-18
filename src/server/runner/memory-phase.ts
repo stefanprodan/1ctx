@@ -230,6 +230,14 @@ async function runCalls(
   let clean = true;
   const settled = calls.map(async (call) => {
     const ctx: ToolContext = {
+      actor: {
+        projectId: send.projectId,
+        userId: send.policy.userId,
+        agentId: send.policy.agentId,
+        agentName: send.policy.agentName,
+        sessionId: send.sessionId,
+        origin: send.kind === "run" ? "automation" : "chat",
+      },
       signal,
       now: deps.clock,
       budget: send.toolBudget,

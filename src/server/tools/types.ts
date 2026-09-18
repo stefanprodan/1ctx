@@ -23,6 +23,14 @@ export type ToolBudget = {
 };
 
 export type ToolContext = {
+  actor: {
+    projectId: string;
+    userId: string;
+    agentId: string;
+    agentName: string;
+    sessionId: string;
+    origin: "chat" | "automation";
+  } | null;
   signal: AbortSignal;
   now(): number;
   budget: ToolBudget;

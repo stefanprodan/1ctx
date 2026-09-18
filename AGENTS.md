@@ -351,10 +351,10 @@ violation, and every rule has a rejected fixture under
   prompt is the agent's prompt, the project and user or automation
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
-  off per server), the two memory blocks, the date line, and last the
-  change note. A send records a content-addressed digest of what it
-  offered from MCP (`mcp_digests`, `sends.mcp`, null for a compact
-  send, swept with the logins); `startSend` compares it with the
+  off per server), the two memory blocks, the knowledge block, the date
+  line, and last the change note. A send records a content-addressed
+  digest of what it offered from MCP (`mcp_digests`, `sends.mcp`, null
+  for a compact send, swept with the logins); `startSend` compares it with the
   session's previous send (a regenerated turn against the turn before
   it), and a difference is the note after the date line naming added,
   removed and changed wire names, so the stable prefix stays cacheable.

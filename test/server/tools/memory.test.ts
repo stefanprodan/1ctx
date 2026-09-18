@@ -82,6 +82,7 @@ function area(): ToolsArea {
 
 function context(resultCut = TOOL_CAPS.resultCut): ToolContext {
   return {
+    actor: null,
     signal: new AbortController().signal,
     now: () => now,
     budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },

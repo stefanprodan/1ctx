@@ -179,6 +179,7 @@ export function history(
     | "offered"
     | "projectMemory"
     | "automationMemory"
+    | "knowledge"
   >,
   lookups: ContextLookups,
   now: number,
