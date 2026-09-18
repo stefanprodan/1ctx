@@ -106,11 +106,6 @@
   .tools-input-invalid:focus {
     border-color: var(--failed);
   }
-  /* the refusal under the row, ending where the box ends */
-  .tools-limit-error {
-    grid-column: 1 / -1;
-    text-align: right;
-  }
   .tools-unit {
     flex-shrink: 0;
     width: 44px;

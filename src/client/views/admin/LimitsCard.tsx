@@ -37,7 +37,7 @@ function LimitField({
   row: LimitRow;
   text: string;
   busy: boolean;
-  // a refusal that names this limit
+  // a refusal that names this limit, drawn in place of its hint
   error: string | null;
   onInput: (text: string) => void;
 }) {
@@ -47,7 +47,13 @@ function LimitField({
     <label class="tools-limit">
       <span class="tools-limit-words">
         <span class="tools-limit-label">{words.label}</span>
-        <span class="tools-limit-text">{words.text}</span>
+        {error ? (
+          <span class="field-error" role="alert">
+            {error}
+          </span>
+        ) : (
+          <span class="tools-limit-text">{words.text}</span>
+        )}
       </span>
       <span class="tools-limit-field">
         <input
@@ -67,11 +73,6 @@ function LimitField({
       </span>
       {row.changedAt !== null && (
         <span class="tools-default">{defaultLine(row)}</span>
-      )}
-      {error && (
-        <span class="field-error tools-limit-error" role="alert">
-          {error}
-        </span>
       )}
     </label>
   );
