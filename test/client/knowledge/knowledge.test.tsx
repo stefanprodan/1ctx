@@ -450,6 +450,16 @@ describe("a knowledge frame", () => {
     expect(held?.deleted[0].deletedAt).toBe(NOW);
   });
 
+  test.serial("a deleted name made again under a new id leaves Deleted", () => {
+    lists.value = new Map([["p1", list()]]);
+    applyKnowledge("p1", file({ revision: 4, updatedAt: NOW }), true);
+    expect(lists.value.get("p1")?.deleted).toHaveLength(1);
+    applyKnowledge("p1", file({ id: "f9", revision: 1 }), false);
+    const held = lists.value.get("p1");
+    expect(held?.files.map((row) => row.id)).toEqual(["f9"]);
+    expect(held?.deleted).toHaveLength(0);
+  });
+
   test.serial("nothing is applied to a project whose list is not held", () => {
     applyKnowledge("p1", file(), false);
     expect(lists.value.get("p1")).toBeUndefined();

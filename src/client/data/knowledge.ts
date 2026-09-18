@@ -92,12 +92,15 @@ const byDeleted = (files: readonly KnowledgeDeleted[]) =>
   files.slice().sort((a, b) => b.deletedAt - a.deletedAt);
 
 // the list as the page reads it: the files by name, the deleted newest
-// first, and the totals of the rows held
+// first, and the totals of the rows held. A name made again under a new
+// id is live, not deleted, as the server's list says, so a frame or an
+// add that brings it back takes it out of the Deleted card
 function shape(list: KnowledgeList): KnowledgeList {
   const files = byName(list.files);
+  const live = new Set(files.map((file) => file.name));
   return {
     files,
-    deleted: byDeleted(list.deleted),
+    deleted: byDeleted(list.deleted.filter((file) => !live.has(file.name))),
     totals: totalsOf(files),
     limits: list.limits,
   };
