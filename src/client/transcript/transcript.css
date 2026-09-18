@@ -150,6 +150,10 @@
     margin: 0 var(--space-2);
     background: var(--line-strong);
   }
+  /* no action before it, a failed turn's, and the stamp stands alone */
+  .transcript-sep:first-child {
+    display: none;
+  }
   .transcript-after .transcript-cut {
     margin-right: var(--space-2);
   }

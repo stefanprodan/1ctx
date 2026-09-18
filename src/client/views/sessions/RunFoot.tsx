@@ -67,7 +67,11 @@ export function RunFoot({
             : `status-${row.session.status}`
         }`}
       />
-      <span class="chat-run-state cut">{text}</span>
+      <span
+        class={`chat-run-state cut${row.session.status === "failed" ? " error" : ""}`}
+      >
+        {text}
+      </span>
       {failure.value !== null && (
         <span class="chat-run-failure error">{failure.value}</span>
       )}
