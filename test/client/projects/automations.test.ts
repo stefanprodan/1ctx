@@ -100,6 +100,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
 
 const run = (changes: Partial<SessionSummary> = {}): StreamRow => ({
   session: session(changes),
+  agent: "assistant",
   send: null,
   last: null,
   automation: { id: "au1", name: "nightly" },

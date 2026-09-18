@@ -131,6 +131,7 @@ describe("Home", () => {
           lastActivityAt: Date.now() - 120_000,
           usage: null,
         },
+        agent: "assistant",
         send: null,
         last: { seq: 2, author: "assistant", text: "nine pods" },
         automation: null,

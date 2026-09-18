@@ -27,18 +27,21 @@ export function iconOf(row: StreamRow): "clock" | "chat" {
 
 export function stateLine(row: StreamRow): StateLine {
   const { session, send, last } = row;
+  // a send that did not finish is the agent's, so its state is credited
+  // to the agent the way a last line is to its author
+  const agent = (text: string): StateLine => ({ author: row.agent, text });
   switch (session.status) {
     case "running": {
       const calls = send?.toolCalls ?? 0;
-      if (calls === 0) return plain("working");
-      return plain(`working · ${calls} tool ${calls === 1 ? "call" : "calls"}`);
+      if (calls === 0) return agent("working");
+      return agent(`working · ${calls} tool ${calls === 1 ? "call" : "calls"}`);
     }
     case "failed": {
       const error = send?.error === null ? "" : firstLine(send?.error ?? "");
-      return plain(error === "" ? "failed" : `failed · ${error}`);
+      return agent(error === "" ? "failed" : `failed · ${error}`);
     }
     case "stopped":
-      return plain(
+      return agent(
         send?.cause === "shutdown" || send?.cause === "restart"
           ? "stopped · the server restarted"
           : send?.cause === "deadline"

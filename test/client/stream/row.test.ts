@@ -69,6 +69,7 @@ const send = (changes: Partial<SendSummary> = {}): SendSummary => ({
 
 const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   session: session(),
+  agent: "assistant",
   send: send(),
   last: { seq: 2, author: "assistant", text: "nine pods, all expected" },
   automation: null,
@@ -76,7 +77,8 @@ const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   ...changes,
 });
 
-const plain = (text: string) => ({ author: null, text });
+// a send that did not finish is credited to the session's agent
+const plain = (text: string) => ({ author: "assistant", text });
 
 describe("stateLine", () => {
   test("a done chat shows its last line with the author", () => {
@@ -254,5 +256,19 @@ describe("a run's row", () => {
       author: "assistant",
       text: "nine pods, all expected",
     });
+  });
+});
+
+describe("a row built without its agent", () => {
+  test("states a failed send with no author", () => {
+    expect(
+      stateLine(
+        row({
+          agent: null,
+          session: session({ status: "failed" }),
+          send: send({ status: "failed", cause: "failure", error: "quiet" }),
+        }),
+      ),
+    ).toEqual({ author: null, text: "failed · quiet" });
   });
 });

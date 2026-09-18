@@ -54,6 +54,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
 function row(changes: Partial<SessionSummary> = {}): StreamRow {
   return {
     session: summary(changes),
+    agent: "assistant",
     send: null,
     last: null,
     automation: null,

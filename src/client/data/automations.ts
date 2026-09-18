@@ -351,6 +351,7 @@ export async function runAutomation(id: string): Promise<SessionDetail> {
   if (owner === forUser && held?.id === id) {
     applyRun(held, {
       session: detail.session,
+      agent: null,
       send: detail.send,
       last: null,
       automation: labelOf(id),
@@ -459,6 +460,7 @@ export function onAutomationsSocket(ev: SocketEvent): void {
       const mine = held.rows.find((r) => r.session.id === ev.session.id);
       applyRun(held, {
         session: ev.session,
+        agent: mine?.agent ?? null,
         send: ev.send ?? mine?.send ?? null,
         last: ev.last ?? mine?.last ?? null,
         automation: mine?.automation ?? labelOf(held.id),

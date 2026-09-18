@@ -171,6 +171,7 @@ export function Chat({ params }: { params: Params }) {
                 <RunFoot
                   row={{
                     session: shown.session,
+                    agent: null,
                     send: shown.send,
                     last: null,
                     automation: null,
