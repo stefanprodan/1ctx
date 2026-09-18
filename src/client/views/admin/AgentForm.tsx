@@ -240,7 +240,7 @@ export function AgentForm({
       : compactLine(picked.contextLength, reserveOf(limits.value));
   return (
     <form class="agents-form" ref={form} onSubmit={submit}>
-      <div class="agents-fields">
+      <div class="pair">
         <label class="field">
           <span class="label label-required">Name</span>
           <input
@@ -269,7 +269,7 @@ export function AgentForm({
                 aria-pressed={avatar.value === a}
                 aria-label={a}
                 disabled={busy}
-                class={`agents-avatar${avatar.value === a ? " agents-avatar-on" : ""}`}
+                class={`avatar avatar-32${avatar.value === a ? " agents-avatar-on" : ""}`}
                 onClick={() => {
                   avatar.value = a;
                   save.touch();
@@ -299,7 +299,7 @@ export function AgentForm({
           </div>
           <FieldError save={save} field="provider" />
         </div>
-        <div class="field agents-field-wide">
+        <div class="field pair-wide">
           <span class="label label-required">Model</span>
           {picked ? (
             <RowsList>
@@ -407,7 +407,7 @@ export function AgentForm({
             }}
           />
         )}
-        <label class="field agents-field-wide">
+        <label class="field pair-wide">
           <span class="label">System prompt</span>
           <textarea
             name="prompt"

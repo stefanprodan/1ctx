@@ -847,7 +847,8 @@ violation, and every rule has a rejected fixture under
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
   Show more), then Suspend or Resume, Edit and Run now over two tabs:
-  Runs, a log with their source, length against the deadline and Stop,
+  Runs, a log with the source as the icon (who pressed Run now its
+  title) and the feed's line, length against the deadline and Stop,
   filtered by `?runs=` and counted by the tally, and, only
   with `ownMemory`, Memory, `/automations/:id/memory`, the own note
   counted by its entries (both routes name one view, so a tab change
@@ -873,7 +874,9 @@ violation, and every rule has a rejected fixture under
   hidden. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
-  failure's words come from `reason()` in `lib/format.ts`.
+  failure's words come from `reason()` in `lib/format.ts`, raw for
+  `fieldOf` to map; anywhere they are drawn they go through `says()` or
+  `sentence()`, a capital and a full stop.
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
   ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
@@ -909,6 +912,22 @@ violation, and every rule has a rejected fixture under
   its own: one that does (a tool value under a fold) leaves Chrome's
   stuck head and foot riding with the rows until a reload, so a long
   value is cut with `overflow: clip` and opens with Show all.
+- **Two themes, one set of names.** `tokens.css` defines every colour
+  twice: dark on `:root`, light on `:root[data-theme="light"]`; no
+  other stylesheet knows the theme. `app/theme.ts` sets `data-theme`
+  on `<html>` (the inline script in `index.html` does it before the
+  first paint): the system's scheme until the user flips Dark theme in
+  the rail's user menu, a flip away from the system kept in
+  `localStorage`, a flip back forgetting it. A fill under the pointer
+  or a picked option is `--hover`, never `--line`, `--card` or
+  `--inset`, except on the rail, whose ground is `--rail` and whose
+  lit fill is `--card`; a word on a brand fill is `--on-brand`. The visual frame
+  reads the theme from the computed `color-scheme` and the tokens.
+  The shared shapes are `base.css` primitives (`.menu`, `.menu-item`,
+  `.seg`, `.choice`, `.avatar`, `.switch`, `.tag`, `.textbox`,
+  `.clamp`, `.cut`, `.meter`, `.notice-failed`, `.btn-text`,
+  `.btn-icon`, `.status-*`); an owner adds only position, size and
+  what is its own.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

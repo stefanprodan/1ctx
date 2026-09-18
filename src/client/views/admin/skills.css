@@ -37,13 +37,6 @@
     gap: var(--space-2) var(--space-3);
     align-items: baseline;
   }
-  .skills-fact-label {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
   .skills-fact {
     min-width: 0;
     font-size: var(--text-ui);
@@ -59,19 +52,12 @@
 
   /* the body and a file as the bytes an agent follows, never rendered */
   .skills-text {
-    margin: 0;
-    max-height: 480px;
-    padding: var(--space-3);
-    overflow: auto;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    font-family: var(--mono);
-    font-size: var(--text-small);
-    line-height: 1.5;
-    color: var(--dim);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .skills-toggle {
+    align-self: flex-start;
   }
 
   .skills-actions {

@@ -25,6 +25,7 @@ import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import {
   aboutProblem,
@@ -153,7 +154,7 @@ function PasswordForm() {
           />
           <FieldError save={save} field="current" />
         </label>
-        <div class="profile-pair">
+        <div class="pair">
           <label class="field">
             <span class="label">New password</span>
             <input
@@ -204,7 +205,7 @@ export function Profile() {
             <AsideSection label="Account">
               <div class="split-line">
                 Email
-                <span class="split-strong profile-email">{user.email}</span>
+                <span class="split-strong cut">{user.email}</span>
               </div>
               <div class="split-line">
                 Role
@@ -225,17 +226,15 @@ export function Profile() {
                 Change the password you were handed before going on.
               </p>
             )}
-            <div class="profile-head">
-              <span class="profile-avatar">{initials(user.fullName)}</span>
-              <div class="profile-who">
-                <span class="profile-name">{user.fullName}</span>
-                <span class="profile-meta profile-handle">
-                  @{user.username}
-                </span>
-                {/* the aside holds the email, and it is hidden this narrow */}
-                <span class="profile-meta profile-narrow">{user.email}</span>
-              </div>
-            </div>
+            <Who
+              class="profile-head"
+              avatar={initials(user.fullName)}
+              name={user.fullName}
+            >
+              <WhoLine handle>@{user.username}</WhoLine>
+              {/* the aside holds the email, and it is hidden this narrow */}
+              <WhoLine narrow>{user.email}</WhoLine>
+            </Who>
             <Section
               title="About you"
               text="What agents should know about you."

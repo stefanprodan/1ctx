@@ -101,6 +101,20 @@ export function reason(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+// the server speaks in lowercase fragments; the page shows sentences
+export function sentence(text: string): string {
+  const t = text.trim();
+  if (t === "") return t;
+  const upper = t[0]!.toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(upper) ? upper : `${upper}.`;
+}
+
+// a failure's words as drawn where no form maps them to a field; the
+// raw words stay with reason() for the field mapping
+export function says(err: unknown): string {
+  return sentence(reason(err));
+}
+
 // a failure as a page shows it: the words, and the HTTP status when the
 // server answered with one (null when it did not answer or nothing was
 // asked of it)

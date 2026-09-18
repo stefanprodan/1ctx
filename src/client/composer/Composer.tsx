@@ -28,7 +28,7 @@ import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import "./composer.css";
-import { reason } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 
 export const MAX_HEIGHT = 160;
 
@@ -140,7 +140,7 @@ export function Composer({
         writeDraft(key, "");
       }
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
     }
   };
   const context = readout(usage);
@@ -154,7 +154,7 @@ export function Composer({
         ? "Replying"
         : idle;
   return (
-    <div class={`composer${tall ? " composer-tall" : ""}`}>
+    <div class={`composer${tall ? " composer-tall" : ""} card`}>
       <textarea
         ref={input}
         class="composer-text"
@@ -213,6 +213,9 @@ export function Composer({
             writeDraft(key, text.value);
             input.current?.focus();
           }}
+          onHover={(index) => {
+            highlight.value = index;
+          }}
         />
       )}
       {failure.value && <p class="composer-failure error">{failure.value}</p>}
@@ -237,10 +240,10 @@ export function Composer({
         />
         {context && (
           <span class="composer-ctx" title={context.title}>
-            <span class="composer-ctx-n">{context.text}</span>
-            <span class="composer-ctx-track">
+            <span>{context.text}</span>
+            <span class="meter composer-ctx-meter">
               <span
-                class="composer-ctx-fill"
+                class="meter-fill"
                 style={{ width: `${context.percent}%` }}
               />
             </span>
@@ -254,7 +257,7 @@ export function Composer({
           onClick={() => {
             if (running) {
               onStop().catch((err) => {
-                failure.value = reason(err);
+                failure.value = says(err);
               });
             } else void submit();
           }}

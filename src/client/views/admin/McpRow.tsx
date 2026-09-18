@@ -24,7 +24,7 @@ import {
   patchServer,
   refreshServer,
 } from "../../data/mcp.ts";
-import { ago, firstSentence, reason } from "../../lib/format.ts";
+import { ago, firstSentence, reason, sentence } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -357,7 +357,8 @@ export function ServerRow({
       <div class="mcp-open">
         {(failed !== null || server.refreshError !== null) && (
           <span class="mcp-note error">
-            {failed?.words ?? server.refreshError}, {servedLine(server, now)}
+            {sentence(failed?.words ?? server.refreshError ?? "")}{" "}
+            {sentence(servedLine(server, now))}
           </span>
         )}
         {server.lastChange !== null && (
@@ -428,7 +429,7 @@ export function ServerRow({
               <span class="hint">Server sent no instructions</span>
             ) : (
               <>
-                <pre class="mcp-block">{box.text}</pre>
+                <pre class="textbox">{box.text}</pre>
                 {box.canToggle && (
                   <button
                     type="button"

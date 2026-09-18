@@ -170,8 +170,8 @@ describe("scheduleWords", () => {
 describe("the row's words", () => {
   test("the next fire, after a failed last run", () => {
     expect(rowState(automation(), now)).toEqual({
+      bad: null,
       text: "next in 4h",
-      bad: false,
     });
     const failed = automation({
       lastEventAt: now - 2 * HOUR,
@@ -179,8 +179,8 @@ describe("the row's words", () => {
       lastRunStatus: "failed",
     });
     expect(rowState(failed, now)).toEqual({
-      text: "failed 2h ago · next in 4h",
-      bad: true,
+      bad: "failed 2h ago",
+      text: "next in 4h",
     });
     const done = automation({ ...failed, lastRunStatus: "done" });
     expect(rowState(done, now).text).toBe("next in 4h");
@@ -204,7 +204,7 @@ describe("the row's words", () => {
     const off = automation({ suspendedAt: now - HOUR, nextAt: null });
     expect(rowState(off, now).text).toBe("suspended");
     const busy = automation({ lastRunStatus: "running" });
-    expect(rowState(busy, now)).toEqual({ text: "running", bad: false });
+    expect(rowState(busy, now)).toEqual({ bad: null, text: "running" });
   });
 
   test("a skip's reason shows on the page", () => {
@@ -352,6 +352,19 @@ describe("the form", () => {
     expect(
       automationFieldOf("ownMemory and projectMemory cannot both be on"),
     ).toBe("memory");
+  });
+
+  test("the server's range refusals land at their fields", () => {
+    expect(automationFieldOf("deadline must be above zero")).toBe("deadline");
+    expect(automationFieldOf("deadline is above the run limit")).toBe(
+      "deadline",
+    );
+    expect(automationFieldOf("retention must be from 1 to 365 days")).toBe(
+      "retention",
+    );
+    expect(
+      automationFieldOf("memory guidance must be at most 2000 bytes"),
+    ).toBe("memoryGuidance");
   });
 
   test("a mode fills its empty box with a suggestion and takes it back unchanged", () => {

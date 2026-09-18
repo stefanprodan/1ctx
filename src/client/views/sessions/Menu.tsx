@@ -16,7 +16,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { CLOSED, type MenuAction, menuStep } from "./Menu.model.ts";
 
@@ -79,7 +79,7 @@ export function Menu({
       refocus.current = true;
       step("saved");
     } catch (err) {
-      step({ failed: reason(err) });
+      step({ failed: says(err) });
     }
   };
   useEffect(() => {
@@ -110,7 +110,7 @@ export function Menu({
     try {
       await onDelete();
     } catch (err) {
-      step({ failed: reason(err) });
+      step({ failed: says(err) });
     }
   };
   const { asking, busy, failure } = state.value;
@@ -155,7 +155,7 @@ export function Menu({
             aria-expanded={open}
             onClick={() => step("toggle")}
           >
-            <span class="chat-menu-title">{title}</span>
+            <span class="cut">{title}</span>
             <Icon
               name="chevron"
               size={14}
@@ -165,10 +165,10 @@ export function Menu({
         )}
       </h1>
       {editing && failure && (
-        <div class="chat-menu-card chat-menu-failure error">{failure}</div>
+        <div class="menu chat-menu-card chat-menu-failure error">{failure}</div>
       )}
       {open && (
-        <div class="chat-menu-card">
+        <div class="menu chat-menu-card">
           {asking ? (
             <div class="chat-menu-ask">
               <p class={`chat-menu-ask-text${failure ? " error" : ""}`}>
@@ -197,13 +197,13 @@ export function Menu({
           ) : (
             <>
               {onRename !== undefined && (
-                <button type="button" class="chat-menu-item" onClick={edit}>
+                <button type="button" class="menu-item" onClick={edit}>
                   <Icon name="pencil" size={14} />
                   <span>Rename</span>
                 </button>
               )}
               <a
-                class="chat-menu-item"
+                class="menu-item"
                 href={download}
                 download
                 onClick={() => step("dismiss")}
@@ -214,7 +214,7 @@ export function Menu({
               {onDelete !== undefined && (
                 <button
                   type="button"
-                  class="chat-menu-item"
+                  class="menu-item"
                   disabled={running}
                   title={running ? `Stop the ${noun} first` : undefined}
                   onClick={() => step("ask")}

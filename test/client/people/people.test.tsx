@@ -262,7 +262,7 @@ describe("the pages", () => {
       };
       const html = render(<User params={{ username: "bogdan" }} />);
       expect(html).toContain(">Bogdan P<");
-      expect(html).toContain('class="people-meta people-handle">@bogdan<');
+      expect(html).toContain('class="who-line who-handle">@bogdan<');
       expect(html).toContain(">Disabled<");
       expect(html).toContain('href="mailto:bogdan@example.com"');
       expect(html).toContain(">Head of SRE.<");
@@ -307,16 +307,14 @@ describe("the pages", () => {
         "router · 128k · $0.14 / $0.28 · tools · reasoning",
       );
       expect(html).toContain(
-        'class="people-prompt-text people-prompt-cut">You write code.\nSmall diffs.<',
+        'class="people-prompt clamp">You write code.\nSmall diffs.<',
+      );
+      expect(html).toContain('>Prompt</span><span class="rows-hint">7 tokens<');
+      expect(html).toContain(
+        '>Skills</span><span class="rows-hint">2k tokens<',
       );
       expect(html).toContain(
-        'class="label">Prompt</span><span class="rows-hint">7 tokens<',
-      );
-      expect(html).toContain(
-        'class="label">Skills</span><span class="rows-hint">2k tokens<',
-      );
-      expect(html).toContain(
-        'class="label">Tools</span><span class="rows-hint">300 tokens<',
+        '>Tools</span><span class="rows-hint">300 tokens<',
       );
       expect(html).toContain(">timoni<");
       // the description under the name, the fetch time at the row's end

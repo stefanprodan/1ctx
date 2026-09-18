@@ -8,6 +8,7 @@
 // asked once in place.
 
 import { useSignal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import type { SkillSummary } from "../../../shared/contracts/skill.ts";
 import {
@@ -22,7 +23,8 @@ import {
   skills,
   skillsError,
 } from "../../data/skills.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
+import { agentHref } from "../../lib/hrefs.ts";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -37,6 +39,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
+import { textBox } from "../knowledge/Knowledge.model.ts";
 import { SkillForm } from "./SkillForm.tsx";
 import {
   bytesWord,
@@ -57,12 +60,13 @@ function Text({
   held: string | undefined;
 }) {
   const failure = useSignal<string | null>(null);
+  const expanded = useSignal(false);
   useEffect(() => {
     failure.value = null;
     if (held !== undefined) return;
     let current = true;
     load().catch((err) => {
-      if (current) failure.value = reason(err);
+      if (current) failure.value = says(err);
     });
     return () => {
       current = false;
@@ -70,7 +74,25 @@ function Text({
   }, [held]);
   if (failure.value) return <p class="skills-state error">{failure.value}</p>;
   if (held === undefined) return <p class="skills-state">Loading</p>;
-  return <pre class="skills-text">{held}</pre>;
+  // cut to its first lines, since a box that scrolls on its own inside
+  // the page's scroll leaves the page's sticky head behind
+  const box = textBox(held, expanded.value);
+  return (
+    <div class="skills-text">
+      <pre class="textbox">{box.text}</pre>
+      {box.canToggle && (
+        <button
+          type="button"
+          class="btn btn-small skills-toggle"
+          onClick={() => {
+            expanded.value = !expanded.value;
+          }}
+        >
+          {box.label}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function FileRow({
@@ -111,13 +133,16 @@ function Fact({
 }: {
   label: string;
   mono?: boolean;
-  children: string | string[];
+  // lines of text, or what a line holds when it links
+  children: string | string[] | ComponentChildren;
 }) {
+  const lines =
+    Array.isArray(children) && children.every((c) => typeof c === "string");
   return (
     <>
-      <span class="skills-fact-label">{label}</span>
+      <span class="label">{label}</span>
       <span class={`skills-fact${mono ? " skills-fact-mono" : ""}`}>
-        {Array.isArray(children) ? children.join("\n") : children}
+        {lines ? children.join("\n") : children}
       </span>
     </>
   );
@@ -145,7 +170,7 @@ function SkillRow({
       if (what === "refresh") await refreshSkill(skill.id);
       else await deleteSkill(skill.id);
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
       // the server records a failed refresh on the row: the list learns
       // it, so the head still says so once these words are gone
       if (what === "refresh") void loadSkills();
@@ -207,7 +232,14 @@ function SkillRow({
             {[sourceLine(skill), skill.sourceUrl]}
           </Fact>
           <Fact label="Agents">
-            {skill.agents.length === 0 ? "None" : skill.agents.join(", ")}
+            {skill.agents.length === 0
+              ? "None"
+              : skill.agents.map((name, i) => (
+                  <span key={name}>
+                    {i > 0 && ", "}
+                    <a href={agentHref(name)}>{name}</a>
+                  </span>
+                ))}
           </Fact>
           <Fact label="Digest" mono>
             {`${skill.digest.slice(0, 12)} · ${changeLine(

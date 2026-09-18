@@ -11,9 +11,6 @@
   .automations-faint {
     color: var(--faint);
   }
-  .automations-bad {
-    color: var(--failed);
-  }
   .automations-strong {
     color: var(--fg);
   }
@@ -25,22 +22,6 @@
     margin: 0;
     font-size: var(--text-small);
     color: var(--faint);
-  }
-
-  /* the tab's row icon, lit by the last run */
-  .automations-icon-running {
-    color: var(--running);
-  }
-  .automations-icon-failed {
-    color: var(--failed);
-  }
-  /* a run's clock is lit by its status, as the feed's is; the tab's
-     rows light only running and failed */
-  .automations-run-icon {
-    color: var(--faint);
-  }
-  .automations-run-icon.automations-icon-done {
-    color: var(--done);
   }
 
   /* the automation page */
@@ -60,9 +41,6 @@
     flex-direction: column;
     gap: var(--space-3);
     padding: var(--space-4);
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
   }
   .automations-brief-line,
   .automations-brief-next {
@@ -83,6 +61,7 @@
     background: var(--inset);
   }
   .automations-brief-body {
+    --clamp: 4;
     margin: 0;
     font-size: var(--text-input);
     line-height: 1.6;
@@ -97,26 +76,10 @@
     gap: var(--space-3);
     min-height: 20px;
   }
-  .automations-brief-cut {
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
   .automations-more {
     margin-left: auto;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--dim);
-    font-size: var(--text-small);
-    cursor: pointer;
-  }
-  .automations-more:hover {
-    color: var(--fg);
   }
 
-  /* the same segmented switch as the stream's head */
   /* a run's meta: its length over its share of the deadline, then when */
   .automations-run-meta {
     display: flex;
@@ -129,17 +92,13 @@
     gap: var(--space-1);
     width: 84px;
   }
-  .automations-bar {
-    height: 3px;
-    border-radius: var(--radius-cell);
-    background: var(--line-strong);
-    overflow: hidden;
+  /* one width for every "ago", so the bars line up row to row */
+  .automations-ago {
+    display: inline-block;
+    min-width: 8ch;
+    text-align: right;
   }
-  .automations-bar-fill {
-    display: block;
-    height: 100%;
-    background: var(--faint);
-  }
+  /* the meter's fill in the run's colour while it runs or once failed */
   .automations-bar-running {
     background: var(--running);
   }
@@ -171,6 +130,7 @@
   .automations-task {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-card);
@@ -184,17 +144,12 @@
   .automations-task-invalid:focus-within {
     border-color: var(--failed);
   }
-  /* a box and the refusal under it */
-  .automations-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
   /* the guidance under its box, apart from the next box */
   .automations-guidance {
     margin: var(--space-1) 0 var(--space-2);
   }
   .automations-task .automations-task-text {
+    min-width: 0;
     padding: var(--space-1) 0;
     border: 0;
     background: transparent;
@@ -208,56 +163,12 @@
     align-items: center;
   }
 
-  .automations-pair {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-4);
-  }
-
   .automations-schedule {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
     min-width: 0;
   }
-  .automations-seg {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-    width: fit-content;
-    max-width: 100%;
-    margin: 0;
-    padding: 2px;
-    border-radius: var(--radius);
-    border: 1px solid var(--line);
-  }
-  .automations-seg-option {
-    padding: var(--space-1) var(--space-3);
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--dim);
-    font-size: var(--text-ui);
-    cursor: pointer;
-  }
-  .automations-seg-option:hover {
-    color: var(--fg);
-  }
-  .automations-seg-on {
-    background: var(--line);
-    color: var(--fg);
-  }
-  .automations-seg-option:disabled {
-    cursor: default;
-    opacity: 0.5;
-  }
-  .automations-seg-on:disabled {
-    opacity: 1;
-  }
-  .automations-seg-invalid {
-    border-color: var(--failed);
-  }
-
   .automations-when {
     display: flex;
     flex-wrap: wrap;
@@ -307,9 +218,6 @@
     flex-direction: column;
     gap: var(--space-3);
     padding: var(--space-3);
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
     font-size: var(--text-ui);
   }
   .automations-readback-head {
@@ -328,11 +236,5 @@
     align-items: center;
     gap: var(--space-2);
     color: var(--dim);
-  }
-
-  @media (max-width: 719px) {
-    .automations-pair {
-      grid-template-columns: 1fr;
-    }
   }
 }

@@ -209,9 +209,15 @@ describe("the model", () => {
     expect(timeoutMs(" 2.5 ")).toBe(2500);
     expect(timeoutProblem("")).toBeNull();
     expect(timeoutProblem("90")).toBeNull();
-    expect(timeoutProblem("abc")).toBe("A number of seconds");
-    expect(timeoutProblem("0.5")).toBe("1 to 3600 seconds");
-    expect(timeoutProblem("3601")).toBe("1 to 3600 seconds");
+    expect(timeoutProblem("abc")).toBe(
+      "The call timeout needs a number of seconds",
+    );
+    expect(timeoutProblem("0.5")).toBe(
+      "The call timeout must be from 1 to 3600 seconds",
+    );
+    expect(timeoutProblem("3601")).toBe(
+      "The call timeout must be from 1 to 3600 seconds",
+    );
   });
 
   test.serial(
@@ -328,7 +334,11 @@ describe("the model", () => {
     expect(mcpFieldOf("readPatterns has an invalid pattern")).toBe(
       "readPatterns",
     );
-    expect(mcpFieldOf("the MCP server refused the key")).toBeUndefined();
+    expect(mcpFieldOf("the MCP server refused the key")).toBe("keyName");
+    expect(mcpFieldOf("the MCP server is offline")).toBe("url");
+    expect(mcpFieldOf("MCP request timed out")).toBe("url");
+    expect(mcpFieldOf("an agent uses the MCP server")).toBeUndefined();
+    expect(mcpFieldOf("the MCP server is refreshing")).toBeUndefined();
   });
 
   test.serial(
@@ -486,7 +496,7 @@ describe("the page", () => {
         <ServerRow server={changed} now={now} open onToggle={() => {}} />,
       );
       expect(html).toContain("refresh failed 1m ago");
-      expect(html).toContain("discovery failed, serving the list from 2h ago");
+      expect(html).toContain("Discovery failed. Serving the list from 2h ago.");
       expect(html).toContain("1h ago: 1 tool added, 1 removed, 1 changed");
       expect(html).toContain("new_tool");
       expect(html).toContain("old_tool");

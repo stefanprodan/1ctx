@@ -7,7 +7,7 @@ import type {
   ToolVisualResponse,
 } from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
-import { reason } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { visualKey } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
@@ -88,8 +88,7 @@ export async function loadToolResult(messageId: string): Promise<void> {
     );
     set({ status: "done", ...body });
   } catch (error) {
-    if (!request.signal.aborted)
-      set({ status: "failed", error: reason(error) });
+    if (!request.signal.aborted) set({ status: "failed", error: says(error) });
   }
 }
 
@@ -120,7 +119,6 @@ export async function loadVisual(
     );
     set({ status: "done", ...body });
   } catch (error) {
-    if (!request.signal.aborted)
-      set({ status: "failed", error: reason(error) });
+    if (!request.signal.aborted) set({ status: "failed", error: says(error) });
   }
 }

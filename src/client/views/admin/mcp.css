@@ -20,9 +20,6 @@
     grid-column: 1 / -1;
   }
   .mcp-head-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
     align-items: start;
   }
   .mcp-pattern-row {
@@ -43,12 +40,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-4);
-  }
-  .mcp-switch {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
   }
   .mcp-note {
     font-size: var(--text-small);
@@ -94,16 +85,22 @@
   }
 
   /* a group of tools: the list's head with the count, then a row per
-     tool that opens to the description and the parameters */
-  .mcp-group {
+     tool that opens to the description and the parameters; the
+     instructions, the block as the prompt carries it; the agent form's
+     preview of what a send would carry */
+  .mcp-group,
+  .mcp-tool-body,
+  .mcp-instructions,
+  .mcp-preview {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
   }
+  /* the mode reads as the form's next field, not a line of the list */
+  .mcp-mode {
+    margin-top: var(--space-3);
+  }
   .mcp-tool-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
     font-size: var(--text-small);
   }
   .mcp-tool-text {
@@ -111,56 +108,24 @@
     overflow-wrap: anywhere;
   }
 
-  /* the instructions: the block as the prompt carries it */
-  .mcp-instructions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
   .mcp-instructions-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-3);
   }
-  .mcp-block {
-    margin: 0;
-    padding: var(--space-3);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--inset);
-    font-family: var(--mono);
-    font-size: var(--text-small);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
   .mcp-toggle {
     align-self: flex-start;
   }
 
-  .mcp-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-  }
   .mcp-ask {
     font-size: var(--text-small);
   }
 
-  .mcp-preview {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
   @media (max-width: 719px) {
-    .mcp-head-row,
     .mcp-pattern-row {
       grid-template-columns: 1fr;
     }
-  }
-  @media (max-width: 719px) {
     .mcp-instructions-head {
       flex-wrap: wrap;
     }

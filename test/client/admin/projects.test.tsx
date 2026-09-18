@@ -332,8 +332,10 @@ describe("the page", () => {
     adminProjects.value = [{ ...team, memberCount: 3 }];
     const html = render(<AdminProjects />);
     expect(html).toContain("New project");
-    expect(html).toContain('class="rows-name rows-name-mono">platform<');
-    expect(html).not.toContain("rows-avatar");
+    expect(html).toContain(
+      'class="rows-name rows-name-mono"><span class="cut">platform<',
+    );
+    expect(html).not.toContain('class="avatar"');
     expect(html).toContain('class="rows-sub">3 members<');
     expect(html).toContain(">since 14 September 2026<");
     expect(html).not.toContain("Oana Mangiurea");

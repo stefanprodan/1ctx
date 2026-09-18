@@ -98,9 +98,13 @@ describe("automation memory guidance", () => {
         "é".repeat(MAX_MEMORY_GUIDANCE / 2 + 1),
       ]) {
         const body = { ...automationBody(chat), memoryGuidance: value };
-        expect(() => parseSaveAutomation(body)).toThrow("memoryGuidance");
+        // the type's refusal names the wire field, the cap's the words
+        // a person reads at the field
+        const said =
+          typeof value === "string" ? "memory guidance" : "memoryGuidance";
+        expect(() => parseSaveAutomation(body)).toThrow(said);
         expect(() => parsePatchAutomation({ memoryGuidance: value })).toThrow(
-          "memoryGuidance",
+          said,
         );
         const created = await chat.member.call(
           "POST",

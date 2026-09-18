@@ -17,7 +17,7 @@ import {
   MEMORY_ENTRY_CHARS,
 } from "../../../shared/memory.ts";
 import { loadMemory, saveMemory, undoMemory } from "../../data/memory.ts";
-import type { Failure } from "../../lib/format.ts";
+import { type Failure, sentence } from "../../lib/format.ts";
 import { userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
@@ -150,7 +150,7 @@ function Editor({
                 <FieldError save={save} field={textField(index)} />
               ) : (
                 <span
-                  class={`hint note-box-size${entry.text.trim().length > MEMORY_ENTRY_CHARS ? " note-box-size-over" : ""}`}
+                  class={`hint note-box-size${entry.text.trim().length > MEMORY_ENTRY_CHARS ? " error" : ""}`}
                 >
                   {textSize(entry.text)}
                 </span>
@@ -241,7 +241,9 @@ export function Note({
       <Rows>
         <RowsCard label={label}>
           <p class="note-empty">
-            {error === null ? "Loading" : `Did not load. ${error.words}`}
+            {error === null
+              ? "Loading"
+              : `Did not load. ${sentence(error.words)}`}
           </p>
         </RowsCard>
       </Rows>
@@ -258,17 +260,17 @@ export function Note({
         hint={countLine(memory.entries)}
         action={
           !editing.value && (
-            <span class="note-switch">
+            <span class="seg seg-small note-switch">
               <button
                 type="button"
-                class={`note-switch-tab${view === "current" ? " note-switch-on" : ""}`}
+                class={`seg-option${view === "current" ? " seg-on" : ""}`}
                 onClick={() => setView("current")}
               >
                 Current
               </button>
               <button
                 type="button"
-                class={`note-switch-tab${view === "changes" ? " note-switch-on" : ""}`}
+                class={`seg-option${view === "changes" ? " seg-on" : ""}`}
                 disabled={memory.previous === null}
                 onClick={() => setView("changes")}
               >
@@ -280,13 +282,15 @@ export function Note({
       >
         {error !== null && (
           <p class="note-notice note-notice-line" role="alert">
-            Could not refresh. {error.words}
+            Could not refresh. {sentence(error.words)}
           </p>
         )}
         {memory.updatedAt !== null && (
           <div class="note-head">
             <Writer memory={memory} now={now} />
-            {view === "changes" && <span>since the previous version</span>}
+            {view === "changes" && !editing.value && (
+              <span>since the previous version</span>
+            )}
           </div>
         )}
         {editing.value ? (

@@ -25,7 +25,7 @@ describe("lazy", () => {
     });
     await View.load();
     const html = render(<View />);
-    expect(html).toContain("chunk missing");
+    expect(html).toContain("Chunk missing.");
     expect(html).toContain("Try again");
     await View.load();
     expect(render(<View />)).toBe("<p>loaded</p>");

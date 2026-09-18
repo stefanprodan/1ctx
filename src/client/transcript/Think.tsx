@@ -40,8 +40,8 @@ export function Think({
   const { word, time } = thinkParts(v, live === null, Date.now());
   return (
     <details
-      class={`transcript-think${streaming ? " transcript-think-live" : ""}${
-        open ? " transcript-think-open" : ""
+      class={`transcript-fold${streaming ? " transcript-fold-live" : ""}${
+        open ? " transcript-fold-open" : ""
       }`}
       open={open}
       onToggle={(e) => {
@@ -51,9 +51,9 @@ export function Think({
         opened.value = next;
       }}
     >
-      <summary class="transcript-think-head">
-        <Icon name="spinner" size={12} class="transcript-think-spin" />
-        <Icon name="chevron-right" size={12} class="transcript-think-chevron" />
+      <summary class="transcript-fold-head transcript-fold-small">
+        <Icon name="spinner" size={12} class="transcript-fold-spin" />
+        <Icon name="chevron-right" size={12} class="transcript-fold-chevron" />
         <span class="transcript-think-word">{word}</span>
         {time !== null && <span class="transcript-think-time">{time}</span>}
       </summary>

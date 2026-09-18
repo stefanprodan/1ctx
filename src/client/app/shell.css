@@ -29,6 +29,9 @@
     flex-direction: column;
     padding: 0 var(--shell-gutter);
     overflow-y: auto;
+    /* a focused field scrolls into view below the stuck page head, its
+       label included, never under it */
+    scroll-padding-top: 96px;
   }
 
   /* the folded rail: its colour and edge, the button and the mark */
@@ -50,21 +53,10 @@
     color: var(--fg);
   }
 
-  .shell-show {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--dim);
-    cursor: pointer;
-  }
-  .shell-show:hover {
+  /* the strip is the rail's ground, so its lit fill is the one the
+     rail lights with, --card */
+  .shell-strip .shell-show:hover {
     background: var(--card);
-    color: var(--fg);
   }
 
   /* the first load failed: the reason and a retry, centred */

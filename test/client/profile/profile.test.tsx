@@ -72,7 +72,7 @@ describe("Profile", () => {
     };
     const html = render(<Profile />);
     expect(html).toContain('class="profile"');
-    expect(html).toContain('class="profile-avatar">OM<');
+    expect(html).toContain('class="avatar avatar-56">OM<');
     expect(html).toContain("@caelea");
     expect(html).toContain('class="section"');
     expect(html).toContain('class="split-aside"');

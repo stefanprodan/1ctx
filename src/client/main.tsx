@@ -11,8 +11,10 @@ import { App } from "./app/App.tsx";
 import { reload, startLoading } from "./app/loading.ts";
 import { boot } from "./app/router.ts";
 import { watchWidth } from "./app/shell.ts";
+import { watchTheme } from "./app/theme.ts";
 import { startSocket } from "./data/socket.ts";
 
+watchTheme();
 boot();
 watchWidth();
 startLoading();

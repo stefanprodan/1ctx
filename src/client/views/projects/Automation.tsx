@@ -13,10 +13,10 @@
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import type { RunFilter } from "../../../shared/words.ts";
+import type { RunFilter, SessionStatus } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
 import {
@@ -35,14 +35,15 @@ import { me } from "../../data/me.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents, stopSession } from "../../data/sessions.ts";
-import { longDate, reason, stamp, until } from "../../lib/format.ts";
+import { longDate, says, sentence, stamp, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { onResize } from "../../lib/resize.ts";
+import { useCut } from "../../lib/resize.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   RowsAvatar,
+  RowsBad,
   RowsCard,
   RowsEnd,
   RowsFilters,
@@ -77,6 +78,12 @@ const FILTERS: { value: RunFilter | null; label: string }[] = [
   { value: "manual", label: "Manual" },
 ];
 
+// a run's clock is lit by its status, as the feed's is; a stopped run
+// stays faint
+function runIcon(status: SessionStatus): string {
+  return status === "stopped" ? "automations-faint" : `status-${status}`;
+}
+
 function RunRow({
   row,
   deadlineMs,
@@ -104,7 +111,7 @@ function RunRow({
               onClick={() => {
                 failure.value = null;
                 stopSession(session.id).catch((err) => {
-                  failure.value = reason(err);
+                  failure.value = says(err);
                 });
               }}
             >
@@ -115,26 +122,30 @@ function RunRow({
         ) : undefined
       }
     >
-      <RowsAvatar>
+      {/* the icon says how the run started, and who pressed Run now
+          under the pointer, so the line is the feed's: author and words */}
+      <RowsAvatar title={sourceText(row) || undefined}>
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
           size={15}
-          class={`automations-run-icon automations-icon-${session.status}`}
+          class={runIcon(session.status)}
         />
       </RowsAvatar>
       <RowsTitle
         name={stamp(row.send?.startedAt ?? session.createdAt)}
-        bad={session.status === "failed" || failure.value !== null}
         sub={
           <>
-            {sourceText(row)}
-            {" · "}
             {line.author !== null && (
               <>
                 <RowsHandle name={line.author} />{" "}
               </>
             )}
-            {failure.value ?? line.text}
+            {/* only the failure's words are red; who ran it keeps its colour */}
+            {failure.value !== null || session.status === "failed" ? (
+              <RowsBad>{failure.value ?? line.text}</RowsBad>
+            ) : (
+              line.text
+            )}
             {row.send?.memoryError != null && " Memory not updated."}
             {row.send?.memorySkipped != null &&
               row.send.memorySkipped > 0 &&
@@ -142,18 +153,20 @@ function RunRow({
           </>
         }
       />
-      <RowsMeta>
+      <RowsMeta keep>
         <span class="automations-run-meta">
           <span class="automations-took">
             <span>{took === null ? "" : durationText(took)}</span>
-            <span class="automations-bar" aria-hidden="true">
+            <span class="meter" aria-hidden="true">
               <span
-                class={`automations-bar-fill automations-bar-${session.status}`}
+                class={`meter-fill automations-bar-${session.status}`}
                 style={{ width: `${Math.round(share * 100)}%` }}
               />
             </span>
           </span>
-          {!running && <span>{whenText(row, now)}</span>}
+          {!running && (
+            <span class="automations-ago">{whenText(row, now)}</span>
+          )}
         </span>
       </RowsMeta>
     </RowsGo>
@@ -170,26 +183,13 @@ function Instructions({
   // the state line under the box, which Show more shares
   foot: ComponentChildren;
 }) {
-  const open = useSignal(false);
-  const long = useSignal(false);
-  const el = useRef<HTMLParagraphElement>(null);
-  useLayoutEffect(() => {
-    const node = el.current;
-    if (node === null) return;
-    const measure = () => {
-      if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
-    };
-    measure();
-    return onResize(node, measure);
-  }, [text, open, long]);
+  const { el, open, long } = useCut<HTMLParagraphElement>([text]);
   return (
     <>
       <div class="automations-brief-text">
         <p
           ref={el}
-          class={`automations-brief-body${
-            open.value ? "" : " automations-brief-cut"
-          }`}
+          class={`automations-brief-body${open.value ? "" : " clamp"}`}
         >
           {text}
         </p>
@@ -199,7 +199,7 @@ function Instructions({
         {long.value && (
           <button
             type="button"
-            class="automations-more"
+            class="btn-text automations-more"
             aria-expanded={open.value}
             onClick={() => {
               open.value = !open.value;
@@ -232,7 +232,9 @@ function NextRuns({ automation }: { automation: AutomationSummary }) {
           <span class="automations-faint">{until(fire, now)}</span>
         </div>
       ))}
-      {held?.problem && <div class="split-line error">{held.problem}</div>}
+      {held?.problem && (
+        <div class="split-line error">{sentence(held.problem)}</div>
+      )}
       {automation.tz !== browserZone() && (
         <div class="split-line automations-faint">In {automation.tz}</div>
       )}
@@ -368,7 +370,7 @@ export function Automation({ params }: { params: Params }) {
             </>
           }
         >
-          <section class="automations-brief">
+          <section class="card automations-brief">
             <p class="automations-brief-line">
               <span class="automations-strong">
                 {scheduleTitle(row.schedule)}

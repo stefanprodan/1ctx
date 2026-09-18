@@ -17,23 +17,17 @@
     border-bottom: 0;
   }
   .stream-row:hover {
-    background: var(--line);
+    background: var(--hover);
     color: var(--fg);
   }
 
-  /* the icon says chat or run; its colour says the status */
+  /* the icon says chat or run; its colour says the status, from base,
+     and a stopped one has none */
   .stream-icon {
     flex-shrink: 0;
+  }
+  .stream-icon-stopped {
     color: var(--faint);
-  }
-  .stream-icon-running {
-    color: var(--running);
-  }
-  .stream-icon-done {
-    color: var(--done);
-  }
-  .stream-icon-failed {
-    color: var(--failed);
   }
 
   .stream-text {
@@ -46,17 +40,11 @@
 
   .stream-title {
     font-size: var(--text-input);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .stream-line {
     font-size: var(--text-small);
     color: var(--faint);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .stream-project {
@@ -67,6 +55,10 @@
 
   .stream-author {
     color: var(--brand);
+  }
+  /* a failure's words, the author keeping its colour */
+  .stream-bad {
+    color: var(--failed);
   }
 
   .stream-when {

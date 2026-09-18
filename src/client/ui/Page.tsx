@@ -110,7 +110,7 @@ export function Page({
         {actions && <div class="page-actions">{actions}</div>}
       </div>
       {failed ? (
-        <div class="page-failed" role="alert">
+        <div class="notice-failed page-failed" role="alert">
           <Icon name="alert" size={20} class="page-failed-icon" />
           <div class="page-failed-words">
             <p class="page-failed-title">

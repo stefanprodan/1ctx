@@ -23,64 +23,10 @@
     gap: var(--space-1);
   }
 
-  .users-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
-  .users-field-wide {
-    grid-column: 1 / -1;
-  }
-
-  /* the role: two cards, the chosen one lit */
-  .users-roles {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
-  }
-  .users-role {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-3);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--dim);
-    text-align: left;
-    cursor: pointer;
-  }
-  .users-role:hover {
-    color: var(--fg);
-  }
-  .users-role:disabled {
-    cursor: default;
-    color: var(--faint);
-  }
-  .users-role-on,
-  .users-role-on:disabled {
-    border-color: var(--brand);
-    color: var(--fg);
-  }
-  .users-role-label {
-    font-weight: 500;
-  }
-  .users-role-text {
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
-
   .users-switch {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     min-width: 0;
-  }
-
-  @media (max-width: 719px) {
-    .users-fields,
-    .users-roles {
-      grid-template-columns: 1fr;
-    }
   }
 }

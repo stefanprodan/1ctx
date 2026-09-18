@@ -31,7 +31,9 @@
     text-transform: none;
   }
 
-  .md-h1 {
+  /* a reply rarely has more than two levels; the top two stand out */
+  .md-h1,
+  .md-h2 {
     font-size: var(--text-title);
   }
 

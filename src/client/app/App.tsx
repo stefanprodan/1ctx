@@ -80,7 +80,7 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
         <aside class="shell-strip">
           <button
             type="button"
-            class="shell-show"
+            class="btn-icon shell-show"
             aria-label="Show the menu"
             onClick={showRail}
           >
@@ -100,7 +100,7 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
           <button
             ref={show}
             type="button"
-            class="shell-show shell-show-float"
+            class="btn-icon shell-show shell-show-float"
             aria-label="Show the menu"
             onClick={openDrawer}
           >

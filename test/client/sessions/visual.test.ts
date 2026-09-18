@@ -298,7 +298,7 @@ test.serial(
     await loadVisual("reply0000001", 0);
     expect(toolVisuals.value.get(key)).toEqual({
       status: "failed",
-      error: "no such visual",
+      error: "No such visual.",
     });
     me.value = {
       id: "another",

@@ -1,0 +1,55 @@
+/* The head of a page about someone: the big avatar, the name, the
+   faint lines under it. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .who {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+  .who-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .who-name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-size: var(--text-body);
+    font-weight: 600;
+  }
+  .who-name-mono {
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+  }
+
+  .who-line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  /* as the stream names an author */
+  .who-handle {
+    color: var(--brand);
+  }
+
+  /* shown only where the aside is hidden; 1100 is the split's width */
+  .who-narrow {
+    display: none;
+  }
+  @media (max-width: 1099px) {
+    .who-narrow {
+      display: block;
+    }
+  }
+}

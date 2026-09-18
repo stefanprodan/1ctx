@@ -43,7 +43,7 @@ import { AgentForm } from "./AgentForm.tsx";
 import { keyLine } from "./Agents.model.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
 import "./agents.css";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 
 // a provider shows its service's mark, or a cloud for a server
 // without one; an agent's tile is the shared row's
@@ -95,7 +95,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
     try {
       await deleteProvider(provider.id);
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
       busy.value = false;
     }
   };

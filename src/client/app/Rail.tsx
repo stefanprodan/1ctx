@@ -4,8 +4,8 @@
 // The rail: the logo with the button that hides it, the pages the route
 // table lists with the user's projects under Projects, personal first,
 // a group as a row that opens to its pages, open while one is shown,
-// and the user row at the bottom with its menu: the profile and sign
-// out. A sign out the server refuses stays in the menu with the
+// and the user row at the bottom with its menu: the profile, the dark
+// theme's switch and sign out. A sign out the server refuses stays in the menu with the
 // reason. As a drawer the hide button is a close, it takes the focus
 // when the drawer opens, and any link closes the drawer, the one to the
 // page already shown included, since that is no navigation.
@@ -18,11 +18,12 @@ import { automationProject } from "../data/automations.ts";
 import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
-import { initials, reason } from "../lib/format.ts";
+import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
 import { onPage, projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
+import { theme, toggleTheme } from "./theme.ts";
 import "./rail.css";
 
 function Sub({
@@ -145,7 +146,7 @@ export function Rail({
           <button
             ref={hide}
             type="button"
-            class="rail-hide"
+            class="btn-icon rail-hide"
             aria-label={narrow ? "Close the menu" : "Hide the menu"}
             onClick={onHide}
           >
@@ -194,9 +195,9 @@ export function Rail({
       </div>
       <div class="rail-user">
         {open.value && (
-          <div class="rail-menu">
+          <div class="menu rail-menu">
             <a
-              class="rail-menu-item"
+              class="menu-item"
               href="/profile"
               onClick={() => {
                 open.value = false;
@@ -208,13 +209,28 @@ export function Rail({
             </a>
             <button
               type="button"
-              class="rail-menu-item"
+              role="switch"
+              aria-checked={theme.value === "dark"}
+              class="menu-item"
+              onClick={toggleTheme}
+            >
+              <Icon name="moon" size={14} />
+              <span>Dark theme</span>
+              <span
+                class={`rail-menu-switch switch${theme.value === "dark" ? " switch-on" : ""}`}
+              >
+                <span class="switch-knob" />
+              </span>
+            </button>
+            <button
+              type="button"
+              class="menu-item"
               onClick={async () => {
                 failure.value = null;
                 try {
                   await logout();
                 } catch (err) {
-                  failure.value = reason(err);
+                  failure.value = says(err);
                   return;
                 }
                 open.value = false;
@@ -237,8 +253,8 @@ export function Rail({
             open.value = !open.value;
           }}
         >
-          <span class="rail-avatar">{initials(user.fullName)}</span>
-          <span class="rail-user-name">{user.fullName}</span>
+          <span class="avatar">{initials(user.fullName)}</span>
+          <span class="rail-user-name cut">{user.fullName}</span>
           <Icon name="chevron" size={14} class="rail-user-chevron" />
         </button>
       </div>

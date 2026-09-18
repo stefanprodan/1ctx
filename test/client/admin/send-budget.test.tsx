@@ -49,9 +49,11 @@ describe("send budget fields", () => {
     expect(defaultLine(tokenLimit)).toBe("default 500000 tokens");
     expect(defaultLine(bashLimit)).toBe("default 100");
     expect(problem(tokenLimit, "9999")).toBe(
-      "Tool-work tokens is 10000 to 10000000 tokens",
+      "Tool-work tokens must be from 10000 to 10000000 tokens",
     );
-    expect(problem(bashLimit, "1001")).toBe("Bash calls per send is 1 to 1000");
+    expect(problem(bashLimit, "1001")).toBe(
+      "Bash calls per send must be from 1 to 1000",
+    );
     expect(limitFieldOf("toolWorkTokens needs a number")).toBe(
       "toolWorkTokens",
     );

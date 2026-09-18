@@ -21,87 +21,12 @@
   }
 
   .profile-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
     padding-bottom: var(--space-5);
-  }
-
-  .profile-avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    font-family: var(--mono);
-    font-size: var(--text-input);
-    font-weight: 600;
-    color: var(--dim);
-  }
-
-  .profile-who {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .profile-name {
-    font-size: var(--text-body);
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .profile-meta {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
-
-  /* a long email is cut to the aside's width */
-  .profile-email {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* shown only where the aside is hidden; 1100 is the split's width */
-  .profile-narrow {
-    display: none;
-  }
-  @media (max-width: 1099px) {
-    .profile-narrow {
-      display: block;
-    }
-  }
-
-  /* the handle in the brand colour, as the stream names an author */
-  .profile-handle {
-    color: var(--brand);
   }
 
   .profile-fields {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-  }
-
-  .profile-pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
-
-  @media (max-width: 719px) {
-    .profile-pair {
-      grid-template-columns: 1fr;
-    }
   }
 }

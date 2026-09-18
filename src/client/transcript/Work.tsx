@@ -76,9 +76,9 @@ export function Work({
 
   return (
     <details
-      class={`transcript-work${running ? " transcript-work-live" : ""}${
-        open ? " transcript-work-open" : ""
-      }`}
+      class={`transcript-fold transcript-work${
+        running ? " transcript-fold-live" : ""
+      }${open ? " transcript-fold-open" : ""}`}
       open={open}
       onToggle={(event) => {
         const next = new Set(opened.value);
@@ -87,9 +87,9 @@ export function Work({
         opened.value = next;
       }}
     >
-      <summary class="transcript-work-head">
-        <Icon name="spinner" size={13} class="transcript-work-spin" />
-        <Icon name="chevron-right" size={13} class="transcript-work-chevron" />
+      <summary class="transcript-fold-head">
+        <Icon name="spinner" size={13} class="transcript-fold-spin" />
+        <Icon name="chevron-right" size={13} class="transcript-fold-chevron" />
         <span>{summary.text}</span>
       </summary>
       <div class="transcript-work-rounds">

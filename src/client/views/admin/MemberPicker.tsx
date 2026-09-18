@@ -13,7 +13,13 @@ import { addProjectMember } from "../../data/admin-projects.ts";
 import { initials } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import type { Save } from "../../lib/save.ts";
-import { RowsAvatar } from "../../ui/Rows.tsx";
+import {
+  RowsAvatar,
+  RowsButton,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { candidateNote, candidates, step } from "./AdminProjects.model.ts";
 import "./admin-projects.css";
 
@@ -36,7 +42,7 @@ export function MemberPicker({
   const disabled = save.busy && adding.value === null;
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const opener = useRef<HTMLButtonElement>(null);
+  const opener = useRef<HTMLDivElement>(null);
   // set by Escape and the close button, never by a click elsewhere,
   // which keeps the focus it moved
   const refocus = useRef(false);
@@ -55,13 +61,16 @@ export function MemberPicker({
 
   useEffect(() => {
     if (!open.value) {
-      if (refocus.current) opener.current?.focus();
+      if (refocus.current) opener.current?.querySelector("button")?.focus();
       refocus.current = false;
       return;
     }
     input.current?.focus();
+    // a click on what is no longer on the page, the Add member that
+    // opened the list, is not a click elsewhere
     const onClick = (ev: MouseEvent) => {
-      if (!root.current?.contains(ev.target as Node)) close();
+      const target = ev.target as Node;
+      if (target.isConnected && !root.current?.contains(target)) close();
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
@@ -115,21 +124,19 @@ export function MemberPicker({
   };
 
   if (!open.value) {
+    if (everyone.length === 0) return <RowsNote>Everyone is in.</RowsNote>;
     return (
-      <button
-        ref={opener}
-        type="button"
-        class="admin-projects-pick-open"
-        disabled={disabled || everyone.length === 0}
-        onClick={(event) => {
-          // the click that opens must not reach the outside listener
-          event.stopPropagation();
-          open.value = true;
-        }}
-      >
-        <Icon name="plus" size={14} />
-        {everyone.length === 0 ? "Everyone is in" : "Add member"}
-      </button>
+      <div ref={opener}>
+        <RowsButton
+          disabled={disabled}
+          onClick={() => {
+            open.value = true;
+          }}
+        >
+          <Icon name="plus" size={14} />
+          Add member
+        </RowsButton>
+      </div>
     );
   }
 
@@ -161,7 +168,7 @@ export function MemberPicker({
         />
         <button
           type="button"
-          class="admin-projects-pick-close"
+          class="btn-icon"
           aria-label="Close"
           onClick={() => {
             refocus.current = true;
@@ -172,7 +179,7 @@ export function MemberPicker({
         </button>
       </div>
       {list.length === 0 ? (
-        <p class="admin-projects-pick-none">No one matches.</p>
+        <RowsNote>No one matches.</RowsNote>
       ) : (
         <div class="admin-projects-pick-list" id={listId} role="listbox">
           {list.map((user, index) => (
@@ -183,8 +190,8 @@ export function MemberPicker({
               tabIndex={-1}
               aria-selected={index === active}
               aria-disabled={adding.value !== null}
-              class={`admin-projects-pick-option${
-                index === active ? " admin-projects-pick-option-on" : ""
+              class={`menu-item admin-projects-pick-option${
+                index === active ? " menu-item-on" : ""
               }`}
               onMouseDown={(event) => event.preventDefault()}
               onMouseMove={() => {
@@ -196,13 +203,10 @@ export function MemberPicker({
               <RowsAvatar lit={index === active}>
                 {initials(user.fullName)}
               </RowsAvatar>
-              <span class="admin-projects-person">
-                <span class="admin-projects-person-name">{user.fullName}</span>
-                <span class="admin-projects-person-user">@{user.username}</span>
-              </span>
-              <span class="admin-projects-pick-note">
+              <RowsTitle name={user.fullName} sub={`@${user.username}`} />
+              <RowsMeta>
                 {adding.value === user.id ? "adding" : candidateNote(user)}
-              </span>
+              </RowsMeta>
             </div>
           ))}
         </div>

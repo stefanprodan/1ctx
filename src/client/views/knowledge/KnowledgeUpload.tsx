@@ -101,7 +101,7 @@ export function KnowledgeUpload({
         <span class="knowledge-progress-total">{progress.aside}</span>
       </div>
       <div
-        class="knowledge-progress-track"
+        class="meter knowledge-progress-track"
         role="progressbar"
         aria-label="Upload progress"
         aria-valuemin={0}
@@ -109,7 +109,7 @@ export function KnowledgeUpload({
         aria-valuenow={Math.round(progress.percent)}
       >
         <div
-          class="knowledge-progress-fill"
+          class="meter-fill knowledge-progress-fill"
           style={{ width: `${progress.percent}%` }}
         />
       </div>
@@ -255,7 +255,7 @@ export function KnowledgeUpload({
           <>
             <button
               type="button"
-              class="btn btn-small"
+              class="btn"
               onClick={() => {
                 all.value = false;
                 state.reset();
@@ -269,11 +269,7 @@ export function KnowledgeUpload({
           </>
         ) : uploading ? (
           <>
-            <button
-              type="button"
-              class="btn btn-small"
-              onClick={() => state.stop()}
-            >
+            <button type="button" class="btn" onClick={() => state.stop()}>
               Stop
             </button>
             <button type="submit" class="btn btn-primary" disabled>
@@ -282,12 +278,7 @@ export function KnowledgeUpload({
           </>
         ) : (
           <>
-            <button
-              type="button"
-              class="btn btn-small"
-              disabled={busy}
-              onClick={onDone}
-            >
+            <button type="button" class="btn" disabled={busy} onClick={onDone}>
               Cancel
             </button>
             <button

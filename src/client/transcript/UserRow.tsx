@@ -18,7 +18,7 @@ export function UserRow({
   return (
     <div class="transcript-user">
       <div class="transcript-author">
-        <span class="transcript-user-tile">{initials(author.name)}</span>
+        <span class="avatar avatar-24">{initials(author.name)}</span>
         {author.username === null ? (
           <span class="transcript-name">{author.name}</span>
         ) : (
@@ -31,7 +31,7 @@ export function UserRow({
         )}
         <span class="transcript-when">{clock(m.createdAt)}</span>
       </div>
-      <div class="transcript-card">{m.content}</div>
+      <div class="card transcript-card">{m.content}</div>
     </div>
   );
 }

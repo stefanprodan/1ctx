@@ -68,7 +68,7 @@ function parseValues(
   if (take("deadlineMs")) {
     const value = body.deadlineMs;
     if (value !== null && (!Number.isInteger(value) || (value as number) < 1)) {
-      throw new BadRequest("deadlineMs must be null or a positive integer");
+      throw new BadRequest("deadline must be above zero");
     }
     out.deadlineMs = value as number | null;
   }
@@ -80,7 +80,7 @@ function parseValues(
       (value as number) > RETENTION_DAYS.max
     ) {
       throw new BadRequest(
-        `retentionDays must be from ${RETENTION_DAYS.min} to ${RETENTION_DAYS.max}`,
+        `retention must be from ${RETENTION_DAYS.min} to ${RETENTION_DAYS.max} days`,
       );
     }
     out.retentionDays = value as number;
@@ -107,7 +107,7 @@ function parseValues(
     const guidance = sanitize(value);
     if (new TextEncoder().encode(guidance).length > MAX_MEMORY_GUIDANCE) {
       throw new BadRequest(
-        `memoryGuidance must be at most ${MAX_MEMORY_GUIDANCE} bytes`,
+        `memory guidance must be at most ${MAX_MEMORY_GUIDANCE} bytes`,
       );
     }
     out.memoryGuidance = guidance;

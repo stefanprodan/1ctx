@@ -78,7 +78,7 @@ export function McpPicker({
     );
   };
   return (
-    <div class="field agents-field-wide">
+    <div class="field pair-wide">
       <RowsListHead
         label="MCP servers"
         hint={
@@ -109,7 +109,7 @@ export function McpPicker({
               </RowsLine>
             ))}
           </RowsList>
-          <div class="field">
+          <div class="field mcp-mode">
             <span class="label">Tool schemas</span>
             <Select
               label="Tool schemas"
@@ -145,9 +145,7 @@ export function McpPicker({
                     >
                       {viewing.value ? "Hide" : "View"}
                     </button>
-                    {viewing.value && (
-                      <pre class="mcp-block">{preview.text}</pre>
-                    )}
+                    {viewing.value && <pre class="textbox">{preview.text}</pre>}
                   </>
                 )}
               </div>

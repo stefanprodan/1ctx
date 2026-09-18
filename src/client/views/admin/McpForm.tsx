@@ -15,6 +15,7 @@ import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
+import { RowsCheck } from "../../ui/Rows.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   KEY_HINT,
@@ -70,18 +71,14 @@ export function McpFields({
     on: boolean,
     label: string,
   ) => (
-    <label class="mcp-switch">
-      <input
-        type="checkbox"
-        name={field}
-        checked={on}
-        disabled={busy}
-        onChange={(e) =>
-          onChange(field, (e.currentTarget as HTMLInputElement).checked)
-        }
-      />
+    <RowsCheck
+      name={field}
+      checked={on}
+      disabled={busy}
+      onChange={() => onChange(field, !on)}
+    >
       {label}
-    </label>
+    </RowsCheck>
   );
   const patterns = (
     field: "readText" | "writeText" | "excludedText",
@@ -118,7 +115,7 @@ export function McpFields({
     <>
       {/* the switches and the timeout share a row, the three pattern
           fields the next, so the form reads as two lines of settings */}
-      <div class="mcp-field-wide mcp-head-row">
+      <div class="mcp-field-wide pair mcp-head-row">
         <div class="field">
           <span class="label">Offered</span>
           <div class="mcp-switches">

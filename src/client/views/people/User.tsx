@@ -23,6 +23,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Who, WhoLine } from "../../ui/Who.tsx";
 import { peopleLine } from "../projects/Project.model.ts";
 import { localTime } from "./People.model.ts";
 import "./people.css";
@@ -56,10 +57,7 @@ export function User({ params }: { params: Params }) {
             <AsideSection label="Account">
               <div class="split-line">
                 Email
-                <a
-                  class="split-strong people-cut"
-                  href={`mailto:${shown.user.email}`}
-                >
+                <a class="split-strong cut" href={`mailto:${shown.user.email}`}>
                   {shown.user.email}
                 </a>
               </div>
@@ -77,7 +75,7 @@ export function User({ params }: { params: Params }) {
               </div>
               <div class="split-line">
                 Zone
-                <span class="split-strong people-cut">{shown.user.tz}</span>
+                <span class="split-strong cut">{shown.user.tz}</span>
               </div>
               <div class="split-line">
                 Joined
@@ -89,27 +87,18 @@ export function User({ params }: { params: Params }) {
           }
         >
           <div class="people">
-            <div class="people-head">
-              <span class="people-avatar">{initials(shown.user.fullName)}</span>
-              <div class="people-who">
-                <span class="people-name">
-                  <span class="people-cut">{shown.user.fullName}</span>
-                  {shown.user.disabled && (
-                    <span class="people-tag">Disabled</span>
-                  )}
-                </span>
-                <span class="people-meta people-handle">
-                  @{shown.user.username}
-                </span>
-                {/* the aside holds these, and it is hidden this narrow */}
-                <span class="people-meta people-narrow">
-                  {shown.user.email}
-                </span>
-                <span class="people-meta people-narrow">
-                  {localTime(shown.user.tz, now.value)} in {shown.user.tz}
-                </span>
-              </div>
-            </div>
+            <Who
+              avatar={initials(shown.user.fullName)}
+              name={shown.user.fullName}
+              tag={shown.user.disabled ? "Disabled" : undefined}
+            >
+              <WhoLine handle>@{shown.user.username}</WhoLine>
+              {/* the aside holds these, and it is hidden this narrow */}
+              <WhoLine narrow>{shown.user.email}</WhoLine>
+              <WhoLine narrow>
+                {localTime(shown.user.tz, now.value)} in {shown.user.tz}
+              </WhoLine>
+            </Who>
             <section class="people-section">
               <span class="label">About</span>
               {shown.user.about === "" ? (

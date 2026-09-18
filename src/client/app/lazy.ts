@@ -10,7 +10,7 @@
 import { signal } from "@preact/signals";
 import { type Attributes, type ComponentType, h } from "preact";
 import "./lazy.css";
-import { reason } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 
 export type Lazy<P> = ComponentType<P> & { load(): Promise<void> };
 
@@ -27,7 +27,7 @@ export function lazy<P>(loader: () => Promise<ComponentType<P>>): Lazy<P> {
         },
         (err) => {
           pending = null;
-          failure.value = reason(err);
+          failure.value = says(err);
         },
       );
     }

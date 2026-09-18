@@ -30,28 +30,28 @@ export function ProjectPicker({
           open.value = !open.value;
         }}
       >
-        <span class="composer-chip-tile">
+        <span class="avatar avatar-18 avatar-agent">
           <Icon name={projectIcon(picked?.kind ?? "team")} size={12} />
         </span>
         <span class="composer-chip-name">{picked?.name ?? "no project"}</span>
         <Icon name="chevron" size={12} />
       </button>
       {open.value && (
-        <ul class="composer-menu">
+        <ul class="menu composer-menu">
           {projects.map((p) => (
             <li key={p.id}>
               <button
                 type="button"
-                class={`composer-option${p.id === projectId ? " composer-option-on" : ""}`}
+                class={`menu-item composer-option${p.id === projectId ? " menu-item-on" : ""}`}
                 onClick={() => {
                   open.value = false;
                   onPick(p.id);
                 }}
               >
-                <span class="composer-chip-tile">
+                <span class="avatar avatar-18 avatar-agent">
                   <Icon name={projectIcon(p.kind)} size={12} />
                 </span>
-                <span class="composer-chip-name">{p.name}</span>
+                <span class="composer-option-name cut">{p.name}</span>
               </button>
             </li>
           ))}

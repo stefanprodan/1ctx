@@ -382,7 +382,7 @@ describe("CatalogSearch", () => {
       }, 0);
       s.type("x");
       await new Promise((r) => setTimeout(r, 2));
-      expect(s.error.value).toBe("the provider did not answer");
+      expect(s.error.value).toBe("The provider did not answer.");
       expect(s.matches.value).toEqual([]);
       fail = false;
       s.type("y");

@@ -215,9 +215,11 @@ describe("the limit words and units", () => {
   });
 
   test.serial("the range check speaks the page's unit", () => {
-    expect(problem(rounds, "0")).toBe("Rounds is 1 to 500");
-    expect(problem(toolMs, "5")).toBe("Tool time is 10 to 3600 s");
-    expect(problem(resultBytes, "64")).toBe("Result bytes is 0.0625 to 32 MB");
+    expect(problem(rounds, "0")).toBe("Rounds must be from 1 to 500");
+    expect(problem(toolMs, "5")).toBe("Tool time must be from 10 to 3600 s");
+    expect(problem(resultBytes, "64")).toBe(
+      "Result bytes must be from 0.0625 to 32 MB",
+    );
     expect(problem(rounds, "x")).toBe("Rounds needs a number");
     expect(problem(rounds, "500")).toBeNull();
   });
@@ -241,7 +243,7 @@ describe("the limit words and units", () => {
     const edited = { ...draft, rounds: "501" };
     expect(dirty(rows, edited)).toBe(true);
     expect(collect(rows, edited)).toEqual({
-      problem: "Rounds is 1 to 500",
+      problem: "Rounds must be from 1 to 500",
       field: "rounds",
     });
     expect(defaultLine(timeout)).toBe("default 20 s");
@@ -408,7 +410,9 @@ describe("the page", () => {
     expect(html).toContain("96 tokens");
     expect(html).toMatch(/rows-hint[^>]*>96 tokens/);
     // the admin rows' own pieces: the name over the sentence, the meta
-    expect(html).toContain('<span class="rows-name rows-name-mono">datetime');
+    expect(html).toContain(
+      '<span class="rows-name rows-name-mono"><span class="cut">datetime',
+    );
     expect(html).toContain(
       '<span class="rows-sub">The current date and time in a timezone.',
     );

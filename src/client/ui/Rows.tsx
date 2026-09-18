@@ -10,6 +10,7 @@
 // row's body holds; a new list never draws a row of its own.
 
 import type { ComponentChildren } from "preact";
+import { useId } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import "./rows.css";
 
@@ -46,10 +47,19 @@ export function RowsCard({
   live?: boolean;
   children?: ComponentChildren;
 }) {
+  const id = useId();
   return (
-    <section class="rows-card" aria-label={search ? label : undefined}>
+    <section
+      class="card rows-card"
+      aria-label={search ? label : undefined}
+      aria-labelledby={search ? undefined : id}
+    >
       <div class={`rows-head${search ? " rows-head-search" : ""}`}>
-        {search ?? <span class="label">{label}</span>}
+        {search ?? (
+          <span class="label" id={id}>
+            {label}
+          </span>
+        )}
         {hint && (
           <span class="rows-hint" aria-live={live ? "polite" : undefined}>
             {hint}
@@ -155,7 +165,7 @@ export function RowsOpen({
 
 // a row that does not open, its text lined up with an opening row's;
 // `flush` starts it at the edge, for an avatar or a radio or a box where
-// the chevron is; a label row lights under the pointer as a row that
+// the chevron is, or in a list where no row opens; a label row lights under the pointer as a row that
 // opens does, unless `off`
 export function RowsLine({
   as = "div",
@@ -194,10 +204,12 @@ export function RowsGo({
   end?: ComponentChildren;
   children: ComponentChildren;
 }) {
+  // the arrow marks the line's end; a row with a button there leaves it
+  // out, or it would sit between the words and the button
   const link = (line: boolean) => (
     <a class={line ? "rows-line rows-go" : "rows-go rows-go-part"} href={href}>
       {children}
-      <Icon name="chevron-right" size={14} class="rows-go-arrow" />
+      {line && <Icon name="chevron-right" size={14} class="rows-go-arrow" />}
     </a>
   );
   return (
@@ -217,14 +229,22 @@ export function RowsGo({
 // a row that acts when pressed: the whole line is the button
 export function RowsButton({
   onClick,
+  disabled,
   children,
 }: {
   onClick: () => void;
+  // while another action of the form runs
+  disabled?: boolean;
   children: ComponentChildren;
 }) {
   return (
     <div class="rows-item">
-      <button type="button" class="rows-line rows-button" onClick={onClick}>
+      <button
+        type="button"
+        class="rows-line rows-button"
+        disabled={disabled}
+        onClick={onClick}
+      >
         {children}
       </button>
     </div>
@@ -259,7 +279,7 @@ export function RowsLogLine({
 }) {
   return (
     <div class={`rows-log-line${bad ? " rows-log-bad" : ""}`}>
-      <span class="rows-log-name" title={name}>
+      <span class="rows-log-name cut" title={name}>
         {name}
       </span>
       <span class={`rows-log-note${running ? " rows-log-running" : ""}`}>
@@ -287,7 +307,7 @@ export function RowsLogMore({
   return (
     <button
       type="button"
-      class="rows-log-more"
+      class="btn-text rows-log-more"
       onClick={onClick}
       disabled={disabled}
     >
@@ -330,13 +350,16 @@ export function RowsNew({ children }: { children: ComponentChildren }) {
 
 export function RowsAvatar({
   lit,
+  title,
   children,
 }: {
   lit?: boolean;
+  // what the avatar stands for, under the pointer
+  title?: string;
   children: ComponentChildren;
 }) {
   return (
-    <span class={`rows-avatar${lit ? " rows-avatar-lit" : ""}`}>
+    <span class={`avatar${lit ? " rows-avatar-lit" : ""}`} title={title}>
       {children}
     </span>
   );
@@ -357,7 +380,11 @@ export function RowsTitle({
 }) {
   return (
     <span class="rows-title">
-      <span class={`rows-name${mono ? " rows-name-mono" : ""}`}>{name}</span>
+      <span class={`rows-name${mono ? " rows-name-mono" : ""}`}>
+        {/* the name is a flex row for a tag beside it, and a flex box
+            never ellipsizes its own text, so plain words get a box */}
+        {typeof name === "string" ? <span class="cut">{name}</span> : name}
+      </span>
       {sub !== undefined && (
         <span class={`rows-sub${bad ? " rows-bad" : ""}`}>{sub}</span>
       )}
@@ -367,7 +394,7 @@ export function RowsTitle({
 
 // a small word in a box beside the name: you
 export function RowsTag({ children }: { children: ComponentChildren }) {
-  return <span class="rows-tag">{children}</span>;
+  return <span class="tag">{children}</span>;
 }
 
 // who a line names, in the brand colour
@@ -384,9 +411,13 @@ export function RowsBad({ children }: { children: ComponentChildren }) {
 export function RowsMeta({
   bad,
   short,
+  keep,
   children,
 }: {
   bad?: boolean;
+  // a meta of boxes, a meter or a strip, which cannot ellipsize: it
+  // keeps its width and the title gives way instead
+  keep?: boolean;
   // what a phone shows in place of the whole meta, the rest being in
   // the open row; empty hides the meta there
   short?: string;
@@ -394,7 +425,11 @@ export function RowsMeta({
 }) {
   if (short === undefined) {
     return (
-      <span class={`rows-meta${bad ? " rows-meta-bad" : ""}`}>{children}</span>
+      <span
+        class={`rows-meta${bad ? " rows-meta-bad" : ""}${keep ? " rows-meta-keep" : ""}`}
+      >
+        {children}
+      </span>
     );
   }
   return (

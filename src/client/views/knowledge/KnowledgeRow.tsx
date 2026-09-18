@@ -18,7 +18,7 @@ import {
   removeFile,
   replaceFile,
 } from "../../data/knowledge.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { noticeOf, useSave } from "../../lib/save.ts";
 import {
   RowsEnd,
@@ -94,7 +94,7 @@ export function KnowledgeRow({
     failure.value = null;
     let live = true;
     const fail = (err: unknown) => {
-      if (live) failure.value = reason(err);
+      if (live) failure.value = says(err);
     };
     if (text === undefined) void readFile(projectId, file.id).catch(fail);
     if (versions === undefined) {
@@ -139,17 +139,17 @@ export function KnowledgeRow({
       }
     >
       <div class="knowledge-open">
-        <p class="knowledge-by">
+        <div class="hint">
           Revision {file.revision} by <Author words={head.author} />
           {` · ${head.when}`}
-        </p>
+        </div>
         {failure.value !== null ? (
-          <p class="knowledge-state error">{failure.value}</p>
+          <div class="hint error">{failure.value}</div>
         ) : text === undefined ? (
-          <p class="knowledge-state">Loading</p>
+          <div class="hint">Loading</div>
         ) : (
           <>
-            <pre class="knowledge-text">{box.text}</pre>
+            <pre class="textbox">{box.text}</pre>
             {box.canToggle && (
               <button
                 type="button"
@@ -176,7 +176,7 @@ export function KnowledgeRow({
                 now,
               );
               return (
-                <RowsLine key={version.id}>
+                <RowsLine key={version.id} flush>
                   <RowsTitle
                     name={line.label}
                     sub={
@@ -217,7 +217,7 @@ export function KnowledgeRow({
             {save.pending.value === "delete" ? "Deleting" : "Delete"}
           </button>
           {notice !== null && (
-            <span class="knowledge-notice" role="alert">
+            <span class="hint error" role="alert">
               {noticeOf(notice)}
             </span>
           )}

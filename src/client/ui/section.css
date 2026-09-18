@@ -6,7 +6,7 @@
 @layer owners {
   .section {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 220px minmax(0, 1fr);
     gap: var(--space-5);
     padding: var(--space-5) 0;
     border-top: 1px solid var(--line);
@@ -43,7 +43,7 @@
 
   @media (max-width: 719px) {
     .section {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--space-4);
     }
   }

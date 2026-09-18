@@ -74,7 +74,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const provider = find(ctx.params.id);
         if (deps.agents.usesProvider(provider.id)) {
-          throw new Conflict(`an agent runs on ${provider.name}`);
+          throw new Conflict(`an agent uses ${provider.name}`);
         }
         deps.store.delete(provider.id);
         deps.catalogs.forget(provider.id);

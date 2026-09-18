@@ -334,7 +334,7 @@ describe("the page", () => {
       ["p1", { words: "the server refused this", status: 403 }],
     ]);
     expect(render(<Knowledge params={{ id: "p1" }} />)).toContain(
-      "the server refused this",
+      "The server refused this.",
     );
   });
 

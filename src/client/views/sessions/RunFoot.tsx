@@ -13,7 +13,7 @@ import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import { forking } from "../../data/fork.ts";
-import { count, reason } from "../../lib/format.ts";
+import { count, says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { durationOf, durationText } from "../projects/Automations.model.ts";
@@ -57,13 +57,21 @@ export function RunFoot({
         ].join(" · ")
       : stateLine(row).text;
   return (
-    <div class="chat-run-foot">
+    <div class="card chat-run-foot">
       <Icon
         name="clock"
         size={14}
-        class={`chat-run-icon chat-run-icon-${row.session.status}`}
+        class={`chat-run-icon ${
+          row.session.status === "stopped"
+            ? "chat-run-icon-stopped"
+            : `status-${row.session.status}`
+        }`}
       />
-      <span class="chat-run-state">{text}</span>
+      <span
+        class={`chat-run-state cut${row.session.status === "failed" ? " error" : ""}`}
+      >
+        {text}
+      </span>
       {failure.value !== null && (
         <span class="chat-run-failure error">{failure.value}</span>
       )}
@@ -74,7 +82,7 @@ export function RunFoot({
           onClick={() => {
             failure.value = null;
             onStop().catch((err) => {
-              failure.value = reason(err);
+              failure.value = says(err);
             });
           }}
         >
@@ -98,7 +106,7 @@ export function RunFoot({
             onClick={() => {
               failure.value = null;
               fork.onFork(picked.value).catch((err) => {
-                failure.value = reason(err);
+                failure.value = says(err);
               });
             }}
           >

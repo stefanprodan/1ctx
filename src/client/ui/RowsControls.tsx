@@ -27,9 +27,9 @@ export function RowsFilters({
   filters: RowsFilter[];
 }) {
   return (
-    <nav class="rows-filters" aria-label={label}>
+    <nav class="seg seg-small rows-filters" aria-label={label}>
       {filters.map((f) => {
-        const cls = `rows-filter${f.on ? " rows-filter-on" : ""}`;
+        const cls = `seg-option${f.on ? " seg-on" : ""}`;
         const inner = (
           <>
             {f.icon && <Icon name={f.icon} size={12} />}
@@ -105,11 +105,11 @@ export function RowsSwitch({
       role="switch"
       aria-checked={on}
       aria-label={`${label} ${on ? "on" : "off"}`}
-      class={`rows-switch${on ? " rows-switch-on" : ""}`}
+      class={`switch${on ? " switch-on" : ""}`}
       disabled={disabled}
       onClick={onClick}
     >
-      <span class="rows-switch-knob" />
+      <span class="switch-knob" />
     </button>
   );
 }

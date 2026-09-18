@@ -11,13 +11,11 @@
 
 import { useSignal } from "@preact/signals";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import { shortModel } from "../agents/meta.ts";
+import { AgentOption } from "../composer/AgentOption.tsx";
 import { useMenu } from "../composer/menu.ts";
 import { forking } from "../data/fork.ts";
-import { AvatarIcon } from "../lib/avatars.tsx";
-import { reason } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
-import { Fit } from "../ui/Fit.tsx";
 import { forkChoices, opensUp } from "./Fork.model.ts";
 
 export type OnFork = (messageId: string, agentId: string) => Promise<void>;
@@ -59,7 +57,7 @@ export function ForkButton({
       await onFork(messageId, id);
       open.value = false;
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
     }
   };
   return (
@@ -77,7 +75,7 @@ export function ForkButton({
       </button>
       {open.value && (
         <ul
-          class={`transcript-fork-menu${up.value ? " transcript-fork-menu-up" : ""}`}
+          class={`menu transcript-fork-menu${up.value ? " transcript-fork-menu-up" : ""}`}
         >
           {failure.value !== null && (
             <li class="transcript-fork-failure">{failure.value}</li>
@@ -89,19 +87,11 @@ export function ForkButton({
             <li key={a.id}>
               <button
                 type="button"
-                class={`transcript-fork-option${a.id === agentId ? " transcript-fork-option-on" : ""}`}
+                class={`menu-item transcript-fork-option${a.id === agentId ? " menu-item-on" : ""}`}
                 disabled={busy}
                 onClick={() => void pick(a.id)}
               >
-                <span class="transcript-fork-tile">
-                  <AvatarIcon name={a.avatar} size={12} />
-                </span>
-                <span class="transcript-fork-name">{a.name}</span>
-                <Fit
-                  class="transcript-fork-model"
-                  long={a.model.id}
-                  short={shortModel(a.model.id)}
-                />
+                <AgentOption agent={a} />
               </button>
             </li>
           ))}
