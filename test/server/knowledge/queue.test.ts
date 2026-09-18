@@ -189,15 +189,11 @@ describe("command admission", () => {
       const pending = run(s, "true", callCaps, controller.signal);
       try {
         await Promise.resolve();
-        expect(
-          s.area.scratch.sweep(101 + 7 * 86_400_000, 7, heldSessions()),
-        ).toBe(0);
+        expect(s.area.sweep(101 + 7 * 86_400_000)).toBe(0);
         expect(scratchState(s)).toEqual(before);
         controller.abort("done");
         await pending;
-        expect(
-          s.area.scratch.sweep(101 + 7 * 86_400_000, 7, heldSessions()),
-        ).toBe(1);
+        expect(s.area.sweep(101 + 7 * 86_400_000)).toBe(1);
       } finally {
         controller.abort();
         for (const release of slots) release();

@@ -6,6 +6,7 @@
 // registry alongside the receipts.
 
 import { describe, expect, test } from "bun:test";
+import { wireTokens } from "../../../src/server/providers/index.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
@@ -56,13 +57,12 @@ describe("bash", () => {
       when: "knowledge",
       names: false,
       variant: null,
+      tokens: 313,
     });
+    expect(listed.tokens).toBe(wireTokens([tool]));
     expect(tool.description).not.toContain("{{year}}");
-    expect(tool.description).toContain(
-      "No network and nothing outside /knowledge is kept.",
-    );
-    expect(tool.description).toContain(
-      "Edit in place with sed -i; read a file again in the same command before replacing it whole.",
+    expect(tool.description).toBe(
+      "Run a bash command. The project's knowledge base, which people may call the project docs, is mounted at /knowledge: UTF-8 text files shared with everyone who can see the project. Use ls, find, grep -n, sed -n and sed -i, awk, jq, yq, diff, and cat > file <<'EOF' to write. Files you change there are saved when the command ends, each as a new version; if another writer changed one during the command nothing is saved and the result says so, so read it again and retry. Edit in place with sed -i; read a file again in the same command before replacing it whole. Keep many small focused files, Markdown for prose, the file's purpose in its first line. /tmp is this session's scratch: any bytes, no versions, kept between commands until the session is deleted or unused for days. Nothing else is kept. Each command starts a new shell in the directory the last one ended in; variables and functions do not carry over. File names use letters, digits, dot, dash and underscore. No network. The result is the output and the exit status, cut when long. Never write secrets: anyone who can see this session or the project can read what you write.",
     );
   });
 

@@ -207,6 +207,10 @@ violation, and every rule has a rejected fixture under
   UTF-8 files under prefix-free names; `knowledge_versions` keeps every
   post-image and an empty delete version with the last live summary.
   History outlives files and both tables cascade with the project.
+  People call the base the project docs or the project files; the prompt
+  block names both and the Knowledge tab, only when bash is offered.
+  The bash description separates shared, versioned UTF-8 `/knowledge`
+  from the session's unversioned, any-byte `/tmp`.
   The seven authenticated routes under `/api/projects/:id/knowledge`
   use `access.project()`: list and create, read/replace/delete by
   `/files/:fileId`, that file's `/versions`, and `/versions/:versionId`.
@@ -234,7 +238,9 @@ violation, and every rule has a rejected fixture under
   symlinks and other types fail the command whole. Empty directories
   are not kept. The cwd is kept only for directories under either
   tree; a missing saved directory starts in `/knowledge` with a notice.
-  Its sweep skips the sessions a command holds.
+  The hourly knowledge sweep also drops scratch past the current
+  `scratchIdleDays`, cascading its files and skipping sessions holding
+  the per-session queue, including commands waiting for a process slot.
   The knowledge limits scope also holds `scratchBytes`, `scratchFiles`
   and `scratchIdleDays`. The project byte ceiling is 64 MiB; stored
   overrides are clamped to their ranges for both effective limits and

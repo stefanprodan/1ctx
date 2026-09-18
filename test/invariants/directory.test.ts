@@ -14,6 +14,7 @@ import type {
   DirectoryAgentResponse,
   DirectoryUserResponse,
 } from "../../src/shared/api/directory.ts";
+import type { ToolsResponse } from "../../src/shared/api/tools.ts";
 import {
   type ChatApp,
   chatApp,
@@ -160,6 +161,17 @@ describe("the directory", () => {
     const offered = chat.app.runner.registry.get(started.sessionId)!.policy
       .offered.tools;
     expect(body.tokens.tools).toBe(wireTokens(offered));
+    const catalogResponse = await chat.admin.call("GET", "/api/tools");
+    expect(catalogResponse.status).toBe(200);
+    const catalog: ToolsResponse = await catalogResponse.json();
+    const bash = catalog.builtin.find((tool) => tool.name === "bash")!;
+    expect(bash.tokens).toBe(313);
+    expect(bash.tokens).toBe(
+      wireTokens(offered.filter((tool) => tool.name === "bash")),
+    );
+    expect(bash.description).toBe(
+      offered.find((tool) => tool.name === "bash")!.description,
+    );
     expect(
       body.tokens.tools -
         wireTokens(offered.filter((tool) => tool.name !== "bash")),

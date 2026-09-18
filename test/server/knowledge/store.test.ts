@@ -9,9 +9,57 @@ import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { Conflict, NotFound } from "../../../src/server/lib/errors.ts";
 import { sha256 } from "../../../src/server/lib/ids.ts";
 import { tokens } from "../../../src/server/lib/tokens.ts";
-import { setup } from "./helpers.ts";
+import { scratchState, seedScratch, setup } from "./helpers.ts";
 
 describe("knowledge store and area", () => {
+  test("sweeps idle scratch with its files using current limits and adds history to the count", () => {
+    const s = setup({ knowledgeHistoryDays: 1, scratchIdleDays: 7 });
+    try {
+      const file = {
+        path: "work/file",
+        data: new Uint8Array([0, 255]),
+        mode: 0o600,
+      };
+      seedScratch(s, { written: [file], cwd: "/tmp/work" });
+      const deleted = s.area.create(s.projectId, s.author, "old.md", "old");
+      s.area.remove(s.projectId, s.author, deleted.id);
+      const live = s.area.create(s.projectId, s.author, "live.md", "live");
+
+      s.now.value = 101;
+      const boundary = { ...s, session: s.makeSession() };
+      seedScratch(boundary, { written: [file] });
+      s.now.value = 200;
+      const fresh = { ...s, session: s.makeSession() };
+      seedScratch(fresh, { written: [file], cwd: "/tmp/work" });
+      const boundaryBefore = scratchState(boundary);
+      const freshBefore = scratchState(fresh);
+
+      s.caps.scratchIdleDays = 1;
+      expect(s.area.sweep(101 + 86_400_000)).toBe(3);
+      expect(scratchState(s)).toEqual({
+        cwd: "/knowledge",
+        revision: 0,
+        bytes: 0,
+        files: 0,
+        entries: [],
+        usedAt: undefined,
+      });
+      expect(
+        s.db
+          .query("select * from session_scratch_files where session_id = ?")
+          .all(s.session.id),
+      ).toEqual([]);
+      expect(s.sessions.byId(s.session.id)).not.toBeNull();
+      expect(scratchState(boundary)).toEqual(boundaryBefore);
+      expect(scratchState(fresh)).toEqual(freshBefore);
+      expect(s.area.list(s.projectId).deleted).toEqual([]);
+      expect(s.area.versions(s.projectId, live.id)).toHaveLength(1);
+      expect(s.area.sweep(101 + 86_400_000)).toBe(0);
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("pins only commands registered by the library", () => {
     const names = getCommandNames();
     for (const command of KNOWLEDGE_COMMANDS) expect(names).toContain(command);

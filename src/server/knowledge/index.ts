@@ -20,6 +20,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
+import { heldSessions } from "./queue.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { ScratchStore } from "./scratch.ts";
 import { KnowledgeStore, summary } from "./store.ts";
@@ -185,8 +186,13 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       files: store.counts(projectId).files,
       recent: store.recent(projectId),
     }),
-    sweep: (now) =>
-      store.sweep(now, deps.limits.current().knowledgeHistoryDays),
+    sweep(now) {
+      const caps = deps.limits.current();
+      return (
+        store.sweep(now, caps.knowledgeHistoryDays) +
+        scratch.sweep(now, caps.scratchIdleDays, heldSessions())
+      );
+    },
   };
   return {
     store,

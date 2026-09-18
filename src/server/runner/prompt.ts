@@ -107,7 +107,10 @@ export function systemPrompt(
   if (policy.automation?.ownMemory) {
     parts.push(memoryBlock("automation-memory", policy.automationMemory));
   }
-  parts.push(knowledgeBlock(policy.knowledge.files, policy.knowledge.recent));
+  // a model that cannot call the tool is not told of the files behind it
+  if (policy.offered.tools.some((tool) => tool.name === "bash")) {
+    parts.push(knowledgeBlock(policy.knowledge.files, policy.knowledge.recent));
+  }
   parts.push(dateLine(now));
   if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");
