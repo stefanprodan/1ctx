@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   FOLDER_ONCE,
   isFolderRefusal,
-  isMacMetadata,
+  isLeftOut,
   kindOf,
   knowledgeFolder,
   normalizeKnowledgePath,
@@ -347,15 +347,28 @@ describe("the upload folder", () => {
   });
 });
 
-test("macOS metadata is known by its raw name", () => {
+test("macOS metadata and version control stores are left out", () => {
   for (const raw of [
     "__MACOSX/._research",
     "./__MACOSX/docs/a.md",
     "docs/.DS_Store",
     "docs\\._notes.md",
+    "repo/.git/config",
+    "repo/.git/objects/ab/cdef",
+    "repo/sub/.git",
+    ".hg/store/data",
+    "a/.svn/entries",
+    "repo/.GIT/HEAD",
   ])
-    expect(isMacMetadata(raw)).toBe(true);
-  // a lowercase folder or a dot file of another name is a file
-  for (const raw of ["__macosx/a.md", "docs/.env", "docs/a._b.md"])
-    expect(isMacMetadata(raw)).toBe(false);
+    expect(isLeftOut(raw)).toBe(true);
+  // other dotfiles, a lowercase __macosx and look-alike names are kept
+  for (const raw of [
+    "__macosx/a.md",
+    "docs/.env",
+    "docs/a._b.md",
+    "repo/.gitignore",
+    "repo/.github/ci.yml",
+    "repo/git/notes.md",
+  ])
+    expect(isLeftOut(raw)).toBe(false);
 });

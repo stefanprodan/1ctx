@@ -225,8 +225,9 @@ violation, and every rule has a rejected fixture under
   Unicode normalization and Latin transliteration, lowercase with dashes,
   never raw `..`; stored names from bash and Restore keep their case.
   The optional folder is normalized, at most seven segments and 180
-  characters. Directories and macOS metadata (`__MACOSX`, `.DS_Store`,
-  `._*`) are dropped without a line, in the picker too. Manifest passes
+  characters. Directories, macOS metadata (`__MACOSX`, `.DS_Store`,
+  `._*`) and `.git`, `.hg` and `.svn` at any depth are dropped without
+  a line, in the picker too; other dotfiles are kept. Manifest passes
   skip `not-regular`, `outside`, `no-letters`, `too-long`, `bad-name`
   and all `duplicate` names; bytes
   skip `too-big` and `not-text`; eligible trees skip `clash` and

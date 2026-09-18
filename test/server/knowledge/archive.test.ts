@@ -381,6 +381,32 @@ test.serial(
   },
 );
 
+test("a zipped repository leaves its .git out without a line", async () => {
+  const s = setup();
+  try {
+    const result = await upload(
+      s,
+      await tar({
+        "repo/README.md": "# Docs\n",
+        "repo/.gitignore": "node_modules\n",
+        "repo/.github/ci.yml": "on: push\n",
+        "repo/.git/config": "[core]\n",
+        "repo/.git/HEAD": "ref: refs/heads/main\n",
+        "repo/.git/objects/ab/cdef": new Uint8Array([0x78, 0x01, 0x00]),
+        "repo/vendor/lib/.git": "gitdir: ../../.git/modules/lib\n",
+      }),
+    );
+    expect(result.saved.sort()).toEqual([
+      "repo/.github/ci.yml",
+      "repo/.gitignore",
+      "repo/readme.md",
+    ]);
+    expect(result.skippedTotal).toBe(0);
+  } finally {
+    s.db.close();
+  }
+});
+
 test("a member that holds a U+FFFD it was written with is text", async () => {
   const s = setup();
   try {

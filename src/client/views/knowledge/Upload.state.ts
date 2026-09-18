@@ -14,7 +14,7 @@ import type {
 } from "../../../shared/contracts/knowledge.ts";
 import {
   isFolderRefusal,
-  isMacMetadata,
+  isLeftOut,
   knowledgeFolder,
   normalizeKnowledgePath,
   textFromBytes,
@@ -132,8 +132,9 @@ export class UploadState {
     this.status.value = "idle";
     try {
       for (const file of files) {
-        // a dragged folder brings Finder's .DS_Store; it never joins the list
-        if (isMacMetadata(file.name)) continue;
+        // a dragged folder brings Finder's .DS_Store or a .git; neither
+        // joins the list
+        if (isLeftOut(file.name)) continue;
         if (
           this.items.value.some(
             (item) =>

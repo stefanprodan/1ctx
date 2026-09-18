@@ -39,14 +39,20 @@ export function splitRawPath(raw: string): string[] {
   return raw.split(/[/\\]/).filter((part) => part !== "" && part !== ".");
 }
 
-// what a Mac adds to an archive or a dragged folder: Finder's resource
-// forks and folder settings, never a file the person meant to keep, so
-// an upload drops them without a word, as it drops directories
-export function isMacMetadata(raw: string): boolean {
+const VCS = new Set([".git", ".hg", ".svn"]);
+
+// what an upload drops without a word, as it drops directories: what a
+// Mac adds to an archive or a dragged folder (Finder's resource forks
+// and folder settings), and a version control store, whose hundreds of
+// objects nobody meant as documents. Other dotfiles are kept.
+export function isLeftOut(raw: string): boolean {
   const parts = splitRawPath(raw);
   const base = parts.at(-1) ?? "";
   return (
-    parts.includes("__MACOSX") || base === ".DS_Store" || base.startsWith("._")
+    parts.includes("__MACOSX") ||
+    base === ".DS_Store" ||
+    base.startsWith("._") ||
+    parts.some((part) => VCS.has(part.toLowerCase()))
   );
 }
 
