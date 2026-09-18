@@ -20,7 +20,14 @@ import {
 import { initials } from "../../lib/format.ts";
 import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
-import { RowsAvatar } from "../../ui/Rows.tsx";
+import {
+  RowsAvatar,
+  RowsEnd,
+  RowsLine,
+  RowsList,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { nameProblem } from "../projects/Project.model.ts";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import { deleteLabel, projectFieldOf } from "./AdminProjects.model.ts";
@@ -42,23 +49,22 @@ function MemberRow({
 }) {
   const action = `remove @${username}`;
   return (
-    <div class="admin-projects-member">
+    <RowsLine flush>
       <RowsAvatar>{initials(fullName)}</RowsAvatar>
-      <span class="admin-projects-person">
-        <span class="admin-projects-person-name">{fullName}</span>
-        <span class="admin-projects-person-user">@{username}</span>
-      </span>
-      <button
-        type="button"
-        class="btn btn-small"
-        disabled={save.busy}
-        onClick={() =>
-          void save.act(action, () => removeProjectMember(project.id, userId))
-        }
-      >
-        {save.pending.value === action ? "Removing" : "Remove"}
-      </button>
-    </div>
+      <RowsTitle name={fullName} sub={`@${username}`} />
+      <RowsEnd>
+        <button
+          type="button"
+          class="btn btn-small"
+          disabled={save.busy}
+          onClick={() =>
+            void save.act(action, () => removeProjectMember(project.id, userId))
+          }
+        >
+          {save.pending.value === action ? "Removing" : "Remove"}
+        </button>
+      </RowsEnd>
+    </RowsLine>
   );
 }
 
@@ -121,11 +127,11 @@ export function ProjectForm({
         }}
       />
       {project !== null && (
-        <section class="admin-projects-members">
+        <section class="field">
           <span class="label">Members</span>
-          <div class="admin-projects-list">
+          <RowsList>
             {project.members.length === 0 ? (
-              <p class="admin-projects-note">No members yet.</p>
+              <RowsNote>No members yet.</RowsNote>
             ) : (
               project.members.map((member) => (
                 <MemberRow
@@ -139,7 +145,7 @@ export function ProjectForm({
               ))
             )}
             <MemberPicker project={project} users={users} save={save} />
-          </div>
+          </RowsList>
         </section>
       )}
       <div class={project === null ? undefined : "admin-projects-foot"}>

@@ -9,13 +9,6 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .tools-label {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
   .tools-text {
     font-size: var(--text-ui);
     line-height: 1.55;
@@ -23,9 +16,12 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .tools-json {
+  .tools-json-cut {
     max-height: 320px;
-    overflow: auto;
+    overflow: clip;
+  }
+  .tools-toggle {
+    align-self: flex-start;
   }
 
   .tools-form {

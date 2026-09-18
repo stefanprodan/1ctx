@@ -150,7 +150,7 @@ function Editor({
                 <FieldError save={save} field={textField(index)} />
               ) : (
                 <span
-                  class={`hint note-box-size${entry.text.trim().length > MEMORY_ENTRY_CHARS ? " note-box-size-over" : ""}`}
+                  class={`hint note-box-size${entry.text.trim().length > MEMORY_ENTRY_CHARS ? " error" : ""}`}
                 >
                   {textSize(entry.text)}
                 </span>
@@ -258,17 +258,17 @@ export function Note({
         hint={countLine(memory.entries)}
         action={
           !editing.value && (
-            <span class="note-switch">
+            <span class="seg seg-small note-switch">
               <button
                 type="button"
-                class={`note-switch-tab${view === "current" ? " note-switch-on" : ""}`}
+                class={`seg-option${view === "current" ? " seg-on" : ""}`}
                 onClick={() => setView("current")}
               >
                 Current
               </button>
               <button
                 type="button"
-                class={`note-switch-tab${view === "changes" ? " note-switch-on" : ""}`}
+                class={`seg-option${view === "changes" ? " seg-on" : ""}`}
                 disabled={memory.previous === null}
                 onClick={() => setView("changes")}
               >

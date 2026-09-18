@@ -27,9 +27,9 @@ export function RowsFilters({
   filters: RowsFilter[];
 }) {
   return (
-    <nav class="rows-filters" aria-label={label}>
+    <nav class="seg seg-small rows-filters" aria-label={label}>
       {filters.map((f) => {
-        const cls = `rows-filter${f.on ? " rows-filter-on" : ""}`;
+        const cls = `seg-option${f.on ? " seg-on" : ""}`;
         const inner = (
           <>
             {f.icon && <Icon name={f.icon} size={12} />}

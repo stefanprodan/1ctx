@@ -142,7 +142,7 @@ function Editor({
         />
       </Section>
       <Section title="Task" text="The first message of every run">
-        <div class="automations-stack">
+        <div class="field">
           <div
             class={`automations-task${invalid("instructions") || invalid("agent") ? " automations-task-invalid" : ""}`}
           >
@@ -174,11 +174,9 @@ function Editor({
         </div>
       </Section>
       <Section title="Memory" text="What a run remembers">
-        <div class="automations-stack">
+        <div class="field">
           <fieldset
-            class={`automations-seg${
-              invalid("memory") ? " automations-seg-invalid" : ""
-            }`}
+            class={`seg${invalid("memory") ? " seg-invalid" : ""}`}
             aria-label="Memory"
           >
             {MEMORY_MODES.map((mode) => (
@@ -186,9 +184,7 @@ function Editor({
                 key={mode.value}
                 type="button"
                 name={mode.value === d.memory ? "memory" : undefined}
-                class={`automations-seg-option${
-                  d.memory === mode.value ? " automations-seg-on" : ""
-                }`}
+                class={`seg-option${d.memory === mode.value ? " seg-on" : ""}`}
                 aria-pressed={d.memory === mode.value}
                 disabled={off || (!takesTools && mode.value !== "none")}
                 onClick={() => set(pickMemory(d, mode.value))}
@@ -240,7 +236,7 @@ function Editor({
         title="Limits"
         text="When a run is stopped, and how long runs are kept"
       >
-        <div class="automations-pair">
+        <div class="pair">
           <label class="field">
             <span class="label">Deadline (in minutes)</span>
             <input

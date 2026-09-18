@@ -47,9 +47,9 @@ function RolePick({
   onPick: (role: Role) => void;
 }) {
   return (
-    <div class="field users-field-wide">
+    <div class="field pair-wide">
       <span class="label">Role</span>
-      <div class="users-roles">
+      <div class="choices">
         {ROLE_CHOICES.map((choice) => (
           <button
             key={choice.value}
@@ -58,11 +58,11 @@ function RolePick({
             aria-pressed={value === choice.value}
             disabled={save.busy || lock !== null}
             title={lock ?? undefined}
-            class={`users-role${value === choice.value ? " users-role-on" : ""}`}
+            class={`choice${value === choice.value ? " choice-on" : ""}`}
             onClick={() => onPick(choice.value)}
           >
-            <span class="users-role-label">{choice.label}</span>
-            <span class="users-role-text">{choice.text}</span>
+            <span class="choice-label">{choice.label}</span>
+            <span class="choice-text">{choice.text}</span>
           </button>
         ))}
       </div>
@@ -149,7 +149,7 @@ function ResetForm({ user }: { user: UserAccount }) {
           Signs {user.fullName} out everywhere. Hand them the new one.
         </span>
       </div>
-      <div class="users-fields">
+      <div class="pair">
         <label class="field">
           <span class="label label-required">New password</span>
           <input
@@ -259,7 +259,7 @@ export function UserForm({
   return (
     <div class="users-forms">
       <form class="users-form" ref={form} onSubmit={submit}>
-        <div class="users-fields">
+        <div class="pair">
           <label class="field">
             <span class="label label-required">Username</span>
             <input

@@ -9,7 +9,7 @@
 // model's meta line.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import {
   modelMeta,
   priceLine,
@@ -22,7 +22,7 @@ import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { ago, longDate } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { onResize } from "../../lib/resize.ts";
+import { useCut } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -36,6 +36,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { Who, WhoLine } from "../../ui/Who.tsx";
 import {
   effortText,
   serverLine,
@@ -48,32 +49,18 @@ import "./people.css";
 // a prompt may run to 16,000 characters: cut to its first lines, with
 // Show more only when the cut hides something
 function Prompt({ text, tokens }: { text: string; tokens: number }) {
-  const open = useSignal(false);
-  const long = useSignal(false);
-  const el = useRef<HTMLPreElement>(null);
-  useLayoutEffect(() => {
-    const node = el.current;
-    if (node === null) return;
-    const measure = () => {
-      if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
-    };
-    measure();
-    return onResize(node, measure);
-  }, [text, open, long]);
+  const { el, open, long } = useCut<HTMLPreElement>([text]);
   return (
     <RowsCard label="Prompt" hint={tokensText(tokens)}>
       {/* the row holds the padding, so the cut ends on a whole line */}
       <RowsBlock>
-        <pre
-          ref={el}
-          class={`people-prompt-text${open.value ? "" : " people-prompt-cut"}`}
-        >
+        <pre ref={el} class={`people-prompt${open.value ? "" : " clamp"}`}>
           {text}
         </pre>
         {long.value && (
           <button
             type="button"
-            class="people-more"
+            class="btn-text people-more"
             aria-expanded={open.value}
             onClick={() => {
               open.value = !open.value;
@@ -115,12 +102,12 @@ export function Agent({ params }: { params: Params }) {
               <AsideSection label="Model">
                 <div class="split-line">
                   Provider
-                  <span class="split-strong people-cut">{shown.provider}</span>
+                  <span class="split-strong cut">{shown.provider}</span>
                 </div>
                 <div class="split-line">
                   Model
                   <Fit
-                    class="split-strong people-cut"
+                    class="split-strong cut"
                     long={shown.agent.model.id}
                     short={shortModel(shown.agent.model.id)}
                   />
@@ -180,21 +167,18 @@ export function Agent({ params }: { params: Params }) {
           }
         >
           <div class="people">
-            <div class="people-head">
-              <span class="people-avatar people-avatar-agent">
-                <AvatarIcon name={shown.agent.avatar} size={24} />
-              </span>
-              <div class="people-who">
-                <span class="people-name people-name-mono">
-                  {shown.agent.model.id}
-                </span>
-                <span class="people-meta">
-                  {[shown.provider, modelMeta(shown.agent.model)]
-                    .filter((s) => s !== "")
-                    .join(" · ")}
-                </span>
-              </div>
-            </div>
+            <Who
+              agent
+              avatar={<AvatarIcon name={shown.agent.avatar} size={24} />}
+              name={shown.agent.model.id}
+              mono
+            >
+              <WhoLine>
+                {[shown.provider, modelMeta(shown.agent.model)]
+                  .filter((s) => s !== "")
+                  .join(" · ")}
+              </WhoLine>
+            </Who>
             <Rows>
               {shown.agent.prompt === "" ? (
                 <RowsCard label="Prompt">

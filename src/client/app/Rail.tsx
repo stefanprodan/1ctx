@@ -146,7 +146,7 @@ export function Rail({
           <button
             ref={hide}
             type="button"
-            class="rail-hide"
+            class="btn-icon rail-hide"
             aria-label={narrow ? "Close the menu" : "Hide the menu"}
             onClick={onHide}
           >
@@ -195,9 +195,9 @@ export function Rail({
       </div>
       <div class="rail-user">
         {open.value && (
-          <div class="rail-menu">
+          <div class="menu rail-menu">
             <a
-              class="rail-menu-item"
+              class="menu-item"
               href="/profile"
               onClick={() => {
                 open.value = false;
@@ -211,7 +211,7 @@ export function Rail({
               type="button"
               role="switch"
               aria-checked={theme.value === "dark"}
-              class="rail-menu-item"
+              class="menu-item"
               onClick={toggleTheme}
             >
               <Icon name="moon" size={14} />
@@ -224,7 +224,7 @@ export function Rail({
             </button>
             <button
               type="button"
-              class="rail-menu-item"
+              class="menu-item"
               onClick={async () => {
                 failure.value = null;
                 try {
@@ -253,8 +253,8 @@ export function Rail({
             open.value = !open.value;
           }}
         >
-          <span class="rail-avatar">{initials(user.fullName)}</span>
-          <span class="rail-user-name">{user.fullName}</span>
+          <span class="avatar">{initials(user.fullName)}</span>
+          <span class="rail-user-name cut">{user.fullName}</span>
           <Icon name="chevron" size={14} class="rail-user-chevron" />
         </button>
       </div>

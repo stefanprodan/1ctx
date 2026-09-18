@@ -395,7 +395,7 @@ describe("the pages", () => {
       const html = render(<Projects />);
       expect(html).toContain('class="rows-line rows-go" href="/projects/p1"');
       expect(html).toContain('class="rows-line rows-go" href="/projects/p2"');
-      expect(html.match(/class="rows-card"/g)).toHaveLength(1);
+      expect(html.match(/class="card rows-card"/g)).toHaveLength(1);
       expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
         html.indexOf('href="/projects/p2"'),
       );
@@ -452,7 +452,7 @@ describe("the pages", () => {
     expect(html).not.toContain("Members");
     expect(html).not.toContain('<div class="split-line">Chats');
     expect(html).toContain(
-      'class="rows-filter rows-filter-on" aria-pressed="true">All<',
+      'class="seg-option seg-on" aria-pressed="true">All<',
     );
     expect(html).toContain('href="/projects/p1/settings"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
@@ -558,7 +558,7 @@ describe("the pages", () => {
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/projects/p1/members"',
     );
-    expect(html).toContain('class="rows-avatar">OM<');
+    expect(html).toContain('class="avatar">OM<');
     expect(html).toContain('class="rows-sub">@caelea<');
     expect(html).toContain('class="rows-line rows-go" href="/users/caelea"');
     expect(html).toContain("Loading");

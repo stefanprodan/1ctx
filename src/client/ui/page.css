@@ -86,7 +86,7 @@
   }
 
   .page-crumb-sep {
-    color: var(--line-strong);
+    color: var(--separator);
   }
   /* the noun as written, never in the label's caps: a chat's title
      keeps the user's casing */
@@ -146,9 +146,8 @@
     gap: var(--space-3);
     max-width: 640px;
     padding: var(--space-4);
-    border: 1px solid var(--failed-line);
     border-radius: var(--radius-card);
-    background: var(--failed-wash);
+    line-height: 1.5;
   }
   .page-failed-icon {
     flex-shrink: 0;

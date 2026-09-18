@@ -37,7 +37,7 @@ export function AgentsAside({
       ) : (
         agents.map((a) => (
           <div key={a.id} class="split-line">
-            <span class="split-tile">
+            <span class="avatar avatar-22">
               <AvatarIcon name={a.avatar} size={13} />
             </span>
             <span class="split-stack">

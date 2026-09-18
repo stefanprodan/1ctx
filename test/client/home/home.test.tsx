@@ -86,7 +86,7 @@ describe("Home", () => {
     const html = render(<Home />);
     expect(html).toContain('class="page-title"');
     expect(html).toContain(", Oana</h1>");
-    expect(html).toContain('class="composer composer-tall"');
+    expect(html).toContain('class="composer composer-tall card"');
     expect(html).toContain('rows="2"');
     expect(html).toContain('placeholder="Search sessions"');
     expect(html).toContain("Loading");
@@ -141,7 +141,7 @@ describe("Home", () => {
     ];
     const html = render(<Home />);
     expect(html).toContain('href="/chat/s1"');
-    expect(html).toContain("stream-icon-done");
+    expect(html).toContain("status-done");
     expect(html).toContain("Which pods restarted");
     expect(html).toContain('<span class="stream-project">#personal</span>');
     expect(html).toContain(

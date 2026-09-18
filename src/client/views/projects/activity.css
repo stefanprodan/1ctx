@@ -1,5 +1,5 @@
 /* The Activity card's heatmap and a project row's strip: cells shaded
-   by level on the grey ramp. */
+   by level on the heat ramp. */
 
 @layer tokens, base, owners;
 
@@ -52,19 +52,19 @@
     cursor: default;
   }
   .activity-level-0 {
-    background: var(--line);
+    background: var(--heat-0);
   }
   .activity-level-1 {
-    background: var(--line-strong);
+    background: var(--heat-1);
   }
   .activity-level-2 {
-    background: var(--faint);
+    background: var(--heat-2);
   }
   .activity-level-3 {
-    background: var(--dim);
+    background: var(--heat-3);
   }
   .activity-level-4 {
-    background: var(--fg);
+    background: var(--heat-4);
   }
   .activity-selected {
     outline: 1px solid var(--fg);

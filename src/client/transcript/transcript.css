@@ -43,26 +43,6 @@
     gap: var(--space-2);
   }
 
-  .transcript-user-tile,
-  .transcript-agent-tile {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-tiny);
-    font-weight: 600;
-    color: var(--dim);
-  }
-  .transcript-agent-tile {
-    color: var(--brand);
-  }
-
   .transcript-name {
     font-size: var(--text-small);
     font-weight: 600;
@@ -82,9 +62,6 @@
 
   .transcript-card {
     padding: var(--space-3) 14px;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line);
     font-size: var(--text-input);
     line-height: 1.55;
     white-space: pre-wrap;
@@ -99,22 +76,6 @@
     min-width: 0;
   }
 
-  /* Matching tool-card geometry keeps mixed work rows aligned. */
-  .transcript-think {
-    min-width: 0;
-  }
-  .transcript-think-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 24px;
-    list-style: none;
-    cursor: pointer;
-    user-select: none;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--dim);
-  }
   .transcript-think-word {
     color: var(--fg);
   }
@@ -158,15 +119,11 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
+  /* no icon beside the words, so the words carry the colour */
   .transcript-failure {
     margin: var(--space-2) 0;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--failed-line);
-    border-radius: var(--radius-card);
-    background: var(--failed-wash);
     color: var(--failed);
     font-size: var(--text-ui);
-    line-height: 1.5;
     overflow-wrap: anywhere;
   }
   /* an icon button on the line under a turn */
@@ -207,78 +164,20 @@
     top: calc(100% + 4px);
     left: 0;
     z-index: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
     min-width: 240px;
     /* never past the phone's edge: the button sits past the row's
        gutter and the agent's tile, so that much is taken off too */
     max-width: min(420px, calc(100vw - 8 * var(--space-4)));
-    margin: 0;
-    padding: var(--space-1);
-    list-style: none;
-    border-radius: var(--radius-card);
-    background: var(--card);
-    border: 1px solid var(--line-strong);
     font-family: var(--mono);
     font-size: var(--text-label);
   }
+  /* a finger's height */
   .transcript-fork-option {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    /* a finger's height */
-    height: 36px;
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--dim);
-    text-align: left;
-    cursor: pointer;
+    min-height: 36px;
   }
   .transcript-fork-menu-up {
     top: auto;
     bottom: calc(100% + 4px);
-  }
-  .transcript-fork-option:hover,
-  .transcript-fork-option-on {
-    background: var(--line);
-  }
-  .transcript-fork-option:disabled {
-    cursor: default;
-    color: var(--faint);
-  }
-  .transcript-fork-tile {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    color: var(--dim);
-    flex-shrink: 0;
-  }
-  .transcript-fork-name {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    color: var(--fg);
-  }
-  .transcript-fork-model {
-    flex-shrink: 0;
-    color: var(--faint);
-    min-width: 0;
-    max-width: 60%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .transcript-fork-failure,
   .transcript-fork-none {
@@ -312,11 +211,14 @@
     opacity: 1;
   }
 
-  .transcript-work {
+  /* the four folds, work, summary, reasoning and a tool call: a
+     chevron that turns when open, a spinner in its place while live.
+     The child combinators keep a live or open fold from reaching the
+     folds nested inside it. */
+  .transcript-fold {
     min-width: 0;
-    color: var(--dim);
   }
-  .transcript-work-head {
+  .transcript-fold-head {
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -327,24 +229,39 @@
     font-family: var(--mono);
     font-size: var(--text-small);
     color: var(--faint);
+  }
+  /* a round's reasoning and its calls, one step down, aligned alike */
+  .transcript-fold-small {
+    min-height: 24px;
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
+  .transcript-fold-chevron {
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .transcript-fold-open > .transcript-fold-head > .transcript-fold-chevron {
+    transform: rotate(90deg);
+  }
+  .transcript-fold-spin {
+    display: none;
+    flex-shrink: 0;
+  }
+  .transcript-fold-live > .transcript-fold-head > .transcript-fold-spin {
+    display: block;
+    color: var(--brand);
+    animation: spin 0.8s linear infinite;
+  }
+  .transcript-fold-live > .transcript-fold-head > .transcript-fold-chevron {
+    display: none;
+  }
+  .transcript-work {
+    color: var(--dim);
   }
   /* the summary fold is the work fold's twin, under the answer */
   .transcript-summary {
-    min-width: 0;
     margin-top: var(--space-2);
     color: var(--dim);
-  }
-  .transcript-summary-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 22px;
-    list-style: none;
-    cursor: pointer;
-    user-select: none;
-    font-family: var(--mono);
-    font-size: var(--text-small);
-    color: var(--faint);
   }
   .transcript-summary-err {
     color: var(--failed);
@@ -352,40 +269,6 @@
   .transcript-summary-body {
     margin-top: var(--space-1);
     padding-left: 20px;
-  }
-  .transcript-work-chevron,
-  .transcript-summary-chevron,
-  .transcript-tool-chevron,
-  .transcript-think-chevron {
-    flex-shrink: 0;
-    transition: transform 0.15s;
-  }
-  .transcript-work-open .transcript-work-chevron,
-  .transcript-summary-open .transcript-summary-chevron,
-  .transcript-tool-open .transcript-tool-chevron,
-  .transcript-think-open .transcript-think-chevron {
-    transform: rotate(90deg);
-  }
-  .transcript-work-spin,
-  .transcript-summary-spin,
-  .transcript-tool-spin,
-  .transcript-think-spin {
-    display: none;
-    flex-shrink: 0;
-  }
-  .transcript-work-live .transcript-work-spin,
-  .transcript-summary-live .transcript-summary-spin,
-  .transcript-tool-live .transcript-tool-spin,
-  .transcript-think-live .transcript-think-spin {
-    display: block;
-    color: var(--brand);
-    animation: spin 0.8s linear infinite;
-  }
-  .transcript-work-live .transcript-work-chevron,
-  .transcript-summary-live .transcript-summary-chevron,
-  .transcript-tool-live .transcript-tool-chevron,
-  .transcript-think-live .transcript-think-chevron {
-    display: none;
   }
   /* one list of lines, a round's think line and its calls alike */
   .transcript-work-rounds {
@@ -415,21 +298,6 @@
     flex-direction: column;
   }
 
-  .transcript-tool {
-    min-width: 0;
-  }
-  .transcript-tool-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 24px;
-    list-style: none;
-    cursor: pointer;
-    user-select: none;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--dim);
-  }
   .transcript-tool-server {
     flex-shrink: 0;
     color: var(--fg);
@@ -442,11 +310,7 @@
     color: var(--fg);
   }
   .transcript-tool-argument {
-    min-width: 0;
-    overflow: hidden;
     color: var(--faint);
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .transcript-tool-state {
     margin-left: auto;
@@ -492,14 +356,5 @@
   }
   .transcript-tool-more {
     align-self: flex-start;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--dim);
-    font-size: var(--text-small);
-    cursor: pointer;
-  }
-  .transcript-tool-more:hover {
-    color: var(--fg);
   }
 }

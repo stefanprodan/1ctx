@@ -14,11 +14,6 @@
     font-size: var(--text-small);
     color: var(--dim);
   }
-  .note-head-count {
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
   .note-head-link {
     color: var(--fg);
     text-decoration: none;
@@ -26,27 +21,10 @@
   .note-head-link:hover {
     text-decoration: underline;
   }
+  /* the Current and Changes switch, at the head's end */
   .note-switch {
-    display: inline-flex;
-    gap: var(--space-1);
+    flex-shrink: 0;
     margin-left: auto;
-  }
-  .note-switch-tab {
-    padding: 2px var(--space-2);
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    font-size: var(--text-small);
-    color: var(--dim);
-    cursor: pointer;
-  }
-  .note-switch-tab:disabled {
-    color: var(--faint);
-    cursor: default;
-  }
-  .note-switch-on {
-    background: var(--inset);
-    color: var(--fg);
   }
   .note-entries {
     display: flex;
@@ -81,7 +59,7 @@
     border-bottom: 0;
   }
   .note-entry-added {
-    background: var(--inset);
+    background: var(--hover);
   }
   .note-entry-added .note-entry-topic::before,
   .note-entry-changed .note-entry-topic::before {
@@ -147,9 +125,6 @@
     font-family: var(--mono);
     font-size: var(--text-label);
   }
-  .note-box-size-over {
-    color: var(--failed);
-  }
   /* level with the Topic field, under its label */
   .note-box-remove {
     margin-top: 22px;
@@ -164,9 +139,6 @@
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
-  }
-  .note-form-count-over {
-    color: var(--failed);
   }
   .note-notice {
     align-self: center;

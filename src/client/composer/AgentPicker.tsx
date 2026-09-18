@@ -11,6 +11,7 @@ import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { Icon } from "../lib/icons.tsx";
 import { Fit } from "../ui/Fit.tsx";
+import { AgentOption } from "./AgentOption.tsx";
 import { useMenu } from "./menu.ts";
 
 export function AgentPicker({
@@ -44,7 +45,9 @@ export function AgentPicker({
           open.value = !open.value;
         }}
       >
-        <span class="composer-chip-tile">
+        <span
+          class={`avatar ${field ? "avatar-22" : "avatar-18"} avatar-agent`}
+        >
           <AvatarIcon name={picked?.avatar ?? "bot"} size={12} />
         </span>
         <span class="composer-chip-name">{picked?.name ?? "no agent"}</span>
@@ -64,26 +67,18 @@ export function AgentPicker({
         )}
       </button>
       {open.value && (
-        <ul class={`composer-menu${field ? " composer-menu-field" : ""}`}>
+        <ul class={`menu composer-menu${field ? " composer-menu-field" : ""}`}>
           {agents.map((a) => (
             <li key={a.id}>
               <button
                 type="button"
-                class={`composer-option${a.id === agentId ? " composer-option-on" : ""}`}
+                class={`menu-item composer-option${a.id === agentId ? " menu-item-on" : ""}`}
                 onClick={() => {
                   open.value = false;
                   onPick?.(a.id);
                 }}
               >
-                <span class="composer-chip-tile">
-                  <AvatarIcon name={a.avatar} size={12} />
-                </span>
-                <span class="composer-chip-name">{a.name}</span>
-                <Fit
-                  class="composer-chip-model"
-                  long={a.model.id}
-                  short={shortModel(a.model.id)}
-                />
+                <AgentOption agent={a} />
               </button>
             </li>
           ))}

@@ -37,6 +37,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
+import { textBox } from "../knowledge/Knowledge.model.ts";
 import { SkillForm } from "./SkillForm.tsx";
 import {
   bytesWord,
@@ -57,6 +58,7 @@ function Text({
   held: string | undefined;
 }) {
   const failure = useSignal<string | null>(null);
+  const expanded = useSignal(false);
   useEffect(() => {
     failure.value = null;
     if (held !== undefined) return;
@@ -70,7 +72,25 @@ function Text({
   }, [held]);
   if (failure.value) return <p class="skills-state error">{failure.value}</p>;
   if (held === undefined) return <p class="skills-state">Loading</p>;
-  return <pre class="skills-text">{held}</pre>;
+  // cut to its first lines, since a box that scrolls on its own inside
+  // the page's scroll leaves the page's sticky head behind
+  const box = textBox(held, expanded.value);
+  return (
+    <div class="skills-text">
+      <pre class="textbox">{box.text}</pre>
+      {box.canToggle && (
+        <button
+          type="button"
+          class="btn btn-small skills-toggle"
+          onClick={() => {
+            expanded.value = !expanded.value;
+          }}
+        >
+          {box.label}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function FileRow({
@@ -115,7 +135,7 @@ function Fact({
 }) {
   return (
     <>
-      <span class="skills-fact-label">{label}</span>
+      <span class="label">{label}</span>
       <span class={`skills-fact${mono ? " skills-fact-mono" : ""}`}>
         {Array.isArray(children) ? children.join("\n") : children}
       </span>

@@ -38,9 +38,9 @@ export function Summary({
   const html = current?.html ?? message.html;
   return (
     <details
-      class={`transcript-summary${running ? " transcript-summary-live" : ""}${
-        open ? " transcript-summary-open" : ""
-      }`}
+      class={`transcript-fold transcript-summary${
+        running ? " transcript-fold-live" : ""
+      }${open ? " transcript-fold-open" : ""}`}
       open={open}
       onToggle={(event) => {
         const next = new Set(opened.value);
@@ -49,13 +49,9 @@ export function Summary({
         opened.value = next;
       }}
     >
-      <summary class="transcript-summary-head">
-        <Icon name="spinner" size={13} class="transcript-summary-spin" />
-        <Icon
-          name="chevron-right"
-          size={13}
-          class="transcript-summary-chevron"
-        />
+      <summary class="transcript-fold-head">
+        <Icon name="spinner" size={13} class="transcript-fold-spin" />
+        <Icon name="chevron-right" size={13} class="transcript-fold-chevron" />
         <span class={label.err ? "transcript-summary-err" : ""}>
           {label.text}
         </span>

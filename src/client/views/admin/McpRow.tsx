@@ -428,7 +428,7 @@ export function ServerRow({
               <span class="hint">Server sent no instructions</span>
             ) : (
               <>
-                <pre class="mcp-block">{box.text}</pre>
+                <pre class="textbox">{box.text}</pre>
                 {box.canToggle && (
                   <button
                     type="button"

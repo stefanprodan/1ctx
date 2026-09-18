@@ -154,7 +154,7 @@ export function Composer({
         ? "Replying"
         : idle;
   return (
-    <div class={`composer${tall ? " composer-tall" : ""}`}>
+    <div class={`composer${tall ? " composer-tall" : ""} card`}>
       <textarea
         ref={input}
         class="composer-text"
@@ -213,6 +213,9 @@ export function Composer({
             writeDraft(key, text.value);
             input.current?.focus();
           }}
+          onHover={(index) => {
+            highlight.value = index;
+          }}
         />
       )}
       {failure.value && <p class="composer-failure error">{failure.value}</p>}
@@ -237,10 +240,10 @@ export function Composer({
         />
         {context && (
           <span class="composer-ctx" title={context.title}>
-            <span class="composer-ctx-n">{context.text}</span>
-            <span class="composer-ctx-track">
+            <span>{context.text}</span>
+            <span class="meter composer-ctx-meter">
               <span
-                class="composer-ctx-fill"
+                class="meter-fill"
                 style={{ width: `${context.percent}%` }}
               />
             </span>

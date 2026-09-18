@@ -47,7 +47,7 @@ function Value({ text, failed }: { text: string; failed?: boolean }) {
       {long.value && (
         <button
           type="button"
-          class="transcript-tool-more"
+          class="btn-text transcript-tool-more"
           aria-expanded={open.value}
           onClick={() => {
             open.value = !open.value;
@@ -76,8 +76,8 @@ export function Tool({ node }: { node: CallNode }) {
   const shown = displayResult(node.result, held);
   return (
     <details
-      class={`transcript-tool${summary.live ? " transcript-tool-live" : ""}${
-        open ? " transcript-tool-open" : ""
+      class={`transcript-fold${summary.live ? " transcript-fold-live" : ""}${
+        open ? " transcript-fold-open" : ""
       }`}
       data-call={node.call.id}
       open={open}
@@ -88,15 +88,15 @@ export function Tool({ node }: { node: CallNode }) {
         opened.value = next;
       }}
     >
-      <summary class="transcript-tool-head">
-        <Icon name="spinner" size={12} class="transcript-tool-spin" />
-        <Icon name="chevron-right" size={12} class="transcript-tool-chevron" />
+      <summary class="transcript-fold-head transcript-fold-small">
+        <Icon name="spinner" size={12} class="transcript-fold-spin" />
+        <Icon name="chevron-right" size={12} class="transcript-fold-chevron" />
         {label.server !== null && (
           <span class="transcript-tool-server">{label.server}</span>
         )}
         <span class="transcript-tool-name">{label.tool}</span>
         {summary.argument !== "" && (
-          <span class="transcript-tool-argument">{summary.argument}</span>
+          <span class="transcript-tool-argument cut">{summary.argument}</span>
         )}
         <span
           class={`transcript-tool-state${

@@ -62,9 +62,9 @@ function ProjectRow({
           onDone={onToggle}
         />
       ) : adminProjectError.value !== null ? (
-        <p class="admin-projects-note error">{adminProjectError.value}</p>
+        <div class="hint error">{adminProjectError.value}</div>
       ) : (
-        <p class="admin-projects-note">Loading</p>
+        <div class="hint">Loading</div>
       )}
     </RowsOpen>
   );

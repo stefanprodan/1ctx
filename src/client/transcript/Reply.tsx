@@ -118,7 +118,7 @@ export function Reply({
   return (
     <div class="transcript-reply">
       <div class="transcript-author">
-        <span class="transcript-agent-tile">
+        <span class="avatar avatar-24 avatar-agent">
           <AvatarIcon name={agent?.avatar ?? "bot"} size={14} />
         </span>
         {agent ? (
@@ -167,7 +167,7 @@ export function Reply({
           />
         )}
         {!running && failure !== null && (
-          <p class="transcript-failure" role="alert">
+          <p class="notice-failed transcript-failure" role="alert">
             {failure}
           </p>
         )}

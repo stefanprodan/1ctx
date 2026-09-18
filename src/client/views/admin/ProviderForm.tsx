@@ -77,22 +77,22 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
   };
   return (
     <form class="agents-form" ref={form} onSubmit={submit}>
-      <div class="agents-presets">
+      <div class="choices">
         {PRESETS.map((p) => (
           <button
             key={p.wire}
             type="button"
             aria-pressed={wire.value === p.wire}
             disabled={busy}
-            class={`agents-preset${wire.value === p.wire ? " agents-preset-on" : ""}`}
+            class={`choice${wire.value === p.wire ? " choice-on" : ""}`}
             onClick={() => choose(p.wire)}
           >
-            <span class="agents-preset-label">{p.label}</span>
-            <span class="agents-preset-text">{p.text}</span>
+            <span class="choice-label">{p.label}</span>
+            <span class="choice-text">{p.text}</span>
           </button>
         ))}
       </div>
-      <div class="agents-fields">
+      <div class="pair">
         <label class="field">
           <span class="label label-required">Name</span>
           <input
@@ -137,7 +137,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
           )}
         </div>
         {chosen.baseUrl === null && (
-          <label class="field agents-field-wide">
+          <label class="field pair-wide">
             <span class="label label-required">Base URL</span>
             <input
               name="baseUrl"

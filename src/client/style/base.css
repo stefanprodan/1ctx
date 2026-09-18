@@ -278,6 +278,18 @@
     color: var(--fg);
   }
 
+  /* two fields side by side, one under the other on a phone; a wide
+     one takes the whole row */
+  .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+  .pair-wide {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
   /* a few cards to pick one from, the picked one lit */
   .choices {
     display: grid;
@@ -352,7 +364,7 @@
   .avatar-56 {
     width: 56px;
     height: 56px;
-    font-size: var(--text-title);
+    font-size: var(--text-input);
   }
   .avatar-agent {
     color: var(--brand);
@@ -505,6 +517,14 @@
 
   .error {
     color: var(--failed);
+  }
+
+  /* the width shell.ts calls NARROW */
+  @media (max-width: 719px) {
+    .pair,
+    .choices {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* the one turn a spinner needs */

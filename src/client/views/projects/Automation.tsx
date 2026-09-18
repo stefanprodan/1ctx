@@ -13,10 +13,10 @@
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import type { RunFilter } from "../../../shared/words.ts";
+import type { RunFilter, SessionStatus } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
 import {
@@ -38,7 +38,7 @@ import { projectAgents, stopSession } from "../../data/sessions.ts";
 import { longDate, reason, stamp, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { onResize } from "../../lib/resize.ts";
+import { useCut } from "../../lib/resize.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -76,6 +76,12 @@ const FILTERS: { value: RunFilter | null; label: string }[] = [
   { value: "failed", label: "Failed" },
   { value: "manual", label: "Manual" },
 ];
+
+// a run's clock is lit by its status, as the feed's is; a stopped run
+// stays faint
+function runIcon(status: SessionStatus): string {
+  return status === "stopped" ? "automations-faint" : `status-${status}`;
+}
 
 function RunRow({
   row,
@@ -119,7 +125,7 @@ function RunRow({
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
           size={15}
-          class={`automations-run-icon automations-icon-${session.status}`}
+          class={runIcon(session.status)}
         />
       </RowsAvatar>
       <RowsTitle
@@ -146,9 +152,9 @@ function RunRow({
         <span class="automations-run-meta">
           <span class="automations-took">
             <span>{took === null ? "" : durationText(took)}</span>
-            <span class="automations-bar" aria-hidden="true">
+            <span class="meter" aria-hidden="true">
               <span
-                class={`automations-bar-fill automations-bar-${session.status}`}
+                class={`meter-fill automations-bar-${session.status}`}
                 style={{ width: `${Math.round(share * 100)}%` }}
               />
             </span>
@@ -170,26 +176,13 @@ function Instructions({
   // the state line under the box, which Show more shares
   foot: ComponentChildren;
 }) {
-  const open = useSignal(false);
-  const long = useSignal(false);
-  const el = useRef<HTMLParagraphElement>(null);
-  useLayoutEffect(() => {
-    const node = el.current;
-    if (node === null) return;
-    const measure = () => {
-      if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
-    };
-    measure();
-    return onResize(node, measure);
-  }, [text, open, long]);
+  const { el, open, long } = useCut<HTMLParagraphElement>([text]);
   return (
     <>
       <div class="automations-brief-text">
         <p
           ref={el}
-          class={`automations-brief-body${
-            open.value ? "" : " automations-brief-cut"
-          }`}
+          class={`automations-brief-body${open.value ? "" : " clamp"}`}
         >
           {text}
         </p>
@@ -199,7 +192,7 @@ function Instructions({
         {long.value && (
           <button
             type="button"
-            class="automations-more"
+            class="btn-text automations-more"
             aria-expanded={open.value}
             onClick={() => {
               open.value = !open.value;
@@ -368,7 +361,7 @@ export function Automation({ params }: { params: Params }) {
             </>
           }
         >
-          <section class="automations-brief">
+          <section class="card automations-brief">
             <p class="automations-brief-line">
               <span class="automations-strong">
                 {scheduleTitle(row.schedule)}

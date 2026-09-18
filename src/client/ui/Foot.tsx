@@ -39,7 +39,7 @@ export function Foot({
   return (
     <div class="foot">
       {notice !== null && (
-        <p class="foot-notice" role="alert">
+        <p class="notice-failed foot-notice" role="alert">
           <Icon name="alert" size={14} class="foot-notice-icon" />
           <span class="foot-notice-words">
             {noticeOf(notice)}

@@ -118,7 +118,7 @@ export function McpFields({
     <>
       {/* the switches and the timeout share a row, the three pattern
           fields the next, so the form reads as two lines of settings */}
-      <div class="mcp-field-wide mcp-head-row">
+      <div class="mcp-field-wide pair mcp-head-row">
         <div class="field">
           <span class="label">Offered</span>
           <div class="mcp-switches">

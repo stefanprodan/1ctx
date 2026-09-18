@@ -909,6 +909,21 @@ violation, and every rule has a rejected fixture under
   its own: one that does (a tool value under a fold) leaves Chrome's
   stuck head and foot riding with the rows until a reload, so a long
   value is cut with `overflow: clip` and opens with Show all.
+- **Two themes, one set of names.** `tokens.css` defines every colour
+  twice: dark on `:root`, light on `:root[data-theme="light"]`; no
+  other stylesheet knows the theme. `app/theme.ts` sets `data-theme`
+  on `<html>` (the inline script in `index.html` does it before the
+  first paint): the system's scheme until the user flips Dark theme in
+  the rail's user menu, a flip away from the system kept in
+  `localStorage`, a flip back forgetting it. A fill under the pointer
+  or a picked option is `--hover`, never `--line`, `--card` or
+  `--inset`; a word on a brand fill is `--on-brand`. The visual frame
+  reads the theme from the computed `color-scheme` and the tokens.
+  The shared shapes are `base.css` primitives (`.menu`, `.menu-item`,
+  `.seg`, `.choice`, `.avatar`, `.switch`, `.tag`, `.textbox`,
+  `.clamp`, `.cut`, `.meter`, `.notice-failed`, `.btn-text`,
+  `.btn-icon`, `.status-*`); an owner adds only position, size and
+  what is its own.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

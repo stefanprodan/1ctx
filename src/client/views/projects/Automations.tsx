@@ -77,7 +77,11 @@ export function Automations({ params }: { params: Params }) {
                     <Icon
                       name={automation.suspendedAt === null ? "clock" : "pause"}
                       size={15}
-                      class={`automations-icon automations-icon-${status}`}
+                      class={
+                        status === "running" || status === "failed"
+                          ? `status-${status}`
+                          : undefined
+                      }
                     />
                   </RowsAvatar>
                   <RowsTitle

@@ -47,7 +47,7 @@ export function RowsCard({
   children?: ComponentChildren;
 }) {
   return (
-    <section class="rows-card" aria-label={search ? label : undefined}>
+    <section class="card rows-card" aria-label={search ? label : undefined}>
       <div class={`rows-head${search ? " rows-head-search" : ""}`}>
         {search ?? <span class="label">{label}</span>}
         {hint && (
@@ -217,14 +217,22 @@ export function RowsGo({
 // a row that acts when pressed: the whole line is the button
 export function RowsButton({
   onClick,
+  disabled,
   children,
 }: {
   onClick: () => void;
+  // while another action of the form runs
+  disabled?: boolean;
   children: ComponentChildren;
 }) {
   return (
     <div class="rows-item">
-      <button type="button" class="rows-line rows-button" onClick={onClick}>
+      <button
+        type="button"
+        class="rows-line rows-button"
+        disabled={disabled}
+        onClick={onClick}
+      >
         {children}
       </button>
     </div>
@@ -259,7 +267,7 @@ export function RowsLogLine({
 }) {
   return (
     <div class={`rows-log-line${bad ? " rows-log-bad" : ""}`}>
-      <span class="rows-log-name" title={name}>
+      <span class="rows-log-name cut" title={name}>
         {name}
       </span>
       <span class={`rows-log-note${running ? " rows-log-running" : ""}`}>
@@ -287,7 +295,7 @@ export function RowsLogMore({
   return (
     <button
       type="button"
-      class="rows-log-more"
+      class="btn-text rows-log-more"
       onClick={onClick}
       disabled={disabled}
     >
@@ -336,9 +344,7 @@ export function RowsAvatar({
   children: ComponentChildren;
 }) {
   return (
-    <span class={`rows-avatar${lit ? " rows-avatar-lit" : ""}`}>
-      {children}
-    </span>
+    <span class={`avatar${lit ? " rows-avatar-lit" : ""}`}>{children}</span>
   );
 }
 
@@ -367,7 +373,7 @@ export function RowsTitle({
 
 // a small word in a box beside the name: you
 export function RowsTag({ children }: { children: ComponentChildren }) {
-  return <span class="rows-tag">{children}</span>;
+  return <span class="tag">{children}</span>;
 }
 
 // who a line names, in the brand colour

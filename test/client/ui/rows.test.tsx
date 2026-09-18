@@ -46,7 +46,7 @@ test("compact logs escape names and notes, and carry failures and expansion", ()
   expect(html).toContain("&lt;script>");
   expect(html).toContain("&lt;refused>");
   expect(html).toContain("&lt;docs.zip>");
-  expect(html).toContain('type="button" class="rows-log-more"');
+  expect(html).toContain('type="button" class="btn-text rows-log-more"');
   expect(html).not.toContain("rows-sub");
   expect(render(<RowsLogLine name="x" note="unchanged" />)).not.toContain(
     "code-tag",
@@ -137,9 +137,7 @@ describe("the system's other parts", () => {
     expect(render(<RowsTitle name="x" sub="broke" bad />)).toContain(
       '<span class="rows-sub rows-bad">broke</span>',
     );
-    expect(render(<RowsTag>you</RowsTag>)).toBe(
-      '<span class="rows-tag">you</span>',
-    );
+    expect(render(<RowsTag>you</RowsTag>)).toBe('<span class="tag">you</span>');
     expect(render(<RowsHandle name="memo" />)).toBe(
       '<span class="rows-handle">@memo</span>',
     );
@@ -207,7 +205,7 @@ describe("the system's other parts", () => {
       />,
     );
     expect(links).toContain(
-      '<a class="rows-filter rows-filter-on" href="/a" aria-current="page">All</a>',
+      '<a class="seg-option seg-on" href="/a" aria-current="page">All</a>',
     );
     const buttons = render(
       <RowsFilters

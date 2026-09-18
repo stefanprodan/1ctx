@@ -16,39 +16,6 @@
     gap: var(--space-4);
   }
 
-  /* the presets: two cards, the chosen one lit */
-  .agents-presets {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
-  }
-  .agents-preset {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-3);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--dim);
-    text-align: left;
-    cursor: pointer;
-  }
-  .agents-preset:hover {
-    color: var(--fg);
-  }
-  .agents-preset-on {
-    border-color: var(--brand);
-    color: var(--fg);
-  }
-  .agents-preset-label {
-    font-weight: 500;
-  }
-  .agents-preset-text {
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
-
   /* the avatar picker: the five robots, the chosen one lit */
   .agents-avatars {
     display: flex;
@@ -57,19 +24,12 @@
     min-height: 36px;
     align-items: center;
   }
-  .agents-avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--inset);
-    border: 1px solid var(--line);
-    color: var(--dim);
+  /* each a .avatar that is a button */
+  .agents-avatars .avatar {
+    padding: 0;
     cursor: pointer;
   }
-  .agents-avatar:hover {
+  .agents-avatars .avatar:hover {
     color: var(--fg);
   }
   .agents-avatar-on {
@@ -102,18 +62,6 @@
   .agents-pick-on {
     border-color: var(--brand);
     color: var(--fg);
-  }
-
-  .agents-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
-  /* a zero minimum, so a skill's long description ellipsizes instead of
-     widening the grid past the card */
-  .agents-field-wide {
-    grid-column: 1 / -1;
-    min-width: 0;
   }
 
   .agents-prompt {
@@ -153,20 +101,9 @@
     color: var(--faint);
     pointer-events: none;
   }
+  /* the field draws the box; room for the glass at its left */
   .agents-search-input {
     width: 100%;
-    height: 36px;
-    padding: 0 var(--space-3) 0 34px;
-    border-radius: var(--radius);
-    background: var(--inset);
-    border: 1px solid var(--line);
-    font-size: var(--text-input);
-  }
-
-  @media (max-width: 719px) {
-    .agents-presets,
-    .agents-fields {
-      grid-template-columns: 1fr;
-    }
+    padding-left: 34px;
   }
 }

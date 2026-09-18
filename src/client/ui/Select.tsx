@@ -160,14 +160,16 @@ export function Select({
           }
         }}
       >
-        <span class={`select-label${mono ? " select-mono" : ""}`}>
+        <span class={`select-label cut${mono ? " select-mono" : ""}`}>
           {picked?.label ?? (value === "" ? placeholder : value)}
         </span>
-        {picked?.detail && <span class="select-detail">{picked.detail}</span>}
+        {picked?.detail && (
+          <span class="select-detail cut">{picked.detail}</span>
+        )}
         <Icon name="chevron" size={14} class="select-chevron" />
       </button>
       {open.value && (
-        <div class="select-panel">
+        <div class="menu select-panel">
           {search && (
             <div class="select-search">
               <Icon name="search" size={14} class="select-glass" />
@@ -227,11 +229,11 @@ export function Select({
                   onClick={() => pick(option)}
                   onKeyDown={onKey}
                 >
-                  <span class={`select-label${mono ? " select-mono" : ""}`}>
+                  <span class={`select-label cut${mono ? " select-mono" : ""}`}>
                     {option.label}
                   </span>
                   {option.detail && (
-                    <span class="select-detail">{option.detail}</span>
+                    <span class="select-detail cut">{option.detail}</span>
                   )}
                   {option.value === value && (
                     <Icon name="check" size={14} class="select-check" />

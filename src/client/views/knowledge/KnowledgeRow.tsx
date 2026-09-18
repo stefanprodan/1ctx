@@ -139,17 +139,17 @@ export function KnowledgeRow({
       }
     >
       <div class="knowledge-open">
-        <p class="knowledge-by">
+        <div class="hint">
           Revision {file.revision} by <Author words={head.author} />
           {` · ${head.when}`}
-        </p>
+        </div>
         {failure.value !== null ? (
-          <p class="knowledge-state error">{failure.value}</p>
+          <div class="hint error">{failure.value}</div>
         ) : text === undefined ? (
-          <p class="knowledge-state">Loading</p>
+          <div class="hint">Loading</div>
         ) : (
           <>
-            <pre class="knowledge-text">{box.text}</pre>
+            <pre class="textbox">{box.text}</pre>
             {box.canToggle && (
               <button
                 type="button"
@@ -217,7 +217,7 @@ export function KnowledgeRow({
             {save.pending.value === "delete" ? "Deleting" : "Delete"}
           </button>
           {notice !== null && (
-            <span class="knowledge-notice" role="alert">
+            <span class="hint error" role="alert">
               {noticeOf(notice)}
             </span>
           )}

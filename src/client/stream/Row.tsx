@@ -28,19 +28,21 @@ export function Row({
     <a class="stream-row" href={`/chat/${session.id}`}>
       <Icon
         name={iconOf(row)}
-        class={`stream-icon stream-icon-${session.status}`}
+        class={`stream-icon ${
+          session.status === "stopped"
+            ? "stream-icon-stopped"
+            : `status-${session.status}`
+        }`}
         size={16}
       />
       <span class="stream-text">
-        <span class="stream-title">{session.title}</span>
-        <span class="stream-line">
+        <span class="stream-title cut">{session.title}</span>
+        <span class="stream-line cut">
           {projectName !== null && (
             <span class="stream-project">#{projectName}</span>
           )}
           {projectName !== null &&
-            (line.author !== null || line.text !== "") && (
-              <span class="stream-sep"> · </span>
-            )}
+            (line.author !== null || line.text !== "") && <span> · </span>}
           {line.author !== null && (
             <span class="stream-author">@{line.author} </span>
           )}

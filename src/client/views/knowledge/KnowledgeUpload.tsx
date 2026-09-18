@@ -101,7 +101,7 @@ export function KnowledgeUpload({
         <span class="knowledge-progress-total">{progress.aside}</span>
       </div>
       <div
-        class="knowledge-progress-track"
+        class="meter knowledge-progress-track"
         role="progressbar"
         aria-label="Upload progress"
         aria-valuemin={0}
@@ -109,7 +109,7 @@ export function KnowledgeUpload({
         aria-valuenow={Math.round(progress.percent)}
       >
         <div
-          class="knowledge-progress-fill"
+          class="meter-fill knowledge-progress-fill"
           style={{ width: `${progress.percent}%` }}
         />
       </div>

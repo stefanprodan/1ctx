@@ -97,14 +97,12 @@ export function ScheduleField({
   );
   return (
     <div class="automations-schedule">
-      <fieldset class="automations-seg" aria-label="Repeats">
+      <fieldset class="seg" aria-label="Repeats">
         {EVERY.map((every) => (
           <button
             key={every}
             type="button"
-            class={`automations-seg-option${
-              b.every === every ? " automations-seg-on" : ""
-            }`}
+            class={`seg-option${b.every === every ? " seg-on" : ""}`}
             aria-pressed={b.every === every}
             disabled={disabled}
             onClick={() => set(switchEvery(b, every))}
@@ -231,7 +229,7 @@ export function ScheduleField({
           />
         </div>
       </div>
-      <div class="automations-readback" aria-live="polite">
+      <div class="card automations-readback" aria-live="polite">
         <div class="automations-readback-head">
           <span class="automations-words">
             <Icon name="clock" size={14} />
@@ -246,7 +244,7 @@ export function ScheduleField({
           )}
         </div>
         {expression !== "" && held?.problem ? (
-          <span class="automations-bad">{held.problem}</span>
+          <span class="error">{held.problem}</span>
         ) : fires !== null && fires.length > 0 ? (
           <span class="automations-next">
             <Icon name="arrow-right" size={14} />

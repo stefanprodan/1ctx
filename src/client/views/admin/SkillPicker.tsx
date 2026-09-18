@@ -33,7 +33,7 @@ export function SkillPicker({
 }) {
   const full = chosen.length >= MAX_SKILLS_PER_AGENT;
   return (
-    <div class="field agents-field-wide">
+    <div class="field pair-wide">
       <RowsListHead
         label="Skills"
         hint={
