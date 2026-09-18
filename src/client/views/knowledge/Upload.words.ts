@@ -12,7 +12,6 @@ export const FOLDER_HINT =
 export function skipWords(reason: Skip): string {
   const words: Record<Skip, string> = {
     "not-regular": "not a regular file",
-    macos: "macOS metadata",
     outside: "outside the folder",
     "no-letters": "no letters or digits",
     "too-long": "name too long",

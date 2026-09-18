@@ -342,7 +342,7 @@ describe("upload picks", () => {
   );
 
   test.serial(
-    "judges loose names and macOS metadata by the shared rules",
+    "judges loose names by the shared rules and leaves macOS metadata out",
     async () => {
       const cases: [string, KnowledgeUploadReason][] = [
         ["../escape.md", "outside"],
@@ -350,12 +350,18 @@ describe("upload picks", () => {
         [".-.", "bad-name"],
         ["a".repeat(81), "too-long"],
         ["a/b/c/d/e/f/g/h/i.md", "too-long"],
-        ["./__MACOSX/notes.md", "macos"],
-        ["docs/.DS_Store", "macos"],
-        ["docs\\._notes.md", "macos"],
+      ];
+      const metadata = [
+        "./__MACOSX/notes.md",
+        "docs/.DS_Store",
+        "docs\\._notes.md",
       ];
       const h = setup();
-      await h.state.pick(cases.map(([name]) => new PickedFile(name)));
+      await h.state.pick(
+        [...cases.map(([name]) => name), ...metadata].map(
+          (name) => new PickedFile(name),
+        ),
+      );
       expect(h.state.items.value.map((item) => item.outcome)).toEqual(
         cases.map(([, reason]) => ({ type: "skipped", reason })),
       );
@@ -366,35 +372,29 @@ describe("upload picks", () => {
     },
   );
 
-  test.serial(
-    "name and metadata refusals take precedence over size and text",
-    async () => {
-      const cases: [string, KnowledgeUploadReason][] = [
-        ["../escape.md", "outside"],
-        ["日本語", "no-letters"],
-        [".-.", "bad-name"],
-        ["a".repeat(81), "too-long"],
-        ["./__MACOSX/notes.md", "macos"],
-        ["../.DS_Store", "macos"],
-        ["docs\\._notes.md", "macos"],
-      ];
-      for (const fileBytes of [1, 10]) {
-        const h = setup({ fileBytes });
-        await h.state.pick(cases.map(([name]) => new PickedFile(name, "a\0b")));
-        expect(h.state.items.value.map((item) => item.outcome)).toEqual(
-          cases.map(([, reason]) => ({ type: "skipped", reason })),
-        );
-        h.state.setFolder("Docs");
-        expect(h.state.items.value.map((item) => item.outcome)).toEqual(
-          cases.map(([, reason]) => ({ type: "skipped", reason })),
-        );
-        expect(h.state.ready).toHaveLength(0);
-        await h.state.run();
-        expect(h.calls).toHaveLength(0);
-        expect(h.state.notice()).toBeNull();
-      }
-    },
-  );
+  test.serial("name refusals take precedence over size and text", async () => {
+    const cases: [string, KnowledgeUploadReason][] = [
+      ["../escape.md", "outside"],
+      ["日本語", "no-letters"],
+      [".-.", "bad-name"],
+      ["a".repeat(81), "too-long"],
+    ];
+    for (const fileBytes of [1, 10]) {
+      const h = setup({ fileBytes });
+      await h.state.pick(cases.map(([name]) => new PickedFile(name, "a\0b")));
+      expect(h.state.items.value.map((item) => item.outcome)).toEqual(
+        cases.map(([, reason]) => ({ type: "skipped", reason })),
+      );
+      h.state.setFolder("Docs");
+      expect(h.state.items.value.map((item) => item.outcome)).toEqual(
+        cases.map(([, reason]) => ({ type: "skipped", reason })),
+      );
+      expect(h.state.ready).toHaveLength(0);
+      await h.state.run();
+      expect(h.calls).toHaveLength(0);
+      expect(h.state.notice()).toBeNull();
+    }
+  });
 
   test.serial(
     "over-cap loose files defer their bytes only for normalized live replacements",
@@ -1306,7 +1306,6 @@ describe("upload logs", () => {
   test("words every skip code without inserting a member name", () => {
     const words: [KnowledgeUploadReason, string][] = [
       ["not-regular", "not a regular file"],
-      ["macos", "macOS metadata"],
       ["outside", "outside the folder"],
       ["no-letters", "no letters or digits"],
       ["too-long", "name too long"],

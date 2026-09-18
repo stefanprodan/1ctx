@@ -14,9 +14,9 @@ import type {
 } from "../../../shared/contracts/knowledge.ts";
 import {
   isFolderRefusal,
+  isMacMetadata,
   knowledgeFolder,
   normalizeKnowledgePath,
-  splitRawPath,
   textFromBytes,
 } from "../../../shared/knowledge.ts";
 import { failure } from "../../lib/format.ts";
@@ -65,16 +65,8 @@ function judge(
   let invalid = item.invalid;
   let name = item.file.name;
   if (invalid !== "upload-size" && item.kind === "text") {
-    const parts = splitRawPath(name);
-    const base = parts.at(-1) ?? "";
     const normalized = normalizeKnowledgePath(name);
-    if (
-      parts.includes("__MACOSX") ||
-      base === ".DS_Store" ||
-      base.startsWith("._")
-    )
-      invalid = "macos";
-    else if (!normalized.ok) invalid = normalized.reason;
+    if (!normalized.ok) invalid = normalized.reason;
     else {
       const joined = normalizeKnowledgePath(
         [folderName(folder), normalized.name].filter(Boolean).join("/"),
@@ -140,6 +132,8 @@ export class UploadState {
     this.status.value = "idle";
     try {
       for (const file of files) {
+        // a dragged folder brings Finder's .DS_Store; it never joins the list
+        if (isMacMetadata(file.name)) continue;
         if (
           this.items.value.some(
             (item) =>

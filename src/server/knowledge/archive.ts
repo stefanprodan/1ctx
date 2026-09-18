@@ -15,6 +15,7 @@ import type {
 } from "../../shared/contracts/knowledge.ts";
 import {
   FOLDER_ONCE,
+  isMacMetadata,
   knowledgeFolder,
   normalizeKnowledgePath,
   prefixConflict,
@@ -92,19 +93,9 @@ export function selectMembers(
   const skipped: Skip[] = [];
   const groups = new Map<string, Candidate[]>();
   for (const member of manifest) {
-    if (member.type === "directory") continue;
+    if (member.type === "directory" || isMacMetadata(member.name)) continue;
     if (member.type !== "file") {
       skipped.push(skip(member, "not-regular"));
-      continue;
-    }
-    const raw = splitRawPath(member.name);
-    const base = raw.at(-1) ?? "";
-    if (
-      raw.includes("__MACOSX") ||
-      base === ".DS_Store" ||
-      base.startsWith("._")
-    ) {
-      skipped.push(skip(member, "macos"));
       continue;
     }
     const normalized = normalizeKnowledgePath(member.name);

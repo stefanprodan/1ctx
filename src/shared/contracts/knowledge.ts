@@ -78,7 +78,6 @@ export type KnowledgeCounts = { files: number; tokens: number };
 
 export type KnowledgeUploadReason =
   | "not-regular"
-  | "macos"
   | "outside"
   | "no-letters"
   | "too-long"

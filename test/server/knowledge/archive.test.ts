@@ -66,7 +66,6 @@ function outcome(entries: Entry[], result: KnowledgeUploadResult) {
 
 const reasons: { reason: KnowledgeUploadReason; entries: Entry[] }[] = [
   { reason: "not-regular", entries: [entry("link", "", "symlink")] },
-  { reason: "macos", entries: [entry("./__MACOSX/x")] },
   { reason: "outside", entries: [entry("docs/../x")] },
   { reason: "no-letters", entries: [entry("\u65e5\u672c\u8a9e")] },
   { reason: "too-long", entries: [entry("x".repeat(81))] },
@@ -111,7 +110,7 @@ test.each(reasons)(
   },
 );
 
-test("directories vanish, every non-regular type skips, raw metadata precedes normalization", () => {
+test("directories and macOS metadata vanish, every other non-regular type skips", () => {
   const files = [
     entry("ignored/", "", "directory"),
     entry("__MACOSX/symlink", "", "symlink"),
@@ -124,15 +123,13 @@ test("directories vanish, every non-regular type skips, raw metadata precedes no
     entry("__macosx", ""),
   ];
   const { result } = judge(files);
+  // metadata is judged on the raw name, before normalization, so a
+  // lowercase __macosx is an ordinary file
   expect(result.skipped.map(({ index, reason }) => [index, reason])).toEqual([
-    [1, "not-regular"],
     [2, "not-regular"],
     [3, "not-regular"],
-    [4, "macos"],
-    [5, "macos"],
-    [6, "macos"],
-    [7, "macos"],
   ]);
+  expect(result.skippedTotal).toBe(2);
   expect(result.saved).toEqual(["__macosx"]);
 });
 

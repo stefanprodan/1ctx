@@ -39,6 +39,17 @@ export function splitRawPath(raw: string): string[] {
   return raw.split(/[/\\]/).filter((part) => part !== "" && part !== ".");
 }
 
+// what a Mac adds to an archive or a dragged folder: Finder's resource
+// forks and folder settings, never a file the person meant to keep, so
+// an upload drops them without a word, as it drops directories
+export function isMacMetadata(raw: string): boolean {
+  const parts = splitRawPath(raw);
+  const base = parts.at(-1) ?? "";
+  return (
+    parts.includes("__MACOSX") || base === ".DS_Store" || base.startsWith("._")
+  );
+}
+
 export function normalizeKnowledgePath(
   raw: string,
   { folder = false }: { folder?: boolean } = {},

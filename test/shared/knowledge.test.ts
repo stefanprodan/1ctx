@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   FOLDER_ONCE,
   isFolderRefusal,
+  isMacMetadata,
   kindOf,
   knowledgeFolder,
   normalizeKnowledgePath,
@@ -344,4 +345,17 @@ describe("the upload folder", () => {
       false,
     );
   });
+});
+
+test("macOS metadata is known by its raw name", () => {
+  for (const raw of [
+    "__MACOSX/._research",
+    "./__MACOSX/docs/a.md",
+    "docs/.DS_Store",
+    "docs\\._notes.md",
+  ])
+    expect(isMacMetadata(raw)).toBe(true);
+  // a lowercase folder or a dot file of another name is a file
+  for (const raw of ["__macosx/a.md", "docs/.env", "docs/a._b.md"])
+    expect(isMacMetadata(raw)).toBe(false);
 });

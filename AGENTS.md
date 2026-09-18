@@ -225,8 +225,10 @@ violation, and every rule has a rejected fixture under
   Unicode normalization and Latin transliteration, lowercase with dashes,
   never raw `..`; stored names from bash and Restore keep their case.
   The optional folder is normalized, at most seven segments and 180
-  characters. Manifest passes skip `not-regular`, `macos`, `outside`,
-  `no-letters`, `too-long`, `bad-name` and all `duplicate` names; bytes
+  characters. Directories and macOS metadata (`__MACOSX`, `.DS_Store`,
+  `._*`) are dropped without a line, in the picker too. Manifest passes
+  skip `not-regular`, `outside`, `no-letters`, `too-long`, `bad-name`
+  and all `duplicate` names; bytes
   skip `too-big` and `not-text`; eligible trees skip `clash` and
   `clash-live`. Skipped files never block eligible files.
   Uploads share the four process slots with commands, take a slot before
