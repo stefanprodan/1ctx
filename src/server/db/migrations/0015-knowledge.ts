@@ -49,6 +49,22 @@ export const m0015: Migration = {
         on knowledge_versions(file_id, revision);
       create index knowledge_versions_project
         on knowledge_versions(project_id, written_at);
+      create table session_scratch (
+        session_id text primary key references sessions(id) on delete cascade,
+        cwd text not null,
+        revision integer not null,
+        bytes integer not null,
+        files integer not null,
+        used_at integer not null
+      );
+      create table session_scratch_files (
+        session_id text not null references session_scratch(session_id) on delete cascade,
+        path text not null,
+        data blob not null,
+        mode integer not null,
+        primary key (session_id, path)
+      );
+      create index session_scratch_used on session_scratch(used_at);
     `);
   },
 };

@@ -221,6 +221,11 @@ violation, and every rule has a rejected fixture under
   at each write; smaller replacements and deletes survive lowered caps.
   History is evicted by per-file count and project bytes; the hourly
   sweep drops expired deleted-file history, never live-file versions.
+  `knowledge/scratch.ts` holds `ScratchStore`, built as the area's
+  `scratch`, over `session_scratch` and `session_scratch_files`; both
+  cascade with the session. Writes use the caller's transaction and
+  check the scratch revision. Its sweep skips the sessions a
+  command holds.
   The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
   so best-effort hardening runs; sqlite3's unpatched worker stays out.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the

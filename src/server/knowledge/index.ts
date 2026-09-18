@@ -21,6 +21,7 @@ import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
+import { ScratchStore } from "./scratch.ts";
 import { KnowledgeStore, summary } from "./store.ts";
 
 export type LimitsPort = { current(): KnowledgeCaps };
@@ -44,11 +45,13 @@ export type KnowledgeCapability = KnowledgePort & {
 };
 export type KnowledgeArea = KnowledgeCapability & {
   store: KnowledgeStore;
+  scratch: ScratchStore;
   routes: RouteDescriptor[];
 };
 
 export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
+  const scratch = new ScratchStore(deps.db);
   const required = (projectId: string, fileId: string) => {
     const row = store.byId(projectId, fileId);
     if (row === null) throw new NotFound();
@@ -184,9 +187,16 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   };
   return {
     store,
+    scratch,
     ...capability,
     routes: routes({ access: deps.access, knowledge: capability }),
   };
 }
 
+export {
+  type Scratch,
+  type ScratchChanges,
+  type ScratchFile,
+  ScratchStore,
+} from "./scratch.ts";
 export { type KnowledgeRow, KnowledgeStore } from "./store.ts";
