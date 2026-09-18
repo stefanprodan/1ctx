@@ -159,7 +159,7 @@ function Base({ projectId }: { projectId: string }) {
                 ? noticeOf(notice)
                 : undefined;
             return (
-              <RowsLine key={file.id}>
+              <RowsLine key={file.id} flush>
                 <RowsTitle
                   name={file.name}
                   mono

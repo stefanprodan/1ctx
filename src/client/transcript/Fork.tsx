@@ -14,7 +14,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AgentOption } from "../composer/AgentOption.tsx";
 import { useMenu } from "../composer/menu.ts";
 import { forking } from "../data/fork.ts";
-import { reason } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { forkChoices, opensUp } from "./Fork.model.ts";
 
@@ -57,7 +57,7 @@ export function ForkButton({
       await onFork(messageId, id);
       open.value = false;
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
     }
   };
   return (

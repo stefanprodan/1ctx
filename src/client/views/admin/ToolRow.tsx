@@ -14,7 +14,7 @@ import type {
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import { patchTool } from "../../data/tools.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { useCut } from "../../lib/resize.ts";
 import { useFocusField, useSave } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
@@ -52,7 +52,7 @@ function Switch({ tool }: { tool: WebToolSummary }) {
     try {
       await patchTool(tool.name, { enabled: !tool.enabled });
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
     }
     busy.value = false;
   };

@@ -13,7 +13,7 @@ import {
   runAutomation,
   suspendAutomation,
 } from "../../data/automations.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 
 // Run now at the left; Suspend or Resume, Edit and Delete at the right,
@@ -41,7 +41,7 @@ export function AutomationActions({
     try {
       await call();
     } catch (err) {
-      onFailure(reason(err));
+      onFailure(says(err));
     }
     busy.value = null;
   };

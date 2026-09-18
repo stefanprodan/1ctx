@@ -28,7 +28,7 @@ import { readout } from "./context.ts";
 import { draftKey, readDraft, writeDraft } from "./draft.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import "./composer.css";
-import { reason } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 
 export const MAX_HEIGHT = 160;
 
@@ -140,7 +140,7 @@ export function Composer({
         writeDraft(key, "");
       }
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
     }
   };
   const context = readout(usage);
@@ -257,7 +257,7 @@ export function Composer({
           onClick={() => {
             if (running) {
               onStop().catch((err) => {
-                failure.value = reason(err);
+                failure.value = says(err);
               });
             } else void submit();
           }}

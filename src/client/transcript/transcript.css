@@ -203,12 +203,13 @@
     border-radius: 50%;
     border: 1px solid var(--line-strong);
     background: var(--card);
-    color: var(--fg);
-    opacity: 0.7;
+    box-shadow: var(--shadow-pop);
+    /* solid, so the text scrolling under it never shows through */
+    color: var(--dim);
     cursor: pointer;
   }
   .transcript-jump:hover {
-    opacity: 1;
+    color: var(--fg);
   }
 
   /* the four folds, work, summary, reasoning and a tool call: a

@@ -847,7 +847,8 @@ violation, and every rule has a rejected fixture under
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
   Show more), then Suspend or Resume, Edit and Run now over two tabs:
-  Runs, a log with their source, length against the deadline and Stop,
+  Runs, a log with the source as the icon (who pressed Run now its
+  title) and the feed's line, length against the deadline and Stop,
   filtered by `?runs=` and counted by the tally, and, only
   with `ownMemory`, Memory, `/automations/:id/memory`, the own note
   counted by its entries (both routes name one view, so a tab change

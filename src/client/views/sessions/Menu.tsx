@@ -16,7 +16,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { CLOSED, type MenuAction, menuStep } from "./Menu.model.ts";
 
@@ -79,7 +79,7 @@ export function Menu({
       refocus.current = true;
       step("saved");
     } catch (err) {
-      step({ failed: reason(err) });
+      step({ failed: says(err) });
     }
   };
   useEffect(() => {
@@ -110,7 +110,7 @@ export function Menu({
     try {
       await onDelete();
     } catch (err) {
-      step({ failed: reason(err) });
+      step({ failed: says(err) });
     }
   };
   const { asking, busy, failure } = state.value;

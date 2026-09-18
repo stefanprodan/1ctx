@@ -43,6 +43,8 @@
     --failed: #f87171;
     --failed-line: rgba(248, 113, 113, 0.45);
     --failed-wash: rgba(248, 113, 113, 0.08);
+    /* a line a change added, under its words */
+    --done-wash: rgba(74, 222, 128, 0.07);
     /* the fill under the pointer and under the picked option */
     --hover: #2a2b2d;
     /* a word or a knob on a brand fill */
@@ -111,6 +113,7 @@
     --failed: #c62828;
     --failed-line: rgba(198, 40, 40, 0.4);
     --failed-wash: rgba(198, 40, 40, 0.06);
+    --done-wash: rgba(27, 122, 61, 0.07);
     --hover: #e6e3da;
     --on-brand: #fbfaf7;
     --shadow-pop: 0 6px 20px rgba(19, 19, 20, 0.12);

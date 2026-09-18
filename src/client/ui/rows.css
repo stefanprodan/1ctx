@@ -51,6 +51,12 @@
     flex-shrink: 0;
     margin-left: auto;
   }
+  /* the hint takes the free room, so what follows it sits beside it */
+  .rows-hint ~ .rows-add,
+  .rows-hint ~ .rows-filters,
+  .rows-hint ~ .seg {
+    margin-left: 0;
+  }
   .rows-note {
     margin: 0;
     padding: var(--space-3) var(--space-4);

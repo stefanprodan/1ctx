@@ -255,7 +255,7 @@ export function KnowledgeUpload({
           <>
             <button
               type="button"
-              class="btn btn-small"
+              class="btn"
               onClick={() => {
                 all.value = false;
                 state.reset();
@@ -269,11 +269,7 @@ export function KnowledgeUpload({
           </>
         ) : uploading ? (
           <>
-            <button
-              type="button"
-              class="btn btn-small"
-              onClick={() => state.stop()}
-            >
+            <button type="button" class="btn" onClick={() => state.stop()}>
               Stop
             </button>
             <button type="submit" class="btn btn-primary" disabled>
@@ -282,12 +278,7 @@ export function KnowledgeUpload({
           </>
         ) : (
           <>
-            <button
-              type="button"
-              class="btn btn-small"
-              disabled={busy}
-              onClick={onDone}
-            >
+            <button type="button" class="btn" disabled={busy} onClick={onDone}>
               Cancel
             </button>
             <button

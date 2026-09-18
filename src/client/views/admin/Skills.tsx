@@ -22,7 +22,7 @@ import {
   skills,
   skillsError,
 } from "../../data/skills.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -64,7 +64,7 @@ function Text({
     if (held !== undefined) return;
     let current = true;
     load().catch((err) => {
-      if (current) failure.value = reason(err);
+      if (current) failure.value = says(err);
     });
     return () => {
       current = false;
@@ -165,7 +165,7 @@ function SkillRow({
       if (what === "refresh") await refreshSkill(skill.id);
       else await deleteSkill(skill.id);
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
       // the server records a failed refresh on the row: the list learns
       // it, so the head still says so once these words are gone
       if (what === "refresh") void loadSkills();

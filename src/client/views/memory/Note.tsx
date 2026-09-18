@@ -286,7 +286,9 @@ export function Note({
         {memory.updatedAt !== null && (
           <div class="note-head">
             <Writer memory={memory} now={now} />
-            {view === "changes" && <span>since the previous version</span>}
+            {view === "changes" && !editing.value && (
+              <span>since the previous version</span>
+            )}
           </div>
         )}
         {editing.value ? (

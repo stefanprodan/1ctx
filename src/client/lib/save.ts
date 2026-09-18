@@ -14,7 +14,9 @@
 import { signal } from "@preact/signals";
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { failure } from "./format.ts";
+import { failure, sentence } from "./format.ts";
+
+export { sentence };
 
 // the words of a refusal; the field to blame, when there is one; the
 // action other than the submit that was refused; and the HTTP status
@@ -35,14 +37,6 @@ export type FieldOf = (message: string) => string | undefined;
 // a check's words pinned to its field, or null when the check passed
 export function at(field: string, error: string | null): Problem | null {
   return error === null ? null : { error, field };
-}
-
-// the server speaks in lowercase fragments; the page shows sentences
-export function sentence(text: string): string {
-  const t = text.trim();
-  if (t === "") return t;
-  const upper = t[0]!.toUpperCase() + t.slice(1);
-  return /[.!?]$/.test(upper) ? upper : `${upper}.`;
 }
 
 // the notice's words: the action that failed, then why

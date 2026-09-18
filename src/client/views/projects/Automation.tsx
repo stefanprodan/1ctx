@@ -35,7 +35,7 @@ import { me } from "../../data/me.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents, stopSession } from "../../data/sessions.ts";
-import { longDate, reason, stamp, until } from "../../lib/format.ts";
+import { longDate, says, stamp, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useCut } from "../../lib/resize.ts";
@@ -43,6 +43,7 @@ import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   RowsAvatar,
+  RowsBad,
   RowsCard,
   RowsEnd,
   RowsFilters,
@@ -110,7 +111,7 @@ function RunRow({
               onClick={() => {
                 failure.value = null;
                 stopSession(session.id).catch((err) => {
-                  failure.value = reason(err);
+                  failure.value = says(err);
                 });
               }}
             >
@@ -121,7 +122,9 @@ function RunRow({
         ) : undefined
       }
     >
-      <RowsAvatar>
+      {/* the icon says how the run started, and who pressed Run now
+          under the pointer, so the line is the feed's: author and words */}
+      <RowsAvatar title={sourceText(row) || undefined}>
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
           size={15}
@@ -130,17 +133,19 @@ function RunRow({
       </RowsAvatar>
       <RowsTitle
         name={stamp(row.send?.startedAt ?? session.createdAt)}
-        bad={session.status === "failed" || failure.value !== null}
         sub={
           <>
-            {sourceText(row)}
-            {" · "}
             {line.author !== null && (
               <>
                 <RowsHandle name={line.author} />{" "}
               </>
             )}
-            {failure.value ?? line.text}
+            {/* only the failure's words are red; who ran it keeps its colour */}
+            {failure.value !== null || session.status === "failed" ? (
+              <RowsBad>{failure.value ?? line.text}</RowsBad>
+            ) : (
+              line.text
+            )}
             {row.send?.memoryError != null && " Memory not updated."}
             {row.send?.memorySkipped != null &&
               row.send.memorySkipped > 0 &&
@@ -159,7 +164,9 @@ function RunRow({
               />
             </span>
           </span>
-          {!running && <span>{whenText(row, now)}</span>}
+          {!running && (
+            <span class="automations-when">{whenText(row, now)}</span>
+          )}
         </span>
       </RowsMeta>
     </RowsGo>

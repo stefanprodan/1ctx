@@ -91,11 +91,12 @@ export function scheduleTitle(schedule: string): string {
 
 // a list row's state at its right: running, suspended, or the next
 // fire, after a failed last run
+// the row's meta: the last failure, red on its own, then the next fire
 export function rowState(
   a: AutomationSummary,
   now: number,
-): { text: string; bad: boolean } {
-  if (a.lastRunStatus === "running") return { text: "running", bad: false };
+): { bad: string | null; text: string } {
+  if (a.lastRunStatus === "running") return { bad: null, text: "running" };
   const failed =
     a.lastRunStatus === "failed" && a.lastEventAt !== null
       ? `failed ${ago(a.lastEventAt, now)}`
@@ -106,10 +107,7 @@ export function rowState(
       : a.nextAt !== null
         ? `next ${until(a.nextAt, now)}`
         : null;
-  return {
-    text: [failed, next].filter((s) => s !== null).join(" · "),
-    bad: failed !== null,
-  };
+  return { bad: failed, text: next ?? "" };
 }
 
 // "Suspended by @bogdan 2h ago"; a row suspended before the name was
@@ -124,7 +122,7 @@ export function suspendedText(
 }
 
 // what started a run: "Scheduled", or "@bogdan" for whoever pressed Run
-// now, under the person icon; the name is the server's, so an admin
+// now, the run icon's title; the name is the server's, so an admin
 // outside the project is named too. A run from before sources were kept
 // says nothing
 export function sourceText(row: StreamRow): string {
@@ -325,9 +323,9 @@ export function automationFieldOf(
   if (message.startsWith("instructions")) return "instructions";
   if (message.includes("schedule")) return "schedule";
   if (message.includes("time zone")) return "tz";
-  if (message.startsWith("deadlineMs")) return "deadline";
+  if (message.startsWith("deadline")) return "deadline";
   if (message.startsWith("retention")) return "retention";
-  if (message.startsWith("memoryGuidance")) return "memoryGuidance";
+  if (message.startsWith("memory guidance")) return "memoryGuidance";
   if (/^(ownMemory|projectMemory)/.test(message)) return "memory";
   return undefined;
 }

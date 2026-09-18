@@ -17,6 +17,7 @@ import { Icon } from "../../lib/icons.tsx";
 import {
   RowsAdd,
   RowsAvatar,
+  RowsBad,
   RowsCard,
   RowsGo,
   RowsHandle,
@@ -96,8 +97,12 @@ export function Automations({ params }: { params: Params }) {
                       </>
                     }
                   />
-                  {state.text !== "" && (
-                    <RowsMeta bad={state.bad}>{state.text}</RowsMeta>
+                  {(state.bad !== null || state.text !== "") && (
+                    <RowsMeta>
+                      {state.bad !== null && <RowsBad>{state.bad}</RowsBad>}
+                      {state.bad !== null && state.text !== "" && " · "}
+                      {state.text}
+                    </RowsMeta>
                   )}
                 </RowsGo>
               );

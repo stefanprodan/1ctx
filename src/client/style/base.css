@@ -492,6 +492,10 @@
   .field textarea[aria-invalid="true"] {
     border-color: var(--failed);
   }
+  /* the focus ring of a refused field keeps the refusal's colour */
+  [aria-invalid="true"]:focus-visible {
+    outline-color: var(--failed);
+  }
 
   /* the HTTP status beside a failure's words, small and in mono, so
      it reads as a reference and never as the message */

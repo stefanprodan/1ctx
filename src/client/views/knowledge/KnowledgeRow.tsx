@@ -18,7 +18,7 @@ import {
   removeFile,
   replaceFile,
 } from "../../data/knowledge.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { noticeOf, useSave } from "../../lib/save.ts";
 import {
   RowsEnd,
@@ -94,7 +94,7 @@ export function KnowledgeRow({
     failure.value = null;
     let live = true;
     const fail = (err: unknown) => {
-      if (live) failure.value = reason(err);
+      if (live) failure.value = says(err);
     };
     if (text === undefined) void readFile(projectId, file.id).catch(fail);
     if (versions === undefined) {
@@ -176,7 +176,7 @@ export function KnowledgeRow({
                 now,
               );
               return (
-                <RowsLine key={version.id}>
+                <RowsLine key={version.id} flush>
                   <RowsTitle
                     name={line.label}
                     sub={

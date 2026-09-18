@@ -20,7 +20,7 @@ import {
 } from "../../../shared/words.ts";
 import { path } from "../../app/router.ts";
 import { limits, patchTool, tools, toolsError } from "../../data/tools.ts";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -83,7 +83,7 @@ function SearchCard() {
     try {
       await patchTool("websearch", { provider });
     } catch (err) {
-      failure.value = reason(err);
+      failure.value = says(err);
     }
     busy.value = false;
   };

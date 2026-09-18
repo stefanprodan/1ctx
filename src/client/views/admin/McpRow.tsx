@@ -24,7 +24,7 @@ import {
   patchServer,
   refreshServer,
 } from "../../data/mcp.ts";
-import { ago, firstSentence, reason } from "../../lib/format.ts";
+import { ago, firstSentence, says } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -313,7 +313,7 @@ export function ServerRow({
     try {
       await refreshServer(server.id);
     } catch (err) {
-      refreshFailure.value = { words: reason(err), at: Date.now() };
+      refreshFailure.value = { words: says(err), at: Date.now() };
       // The failed route has no row, so read the failure the server kept.
       await loadMcp();
       refreshFailure.value = null;

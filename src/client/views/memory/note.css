@@ -59,7 +59,7 @@
     border-bottom: 0;
   }
   .note-entry-added {
-    background: var(--hover);
+    background: var(--done-wash);
   }
   .note-entry-added .note-entry-topic::before,
   .note-entry-changed .note-entry-topic::before {

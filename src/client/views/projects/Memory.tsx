@@ -18,7 +18,7 @@ export function Memory({ params }: { params: Params }) {
           memory={notes.value.get(key) ?? null}
           memoryKey={key}
           error={noteErrors.value.get(key) ?? null}
-          empty='No memory yet. A scheduled task with "Updates project memory from chats" writes it.'
+          empty="No memory yet. A scheduled task set to Project memory writes it."
         />
       )}
     </Frame>

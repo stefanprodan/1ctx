@@ -13,7 +13,7 @@ import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import { forking } from "../../data/fork.ts";
-import { count, reason } from "../../lib/format.ts";
+import { count, says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { durationOf, durationText } from "../projects/Automations.model.ts";
@@ -78,7 +78,7 @@ export function RunFoot({
           onClick={() => {
             failure.value = null;
             onStop().catch((err) => {
-              failure.value = reason(err);
+              failure.value = says(err);
             });
           }}
         >
@@ -102,7 +102,7 @@ export function RunFoot({
             onClick={() => {
               failure.value = null;
               fork.onFork(picked.value).catch((err) => {
-                failure.value = reason(err);
+                failure.value = says(err);
               });
             }}
           >

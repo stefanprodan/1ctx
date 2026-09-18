@@ -155,7 +155,7 @@ export function RowsOpen({
 
 // a row that does not open, its text lined up with an opening row's;
 // `flush` starts it at the edge, for an avatar or a radio or a box where
-// the chevron is; a label row lights under the pointer as a row that
+// the chevron is, or in a list where no row opens; a label row lights under the pointer as a row that
 // opens does, unless `off`
 export function RowsLine({
   as = "div",
@@ -194,10 +194,12 @@ export function RowsGo({
   end?: ComponentChildren;
   children: ComponentChildren;
 }) {
+  // the arrow marks the line's end; a row with a button there leaves it
+  // out, or it would sit between the words and the button
   const link = (line: boolean) => (
     <a class={line ? "rows-line rows-go" : "rows-go rows-go-part"} href={href}>
       {children}
-      <Icon name="chevron-right" size={14} class="rows-go-arrow" />
+      {line && <Icon name="chevron-right" size={14} class="rows-go-arrow" />}
     </a>
   );
   return (
@@ -338,13 +340,18 @@ export function RowsNew({ children }: { children: ComponentChildren }) {
 
 export function RowsAvatar({
   lit,
+  title,
   children,
 }: {
   lit?: boolean;
+  // what the avatar stands for, under the pointer
+  title?: string;
   children: ComponentChildren;
 }) {
   return (
-    <span class={`avatar${lit ? " rows-avatar-lit" : ""}`}>{children}</span>
+    <span class={`avatar${lit ? " rows-avatar-lit" : ""}`} title={title}>
+      {children}
+    </span>
   );
 }
 

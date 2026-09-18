@@ -85,7 +85,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
   };
   const deadline = (value: number | null) => {
     if (value !== null && value > deps.limits.current().runDeadlineMs) {
-      throw new BadRequest("deadlineMs is above the run limit");
+      throw new BadRequest("deadline is above the run limit");
     }
   };
 

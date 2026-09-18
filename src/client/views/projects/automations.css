@@ -92,6 +92,12 @@
     gap: var(--space-1);
     width: 84px;
   }
+  /* one width for every "ago", so the bars above line up row to row,
+     a running row's Stop taking about the same room */
+  .automations-when {
+    min-width: 8ch;
+    justify-content: flex-end;
+  }
   /* the meter's fill in the run's colour while it runs or once failed */
   .automations-bar-running {
     background: var(--running);

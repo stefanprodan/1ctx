@@ -46,7 +46,11 @@ export function Row({
           {line.author !== null && (
             <span class="stream-author">@{line.author} </span>
           )}
-          {line.text}
+          {session.status === "failed" ? (
+            <span class="stream-bad">{line.text}</span>
+          ) : (
+            line.text
+          )}
         </span>
       </span>
       <span class="stream-when">{whenText(row, now)}</span>

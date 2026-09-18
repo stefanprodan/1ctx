@@ -9,7 +9,7 @@ import { navigate } from "../../app/router.ts";
 import { login } from "../../data/me.ts";
 import { Logo } from "../../lib/icons.tsx";
 import "./login.css";
-import { reason } from "../../lib/format.ts";
+import { says } from "../../lib/format.ts";
 
 export function Login() {
   const username = useSignal("");
@@ -26,7 +26,7 @@ export function Login() {
       await login({ username: username.value, password: password.value });
       navigate("/", true);
     } catch (err) {
-      error.value = reason(err);
+      error.value = says(err);
     } finally {
       busy.value = false;
     }

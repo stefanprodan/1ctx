@@ -56,6 +56,10 @@
   .stream-author {
     color: var(--brand);
   }
+  /* a failure's words, the author keeping its colour */
+  .stream-bad {
+    color: var(--failed);
+  }
 
   .stream-when {
     width: 64px;

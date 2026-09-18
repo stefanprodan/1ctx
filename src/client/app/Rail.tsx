@@ -18,7 +18,7 @@ import { automationProject } from "../data/automations.ts";
 import { logout } from "../data/me.ts";
 import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
-import { initials, reason } from "../lib/format.ts";
+import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
 import { onPage, projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
@@ -230,7 +230,7 @@ export function Rail({
                 try {
                   await logout();
                 } catch (err) {
-                  failure.value = reason(err);
+                  failure.value = says(err);
                   return;
                 }
                 open.value = false;
