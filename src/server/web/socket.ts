@@ -189,6 +189,16 @@ export function socketArea(deps: SocketDeps): Socket {
           }
         });
         break;
+      case "knowledge.changed":
+        each((conn) => {
+          if (
+            !conn.data.principal.mustChangePassword &&
+            conn.data.projects.has(event.data.projectId)
+          ) {
+            deliver(conn, { type: "knowledge", ...event.data });
+          }
+        });
+        break;
       case "access.changed":
         each((conn) => {
           const ids = event.data.userIds;
@@ -219,6 +229,8 @@ export function socketArea(deps: SocketDeps): Socket {
             p.userId === event.data.userId &&
             (event.data.loginId === null || p.loginId === event.data.loginId)
           ) {
+            // A close callback can lag behind the next committed write.
+            forget(conn);
             conn.close(CLOSE_REVOKED, "signed out");
           }
         });

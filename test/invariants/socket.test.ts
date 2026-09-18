@@ -157,6 +157,75 @@ describe("the socket", () => {
     close(chat, member, admin);
   });
 
+  test.serial(
+    "knowledge frames reach the project, with nothing after login revocation",
+    async () => {
+      const chat = await chatApp();
+      try {
+        const member = await connection(chat, chat.member);
+        const admin = await connection(chat, chat.admin);
+        chat.app.socket.open(member);
+        chat.app.socket.open(admin);
+        member.frames = [];
+        admin.frames = [];
+        const path = `/api/projects/${chat.projectId}/knowledge`;
+        const created = await chat.member.call("POST", path, {
+          body: { name: "docs/x.md", text: "hello\n" },
+        });
+        expect(created.status).toBe(201);
+        const { file } = await created.json();
+        expect(frames(member, "knowledge")).toEqual([
+          {
+            type: "knowledge",
+            projectId: chat.projectId,
+            file,
+            deleted: false,
+          },
+        ]);
+        expect(frames(admin, "knowledge")).toEqual([]);
+        chat.app.now.value += 1000;
+        const deleted = await chat.member.call(
+          "DELETE",
+          `${path}/files/${file.id}`,
+        );
+        expect(deleted.status).toBe(204);
+        expect(frames(member, "knowledge").at(-1)).toEqual({
+          type: "knowledge",
+          projectId: chat.projectId,
+          file: { ...file, revision: 2, updatedAt: chat.app.now.value },
+          deleted: true,
+        });
+        expect(
+          chat.app.knowledge.versions(chat.projectId, file.id)[0],
+        ).toMatchObject({ revision: 2, deleted: true });
+        expect(frames(admin, "knowledge")).toEqual([]);
+
+        const activeClient = chat.app.client();
+        await activeClient.login("caelea", "pw");
+        const active = await connection(chat, activeClient);
+        chat.app.socket.open(active);
+        const logout = await chat.member.call("POST", "/api/logout");
+        expect(logout.status).toBe(200);
+        expect(member.closed).toEqual([
+          { code: CLOSE_REVOKED, reason: "signed out" },
+        ]);
+        expect(active.closed).toEqual([]);
+        const before = [...member.frames];
+        const saved = await activeClient.call("POST", path, {
+          body: { name: "new.md", text: "after revocation" },
+        });
+        expect(saved.status).toBe(201);
+        expect(member.frames).toEqual(before);
+        expect(frames(active, "knowledge")).toHaveLength(1);
+        expect(frames(admin, "knowledge")).toEqual([]);
+        close(chat, member, admin, active);
+      } finally {
+        await chat.app.shutdown();
+        chat.app.db.close();
+      }
+    },
+  );
+
   test("watch gets live state and streams only to the watcher", async () => {
     const chat = await chatApp();
     const watching = await connection(chat, chat.member);
@@ -212,35 +281,54 @@ describe("the socket", () => {
     close(chat, watching, idle);
   });
 
-  test("a locked connection cannot watch a session", async () => {
-    const chat = await chatApp();
-    const { script, sessionId } = await startChat(chat);
-    chat.app.users.setMustChangePassword(chat.memberId, true);
-    const conn = await connection(chat, chat.member);
-    chat.app.socket.open(conn);
+  test.serial(
+    "a locked connection cannot watch a session or hear project changes",
+    async () => {
+      const chat = await chatApp();
+      const { script, sessionId } = await startChat(chat);
+      chat.app.users.setMustChangePassword(chat.memberId, true);
+      const conn = await connection(chat, chat.member);
+      chat.app.socket.open(conn);
 
-    chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
+      chat.app.socket.message(
+        conn,
+        JSON.stringify({ type: "watch", sessionId }),
+      );
 
-    expect(conn.data.watching).toBeNull();
-    expect(frames(conn, "watched")).toEqual([]);
-    transact(chat.app.db, () => ({
-      result: undefined,
-      events: [
-        {
-          type: "memory.changed" as const,
-          data: {
-            projectId: chat.projectId,
-            automationId: null,
-            revision: 1,
+      expect(conn.data.watching).toBeNull();
+      expect(frames(conn, "watched")).toEqual([]);
+      transact(chat.app.db, () => ({
+        result: undefined,
+        events: [
+          {
+            type: "memory.changed" as const,
+            data: {
+              projectId: chat.projectId,
+              automationId: null,
+              revision: 1,
+            },
           },
+        ],
+      }));
+      expect(frames(conn, "memory")).toEqual([]);
+      chat.app.knowledge.create(
+        chat.projectId,
+        {
+          kind: "user",
+          id: chat.memberId,
+          name: "caelea",
+          sessionId: null,
+          origin: null,
         },
-      ],
-    }));
-    expect(frames(conn, "memory")).toEqual([]);
-    await finish(script);
-    expect(frames(conn, "session")).toEqual([]);
-    close(chat, conn);
-  });
+        "locked.md",
+        "not sent to the locked tab",
+      );
+      expect(frames(conn, "knowledge")).toEqual([]);
+      await finish(script);
+      expect(frames(conn, "session")).toEqual([]);
+      close(chat, conn);
+    },
+  );
 
   test("content is rendered after the HTML clock interval", async () => {
     const chat = await chatApp();
