@@ -151,6 +151,107 @@ describe("the schema", () => {
     }
   });
 
+  test("0015 adds knowledge and keeps history after a file is deleted", () => {
+    const db = seed(MIGRATIONS.slice(0, 14));
+    try {
+      const tables = ["users", "projects", "sessions", "messages", "sends"];
+      const before = tables.map((name) =>
+        db.query(`select * from ${name} order by id`).all(),
+      );
+      expect(migrate(db)).toEqual(["0015-knowledge"]);
+      expect(MIGRATIONS[14]?.rebuild).toBeUndefined();
+      expect(
+        tables.map((name) =>
+          db.query(`select * from ${name} order by id`).all(),
+        ),
+      ).toEqual(before);
+      const fileColumns = db
+        .query<{ name: string }, []>("pragma table_info(knowledge_files)")
+        .all()
+        .map((row) => row.name);
+      expect(fileColumns).toEqual([
+        "id",
+        "project_id",
+        "name",
+        "kind",
+        "text",
+        "bytes",
+        "lines",
+        "digest",
+        "tokens",
+        "revision",
+        "author_kind",
+        "author_id",
+        "author_name",
+        "session_id",
+        "origin",
+        "created_at",
+        "updated_at",
+      ]);
+      expect(
+        db
+          .query<{ from: string }, []>(
+            "pragma foreign_key_list(knowledge_versions)",
+          )
+          .all()
+          .map((row) => row.from),
+      ).toEqual(["project_id"]);
+      db.exec(`
+        insert into knowledge_files values (
+          'f', 'p', 'docs/x.md', 'md', 'hello', 5, 1, 'digest', 1, 1,
+          'agent', 'gone-agent', 'writer', 'gone-session', 'chat', 1, 1
+        );
+        insert into knowledge_versions values (
+          'v', 'f', 'p', 'docs/x.md', 1, 'hello', 5, 1,
+          'agent', 'gone-agent', 'writer', 'gone-session', 'automation', 1,
+          0, null
+        );
+      `);
+      for (const table of ["knowledge_files", "knowledge_versions"]) {
+        expect(() =>
+          db.query(`update ${table} set author_kind = 'other'`).run(),
+        ).toThrow();
+        expect(() =>
+          db.query(`update ${table} set origin = 'other'`).run(),
+        ).toThrow();
+        db.query(
+          `update ${table} set author_kind = 'user', origin = null`,
+        ).run();
+      }
+      expect(() =>
+        db.query("update knowledge_versions set deleted = 2").run(),
+      ).toThrow();
+      expect(() =>
+        db
+          .query(
+            "insert into knowledge_files select 'other', project_id, name, kind, text, bytes, lines, digest, tokens, revision, author_kind, author_id, author_name, session_id, origin, created_at, updated_at from knowledge_files",
+          )
+          .run(),
+      ).toThrow();
+      const indexes = db
+        .query<{ name: string }, []>(
+          "select name from sqlite_master where type = 'index'",
+        )
+        .all()
+        .map((row) => row.name);
+      expect(indexes).toContain("knowledge_versions_file");
+      expect(indexes).toContain("knowledge_versions_project");
+      db.exec("delete from knowledge_files");
+      expect(db.query("select text from knowledge_versions").get()).toEqual({
+        text: "hello",
+      });
+      db.exec("delete from projects where id = 'p'");
+      expect(db.query("select * from knowledge_versions").all()).toEqual([]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
   test("a provider accepts every known wire and refuses anything else", () => {
     const db = seed();
     try {
@@ -378,6 +479,7 @@ describe("additive migrations", () => {
       "0012-fork",
       "0013-web-tools",
       "0014-visualize",
+      "0015-knowledge",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -428,6 +530,7 @@ describe("0005", () => {
       "0012-fork",
       "0013-web-tools",
       "0014-visualize",
+      "0015-knowledge",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -487,6 +590,7 @@ describe("rebuild migrations", () => {
       "0012-fork",
       "0013-web-tools",
       "0014-visualize",
+      "0015-knowledge",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -579,6 +683,7 @@ describe("0006 skills migration", () => {
       "0012-fork",
       "0013-web-tools",
       "0014-visualize",
+      "0015-knowledge",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -630,6 +735,7 @@ describe("0007 user tz migration", () => {
       "0012-fork",
       "0013-web-tools",
       "0014-visualize",
+      "0015-knowledge",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -660,6 +766,7 @@ describe("0009 mcp migration", () => {
       "0012-fork",
       "0013-web-tools",
       "0014-visualize",
+      "0015-knowledge",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -745,7 +852,7 @@ describe("0014 visualize migration", () => {
           "select * from tools order by rowid",
         )
         .all();
-      expect(migrate(db)).toEqual(["0014-visualize"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 14))).toEqual(["0014-visualize"]);
       expect(MIGRATIONS[13]?.rebuild).toBeUndefined();
       const rows = db.query("select * from tools order by rowid").all();
       expect(rows.slice(0, 2)).toEqual(
@@ -770,7 +877,7 @@ describe("0014 visualize migration", () => {
       expect(db.query("pragma foreign_keys").get()).toEqual({
         foreign_keys: 1,
       });
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 14))).toEqual([]);
     } finally {
       db.close();
     }
@@ -839,6 +946,7 @@ describe("0008 search tavily migration", () => {
           "0012-fork",
           "0013-web-tools",
           "0014-visualize",
+          "0015-knowledge",
         ]);
         expect(db.query("select * from providers order by id").all()).toEqual(
           providers,
