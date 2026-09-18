@@ -215,10 +215,30 @@ violation, and every rule has a rejected fixture under
   block names both and the Knowledge tab, only when bash is offered.
   The bash description separates shared, versioned UTF-8 `/knowledge`
   from the session's unversioned, any-byte `/tmp`.
-  The seven authenticated routes under `/api/projects/:id/knowledge`
+  The eight authenticated routes under `/api/projects/:id/knowledge`
   use `access.project()`: list and create, read/replace/delete by
-  `/files/:fileId`, that file's `/versions`, and `/versions/:versionId`.
+  `/files/:fileId`, that file's `/versions`, `/versions/:versionId`, and
+  `POST /upload?folder=&name=` for one archive or text file.
   Replacements check the revision; deleted-name restores create new ids.
+  Uploads normalize paths through `shared/knowledge.ts`: both separators,
+  Unicode normalization and Latin transliteration, lowercase with dashes,
+  never raw `..`; stored names from bash and Restore keep their case.
+  The optional folder is normalized, at most seven segments and 180
+  characters. Manifest passes skip `not-regular`, `macos`, `outside`,
+  `no-letters`, `too-long`, `bad-name` and all `duplicate` names; bytes
+  skip `too-big` and `not-text`; eligible trees skip `clash` and
+  `clash-live`. Skipped files never block eligible files.
+  Uploads share the four process slots with commands, take a slot before
+  reading, and allow one upload per user. The 60-second deadline covers
+  waiting, reading and judging; cancellation settles before admission
+  is released. Caps are 32 MiB uploaded, 64 MiB expanded and 2,000
+  members. Valid changes commit together through `commitKnowledge`,
+  checking live identities, revisions and current caps, authored by the
+  user without a session. All-unchanged uploads write and evict nothing.
+  Answers count every outcome but carry at most 200 saved names and
+  200 skips, raw names cut to 200 characters and 300 JSON bytes, with
+  reason codes and clash indexes.
+  History eviction may drop replaced versions near its caps.
   `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
   host or network, and `defenseInDepth: true`. Four commands at most
   hold disposable mounts of `/knowledge` and the session's `/tmp`; the

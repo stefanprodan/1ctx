@@ -7,6 +7,7 @@
 // One command per session at a time, so parallel calls of a round never
 // mount the same scratch revision; the held set keeps the sweep off it.
 
+import { Conflict } from "../lib/errors.ts";
 import { KNOWLEDGE_COMMANDS_IN_FLIGHT } from "./limits.ts";
 
 class Queue {
@@ -51,8 +52,20 @@ class Queue {
 
 const processQueue = new Queue(KNOWLEDGE_COMMANDS_IN_FLIGHT);
 const sessions = new Map<string, Queue>();
+const uploads = new Set<string>();
 
 export const acquire = (signal: AbortSignal) => processQueue.acquire(signal);
+
+export function acquireUpload(userId: string): () => void {
+  if (uploads.has(userId)) throw new Conflict("an upload is running");
+  uploads.add(userId);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    uploads.delete(userId);
+  };
+}
 
 export function heldSessions(): ReadonlySet<string> {
   return new Set(sessions.keys());

@@ -3,29 +3,27 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  kindOf,
   lineCount,
   textFromBytes,
   textFromString,
 } from "../../../src/server/knowledge/text.ts";
+import {
+  textFromBytes as sharedBytes,
+  textFromString as sharedString,
+} from "../../../src/shared/knowledge.ts";
 import fixtures from "../../fixtures/knowledge/text.json";
 
-describe("knowledge text", () => {
-  test.each(fixtures)("$name", (fixture) => {
-    const readers: (() => string)[] = [];
-    if (fixture.bytes !== undefined) {
-      readers.push(() => textFromBytes(Uint8Array.from(fixture.bytes!)));
-    }
-    if (fixture.text !== undefined) {
-      readers.push(() => textFromString(fixture.text!));
-    }
-    for (const read of readers) {
-      if (fixture.invalid) expect(read).toThrow("not a text file");
-      else {
-        expect(read()).toBe(fixture.expected!);
-        expect(lineCount(read())).toBe(fixture.lines!);
-      }
-    }
+describe("knowledge text lines", () => {
+  test.each(fixtures.filter((fixture) => !fixture.invalid))(
+    "$name",
+    (fixture) => {
+      expect(lineCount(fixture.expected!)).toBe(fixture.lines!);
+    },
+  );
+
+  test("re-exports the shared text rules for server callers", () => {
+    expect(textFromBytes).toBe(sharedBytes);
+    expect(textFromString).toBe(sharedString);
   });
 
   test("counts the last line once, with or without a newline", () => {
@@ -33,10 +31,5 @@ describe("knowledge text", () => {
     expect(lineCount("one\n")).toBe(1);
     expect(lineCount("one\ntwo")).toBe(2);
     expect(lineCount("\n\n")).toBe(2);
-    expect(textFromString(" \t\r\n")).toBe(" \t\r\n");
-    expect(kindOf("docs/runbook.MD")).toBe("md");
-    expect(kindOf(".gitignore")).toBe("");
-    expect(kindOf("Makefile")).toBe("");
-    expect(kindOf("dir.with.dot/main.go")).toBe("go");
   });
 });

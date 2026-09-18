@@ -5,6 +5,7 @@
 // to anyone who sees the project:
 //   GET    .                          the list
 //   POST   .                          {name, text}: a create, 201
+//   POST   ./upload?folder=&name=      one file or archive as bytes
 //   GET    ./files/:fileId            the file with its text
 //   PUT    ./files/:fileId            {text, revision}: a replace
 //   DELETE ./files/:fileId            204
@@ -22,6 +23,8 @@ import type {
 } from "../contracts/knowledge.ts";
 
 export type KnowledgeListResponse = KnowledgeList;
+
+export type { KnowledgeUploadResult } from "../contracts/knowledge.ts";
 
 export type CreateKnowledgeFileRequest = { name: string; text: string };
 export type KnowledgeFileResponse = { file: KnowledgeFile };

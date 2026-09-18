@@ -75,3 +75,32 @@ export type KnowledgeList = {
 
 // the aside's and the tab's count
 export type KnowledgeCounts = { files: number; tokens: number };
+
+export type KnowledgeUploadReason =
+  | "not-regular"
+  | "macos"
+  | "outside"
+  | "no-letters"
+  | "too-long"
+  | "bad-name"
+  | "duplicate"
+  | "too-big"
+  | "not-text"
+  | "clash"
+  | "clash-live";
+
+export type KnowledgeUploadResult = {
+  added: number;
+  replaced: number;
+  unchanged: number;
+  renamed: number;
+  saved: string[];
+  skipped: {
+    index: number;
+    // At most 200 characters and 300 JSON bytes, including escaped controls.
+    name: string;
+    reason: KnowledgeUploadReason;
+    other?: number;
+  }[];
+  skippedTotal: number;
+};

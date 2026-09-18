@@ -9,6 +9,7 @@ import type {
   KnowledgeFileDetailResponse,
   KnowledgeFileResponse,
   KnowledgeListResponse,
+  KnowledgeUploadResult,
   KnowledgeVersionDetailResponse,
   KnowledgeVersionsResponse,
 } from "../../shared/api/knowledge.ts";
@@ -24,6 +25,11 @@ export type AccessPort = {
 };
 
 export type KnowledgePort = {
+  upload(
+    projectId: string,
+    author: KnowledgeAuthor,
+    req: Request,
+  ): Promise<KnowledgeUploadResult>;
   list(projectId: string): KnowledgeListResponse;
   read(projectId: string, fileId: string): KnowledgeFileDetailResponse["file"];
   versions(
@@ -68,6 +74,20 @@ function author(principal: Principal): KnowledgeAuthor {
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   return [
+    {
+      method: "POST",
+      path: "/api/projects/:id/knowledge/upload",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const body: KnowledgeUploadResult = await deps.knowledge.upload(
+          project.id,
+          author(ctx.principal!),
+          req,
+        );
+        return json(body);
+      },
+    },
     {
       method: "GET",
       path: "/api/projects/:id/knowledge",

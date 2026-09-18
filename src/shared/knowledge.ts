@@ -2,9 +2,106 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The pure rules of the knowledge base the server and the page share:
-// the kind a name carries, the prefix-free rule over live names, and
-// the block a base takes in a system prompt. Environment neutral: no
-// Bun, no DOM, no packages.
+// how an uploaded path becomes a name, what counts as text, the kind a
+// name carries, the prefix-free rule over live names, and the block a
+// base takes in a system prompt. Environment neutral: no Bun, no DOM,
+// no packages.
+
+import {
+  isKnowledgeName,
+  MAX_KNOWLEDGE_NAME,
+  MAX_KNOWLEDGE_SEGMENTS,
+} from "./words.ts";
+
+export type KnowledgePathReason =
+  | "outside"
+  | "no-letters"
+  | "too-long"
+  | "bad-name";
+
+export type KnowledgePathResult =
+  | { ok: true; name: string }
+  | { ok: false; reason: KnowledgePathReason };
+
+const LATIN: Record<string, string> = {
+  ß: "ss",
+  æ: "ae",
+  œ: "oe",
+  ø: "o",
+  ł: "l",
+  đ: "d",
+  ð: "d",
+  þ: "th",
+  ı: "i",
+};
+
+export function splitRawPath(raw: string): string[] {
+  return raw.split(/[/\\]/).filter((part) => part !== "" && part !== ".");
+}
+
+export function normalizeKnowledgePath(
+  raw: string,
+  { folder = false }: { folder?: boolean } = {},
+): KnowledgePathResult {
+  const parts = splitRawPath(raw);
+  if (parts.includes("..")) return { ok: false, reason: "outside" };
+  const normalized: string[] = [];
+  for (const part of parts) {
+    const name = part
+      .normalize("NFKC")
+      .replace(/[ßẞæÆœŒøØłŁđĐðÐþÞı]/g, (letter) => LATIN[letter.toLowerCase()])
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .replace(
+        /[\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g,
+        "",
+      )
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/-\./g, ".")
+      .replace(/\.-/g, ".")
+      .replace(/^-|-$/g, "");
+    if (!name) return { ok: false, reason: "no-letters" };
+    if (name === "." || name === "..") return { ok: false, reason: "bad-name" };
+    if (name.length > 80) return { ok: false, reason: "too-long" };
+    normalized.push(name);
+  }
+  const name = normalized.join("/");
+  if (
+    name.length > MAX_KNOWLEDGE_NAME ||
+    normalized.length > MAX_KNOWLEDGE_SEGMENTS
+  ) {
+    return { ok: false, reason: "too-long" };
+  }
+  if (folder && name === "") return { ok: true, name };
+  if (!isKnowledgeName(name)) return { ok: false, reason: "bad-name" };
+  return { ok: true, name };
+}
+
+// Fatal decoding and string checks refuse corruption rather than keeping
+// replacement characters as if they were the input.
+export function textFromString(value: string): string {
+  if (
+    !value.isWellFormed() ||
+    value.includes("\u0000") ||
+    value.includes("\ufffd")
+  ) {
+    throw new Error("not a text file");
+  }
+  return value.startsWith("\ufeff") ? value.slice(1) : value;
+}
+
+export function textFromBytes(bytes: Uint8Array): string {
+  if (bytes.indexOf(0) !== -1) throw new Error("not a text file");
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("not a text file");
+  }
+  return textFromString(text);
+}
 
 // the extension as a word: "md", "yaml", "go"; empty without one or
 // for a dotfile

@@ -17,6 +17,7 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
+import { upload } from "./archive.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
@@ -74,6 +75,18 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       return { result: file, events: [event] };
     });
   const capability: KnowledgeCapability = {
+    upload: (projectId, author, req) =>
+      upload(
+        {
+          db: deps.db,
+          store,
+          clock: deps.clock,
+          current: () => deps.limits.current(),
+        },
+        projectId,
+        author,
+        req,
+      ),
     run: (projectId, sessionId, author, command, caps, signal) =>
       run(
         {

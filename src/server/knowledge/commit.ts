@@ -62,10 +62,14 @@ export function commit(
   return transact(deps.db, () => {
     signal.throwIfAborted();
     const caps = deps.current();
-    const { events, receipts } =
-      changes.length === 0
-        ? { events: [], receipts: [] }
-        : commitKnowledge(deps.store, projectId, author, changes, caps, now);
+    const { events, receipts } = commitKnowledge(
+      deps.store,
+      projectId,
+      author,
+      changes,
+      caps,
+      now,
+    );
     checkScratchTotals(scratch.before, scratch.totals, caps);
     deps.scratch.write(
       scratch.sessionId,
@@ -84,14 +88,17 @@ export function commit(
   });
 }
 
-function commitKnowledge(
+// The caller owns the transaction, including any scratch writes or receipts.
+export function commitKnowledge(
   store: KnowledgeStore,
   projectId: string,
   author: KnowledgeAuthor,
   changes: readonly Change[],
   caps: KnowledgeCaps,
   now: number,
+  source: "command" | "upload" = "command",
 ) {
+  if (changes.length === 0) return { receipts: [], events: [] };
   const current = store.list(projectId);
   const live = new Map(current.map((file) => [file.name, file]));
   const names = new Set(live.keys());
@@ -107,7 +114,9 @@ function commitKnowledge(
           found.revision !== change.before.revision
     ) {
       throw new Conflict(
-        `${change.name} changed while the command ran, read it again`,
+        source === "upload"
+          ? `${change.name} changed while uploading, try again`
+          : `${change.name} changed while the command ran, read it again`,
       );
     }
     bytes -= found?.bytes ?? 0;
