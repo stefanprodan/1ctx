@@ -30,7 +30,13 @@ import {
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import { fillYear, schema } from "./catalog.ts";
 import type { ToolStore } from "./store.ts";
-import type { MemoryHandle, MemoryScope, Offered, Tool } from "./types.ts";
+import type {
+  MemoryHandle,
+  MemoryScope,
+  Offered,
+  Tool,
+  ToolResult,
+} from "./types.ts";
 
 export type SkillsPort = SkillToolsPort & {
   forAgent(agentId: string): OfferedSkill[];
@@ -42,7 +48,10 @@ type OfferDeps = {
   mcp: Pick<Mcp, "offered">;
   memory?: Pick<MemoryCapability, "work">;
   memorySessions: MemorySessionsPort;
-  toolsFor(search: SearchProvider, hosts: readonly string[]): Tool[];
+  toolsFor(
+    search: SearchProvider,
+    hosts: readonly string[],
+  ): Tool<string | ToolResult>[];
   log: Log;
 };
 
@@ -122,9 +131,10 @@ export function offered(
     searchRow.enabled && searchRow.provider !== null
       ? searchRow.provider
       : null;
-  // datetime has no switch; a web tool has its row
+  // datetime and bash have no switches; a web tool has its row
   const allowed = new Set<string>([
     "datetime",
+    "bash",
     ...[...rows.values()]
       .filter((row) => row.enabled && (row.name !== "websearch" || search))
       .map((row) => row.name),

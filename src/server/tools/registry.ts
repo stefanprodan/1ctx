@@ -20,18 +20,18 @@ function describe(error: unknown, timeoutMs: number): string {
 }
 
 export class Registry {
-  private readonly byName = new Map<string, Tool>();
+  private readonly byName = new Map<string, Tool<string | ToolResult>>();
 
   // unknown() lets a caller whose set is not the send's usual one say
   // what is on offer instead of the bare not-found line
   constructor(
-    tools: Tool[],
+    tools: Tool<string | ToolResult>[],
     private readonly unknown = (name: string) => `tool "${name}" not found.`,
   ) {
     for (const tool of tools) this.byName.set(tool.name, tool);
   }
 
-  get(name: string): Tool | undefined {
+  get(name: string): Tool<string | ToolResult> | undefined {
     return this.byName.get(name);
   }
 
@@ -59,11 +59,17 @@ export class Registry {
       started = performance.now();
       timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
-      const text = await tool.run(parsed as Record<string, unknown>, {
+      const result = await tool.run(parsed as Record<string, unknown>, {
         ...ctx,
         signal,
       });
-      return { content: clean(String(text), ctx.caps.resultCut), error: false };
+      return {
+        content: clean(
+          typeof result === "string" ? result : result.content,
+          ctx.caps.resultCut,
+        ),
+        error: typeof result === "string" ? false : result.error,
+      };
     } catch (error) {
       // a tool with its own timer of the same length (an MCP call) can
       // throw its own words a moment before this one fires; past the

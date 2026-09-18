@@ -229,6 +229,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       skills,
       mcp,
       memory,
+      knowledge,
       sessions: {
         memorySnapshot: (projectId, sessionId) =>
           sessions.memorySnapshot(projectId, sessionId),

@@ -7,7 +7,11 @@
 import { describe, expect, test } from "bun:test";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
-import type { Tool, ToolContext } from "../../../src/server/tools/types.ts";
+import type {
+  Tool,
+  ToolContext,
+  ToolResult,
+} from "../../../src/server/tools/types.ts";
 
 // built from code points, so no invisible character sits in the source
 const char = (...codes: number[]) => String.fromCodePoint(...codes);
@@ -46,6 +50,24 @@ function echo(text: string, fail = false): Registry {
 const call = { id: "c1", name: "echo", arguments: "{}" };
 
 describe("the registry's result cleaning", () => {
+  test.each([false, true])(
+    "cleans a structured result and preserves error=%s",
+    async (error) => {
+      const ctx = context();
+      ctx.caps = { ...ctx.caps, resultCut: 4 };
+      const tool: Tool<ToolResult> = {
+        name: "echo",
+        description: "",
+        parameters: {},
+        run: async () => ({ content: `a${NUL}bcdef`, error }),
+      };
+      expect(await new Registry([tool]).run(call, ctx)).toEqual({
+        content: "abcd",
+        error,
+      });
+    },
+  );
+
   test("drops controls, C1 and bidi controls, keeps text and RTL letters", async () => {
     const dirty = `a${NUL}b${ESC}c${NEL}d${RLO}e${LRE}f${LRI}g${PDI}h\ti\nj ${SHALOM}`;
     expect(await echo(dirty).run(call, context())).toEqual({

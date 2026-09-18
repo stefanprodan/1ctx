@@ -39,12 +39,12 @@ export type ToolContext = {
 
 export type ToolResult = { content: string; error: boolean };
 
-export type Tool = {
+export type Tool<T extends string | ToolResult = string> = {
   name: string;
   description: string;
   parameters: object;
   timeoutMs?: number;
-  run(args: Record<string, unknown>, ctx: ToolContext): Promise<string>;
+  run(args: Record<string, unknown>, ctx: ToolContext): Promise<T>;
 };
 
 export type MemoryScope = {

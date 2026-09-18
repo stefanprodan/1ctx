@@ -15,6 +15,7 @@ import { BUILTIN_TOOLS, type BuiltinTool } from "../../shared/words.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type { MemoryWork } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
+import { makeBashTool } from "./builtin/bash.ts";
 import {
   DEFAULT_TIMEZONE,
   datetimeTool,
@@ -27,7 +28,7 @@ import {
   makeMemoryTools,
 } from "./builtin/memory.ts";
 import { makeSkillTools } from "./builtin/skill.ts";
-import type { Tool } from "./types.ts";
+import type { Tool, ToolResult } from "./types.ts";
 
 export function fillYear(tools: ChatTool[], now: number): ChatTool[] {
   const year = formatDatetime(now, DEFAULT_TIMEZONE).datetime.slice(0, 4);
@@ -37,7 +38,7 @@ export function fillYear(tools: ChatTool[], now: number): ChatTool[] {
   }));
 }
 
-export function schema(tool: Tool): ChatTool {
+export function schema(tool: Tool<string | ToolResult>): ChatTool {
   return {
     name: tool.name,
     description: tool.description,
@@ -55,6 +56,7 @@ export function parametersHtml(
 }
 
 const WHEN: Record<BuiltinTool, ToolWhen> = {
+  bash: "knowledge",
   datetime: "always",
   skill: "skills",
   skill_file: "skillFiles",
@@ -114,6 +116,7 @@ export function builtinCatalog(
   const own = fillYear(memoryTools("").map(schema), now);
   const tools = fillYear(
     [
+      makeBashTool(),
       datetimeTool,
       ...makeSkillTools([skill], {
         body: () => null,

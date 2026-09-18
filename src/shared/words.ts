@@ -341,6 +341,7 @@ export function isWebTool(value: unknown): value is WebTool {
 // the tools the server writes itself, besides the web ones, by name;
 // none has a switch, each follows what its send has
 export const BUILTIN_TOOLS = [
+  "bash",
   "datetime",
   "mcp_call",
   "mcp_describe",

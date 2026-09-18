@@ -197,22 +197,25 @@ describe("memory offered sets", () => {
     }
   });
 
-  test("a call the phase does not offer says what it offers", async () => {
-    const tools = area();
-    const phase = tools.offered(now, "agent", [], "auto", {
-      ...task,
-      phase: "memory",
-    });
-    const result = await tools.run(
-      phase,
-      { id: "c1", name: "session_read", arguments: '{"id":"s1"}' },
-      context(),
-    );
-    expect(result.error).toBe(true);
-    expect(result.content).toBe(
-      "Error: only memory_edit is offered in the memory phase.",
-    );
-  });
+  test.each(["session_read", "bash"])(
+    "a %s call in the phase says what it offers",
+    async (name) => {
+      const tools = area();
+      const phase = tools.offered(now, "agent", [], "auto", {
+        ...task,
+        phase: "memory",
+      });
+      const result = await tools.run(
+        phase,
+        { id: "c1", name, arguments: '{"command":"ls"}' },
+        context(),
+      );
+      expect(result.error).toBe(true);
+      expect(result.content).toBe(
+        "Error: only memory_edit is offered in the memory phase.",
+      );
+    },
+  );
 });
 
 describe("memory tool handles", () => {

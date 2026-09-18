@@ -565,16 +565,18 @@ violation, and every rule has a rejected fixture under
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
   the defaults; `tools/` never imports `runner/`. The offered set is
   decided once per send in `runner/policy.ts` from the `tools` rows:
-  a model that accepts tools always gets `datetime`, and the web tools
+  a model that accepts tools always gets `datetime` and `bash` over the
+  project's knowledge base, plus the web tools
   (`WEB_TOOLS`: `webfetch`, `websearch`, `visualize`, the only rows and
   switches) that an admin has not switched off, websearch only once a
-  search provider is chosen;
-  every provider (exa, firecrawl, tavily) answers keyless, its
+  search provider is chosen. The memory phase offers `memory_edit` alone.
+  Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
   a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
   `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
-  `BUILTIN_TOOLS` schema by name from `tools/catalog.ts`, built by the
-  send's own factories with sample inputs (name enums empty,
+  `BUILTIN_TOOLS` schema, including `bash`, by name from
+  `tools/catalog.ts`, built by the send's own factories with sample
+  inputs (name enums empty,
   `memory_edit`'s own-note text as the variant), each row `RowsTitle`
   (the name over the first sentence) with its tokens by `wireTokens()`
   as `RowsMeta`, read-only; Web's rows carry the switch and no tokens,

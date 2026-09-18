@@ -7,13 +7,20 @@
 
 import { describe, expect, test } from "bun:test";
 import { tokens } from "../../src/server/lib/tokens.ts";
+import { wireTokens } from "../../src/server/providers/index.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
 import { hashPassword } from "../../src/server/users/index.ts";
 import type {
   DirectoryAgentResponse,
   DirectoryUserResponse,
 } from "../../src/shared/api/directory.ts";
-import { type ChatApp, chatApp, FLASH, NO_TOOLS } from "../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  FLASH,
+  NO_TOOLS,
+  startChat,
+} from "../helpers/chat.ts";
 
 const loaded = (
   name: string,
@@ -141,6 +148,7 @@ describe("the directory", () => {
       { name: "datetime", provider: null },
       { name: "webfetch", provider: null },
       { name: "visualize", provider: null },
+      { name: "bash", provider: null },
     ]);
     // the agent has no prompt and no skills; the tool schemas cost,
     // and no MCP server is offered
@@ -148,6 +156,15 @@ describe("the directory", () => {
     expect(body.tokens.prompt).toBe(0);
     expect(body.tokens.skills).toBe(0);
     expect(body.tokens.tools).toBeGreaterThan(50);
+    const started = await startChat(chat);
+    const offered = chat.app.runner.registry.get(started.sessionId)!.policy
+      .offered.tools;
+    expect(body.tokens.tools).toBe(wireTokens(offered));
+    expect(
+      body.tokens.tools -
+        wireTokens(offered.filter((tool) => tool.name !== "bash")),
+    ).toBeGreaterThan(0);
+    started.script.reply("done");
     const off = await chat.admin.call("PATCH", "/api/tools/webfetch", {
       body: { enabled: false },
     });
@@ -155,7 +172,11 @@ describe("the directory", () => {
     const after: DirectoryAgentResponse = await (
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();
-    expect(after.tools.map((t) => t.name)).toEqual(["datetime", "visualize"]);
+    expect(after.tools.map((t) => t.name)).toEqual([
+      "datetime",
+      "visualize",
+      "bash",
+    ]);
     // one schema fewer on the wire, fewer tokens
     expect(after.tokens.tools).toBeLessThan(body.tokens.tools);
     const search = await chat.admin.call("PATCH", "/api/tools/websearch", {
@@ -230,6 +251,7 @@ describe("the directory", () => {
       "datetime",
       "webfetch",
       "visualize",
+      "bash",
     ]);
     expect(body.tokens.tools).toBeGreaterThan(bare.tokens.tools);
     expect(body.tokens.skills).toBe(

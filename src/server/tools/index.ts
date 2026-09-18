@@ -16,6 +16,7 @@ import {
   type WebTool,
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
+import type { KnowledgeCapability } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
@@ -23,6 +24,7 @@ import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ToolCall, wireTokens } from "../providers/index.ts";
 import type { MemorySnapshot } from "../sessions/index.ts";
+import { makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
   makeMcpCatalogTools,
@@ -81,6 +83,7 @@ export type ToolsDeps = {
   skills: SkillsPort;
   mcp?: Pick<Mcp, "offered" | "call" | "validateArguments">;
   memory?: Pick<MemoryCapability, "work">;
+  knowledge?: Pick<KnowledgeCapability, "run">;
   sessions?: {
     memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
   };
@@ -177,7 +180,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const toolsFor = (
     search: SearchProvider,
     hosts: readonly string[],
-  ): Tool[] => [
+  ): Tool<string | ToolResult>[] => [
     datetimeTool,
     makeWebfetchTool(deps.version, fetchDeps),
     makeWebsearchTool(
@@ -187,6 +190,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       searchDeps,
     ),
     makeVisualizeTool(hosts),
+    makeBashTool(deps.knowledge),
   ];
 
   const mcpTools = (servers: OfferedServer[], ctx: ToolContext): Tool[] =>
