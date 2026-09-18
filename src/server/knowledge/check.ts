@@ -44,24 +44,48 @@ export function checkTotals(
   after: { files: number; bytes: number },
   caps: KnowledgeCaps,
 ): void {
+  checkUsage(
+    before,
+    after,
+    caps.knowledgeFiles,
+    caps.knowledgeProjectBytes,
+    "base",
+  );
+}
+
+export function checkScratchTotals(
+  before: { files: number; bytes: number },
+  after: { files: number; bytes: number },
+  caps: KnowledgeCaps,
+): void {
+  checkUsage(before, after, caps.scratchFiles, caps.scratchBytes, "scratch");
+}
+
+function checkUsage(
+  before: { files: number; bytes: number },
+  after: { files: number; bytes: number },
+  files: number,
+  bytes: number,
+  tree: string,
+): void {
   // A lowered cap must still let a base shrink, without admitting growth
   // in another dimension already over its cap.
   if (
-    after.files > caps.knowledgeFiles &&
+    after.files > files &&
     (after.files > before.files ||
       (after.files === before.files && after.bytes >= before.bytes))
   ) {
     throw new BadRequest(
-      `the base would have ${after.files} files, the limit is ${caps.knowledgeFiles}`,
+      `the ${tree} would have ${after.files} files, the limit is ${files}`,
     );
   }
   if (
-    after.bytes > caps.knowledgeProjectBytes &&
+    after.bytes > bytes &&
     (after.bytes > before.bytes ||
       (after.bytes === before.bytes && after.files >= before.files))
   ) {
     throw new BadRequest(
-      `the base would be ${after.bytes} bytes, the limit is ${caps.knowledgeProjectBytes}`,
+      `the ${tree} would be ${after.bytes} bytes, the limit is ${bytes}`,
     );
   }
 }

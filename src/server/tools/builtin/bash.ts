@@ -40,6 +40,7 @@ export function makeBashTool(
       }
       return knowledge.run(
         actor.projectId,
+        actor.sessionId,
         {
           kind: "agent",
           id: actor.agentId,

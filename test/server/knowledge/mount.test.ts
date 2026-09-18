@@ -4,17 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import { KNOWLEDGE_COMMANDS } from "../../../src/server/knowledge/limits.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
-import { setup } from "./helpers.ts";
+import { callCaps, freshSignal, run, type Setup, setup } from "./helpers.ts";
 
-const callCaps = { callTimeoutMs: 4000, resultCut: 1000 };
-const freshSignal = () => new AbortController().signal;
-type Setup = ReturnType<typeof setup>;
-const run = (
-  s: Setup,
-  command: string,
-  caps = callCaps,
-  signal = freshSignal(),
-) => s.area.run(s.projectId, s.agent, command, caps, signal);
 const create = (s: Setup, name: string, text: string) =>
   s.area.create(s.projectId, s.author, name, text);
 
@@ -179,7 +170,7 @@ describe("knowledge command mounts", () => {
     }
   });
 
-  test("regular files outside knowledge are discarded, directories are not rows", async () => {
+  test("files outside both trees are discarded, directories are not rows", async () => {
     const s = setup();
     try {
       expect(
@@ -193,7 +184,8 @@ describe("knowledge command mounts", () => {
       expect(s.area.list(s.projectId).files.map((file) => file.name)).toEqual([
         "inside",
       ]);
-      expect((await run(s, "cat /outside /tmp/z")).error).toBe(true);
+      expect((await run(s, "cat /outside")).error).toBe(true);
+      expect((await run(s, "cat /tmp/z")).content).toStartWith("z\n");
     } finally {
       s.db.close();
     }
@@ -343,12 +335,15 @@ describe("knowledge command mounts", () => {
   );
 
   test("a full mount throws, leaving no empty or partial database files", async () => {
-    const s = setup({ knowledgeProjectBytes: 1024 * 1024 });
+    const s = setup({
+      knowledgeProjectBytes: 1024 * 1024,
+      scratchBytes: 1024 * 1024,
+    });
     try {
       create(s, "source", "x\n".repeat(64 * 1024));
       const result = await run(
         s,
-        "for i in {1..30}; do cp source file$i; done; cat source > last",
+        "for i in {1..40}; do cp source file$i; done; cat source > last",
         { ...callCaps, resultCut: 500_000 },
       );
       expect(result.error).toBe(true);
@@ -450,7 +445,7 @@ describe("knowledge command mounts", () => {
   });
 
   test("output budget limits and unreportable receipt sets never commit", async () => {
-    const s = setup();
+    const s = setup({ scratchBytes: 4000, knowledgeFileBytes: 4000 });
     try {
       expect((await run(s, "echo saved > x; seq 1 10000")).error).toBe(true);
       expect(s.area.list(s.projectId).files).toEqual([]);
@@ -475,7 +470,13 @@ describe("knowledge command mounts", () => {
         () => new AbortController(),
       );
       const pending = controllers.map((controller, i) =>
-        run(first, `echo x > file${i}; sleep 1`, callCaps, controller.signal),
+        run(
+          first,
+          `echo x > file${i}; sleep 1`,
+          callCaps,
+          controller.signal,
+          first.makeSession().id,
+        ),
       );
       try {
         await Bun.sleep(30);
@@ -484,10 +485,13 @@ describe("knowledge command mounts", () => {
           finished = true;
           return result;
         });
-        const expired = await run(second, "echo no > expired", {
-          ...callCaps,
-          callTimeoutMs: 20,
-        });
+        const expired = await run(
+          second,
+          "echo no > expired",
+          { ...callCaps, callTimeoutMs: 20 },
+          freshSignal(),
+          second.makeSession().id,
+        );
         expect(expired.error).toBe(true);
         expect(finished).toBe(false);
         expect(second.area.list(second.projectId).files).toEqual([]);

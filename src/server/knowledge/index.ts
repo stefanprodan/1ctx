@@ -36,6 +36,7 @@ export type KnowledgeCapability = KnowledgePort & {
   counts(projectId: string): KnowledgeCounts;
   run(
     projectId: string,
+    sessionId: string,
     author: KnowledgeAuthor,
     command: string,
     caps: CommandCaps,
@@ -72,15 +73,17 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       return { result: file, events: [event] };
     });
   const capability: KnowledgeCapability = {
-    run: (projectId, author, command, caps, signal) =>
+    run: (projectId, sessionId, author, command, caps, signal) =>
       run(
         {
           db: deps.db,
           store,
+          scratch,
           clock: deps.clock,
           current: () => deps.limits.current(),
         },
         projectId,
+        sessionId,
         author,
         command,
         caps,

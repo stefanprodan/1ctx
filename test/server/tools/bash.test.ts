@@ -76,9 +76,10 @@ describe("bash", () => {
       };
       let calls = 0;
       const tool = makeBashTool({
-        async run(projectId, author, command, caps, signal) {
+        async run(projectId, sessionId, author, command, caps, signal) {
           calls++;
           expect(projectId).toBe("project");
+          expect(sessionId).toBe("session");
           expect(author).toEqual({
             kind: "agent",
             id: "agent",
@@ -146,7 +147,7 @@ describe("bash", () => {
     const controller = new AbortController();
     ctx.signal = controller.signal;
     const tool = makeBashTool({
-      async run(_projectId, _author, _command, _caps, signal) {
+      async run(_projectId, _sessionId, _author, _command, _caps, signal) {
         controller.abort(new Error("stopped"));
         expect(signal.aborted).toBe(true);
         signal.throwIfAborted();

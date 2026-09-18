@@ -211,12 +211,17 @@ violation, and every rule has a rejected fixture under
   use `access.project()`: list and create, read/replace/delete by
   `/files/:fileId`, that file's `/versions`, and `/versions/:versionId`.
   Replacements check the revision; deleted-name restores create new ids.
-  `knowledge/mount.ts` alone imports just-bash, with pinned commands,
-  no host or network, and `defenseInDepth: true`. Four commands at most
-  hold disposable mounts; aborts, exits 124/126 and throws discard them.
-  Other exits commit all changed regular files under `/knowledge` in
-  one transaction, checking mounted ids, revisions, absence and current
-  caps, with one version and `knowledge.changed` event per file.
+  `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
+  host or network, and `defenseInDepth: true`. Four commands at most
+  hold disposable mounts of `/knowledge` and the session's `/tmp`; the
+  per-session queue is taken before the process slot and released last.
+  Aborts, exits 124/126 and throws discard both trees. Every ordinary
+  exit, nonzero included, commits in one transaction: knowledge changes
+  under mounted ids, revisions, absence and current caps, with one
+  version and `knowledge.changed` per file; scratch changes under its
+  revision and current caps, its checked cwd, revision and last use
+  even on a read-only command. Receipts cover knowledge only and an
+  overflow rolls both trees back.
   Unchanged bytes publish nothing. The six knowledge limits are read
   at each write; smaller replacements and deletes survive lowered caps.
   History is evicted by per-file count and project bytes; the hourly
@@ -224,8 +229,12 @@ violation, and every rule has a rejected fixture under
   `knowledge/scratch.ts` holds `ScratchStore`, built as the area's
   `scratch`, over `session_scratch` and `session_scratch_files`; both
   cascade with the session. Writes use the caller's transaction and
-  check the scratch revision. Its sweep skips the sessions a
-  command holds.
+  check the scratch revision. `/tmp` keeps regular files of any bytes
+  and their modes, with the knowledge name and prefix-free rules;
+  symlinks and other types fail the command whole. Empty directories
+  are not kept. The cwd is kept only for directories under either
+  tree; a missing saved directory starts in `/knowledge` with a notice.
+  Its sweep skips the sessions a command holds.
   The knowledge limits scope also holds `scratchBytes`, `scratchFiles`
   and `scratchIdleDays`. The project byte ceiling is 64 MiB; stored
   overrides are clamped to their ranges for both effective limits and

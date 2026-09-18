@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AgentStore } from "../../../src/server/agents/index.ts";
+import { transact } from "../../../src/server/db/index.ts";
 import { knowledgeArea } from "../../../src/server/knowledge/index.ts";
+import type { ScratchChanges } from "../../../src/server/knowledge/scratch.ts";
 import { NotFound } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
@@ -107,7 +109,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
   const area = knowledgeArea({
     db,
     clock: () => now.value,
-    limits: { current: () => caps },
+    limits: { current: () => ({ ...caps }) },
     access: {
       project(_principal, id) {
         const project = projects.byId(id);
@@ -127,5 +129,47 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     session,
     sessions,
     makeSession,
+  };
+}
+
+export const callCaps = { callTimeoutMs: 4000, resultCut: 1000 };
+export const freshSignal = () => new AbortController().signal;
+export type Setup = ReturnType<typeof setup>;
+
+export const run = (
+  s: Setup,
+  command: string,
+  caps = callCaps,
+  signal = freshSignal(),
+  sessionId = s.session.id,
+) =>
+  s.area.run(
+    s.projectId,
+    sessionId,
+    { ...s.agent, sessionId },
+    command,
+    caps,
+    signal,
+  );
+
+export function seedScratch(s: Setup, changes: Partial<ScratchChanges>) {
+  transact(s.db, () => ({
+    result: s.area.scratch.write(
+      s.session.id,
+      s.area.scratch.read(s.session.id).revision,
+      { written: [], removed: [], cwd: "/knowledge", ...changes },
+      s.now.value,
+    ),
+  }));
+}
+
+export function scratchState(s: Setup) {
+  return {
+    ...s.area.scratch.read(s.session.id),
+    usedAt: s.db
+      .query<{ used_at: number }, [string]>(
+        "select used_at from session_scratch where session_id = ?",
+      )
+      .get(s.session.id)?.used_at,
   };
 }
