@@ -11,8 +11,10 @@ import {
   isAvatar,
   isMcpMode,
   isName,
+  MAX_CONTEXT_LENGTH,
   MAX_NAME,
   MAX_SKILLS_PER_AGENT,
+  MIN_CONTEXT_LENGTH,
   MIN_NAME,
   NAME_CHARACTERS,
 } from "../../shared/words.ts";
@@ -25,11 +27,13 @@ export const MAX_SERVERS_PER_AGENT = 50;
 
 export type ParsedAgent = Omit<
   SaveAgentRequest,
-  "effort" | "servers" | "mcpMode"
+  "effort" | "servers" | "mcpMode" | "contextLength" | "tools"
 > & {
   effort: string | null;
   servers: AgentServer[];
   mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
+  // null when the body did not state them
+  stated: { contextLength: number | null; tools: boolean } | null;
 };
 
 // an agent's name as a path names it, by the same rule a save keeps
@@ -87,6 +91,8 @@ export function parseAgent(body: unknown): ParsedAgent {
     "skills",
     "servers",
     "mcpMode",
+    "contextLength",
+    "tools",
   ]);
   const name = parseAgentName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
@@ -133,6 +139,25 @@ export function parseAgent(body: unknown): ParsedAgent {
     throw new BadRequest("mcpMode must be all, catalog or auto");
   }
   const mcpMode = b.mcpMode;
+  const contextLength = b.contextLength ?? null;
+  if (
+    contextLength !== null &&
+    (typeof contextLength !== "number" ||
+      !Number.isInteger(contextLength) ||
+      contextLength < MIN_CONTEXT_LENGTH ||
+      contextLength > MAX_CONTEXT_LENGTH)
+  ) {
+    throw new BadRequest(
+      `contextLength must be a whole number of tokens from ${MIN_CONTEXT_LENGTH} to ${MAX_CONTEXT_LENGTH}`,
+    );
+  }
+  if (b.tools !== undefined && typeof b.tools !== "boolean") {
+    throw new BadRequest("tools must be true or false");
+  }
+  const stated =
+    contextLength === null && b.tools === undefined
+      ? null
+      : { contextLength, tools: b.tools ?? false };
   return {
     name,
     avatar,
@@ -144,5 +169,6 @@ export function parseAgent(body: unknown): ParsedAgent {
     skills,
     servers,
     mcpMode,
+    stated,
   };
 }

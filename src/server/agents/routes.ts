@@ -60,6 +60,29 @@ export type RoutesDeps = {
   clock: Clock;
 };
 
+// a catalog that describes the model is never overridden; one that
+// lists only ids takes the admin's window and tools flag, and a model
+// with tools needs a window, since the tool loop weighs it before calls
+function stated(
+  model: CatalogMatch,
+  body: ParsedAgent["stated"],
+): CatalogMatch {
+  if (model.described) {
+    if (body !== null) {
+      throw new BadRequest(
+        "contextLength and tools are only for a model the catalog does not describe",
+      );
+    }
+    return model;
+  }
+  const tools = body?.tools ?? false;
+  const contextLength = body?.contextLength ?? null;
+  if (tools && contextLength === null) {
+    throw new BadRequest("contextLength is required for a model with tools");
+  }
+  return { ...model, contextLength, tools };
+}
+
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   // the rows the body names are checked before the catalog fetch and
   // again in the transaction, since the world may move while it waits
@@ -98,7 +121,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         name: body.name,
         avatar: body.avatar,
         providerId: provider.id,
-        model,
+        model: stated(model, body.stated),
         thinking: body.thinking,
         effort,
         prompt: body.prompt,

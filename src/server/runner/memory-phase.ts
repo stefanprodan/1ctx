@@ -199,6 +199,7 @@ function memoryRequest(
     model: send.policy.model,
     messages,
     thinking: send.policy.thinking,
+    thinkingOff: send.policy.thinkingOff,
     reasoningEffort: send.policy.effort,
     cacheKey: send.sessionId,
     ...(offered.tools.length > 0 ? { tools: offered.tools } : {}),

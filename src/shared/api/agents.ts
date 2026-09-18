@@ -27,4 +27,9 @@ export type SaveAgentRequest = {
   // at most 50; an unknown id is a 400
   servers: AgentServer[];
   mcpMode: McpMode;
+  // what the admin states for a model its catalog does not describe:
+  // the window in tokens and whether it takes tools. Refused for a
+  // model the catalog describes; a window is required with tools on
+  contextLength?: number | null;
+  tools?: boolean;
 };

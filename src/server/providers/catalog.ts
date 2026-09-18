@@ -36,23 +36,28 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
   for (const m of data as Record<string, unknown>[]) {
     if (typeof m?.id !== "string" || m.id === "" || seen.has(m.id)) continue;
     seen.add(m.id);
-    // OpenRouter lists supported_parameters; mlx-serve lists capabilities
-    const params: unknown[] = [
-      ...(Array.isArray(m.supported_parameters) ? m.supported_parameters : []),
-      ...(Array.isArray(m.capabilities) ? m.capabilities : []),
-    ];
+    // OpenRouter lists supported_parameters, mlx-serve capabilities and
+    // Groq supported_features; NIM and OpenAI list none of them
+    const lists = [
+      m.supported_parameters,
+      m.capabilities,
+      m.supported_features,
+    ].filter((list): list is unknown[] => Array.isArray(list));
+    const params = lists.flat();
     const pricing = (m.pricing ?? {}) as Record<string, unknown>;
+    const contextLength =
+      typeof m.context_length === "number" && m.context_length > 0
+        ? m.context_length
+        : null;
     out.push({
       id: m.id,
       name: typeof m.name === "string" && m.name !== "" ? m.name : m.id,
-      contextLength:
-        typeof m.context_length === "number" && m.context_length > 0
-          ? m.context_length
-          : null,
+      contextLength,
       promptPrice: perMillion(pricing.prompt),
       completionPrice: perMillion(pricing.completion),
       tools: params.includes("tools") || params.includes("tool_use"),
       reasoning: params.includes("reasoning"),
+      described: contextLength !== null || lists.length > 0,
     });
   }
   return out;

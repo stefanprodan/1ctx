@@ -45,6 +45,7 @@ describe("parseCatalog", () => {
       completionPrice: 0.6,
       tools: true,
       reasoning: true,
+      described: true,
     });
     const free = models.find(
       (m) => m.id === "nvidia/nemotron-3-super-120b-a12b:free",
@@ -64,6 +65,7 @@ describe("parseCatalog", () => {
         completionPrice: null,
         tools: false,
         reasoning: false,
+        described: false,
       },
     ]);
   });

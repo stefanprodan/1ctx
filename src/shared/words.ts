@@ -218,8 +218,14 @@ export function isAvatar(value: unknown): value is Avatar {
 }
 
 // the wire a provider speaks: OpenRouter, an OpenAI-compatible server,
-// or Google AI Studio with its native catalog and compatible chat endpoint
-export const WIRES = ["openrouter", "openai-compatible", "gemini"] as const;
+// a server that refuses any field outside the OpenAI spec, or Google AI
+// Studio with its native catalog and compatible chat endpoint
+export const WIRES = [
+  "openrouter",
+  "openai-compatible",
+  "openai-strict",
+  "gemini",
+] as const;
 export type Wire = (typeof WIRES)[number];
 export function isWire(value: unknown): value is Wire {
   return (
@@ -230,6 +236,8 @@ export function isWire(value: unknown): value is Wire {
 export const EFFORTS = {
   openrouter: ["minimal", "low", "medium", "high", "xhigh"],
   "openai-compatible": ["low", "medium", "high"],
+  // Groq refuses minimal, on every model tried
+  "openai-strict": ["low", "medium", "high"],
   gemini: ["low", "medium", "high"],
 } as const satisfies Record<Wire, readonly string[]>;
 export type Effort = (typeof EFFORTS)[Wire][number];
@@ -437,6 +445,11 @@ export const MAX_SKILL_DESCRIPTION = 1024;
 export const MAX_SKILL_COMPATIBILITY = 500;
 // the Claude API's cap per request; recall drops past it
 export const MAX_SKILLS_PER_AGENT = 20;
+
+// the window an admin may state for a model its catalog does not
+// describe, in tokens
+export const MIN_CONTEXT_LENGTH = 1_024;
+export const MAX_CONTEXT_LENGTH = 10_000_000;
 
 // where a skill came from: a GitHub directory, a tarball with a path
 // inside it, a site's discovery index, or one raw SKILL.md

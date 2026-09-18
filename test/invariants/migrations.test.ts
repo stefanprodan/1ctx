@@ -158,7 +158,7 @@ describe("the schema", () => {
       const before = tables.map((name) =>
         db.query(`select * from ${name} order by id`).all(),
       );
-      expect(migrate(db)).toEqual(["0015-knowledge"]);
+      expect(migrate(db)).toEqual(["0015-knowledge", "0016-openai-strict"]);
       expect(MIGRATIONS[14]?.rebuild).toBeUndefined();
       expect(
         tables.map((name) =>
@@ -480,6 +480,7 @@ describe("additive migrations", () => {
       "0013-web-tools",
       "0014-visualize",
       "0015-knowledge",
+      "0016-openai-strict",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -531,6 +532,7 @@ describe("0005", () => {
       "0013-web-tools",
       "0014-visualize",
       "0015-knowledge",
+      "0016-openai-strict",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -591,6 +593,7 @@ describe("rebuild migrations", () => {
       "0013-web-tools",
       "0014-visualize",
       "0015-knowledge",
+      "0016-openai-strict",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -684,6 +687,7 @@ describe("0006 skills migration", () => {
       "0013-web-tools",
       "0014-visualize",
       "0015-knowledge",
+      "0016-openai-strict",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -736,6 +740,7 @@ describe("0007 user tz migration", () => {
       "0013-web-tools",
       "0014-visualize",
       "0015-knowledge",
+      "0016-openai-strict",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -767,6 +772,7 @@ describe("0009 mcp migration", () => {
       "0013-web-tools",
       "0014-visualize",
       "0015-knowledge",
+      "0016-openai-strict",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -941,7 +947,7 @@ describe("0008 search tavily migration", () => {
             .query("update providers set wire = 'gemini' where id = 'local11'")
             .run(),
         ).toThrow();
-        expect(migrate(db)).toEqual([
+        expect(migrate(db, MIGRATIONS.slice(0, 15))).toEqual([
           "0011-gemini",
           "0012-fork",
           "0013-web-tools",
@@ -972,6 +978,70 @@ describe("0008 search tavily migration", () => {
         ).toThrow();
         expect(() =>
           db.query("delete from providers where id = 'gemini11'").run(),
+        ).toThrow();
+        expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+        expect(db.query("pragma foreign_keys").get()).toEqual({
+          foreign_keys: 1,
+        });
+        expect(migrate(db, MIGRATIONS.slice(0, 15))).toEqual([]);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  describe("0016 openai-strict migration", () => {
+    test("widens the wire check, keeps providers and agents, and marks their models described", () => {
+      const db = new Database(":memory:");
+      db.exec("pragma foreign_keys = on");
+      try {
+        migrate(db, MIGRATIONS.slice(0, 15));
+        db.exec(`
+          insert into providers (id, name, wire, base_url, key_name, created_at)
+            values ('pr16', 'router', 'openrouter', 'http://models.test/v1', 'router', 17),
+                   ('local16', 'local', 'openai-compatible', 'http://local.test/v1', null, 18);
+          insert into agents
+            (id, name, avatar, provider_id, model, model_name, context_length,
+             prompt_price, completion_price, tools, reasoning, prompt, thinking,
+             effort, created_at, mcp_mode)
+            values ('a16', 'agent', 'dome', 'pr16', 'model', 'Model', 100000,
+                    1.5, 2.5, 1, 1, 'Be brief', 'on', 'high', 19, 'catalog');
+        `);
+        const providers = db.query("select * from providers order by id").all();
+        const agents = db.query("select * from agents").all() as Record<
+          string,
+          unknown
+        >[];
+        expect(() =>
+          db
+            .query(
+              "update providers set wire = 'openai-strict' where id = 'local16'",
+            )
+            .run(),
+        ).toThrow();
+        expect(migrate(db)).toEqual(["0016-openai-strict"]);
+        expect(MIGRATIONS[15]?.rebuild).toBe(true);
+        expect(db.query("select * from providers order by id").all()).toEqual(
+          providers,
+        );
+        expect(db.query("select * from agents").all()).toEqual(
+          agents.map((agent) => ({ ...agent, model_described: 1 })),
+        );
+        db.exec(`
+          insert into providers (id, name, wire, base_url, key_name, created_at)
+            values ('nim16', 'nvidia', 'openai-strict', 'http://nim.test/v1', 'provider-nvidia', 20);
+          insert into agents
+            (id, name, provider_id, model, model_name, created_at, model_described)
+            values ('n16', 'nim-agent', 'nim16', 'nvidia/nemotron', 'nvidia/nemotron', 21, 0);
+        `);
+        expect(() =>
+          db.query("update providers set wire = 'unknown'").run(),
+        ).toThrow();
+        expect(() =>
+          db.query("update agents set model_described = 2").run(),
+        ).toThrow();
+        expect(() =>
+          db.query("delete from providers where id = 'nim16'").run(),
         ).toThrow();
         expect(db.query("pragma foreign_key_check").all()).toEqual([]);
         expect(db.query("pragma foreign_keys").get()).toEqual({

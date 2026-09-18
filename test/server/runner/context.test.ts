@@ -72,6 +72,7 @@ const policy: SendPolicy = {
   contextLength: 1000,
   prompt: "You write Go.",
   thinking: true,
+  thinkingOff: false,
   effort: "high",
   offered: WITH_BASH,
   memoryOffered: null,
@@ -908,6 +909,7 @@ describe("history", () => {
         { role: "user", content: SUMMARIZE },
       ],
       thinking: false,
+      thinkingOff: false,
       reasoningEffort: null,
       cacheKey: "s1",
       maxTokens: 2000,
@@ -929,9 +931,14 @@ describe("history", () => {
       model: "org/model",
       messages: [],
       thinking: true,
+      thinkingOff: false,
       reasoningEffort: "high",
       cacheKey: "s1",
     });
+    // the agent's own Off rides along, for the summary round too
+    const off = { ...policy, thinking: false, thinkingOff: true, effort: null };
+    expect(request({ ...off, offered: NONE }, "s1", []).thinkingOff).toBe(true);
+    expect(summaryRequest(off, "s1", []).thinkingOff).toBe(true);
   });
 
   test("the request carries the offered tools when there are any", () => {

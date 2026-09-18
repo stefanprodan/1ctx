@@ -40,6 +40,7 @@ const agent: AgentRow = {
     completionPrice: null,
     tools: false,
     reasoning: true,
+    described: true,
   },
   thinking: null,
   effort: "high",

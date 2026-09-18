@@ -65,8 +65,9 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
                 tests, helpers/ (app.ts wires the server over a test db
                 with a fake clock, a cookie jar and a fake fetch that
-                answers the recorded catalog for `PROVIDER_URL` and
-                fails every other host; chat.ts drives a chat with a
+                answers the recorded catalog for `PROVIDER_URL`, the
+                NIM and Groq recordings for `NIM_URL` and `GROQ_URL`,
+                and fails every other host; chat.ts drives a chat with a
                 scripted provider stream; auth-cases.ts is the
                 authorization matrix), fixtures/ (recorded bodies,
                 structure/ holds one violating root per layout rule).
@@ -285,9 +286,9 @@ violation, and every rule has a rejected fixture under
   returns null for an absent or empty file. Values are never logged,
   returned by a route or stored in the database.
 - **A provider is added and deleted, never changed.** Its wire is
-  `openrouter`, `openai-compatible` or `gemini`. The first two answer
-  `GET /models` under the base URL; `gemini` is Google AI Studio, whose
-  catalog is the native `GET /models?pageSize=1000` under
+  `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
+  first three answer `GET /models` under the base URL; `gemini` is
+  Google AI Studio, whose catalog is the native `GET /models?pageSize=1000` under
   `/v1beta` with the key in `x-goog-api-key`, kept to the models that
   chat (`providers/gemini.ts`), and whose chat is the OpenAI-compatible
   `/openai/chat/completions` under the same base. `providers/catalog.ts`
@@ -301,7 +302,12 @@ violation, and every rule has a rejected fixture under
   rules in `providers/openrouter.ts`, the Gemini rules in
   `providers/gemini.ts`: no unknown fields, thinking as
   `thinking_config` or `reasoning_effort: none`, thought frames to
-  reasoning, `completionTokens` counting the thoughts), as one
+  reasoning, `completionTokens` counting the thoughts; the strict rules
+  in `providers/strict.ts` for servers that refuse any field outside
+  the OpenAI spec, NIM and Groq: no `enable_thinking` or
+  `prompt_cache_key`, reasoning sent back as `reasoning`, thinking as
+  `reasoning_effort` alone and `none` only on the agent's own Off,
+  since a model that never thinks refuses the field), as one
   `ChatEvent` stream; the key is read from the secrets port at each
   request and scrubbed from every error, and the recorded frames under
   `test/fixtures/providers/` are what the tests and the fake fetch
@@ -310,9 +316,15 @@ violation, and every rule has a rejected fixture under
   stored with the call and sent back as received, never shown. An agent
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider an agent runs on is a 409 to
-  delete. An agent carries `thinking` and `effort`, null for the provider's
-  default; the levels per wire are `EFFORTS` in `shared/words.ts`, and the
-  policy resolves both once per send.
+  delete. A catalog row with no window and none of
+  `supported_parameters`, `capabilities` or `supported_features` is
+  undescribed (`described: false`, NIM and OpenAI list only ids): the
+  agent form asks for its window and Tools, the agents API takes
+  `contextLength` and `tools` only for such a model (a 400 otherwise,
+  and a window is required with tools on), and a save without them
+  clears them. An agent carries `thinking` and `effort`, null for the
+  provider's default; the levels per wire are `EFFORTS` in
+  `shared/words.ts`, and the policy resolves both once per send.
   `GET /api/providers` answers the `provider-` key names beside the rows.
   The form picks one with `Select`, or No key; a missing file stays named
   and marked on its provider row.
@@ -781,7 +793,7 @@ violation, and every rule has a rejected fixture under
   `RowsButton` (an action) or `RowsLine` (neither; `as="label"` for a
   pick, `off` when it cannot be picked). Its head is only
   `RowsAvatar`, `RowsTitle` (mono for an identifier, `bad` for a
-  failed line) and `RowsMeta` (centred at the right), with
+  failed line) and `RowsMeta` (centred at the right; `short` is all a phone shows), with
   `RowsTag`, `RowsHandle` and `RowsBad` inside a line; its end is
   `RowsEnd` (buttons, after the words that ask or the failure),
   `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first

@@ -269,6 +269,9 @@
   .rows-meta-bad {
     color: var(--failed);
   }
+  .rows-meta-short {
+    display: none;
+  }
 
   .rows-tag {
     flex-shrink: 0;
@@ -541,19 +544,28 @@
       padding-left: var(--space-4);
     }
     /* the meta wraps under the text it follows: past a radio or a
-       chevron, past nothing in a static row or a link, and past the
-       avatar too when the row has one */
+       chevron, past nothing in a static row, a link or a row whose
+       title comes first, and past the avatar too when the row has one */
     .rows-meta {
       flex-basis: 100%;
       order: 6;
       white-space: normal;
+    }
+    /* a meta with a short form shows only that on a phone */
+    .rows-meta-long,
+    .rows-meta-wide {
+      display: none;
+    }
+    .rows-meta-short {
+      display: inline;
     }
     .rows-line > .rows-meta,
     .rows-toggle > .rows-meta {
       padding-left: calc(14px + var(--space-3));
     }
     .rows-line-static > .rows-meta,
-    .rows-go > .rows-meta {
+    .rows-go > .rows-meta,
+    .rows-line > .rows-title:first-child ~ .rows-meta {
       padding-left: 0;
     }
     .rows-line:has(> .rows-avatar) > .rows-meta,

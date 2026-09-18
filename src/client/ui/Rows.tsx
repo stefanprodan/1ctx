@@ -383,12 +383,28 @@ export function RowsBad({ children }: { children: ComponentChildren }) {
 // the faint words at the row's right; under 720 they wrap below
 export function RowsMeta({
   bad,
+  short,
   children,
 }: {
   bad?: boolean;
+  // what a phone shows in place of the whole meta, the rest being in
+  // the open row; empty hides the meta there
+  short?: string;
   children: ComponentChildren;
 }) {
+  if (short === undefined) {
+    return (
+      <span class={`rows-meta${bad ? " rows-meta-bad" : ""}`}>{children}</span>
+    );
+  }
   return (
-    <span class={`rows-meta${bad ? " rows-meta-bad" : ""}`}>{children}</span>
+    <span
+      class={`rows-meta${bad ? " rows-meta-bad" : ""}${
+        short === "" ? " rows-meta-wide" : ""
+      }`}
+    >
+      <span class="rows-meta-long">{children}</span>
+      <span class="rows-meta-short">{short}</span>
+    </span>
   );
 }

@@ -95,6 +95,9 @@ export type AgentSpec = {
   skills?: string[];
   servers?: { name: string; read: boolean; write: boolean }[];
   mcpMode?: McpMode;
+  // for a model its catalog does not describe, as the agents API takes
+  contextLength?: number | null;
+  tools?: boolean;
 };
 
 export type ToolSpec = {
@@ -282,6 +285,8 @@ export function agent(value: unknown): AgentSpec {
         "skills",
         "servers",
         "mcpMode",
+        "contextLength",
+        "tools",
       ],
       "spec",
     ),
@@ -318,6 +323,14 @@ export function agent(value: unknown): AgentSpec {
       skills: (v) => names(v ?? [], isSkillName, MAX_SKILLS_PER_AGENT),
       servers,
       mcpMode: guarded(isMcpMode, "must be all, catalog or auto"),
+      // the range is the API's to hold
+      contextLength: (v) => {
+        if (v !== null && (typeof v !== "number" || !Number.isInteger(v))) {
+          throw new BadRequest("must be a whole number of tokens or null");
+        }
+        return v;
+      },
+      tools: boolean,
     },
   );
 }

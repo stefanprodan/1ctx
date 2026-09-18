@@ -67,6 +67,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
       completionPrice: null,
       tools: true,
       reasoning: false,
+      described: true,
     },
     thinking: null,
     effort: null,

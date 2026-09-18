@@ -56,6 +56,12 @@ export function thinkingLine(
     .join(" · ");
 }
 
+// "2 MCPs": what the row says of the agent's MCP servers, empty for none
+export function serversLine(agent: Pick<AgentSummary, "servers">): string {
+  const n = agent.servers.length;
+  return n === 0 ? "" : `${n} MCP${n === 1 ? "" : "s"}`;
+}
+
 // "2 skills": what the row says of the agent's skills, empty for none
 export function skillsLine(agent: Pick<AgentSummary, "skills">): string {
   const n = agent.skills.length;

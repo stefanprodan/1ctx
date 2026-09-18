@@ -132,6 +132,53 @@ describe("tool loop provider policy", () => {
     }
   });
 
+  test("a strict tool round sends only spec fields", async () => {
+    const chat = await chatApp({ wire: "openai-strict" });
+    try {
+      const { detail, script } = await startChat(chat, "what time is it");
+      for (const field of [
+        "enable_thinking",
+        "chat_template_kwargs",
+        "prompt_cache_key",
+      ]) {
+        expect(script.body).not.toHaveProperty(field);
+      }
+      // the model reasons by its catalog flag, so thinking is on and no
+      // effort is sent: the provider's default
+      expect(script.body).not.toHaveProperty("reasoning_effort");
+      script.reasoning("check the clock");
+      script.toolCall({ id: "call_1", name: "datetime", arguments: "{}" });
+      script.finish("tool_calls");
+      script.usage();
+      script.end();
+      const next = await waitScript(chat.scripted, 2);
+      const messages = next.body.messages as Record<string, unknown>[];
+      expect(messages.find((message) => message.role === "assistant")).toEqual({
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "datetime", arguments: "{}" },
+          },
+        ],
+      });
+      expect(next.body).not.toHaveProperty("prompt_cache_key");
+      next.reply("It is noon.");
+      await settle(chat);
+      expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+        status: "done",
+        cause: "finish",
+        rounds: 2,
+        toolCalls: 1,
+      });
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
+
   test("websearch is not offered without a chosen provider", async () => {
     const chat = await chatApp({ secrets: {} });
     const { script } = await startChat(chat, "search");

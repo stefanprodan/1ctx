@@ -19,7 +19,9 @@ export type ProviderSummary = {
 };
 
 // what the catalog says about one model: the window, the prices in USD
-// per million tokens (null when the catalog did not say) and the flags
+// per million tokens (null when the catalog did not say) and the flags.
+// A catalog that lists only ids leaves `described` false, and an admin
+// states the window and the tools flag on the agent in its place
 export type CatalogMatch = {
   id: string;
   name: string;
@@ -28,4 +30,5 @@ export type CatalogMatch = {
   completionPrice: number | null;
   tools: boolean;
   reasoning: boolean;
+  described: boolean;
 };

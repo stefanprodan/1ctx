@@ -51,6 +51,10 @@ export type ChatRequest = {
   model: string;
   messages: ChatMessageIn[];
   thinking: boolean;
+  // the agent chose Off, as against a default or a summary without
+  // thinking: a strict server refuses the field that turns thinking off
+  // on a model that never thinks, so it is sent only on this word
+  thinkingOff?: boolean;
   reasoningEffort?: Effort | null;
   temperature?: number | null;
   topP?: number | null;
