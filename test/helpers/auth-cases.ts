@@ -258,6 +258,43 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/projects/:id/knowledge",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/knowledge",
+    body: { name: "docs/x.md", text: "text" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/knowledge/files/:fileId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PUT",
+    path: "/api/projects/:id/knowledge/files/:fileId",
+    body: { text: "text", revision: 1 },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/knowledge/files/:fileId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/knowledge/files/:fileId/versions",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/knowledge/versions/:versionId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/projects/:id/automations",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },

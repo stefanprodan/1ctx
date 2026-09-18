@@ -12,6 +12,7 @@ import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
 import type { Db } from "./db/index.ts";
+import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
@@ -76,6 +77,7 @@ export type App = {
   skills: SkillStore;
   agents: AgentStore;
   memory: MemoryStore;
+  knowledge: KnowledgeArea;
   sessions: SessionStore;
   automations: Automations["store"];
   automationScheduler: Automations["scheduler"];
@@ -163,9 +165,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage: {
       deleteProject: (projectId) => usage.deleteProject(projectId),
     },
-    // the knowledge area is built after projects; until it lands the
-    // detail counts nothing
-    knowledge: { counts: () => ({ files: 0, tokens: 0 }) },
+    knowledge: { counts: (projectId) => knowledge.counts(projectId) },
   });
   const access: Access = accessArea({
     db,
@@ -205,6 +205,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     runs: { runInfo: (sessionId) => sessions.runInfo(sessionId) },
   });
+  const knowledge = knowledgeArea({ db, clock, limits, access });
   sessions = sessionsArea({
     db,
     clock,
@@ -297,6 +298,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...access.routes,
     ...agents.routes,
     ...memory.routes,
+    ...knowledge.routes,
     ...sessions.routes,
     ...(tools.routes ?? []),
     ...runner.routes,
@@ -336,6 +338,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     skills: skills.store,
     agents: agents.store,
     memory: memory.store,
+    knowledge,
     sessions: sessions.store,
     automations: automations.store,
     automationScheduler: automations.scheduler,
@@ -348,7 +351,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     handle,
     provision,
-    sweep: () => access.sweep() + sessions.store.sweepDigests(),
+    sweep: () =>
+      access.sweep() + knowledge.sweep(clock()) + sessions.store.sweepDigests(),
     mcpStart: () => mcp.start(),
     // the runner first, whose ending calls may still ask for a refresh
     // that the MCP close then refuses; nothing touches the db after

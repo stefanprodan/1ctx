@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { knowledgeArea } from "../../../src/server/knowledge/index.ts";
+import { NotFound } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
   DEFAULT_LIMITS,
@@ -55,6 +56,13 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     db,
     clock: () => now.value,
     limits: { current: () => caps },
+    access: {
+      project(_principal, id) {
+        const project = projects.byId(id);
+        if (project === null) throw new NotFound();
+        return project;
+      },
+    },
   });
   return { db, area, projectId, author, agent, now, caps };
 }

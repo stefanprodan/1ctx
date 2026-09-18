@@ -203,6 +203,26 @@ violation, and every rule has a rejected fixture under
   through `access.project(principal, id)`, which answers the same 404
   whether the project is missing or not theirs to see. The rule is
   `projects/visible.ts`, pure.
+- **Knowledge is versioned project text.** `knowledge_files` holds live
+  UTF-8 files under prefix-free names; `knowledge_versions` keeps every
+  post-image and an empty delete version with the last live summary.
+  History outlives files and both tables cascade with the project.
+  The seven authenticated routes under `/api/projects/:id/knowledge`
+  use `access.project()`: list and create, read/replace/delete by
+  `/files/:fileId`, that file's `/versions`, and `/versions/:versionId`.
+  Replacements check the revision; deleted-name restores create new ids.
+  `knowledge/mount.ts` alone imports just-bash, with pinned commands,
+  no host or network, and `defenseInDepth: true`. Four commands at most
+  hold disposable mounts; aborts, exits 124/126 and throws discard them.
+  Other exits commit all changed regular files under `/knowledge` in
+  one transaction, checking mounted ids, revisions, absence and current
+  caps, with one version and `knowledge.changed` event per file.
+  Unchanged bytes publish nothing. The six knowledge limits are read
+  at each write; smaller replacements and deletes survive lowered caps.
+  History is evicted by per-file count and project bytes; the hourly
+  sweep drops expired deleted-file history, never live-file versions.
+  The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
+  so best-effort hardening runs; sqlite3's unpatched worker stays out.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
   secrets directory. The closed kinds are `user-`, `provider-`, `search-`
   and `mcp-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`

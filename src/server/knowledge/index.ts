@@ -5,47 +5,28 @@ import type {
   KnowledgeAuthor,
   KnowledgeCounts,
   KnowledgeFile,
-  KnowledgeFileDetail,
-  KnowledgeList,
-  KnowledgeVersion,
-  KnowledgeVersionDetail,
 } from "../../shared/contracts/knowledge.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
+import type { RouteDescriptor } from "../lib/http.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
+import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { KnowledgeStore, summary } from "./store.ts";
 
 export type LimitsPort = { current(): KnowledgeCaps };
-export type KnowledgeDeps = { db: Db; clock: Clock; limits: LimitsPort };
-export type KnowledgeCapability = {
-  list(projectId: string): KnowledgeList;
-  read(projectId: string, fileId: string): KnowledgeFileDetail;
-  versions(projectId: string, fileId: string): KnowledgeVersion[];
-  version(projectId: string, versionId: string): KnowledgeVersionDetail;
-  create(
-    projectId: string,
-    author: KnowledgeAuthor,
-    name: string,
-    text: string,
-  ): KnowledgeFile;
-  replace(
-    projectId: string,
-    author: KnowledgeAuthor,
-    fileId: string,
-    text: string,
-    revision: number,
-  ): KnowledgeFile;
-  remove(
-    projectId: string,
-    author: KnowledgeAuthor,
-    fileId: string,
-  ): KnowledgeFile;
+export type KnowledgeDeps = {
+  db: Db;
+  clock: Clock;
+  limits: LimitsPort;
+  access: AccessPort;
+};
+export type KnowledgeCapability = KnowledgePort & {
   snapshot(projectId: string): { files: number; recent: RecentFile[] };
   counts(projectId: string): KnowledgeCounts;
   run(
@@ -57,7 +38,10 @@ export type KnowledgeCapability = {
   ): Promise<CommandResult>;
   sweep(now: number): number;
 };
-export type KnowledgeArea = KnowledgeCapability & { store: KnowledgeStore };
+export type KnowledgeArea = KnowledgeCapability & {
+  store: KnowledgeStore;
+  routes: RouteDescriptor[];
+};
 
 export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
@@ -80,8 +64,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       };
       return { result: file, events: [event] };
     });
-  return {
-    store,
+  const capability: KnowledgeCapability = {
     run: (projectId, author, command, caps, signal) =>
       run(
         {
@@ -194,6 +177,11 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     }),
     sweep: (now) =>
       store.sweep(now, deps.limits.current().knowledgeHistoryDays),
+  };
+  return {
+    store,
+    ...capability,
+    routes: routes({ access: deps.access, knowledge: capability }),
   };
 }
 

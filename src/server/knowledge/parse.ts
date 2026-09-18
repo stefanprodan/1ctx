@@ -10,6 +10,13 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { textFromString } from "./text.ts";
 
+export function parseId(value: unknown, name: string): string {
+  if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
+    throw new BadRequest(`${name} must be an id`);
+  }
+  return value;
+}
+
 export function parseName(value: unknown): string {
   if (!isKnowledgeName(value)) {
     throw new BadRequest(
