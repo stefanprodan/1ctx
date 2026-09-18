@@ -252,6 +252,13 @@ describe("the knowledge words", () => {
 test("file sizes keep their units", () => {
   expect(sizeWords(262_144)).toBe("256 KB");
   expect(sizeWords(4 * 1024 * 1024)).toBe("4 MB");
+  expect(sizeWords(1023)).toBe("1023 B");
+  expect(sizeWords(5.78 * 1024 * 1024)).toBe("5.78 MB");
+  expect(sizeWords(812 * 1024)).toBe("812 KB");
+  // never a rounded thousand: the next unit takes over
+  expect(sizeWords(1023.5 * 1024 * 1024)).toBe("1 GB");
+  expect(sizeWords(1024 ** 3)).toBe("1 GB");
+  expect(sizeWords(1.5 * 1024 ** 3)).toBe("1.5 GB");
 });
 
 describe("the page", () => {

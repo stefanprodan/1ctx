@@ -144,10 +144,18 @@ export function deletedHint(historyDays: number): string {
 }
 
 // a size as a field says it: "256 KB", "4 MB"
+// three significant digits, but never a rounded thousand: 1,023.5 MB
+// to three digits is "1020 MB", so the next unit takes over at 1,000
 export function sizeWords(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) {
-    return `${Number((bytes / 1024).toPrecision(3))} KB`;
+  let value = bytes;
+  for (const unit of ["KB", "MB", "GB"]) {
+    value /= 1024;
+    if (value < 1000 || unit === "GB") {
+      const shown =
+        value < 100 ? Number(value.toPrecision(3)) : Math.round(value);
+      return `${shown} ${unit}`;
+    }
   }
-  return `${Number((bytes / (1024 * 1024)).toPrecision(3))} MB`;
+  return `${bytes} B`;
 }

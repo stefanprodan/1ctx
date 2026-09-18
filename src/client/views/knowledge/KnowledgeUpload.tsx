@@ -295,7 +295,8 @@ export function KnowledgeUpload({
               class="btn btn-primary"
               disabled={busy || !state.ready.length}
             >
-              {items.length
+              {/* a count of none says nothing: the button is off anyway */}
+              {state.ready.length
                 ? `Upload ${plural(state.ready.length, "file")}`
                 : "Upload"}
             </button>
