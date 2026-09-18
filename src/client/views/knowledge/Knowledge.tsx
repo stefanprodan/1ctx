@@ -123,6 +123,7 @@ function Base({ projectId }: { projectId: string }) {
             <KnowledgeForm
               projectId={projectId}
               names={list.files.map((file) => file.name)}
+              limits={list.limits}
               onDone={() => {
                 adding.value = false;
               }}

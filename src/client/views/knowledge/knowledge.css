@@ -61,4 +61,32 @@
     font-size: var(--text-small);
     resize: vertical;
   }
+
+  /* the drop target: a file lands here, or Choose file opens the
+     picker behind it */
+  .knowledge-drop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    font-size: var(--text-small);
+    color: var(--faint);
+    text-align: center;
+  }
+  .knowledge-drop-over {
+    border-color: var(--brand);
+    background: var(--inset);
+  }
+  .knowledge-drop .knowledge-choose {
+    cursor: pointer;
+  }
+  .knowledge-file {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
 }

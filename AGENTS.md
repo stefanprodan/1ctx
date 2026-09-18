@@ -736,7 +736,11 @@ violation, and every rule has a rejected fixture under
   with the totals as its hint and Add file at its head: a row opens to
   who wrote it and from where, its text folded at twelve lines with
   Show all, History with Restore on every past version, and Delete; a
-  second card lists the deleted files whose text is still kept.
+  second card lists the deleted files whose text is still kept. Add file
+  is a name box, a drop target with Choose file behind it, and the text,
+  which a pick, a drop or a paste fills; the name rule, a text the
+  browser could not decode and the file and body caps are refused at
+  their field before anything is sent.
   `data/knowledge.ts` holds the list per project, a file's text and its
   versions once read, and applies a `knowledge` frame by revision, so a
   run's write lands on the open tab. A team project's Members tab is the

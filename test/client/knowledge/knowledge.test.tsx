@@ -21,6 +21,8 @@ import { me } from "../../../src/client/data/me.ts";
 import { project } from "../../../src/client/data/projects.ts";
 import {
   authorOf,
+  baseName,
+  bodyProblem,
   deletedHint,
   deletedLine,
   fieldOf,
@@ -28,8 +30,11 @@ import {
   knowledgeWords,
   lastLiveVersion,
   nameProblem,
+  shapeKnowledgeName,
   shownFiles,
+  sizeWords,
   textBox,
+  textHint,
   textProblem,
   versionLine,
 } from "../../../src/client/views/knowledge/Knowledge.model.ts";
@@ -265,9 +270,39 @@ describe("the add checks", () => {
     expect(nameProblem(" runbook.md ", names)).toBeNull();
   });
 
-  test("a text is asked for", () => {
-    expect(textProblem("")).toBe("Add some text");
-    expect(textProblem("hello")).toBeNull();
+  test("a text is asked for, and read as UTF-8 under the cap", () => {
+    const cap = 262_144;
+    expect(textProblem("", cap)).toBe("Add some text");
+    expect(textProblem("hello", cap)).toBeNull();
+    // the browser decodes what it cannot read into U+FFFD
+    expect(textProblem("hi\uFFFD!", cap)).toBe("Not a text file");
+    expect(textProblem("hi\u0000", cap)).toBe("Not a text file");
+    expect(textProblem("a".repeat(307_200), cap)).toBe(
+      "Too large: 300 KB, the cap is 256 KB",
+    );
+    // a multibyte character counts its bytes
+    expect(textProblem("é".repeat(cap), cap)).toContain("Too large: 512 KB");
+  });
+
+  test("what escaping adds is measured against the body cap", () => {
+    const cap = 4096;
+    expect(bodyProblem({ name: "x.md", text: "hello" }, cap)).toBeNull();
+    // a quote or a control character grows to six bytes on the wire
+    const words = bodyProblem(
+      { name: "x.md", text: "\u0001".repeat(3000) },
+      cap,
+    );
+    expect(words).toContain("Too large to send");
+    expect(words).toContain("the cap is 12 KB");
+  });
+
+  test("a name is shaped as it is typed, and a picked file names itself", () => {
+    expect(shapeKnowledgeName("  my notes.md  ")).toBe("my-notes.md");
+    expect(baseName("docs/runbook.md")).toBe("runbook.md");
+    expect(baseName("runbook.md")).toBe("runbook.md");
+    expect(sizeWords(262_144)).toBe("256 KB");
+    expect(sizeWords(4 * 1024 * 1024)).toBe("4 MB");
+    expect(textHint(262_144)).toBe("Any UTF-8 text up to 256 KB");
   });
 
   test("the server's words land at the field they are about", () => {
@@ -346,13 +381,22 @@ describe("the page", () => {
     expect(html).toContain("btn-danger");
   });
 
-  test.serial("the add form takes a name and a text", () => {
+  test.serial("the add form takes a name, a file and a text", () => {
     const html = render(
-      <KnowledgeForm projectId="p1" names={[]} onDone={() => {}} />,
+      <KnowledgeForm
+        projectId="p1"
+        names={[]}
+        limits={list().limits}
+        onDone={() => {}}
+      />,
     );
     expect(html).toContain('name="name"');
     expect(html).toContain('name="text"');
     expect(html).toContain("One to eight segments");
+    expect(html).toContain("Drop a text file here, or");
+    expect(html).toContain("Choose file");
+    expect(html).toContain('type="file"');
+    expect(html).toContain("Any UTF-8 text up to 256 KB");
     expect(html).toContain("Cancel");
   });
 });
