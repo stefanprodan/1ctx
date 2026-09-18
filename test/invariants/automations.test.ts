@@ -4,8 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import { nextFire, nextFires } from "../../src/server/automations/index.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
-import { hashPassword } from "../../src/server/users/index.ts";
 import type { StreamRow } from "../../src/shared/api/sessions.ts";
+import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import { chatApp, tick } from "../helpers/chat.ts";
 

@@ -12,12 +12,7 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import {
-  account,
-  hashPassword,
-  type UserFields,
-  type UserRow,
-} from "../users/index.ts";
+import { account, type UserFields, type UserRow } from "../users/index.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
 
@@ -34,6 +29,7 @@ export type UsersPort = {
   setDisabled(id: string, disabled: boolean): void;
   setMustChangePassword(id: string, required: boolean): void;
   setPasswordHash(id: string, hash: string): void;
+  hashPassword(password: string): Promise<string>;
   countAdmins(): number;
   createUser(fields: UserFields): UserRow;
 };
@@ -81,7 +77,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(req) {
         const parsed = parseNewUser(await jsonBody(req));
-        const passwordHash = await hashPassword(parsed.password);
+        const passwordHash = await deps.users.hashPassword(parsed.password);
         const user = transact(deps.db, () => {
           usernameAvailable(parsed.username, null);
           emailAvailable(parsed.email, null);
@@ -205,7 +201,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         if (id === ctx.principal!.userId) {
           throw new Conflict("cannot reset your own password");
         }
-        const passwordHash = await hashPassword(password);
+        const passwordHash = await deps.users.hashPassword(password);
         transact(deps.db, () => {
           const user = find(id);
           deps.users.setPasswordHash(user.id, passwordHash);

@@ -64,7 +64,9 @@ src/client/     the Preact app, bundled by Bun from client/index.html.
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
                 tests, helpers/ (app.ts wires the server over a test db
-                with a fake clock, a cookie jar and a fake fetch that
+                with a fake clock, the least argon2id cost (its
+                `hashPassword` hashes a test's users at it), a
+                cookie jar and a fake fetch that
                 answers the recorded catalog for `PROVIDER_URL`, the
                 NIM and Groq recordings for `NIM_URL` and `GROQ_URL`,
                 and fails every other host; chat.ts drives a chat with a
@@ -159,7 +161,8 @@ violation, and every rule has a rejected fixture under
   and the router re-sends the cookie with a full Max-Age on every
   answer, a denial or an error included. The row holds
   a hash of the token; expired rows are swept at start and hourly.
-  Passwords are argon2id through `Bun.password`, at most 1024 bytes,
+  Passwords are argon2id through `Bun.password` at `PASSWORD_COST`, a
+  compose option a test lowers, at most 1024 bytes,
   the same cap for `user-admin.key`. The first admin comes from
   `user-admin.key` in the secrets directory, read once when there are no
   users, with `admin@1ctx.dev` as its email. Every user has an email, unique and

@@ -120,6 +120,8 @@ export type ToolsArea = Tools & {
 // the memory phase is offered memory_edit and nothing else; a call to
 // anything the run had gets the reason rather than a bare not found
 const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
+// how long an MCP call's own timer runs past the registry's limit
+const MCP_BACKSTOP_MS = 1000;
 
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
@@ -202,10 +204,14 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           description: tool.description,
           parameters: tool.wireInputSchema,
           timeoutMs,
+          // the registry times the call and aborts its signal; the
+          // client's own timer is a backstop set past it, since two
+          // timers of one length race and the client's words would win
+          // now and then
           run: (args: Record<string, unknown>, runCtx: ToolContext) =>
             mcpService.call(server, tool, args, {
               signal: runCtx.signal,
-              timeoutMs,
+              timeoutMs: timeoutMs + MCP_BACKSTOP_MS,
               bodyBytes: runCtx.caps.fetchBodyBytes,
             }),
         };

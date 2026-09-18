@@ -9,12 +9,12 @@ import { describe, expect, test } from "bun:test";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { wireTokens } from "../../src/server/providers/index.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
-import { hashPassword } from "../../src/server/users/index.ts";
 import type {
   DirectoryAgentResponse,
   DirectoryUserResponse,
 } from "../../src/shared/api/directory.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
+import { hashPassword } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,

@@ -5,14 +5,13 @@ import { describe, expect, test } from "bun:test";
 import { MAX_KNOWLEDGE_BODY } from "../../src/server/knowledge/limits.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
-import { hashPassword } from "../../src/server/users/index.ts";
 import type {
   KnowledgeFileResponse,
   KnowledgeListResponse,
   KnowledgeVersionsResponse,
 } from "../../src/shared/api/knowledge.ts";
 import type { KnowledgeFile } from "../../src/shared/contracts/knowledge.ts";
-import { type TestClient, testApp } from "../helpers/app.ts";
+import { hashPassword, type TestClient, testApp } from "../helpers/app.ts";
 
 const base = (id: string) => `/api/projects/${id}/knowledge`;
 const filePath = (project: string, file: string) =>

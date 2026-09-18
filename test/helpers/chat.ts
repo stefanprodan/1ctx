@@ -12,11 +12,11 @@ import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
-import { hashPassword } from "../../src/server/users/index.ts";
 import type { Wire } from "../../src/shared/words.ts";
 import {
   fakeFetch,
   GEMINI_URL,
+  hashPassword,
   PROVIDER_URL,
   type TestApp,
   testApp,

@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
-import { hashPassword } from "../../src/server/users/index.ts";
 import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ProjectDetail } from "../../src/shared/contracts/project.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
-import { ORIGIN, type TestClient } from "../helpers/app.ts";
+import { hashPassword, ORIGIN, type TestClient } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,

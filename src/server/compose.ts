@@ -42,7 +42,12 @@ import {
 import { type SkillStore, type Skills, skillsArea } from "./skills/index.ts";
 import { type Tools, toolsArea } from "./tools/index.ts";
 import { type Usage, type UsageStore, usageArea } from "./usage/index.ts";
-import { type UserStore, type Users, usersArea } from "./users/index.ts";
+import {
+  type PasswordCost,
+  type UserStore,
+  type Users,
+  usersArea,
+} from "./users/index.ts";
 import { healthRoute } from "./web/health.ts";
 import { type Router, router } from "./web/router.ts";
 import { type Socket, socketArea } from "./web/socket.ts";
@@ -67,6 +72,8 @@ export type ComposeOptions = {
   registry?: Registry;
   // Provisioning validates before bootstrap and never repairs or schedules.
   activate?: boolean;
+  // argon2id's cost; a test passes the least
+  passwordCost?: PasswordCost;
 };
 
 export type App = {
@@ -119,6 +126,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: options.log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
+    passwordCost: options.passwordCost,
   });
   const limits = limitsArea({ db, clock });
   const providers = providersArea({

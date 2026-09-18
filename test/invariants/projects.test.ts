@@ -6,8 +6,7 @@
 // is a 404 to everyone else, an admin included.
 
 import { describe, expect, test } from "bun:test";
-import { hashPassword } from "../../src/server/users/index.ts";
-import { testApp } from "../helpers/app.ts";
+import { hashPassword, testApp } from "../helpers/app.ts";
 
 const member = async (app: Awaited<ReturnType<typeof testApp>>) =>
   app.createUser({
