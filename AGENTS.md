@@ -730,8 +730,16 @@ violation, and every rule has a rejected fixture under
   `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
   then one Projects card, personal first, each row with its 14-day
   strip, headed by `ui/Search.tsx` (the stream's box too) narrowing the
-  rows by name in place. A project's tabs are Feed, Automations, then Members for a team
-  or Settings for a personal one. A team project's Members tab is the
+  rows by name in place. A project's tabs are Feed, Automations, Memory,
+  Knowledge, then Members for a team or Settings for a personal one.
+  The Knowledge tab is one card of the base's files, searched by name,
+  with the totals as its hint and Add file at its head: a row opens to
+  who wrote it and from where, its text folded at twelve lines with
+  Show all, History with Restore on every past version, and Delete; a
+  second card lists the deleted files whose text is still kept.
+  `data/knowledge.ts` holds the list per project, a file's text and its
+  versions once read, and applies a `knowledge` frame by revision, so a
+  run's write lands on the open tab. A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab
   is one card of `RowsGo` rows titled Scheduled tasks, the schedule in

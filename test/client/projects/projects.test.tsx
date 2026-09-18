@@ -323,6 +323,7 @@ describe("Project.model", () => {
       "Feed",
       "Automations",
       "Memory",
+      "Knowledge",
       "Members",
     ]);
     expect(tabsOf("p1", "personal")[1]).toEqual({
@@ -334,17 +335,22 @@ describe("Project.model", () => {
       href: "/projects/p1/memory",
     });
     expect(tabsOf("p1", "personal")[3]).toEqual({
+      label: "Knowledge",
+      href: "/projects/p1/knowledge",
+    });
+    expect(tabsOf("p1", "personal")[4]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });
   });
 
-  test("Automations counts its rows, Members the users and the agents", () => {
-    const counts = { automations: 3, members: 4, agents: 5 };
+  test("Automations, Knowledge and Members count their rows", () => {
+    const counts = { automations: 3, knowledge: 6, members: 4, agents: 5 };
     expect(tabsOf("p1", "team", counts).map((t) => t.count)).toEqual([
       undefined,
       3,
       undefined,
+      6,
       9,
     ]);
     // Settings counts nothing
@@ -352,14 +358,18 @@ describe("Project.model", () => {
       undefined,
       3,
       undefined,
+      6,
       undefined,
     ]);
     // a count not known yet is left out, never shown as zero
     expect(
-      tabsOf("p1", "team", { automations: null, members: 4, agents: null }).map(
-        (t) => t.count,
-      ),
-    ).toEqual([undefined, undefined, undefined]);
+      tabsOf("p1", "team", {
+        automations: null,
+        knowledge: null,
+        members: 4,
+        agents: null,
+      }).map((t) => t.count),
+    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
     expect(tabsOf("p1", "team", { ...counts, automations: 0 })[1]?.count).toBe(
       0,
     );

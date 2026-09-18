@@ -31,12 +31,19 @@ export function plural(n: number, word: string): string {
 // what the tabs count; null while it is not known yet
 export type TabCounts = {
   automations: number | null;
+  // the files of the project's knowledge base
+  knowledge: number | null;
   // the people and the agents a team tab lists
   members: number | null;
   agents: number | null;
 };
 
-const NO_COUNTS: TabCounts = { automations: null, members: null, agents: null };
+const NO_COUNTS: TabCounts = {
+  automations: null,
+  knowledge: null,
+  members: null,
+  agents: null,
+};
 
 const counted = (n: number | null) => (n === null ? {} : { count: n });
 
@@ -60,6 +67,11 @@ export function tabsOf(
       ...counted(counts.automations),
     },
     { label: "Memory", href: `/projects/${id}/memory` },
+    {
+      label: "Knowledge",
+      href: `/projects/${id}/knowledge`,
+      ...counted(counts.knowledge),
+    },
     kind === "team"
       ? {
           label: "Members",

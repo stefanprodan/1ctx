@@ -16,6 +16,7 @@ import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadAgentPage, loadPerson } from "../data/directory.ts";
+import { loadKnowledge } from "../data/knowledge.ts";
 import { loadMcp } from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
 import { loadProfile } from "../data/profile.ts";
@@ -174,6 +175,23 @@ export const ROUTES: Route[] = [
         loadAutomations(params.id),
         loadRecentDays(),
         loadMemory(keyOf(params.id, null)),
+      ]);
+    },
+  },
+  {
+    path: "/projects/:id/knowledge",
+    view: lazy(() =>
+      import("../views/knowledge/Knowledge.tsx").then((m) => m.Knowledge),
+    ),
+    title: () => "Knowledge",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadAutomations(params.id),
+        loadRecentDays(),
+        loadKnowledge(params.id),
       ]);
     },
   },
