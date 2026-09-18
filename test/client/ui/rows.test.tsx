@@ -18,6 +18,10 @@ import {
   RowsLine,
   RowsList,
   RowsListHead,
+  RowsLog,
+  RowsLogGroup,
+  RowsLogLine,
+  RowsLogMore,
   RowsOpen,
   RowsSwitch,
   RowsTag,
@@ -25,6 +29,29 @@ import {
 } from "../../../src/client/ui/Rows.tsx";
 
 const noop = () => {};
+
+test("compact logs escape names and notes, and carry failures and expansion", () => {
+  const html = render(
+    <RowsLog>
+      <RowsLogGroup>{"<docs.zip>"}</RowsLogGroup>
+      <RowsLogLine name="<script>" note="<refused>" bad status={409} />
+      <RowsLogLine name="next.md" note="sending" running />
+      <RowsLogMore onClick={noop}>Show all 14</RowsLogMore>
+    </RowsLog>,
+  );
+  expect(html).toContain('class="rows-log"');
+  expect(html).toContain("rows-log-bad");
+  expect(html).toContain('class="code-tag">HTTP 409');
+  expect(html).toContain("rows-log-running");
+  expect(html).toContain("&lt;script>");
+  expect(html).toContain("&lt;refused>");
+  expect(html).toContain("&lt;docs.zip>");
+  expect(html).toContain('type="button" class="rows-log-more"');
+  expect(html).not.toContain("rows-sub");
+  expect(render(<RowsLogLine name="x" note="unchanged" />)).not.toContain(
+    "code-tag",
+  );
+});
 
 describe("RowsOpen", () => {
   test("a closed row draws the toggle as its line and no body", () => {

@@ -22,9 +22,12 @@ export type SessionsResponse = { rows: StreamRow[] };
 // the row shows for a session that is done, and the automation a run
 // belongs to, drawn in the author's place; null for a chat. runBy is
 // who pressed Run now, whether or not they are in the project; null
-// for a chat and a scheduled run
+// for a chat and a scheduled run. agent is the session's agent by name,
+// credited on a line that says a send did not finish; null where the
+// row is built without it
 export type StreamRow = {
   session: SessionSummary;
+  agent: string | null;
   send: SendSummary | null;
   last: LastLine | null;
   automation: { id: string; name: string } | null;

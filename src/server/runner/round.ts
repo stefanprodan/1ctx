@@ -16,6 +16,7 @@ import {
   type ChatEvent,
   type ChatRequest,
   mergeReasoningDetail,
+  requestTokens,
 } from "../providers/index.ts";
 import {
   type ContextLookups,
@@ -62,16 +63,23 @@ function sleep(clock: Clock, ms: number) {
   };
 }
 
+// idleMs is null before the first event: a local server says nothing
+// while it reads a long prompt, minutes for a cold 64k tokens, so only
+// the send's deadline, Stop and shutdown bound that wait
 async function nextEvent(
   iterator: AsyncIterator<ChatEvent>,
   clock: Clock,
   visuals: RoundVisuals | null,
+  idleMs: number | null,
 ): Promise<TimedNext> {
   const read = iterator.next().then((result) => ({
     kind: "next" as const,
     result,
   }));
-  const idle = sleep(clock, STREAM_IDLE_MS);
+  const idle =
+    idleMs === null
+      ? { promise: new Promise<void>(() => {}), cancel: () => {} }
+      : sleep(clock, idleMs);
   const quiet = idle.promise.then(() => ({ kind: "idle" as const }));
   try {
     while (true) {
@@ -112,10 +120,13 @@ export function buildRequest(
     // copy, never the stored rows
     send.answering ? withExhausted(messages) : messages,
   );
-  // the answer round keeps the schemas so the cached prefix holds and
-  // forbids a call with tool_choice none (decision 10)
-  if (send.answering && req.tools && req.tools.length > 0) {
-    req.toolChoice = "none";
+  // The answer round keeps the schemas untouched and asks in words: a
+  // tool_choice changes the prompt a server renders and misses its
+  // cache (mlx-serve: 138 s against 1.4 s for 64k tokens). A call anyway
+  // is asked again with no schemas, with nothing left to call.
+  if (send.bare) {
+    const { tools: _tools, ...bare } = req;
+    return bare;
   }
   return req;
 }
@@ -138,14 +149,20 @@ export async function runRound(
     send.kind !== "compact" &&
     !send.summarizing &&
     !send.answering &&
-    req.toolChoice !== "none" &&
     send.policy.offered.tools.some((tool) => tool.name === "visualize")
       ? new RoundVisuals(send, round, deps.writer, signal)
       : null;
   let replyBytes = bytes(round.content) + bytes(round.reasoning);
+  let started = false;
   while (true) {
-    const next = await nextEvent(iterator, deps.clock, visuals);
+    const next = await nextEvent(
+      iterator,
+      deps.clock,
+      visuals,
+      started ? STREAM_IDLE_MS : null,
+    );
     if (next.kind === "idle") throw new Error("the provider went quiet");
+    started = true;
     if (next.result.done) break;
     const event = next.result.value;
     if (signal.aborted) return;
@@ -205,6 +222,10 @@ export async function runRound(
     throw new Error("the stream ended early");
   }
   visuals?.flush();
+  round.tokens =
+    round.usage === null
+      ? requestTokens(req)
+      : round.usage.promptTokens + round.usage.completionTokens;
 }
 
 // the first tool call delta of a round marks it work, once; the round

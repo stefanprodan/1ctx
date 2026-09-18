@@ -9,6 +9,7 @@ import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
   type AccessPort,
+  type KnowledgePort,
   routes,
   type SessionsPort,
   type UsagePort,
@@ -18,6 +19,7 @@ import { type ProjectRow, ProjectStore } from "./store.ts";
 
 export {
   type AccessPort,
+  type KnowledgePort,
   type RoutesDeps,
   routes,
   type SessionsPort,
@@ -33,6 +35,7 @@ export type ProjectsDeps = {
   users: UsersPort;
   sessions: SessionsPort;
   usage: UsagePort;
+  knowledge: KnowledgePort;
 };
 
 export type Projects = {
@@ -67,6 +70,7 @@ export function projectsArea(deps: ProjectsDeps): Projects {
       users: deps.users,
       sessions: deps.sessions,
       usage: deps.usage,
+      knowledge: deps.knowledge,
       clock: deps.clock,
     }),
   };

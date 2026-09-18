@@ -41,6 +41,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Result bytes",
     text: "Stored tool results over a send, weighed before a round launches.",
   },
+  toolWorkTokens: {
+    label: "Tool-work tokens",
+    text: "Tokens a send may spend on tools before it must answer.",
+  },
   callTimeoutMs: {
     label: "Call timeout",
     text: "How long one tool call may run.",
@@ -48,6 +52,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   resultCut: {
     label: "Result cut",
     text: "Characters a result is cut to before the model reads it.",
+  },
+  maxBashCalls: {
+    label: "Bash calls per send",
+    text: "bash calls a send may make.",
   },
   maxFetches: {
     label: "Fetches per send",
@@ -87,7 +95,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   contextReserve: {
     label: "Context reserve",
-    text: "Room kept in the window. A reply that leaves less is followed by a summary.",
+    text: "Room kept in the window. Reaching it ends tool work and answers. A chat then summarizes.",
   },
   summaryMaxTokens: {
     label: "Summary tokens",
@@ -109,6 +117,42 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Chat deadline",
     text: "How long one chat turn may take, tools included.",
   },
+  knowledgeFileBytes: {
+    label: "File size",
+    text: "Bytes one knowledge file may hold.",
+  },
+  knowledgeFiles: {
+    label: "Files per project",
+    text: "Knowledge files a project may hold.",
+  },
+  knowledgeProjectBytes: {
+    label: "Base size",
+    text: "Bytes a project's knowledge files may hold together.",
+  },
+  knowledgeVersions: {
+    label: "Versions per file",
+    text: "Past versions kept per file. Older ones go as a write lands.",
+  },
+  knowledgeHistoryBytes: {
+    label: "History size",
+    text: "Bytes of past versions a project keeps. The oldest go first.",
+  },
+  knowledgeHistoryDays: {
+    label: "History days",
+    text: "How long a deleted file's versions are kept.",
+  },
+  scratchBytes: {
+    label: "Scratch size",
+    text: "Bytes a session's scratch files may hold together.",
+  },
+  scratchFiles: {
+    label: "Scratch files",
+    text: "Scratch files a session may hold.",
+  },
+  scratchIdleDays: {
+    label: "Scratch idle days",
+    text: "How long an unused session scratch is kept.",
+  },
 };
 
 // when a send carries a built-in, over its description
@@ -120,6 +164,7 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
   projectMemory: "Sent in a run that reads the project's chats for its memory.",
   memory:
     "Sent in a run that updates the project's memory, and in the step after a run that updates its own memory.",
+  knowledge: "Sent in every chat and run, over the project's knowledge base.",
 };
 
 export const NAMES_WORDS =
@@ -161,6 +206,8 @@ export function displayOf(row: LimitRow): Display {
       return { word: "chars", factor: 1 };
     case "tokens":
       return { word: "tokens", factor: 1 };
+    case "days":
+      return { word: "days", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

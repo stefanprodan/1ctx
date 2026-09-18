@@ -11,7 +11,13 @@
 // started on whatever an admin changes later.
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
-import type { Effort, EventSource, ProjectKind } from "../../shared/words.ts";
+import type { RecentFile } from "../../shared/knowledge.ts";
+import type {
+  Effort,
+  EventSource,
+  ProjectKind,
+  Wire,
+} from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -63,6 +69,9 @@ export type SendPolicy = {
   agentId: string;
   agentName: string;
   providerId: string;
+  // the provider's wire, null when its row is gone; the answer round's
+  // retries depend on whether a local server caches the conversation
+  wire: Wire | null;
   model: string;
   contextLength: number | null;
   prompt: string;
@@ -73,6 +82,7 @@ export type SendPolicy = {
   memoryOffered: Offered | null;
   projectMemory: MemoryEntry[];
   automationMemory: MemoryEntry[];
+  knowledge: { files: number; recent: RecentFile[] };
   automation: {
     id: string;
     name: string;
@@ -103,11 +113,13 @@ export function buildPolicy(input: {
   project: Pick<ProjectRow, "id" | "kind" | "name" | "description">;
   user: UserRow;
   agent: AgentRow;
+  wire?: Wire | null;
   now: number;
   // the tools area, or none when the model does not accept tools; the
   // one place the set is decided
   tools: ToolsPort | null;
   limits: Limits;
+  knowledge: SendPolicy["knowledge"];
   automation?: SendPolicy["automation"];
   projectMemory?: readonly MemoryEntry[];
   automationMemory?: readonly MemoryEntry[];
@@ -153,6 +165,7 @@ export function buildPolicy(input: {
     agentId: agent.id,
     agentName: agent.name,
     providerId: agent.providerId,
+    wire: input.wire ?? null,
     model: agent.model.id,
     contextLength: agent.model.contextLength,
     prompt: agent.prompt,
@@ -164,6 +177,10 @@ export function buildPolicy(input: {
     automationMemory: (input.automationMemory ?? []).map((entry) => ({
       ...entry,
     })),
+    knowledge: {
+      files: input.knowledge.files,
+      recent: input.knowledge.recent.map((file) => ({ ...file })),
+    },
     automation: input.automation ? { ...input.automation } : null,
     deadlineMs: input.deadlineMs ?? null,
     limits: {
@@ -172,6 +189,7 @@ export function buildPolicy(input: {
       callsPerSend: input.limits.callsPerSend,
       toolMs: input.limits.toolMs,
       resultBytes: input.limits.resultBytes,
+      toolWorkTokens: input.limits.toolWorkTokens,
       contextReserve: input.limits.contextReserve,
       summaryMaxTokens: input.limits.summaryMaxTokens,
       memoryPhaseMs: input.limits.memoryPhaseMs,
@@ -180,6 +198,7 @@ export function buildPolicy(input: {
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,
       resultCut: input.limits.resultCut,
+      maxBashCalls: input.limits.maxBashCalls,
       maxFetches: input.limits.maxFetches,
       maxSearches: input.limits.maxSearches,
       fetchBodyBytes: input.limits.fetchBodyBytes,

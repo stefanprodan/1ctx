@@ -167,6 +167,7 @@ export function applyEnvelope(
   if (held.session.revision >= ev.session.revision) return;
   const next: StreamRow = {
     session: ev.session,
+    agent: held.agent,
     send: ev.send ?? held.send,
     last: ev.last ?? held.last,
     automation: held.automation,

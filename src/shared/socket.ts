@@ -7,6 +7,7 @@
 // sequence per send. A command is what the client sends.
 
 import type { AutomationSummary } from "./contracts/automation.ts";
+import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
   LastLine,
   LiveSend,
@@ -18,7 +19,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 11;
+export const PROTOCOL = 12;
 
 export type VisualFrame = {
   type: "visual";
@@ -63,6 +64,14 @@ export type SocketEvent =
       projectId: string;
       automationId: string | null;
       revision: number;
+    }
+  // a knowledge file was written or deleted: the row as it is now, by
+  // the same revision rule; a delete carries the last live row
+  | {
+      type: "knowledge";
+      projectId: string;
+      file: KnowledgeFile;
+      deleted: boolean;
     }
   // the connection may now see the project
   | { type: "granted"; projectId: string }

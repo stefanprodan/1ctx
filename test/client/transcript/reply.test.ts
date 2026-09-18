@@ -115,6 +115,8 @@ describe("the line under an answer", () => {
     );
     // a cap is the work fold's word, not this line's
     expect(cutReason(answer({ finishReason: "tool_limit" }))).toBeNull();
+    expect(cutReason(answer({ finishReason: "token_limit" }))).toBeNull();
+    expect(cutReason(answer({ finishReason: "context_limit" }))).toBeNull();
     expect(cutReason(answer({ finishReason: "tool_loop" }))).toBeNull();
   });
 });

@@ -74,6 +74,7 @@ describe("the projects entity", () => {
         ...personal,
         description: "Scratch work",
         chats: 0,
+        knowledge: { files: 0, tokens: 0 },
         members: [caelea],
       };
       project.value = { ...saved, description: "" };
@@ -117,6 +118,7 @@ describe("the projects entity", () => {
       createdAt: 0,
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     me.value = null;
@@ -179,6 +181,7 @@ describe("the projects entity", () => {
                 createdAt: 0,
                 description: "",
                 chats: 0,
+                knowledge: { files: 0, tokens: 0 },
                 members: [],
               },
             }),
@@ -212,6 +215,7 @@ describe("the projects entity", () => {
                     createdAt: 0,
                     description: "",
                     chats: 0,
+                    knowledge: { files: 0, tokens: 0 },
                     members: [],
                   },
                 }),
@@ -319,6 +323,7 @@ describe("Project.model", () => {
       "Feed",
       "Automations",
       "Memory",
+      "Knowledge",
       "Members",
     ]);
     expect(tabsOf("p1", "personal")[1]).toEqual({
@@ -330,17 +335,22 @@ describe("Project.model", () => {
       href: "/projects/p1/memory",
     });
     expect(tabsOf("p1", "personal")[3]).toEqual({
+      label: "Knowledge",
+      href: "/projects/p1/knowledge",
+    });
+    expect(tabsOf("p1", "personal")[4]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });
   });
 
-  test("Automations counts its rows, Members the users and the agents", () => {
-    const counts = { automations: 3, members: 4, agents: 5 };
+  test("Automations, Knowledge and Members count their rows", () => {
+    const counts = { automations: 3, knowledge: 6, members: 4, agents: 5 };
     expect(tabsOf("p1", "team", counts).map((t) => t.count)).toEqual([
       undefined,
       3,
       undefined,
+      6,
       9,
     ]);
     // Settings counts nothing
@@ -348,14 +358,18 @@ describe("Project.model", () => {
       undefined,
       3,
       undefined,
+      6,
       undefined,
     ]);
     // a count not known yet is left out, never shown as zero
     expect(
-      tabsOf("p1", "team", { automations: null, members: 4, agents: null }).map(
-        (t) => t.count,
-      ),
-    ).toEqual([undefined, undefined, undefined]);
+      tabsOf("p1", "team", {
+        automations: null,
+        knowledge: null,
+        members: 4,
+        agents: null,
+      }).map((t) => t.count),
+    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
     expect(tabsOf("p1", "team", { ...counts, automations: 0 })[1]?.count).toBe(
       0,
     );
@@ -424,6 +438,7 @@ describe("the pages", () => {
       createdAt: 0,
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     projectAgents.value = [];
@@ -456,6 +471,7 @@ describe("the pages", () => {
       kind: "team",
       description: "Incidents and pages",
       chats: 12,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     let html = render(<Project params={{ id: "p1" }} />);
@@ -474,6 +490,7 @@ describe("the pages", () => {
       ...personal,
       description: "Scratch work",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     let html = render(<Settings params={{ id: "p1" }} />);
@@ -498,6 +515,7 @@ describe("the pages", () => {
       ...personal,
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     projectAgents.value = [];
@@ -514,6 +532,7 @@ describe("the pages", () => {
         kind: "team",
         description: "",
         chats: 0,
+        knowledge: { files: 0, tokens: 0 },
         members: [caelea],
       };
       projectAgents.value = [];
@@ -531,6 +550,7 @@ describe("the pages", () => {
       kind: "team",
       description: "",
       chats: 0,
+      knowledge: { files: 0, tokens: 0 },
       members: [caelea],
     };
     projectAgents.value = null;

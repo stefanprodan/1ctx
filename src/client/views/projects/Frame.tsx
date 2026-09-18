@@ -10,12 +10,14 @@
 import type { ComponentChildren } from "preact";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import { automationCount } from "../../data/automations.ts";
+import { knowledgeCount, knowledgeOf } from "../../data/knowledge.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
 import { Page } from "../../ui/Page.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { knowledgeWords } from "../knowledge/Knowledge.model.ts";
 import { ActivityAside } from "./ActivityAside.tsx";
 import { aboutLine, tabsOf } from "./Project.model.ts";
 import "./projects.css";
@@ -26,7 +28,7 @@ export function Frame({
   children,
 }: {
   id: string;
-  tab: "feed" | "automations" | "memory" | "members" | "settings";
+  tab: "feed" | "automations" | "memory" | "knowledge" | "members" | "settings";
   children: (shown: ProjectDetail) => ComponentChildren;
 }) {
   const row = project.value;
@@ -34,10 +36,14 @@ export function Frame({
   const listed = projects.value?.find((p) => p.id === id);
   const tabs = tabsOf(id, shown?.kind ?? listed?.kind ?? "team", {
     automations: automationCount(id),
+    knowledge: knowledgeCount(id),
     members: shown === null ? null : shown.members.length,
     agents: projectAgentCount(id),
   });
   const about = shown === null ? null : aboutLine(shown);
+  // the list, once the tab loaded it, is fresher than the project row
+  const knowledge = knowledgeOf(id)?.totals ??
+    shown?.knowledge ?? { files: 0, tokens: 0 };
   return (
     <Page
       crumb="Projects"
@@ -52,6 +58,14 @@ export function Frame({
             <>
               <AsideSection label="About">
                 {about !== null && <div class="split-line">{about}</div>}
+                {knowledge.files > 0 && (
+                  <div class="split-line">
+                    Knowledge
+                    <span class="split-strong">
+                      {knowledgeWords(knowledge)}
+                    </span>
+                  </div>
+                )}
                 <div class="split-line">
                   Created
                   <span class="split-strong">{longDate(shown.createdAt)}</span>

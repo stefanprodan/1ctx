@@ -2,98 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { silent } from "../../../src/server/lib/log.ts";
-import type { MemoryWork } from "../../../src/server/memory/index.ts";
-import type { SkillBody } from "../../../src/server/skills/index.ts";
-import {
-  type SkillsPort,
-  type ToolsArea,
-  toolsArea,
-} from "../../../src/server/tools/index.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
-import type { ToolContext } from "../../../src/server/tools/types.ts";
-import { memoryChars } from "../../../src/shared/memory.ts";
 import parallelEdits from "../../fixtures/memory/parallel-edits.json";
-import { memoryDb } from "../../helpers/db.ts";
-
-const now = Date.UTC(2026, 8, 16, 0, 0, 0);
-
-function area(): ToolsArea {
-  const skills: SkillsPort = {
-    forAgent: () => [],
-    body: (): SkillBody | null => null,
-    file: () => null,
-  };
-  return toolsArea({
-    db: memoryDb(),
-    fetcher: (async () => {
-      throw new Error("no network in this test");
-    }) as unknown as typeof fetch,
-    secret: () => null,
-    clock: () => now,
-    log: silent,
-    version: "vtest",
-    render: (markdown) => markdown,
-    skills,
-    memory: {
-      work(projectId, automationId): MemoryWork {
-        return {
-          target: { projectId, automationId },
-          baseRevision: 0,
-          entries: [],
-          operations: [],
-          failedRounds: 0,
-        };
-      },
-    },
-    sessions: {
-      memorySnapshot(projectId, sessionId) {
-        if (projectId !== "p1" || sessionId === "missing") return null;
-        return {
-          id: sessionId,
-          title: "A chat",
-          lastActivityAt: 20,
-          markdown: "# A chat\n\n## @user 1970-01-01 00:00\n\nA long answer.",
-        };
-      },
-    },
-    markers: {
-      unread(_automationId, _projectId, _cap, exclude) {
-        return {
-          chats: exclude.includes("s1")
-            ? []
-            : [
-                {
-                  id: "s1",
-                  title: "A chat",
-                  author: "user",
-                  lastActivityAt: 20,
-                  userMessages: 2,
-                  readBefore: true,
-                  changedSince: true,
-                },
-              ],
-          remaining: 0,
-        };
-      },
-    },
-  });
-}
-
-function context(resultCut = TOOL_CAPS.resultCut): ToolContext {
-  return {
-    signal: new AbortController().signal,
-    now: () => now,
-    budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
-    caps: { ...TOOL_CAPS, resultCut },
-  };
-}
-
-const task = {
-  projectId: "p1",
-  automation: { id: "a1", projectMemory: true, ownMemory: true },
-  phase: "main" as const,
-};
+import { area, context, now, task } from "./memory.helpers.ts";
 
 describe("memory offered sets", () => {
   test("adds the three project tools only to a memory task", () => {
@@ -196,22 +106,25 @@ describe("memory offered sets", () => {
     }
   });
 
-  test("a call the phase does not offer says what it offers", async () => {
-    const tools = area();
-    const phase = tools.offered(now, "agent", [], "auto", {
-      ...task,
-      phase: "memory",
-    });
-    const result = await tools.run(
-      phase,
-      { id: "c1", name: "session_read", arguments: '{"id":"s1"}' },
-      context(),
-    );
-    expect(result.error).toBe(true);
-    expect(result.content).toBe(
-      "Error: only memory_edit is offered in the memory phase.",
-    );
-  });
+  test.each(["session_read", "bash"])(
+    "a %s call in the phase says what it offers",
+    async (name) => {
+      const tools = area();
+      const phase = tools.offered(now, "agent", [], "auto", {
+        ...task,
+        phase: "memory",
+      });
+      const result = await tools.run(
+        phase,
+        { id: "c1", name, arguments: '{"command":"ls"}' },
+        context(),
+      );
+      expect(result.error).toBe(true);
+      expect(result.content).toBe(
+        "Error: only memory_edit is offered in the memory phase.",
+      );
+    },
+  );
 });
 
 describe("memory tool handles", () => {
@@ -562,158 +475,5 @@ describe("memory tool handles", () => {
     expect(handle.read!.pending.size).toBe(0);
     expect([...handle.read!.marks.keys()]).toEqual(["s1"]);
     expect(handle.work.entries).toEqual([{ topic: "Facts", text: "one fact" }]);
-  });
-
-  test("refusals show current entry sizes, totals and the required cuts", async () => {
-    const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
-    const handle = offered.memory!;
-    const entries = [
-      { topic: "First", text: "a".repeat(500) },
-      { topic: "Second", text: "b".repeat(500) },
-      { topic: "Last snapshot", text: "NVDA 18".padEnd(346, "x") },
-      { topic: "Fourth", text: `Fourth\n${"d".repeat(336)}` },
-    ];
-    expect(memoryChars(entries)).toBe(1741);
-    handle.work.entries = [...entries];
-    const call = (args: string) =>
-      tools.run(
-        offered,
-        { id: "edit", name: "memory_edit", arguments: args },
-        context(),
-      );
-    const oversized = await call(
-      JSON.stringify({
-        action: "set",
-        topic: "Last snapshot",
-        text: "x".repeat(612),
-      }),
-    );
-    expect(oversized.error).toBe(true);
-    const currentNote = entries
-      .map(
-        (entry, index) =>
-          `${index + 1}. ${entry.topic} [${entry.text.length}/500]\n${entry.text}`,
-      )
-      .join("\n\n");
-    expect(oversized.content).toBe(
-      `Error: The text of Last snapshot is 612 characters, the limit is 500, cut 112. Split it into several topics, one set call each, or cut it.\n${currentNote}\n1,741 of 2,200 characters.`,
-    );
-    expect(oversized.content).not.toContain("x".repeat(612));
-    handle.work.entries = [
-      { topic: "First", text: "a".repeat(500) },
-      { topic: "Second", text: "b".repeat(500) },
-      { topic: "Third", text: "c".repeat(500) },
-      { topic: "Fourth", text: "d".repeat(406) },
-    ];
-    expect(memoryChars(handle.work.entries)).toBe(1950);
-    const full = await call(
-      JSON.stringify({ action: "set", topic: "Fifth", text: "e".repeat(489) }),
-    );
-    const fullNote = handle.work.entries
-      .map(
-        (entry, index) =>
-          `${index + 1}. ${entry.topic} [${entry.text.length}/500]\n${entry.text}`,
-      )
-      .join("\n\n");
-    expect(full.content).toBe(
-      `Error: The note would be 2,450 of 2,200, free 250. Shorten or remove entries, or leave out what the next run does not need.\n${fullNote}\n1,950 of 2,200 characters.`,
-    );
-    expect(full.content).not.toContain("retry");
-    expect(full.error).toBe(true);
-    expect(full.content).not.toContain("e".repeat(489));
-    handle.work.entries = [...entries];
-    for (const args of [
-      "{",
-      "[]",
-      "null",
-      '{"action":"set"}',
-      '{"action":"invalid"}',
-      '{"action":"set","topic":"","text":"fact"}',
-      '{"action":"set","topic":"Facts","text":""}',
-      '{"action":"remove","topic":"missing"}',
-    ]) {
-      const result = await call(args);
-      expect(result.error).toBe(true);
-      expect(result.content).toEndWith(
-        `\n${currentNote}\n1,741 of 2,200 characters.`,
-      );
-      expect(result.content.length).toBeLessThanOrEqual(TOOL_CAPS.resultCut);
-      expect(handle.work.entries).toEqual(entries);
-      expect(handle.work.operations).toEqual([]);
-    }
-    const saved = await call('{"action":"none"}');
-    expect(saved).toEqual({
-      error: false,
-      content:
-        "Saved for the end of the run in the project's memory. 1,741 of 2,200 characters.",
-    });
-  });
-
-  test("empty-note refusals give the right fix without asking for another set", async () => {
-    const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
-    const cases = [
-      {
-        args: { action: "set", topic: "NVDA run notes", text: "x".repeat(913) },
-        reason:
-          "The text of NVDA run notes is 913 characters, the limit is 500, cut 413. Split it into several topics, one set call each, or cut it.",
-      },
-      {
-        args: { action: "remove", topic: "Note" },
-        reason: "No entry has topic Note. Topics: (none).",
-      },
-      {
-        args: { action: "invalid" },
-        reason:
-          "action must be set, remove or none. Retry with the arguments the action takes.",
-      },
-      {
-        args: { action: "set" },
-        reason:
-          "topic must be text. Retry with the arguments the action takes.",
-      },
-    ];
-    for (const fixture of cases) {
-      const result = await tools.run(
-        offered,
-        {
-          id: "edit",
-          name: "memory_edit",
-          arguments: JSON.stringify(fixture.args),
-        },
-        context(),
-      );
-      expect(result).toEqual({
-        error: true,
-        content: `Error: ${fixture.reason}\n0 of 2,200 characters.`,
-      });
-      expect(offered.memory!.work.entries).toEqual([]);
-      expect(offered.memory!.work.operations).toEqual([]);
-    }
-  });
-
-  test("an absent topic returns the working texts and the whole refusal stays under the result cut", async () => {
-    const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
-    offered.memory!.work.entries = [
-      { topic: "Sources", text: "Use the feed." },
-    ];
-    const call = {
-      id: "edit",
-      name: "memory_edit",
-      arguments: '{"action":"remove","topic":"Note"}',
-    };
-    const expected =
-      "Error: No entry has topic Note. Topics: Sources. Use one of the topics in the note.\n1. Sources [13/500]\nUse the feed.\n24 of 2,200 characters.";
-    expect(await tools.run(offered, call, context())).toEqual({
-      error: true,
-      content: expected,
-    });
-    const cut = 120;
-    expect(await tools.run(offered, call, context(cut))).toEqual({
-      error: true,
-      content: expected.slice(0, cut),
-    });
   });
 });

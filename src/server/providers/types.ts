@@ -56,9 +56,6 @@ export type ChatRequest = {
   topP?: number | null;
   maxTokens?: number | null;
   tools?: ChatTool[];
-  // the answer round keeps the schemas so the cached prefix holds but
-  // forbids a call: the wire sends tool_choice none (decision 10)
-  toolChoice?: "none";
   // the session id, so a provider that routes or caches by conversation
   // keeps one session's turns together; omitted when not set
   cacheKey?: string | null;

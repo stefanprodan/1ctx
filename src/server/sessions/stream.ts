@@ -98,6 +98,20 @@ function automations(db: Db, sessionIds: string[]) {
   );
 }
 
+// the agent of each session by name; a session keeps its agent for
+// life and an agent in use cannot be deleted
+function agentNames(db: Db, sessionIds: string[]) {
+  const marks = sessionIds.map(() => "?").join(", ");
+  const rows = db
+    .query<{ session_id: string; name: string }, string[]>(
+      `select sessions.id as session_id, agents.name
+       from sessions join agents on agents.id = sessions.agent_id
+       where sessions.id in (${marks})`,
+    )
+    .all(...sessionIds);
+  return new Map(rows.map((raw) => [raw.session_id, raw.name]));
+}
+
 // who pressed Run now on each manual run, by the session's owner
 function runners(db: Db, raws: RawSession[]) {
   const manual = raws.filter((raw) => raw.run_source === "manual");
@@ -123,11 +137,13 @@ export function streamRows(
   const lines = lastLines(db, ids);
   const automationRows = automations(db, ids);
   const names = runners(db, raws);
+  const agents = agentNames(db, ids);
   return raws.map((raw) => {
     const username =
       raw.run_source === "manual" ? names.get(raw.owner_id) : undefined;
     return {
       session: session(raw, usage.get(raw.id) ?? null),
+      agent: agents.get(raw.id) ?? null,
       send: sends.get(raw.id) ?? null,
       last: lines.get(raw.id) ?? null,
       automation: automationRows.get(raw.id) ?? null,

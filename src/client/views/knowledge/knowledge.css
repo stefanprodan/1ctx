@@ -1,0 +1,144 @@
+/* Knowledge: what an open file row holds, the file's text as it is,
+   and the uploader's drop target and progress. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .knowledge-open,
+  .knowledge-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  /* the open row's first line, the one place a name is a link */
+  .knowledge-by {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .knowledge-link {
+    color: inherit;
+  }
+  .knowledge-link:hover {
+    color: var(--fg);
+  }
+
+  /* the file as it is: never rendered, never scrolling on its own */
+  .knowledge-text {
+    margin: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .knowledge-toggle {
+    align-self: flex-start;
+  }
+  .knowledge-state {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  .knowledge-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .knowledge-notice {
+    font-size: var(--text-small);
+    color: var(--failed);
+  }
+
+  /* a path is read character by character: a ligature would draw
+     ../ as two glyphs that look like one dot */
+  .knowledge-folder {
+    font-family: var(--mono);
+    font-variant-ligatures: none;
+  }
+
+  /* the drop target: a file lands here, or Choose file opens the
+     picker behind it */
+  .knowledge-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-4);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    font-size: var(--text-small);
+    color: var(--faint);
+    text-align: center;
+  }
+  .knowledge-drop-over {
+    border-color: var(--brand);
+    background: var(--inset);
+  }
+  .knowledge-drop-icon {
+    color: var(--dim);
+  }
+  .knowledge-drop-main {
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+  .knowledge-drop .knowledge-choose {
+    cursor: pointer;
+  }
+  .knowledge-file {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .knowledge-choose:focus-within {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .knowledge-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .knowledge-progress-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  .knowledge-progress-words {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .knowledge-progress-title {
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .knowledge-progress-total {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .knowledge-progress-track {
+    height: 6px;
+    border-radius: var(--radius);
+    background: var(--inset);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .knowledge-progress-fill {
+    height: 100%;
+    background: var(--brand);
+    transition: width 0.2s;
+  }
+  .knowledge-progress-done .knowledge-progress-fill {
+    background: var(--done);
+  }
+}

@@ -11,9 +11,10 @@
 // tools have settled.
 
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
-import type { SendCause } from "../../shared/words.ts";
+import type { SendCause, Wire } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
+import type { KnowledgeCapability } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
@@ -66,9 +67,13 @@ export type RunnerDeps = {
   visible(principal: Principal, id: string): SessionRow;
   agents: { byId(id: string): AgentRow | null };
   users: { byId(id: string): UserRow | null };
-  providers: { chat: RoundDeps["chat"] };
+  providers: {
+    chat: RoundDeps["chat"];
+    byId(id: string): { wire: Wire } | null;
+  };
   tools: ToolsPort;
   memory: Pick<MemoryCapability, "read" | "commit">;
+  knowledge: Pick<KnowledgeCapability, "snapshot">;
   markers: {
     mark(
       automationId: string,
@@ -212,10 +217,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
       project,
       user,
       agent,
+      wire: deps.providers.byId(agent.providerId)?.wire ?? null,
       now: deps.clock(),
       tools: offerTools && agent.model.tools ? deps.tools : null,
       limits,
       automation,
+      knowledge: deps.knowledge.snapshot(project.id),
       projectMemory: deps.memory.read(project.id, null).entries,
       automationMemory:
         automation?.ownMemory === true

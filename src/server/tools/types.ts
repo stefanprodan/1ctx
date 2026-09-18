@@ -16,6 +16,7 @@ import type { MemorySnapshot } from "../sessions/index.ts";
 export type { ToolCaps } from "../limits/index.ts";
 
 export type ToolBudget = {
+  bashCalls: number;
   fetches: number;
   searches: number;
   visualBytes: number;
@@ -23,20 +24,32 @@ export type ToolBudget = {
 };
 
 export type ToolContext = {
+  actor: {
+    projectId: string;
+    userId: string;
+    agentId: string;
+    agentName: string;
+    sessionId: string;
+    origin: "chat" | "automation";
+  } | null;
   signal: AbortSignal;
   now(): number;
   budget: ToolBudget;
   caps: ToolCaps;
 };
 
-export type ToolResult = { content: string; error: boolean };
+export type ToolResult = {
+  content: string;
+  error: boolean;
+  tail?: number;
+};
 
-export type Tool = {
+export type Tool<T extends string | ToolResult = string> = {
   name: string;
   description: string;
   parameters: object;
   timeoutMs?: number;
-  run(args: Record<string, unknown>, ctx: ToolContext): Promise<string>;
+  run(args: Record<string, unknown>, ctx: ToolContext): Promise<T>;
 };
 
 export type MemoryScope = {

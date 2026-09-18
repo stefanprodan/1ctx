@@ -44,16 +44,16 @@ function language(info: string | undefined): string {
 
 function codeBlock(text: string, info: string | undefined): string {
   const lang = language(info);
-  const label = lang
-    ? `<span class="md-block-lang">${escapeHtml(lang)}</span>`
-    : "";
-  const head = `<div class="md-block-head">${label}${COPY_BLOCK}</div>`;
   const body = (lang && highlight(unescapeHtml(text), lang)) || text;
-  const data = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
+  const pre = `<pre class="md-pre"><code class="md-block-code">${body}</code></pre>`;
+  // without a language a head would hold only the copy button, an empty
+  // bar over the block, so the button takes a column beside the code
+  if (!lang)
+    return `<div class="md-block md-block-bare">${pre}${COPY_BLOCK}</div>`;
   return (
-    `<div class="md-block"${data}>${head}` +
-    `<pre class="md-pre"><code class="md-block-code">${body}</code></pre>` +
-    "</div>"
+    `<div class="md-block" data-lang="${escapeHtml(lang)}">` +
+    `<div class="md-block-head"><span class="md-block-lang">${escapeHtml(lang)}</span>${COPY_BLOCK}</div>` +
+    `${pre}</div>`
   );
 }
 

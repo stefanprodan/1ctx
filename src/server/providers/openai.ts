@@ -109,8 +109,6 @@ export function buildChatBody(
   }
   if (req.tools && req.tools.length > 0) {
     body.tools = wireTools(req.tools);
-    // the answer round keeps the schemas but forbids a call
-    if (req.toolChoice === "none") body.tool_choice = "none";
   }
   if (req.temperature != null) body.temperature = req.temperature;
   if (req.topP != null) body.top_p = req.topP;
@@ -130,6 +128,15 @@ export function wireTools(
 // the tokens those schemas cost, the one count every page shows
 export function wireTokens(tools: readonly ChatTool[]): number {
   return tools.length === 0 ? 0 : tokens(JSON.stringify(wireTools(tools)));
+}
+
+export function requestTokens(req: ChatRequest): number {
+  return tokens(
+    JSON.stringify({
+      messages: req.messages,
+      tools: wireTools(req.tools ?? []),
+    }),
+  );
 }
 
 // Frames are returned as their joined data payload. Comments count as bytes

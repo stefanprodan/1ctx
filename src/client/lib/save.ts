@@ -177,15 +177,16 @@ export function useSave(call: () => Promise<void>, fieldOf?: FieldOf): Save {
 // a refusal at a field takes the focus there, so the fix is one keystroke
 // away; the control carries the field's name
 export function useFocusField(
-  save: Save,
+  save: Pick<Save, "status" | "busy">,
   form: RefObject<HTMLElement | null>,
 ): void {
   const status = save.status.value;
+  const busy = save.busy;
   const field = typeof status === "object" ? status.field : undefined;
   useEffect(() => {
-    if (field === undefined) return;
+    if (busy || field === undefined) return;
     form.current
       ?.querySelector<HTMLElement>(`[name="${CSS.escape(field)}"]`)
       ?.focus();
-  }, [status]);
+  }, [status, busy]);
 }

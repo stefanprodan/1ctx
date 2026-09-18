@@ -164,6 +164,22 @@
     white-space: pre;
   }
 
+  /* a block without a language has no head: the code scrolls in its
+     own column and the copy button keeps a column at the right, so a
+     long line never runs under it */
+  .md-block-bare {
+    display: flex;
+    align-items: flex-start;
+  }
+  .md-block-bare > .md-pre {
+    flex: 1;
+    min-width: 0;
+  }
+  .md-block-bare > .md-copy {
+    flex-shrink: 0;
+    margin: 8px 6px 0 0;
+  }
+
   .md-table-wrap {
     max-width: 100%;
     margin: 0 0 10px;

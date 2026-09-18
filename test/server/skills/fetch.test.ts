@@ -13,6 +13,8 @@ const controller = () => new AbortController().signal;
 const fake = (handler: (url: string) => Response): typeof fetch =>
   (async (input) => handler(String(input))) as typeof fetch;
 const skill = "---\nname: x\ndescription: x\n---\nbody";
+const archive = (name: string) =>
+  Bun.file(new URL(`../../fixtures/archives/${name}`, import.meta.url)).bytes();
 
 describe("fetchSource", () => {
   test("reads a raw SKILL.md with or without a BOM", async () => {
@@ -39,6 +41,47 @@ describe("fetchSource", () => {
       expect(result.kind).toBe("archive");
       if (result.kind === "archive")
         expect(result.files.has("x/a.txt")).toBeTrue();
+    }
+  });
+
+  test("refuses a zip with a bad CRC through the shared reader", async () => {
+    const bytes = await archive("bad-crc.zip");
+    await expect(
+      fetchSource(
+        fake(() => new Response(bytes)),
+        "https://skills.test/bad.zip",
+        controller(),
+      ),
+    ).rejects.toThrow("CRC32");
+  });
+
+  test("refuses duplicate tar member names before reading files", async () => {
+    const bytes = await archive("duplicate.tar");
+    await expect(
+      fetchSource(
+        fake(() => new Response(bytes)),
+        "https://skills.test/duplicate.tar",
+        controller(),
+      ),
+    ).rejects.toThrow("duplicate member names");
+  });
+
+  test("does not expand GNU or PAX sparse files into skill files", async () => {
+    for (const name of ["sparse-gnu.tar", "sparse-pax.tar"]) {
+      const bytes = await archive(name);
+      expect(bytes.length).toBeLessThan(32 * 1024);
+      const result = await fetchSource(
+        fake(() => new Response(bytes)),
+        `https://skills.test/${name}`,
+        controller(),
+      );
+      expect(result.kind).toBe("archive");
+      if (result.kind === "archive") {
+        expect([...result.files.keys()]).toEqual(["SKILL.md"]);
+        expect(
+          new TextDecoder().decode(result.files.get("SKILL.md")),
+        ).toContain("name: archive-fixture");
+      }
     }
   });
 
@@ -90,9 +133,7 @@ describe("fetchSource", () => {
   });
 
   test("caps the gunzipped tar even when its gzip is tiny", async () => {
-    // a gzip of many zeros expands ~1000x; the decompression is read
-    // under MAX_TAR_BYTES and refused before Bun.Archive ever sees it,
-    // so a small download cannot expand into a huge tar
+    // Padding counts too, even after the decoder has reached tar's EOF.
     const zeros = new Uint8Array(MAX_TAR_BYTES + 1024);
     const bomb = Bun.gzipSync(zeros);
     expect(bomb.byteLength).toBeLessThan(MAX_DOWNLOAD_BYTES);
@@ -117,6 +158,6 @@ describe("fetchSource", () => {
         "https://skills.test/many.tar",
         controller(),
       ),
-    ).rejects.toThrow("too many files");
+    ).rejects.toThrow(`too many members, at most ${MAX_ARCHIVE_MEMBERS}`);
   });
 });

@@ -93,6 +93,7 @@ describe("memory chat receipts", () => {
     const names = [
       "mcp__deleted__delete_kubernetes_resource",
       "mcp__flux__unknown",
+      "bash",
       "datetime",
       "webfetch",
       "websearch",
@@ -114,6 +115,30 @@ describe("memory chat receipts", () => {
     expect(text).toContain("Tools:");
     expect(text).not.toContain("(write)");
     for (const name of names) expect(text).toContain(`- ${name} {} : done`);
+  });
+
+  test("a bash receipt names the command without trusting its output", () => {
+    const command = JSON.stringify({
+      command: "sed -i 's/hello/world/' docs/x.md",
+    });
+    const messages = [
+      row({
+        slot: "work",
+        toolCalls: [{ id: "bash", name: "bash", arguments: command }],
+      }),
+      row({
+        kind: "tool",
+        toolCallId: "bash",
+        toolName: "bash",
+        content: "exit 0\nwrote docs/x.md (rev 2, 1 lines)",
+      }),
+    ];
+    const text = snapshot(messages).markdown;
+    expect(text).toContain(`- bash ${command} : done`);
+    expect(text).not.toContain("(write)");
+    expect(text).not.toContain("wrote docs/x.md");
+    expect(text).not.toContain("exit 0");
+    expect(chatMarkdown("Chat", messages, "UTC")).not.toContain(command);
   });
 
   test.each([199, 200, 201, 250])(
@@ -224,9 +249,16 @@ describe("memory chat receipts", () => {
     });
     const read = tools.find((tool) => tool.name === "session_read")!;
     const ctx: ToolContext = {
+      actor: null,
       signal: new AbortController().signal,
       now: () => now,
-      budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+      budget: {
+        bashCalls: 0,
+        fetches: 0,
+        searches: 0,
+        visualBytes: 0,
+        visuals: 0,
+      },
       caps: { ...TOOL_CAPS, resultCut: 400 },
     };
     const pages: string[] = [];

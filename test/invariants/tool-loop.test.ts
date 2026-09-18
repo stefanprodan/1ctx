@@ -8,88 +8,18 @@
 // the runner drives round after round to the answer. Every assertion is
 // on the rows the server wrote and the send it ended: the slot per reply,
 // the round numbers, the tool rows, the counters and the terminal cause.
-// A model without the tools flag is offered none; a search key removed
-// after the policy was built is a failed result.
 
 import { describe, expect, test } from "bun:test";
-import { geminiEvents } from "../../src/server/providers/index.ts";
-import { parseSse } from "../../src/server/providers/openai.ts";
 import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
+import { settleRun } from "../helpers/automations.ts";
+import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 import {
-  type ChatApp,
-  chatApp,
-  NO_TOOLS,
-  startChat,
-  tick,
-  waitScript,
-} from "../helpers/chat.ts";
-
-// let the loop settle: each tool round crosses several microtasks and a
-// db transaction, so a few ticks cover the round and the next request.
-// The fake clock is nudged so a finalize retry (clock.sleep) resolves
-// rather than hanging the test
-async function settle(chat: ChatApp, times = 6) {
-  for (let i = 0; i < times; i++) {
-    await tick();
-    chat.app.now.value += 200;
-    await tick();
-  }
-}
-
-// the message rows of a session, shaped for a compact assertion
-function shape(chat: ChatApp, sessionId: string) {
-  return chat.app.sessions.messages(sessionId).map((row) => ({
-    kind: row.kind,
-    slot: row.slot,
-    round: row.round,
-    status: row.status,
-    toolName: row.toolName,
-    calls: row.toolCalls?.map((c) => c.name) ?? null,
-  }));
-}
-
-// the answer node invariant of decision 7, replayed on the final rows:
-// per send, outside the fold there is the user row and at most one
-// reply node, whose row has slot answer or is streaming with a null
-// slot; every work reply and every tool row is inside the fold
-function answerNodes(chat: ChatApp, sessionId: string) {
-  const rows = chat.app.sessions.messages(sessionId);
-  const bySend = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const list = bySend.get(row.sendId) ?? [];
-    list.push(row);
-    bySend.set(row.sendId, list);
-  }
-  for (const [, list] of bySend) {
-    const outside = list.filter(
-      (row) =>
-        row.kind === "user" ||
-        (row.kind === "reply" &&
-          (row.slot === "answer" ||
-            (row.status === "streaming" && row.slot === null))),
-    );
-    expect(outside.filter((row) => row.kind === "user")).toHaveLength(1);
-    expect(
-      outside.filter((row) => row.kind === "reply").length,
-    ).toBeLessThanOrEqual(1);
-    expect(outside.map((row) => row.kind)).toEqual(
-      outside.length === 1 ? ["user"] : ["user", "reply"],
-    );
-  }
-}
-
-const time = (id: string, tz = "UTC") => ({
-  id,
-  name: "datetime",
-  arguments: JSON.stringify({ timezone: tz }),
-});
-
-async function chooseSearch(chat: ChatApp, provider: "exa" | "firecrawl") {
-  const res = await chat.admin.call("PATCH", "/api/tools/websearch", {
-    body: { provider },
-  });
-  expect(res.status).toBe(200);
-}
+  answerNodes,
+  asksAnswer,
+  settle,
+  shape,
+  time,
+} from "../helpers/tool-loop.ts";
 
 describe("the tool loop", () => {
   test("a plain reply on a tools model runs no round", async () => {
@@ -138,34 +68,6 @@ describe("the tool loop", () => {
     const rows = shape(chat, sessionId);
     expect(rows[1]).toMatchObject({ kind: "reply", slot: "answer", round: 1 });
     answerNodes(chat, sessionId);
-    chat.app.socket.dispose();
-  });
-
-  test("a model without the tools flag is offered none and behaves as before", async () => {
-    const chat = await chatApp({ model: NO_TOOLS });
-    const { detail, script, sessionId } = await startChat(chat, "hi");
-    expect(script.body.tools).toBeUndefined();
-    script.reply("plain");
-    await settle(chat);
-    expect(shape(chat, sessionId)).toEqual([
-      {
-        kind: "user",
-        slot: null,
-        round: 1,
-        status: "done",
-        toolName: null,
-        calls: null,
-      },
-      {
-        kind: "reply",
-        slot: "answer",
-        round: 1,
-        status: "done",
-        toolName: null,
-        calls: null,
-      },
-    ]);
-    expect(chat.app.sessions.send(detail.send.id)!.toolCalls).toBe(0);
     chat.app.socket.dispose();
   });
 
@@ -227,89 +129,6 @@ describe("the tool loop", () => {
     });
     answerNodes(chat, sessionId);
     chat.app.socket.dispose();
-  });
-
-  test("a Gemini call ending with stop runs and echoes its stored signature in the answer request", async () => {
-    const recorded = await Bun.file(
-      new URL("../fixtures/providers/gemini/chat-tools.sse", import.meta.url),
-    ).text();
-    const events = parseSse("", recorded).frames.flatMap(geminiEvents());
-    const call = events.find((event) => event.kind === "toolCallDelta")!;
-    expect(call.signature).toEqual(expect.any(String));
-    expect(events.find((event) => event.kind === "finish")).toMatchObject({
-      reason: "stop",
-    });
-    const chat = await chatApp({ wire: "gemini" });
-    try {
-      const { detail, script, sessionId } = await startChat(
-        chat,
-        "what time is it",
-      );
-      script.reasoning("<thought>check the clock");
-      script.toolCall({
-        id: call.id!,
-        name: call.name!,
-        arguments: call.arguments!,
-        signature: call.signature,
-      });
-      script.finish("stop");
-      script.usage();
-      script.end();
-      const next = await waitScript(chat.scripted, 2);
-      const messages = next.body.messages as Record<string, unknown>[];
-      expect(messages.find((message) => message.role === "assistant")).toEqual({
-        role: "assistant",
-        content: null,
-        tool_calls: [
-          {
-            id: call.id,
-            type: "function",
-            function: { name: call.name, arguments: call.arguments },
-            extra_content: { google: { thought_signature: call.signature } },
-          },
-        ],
-      });
-      expect(messages.find((message) => message.role === "tool")).toMatchObject(
-        {
-          tool_call_id: call.id,
-          content: expect.stringContaining('"timezone":"UTC"'),
-        },
-      );
-      next.reply("It is noon.");
-      await settle(chat);
-      const rows = chat.app.sessions.messages(sessionId);
-      expect(rows[1]).toMatchObject({
-        slot: "work",
-        status: "done",
-        finishReason: "stop",
-        reasoning: "check the clock",
-        toolCalls: [
-          {
-            id: call.id,
-            name: call.name,
-            arguments: call.arguments,
-            signature: call.signature,
-          },
-        ],
-      });
-      expect(rows[2]).toMatchObject({ kind: "tool", status: "done" });
-      expect(rows[3]).toMatchObject({
-        slot: "answer",
-        round: 2,
-        status: "done",
-      });
-      expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
-        status: "done",
-        cause: "finish",
-        rounds: 2,
-        toolCalls: 1,
-        tokens: 30,
-      });
-      answerNodes(chat, sessionId);
-    } finally {
-      await chat.app.shutdown();
-      chat.app.db.close();
-    }
   });
 
   test("two tool rounds then an answer: a new reply id in round 2 and round 3", async () => {
@@ -459,25 +278,38 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
-  test("the answer round keeps the schemas and forbids a call with tool_choice none", async () => {
+  test("the answer round keeps the schemas and asks for the answer in words", async () => {
     const chat = await chatApp();
     const { detail, sessionId } = await startChat(chat, "cap then answer");
     // over the per-round cap: the calls are recorded not run and the
-    // loop enters the answer round, which is sent tool_choice none
+    // loop enters the answer round, which asks for the answer in words
     const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
       time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
     );
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
-    // the answer round: the provider calls anyway, which ends tool_limit
+    // the answer round: the provider calls anyway, so a local server is
+    // asked the same way again, then once more with no schemas
     const answer = await chat.scripted.next();
     answer.toolRound([time("again")]);
     answer.end();
+    const repeat = await chat.scripted.next();
+    repeat.toolRound([time("twice")]);
+    repeat.end();
+    const bare = await chat.scripted.next();
+    // a provider past all three still ends the send on the cap
+    bare.toolRound([time("still")]);
+    bare.end();
     await settle(chat, 10);
     const answerReq = chat.scripted.scripts[1].body;
-    // the schemas stay so the cached prefix holds, tool_choice forbids
+    // the schemas stay untouched so the cached prefix holds
     expect((answerReq.tools as unknown[]).length).toBeGreaterThan(0);
-    expect(answerReq.tool_choice).toBe("none");
+    expect(asksAnswer(answerReq)).toBe(true);
+    expect(asksAnswer(chat.scripted.scripts[2].body)).toBe(true);
+    const bareReq = chat.scripted.scripts[3].body;
+    expect(bareReq.tools).toBeUndefined();
+    expect(bareReq.tool_choice).toBeUndefined();
+    expect(chat.scripted.scripts).toHaveLength(4);
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send.status).toBe("done");
     const lastReply = chat.app.sessions
@@ -486,6 +318,31 @@ describe("the tool loop", () => {
       .at(-1)!;
     expect(lastReply.finishReason).toBe("tool_limit");
     answerNodes(chat, sessionId);
+    chat.app.socket.dispose();
+  });
+
+  test("a hosted wire goes from the answer round straight to no schemas", async () => {
+    const chat = await chatApp({ wire: "gemini" });
+    const { sessionId } = await startChat(chat, "cap on gemini");
+    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
+      time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+    );
+    chat.scripted.scripts[0].toolRound(many);
+    chat.scripted.scripts[0].end();
+    const answer = await chat.scripted.next();
+    answer.toolRound([time("again")]);
+    answer.end();
+    const bare = await chat.scripted.next();
+    expect(bare.body.tools).toBeUndefined();
+    bare.reply("answered without tools");
+    await settle(chat, 10);
+    expect(chat.scripted.scripts).toHaveLength(3);
+    expect(
+      chat.app.sessions
+        .messages(sessionId)
+        .filter((r) => r.kind === "reply")
+        .map((r) => r.finishReason),
+    ).toEqual(["tool_limit", "tool_limit", "stop"]);
     chat.app.socket.dispose();
   });
 
@@ -539,32 +396,32 @@ describe("the tool loop", () => {
 
   test("the round cap ends the loop after MAX_ROUNDS and lands on an answer", async () => {
     const chat = await chatApp();
-    const { detail, sessionId } = await startChat(chat, "many");
-    // every work round asks for a fresh distinct call so the loop check
-    // never trips; the cap reserves MAX_ROUNDS for the answer round
-    for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
-      const send = chat.app.sessions.send(detail.send.id)!;
-      if (send.status !== "running") break;
-      const script = await waitScript(chat.scripted, round);
-      if (round === LOOP_LIMITS.rounds) {
-        script.reply("done after the cap");
-      } else {
-        script.toolRound([time(`c${round}`, `Etc/GMT+${(round % 12) + 1}`)]);
-        script.end();
+    try {
+      const { detail, sessionId } = await startChat(chat, "many");
+      for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
+        const script = await waitScript(chat.scripted, round);
+        if (round === LOOP_LIMITS.rounds) {
+          expect(asksAnswer(script.body)).toBe(true);
+          script.reply("done after the cap");
+        } else {
+          expect(asksAnswer(script.body)).toBe(false);
+          script.toolRound([time(`c${round}`, `Etc/GMT+${(round % 12) + 1}`)]);
+          script.end();
+        }
       }
-      await settle(chat);
+      expect((await settleRun(chat, sessionId))?.status).toBe("done");
+      const send = chat.app.sessions.send(detail.send.id)!;
+      expect(send.rounds).toBe(LOOP_LIMITS.rounds);
+      const replies = chat.app.sessions
+        .messages(sessionId)
+        .filter((r) => r.kind === "reply");
+      expect(replies.at(-2)?.finishReason).toBe("tool_limit");
+      expect(replies.at(-1)?.finishReason).toBe("stop");
+      answerNodes(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
     }
-    await settle(chat, 10);
-    const send = chat.app.sessions.send(detail.send.id)!;
-    expect(send.status).toBe("done");
-    expect(send.rounds).toBe(LOOP_LIMITS.rounds);
-    const replies = chat.app.sessions
-      .messages(sessionId)
-      .filter((r) => r.kind === "reply");
-    // a reply carries the cap's finish reason where the loop cut it
-    expect(replies.some((r) => r.finishReason === "tool_limit")).toBe(true);
-    answerNodes(chat, sessionId);
-    chat.app.socket.dispose();
   });
 
   test("the call cap cuts a round over the per-round limit", async () => {
@@ -641,58 +498,5 @@ describe("the tool loop", () => {
     expect(send).toMatchObject({ status: "stopped", cause: "shutdown" });
     expect(chat.app.sessions.byId(sessionId)!.status).toBe("stopped");
     answerNodes(chat, sessionId);
-  });
-
-  test("websearch is not offered without a chosen provider", async () => {
-    const chat = await chatApp({ secrets: {} });
-    const { script } = await startChat(chat, "search");
-    const tools = (script.body.tools as { function: { name: string } }[]).map(
-      (t) => t.function.name,
-    );
-    expect(tools).toContain("datetime");
-    expect(tools).toContain("webfetch");
-    expect(tools).not.toContain("websearch");
-    script.reply("no search offered");
-    await settle(chat);
-    chat.app.socket.dispose();
-  });
-
-  test("the chosen search provider is snapshotted once per send", async () => {
-    const chat = await chatApp({ secrets: { "search-exa": "exa-key" } });
-    await chooseSearch(chat, "exa");
-    const { script } = await startChat(chat, "search please");
-    const offered = (script.body.tools as { function: { name: string } }[]).map(
-      (t) => t.function.name,
-    );
-    expect(offered).toContain("websearch");
-    // the provider is unchosen now, but the send already holds its
-    // snapshot; a fresh send, begun after, is offered no websearch
-    const cleared = await chat.admin.call("PATCH", "/api/tools/websearch", {
-      body: { provider: null },
-    });
-    expect(cleared.status).toBe(200);
-    script.reply("ok");
-    await settle(chat);
-    const again = await startChat(chat, "search again");
-    const laterOffered = (
-      again.script.body.tools as { function: { name: string } }[]
-    ).map((t) => t.function.name);
-    expect(laterOffered).not.toContain("websearch");
-    again.script.reply("no search now");
-    await settle(chat);
-    chat.app.socket.dispose();
-  });
-
-  test("with a chosen provider websearch is offered", async () => {
-    const chat = await chatApp({ secrets: { "search-exa": "exa-key" } });
-    await chooseSearch(chat, "exa");
-    const { script } = await startChat(chat, "search please");
-    const tools = (script.body.tools as { function: { name: string } }[]).map(
-      (t) => t.function.name,
-    );
-    expect(tools).toContain("websearch");
-    script.reply("ok");
-    await settle(chat);
-    chat.app.socket.dispose();
   });
 });

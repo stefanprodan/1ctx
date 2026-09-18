@@ -24,12 +24,13 @@ import type {
 
 function context(signal = new AbortController().signal): ToolContext {
   const budget: ToolBudget = {
+    bashCalls: 0,
     fetches: 0,
     searches: 0,
     visualBytes: 0,
     visuals: 0,
   };
-  return { signal, now: () => 0, budget, caps: TOOL_CAPS };
+  return { actor: null, signal, now: () => 0, budget, caps: TOOL_CAPS };
 }
 
 function dependencies(
@@ -149,12 +150,14 @@ describe("fetch URL guard", () => {
 
   test("enforces the fetch budget", async () => {
     const shared: ToolBudget = {
+      bashCalls: 0,
       fetches: TOOL_CAPS.maxFetches,
       searches: 0,
       visualBytes: 0,
       visuals: 0,
     };
     const ctx: ToolContext = {
+      actor: null,
       signal: new AbortController().signal,
       now: () => 0,
       budget: shared,
@@ -328,9 +331,16 @@ describe("fetch extraction and slicing", () => {
 describe("fetch deadline", () => {
   test("times out a fetch that never resolves", async () => {
     const ctx: ToolContext = {
+      actor: null,
       signal: new AbortController().signal,
       now: () => 0,
-      budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+      budget: {
+        bashCalls: 0,
+        fetches: 0,
+        searches: 0,
+        visualBytes: 0,
+        visuals: 0,
+      },
       caps: { ...TOOL_CAPS, fetchDeadlineMs: 20 },
     };
     const deps: FetchDependencies = {

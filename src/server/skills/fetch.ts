@@ -1,6 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { sniffArchive } from "../../shared/archive.ts";
+import { readArchive } from "../lib/archive.ts";
 import { BadGateway, BadRequest, ServiceUnavailable } from "../lib/errors.ts";
 import {
   FETCH_DEADLINE_MS,
@@ -107,26 +109,32 @@ async function download(
   }
 }
 
-const isTar = (bytes: Uint8Array) =>
-  bytes.byteLength >= 262 &&
-  new TextDecoder().decode(bytes.slice(257, 262)) === "ustar";
-
 async function archiveFiles(
   bytes: Uint8Array,
+  signal: AbortSignal,
 ): Promise<Map<string, Uint8Array>> {
-  let files: Map<string, File>;
-  try {
-    files = await new Bun.Archive(bytes).files();
-  } catch {
-    throw new BadRequest("the archive is invalid");
-  }
-  if (files.size > MAX_ARCHIVE_MEMBERS) {
-    throw new BadRequest("the archive has too many files");
-  }
-  const out = new Map<string, Uint8Array>();
-  for (const [path, file] of files)
-    out.set(path, new Uint8Array(await file.arrayBuffer()));
-  return out;
+  const members = await readArchive(
+    bytes,
+    { maxExpandedBytes: MAX_TAR_BYTES, maxMembers: MAX_ARCHIVE_MEMBERS },
+    signal,
+    (manifest) => {
+      const names = new Set<string>();
+      for (const member of manifest) {
+        if (names.has(member.name)) {
+          throw new BadRequest("the archive has duplicate member names");
+        }
+        names.add(member.name);
+      }
+      return manifest
+        .filter((member) => member.type === "file")
+        .map((member) => member.index);
+    },
+  );
+  return new Map(
+    members
+      .filter((member) => member.type === "file")
+      .map((member) => [member.name, member.data!]),
+  );
 }
 
 export async function fetchSource(
@@ -135,21 +143,15 @@ export async function fetchSource(
   shutdown: AbortSignal,
 ): Promise<Fetched> {
   const bytes = await download(fetcher, url, shutdown);
-  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
-    let tar: Uint8Array;
-    try {
-      const stream = new Blob([bytes.slice().buffer as ArrayBuffer])
-        .stream()
-        .pipeThrough(new DecompressionStream("gzip"));
-      tar = await readCapped(stream, MAX_TAR_BYTES, "the archive is too large");
-    } catch (error) {
-      if (error instanceof BadRequest) throw error;
-      throw new BadRequest("the gzip archive is invalid");
-    }
-    return { kind: "archive", bytes, files: await archiveFiles(tar) };
-  }
-  if (isTar(bytes)) {
-    return { kind: "archive", bytes, files: await archiveFiles(bytes) };
+  if (sniffArchive(bytes) !== null) {
+    return {
+      kind: "archive",
+      bytes,
+      files: await archiveFiles(
+        bytes,
+        AbortSignal.any([shutdown, AbortSignal.timeout(FETCH_DEADLINE_MS)]),
+      ),
+    };
   }
   let text: string;
   try {

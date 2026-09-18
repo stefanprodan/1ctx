@@ -13,12 +13,15 @@ import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
+import { tokens } from "../lib/tokens.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { isMemoryTool } from "../tools/index.ts";
+import { EXHAUSTED_LINE } from "./context.ts";
 import type { ToolContext, ToolResult, ToolsPort } from "./policy.ts";
+import { cutResult, fitResults, resultsFit } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
-import { type ActiveSend, newRound } from "./send.ts";
+import { type ActiveSend, type CapReason, newRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
 // how many identical rounds in a row are the loop check
@@ -62,12 +65,6 @@ function looping(signatures: string[]): boolean {
   return last.every((s) => s === last[0]);
 }
 
-// the cut a result gets before the byte cap weighs it
-function cut(result: ToolResult, resultChars: number): ToolResult {
-  if (result.content.length <= resultChars) return result;
-  return { ...result, content: result.content.slice(0, resultChars) };
-}
-
 const bytes = (s: string) => new TextEncoder().encode(s).byteLength;
 
 // the loop; returns how the send should end, which run() hands to
@@ -94,6 +91,7 @@ export async function toolLoop(
           }
         : finish();
     }
+    send.budget.tokens += round.tokens;
 
     // an answer round can open the one final summary round, the capped
     // answer round included: it is the request the tool results filled
@@ -102,16 +100,14 @@ export async function toolLoop(
         send.policy.contextLength,
         limits.contextReserve,
       );
-      const usage = round.usage;
       if (
         send.kind === "chat" &&
-        usage !== null &&
         threshold !== null &&
-        usage.promptTokens + usage.completionTokens >= threshold
+        round.tokens >= threshold
       ) {
         const summary = deps.writer.startSummary(send);
         send.summarizing = true;
-        send.used = usage.promptTokens + usage.completionTokens;
+        send.used = round.tokens;
         send.roundNo += 1;
         send.phase = "provider";
         send.round = newRound(summary.id, summary.createdAt);
@@ -120,11 +116,25 @@ export async function toolLoop(
       return finish();
     }
 
-    // calls in the answer round: keep work, record them not run, end
+    // calls in the answer round: keep work, record them not run, ask
+    // once more without schemas, then end
     if (send.answering) {
-      deps.writer.recordUnrun(send, "tool_limit", calls);
+      deps.writer.recordUnrun(send, send.answering, calls);
+      // a request without schemas is a new prompt to a local server,
+      // minutes for a long chat, so the same request goes first there;
+      // a hosted wire's cache is not one conversation's to keep
+      if (!send.repeated && send.policy.wire === "openai-compatible") {
+        send.repeated = true;
+        startNextRound(deps, send);
+        continue;
+      }
+      if (!send.bare) {
+        send.bare = true;
+        startNextRound(deps, send);
+        continue;
+      }
       send.round = null;
-      return { cause: "finish", finishReason: "tool_limit", error: null };
+      return { cause: "finish", finishReason: send.answering, error: null };
     }
 
     // a finish reason other than stop or tool_calls with calls present:
@@ -145,8 +155,9 @@ export async function toolLoop(
     }
 
     // the caps, weighed before the calls launch
-    if (overCap(send, calls, limits)) {
-      goToAnswer(deps, send, calls);
+    const cap = overCap(send, calls, limits);
+    if (cap !== null) {
+      goToAnswer(deps, send, cap, { calls });
       continue;
     }
 
@@ -158,26 +169,45 @@ export async function toolLoop(
     send.budget.calls = deps.writer.finishRound(send, toolNames).toolCalls;
     if (send.cause !== null) return endFor(send.cause);
     goToTools(send);
-    await runCalls(deps, send, calls);
+    const threshold = compactsAt(
+      send.policy.contextLength,
+      limits.contextReserve,
+    );
+    // Leave the forced-answer instruction outside the stored result budget.
+    const room =
+      threshold === null
+        ? null
+        : Math.max(0, threshold - round.tokens - tokens(EXHAUSTED_LINE) - 4);
+    const cut = await runCalls(deps, send, calls, room);
     if (send.cause !== null) return endFor(send.cause);
 
-    startNextRound(deps, send);
+    if (cut) {
+      goToAnswer(deps, send, "context_limit", { messageId: round.messageId });
+    } else {
+      startNextRound(deps, send);
+    }
   }
 }
 
-// the caps, in the order the plan weighs them; a send at a cap goes to
-// the answer round rather than launching this round's calls
 function overCap(
   send: ActiveSend,
   calls: ToolCall[],
   limits: ActiveSend["policy"]["limits"],
-): boolean {
-  if (calls.length > limits.callsPerRound) return true;
-  if (send.budget.calls + calls.length > limits.callsPerSend) return true;
-  if (send.roundNo >= limits.rounds - 1) return true;
-  if (send.budget.toolMs >= limits.toolMs) return true;
-  if (send.budget.resultBytes >= limits.resultBytes) return true;
-  return false;
+): CapReason | null {
+  if (calls.length > limits.callsPerRound) return "tool_limit";
+  if (send.budget.calls + calls.length > limits.callsPerSend)
+    return "tool_limit";
+  if (send.roundNo >= limits.rounds - 1) return "tool_limit";
+  if (send.budget.toolMs >= limits.toolMs) return "tool_limit";
+  if (send.budget.resultBytes >= limits.resultBytes) return "tool_limit";
+  if (send.budget.tokens >= limits.toolWorkTokens) return "token_limit";
+  const threshold = compactsAt(
+    send.policy.contextLength,
+    limits.contextReserve,
+  );
+  if (threshold !== null && send.round!.tokens >= threshold)
+    return "context_limit";
+  return null;
 }
 
 // the round's tools launch in parallel under the call timeout and the
@@ -187,11 +217,26 @@ async function runCalls(
   deps: LoopDeps,
   send: ActiveSend,
   calls: ToolCall[],
-): Promise<void> {
+  room: number | null,
+): Promise<boolean> {
   const startedAt = deps.clock();
+  const immediate = resultsFit(calls, send.policy.toolCaps.resultCut, room);
   let writeError: unknown = null;
+  const store = (call: ToolCall, result: ToolResult) => {
+    if (send.cause !== null) return;
+    send.budget.resultBytes += bytes(result.content);
+    deps.writer.finishTool(send, call, result);
+  };
   const settled = calls.map(async (call) => {
     const ctx: ToolContext = {
+      actor: {
+        projectId: send.projectId,
+        userId: send.policy.userId,
+        agentId: send.policy.agentId,
+        agentName: send.policy.agentName,
+        sessionId: send.sessionId,
+        origin: send.kind === "run" ? "automation" : "chat",
+      },
       signal: send.controller.signal,
       now: deps.clock,
       budget: send.toolBudget,
@@ -207,41 +252,58 @@ async function runCalls(
         error: true,
       };
     }
-    // A terminal transaction may be between retries. Do not let a tool
-    // that settled after the claim write into that rollback window.
-    if (send.cause !== null) return;
-    const stored = cut(result, send.policy.toolCaps.resultCut);
-    send.budget.resultBytes += bytes(stored.content);
+    let stored = result;
     try {
-      deps.writer.finishTool(send, call, stored);
+      stored = cutResult(result, send.policy.toolCaps.resultCut);
+      if (immediate) store(call, stored);
     } catch (err) {
-      // Claim failure immediately so the send aborts siblings; they still
-      // settle under the round's allSettled before the lock is released.
-      if (writeError === null) {
-        writeError = err;
-        deps.fail(send, err instanceof Error ? err.message : String(err));
-      }
+      writeError ??= err;
+      deps.fail(send, err instanceof Error ? err.message : String(err));
+    }
+    return stored;
+  });
+  let cut = false;
+  const task = Promise.all(settled).then((results) => {
+    if (writeError !== null) throw writeError;
+    // A terminal transaction may be between retries.
+    if (send.cause !== null || immediate) return;
+    const fitted = fitResults(calls, results, room);
+    cut = fitted.cut;
+    for (let i = 0; i < calls.length; i++) {
+      store(calls[i]!, fitted.results[i]!);
+    }
+    if (!fitted.fits) {
+      throw new Error("the result tails do not fit the context");
     }
   });
-  const task = Promise.allSettled(settled).then(() => {});
   send.tools = task;
-  await task;
-  const offered = send.policy.offered;
-  offered.memory?.settleRound();
-  if (offered.memory?.stopped) {
-    offered.tools = offered.tools.filter((tool) => !isMemoryTool(tool.name));
+  try {
+    await task;
+  } catch (err) {
+    deps.fail(send, err instanceof Error ? err.message : String(err));
+    throw err;
+  } finally {
+    const offered = send.policy.offered;
+    offered.memory?.settleRound();
+    if (offered.memory?.stopped) {
+      offered.tools = offered.tools.filter((tool) => !isMemoryTool(tool.name));
+    }
+    send.tools = null;
+    send.budget.toolMs += deps.clock() - startedAt;
   }
-  send.tools = null;
-  send.budget.toolMs += deps.clock() - startedAt;
-  if (writeError !== null) throw writeError;
+  return cut;
 }
 
-// enter the answer round: keep the tools, forbid a call
-function goToAnswer(deps: LoopDeps, send: ActiveSend, calls: ToolCall[]): void {
-  send.answering = true;
+function goToAnswer(
+  deps: LoopDeps,
+  send: ActiveSend,
+  reason: CapReason,
+  previous: { calls: ToolCall[] } | { messageId: string },
+): void {
+  send.answering = reason;
   const reply = deps.writer.startRound(send, {
-    finishReason: "tool_limit",
-    calls,
+    finishReason: reason,
+    ...previous,
   });
   send.roundNo += 1;
   send.phase = "provider";

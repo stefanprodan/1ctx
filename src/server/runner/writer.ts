@@ -306,12 +306,26 @@ export class Writer {
   // with the new row in one revision and one envelope.
   startRound(
     send: ActiveSend,
-    transition?: { finishReason: string; calls: ToolCall[] },
+    transition?: { finishReason: string } & (
+      | { calls: ToolCall[] }
+      | { messageId: string }
+    ),
   ): Message {
     const now = this.deps.clock();
     const reply = transact(this.deps.db, () => {
       const changed: Message[] = [];
-      if (transition !== undefined && send.round !== null) {
+      if (transition !== undefined && "messageId" in transition) {
+        const previous = this.deps.sessions.capWork(
+          transition.messageId,
+          transition.finishReason,
+        );
+        if (previous !== null) changed.push(previous);
+      }
+      if (
+        transition !== undefined &&
+        "calls" in transition &&
+        send.round !== null
+      ) {
         const previous = this.finishReplyRow(
           send.round,
           "done",

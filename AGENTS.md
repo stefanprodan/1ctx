@@ -6,6 +6,9 @@ One continuous context for agents. Domain: 1ctx.dev.
   No Node. Packages are devDependencies bundled at build time, exact
   pins, official npm only, `bun install --ignore-scripts`. A new package
   needs the user's explicit go-ahead.
+  `src/server/lib/archive.ts` alone imports `@zip.js/zip.js` and
+  `modern-tar`. The modern-tar patch retains the raw header `typeflag`
+  to distinguish GNU sparse and unknown types from regular files.
 - **Status:** alpha. No backwards compatibility, no shims; the schema,
   the API and the socket may change freely; the schema grows by
   migration and is rewritten, with a wipe, only for a rename.
@@ -21,6 +24,7 @@ make preview-stop   # stop it
 make preview-log    # tail its log
 make preview-clean  # stop it and wipe its db, secrets, log and pid
 make preview-provision FILE=x.yaml  # stop it, apply the objects, start it
+make preview-reset FILE=x.yaml SECRETS=dir  # wipe it, copy the secrets in, provision
 make lint           # biome check --write, then tsc; run after any code change
 make test           # bun test, concurrent; run after any code change, before finishing
 make build          # standalone binary in bin/
@@ -142,10 +146,11 @@ violation, and every rule has a rejected fixture under
   never downgraded (`--trust-proxy` reads the scheme and the client
   address from the proxy's `X-Forwarded-*`). Every request body and
   parameter goes through a hand-written parser that throws a 400 on
-  anything unexpected; a body is read through `readBody()` with a cap,
-  never `req.json()`. The login rate limit is a fixed window per
-  address with a cap on addresses, constant memory per key. Every new
-  route gets a row in
+  anything unexpected; a body is read through `readBody()` or
+  `readBytes()` with a cap, never `req.json()`. The listener ceiling is
+  32 MiB; each route keeps its own cap. The login rate limit is a fixed
+  window per address with a cap on addresses, constant memory per key.
+  Every new route gets a row in
   `test/helpers/auth-cases.ts` or the access suite fails; the matrix is
   checked against the composed route list, health included.
 - **Logins, not sessions.** The cookie is `login`, HttpOnly, SameSite=Lax,
@@ -203,6 +208,73 @@ violation, and every rule has a rejected fixture under
   through `access.project(principal, id)`, which answers the same 404
   whether the project is missing or not theirs to see. The rule is
   `projects/visible.ts`, pure.
+- **Knowledge is versioned project text.** `knowledge_files` holds live
+  UTF-8 files under prefix-free names; `knowledge_versions` keeps every
+  post-image and an empty delete version with the last live summary.
+  History outlives files and both tables cascade with the project.
+  People call the base the project docs or the project files; the prompt
+  block names both and the Knowledge tab, only when bash is offered.
+  The bash description separates shared, versioned UTF-8 `/knowledge`
+  from the session's unversioned, any-byte `/tmp`.
+  The eight authenticated routes under `/api/projects/:id/knowledge`
+  use `access.project()`: list and create, read/replace/delete by
+  `/files/:fileId`, that file's `/versions`, `/versions/:versionId`, and
+  `POST /upload?folder=&name=` for one archive or text file.
+  Replacements check the revision; deleted-name restores create new ids.
+  Uploads normalize paths through `shared/knowledge.ts`: both separators,
+  Unicode normalization and Latin transliteration, lowercase with dashes,
+  never raw `..`; stored names from bash and Restore keep their case.
+  The optional folder is normalized, at most seven segments and 180
+  characters. Directories, macOS metadata (`__MACOSX`, `.DS_Store`,
+  `._*`) and `.git`, `.hg` and `.svn` at any depth are dropped without
+  a line, in the picker too; other dotfiles are kept. Manifest passes
+  skip `not-regular`, `outside`, `no-letters`, `too-long`, `bad-name`
+  and all `duplicate` names; bytes
+  skip `too-big` and `not-text`; eligible trees skip `clash` and
+  `clash-live`. Skipped files never block eligible files.
+  Uploads share the four process slots with commands, take a slot before
+  reading, and allow one upload per user. The 60-second deadline covers
+  waiting, reading and judging; cancellation settles before admission
+  is released. Caps are 32 MiB uploaded, 64 MiB expanded and 2,000
+  members. Valid changes commit together through `commitKnowledge`,
+  checking live identities, revisions and current caps, authored by the
+  user without a session. All-unchanged uploads write and evict nothing.
+  Answers count every outcome but carry at most 200 saved names and
+  200 skips, raw names cut to 200 characters and 300 JSON bytes, with
+  reason codes and clash indexes.
+  History eviction may drop replaced versions near its caps.
+  `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
+  host or network, and `defenseInDepth: true`. Four commands at most
+  hold disposable mounts of `/knowledge` and the session's `/tmp`; the
+  per-session queue is taken before the process slot and released last.
+  Aborts, exits 124/126 and throws discard both trees. Every ordinary
+  exit, nonzero included, commits in one transaction: knowledge changes
+  under mounted ids, revisions, absence and current caps, with one
+  version and `knowledge.changed` per file; scratch changes under its
+  revision and current caps, its checked cwd, revision and last use
+  even on a read-only command. Receipts cover knowledge only and an
+  overflow rolls both trees back.
+  Unchanged bytes publish nothing. The six knowledge limits are read
+  at each write; smaller replacements and deletes survive lowered caps.
+  History is evicted by per-file count and project bytes; the hourly
+  sweep drops expired deleted-file history, never live-file versions.
+  `knowledge/scratch.ts` holds `ScratchStore`, built as the area's
+  `scratch`, over `session_scratch` and `session_scratch_files`; both
+  cascade with the session. Writes use the caller's transaction and
+  check the scratch revision. `/tmp` keeps regular files of any bytes
+  and their modes, with the knowledge name and prefix-free rules;
+  symlinks and other types fail the command whole. Empty directories
+  are not kept. The cwd is kept only for directories under either
+  tree; a missing saved directory starts in `/knowledge` with a notice.
+  The hourly knowledge sweep also drops scratch past the current
+  `scratchIdleDays`, cascading its files and skipping sessions holding
+  the per-session queue, including commands waiting for a process slot.
+  The knowledge limits scope also holds `scratchBytes`, `scratchFiles`
+  and `scratchIdleDays`. The project byte ceiling is 64 MiB; stored
+  overrides are clamped to their ranges for both effective limits and
+  the Limits tab.
+  The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
+  so best-effort hardening runs; sqlite3's unpatched worker stays out.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
   secrets directory. The closed kinds are `user-`, `provider-`, `search-`
   and `mcp-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
@@ -266,10 +338,12 @@ violation, and every rule has a rejected fixture under
   names or the tool's contract.
 - **A skill is stored text, never executable.** An admin adds a `SKILL.md`
   and its text files from a GitHub directory, an archive, a discovery
-  index or a raw file through the compose fetcher. An index digest is
-  checked on add and refresh. Refresh is explicit and never renames the
-  skill; deleting one an agent names is a 409. Stored text is cleaned and
-  shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
+  index or a raw file through the compose fetcher. Tar, tar.gz and zip
+  archives go through `lib/archive.ts`; duplicate member names are
+  refused. An index digest is checked on add and refresh. Refresh is
+  explicit and never renames the skill; deleting one an agent names is
+  a 409. Stored text is cleaned and shown as text, ingest caps live in
+  `skills/limits.ts`, and nothing runs.
   The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
   (a site or an index is looked up first and its entries listed with
   Add), a row's head is the name over its files and when it was fetched
@@ -331,10 +405,10 @@ violation, and every rule has a rejected fixture under
   prompt is the agent's prompt, the project and user or automation
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
-  off per server), the two memory blocks, the date line, and last the
-  change note. A send records a content-addressed digest of what it
-  offered from MCP (`mcp_digests`, `sends.mcp`, null for a compact
-  send, swept with the logins); `startSend` compares it with the
+  off per server), the two memory blocks, the knowledge block, the date
+  line, and last the change note. A send records a content-addressed
+  digest of what it offered from MCP (`mcp_digests`, `sends.mcp`, null
+  for a compact send, swept with the logins); `startSend` compares it with the
   session's previous send (a regenerated turn against the turn before
   it), and a difference is the note after the date line naming added,
   removed and changed wire names, so the stable prefix stays cacheable.
@@ -393,7 +467,9 @@ violation, and every rule has a rejected fixture under
   failure, shutdown, deadline) through one compare-and-set in the
   runner, and
   `finalizeSend` runs exactly once; the lock is held until the stream
-  has let go. A stream quiet for two minutes or a reply past 1 MB is
+  has let go. A stream quiet for two minutes after its first event
+  (the wait for the first is bounded only by the deadline, since a
+  local server reads a long prompt in silence) or a reply past 1 MB is
   a failure (`runner/round.ts`). A chat send (a message, regenerate or
   compact) past the `sendDeadlineMs` limit, thirty minutes by default, ends
   with cause `deadline`, status `stopped`; a run has its own deadline.
@@ -539,22 +615,40 @@ violation, and every rule has a rejected fixture under
   runs, with `automation_id` set null.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
-  bytes) and the per-tool caps have their defaults, floors and
-  ceilings in one table, `limits/defaults.ts`; an admin's override is
-  a row in `limits`, `limits.current()` merges them, and
+  bytes, `toolWorkTokens`) and the per-tool caps have their defaults,
+  floors and ceilings in one table, `limits/defaults.ts`; an admin's
+  override is a row in `limits`, `limits.current()` merges them, and
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
-  the defaults; `tools/` never imports `runner/`. The offered set is
-  decided once per send in `runner/policy.ts` from the `tools` rows:
-  a model that accepts tools always gets `datetime`, and the web tools
+  the defaults; `tools/` never imports `runner/`. `maxBashCalls` refuses
+  excess bash calls before queue or slot admission without ending the loop.
+  Main rounds spend prompt plus completion tokens, cached tokens included,
+  or a request estimate without usage. The tool-work threshold and the
+  window threshold are checked before calls, forcing one answer round.
+  The answer round sends the schemas unchanged and no `tool_choice`,
+  which would miss a server's cached prefix; the exhausted line asks
+  for the answer. A round that still calls is asked again: on
+  `openai-compatible` first with the same request, which a local
+  server's cached prefix answers in seconds, then on every wire once
+  without schemas.
+  The crossing and answer rounds may pass the tool-work budget; summaries
+  and memory have their own limits. Results that outgrow the remaining
+  window are cut largest first before storage, keeping bash's exit and
+  receipts and a cut line. The work row carries `tool_limit`, `token_limit`
+  or `context_limit`; the answer keeps the provider's finish reason.
+  The offered set is decided once per send in `runner/policy.ts` from
+  the `tools` rows:
+  a model that accepts tools always gets `datetime` and `bash` over the
+  project's knowledge base, plus the web tools
   (`WEB_TOOLS`: `webfetch`, `websearch`, `visualize`, the only rows and
   switches) that an admin has not switched off, websearch only once a
-  search provider is chosen;
-  every provider (exa, firecrawl, tavily) answers keyless, its
+  search provider is chosen. The memory phase offers `memory_edit` alone.
+  Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
   a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
   `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
-  `BUILTIN_TOOLS` schema by name from `tools/catalog.ts`, built by the
-  send's own factories with sample inputs (name enums empty,
+  `BUILTIN_TOOLS` schema, including `bash`, by name from
+  `tools/catalog.ts`, built by the send's own factories with sample
+  inputs (name enums empty,
   `memory_edit`'s own-note text as the variant), each row `RowsTitle`
   (the name over the first sentence) with its tokens by `wireTokens()`
   as `RowsMeta`, read-only; Web's rows carry the switch and no tokens,
@@ -583,6 +677,8 @@ violation, and every rule has a rejected fixture under
   event (`session`, `deleted`) goes to the connections holding its
   project, and so do `automation` and `automationDeleted`, from the bus's
   `automation.changed` and `automation.deleted`, by the row's revision;
+  `knowledge.changed` reaches the same project audience as a `knowledge`
+  frame with the file summary and `deleted`, including the delete revision;
   a stream frame (`delta`, `html`, with a sequence per send)
   goes to the connections watching its session, straight from the
   writer through a port. `watch` is authorized through a port to
@@ -590,8 +686,8 @@ violation, and every rule has a rejected fixture under
   `access.changed` recomputes a connection's set and sends `granted`
   for a project that joined it or `revoked` for one that left it, and
   `role` when the user's role moved, which `data/socket.ts` applies to
-  `me`; `login.revoked` closes the login's
-  connections, and the expiry sweep publishes it too. Backpressure
+  `me`; `login.revoked` removes the login's connections from delivery
+  before closing them, and the expiry sweep publishes it too. Backpressure
   closes a slow connection; a dropped frame closes with 1013; the
   client reloads on every open. The upgrade is `GET /api/socket` with
   `upgrade: true` on the descriptor: the router applies the same-origin
@@ -692,8 +788,12 @@ violation, and every rule has a rejected fixture under
   in a label row. A card's head holds `RowsAdd`, `RowsLink` or
   `RowsFilters`; `RowsNote` says why a list is empty, `RowsBlock` is a
   row of text. The controls live in `ui/RowsControls.tsx`, exported
-  through `Rows.tsx`. A view never draws a row, a head, a list box, a
-  switch, a box or filter chips of its own; its stylesheet holds only
+  through `Rows.tsx`. Compact outcome logs use `RowsLog`,
+  `RowsLogGroup`, `RowsLogLine` (name, note, failure and status tag)
+  and `RowsLogMore`; names ellipsize and notes wrap only when needed.
+  Card head buttons never wrap; hints stay on one ellipsized line. A
+  view never draws a row, a head, a list box, a switch, a box or filter
+  chips of its own; its stylesheet holds only
   what an open row's body or a meta holds. The stream's session row
   (`stream/Row.tsx`) is the one row outside Rows, a denser feed line
   inside a `RowsCard`. A card whose
@@ -706,8 +806,24 @@ violation, and every rule has a rejected fixture under
   `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
   then one Projects card, personal first, each row with its 14-day
   strip, headed by `ui/Search.tsx` (the stream's box too) narrowing the
-  rows by name in place. A project's tabs are Feed, Automations, then Members for a team
-  or Settings for a personal one. A team project's Members tab is the
+  rows by name in place. A project's tabs are Feed, Automations, Memory,
+  Knowledge, then Members for a team or Settings for a personal one.
+  The Knowledge tab is one card of the base's files, searched by name,
+  with the totals as its hint and Upload at its head: a row opens to
+  who wrote it and from where, its text folded at twelve lines with
+  Show all, History with Restore on every past version, and Delete; a
+  second card lists the deleted files whose text is still kept. Upload
+  takes a Folder and multiple text files or archives, judged at pick
+  with the shared name, archive and text rules. Items send sequentially
+  under a byte progress bar; outcomes and skips are compact Rows logs,
+  cut at ten with Show all. Stop aborts the request and leaves earlier
+  saves; a fully sent unanswered item may have saved. A 401, a changed
+  user, unmount or a folder refusal stops the run. The list reloads
+  once at the end, including Stop; changed or removed revisions drop
+  cached text and History even without socket frames.
+  `data/knowledge.ts` holds the list per project, a file's text and its
+  versions once read, and applies a `knowledge` frame by revision, so a
+  run's write lands on the open tab. A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab
   is one card of `RowsGo` rows titled Scheduled tasks, the schedule in
@@ -753,9 +869,13 @@ violation, and every rule has a rejected fixture under
   place of its hint, and `useFocusField()` moves the focus to the
   control carrying that `name`. Any other refusal is the notice `Foot`
   draws over the buttons, "Could not delete." then the server's words.
-  No form shows a refusal anywhere else. A page whose load failed is
-  `Page`'s `error`: a card saying the page did not load, the words and
-  Try again. A failure is words first: `api()` passes the server's own
+  The uploader is the exception: `Upload.state.ts`, not `useSave()`,
+  owns busy state; Stop alone stays enabled during a run. An item's
+  refusal is its log line with a status tag, a folder refusal is the
+  field's, and a run refusal such as a picked-file read failure is
+  the `Foot`'s. No other form shows a refusal elsewhere. A page whose
+  load failed is `Page`'s `error`: a card saying the page did not load,
+  the words and Try again. A failure is words first: `api()` passes the server's own
   words and gives an answer without them the words of `statusWords()`,
   never a bare status. The status rides beside them, `failure()` in
   `lib/format.ts` for a page's error signal and `status` on a form's

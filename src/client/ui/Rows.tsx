@@ -236,6 +236,66 @@ export function RowsList({ children }: { children: ComponentChildren }) {
   return <div class="rows-list">{children}</div>;
 }
 
+export function RowsLog({ children }: { children: ComponentChildren }) {
+  return <div class="rows-log">{children}</div>;
+}
+
+export function RowsLogGroup({ children }: { children: ComponentChildren }) {
+  return <div class="rows-log-group">{children}</div>;
+}
+
+export function RowsLogLine({
+  name,
+  note,
+  bad,
+  running,
+  status,
+}: {
+  name: string;
+  note: string;
+  bad?: boolean;
+  running?: boolean;
+  status?: number | null;
+}) {
+  return (
+    <div class={`rows-log-line${bad ? " rows-log-bad" : ""}`}>
+      <span class="rows-log-name" title={name}>
+        {name}
+      </span>
+      <span class={`rows-log-note${running ? " rows-log-running" : ""}`}>
+        {note}
+        {status != null && (
+          <>
+            {" "}
+            <span class="code-tag">HTTP {status}</span>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
+export function RowsLogMore({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ComponentChildren;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      class="rows-log-more"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
+
 // the label over an inset list, and a faint count or word at its right
 export function RowsListHead({
   label,

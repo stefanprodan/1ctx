@@ -17,7 +17,7 @@ import { ago, longDate } from "../../lib/format.ts";
 export { firstSentence } from "../../lib/format.ts";
 
 export const URL_HINT =
-  "A site with skills, a GitHub directory, a raw SKILL.md, or a tarball.";
+  "A site with skills, a GitHub directory, a raw SKILL.md, or a zip or tar archive.";
 
 // the form's shape follows the URL as it is typed: null until it is one
 export function formKind(url: string): SkillSource | null {

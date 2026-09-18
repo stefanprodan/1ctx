@@ -121,6 +121,35 @@ describe("loadSkill caps", () => {
 });
 
 describe("loadSkill archive paths", () => {
+  test("loads a skill from a zip URL through the fake fetcher", async () => {
+    const bytes = await Bun.file(
+      new URL("../../fixtures/archives/skill.zip", import.meta.url),
+    ).bytes();
+    const url = "https://skills.test/skill.zip";
+    const calls: string[] = [];
+    const fetcher = (async (input) => {
+      const requested = String(input);
+      calls.push(requested);
+      if (requested !== url) throw new Error(`unexpected URL ${requested}`);
+      return new Response(bytes);
+    }) as typeof fetch;
+    const loaded = await loadSkill(fetcher, url, {}, signal());
+    expect(calls).toEqual([url]);
+    expect(loaded.sourceKind).toBe("archive");
+    expect(loaded.sourceUrl).toBe(url);
+    expect(loaded.name).toBe("archive-fixture");
+    expect(loaded.description).toBe("A recorded archive skill.");
+    expect(loaded.body).toBe("# Archive fixture\nRead references/guide.md.\n");
+    expect(loaded.files).toEqual([
+      {
+        path: "references/guide.md",
+        content: "# Guide\nRecorded supporting text.\n",
+        bytes: 34,
+      },
+    ]);
+    expect(loaded.dropped).toEqual([]);
+  });
+
   test("reads a leading ./ path leniently as the same file", async () => {
     const { ready, fetcher } = fromArchive({
       "./SKILL.md": skillMd(),

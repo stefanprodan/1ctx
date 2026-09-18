@@ -102,6 +102,8 @@ describe("automations", () => {
     expect(stream.rows.map((row: StreamRow) => row.session.id)).toEqual([
       detail.session.id,
     ]);
+    // the row names its agent, credited on a line of a send that ended
+    expect(stream.rows[0].agent).toBe("coder");
     expect(
       (await chat.member.call("GET", "/api/sessions?origin=chat")).json(),
     ).resolves.toMatchObject({ rows: [] });

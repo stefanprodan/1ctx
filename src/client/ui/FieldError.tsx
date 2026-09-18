@@ -5,7 +5,13 @@
 
 import type { Save } from "../lib/save.ts";
 
-export function FieldError({ save, field }: { save: Save; field: string }) {
+export function FieldError({
+  save,
+  field,
+}: {
+  save: Pick<Save, "fieldError">;
+  field: string;
+}) {
   const error = save.fieldError(field);
   if (error === null) return null;
   return (

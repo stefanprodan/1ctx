@@ -25,7 +25,7 @@ import { type AgentRow, type AgentStore, summary } from "./store.ts";
 
 // the tools the page lists; the skill and MCP tools are shown as what
 // they carry
-const LISTED = new Set<string>(["datetime", ...WEB_TOOLS]);
+const LISTED = new Set<string>(["datetime", ...WEB_TOOLS, "bash"]);
 
 // the lean MCP schemas as the wire carries them in all mode, the count
 // the token cap reads whatever mode the send resolved to

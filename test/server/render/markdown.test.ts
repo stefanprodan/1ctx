@@ -79,6 +79,15 @@ describe("renderMarkdown", () => {
     expect(html).not.toContain("hljs-");
   });
 
+  test("a block without a language has no head, only its copy button", () => {
+    const html = renderMarkdown("```\n/tmp/work\n```");
+    expect(html).toStartWith(
+      '<div class="md-block md-block-bare"><pre class="md-pre"><code class="md-block-code">/tmp/work\n</code></pre><button type="button" class="md-copy"',
+    );
+    expect(html).not.toContain("md-block-head");
+    expect(html).not.toContain("data-lang");
+  });
+
   test("renders Mermaid as a plain code block", () => {
     const html = renderMarkdown("```mermaid\ngraph LR\nA --> B\n```");
     expect(html).toContain('<div class="md-block" data-lang="mermaid">');

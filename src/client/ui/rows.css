@@ -35,12 +35,18 @@
   }
   .rows-hint {
     margin-left: auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
   }
   .rows-add {
     margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   /* a head's filters: one segmented switch, the picked one filled */
   .rows-filters {
@@ -314,6 +320,73 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-3);
+  }
+  .rows-log {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    font-size: var(--text-small);
+    line-height: 20px;
+  }
+  .rows-log-group {
+    padding: 4px var(--space-3) 0;
+    color: var(--faint);
+    font-size: var(--text-label);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+  .rows-log-group:not(:first-child) {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .rows-log-line {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--space-3);
+    padding: 0 var(--space-3);
+  }
+  .rows-log-name {
+    flex: 1 1 120px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    color: var(--fg);
+  }
+  .rows-log-note {
+    max-width: 100%;
+    margin-left: auto;
+    text-align: right;
+    overflow-wrap: anywhere;
+    min-width: 0;
+    color: var(--faint);
+  }
+  .rows-log-running {
+    color: var(--running);
+  }
+  .rows-log-bad .rows-log-name,
+  .rows-log-bad .rows-log-note {
+    color: var(--failed);
+  }
+  .rows-log-more {
+    align-self: flex-start;
+    margin: 4px var(--space-3) 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--text-small);
+    cursor: pointer;
+  }
+  .rows-log-more:hover {
+    color: var(--fg);
   }
   .rows-list-hint {
     font-family: var(--mono);

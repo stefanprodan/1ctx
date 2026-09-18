@@ -43,7 +43,7 @@ export function sourceForm(text: string): SourceForm | null {
       };
     }
   }
-  if (/\.(tar\.gz|tgz|tar)$/i.test(path))
+  if (/\.(tar\.gz|tgz|tar|zip)$/i.test(path))
     return { kind: "archive", url: url.href };
   if (path === "" || path === "/") {
     return { kind: "index", url: `${url.origin}${INDEX_PATH}` };

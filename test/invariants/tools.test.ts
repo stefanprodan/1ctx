@@ -56,6 +56,7 @@ describe("tools administration", () => {
     expect(codeJson(tool.parametersHtml)).toEqual(tool.parameters);
     expect(tool.tokens).toBeGreaterThan(0);
     expect(body.builtin.map((t: { name: string }) => t.name)).toEqual([
+      "bash",
       "datetime",
       "mcp_call",
       "mcp_describe",
@@ -87,7 +88,7 @@ describe("tools administration", () => {
     expect(text).not.toContain("never-return-this-key");
     const body = JSON.parse(text);
     expect(body.web).toHaveLength(3);
-    expect(body.builtin).toHaveLength(8);
+    expect(body.builtin).toHaveLength(9);
     expect(body.search).toEqual({
       provider: null,
       keys: { exa: true, firecrawl: false, tavily: false },

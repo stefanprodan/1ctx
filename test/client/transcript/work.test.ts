@@ -96,6 +96,31 @@ function node(changes: Partial<WorkNode> = {}): WorkNode {
 }
 
 describe("work summaries", () => {
+  test.each([
+    ["tool_limit", "tool limit"],
+    ["token_limit", "token limit"],
+    ["context_limit", "context full"],
+    ["tool_loop", "tool loop"],
+  ])("names %s on the work row as %s", (finishReason, word) => {
+    const work = message({ finishReason });
+    const answer = message({
+      id: "answer-1",
+      slot: "answer",
+      finishReason: "length",
+      toolCalls: null,
+      createdAt: 61_000,
+    });
+    expect(capWord([work, answer])).toBe(word);
+    expect(capWord([answer])).toBeNull();
+    expect(
+      capWord([message({ kind: "tool", finishReason }), answer]),
+    ).toBeNull();
+    expect(workSummary(node({ rows: [work], answer }), false).text).toBe(
+      `Worked for 51 s · 1 tool, ${word}`,
+    );
+    expect(answer.finishReason).toBe("length");
+  });
+
   test("shuts only when a running send ends", () => {
     expect(workJustEnded(true, false)).toBeTrue();
     expect(workJustEnded(false, false)).toBeFalse();

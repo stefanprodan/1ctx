@@ -179,6 +179,7 @@ export function history(
     | "offered"
     | "projectMemory"
     | "automationMemory"
+    | "knowledge"
   >,
   lookups: ContextLookups,
   now: number,
@@ -339,8 +340,8 @@ export function summaryRequest(
 
 // the exhausted line the caps reached: it rides on a request-local copy
 // of the last tool result, never the stored row and never the system
-// prompt. The answer round keeps the schemas (tool_choice none is set
-// on the wire) so the cached prefix holds.
+// prompt. The answer round keeps the schemas untouched so the cached
+// prefix holds; this line is what asks for the answer.
 export const EXHAUSTED_LINE =
   "The tool budget is spent. Answer now with what the results gave you.";
 

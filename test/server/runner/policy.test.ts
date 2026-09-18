@@ -68,6 +68,7 @@ function policy(
     },
     now: 1,
     tools: null,
+    knowledge: { files: 0, recent: [] },
     limits: DEFAULT_LIMITS,
   });
 }
@@ -90,6 +91,7 @@ describe("send policy thinking", () => {
       agent,
       now: 1,
       tools: null,
+      knowledge: { files: 0, recent: [] },
       limits: DEFAULT_LIMITS,
       automation,
     });
@@ -101,6 +103,57 @@ describe("send policy thinking", () => {
     expect(policy({}).limits).toMatchObject({
       contextReserve: 20_000,
       summaryMaxTokens: 4096,
+    });
+  });
+
+  test("snapshots the tool-work and bash limits separately from later changes", () => {
+    const limits = {
+      ...DEFAULT_LIMITS,
+      rounds: 250,
+      toolWorkTokens: 750_000,
+      maxBashCalls: 200,
+    };
+    const send = buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent,
+      now: 1,
+      tools: null,
+      knowledge: { files: 0, recent: [] },
+      limits,
+    });
+    limits.rounds = 20;
+    limits.toolWorkTokens = 50_000;
+    limits.maxBashCalls = 10;
+    expect(send.limits).toMatchObject({
+      rounds: 250,
+      toolWorkTokens: 750_000,
+    });
+    expect(send.toolCaps.maxBashCalls).toBe(200);
+    expect(send.limits).not.toHaveProperty("maxBashCalls");
+    expect(send.toolCaps).not.toHaveProperty("toolWorkTokens");
+  });
+
+  test("copies the knowledge count and recent files without tools", () => {
+    const knowledge = {
+      files: 1,
+      recent: [{ name: "docs/x.md", author: "coder", updatedAt: 1 }],
+    };
+    const send = buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent,
+      now: 1,
+      tools: null,
+      limits: DEFAULT_LIMITS,
+      knowledge,
+    });
+    knowledge.files = 2;
+    knowledge.recent[0]!.name = "changed.md";
+    knowledge.recent.push({ name: "new.md", author: "ana", updatedAt: 2 });
+    expect(send.knowledge).toEqual({
+      files: 1,
+      recent: [{ name: "docs/x.md", author: "coder", updatedAt: 1 }],
     });
   });
 

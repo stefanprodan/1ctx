@@ -32,9 +32,11 @@ export type ToolCall = {
 
 // when a send carries a built-in: always, when the agent has skills,
 // when one of them has files, when MCP runs as a catalog, in a project
-// memory task, or in a project memory task and an own-note phase
+// memory task, in a project memory task and an own-note phase, or in
+// every send of a project for the knowledge base
 export type ToolWhen =
   | "always"
+  | "knowledge"
   | "skills"
   | "skillFiles"
   | "mcpCatalog"

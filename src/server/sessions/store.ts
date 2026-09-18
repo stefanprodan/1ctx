@@ -36,7 +36,7 @@ import {
   type MemorySnapshot,
   memorySnapshot as readMemorySnapshot,
 } from "./memory.ts";
-import { addAgentMessage } from "./messages.ts";
+import { addAgentMessage, finishReply } from "./messages.ts";
 import { titleFrom } from "./parse.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -348,33 +348,16 @@ export class SessionStore {
   }
 
   finishReply(id: string, fields: ReplyFinish): Message | null {
+    return finishReply(this.db, id, fields) ? this.message(id) : null;
+  }
+
+  capWork(id: string, finishReason: string): Message | null {
     const changed =
       this.db
         .query(
-          `update messages set content = ?, reasoning = ?, reasoning_details = ?, html = ?,
-           status = ?, error = ?, finish_reason = ?, slot = ?, tool_calls = ?,
-           ttft_ms = ?, thinking_ms = ?, finished_at = ?
-         where id = ? and status = 'streaming'`,
+          "update messages set finish_reason = ? where id = ? and kind = 'reply' and slot = 'work' and status = 'done'",
         )
-        .run(
-          fields.content,
-          fields.reasoning,
-          fields.reasoningDetails.length > 0
-            ? JSON.stringify(fields.reasoningDetails)
-            : null,
-          fields.html,
-          fields.status,
-          fields.error,
-          fields.finishReason,
-          fields.slot,
-          fields.toolCalls && fields.toolCalls.length > 0
-            ? JSON.stringify(fields.toolCalls)
-            : null,
-          fields.ttftMs,
-          fields.thinkingMs,
-          fields.finishedAt,
-          id,
-        ).changes > 0;
+        .run(finishReason, id).changes > 0;
     return changed ? this.message(id) : null;
   }
 

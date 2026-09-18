@@ -204,7 +204,7 @@ describe("Gemini catalog", () => {
 
 describe("Gemini chat body", () => {
   test("keeps accepted fields and schemas but drops cache and plain thinking fields", () => {
-    const body = buildChatBody({ ...request, toolChoice: "none" });
+    const body = buildChatBody(request);
     expect(body).toEqual({
       model: request.model,
       messages: request.messages,
@@ -217,7 +217,6 @@ describe("Gemini chat body", () => {
         type: "function",
         function: tool,
       })),
-      tool_choice: "none",
       extra_body: { google: { thinking_config: { include_thoughts: true } } },
     });
     expect(isWire("gemini")).toBe(true);

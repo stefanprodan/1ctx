@@ -60,11 +60,12 @@ function skillsPort(offered: OfferedSkill[] = []): SkillsPort {
 }
 
 function budget(): ToolBudget {
-  return { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 };
+  return { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 };
 }
 
 function context(shared: ToolBudget = budget()): ToolContext {
   return {
+    actor: null,
     signal: new AbortController().signal,
     now: () => now,
     budget: shared,
@@ -116,12 +117,12 @@ describe("formatDatetime", () => {
 });
 
 describe("offered", () => {
-  test("offers time, webfetch and visualize, websearch once chosen", () => {
+  test("offers time, webfetch, visualize and bash, websearch once chosen", () => {
     expect(
       area()
         .offered(now, "")
         .tools.map((tool) => tool.name),
-    ).toEqual(["datetime", "webfetch", "visualize"]);
+    ).toEqual(["datetime", "webfetch", "visualize", "bash"]);
     expect(area().offered(now, "").search).toBeNull();
 
     const withExa = area({ "search-exa": "exa-key" }, "exa").offered(now, "");
@@ -130,6 +131,7 @@ describe("offered", () => {
       "webfetch",
       "websearch",
       "visualize",
+      "bash",
     ]);
     expect(withExa.search).toBe("exa");
     // a chosen provider without its key file still answers, keyless
@@ -147,6 +149,7 @@ describe("offered", () => {
     expect(tools.offered(now, "").tools.map((tool) => tool.name)).toEqual([
       "datetime",
       "visualize",
+      "bash",
     ]);
   });
 
@@ -238,6 +241,7 @@ describe("the built-in catalog", () => {
 
   test("says when a send carries each, and memory_edit's own-note text", () => {
     expect(Object.fromEntries(catalog.map((t) => [t.name, t.when]))).toEqual({
+      bash: "knowledge",
       datetime: "always",
       skill: "skills",
       skill_file: "skillFiles",
@@ -401,6 +405,14 @@ describe("skill tools from the required skills port", () => {
   test("offers skill with the catalog enum and skill_file when a skill has files", () => {
     const tools = area({}, null, skillsPort(catalog)).offered(now, "agent");
     const skill = tools.tools.find((tool) => tool.name === "skill")!;
+    expect(tools.tools.map((tool) => tool.name)).toEqual([
+      "datetime",
+      "webfetch",
+      "visualize",
+      "bash",
+      "skill",
+      "skill_file",
+    ]);
     expect(
       (
         skill.parameters as {

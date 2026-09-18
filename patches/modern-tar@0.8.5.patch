@@ -1,0 +1,25 @@
+diff --git a/dist/packer-kJPaRbFA.js b/dist/packer-kJPaRbFA.js
+index 394ca0bdf231de709efd6062f53fc2962f472aa7..4c4c3d7784dca3f0d7e031ff22dfad6efe4b83b1 100644
+--- a/dist/packer-kJPaRbFA.js
++++ b/dist/packer-kJPaRbFA.js
+@@ -359,6 +359,7 @@ function parseUstarHeader(block, strict) {
+ 		size: readNumeric(block, 124, 12),
+ 		mtime: /* @__PURE__ */ new Date(readNumeric(block, 136, 12) * 1e3),
+ 		type: FLAGTYPE[typeflag] || "file",
++		typeflag,
+ 		linkname: readString(block, 157, 100)
+ 	};
+ 	const magic = readString(block, 257, 6);
+diff --git a/dist/types-D-Ho0iSu.d.ts b/dist/types-D-Ho0iSu.d.ts
+index f070101af323befb6c265076cb4569eb71b96e28..4f5faad087b80a057b308b3c5e38bb97b5f45a58 100644
+--- a/dist/types-D-Ho0iSu.d.ts
++++ b/dist/types-D-Ho0iSu.d.ts
+@@ -29,6 +29,8 @@ interface TarHeader {
+   mode?: number;
+   /** Entry type. Defaults to "file" if not specified. */
+   type?: keyof typeof TYPEFLAG;
++  /** Raw decoded type flag, including unknown types such as GNU sparse ("S"). */
++  typeflag?: string;
+   /** User ID of the entry owner. */
+   uid?: number;
+   /** Group ID of the entry owner. */

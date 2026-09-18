@@ -5,6 +5,7 @@
 // and the page with its members.
 
 import type { ProjectKind } from "../words.ts";
+import type { KnowledgeCounts } from "./knowledge.ts";
 import type { UserSummary } from "./user.ts";
 
 export type ProjectSummary = {
@@ -21,4 +22,6 @@ export type ProjectDetail = ProjectSummary & {
   description: string;
   members: UserSummary[];
   chats: number;
+  // the knowledge base, for the aside and the tab's count
+  knowledge: KnowledgeCounts;
 };

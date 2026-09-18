@@ -88,6 +88,7 @@ const detail: ProjectDetail = {
   description: "",
   members: [caelea],
   chats: 3,
+  knowledge: { files: 0, tokens: 0 },
 };
 
 const realFetch = globalThis.fetch;

@@ -17,6 +17,7 @@ export type LoopLimits = {
   callsPerSend: number;
   toolMs: number;
   resultBytes: number;
+  toolWorkTokens: number;
   contextReserve: number;
   summaryMaxTokens: number;
   memoryPhaseMs: number;
@@ -26,6 +27,7 @@ export type LoopLimits = {
 export type ToolCaps = {
   callTimeoutMs: number;
   resultCut: number;
+  maxBashCalls: number;
   maxFetches: number;
   maxSearches: number;
   fetchBodyBytes: number;
@@ -37,8 +39,23 @@ export type ToolCaps = {
   maxVisuals: number;
 };
 
+// the storage caps of a project's knowledge base and a session's scratch,
+// read at each write
+export type KnowledgeCaps = {
+  knowledgeFileBytes: number;
+  knowledgeFiles: number;
+  knowledgeProjectBytes: number;
+  knowledgeVersions: number;
+  knowledgeHistoryBytes: number;
+  knowledgeHistoryDays: number;
+  scratchBytes: number;
+  scratchFiles: number;
+  scratchIdleDays: number;
+};
+
 export type Limits = LoopLimits &
-  ToolCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  ToolCaps &
+  KnowledgeCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -49,7 +66,7 @@ export type LimitDefinition = {
 };
 
 export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
-  rounds: { default: 10, min: 1, max: 50, unit: "count", scope: "send" },
+  rounds: { default: 100, min: 1, max: 500, unit: "count", scope: "send" },
   callsPerRound: {
     default: 10,
     min: 1,
@@ -76,6 +93,13 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     min: 64 * 1024,
     max: 32 * 1024 * 1024,
     unit: "bytes",
+    scope: "send",
+  },
+  toolWorkTokens: {
+    default: 500_000,
+    min: 10_000,
+    max: 10_000_000,
+    unit: "tokens",
     scope: "send",
   },
   contextReserve: {
@@ -118,6 +142,13 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     min: 1000,
     max: 500_000,
     unit: "chars",
+    scope: "call",
+  },
+  maxBashCalls: {
+    default: 100,
+    min: 1,
+    max: 1000,
+    unit: "count",
     scope: "call",
   },
   maxFetches: {
@@ -197,6 +228,69 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     unit: "count",
     scope: "call",
   },
+  knowledgeFileBytes: {
+    default: 256 * 1024,
+    min: 4 * 1024,
+    max: 4 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  knowledgeFiles: {
+    default: 500,
+    min: 1,
+    max: 10_000,
+    unit: "count",
+    scope: "knowledge",
+  },
+  knowledgeProjectBytes: {
+    default: 16 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  knowledgeVersions: {
+    default: 20,
+    min: 1,
+    max: 200,
+    unit: "count",
+    scope: "knowledge",
+  },
+  knowledgeHistoryBytes: {
+    default: 64 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 1024 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  knowledgeHistoryDays: {
+    default: 90,
+    min: 1,
+    max: 3650,
+    unit: "days",
+    scope: "knowledge",
+  },
+  scratchBytes: {
+    default: 16 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  scratchFiles: {
+    default: 1000,
+    min: 10,
+    max: 10_000,
+    unit: "count",
+    scope: "knowledge",
+  },
+  scratchIdleDays: {
+    default: 7,
+    min: 1,
+    max: 90,
+    unit: "days",
+    scope: "knowledge",
+  },
 };
 
 export const DEFAULT_LIMITS = Object.fromEntries(
@@ -212,6 +306,7 @@ export const LOOP_LIMITS: LoopLimits = {
   callsPerSend: DEFAULT_LIMITS.callsPerSend,
   toolMs: DEFAULT_LIMITS.toolMs,
   resultBytes: DEFAULT_LIMITS.resultBytes,
+  toolWorkTokens: DEFAULT_LIMITS.toolWorkTokens,
   contextReserve: DEFAULT_LIMITS.contextReserve,
   summaryMaxTokens: DEFAULT_LIMITS.summaryMaxTokens,
   memoryPhaseMs: DEFAULT_LIMITS.memoryPhaseMs,
@@ -221,6 +316,7 @@ export const LOOP_LIMITS: LoopLimits = {
 export const TOOL_CAPS: ToolCaps = {
   callTimeoutMs: DEFAULT_LIMITS.callTimeoutMs,
   resultCut: DEFAULT_LIMITS.resultCut,
+  maxBashCalls: DEFAULT_LIMITS.maxBashCalls,
   maxFetches: DEFAULT_LIMITS.maxFetches,
   maxSearches: DEFAULT_LIMITS.maxSearches,
   fetchBodyBytes: DEFAULT_LIMITS.fetchBodyBytes,

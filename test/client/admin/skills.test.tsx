@@ -122,6 +122,7 @@ describe("the form", () => {
       "github",
     );
     expect(formKind("https://example.com/skill.tar.gz")).toBe("archive");
+    expect(formKind("https://example.com/skill.zip")).toBe("archive");
     expect(formKind("https://timoni.sh")).toBe("index");
     expect(formKind("https://timoni.sh/.well-known/index.json")).toBe("index");
     expect(formKind("https://timoni.sh/skills/timoni/SKILL.md")).toBe("file");
@@ -413,7 +414,9 @@ describe("the page", () => {
     skills.value = [];
     const html = render(<SkillForm onDone={() => {}} />);
     expect(html).toContain('name="url"');
-    expect(html).toContain("a GitHub directory, a raw SKILL.md, or a tarball");
+    expect(html).toContain(
+      "a GitHub directory, a raw SKILL.md, or a zip or tar archive",
+    );
     expect(html).toContain("Add skill");
     expect(html).not.toContain('name="path"');
   });
