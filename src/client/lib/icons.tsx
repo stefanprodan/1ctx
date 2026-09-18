@@ -3,7 +3,7 @@
 //
 // The inline SVGs: the mark and the logo from the brand book, and the
 // 16 px stroke icons, one style. A colour comes from currentColor; the
-// sparkle is always brand amber.
+// sparkle is the brand book's amber for the theme's ground.
 
 const SPARKLE =
   "M19.5 1.0C19.5 2.925 21.075 4.5 23.0 4.5C21.075 4.5 19.5 6.075 19.5 8.0C19.5 6.075 17.925 4.5 16.0 4.5C17.925 4.5 19.5 2.925 19.5 1.0Z";
@@ -26,7 +26,7 @@ export function Mark({ size = 24 }: { size?: number }) {
     >
       <path d="M13.5 4H11C6.757 4 4.636 4 3.318 5.318S2 8.758 2 13s0 6.364 1.318 7.682S6.758 22 11 22s6.364 0 7.682-1.318S20 17.242 20 13v-2.5" />
       <path d="M8.75 11.25 11.5 8.75V17.5" />
-      <path fill="var(--brand)" stroke="none" d={SPARKLE} />
+      <path fill="var(--sparkle)" stroke="none" d={SPARKLE} />
     </svg>
   );
 }
@@ -54,7 +54,7 @@ export function Logo({ height = 26 }: { height?: number }) {
           d="M126.19 0H18.72A18.72 18.72 0 0 0 0 18.72V53.28A18.72 18.72 0 0 0 18.72 72H133.47A18.72 18.72 0 0 0 152.19 53.28V26"
         />
         <path
-          fill="var(--brand)"
+          fill="var(--sparkle)"
           stroke="none"
           transform="translate(74.19 -18) scale(4)"
           d={SPARKLE}
@@ -114,6 +114,7 @@ const PATHS: Record<string, string> = {
   bolt: "M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z",
   play: "M5 3.5v9l7-4.5z",
   pause: "M5.5 3.5v9M10.5 3.5v9",
+  moon: "M13.5 9.6A5.75 5.75 0 1 1 6.4 2.5a4.6 4.6 0 0 0 7.1 7.1z",
   tools:
     "M10 2.5a3.5 3.5 0 0 0-4.2 4.6L2.5 10.4l3.1 3.1 3.3-3.3a3.5 3.5 0 0 0 4.6-4.2L11.3 8.2 7.8 4.7z",
   skill: "M4 2.5h5.5L13 6v7.5H4zM9.5 2.5V6H13M6.5 9h3M6.5 11.5h3",

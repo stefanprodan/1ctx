@@ -235,6 +235,11 @@
     color: var(--fg);
   }
 
+  /* the theme's switch at the end of its row */
+  .rail-menu-switch {
+    margin-left: auto;
+  }
+
   .rail-menu-error {
     margin: var(--space-1) 10px var(--space-1);
   }

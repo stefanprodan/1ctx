@@ -105,11 +105,11 @@ export function RowsSwitch({
       role="switch"
       aria-checked={on}
       aria-label={`${label} ${on ? "on" : "off"}`}
-      class={`rows-switch${on ? " rows-switch-on" : ""}`}
+      class={`switch${on ? " switch-on" : ""}`}
       disabled={disabled}
       onClick={onClick}
     >
-      <span class="rows-switch-knob" />
+      <span class="switch-knob" />
     </button>
   );
 }

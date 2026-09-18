@@ -4,8 +4,8 @@
 // The rail: the logo with the button that hides it, the pages the route
 // table lists with the user's projects under Projects, personal first,
 // a group as a row that opens to its pages, open while one is shown,
-// and the user row at the bottom with its menu: the profile and sign
-// out. A sign out the server refuses stays in the menu with the
+// and the user row at the bottom with its menu: the profile, the dark
+// theme's switch and sign out. A sign out the server refuses stays in the menu with the
 // reason. As a drawer the hide button is a close, it takes the focus
 // when the drawer opens, and any link closes the drawer, the one to the
 // page already shown included, since that is no navigation.
@@ -23,6 +23,7 @@ import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
 import { onPage, projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
+import { theme, toggleTheme } from "./theme.ts";
 import "./rail.css";
 
 function Sub({
@@ -206,6 +207,21 @@ export function Rail({
               <Icon name="user" size={14} />
               <span>Profile</span>
             </a>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={theme.value === "dark"}
+              class="rail-menu-item"
+              onClick={toggleTheme}
+            >
+              <Icon name="moon" size={14} />
+              <span>Dark theme</span>
+              <span
+                class={`rail-menu-switch switch${theme.value === "dark" ? " switch-on" : ""}`}
+              >
+                <span class="switch-knob" />
+              </span>
+            </button>
             <button
               type="button"
               class="rail-menu-item"

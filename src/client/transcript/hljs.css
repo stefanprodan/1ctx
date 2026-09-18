@@ -4,7 +4,7 @@
   .hljs-comment,
   .hljs-quote,
   .hljs-meta {
-    color: var(--faint);
+    color: var(--code-comment);
     font-style: italic;
   }
 
@@ -13,7 +13,7 @@
   .hljs-doctag,
   .hljs-name,
   .hljs-tag {
-    color: var(--brand);
+    color: var(--code-keyword);
   }
 
   .hljs-string,
@@ -22,7 +22,7 @@
   .hljs-addition,
   .hljs-template-tag,
   .hljs-subst {
-    color: var(--done);
+    color: var(--code-string);
   }
 
   .hljs-number,
@@ -30,7 +30,7 @@
   .hljs-symbol,
   .hljs-bullet,
   .hljs-link {
-    color: var(--brand-hover);
+    color: var(--code-number);
   }
 
   .hljs-title,
@@ -46,7 +46,7 @@
   .hljs-selector-pseudo,
   .hljs-variable,
   .hljs-template-variable {
-    color: var(--running);
+    color: var(--code-title);
   }
 
   .hljs-deletion {
