@@ -226,6 +226,10 @@ violation, and every rule has a rejected fixture under
   cascade with the session. Writes use the caller's transaction and
   check the scratch revision. Its sweep skips the sessions a
   command holds.
+  The knowledge limits scope also holds `scratchBytes`, `scratchFiles`
+  and `scratchIdleDays`. The project byte ceiling is 64 MiB; stored
+  overrides are clamped to their ranges for both effective limits and
+  the Limits tab.
   The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
   so best-effort hardening runs; sqlite3's unpatched worker stays out.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the

@@ -9,7 +9,7 @@
 
 import type { LimitsResponse } from "../../shared/api/limits.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
-import { LIMIT_NAMES } from "../../shared/words.ts";
+import { LIMIT_NAMES, type LimitName } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
@@ -41,11 +41,18 @@ export type LimitsArea = {
   reset(): void;
 };
 
+function effectiveValue(name: LimitName, override?: number): number {
+  const entry = LIMIT_DEFINITIONS[name];
+  return Math.max(entry.min, Math.min(entry.max, override ?? entry.default));
+}
+
 export function limitsArea(deps: LimitsDeps): LimitsArea {
   const store = new LimitStore(deps.db);
   const current = (): Limits => {
     const values = { ...DEFAULT_LIMITS };
-    for (const override of store.rows()) values[override.name] = override.value;
+    for (const override of store.rows()) {
+      values[override.name] = effectiveValue(override.name, override.value);
+    }
     return values;
   };
   const rows = (): LimitRow[] => {
@@ -55,7 +62,7 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
       const override = overrides.get(name);
       return {
         name,
-        value: override?.value ?? entry.default,
+        value: effectiveValue(name, override?.value),
         default: entry.default,
         min: entry.min,
         max: entry.max,

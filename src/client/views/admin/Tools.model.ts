@@ -133,6 +133,18 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "History days",
     text: "How long a deleted file's versions are kept.",
   },
+  scratchBytes: {
+    label: "Scratch size",
+    text: "Bytes a session's scratch files may hold together.",
+  },
+  scratchFiles: {
+    label: "Scratch files",
+    text: "Scratch files a session may hold.",
+  },
+  scratchIdleDays: {
+    label: "Scratch idle days",
+    text: "How long an unused session scratch is kept.",
+  },
 };
 
 // when a send carries a built-in, over its description

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { withSaved } from "../../../src/client/views/admin/Tools.model.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
   DEFAULT_LIMITS,
@@ -9,10 +10,109 @@ import {
   limitsArea,
 } from "../../../src/server/limits/index.ts";
 import { parseLimits } from "../../../src/server/limits/parse.ts";
+import type { LimitsResponse } from "../../../src/shared/api/limits.ts";
+import { testApp } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 describe("limits area", () => {
-  test("round-trips all six knowledge caps with their scope and units", () => {
+  test.each([
+    {
+      name: "scratchBytes",
+      default: 16 * 1024 * 1024,
+      min: 1024 * 1024,
+      max: 64 * 1024 * 1024,
+      unit: "bytes",
+    },
+    {
+      name: "scratchFiles",
+      default: 1000,
+      min: 10,
+      max: 10_000,
+      unit: "count",
+    },
+    { name: "scratchIdleDays", default: 7, min: 1, max: 90, unit: "days" },
+  ])("defines the scratch limit %p", ({ name, ...definition }) => {
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100 });
+      expect(area.rows().find((row) => row.name === name)).toEqual({
+        name,
+        ...definition,
+        scope: "knowledge",
+        value: definition.default,
+        changedAt: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  test.each([
+    { stored: 256 * 1024 * 1024, effective: 64 * 1024 * 1024 },
+    { stored: 1, effective: 1024 * 1024 },
+    { stored: 32 * 1024 * 1024, effective: 32 * 1024 * 1024 },
+  ])(
+    "uses the same bounded value for both reads: %p",
+    ({ stored, effective }) => {
+      const db = memoryDb();
+      try {
+        const area = limitsArea({ db, clock: () => 100 });
+        area.store.set("knowledgeProjectBytes", stored, 50);
+        expect(area.current().knowledgeProjectBytes).toBe(effective);
+        expect(
+          area.rows().find((row) => row.name === "knowledgeProjectBytes"),
+        ).toMatchObject({
+          value: effective,
+          min: 1024 * 1024,
+          max: 64 * 1024 * 1024,
+          changedAt: 50,
+        });
+        expect(area.store.rows()).toEqual([
+          { name: "knowledgeProjectBytes", value: stored, changedAt: 50 },
+        ]);
+      } finally {
+        db.close();
+      }
+    },
+  );
+
+  test("saves another scope when a stored override exceeds its ceiling", async () => {
+    const app = await testApp();
+    try {
+      const area = limitsArea({ db: app.db, clock: () => app.now.value });
+      area.store.set("knowledgeProjectBytes", 256 * 1024 * 1024, 50);
+      const admin = app.client();
+      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+      const response = await admin.call("GET", "/api/limits");
+      expect(response.status).toBe(200);
+      const { limits }: LimitsResponse = await response.json();
+      const values = withSaved(limits, "send", { rounds: 12 });
+      const saved = await admin.call("PUT", "/api/limits", {
+        body: { values },
+      });
+      expect(saved.status).toBe(200);
+      const body: LimitsResponse = await saved.json();
+      expect(body.limits).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "rounds", value: 12 }),
+          expect.objectContaining({
+            name: "knowledgeProjectBytes",
+            value: 64 * 1024 * 1024,
+          }),
+        ]),
+      );
+      expect(area.current()).toEqual({
+        ...DEFAULT_LIMITS,
+        rounds: 12,
+        knowledgeProjectBytes: 64 * 1024 * 1024,
+      });
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
+  test("round-trips all nine knowledge caps with their scope and units", () => {
     const db = memoryDb();
     try {
       const area = limitsArea({ db, clock: () => 100 });
@@ -24,16 +124,20 @@ describe("limits area", () => {
         knowledgeVersions: 1,
         knowledgeHistoryBytes: 1024 * 1024,
         knowledgeHistoryDays: 1,
+        scratchBytes: 1024 * 1024,
+        scratchFiles: 10,
+        scratchIdleDays: 1,
       };
       expect(parseLimits({ values })).toEqual({ values });
       area.set(values, 100);
       expect(area.current()).toEqual(values);
       const rows = area.rows().filter((row) => row.scope === "knowledge");
-      expect(rows).toHaveLength(6);
+      expect(rows).toHaveLength(9);
       expect(
         rows.find((row) => row.name === "knowledgeHistoryDays")?.unit,
       ).toBe("days");
       for (const row of rows) {
+        expect(row.value).toBe(values[row.name]);
         expect(() =>
           parseLimits({ values: { ...values, [row.name]: row.min - 1 } }),
         ).toThrow(BadRequest);

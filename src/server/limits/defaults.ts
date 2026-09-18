@@ -37,7 +37,8 @@ export type ToolCaps = {
   maxVisuals: number;
 };
 
-// the storage caps of a project's knowledge base, read at each write
+// the storage caps of a project's knowledge base and a session's scratch,
+// read at each write
 export type KnowledgeCaps = {
   knowledgeFileBytes: number;
   knowledgeFiles: number;
@@ -45,6 +46,9 @@ export type KnowledgeCaps = {
   knowledgeVersions: number;
   knowledgeHistoryBytes: number;
   knowledgeHistoryDays: number;
+  scratchBytes: number;
+  scratchFiles: number;
+  scratchIdleDays: number;
 };
 
 export type Limits = LoopLimits &
@@ -225,7 +229,7 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   knowledgeProjectBytes: {
     default: 16 * 1024 * 1024,
     min: 1024 * 1024,
-    max: 256 * 1024 * 1024,
+    max: 64 * 1024 * 1024,
     unit: "bytes",
     scope: "knowledge",
   },
@@ -247,6 +251,27 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     default: 90,
     min: 1,
     max: 3650,
+    unit: "days",
+    scope: "knowledge",
+  },
+  scratchBytes: {
+    default: 16 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  scratchFiles: {
+    default: 1000,
+    min: 10,
+    max: 10_000,
+    unit: "count",
+    scope: "knowledge",
+  },
+  scratchIdleDays: {
+    default: 7,
+    min: 1,
+    max: 90,
     unit: "days",
     scope: "knowledge",
   },

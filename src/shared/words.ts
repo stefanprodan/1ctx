@@ -392,6 +392,9 @@ export const LIMIT_NAMES = [
   "knowledgeVersions",
   "knowledgeHistoryBytes",
   "knowledgeHistoryDays",
+  "scratchBytes",
+  "scratchFiles",
+  "scratchIdleDays",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {
