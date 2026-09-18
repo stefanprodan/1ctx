@@ -8,11 +8,10 @@
 // websocket handlers hand each connection to the socket module.
 
 import type { HTMLBundle, ServerWebSocket } from "bun";
+import { MAX_REQUEST_BYTES } from "../lib/body.ts";
 import { lastForwarded, type Router } from "./router.ts";
 import type { Conn, ConnData } from "./socket.ts";
 
-// well past any JSON body; uploads will get their own path and cap
-export const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 // a tab that cannot keep up with a stream is closed and reconnects,
 // rather than growing a buffer per connection
 export const BACKPRESSURE_LIMIT = 1024 * 1024;

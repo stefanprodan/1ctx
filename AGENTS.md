@@ -145,10 +145,11 @@ violation, and every rule has a rejected fixture under
   never downgraded (`--trust-proxy` reads the scheme and the client
   address from the proxy's `X-Forwarded-*`). Every request body and
   parameter goes through a hand-written parser that throws a 400 on
-  anything unexpected; a body is read through `readBody()` with a cap,
-  never `req.json()`. The login rate limit is a fixed window per
-  address with a cap on addresses, constant memory per key. Every new
-  route gets a row in
+  anything unexpected; a body is read through `readBody()` or
+  `readBytes()` with a cap, never `req.json()`. The listener ceiling is
+  32 MiB; each route keeps its own cap. The login rate limit is a fixed
+  window per address with a cap on addresses, constant memory per key.
+  Every new route gets a row in
   `test/helpers/auth-cases.ts` or the access suite fails; the matrix is
   checked against the composed route list, health included.
 - **Logins, not sessions.** The cookie is `login`, HttpOnly, SameSite=Lax,
