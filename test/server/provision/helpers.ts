@@ -9,6 +9,8 @@ import type { TestApp } from "../../helpers/app.ts";
 import { mcpFetch } from "../mcp/fake.ts";
 
 export const MODEL_URL = "http://models.test/v1";
+// a strict server whose catalog lists only ids
+export const BARE_URL = "http://bare.test/v1";
 export const SKILL_URL = "https://skills.test/SKILL.md";
 export const MCP_URL = "https://mcp.test/mcp";
 export const INDEX_URL = "https://index.test";
@@ -119,6 +121,14 @@ export function network() {
           displayName: id,
           inputTokenLimit: 32_768,
           supportedGenerationMethods: ["generateContent"],
+        })),
+      });
+    }
+    if (url === `${BARE_URL}/models`) {
+      return Response.json({
+        data: ["bare-model", "bare-model-next"].map((id) => ({
+          id,
+          object: "model",
         })),
       });
     }

@@ -97,12 +97,14 @@ describe("Gemini catalog", () => {
       completionPrice: null,
       tools: true,
       reasoning: true,
+      described: true,
     });
     expect(models[2]).toMatchObject({
       name: "Gemma 4 31B IT",
       contextLength: 262144,
       tools: true,
       reasoning: true,
+      described: true,
     });
     expect(
       models.every(
@@ -166,6 +168,7 @@ describe("Gemini catalog", () => {
         completionPrice: null,
         tools: true,
         reasoning: false,
+        described: true,
       },
     ]);
     expect(parseCatalog(null)).toEqual([]);

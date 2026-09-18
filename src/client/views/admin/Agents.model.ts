@@ -23,12 +23,15 @@ import {
   EFFORTS,
   type Effort,
   isEffort,
+  MAX_CONTEXT_LENGTH,
+  MIN_CONTEXT_LENGTH,
   type Wire,
 } from "../../../shared/words.ts";
 
-// what New provider offers: any server speaking the plain OpenAI chat
-// shape, whose address is typed, then OpenRouter and Google AI Studio,
-// whose addresses are known
+// what New provider offers: a server speaking the OpenAI chat shape with
+// the local servers' extra fields, or one that refuses anything outside
+// the spec, whose addresses are typed, then OpenRouter and Google AI
+// Studio, whose addresses are known
 export type Preset = {
   wire: Wire;
   label: string;
@@ -41,8 +44,15 @@ export type Preset = {
 export const PRESETS: Preset[] = [
   {
     wire: "openai-compatible",
-    label: "OpenAI-compatible server",
-    text: "GPT, mlx-serve, llama-server, vLLM, Ollama: any /chat/completions.",
+    label: "OpenAI-compatible",
+    text: "mlx-serve, oMLX, llama-server, Ollama",
+    baseUrl: null,
+    name: "",
+  },
+  {
+    wire: "openai-strict",
+    label: "OpenAI-strict",
+    text: "GPT, Nvidia NIM, vLLM, Groq",
     baseUrl: null,
     name: "",
   },
@@ -95,6 +105,7 @@ export function agentFieldOf(message: string): string | undefined {
   if (message.startsWith("model") || message.includes(" does not list "))
     return "model";
   if (message.startsWith("prompt")) return "prompt";
+  if (message.startsWith("contextLength")) return "contextLength";
   return undefined;
 }
 
@@ -135,11 +146,19 @@ export function defaultThinking(model: CatalogMatch | null): "on" | "off" {
 
 export type Choice<T> = { value: T; label: string };
 
+// a catalog that does not describe the model does not say whether it
+// thinks, so its default names no side
 export function thinkingChoices(
   model: CatalogMatch | null,
 ): Choice<"on" | "off" | null>[] {
   return [
-    { value: null, label: `Default (${defaultThinking(model)})` },
+    {
+      value: null,
+      label:
+        model !== null && !model.described
+          ? "Default"
+          : `Default (${defaultThinking(model)})`,
+    },
     { value: "on", label: "On" },
     { value: "off", label: "Off" },
   ];
@@ -231,4 +250,67 @@ export function listedServers(
   return rows === null
     ? links
     : links.filter((s) => rows.some((r) => r.id === s.serverId));
+}
+
+// the window an admin types for a model its catalog does not describe:
+// the problem, or null. Empty is no window, allowed without tools
+export function contextProblem(value: string, tools: boolean): string | null {
+  const v = value.trim().replaceAll(/[,_ ]/g, "");
+  if (v === "") return tools ? "Enter the context window" : null;
+  const n = Number(v);
+  if (
+    !Number.isInteger(n) ||
+    n < MIN_CONTEXT_LENGTH ||
+    n > MAX_CONTEXT_LENGTH
+  ) {
+    return `Enter a whole number from ${MIN_CONTEXT_LENGTH} to ${MAX_CONTEXT_LENGTH}`;
+  }
+  return null;
+}
+
+// the typed window as the body carries it, null when empty
+export function contextValue(value: string): number | null {
+  const v = value.trim().replaceAll(/[,_ ]/g, "");
+  return v === "" ? null : Number(v);
+}
+
+// what the save sends for the model: the stated window and tools flag
+// only for a model the catalog does not describe, since the server
+// refuses them for one it does
+export function statedFields(
+  model: CatalogMatch | null,
+  contextLength: string,
+  tools: boolean,
+): { contextLength?: number | null; tools?: boolean } {
+  if (model === null || model.described) return {};
+  return { contextLength: contextValue(contextLength), tools };
+}
+
+// the pick as a send would see it: for a model the catalog does not
+// describe, the typed window when it is a valid one and the tools flag
+export function statedModel(
+  model: CatalogMatch | null,
+  contextLength: string,
+  tools: boolean,
+): CatalogMatch | null {
+  if (model === null || model.described) return model;
+  return {
+    ...model,
+    contextLength:
+      contextProblem(contextLength, false) === null
+        ? contextValue(contextLength)
+        : null,
+    tools,
+  };
+}
+
+// the window's problem for a model the catalog does not describe, and
+// none for one it does, since then the form asks nothing
+export function statedProblem(
+  model: CatalogMatch | null,
+  contextLength: string,
+  tools: boolean,
+): string | null {
+  if (model === null || model.described) return null;
+  return contextProblem(contextLength, tools);
 }

@@ -74,6 +74,7 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       completionPrice: null,
       tools: true,
       reasoning: model.thinking === true,
+      described: true,
     });
   }
   // Google lists oldest first; the search keeps catalog order within a

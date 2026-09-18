@@ -10,7 +10,7 @@ import {
   Catalogs,
   type ProviderRow,
 } from "../../src/server/providers/index.ts";
-import { fakeFetch, PROVIDER_URL, testApp } from "../helpers/app.ts";
+import { fakeFetch, NIM_URL, PROVIDER_URL, testApp } from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
 
 const setup = async () => {
@@ -38,6 +38,7 @@ const flash = {
   completionPrice: 0.6,
   tools: true,
   reasoning: true,
+  described: true,
 };
 
 const defaults = {
@@ -454,4 +455,123 @@ describe("the agents", () => {
       (await client.call("DELETE", `/api/agents/${agent.id}`)).status,
     ).toBe(404);
   });
+});
+
+describe("a model its catalog does not describe", () => {
+  const ULTRA = "nvidia/nemotron-3-ultra-550b-a55b";
+  const nim = async () => {
+    const { app, client, provider: router } = await setup();
+    const { provider } = await (
+      await client.call("POST", "/api/providers", {
+        body: {
+          name: "nvidia",
+          wire: "openai-strict",
+          baseUrl: NIM_URL,
+          keyName: null,
+        },
+      })
+    ).json();
+    const save = (body: Record<string, unknown>, id?: string) =>
+      client.call(id ? "PATCH" : "POST", `/api/agents${id ? `/${id}` : ""}`, {
+        body: {
+          name: "nim",
+          providerId: provider.id,
+          model: ULTRA,
+          ...defaults,
+          ...body,
+        },
+      });
+    return { app, client, provider, router, save };
+  };
+
+  test("takes the window and the tools flag the admin states", async () => {
+    const { save } = await nim();
+    const res = await save({ contextLength: 262144, tools: true });
+    expect(res.status).toBe(201);
+    expect((await res.json()).agent.model).toEqual({
+      id: ULTRA,
+      name: ULTRA,
+      contextLength: 262144,
+      promptPrice: null,
+      completionPrice: null,
+      tools: true,
+      reasoning: false,
+      described: false,
+    });
+  });
+
+  test("without them it has no window and no tools", async () => {
+    const { save } = await nim();
+    const res = await save({});
+    expect(res.status).toBe(201);
+    expect((await res.json()).agent.model).toMatchObject({
+      contextLength: null,
+      tools: false,
+      described: false,
+    });
+  });
+
+  test("tools need a window, since the loop weighs it before calls", async () => {
+    const { save } = await nim();
+    const res = await save({ tools: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(
+      "contextLength is required for a model with tools",
+    );
+  });
+
+  test("a model the catalog describes is never overridden", async () => {
+    const { router, save } = await nim();
+    const res = await save({
+      providerId: router.id,
+      model: flash.id,
+      contextLength: 1024,
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(
+      "contextLength and tools are only for a model the catalog does not describe",
+    );
+  });
+
+  test("a save that leaves them out clears them", async () => {
+    const { save } = await nim();
+    const { agent } = await (
+      await save({ contextLength: 262144, tools: true })
+    ).json();
+    const res = await save({ model: "01-ai/yi-large" }, agent.id);
+    expect(res.status).toBe(200);
+    expect((await res.json()).agent.model).toMatchObject({
+      id: "01-ai/yi-large",
+      contextLength: null,
+      tools: false,
+      described: false,
+    });
+  });
+
+  test("the wire's levels leave out minimal", async () => {
+    const { save } = await nim();
+    const res = await save({ thinking: "on", effort: "minimal" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(
+      "effort must be one of low, medium, high",
+    );
+  });
+
+  refuses(
+    [
+      { contextLength: 1023 },
+      { contextLength: 10_000_001 },
+      { contextLength: 4096.5 },
+      { contextLength: "4096" },
+      { tools: "yes" },
+      { tools: null },
+    ].map((extra) => ({
+      name: "nim",
+      providerId: "p",
+      model: "m",
+      ...defaults,
+      ...extra,
+    })),
+    parseAgent,
+  );
 });

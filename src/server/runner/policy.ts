@@ -76,6 +76,8 @@ export type SendPolicy = {
   contextLength: number | null;
   prompt: string;
   thinking: boolean;
+  // the agent's own Off, not a default that resolved to off
+  thinkingOff: boolean;
   effort: Effort | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
@@ -170,6 +172,7 @@ export function buildPolicy(input: {
     contextLength: agent.model.contextLength,
     prompt: agent.prompt,
     thinking,
+    thinkingOff: agent.thinking === "off",
     effort: thinking ? agent.effort : null,
     offered,
     memoryOffered,

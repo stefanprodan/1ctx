@@ -22,6 +22,11 @@ export const ORIGIN = "http://1ctx.test";
 // else, so the suite never reaches a network
 export const PROVIDER_URL = "http://models.test/v1";
 export const GEMINI_URL = "http://models.test/v1beta";
+// two strict servers on the openai-strict wire: one whose catalog lists
+// only ids (recorded from NVIDIA NIM) and one whose catalog describes
+// its models (recorded from Groq)
+export const NIM_URL = "http://nim.test/v1";
+export const GROQ_URL = "http://groq.test/openai/v1";
 
 const fixture = (...parts: string[]) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
@@ -48,6 +53,22 @@ const geminiChatBody = (body: string | null) => {
     "providers",
     "gemini",
     tools ? "chat-tools.sse" : "chat-stream.sse",
+  );
+};
+
+// a strict server's recorded answer: the tool call when the request
+// offers tools and has no result yet, else the plain reply
+const strictChatBody = (name: string, body: string | null) => {
+  const request = JSON.parse(body ?? "{}");
+  const tools =
+    request.tools?.length > 0 &&
+    !request.messages?.some(
+      (message: { role: string }) => message.role === "tool",
+    );
+  return fixture(
+    "providers",
+    "strict",
+    `${name}-${tools ? "chat-tools" : "chat-stream"}.sse`,
   );
 };
 
@@ -92,6 +113,24 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
       return new Response(geminiChatBody(body), {
         headers: { "content-type": "text/event-stream" },
       });
+    }
+    for (const [name, base] of [
+      ["nim", NIM_URL],
+      ["groq", GROQ_URL],
+    ] as const) {
+      if (url === `${base}/models`) {
+        return new Response(
+          fixture("providers", "strict", `${name}-models.json`),
+          {
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+      if (url === `${base}/chat/completions`) {
+        return new Response(strictChatBody(name, body), {
+          headers: { "content-type": "text/event-stream" },
+        });
+      }
     }
     throw new TypeError("unable to connect");
   }) as unknown as typeof fetch;

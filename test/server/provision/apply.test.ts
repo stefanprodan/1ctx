@@ -6,6 +6,7 @@ import { parse } from "../../../src/server/provision/index.ts";
 import { testApp } from "../../helpers/app.ts";
 import {
   agent,
+  BARE_URL,
   changes,
   documents,
   fullDocuments,
@@ -187,6 +188,63 @@ describe("provision through the composed app", () => {
           contextLength: 65_536,
         },
       });
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("keeps what an admin stated for an undescribed model while the model stays", async () => {
+    const { app } = await instance();
+    try {
+      const strict = object("Provider", "bare", {
+        wire: "openai-strict",
+        baseUrl: BARE_URL,
+        keyFrom: null,
+      });
+      const bare = (spec: Record<string, unknown>) =>
+        object("Agent", "bare-guide", { provider: "bare", ...spec });
+      expect(
+        await app.provision.apply(
+          documents(
+            strict,
+            bare({ model: "bare-model", contextLength: 65_536, tools: true }),
+          ),
+          ignore,
+        ),
+      ).toEqual({ created: 2, updated: 0, unchanged: 0 });
+      const stated = {
+        id: "bare-model",
+        name: "bare-model",
+        contextLength: 65_536,
+        promptPrice: null,
+        completionPrice: null,
+        tools: true,
+        reasoning: false,
+        described: false,
+      };
+      expect(app.agents.byName("bare-guide")!.model).toEqual(stated);
+      // omitted, they stay as an omitted field does
+      expect(
+        await app.provision.apply(documents(bare({ prompt: "" })), ignore),
+      ).toEqual({ created: 0, updated: 0, unchanged: 1 });
+      expect(app.agents.byName("bare-guide")!.model).toEqual(stated);
+      // another model is another set of facts
+      expect(
+        await app.provision.apply(
+          documents(bare({ model: "bare-model-next" })),
+          ignore,
+        ),
+      ).toEqual({ created: 0, updated: 1, unchanged: 0 });
+      expect(app.agents.byName("bare-guide")!.model).toEqual({
+        ...stated,
+        id: "bare-model-next",
+        name: "bare-model-next",
+        contextLength: null,
+        tools: false,
+      });
+      expect(() =>
+        documents(bare({ model: "bare-model", contextLength: "big" })),
+      ).toThrow("spec.contextLength");
     } finally {
       await app.shutdown();
     }

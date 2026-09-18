@@ -4,11 +4,12 @@
 // An agent's form: the name, the provider it runs on, the model, found
 // by typing part of its name or id into that provider's catalog, and
 // the system prompt. The pick shows its window and prices when the
-// catalog has them. Under the pick, thinking and effort: the default
-// is the provider's, and the levels are the wire's. After the prompt,
-// the skills: one line per skill on the server, the checked ones go
-// with the agent into every send, at most the cap. Delete asks once
-// in place.
+// catalog has them; a catalog that lists only ids leaves the window and
+// the tools flag to the admin, asked under the pick. Then thinking and
+// effort: the default is the provider's, and the levels are the wire's.
+// After the prompt, the skills: one line per skill on the server, the
+// checked ones go with the agent into every send, at most the cap.
+// Delete asks once in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -40,7 +41,6 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import {
   agentFieldOf,
-  type Choice,
   compactLine,
   effortApplies,
   listedServers,
@@ -50,12 +50,17 @@ import {
   sameIds,
   sameServers,
   sentEffort,
+  statedFields,
+  statedModel,
+  statedProblem,
   thinkingChoices,
   toggleSide,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import { EffortField } from "./EffortField.tsx";
 import { McpPicker } from "./McpPicker.tsx";
+import { ModelFacts } from "./ModelFacts.tsx";
+import { Picks } from "./Picks.tsx";
 import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
 import { shapedInput } from "../../lib/names.ts";
@@ -69,38 +74,6 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-
-// one row of chips, the chosen one lit, as the provider picker
-function Picks<T extends string | null>({
-  choices,
-  value,
-  busy,
-  onPick,
-}: {
-  choices: Choice<T>[];
-  value: T;
-  busy: boolean;
-  onPick: (value: T) => void;
-}) {
-  return (
-    <div class="agents-picks">
-      {choices.map((choice) => (
-        <button
-          key={choice.value ?? "default"}
-          type="button"
-          aria-pressed={value === choice.value}
-          disabled={busy}
-          class={`agents-pick${
-            value === choice.value ? " agents-pick-on" : ""
-          }`}
-          onClick={() => onPick(choice.value)}
-        >
-          {choice.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function AgentForm({
   agent,
@@ -121,6 +94,9 @@ export function AgentForm({
   const pickedSkills = useSignal<string[]>(agent?.skills ?? []);
   const pickedServers = useSignal<AgentServer[]>(agent?.servers ?? []);
   const mcpMode = useSignal<McpMode>(agent?.mcpMode ?? "auto");
+  // the window and tools an admin states when the catalog is silent
+  const windowText = useSignal(agent?.model.contextLength?.toString() ?? "");
+  const takesTools = useSignal(agent?.model.tools ?? false);
   // the servers are read again on open, since a background refresh
   // may have changed the rows the preview is built from
   useEffect(() => void loadMcp(), []);
@@ -188,6 +164,7 @@ export function AgentForm({
       // a new agent has no server and lets the token threshold choose.
       servers: chosenServers(),
       mcpMode: mcpMode.value,
+      ...statedFields(model.value, windowText.value, takesTools.value),
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -198,6 +175,8 @@ export function AgentForm({
   const invalid = (field: string) => save.fieldError(field) !== null;
   const pick = (m: CatalogMatch) => {
     model.value = m;
+    windowText.value = "";
+    takesTools.value = false;
     s.clear();
     save.touch();
   };
@@ -211,6 +190,8 @@ export function AgentForm({
     s.clear();
     save.touch();
   };
+  // the pick as a send sees it, with what the admin stated
+  const picked = statedModel(model.value, windowText.value, takesTools.value);
   const dirty =
     agent === null ||
     name.value.trim() !== agent.name ||
@@ -222,7 +203,9 @@ export function AgentForm({
     effortSent !== agent.effort ||
     !sameIds(pickedSkills.value, agent.skills) ||
     mcpMode.value !== agent.mcpMode ||
-    !sameServers(pickedServers.value, agent.servers);
+    !sameServers(pickedServers.value, agent.servers) ||
+    picked?.contextLength !== agent.model.contextLength ||
+    picked?.tools !== agent.model.tools;
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -231,11 +214,14 @@ export function AgentForm({
           "provider",
           providerId.value === "" ? "Add a provider first" : null,
         ) ??
-        at("model", model.value === null ? "Pick a model" : null),
+        at("model", model.value === null ? "Pick a model" : null) ??
+        at(
+          "contextLength",
+          statedProblem(model.value, windowText.value, takesTools.value),
+        ),
     );
   };
   const remove = () => save.act("delete", () => deleteAgent(agent!.id));
-  const picked = model.value;
   const busy = save.busy;
   const chosen = chosenSkills();
   const toggleServer = (serverId: string, side: "read" | "write") => {
@@ -380,6 +366,22 @@ export function AgentForm({
           )}
           <FieldError save={save} field="model" />
         </div>
+        {picked && !picked.described && (
+          <ModelFacts
+            save={save}
+            window={windowText.value}
+            tools={takesTools.value}
+            busy={busy}
+            onWindow={(value) => {
+              windowText.value = value;
+              save.touch();
+            }}
+            onTools={(value) => {
+              takesTools.value = value;
+              save.touch();
+            }}
+          />
+        )}
         {picked && (
           <div class="field">
             <span class="label">Thinking</span>

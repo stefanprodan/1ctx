@@ -22,6 +22,7 @@ type Raw = {
   completion_price: number | null;
   tools: number;
   reasoning: number;
+  model_described: number;
   thinking: "on" | "off" | null;
   effort: Effort | null;
   prompt: string;
@@ -42,6 +43,7 @@ const row = (raw: Raw, skills: string[], servers: AgentServer[]): AgentRow => ({
     completionPrice: raw.completion_price,
     tools: raw.tools === 1,
     reasoning: raw.reasoning === 1,
+    described: raw.model_described === 1,
   },
   thinking: raw.thinking,
   effort: raw.effort,
@@ -117,8 +119,8 @@ export class AgentStore {
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           thinking, effort, prompt, mcp_mode, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           model_described, thinking, effort, prompt, mcp_mode, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -132,6 +134,7 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        m.described ? 1 : 0,
         fields.thinking,
         fields.effort,
         fields.prompt,
@@ -147,7 +150,8 @@ export class AgentStore {
       .query(
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
-           tools = ?, reasoning = ?, thinking = ?, effort = ?, prompt = ?, mcp_mode = ?
+           tools = ?, reasoning = ?, model_described = ?, thinking = ?,
+           effort = ?, prompt = ?, mcp_mode = ?
          where id = ?`,
       )
       .run(
@@ -161,6 +165,7 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        m.described ? 1 : 0,
         fields.thinking,
         fields.effort,
         fields.prompt,

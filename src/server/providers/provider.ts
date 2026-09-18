@@ -26,6 +26,7 @@ import {
   openRouterEvents,
 } from "./openrouter.ts";
 import type { ProviderRow } from "./store.ts";
+import { buildChatBody as buildStrictChatBody } from "./strict.ts";
 import type { ChatEvent, ChatRequest, Fetcher, Provider } from "./types.ts";
 
 export type ProviderDeps = {
@@ -67,7 +68,9 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
         ? buildOpenRouterChatBody(req)
         : gemini
           ? buildGeminiChatBody(req)
-          : buildOpenAiChatBody(req);
+          : row.wire === "openai-strict"
+            ? buildStrictChatBody(req)
+            : buildOpenAiChatBody(req);
       const scrub = (message: string) =>
         key === null ? message : message.replaceAll(key, "[key]");
       const events = streamChat(deps.fetcher, url, body, signal, {

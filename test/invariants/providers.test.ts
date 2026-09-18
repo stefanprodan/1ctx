@@ -254,6 +254,7 @@ describe("GET /api/providers/:id/catalog", () => {
         completionPrice: null,
         tools: true,
         reasoning: true,
+        described: true,
       });
       const agent = await client.call("POST", "/api/agents", {
         body: {
@@ -310,6 +311,7 @@ describe("GET /api/providers/:id/catalog", () => {
       completionPrice: expect.any(Number),
       tools: expect.any(Boolean),
       reasoning: expect.any(Boolean),
+      described: true,
     });
     await client.call("GET", `/api/providers/${provider.id}/catalog?q=chat`);
     expect(app.fetched.length).toBe(1);

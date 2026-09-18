@@ -259,6 +259,14 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
       write,
     }));
   }
+  // what an admin stated for a model its catalog does not describe
+  // stays while the model does, as an omitted field stays
+  const keep = (row: typeof before) =>
+    row &&
+    !row.model.described &&
+    (fields.model ?? row.model.id) === row.model.id
+      ? { contextLength: row.model.contextLength, tools: row.model.tools }
+      : {};
   const desired = {
     name: doc.name,
     providerId,
@@ -268,14 +276,19 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
     effort: before?.effort ?? null,
     prompt: before?.prompt ?? "",
     mcpMode: before?.mcpMode ?? "auto",
+    ...keep(before),
     ...fields,
     skills: savedSkills,
     servers: savedServers,
   };
   if (
     before &&
-    !Object.keys(difference({ ...before, model: before.model.id }, desired))
-      .length
+    !Object.keys(
+      difference(
+        { ...before, model: before.model.id, ...keep(before) },
+        desired,
+      ),
+    ).length
   ) {
     return "unchanged";
   }
