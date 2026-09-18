@@ -10,7 +10,7 @@
 import type { ComponentChildren } from "preact";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import { automationCount } from "../../data/automations.ts";
-import { knowledgeCount } from "../../data/knowledge.ts";
+import { knowledgeCount, knowledgeOf } from "../../data/knowledge.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
@@ -41,6 +41,9 @@ export function Frame({
     agents: projectAgentCount(id),
   });
   const about = shown === null ? null : aboutLine(shown);
+  // the list, once the tab loaded it, is fresher than the project row
+  const knowledge = knowledgeOf(id)?.totals ??
+    shown?.knowledge ?? { files: 0, tokens: 0 };
   return (
     <Page
       crumb="Projects"
@@ -55,11 +58,11 @@ export function Frame({
             <>
               <AsideSection label="About">
                 {about !== null && <div class="split-line">{about}</div>}
-                {shown.knowledge.files > 0 && (
+                {knowledge.files > 0 && (
                   <div class="split-line">
                     Knowledge
                     <span class="split-strong">
-                      {knowledgeWords(shown.knowledge)}
+                      {knowledgeWords(knowledge)}
                     </span>
                   </div>
                 )}

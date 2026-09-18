@@ -46,12 +46,14 @@ export class KnowledgeVersions {
 
   deleted(projectId: string): KnowledgeDeleted[] {
     return this.db
-      .query<VersionRaw & { file_snapshot: string }, [string]>(
+      .query<VersionRaw & { file_snapshot: string }, [string, string]>(
         `select ${VERSION_COLUMNS}, file_snapshot from knowledge_versions
        where project_id = ? and deleted = 1
+         and name not in
+           (select name from knowledge_files where project_id = ?)
        order by written_at desc, rowid desc`,
       )
-      .all(projectId)
+      .all(projectId, projectId)
       .map((raw) => ({
         ...(JSON.parse(raw.file_snapshot) as KnowledgeFile),
         deletedBy: authorOf(raw),

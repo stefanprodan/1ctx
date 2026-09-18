@@ -116,6 +116,10 @@ describe("knowledge store and area", () => {
       expect(restored.id).not.toBe(file.id);
       expect(restored.revision).toBe(1);
       expect(area.versions(projectId, file.id)).toHaveLength(2);
+      // a name that is live again is no longer offered for a restore
+      expect(area.list(projectId).deleted.map((row) => row.name)).not.toContain(
+        file.name,
+      );
       expect(() => area.read(projectId, file.id)).toThrow(NotFound);
       expect(() => area.remove(projectId, author, file.id)).toThrow(NotFound);
       expect(() => area.read("foreign", restored.id)).toThrow(NotFound);
