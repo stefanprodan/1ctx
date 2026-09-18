@@ -109,7 +109,7 @@ export function McpPicker({
               </RowsLine>
             ))}
           </RowsList>
-          <div class="field">
+          <div class="field mcp-mode">
             <span class="label">Tool schemas</span>
             <Select
               label="Tool schemas"

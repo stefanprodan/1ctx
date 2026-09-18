@@ -53,7 +53,8 @@
     color: var(--fg);
   }
 
-  /* on the strip, the rail's ground, the lit fill is the rail's */
+  /* the strip is the rail's ground, so its lit fill is the one the
+     rail lights with, --card */
   .shell-strip .shell-show:hover {
     background: var(--card);
   }

@@ -41,12 +41,6 @@
     flex-wrap: wrap;
     gap: var(--space-4);
   }
-  .mcp-switch {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-  }
   .mcp-note {
     font-size: var(--text-small);
     color: var(--dim);
@@ -101,6 +95,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+  }
+  /* the mode reads as the form's next field, not a line of the list */
+  .mcp-mode {
+    margin-top: var(--space-3);
   }
   .mcp-tool-body {
     font-size: var(--text-small);

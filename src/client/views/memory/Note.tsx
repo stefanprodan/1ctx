@@ -17,7 +17,7 @@ import {
   MEMORY_ENTRY_CHARS,
 } from "../../../shared/memory.ts";
 import { loadMemory, saveMemory, undoMemory } from "../../data/memory.ts";
-import type { Failure } from "../../lib/format.ts";
+import { type Failure, sentence } from "../../lib/format.ts";
 import { userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
@@ -241,7 +241,9 @@ export function Note({
       <Rows>
         <RowsCard label={label}>
           <p class="note-empty">
-            {error === null ? "Loading" : `Did not load. ${error.words}`}
+            {error === null
+              ? "Loading"
+              : `Did not load. ${sentence(error.words)}`}
           </p>
         </RowsCard>
       </Rows>
@@ -280,7 +282,7 @@ export function Note({
       >
         {error !== null && (
           <p class="note-notice note-notice-line" role="alert">
-            Could not refresh. {error.words}
+            Could not refresh. {sentence(error.words)}
           </p>
         )}
         {memory.updatedAt !== null && (

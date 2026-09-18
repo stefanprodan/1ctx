@@ -10,6 +10,7 @@
 // row's body holds; a new list never draws a row of its own.
 
 import type { ComponentChildren } from "preact";
+import { useId } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import "./rows.css";
 
@@ -46,10 +47,19 @@ export function RowsCard({
   live?: boolean;
   children?: ComponentChildren;
 }) {
+  const id = useId();
   return (
-    <section class="card rows-card" aria-label={search ? label : undefined}>
+    <section
+      class="card rows-card"
+      aria-label={search ? label : undefined}
+      aria-labelledby={search ? undefined : id}
+    >
       <div class={`rows-head${search ? " rows-head-search" : ""}`}>
-        {search ?? <span class="label">{label}</span>}
+        {search ?? (
+          <span class="label" id={id}>
+            {label}
+          </span>
+        )}
         {hint && (
           <span class="rows-hint" aria-live={live ? "polite" : undefined}>
             {hint}
@@ -370,7 +380,11 @@ export function RowsTitle({
 }) {
   return (
     <span class="rows-title">
-      <span class={`rows-name${mono ? " rows-name-mono" : ""}`}>{name}</span>
+      <span class={`rows-name${mono ? " rows-name-mono" : ""}`}>
+        {/* the name is a flex row for a tag beside it, and a flex box
+            never ellipsizes its own text, so plain words get a box */}
+        {typeof name === "string" ? <span class="cut">{name}</span> : name}
+      </span>
       {sub !== undefined && (
         <span class={`rows-sub${bad ? " rows-bad" : ""}`}>{sub}</span>
       )}
@@ -397,9 +411,13 @@ export function RowsBad({ children }: { children: ComponentChildren }) {
 export function RowsMeta({
   bad,
   short,
+  keep,
   children,
 }: {
   bad?: boolean;
+  // a meta of boxes, a meter or a strip, which cannot ellipsize: it
+  // keeps its width and the title gives way instead
+  keep?: boolean;
   // what a phone shows in place of the whole meta, the rest being in
   // the open row; empty hides the meta there
   short?: string;
@@ -407,7 +425,11 @@ export function RowsMeta({
 }) {
   if (short === undefined) {
     return (
-      <span class={`rows-meta${bad ? " rows-meta-bad" : ""}`}>{children}</span>
+      <span
+        class={`rows-meta${bad ? " rows-meta-bad" : ""}${keep ? " rows-meta-keep" : ""}`}
+      >
+        {children}
+      </span>
     );
   }
   return (

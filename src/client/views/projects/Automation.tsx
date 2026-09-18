@@ -35,7 +35,7 @@ import { me } from "../../data/me.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents, stopSession } from "../../data/sessions.ts";
-import { longDate, says, stamp, until } from "../../lib/format.ts";
+import { longDate, says, sentence, stamp, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useCut } from "../../lib/resize.ts";
@@ -153,7 +153,7 @@ function RunRow({
           </>
         }
       />
-      <RowsMeta>
+      <RowsMeta keep>
         <span class="automations-run-meta">
           <span class="automations-took">
             <span>{took === null ? "" : durationText(took)}</span>
@@ -165,7 +165,7 @@ function RunRow({
             </span>
           </span>
           {!running && (
-            <span class="automations-when">{whenText(row, now)}</span>
+            <span class="automations-ago">{whenText(row, now)}</span>
           )}
         </span>
       </RowsMeta>
@@ -232,7 +232,9 @@ function NextRuns({ automation }: { automation: AutomationSummary }) {
           <span class="automations-faint">{until(fire, now)}</span>
         </div>
       ))}
-      {held?.problem && <div class="split-line error">{held.problem}</div>}
+      {held?.problem && (
+        <div class="split-line error">{sentence(held.problem)}</div>
+      )}
       {automation.tz !== browserZone() && (
         <div class="split-line automations-faint">In {automation.tz}</div>
       )}

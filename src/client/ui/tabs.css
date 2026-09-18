@@ -40,4 +40,21 @@
   .tabs-tab-on .tabs-count {
     color: var(--dim);
   }
+
+  /* a phone: the counts go, since the tab itself shows them, and a row
+     still too long for the width slides sideways rather than pushing
+     the page wider */
+  @media (max-width: 719px) {
+    .tabs {
+      gap: var(--space-4);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs-tab {
+      flex-shrink: 0;
+    }
+    .tabs-count {
+      display: none;
+    }
+  }
 }

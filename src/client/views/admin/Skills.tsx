@@ -8,6 +8,7 @@
 // asked once in place.
 
 import { useSignal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import type { SkillSummary } from "../../../shared/contracts/skill.ts";
 import {
@@ -23,6 +24,7 @@ import {
   skillsError,
 } from "../../data/skills.ts";
 import { says } from "../../lib/format.ts";
+import { agentHref } from "../../lib/hrefs.ts";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -131,13 +133,16 @@ function Fact({
 }: {
   label: string;
   mono?: boolean;
-  children: string | string[];
+  // lines of text, or what a line holds when it links
+  children: string | string[] | ComponentChildren;
 }) {
+  const lines =
+    Array.isArray(children) && children.every((c) => typeof c === "string");
   return (
     <>
       <span class="label">{label}</span>
       <span class={`skills-fact${mono ? " skills-fact-mono" : ""}`}>
-        {Array.isArray(children) ? children.join("\n") : children}
+        {lines ? children.join("\n") : children}
       </span>
     </>
   );
@@ -227,7 +232,14 @@ function SkillRow({
             {[sourceLine(skill), skill.sourceUrl]}
           </Fact>
           <Fact label="Agents">
-            {skill.agents.length === 0 ? "None" : skill.agents.join(", ")}
+            {skill.agents.length === 0
+              ? "None"
+              : skill.agents.map((name, i) => (
+                  <span key={name}>
+                    {i > 0 && ", "}
+                    <a href={agentHref(name)}>{name}</a>
+                  </span>
+                ))}
           </Fact>
           <Fact label="Digest" mono>
             {`${skill.digest.slice(0, 12)} · ${changeLine(

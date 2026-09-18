@@ -309,14 +309,12 @@ describe("the pages", () => {
       expect(html).toContain(
         'class="people-prompt clamp">You write code.\nSmall diffs.<',
       );
+      expect(html).toContain('>Prompt</span><span class="rows-hint">7 tokens<');
       expect(html).toContain(
-        'class="label">Prompt</span><span class="rows-hint">7 tokens<',
+        '>Skills</span><span class="rows-hint">2k tokens<',
       );
       expect(html).toContain(
-        'class="label">Skills</span><span class="rows-hint">2k tokens<',
-      );
-      expect(html).toContain(
-        'class="label">Tools</span><span class="rows-hint">300 tokens<',
+        '>Tools</span><span class="rows-hint">300 tokens<',
       );
       expect(html).toContain(">timoni<");
       // the description under the name, the fetch time at the row's end

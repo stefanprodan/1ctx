@@ -193,13 +193,14 @@
   }
 
   /* a zero basis, so a long sub ellipsizes instead of wrapping the
-     title off the avatar's line */
+     title off the avatar's line, and a floor, so the title keeps a
+     share of the row and a long meta gives way first */
   .rows-title {
     display: flex;
     flex-direction: column;
     gap: 2px;
     flex: 1 1 0;
-    min-width: 0;
+    min-width: min(40%, 240px);
   }
   .rows-name {
     display: flex;
@@ -228,11 +229,17 @@
     color: var(--faint);
   }
   .rows-meta {
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
     white-space: nowrap;
+  }
+  .rows-meta-keep {
+    flex-shrink: 0;
   }
   .rows-meta-bad {
     color: var(--failed);

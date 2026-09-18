@@ -183,11 +183,11 @@ export function timeoutProblem(text: string): string | null {
   if (trimmed === "") return null;
   const seconds = Number(trimmed);
   if (!Number.isFinite(seconds) || !Number.isInteger(seconds * 1000)) {
-    return "A number of seconds";
+    return "The call timeout needs a number of seconds";
   }
   const ms = Math.round(seconds * 1000);
   if (ms < MCP_TIMEOUT_MS.min || ms > MCP_TIMEOUT_MS.max) {
-    return `${MCP_TIMEOUT_MS.min / 1000} to ${MCP_TIMEOUT_MS.max / 1000} seconds`;
+    return `The call timeout must be from ${MCP_TIMEOUT_MS.min / 1000} to ${MCP_TIMEOUT_MS.max / 1000} seconds`;
   }
   return null;
 }
@@ -293,5 +293,10 @@ export function mcpFieldOf(message: string): string | undefined {
     if (message.startsWith(field)) return field;
   }
   if (message.startsWith("an MCP server named")) return "name";
+  // a discovery that failed is the endpoint's: the key it refused, or
+  // the address that did not answer as a server should
+  if (message.startsWith("the MCP server refused the key")) return "keyName";
+  if (message.startsWith("the MCP server is refreshing")) return undefined;
+  if (/^(the MCP server|MCP request)\b/.test(message)) return "url";
   return undefined;
 }

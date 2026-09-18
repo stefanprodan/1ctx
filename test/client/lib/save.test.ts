@@ -133,15 +133,15 @@ describe("Save", () => {
     await save.run(null);
     expect(await save.act("disable", async () => {})).toBe(false);
     expect(saves).toBe(0);
-    call.reject(new Error("an agent runs on local"));
+    call.reject(new Error("an agent uses local"));
     expect(await acting).toBe(false);
     expect(save.busy).toBe(false);
     const notice = save.notice();
     expect(notice).toEqual({
-      error: "an agent runs on local",
+      error: "an agent uses local",
       action: "delete",
     });
-    expect(noticeOf(notice!)).toBe("Could not delete. An agent runs on local.");
+    expect(noticeOf(notice!)).toBe("Could not delete. An agent uses local.");
     expect(await save.act("delete", async () => {})).toBe(true);
     expect(save.notice()).toBeNull();
     expect(save.status.value).toBe("idle");

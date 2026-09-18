@@ -11,7 +11,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { MAX_SCHEDULE } from "../../../shared/words.ts";
 import { loadPreview, preview, previewKey } from "../../data/automations.ts";
-import { until } from "../../lib/format.ts";
+import { sentence, until } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
@@ -244,7 +244,7 @@ export function ScheduleField({
           )}
         </div>
         {expression !== "" && held?.problem ? (
-          <span class="error">{held.problem}</span>
+          <span class="error">{sentence(held.problem)}</span>
         ) : fires !== null && fires.length > 0 ? (
           <span class="automations-next">
             <Icon name="arrow-right" size={14} />

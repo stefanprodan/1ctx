@@ -107,7 +107,7 @@ describe("the parts", () => {
 
   test("a title is mono only when asked and has a sub only when given", () => {
     expect(render(<RowsTitle name="ops" mono />)).toBe(
-      '<span class="rows-title"><span class="rows-name rows-name-mono">ops</span></span>',
+      '<span class="rows-title"><span class="rows-name rows-name-mono"><span class="cut">ops</span></span></span>',
     );
     expect(render(<RowsTitle name="Oana" sub="@caelea" />)).toContain(
       '<span class="rows-sub">@caelea</span>',

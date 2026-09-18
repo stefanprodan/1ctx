@@ -874,7 +874,9 @@ violation, and every rule has a rejected fixture under
   hidden. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`. A
-  failure's words come from `reason()` in `lib/format.ts`.
+  failure's words come from `reason()` in `lib/format.ts`, raw for
+  `fieldOf` to map; anywhere they are drawn they go through `says()` or
+  `sentence()`, a capital and a full stop.
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
   ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
@@ -918,7 +920,8 @@ violation, and every rule has a rejected fixture under
   the rail's user menu, a flip away from the system kept in
   `localStorage`, a flip back forgetting it. A fill under the pointer
   or a picked option is `--hover`, never `--line`, `--card` or
-  `--inset`; a word on a brand fill is `--on-brand`. The visual frame
+  `--inset`, except on the rail, whose ground is `--rail` and whose
+  lit fill is `--card`; a word on a brand fill is `--on-brand`. The visual frame
   reads the theme from the computed `color-scheme` and the tokens.
   The shared shapes are `base.css` primitives (`.menu`, `.menu-item`,
   `.seg`, `.choice`, `.avatar`, `.switch`, `.tag`, `.textbox`,

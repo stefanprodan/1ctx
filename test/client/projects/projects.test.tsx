@@ -588,7 +588,9 @@ describe("the pages", () => {
       } as never,
     ];
     html = render(<Members params={{ id: "p1" }} />);
-    expect(html).toContain('class="rows-name rows-name-mono">coder<');
+    expect(html).toContain(
+      'class="rows-name rows-name-mono"><span class="cut">coder<',
+    );
     expect(html).toContain("deepseek/deepseek-v4-flash");
     // no provider name for a member, and no form to open
     expect(html).toContain(

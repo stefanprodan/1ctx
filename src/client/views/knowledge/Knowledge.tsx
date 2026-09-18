@@ -16,6 +16,7 @@ import {
   loadVersions,
   readVersion,
 } from "../../data/knowledge.ts";
+import { sentence } from "../../lib/format.ts";
 import { noticeOf, useSave } from "../../lib/save.ts";
 import {
   Rows,
@@ -65,7 +66,7 @@ function Base({ projectId }: { projectId: string }) {
     return (
       <Rows>
         <RowsCard label="Knowledge">
-          <RowsNote>{error.words}</RowsNote>
+          <RowsNote>{sentence(error.words)}</RowsNote>
         </RowsCard>
       </Rows>
     );

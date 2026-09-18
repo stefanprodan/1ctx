@@ -27,7 +27,12 @@ export const resolveTheme = (
       ? "light"
       : "dark";
 
+// the choice for this tab when storage refuses it, so a blocked or full
+// storage still keeps a flip until the page reloads
+let unsaved: Theme | null = null;
+
 const kept = (): string | null => {
+  if (unsaved !== null) return unsaved;
   try {
     return localStorage.getItem(THEME_KEY);
   } catch {
@@ -51,11 +56,14 @@ function apply(next: Theme): void {
 }
 
 export function setTheme(next: Theme): void {
+  const system = next === resolveTheme(null, systemLight());
+  unsaved = null;
   try {
-    if (next === resolveTheme(null, systemLight()))
-      localStorage.removeItem(THEME_KEY);
+    if (system) localStorage.removeItem(THEME_KEY);
     else localStorage.setItem(THEME_KEY, next);
-  } catch {}
+  } catch {
+    if (!system) unsaved = next;
+  }
   apply(next);
 }
 

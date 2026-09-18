@@ -189,10 +189,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const agent = find(ctx.params.id);
         if (deps.sessions.usesAgent(agent.id)) {
-          throw new Conflict(`a chat runs on ${agent.name}`);
+          throw new Conflict(`a chat uses ${agent.name}`);
         }
         if (deps.automations.usesAgent(agent.id)) {
-          throw new Conflict(`an automation runs on ${agent.name}`);
+          throw new Conflict(`an automation uses ${agent.name}`);
         }
         deps.store.delete(agent.id);
         return json({});

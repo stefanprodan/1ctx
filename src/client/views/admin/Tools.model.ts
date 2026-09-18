@@ -236,7 +236,7 @@ export function problem(row: LimitRow, text: string): string | null {
   const { word } = displayOf(row);
   const unit = word === "" ? "" : ` ${word}`;
   if (value < row.min || value > row.max) {
-    return `${label} is ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
+    return `${label} must be from ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
   }
   return null;
 }

@@ -818,7 +818,7 @@ describe("POST /api/sessions/:id/fork", () => {
         `/api/agents/${chat.agentId}`,
       );
       expect(deletion.status).toBe(409);
-      expect(await deletion.json()).toEqual({ error: "a chat runs on coder" });
+      expect(await deletion.json()).toEqual({ error: "a chat uses coder" });
       expect(
         (await chat.member.call("DELETE", `/api/sessions/${copied.session.id}`))
           .status,

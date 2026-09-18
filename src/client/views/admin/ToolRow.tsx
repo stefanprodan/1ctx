@@ -131,9 +131,6 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
           )}
         </RowsList>
       </div>
-      <p class="hint">
-        Allowed hosts receive whatever a visual puts in its URLs.
-      </p>
       <label class="field">
         <span class="label">Host</span>
         <input
@@ -149,7 +146,13 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
             save.touch();
           }}
         />
-        {invalid && <FieldError save={save} field="hosts" />}
+        {invalid ? (
+          <FieldError save={save} field="hosts" />
+        ) : (
+          <span class="hint">
+            Allowed hosts receive whatever a visual puts in its URLs.
+          </span>
+        )}
       </label>
       <Foot
         save={save}

@@ -14,7 +14,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { stamp } from "../lib/format.ts";
+import { sentence, stamp } from "../lib/format.ts";
 import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { CopyButton } from "./Copy.tsx";
@@ -168,7 +168,7 @@ export function Reply({
         )}
         {!running && failure !== null && (
           <p class="notice-failed transcript-failure" role="alert">
-            {failure}
+            {sentence(failure)}
           </p>
         )}
         {!running && (

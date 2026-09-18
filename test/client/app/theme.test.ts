@@ -11,6 +11,7 @@ import {
   THEME_KEY,
   theme,
   toggleTheme,
+  watchTheme,
 } from "../../../src/client/app/theme.ts";
 
 const store = new Map<string, string>();
@@ -52,5 +53,68 @@ describe("the switch", () => {
     toggleTheme();
     expect(theme.value).toBe("dark");
     expect(store.has(THEME_KEY)).toBe(false);
+  });
+});
+
+describe("the system moving", () => {
+  // a fake matchMedia the test flips, standing in for the OS scheme
+  function fakeSystem(light: boolean) {
+    const listeners: (() => void)[] = [];
+    const media = {
+      get matches() {
+        return light;
+      },
+      addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+    };
+    (globalThis as { matchMedia?: unknown }).matchMedia = () => media;
+    return (next: boolean) => {
+      light = next;
+      for (const fn of listeners) fn();
+    };
+  }
+
+  test.serial("the theme moves with the system until a flip is kept", () => {
+    const move = fakeSystem(false);
+    try {
+      watchTheme();
+      expect(theme.value).toBe("dark");
+      move(true);
+      expect(theme.value).toBe("light");
+      setTheme("dark");
+      move(false);
+      move(true);
+      expect(theme.value).toBe("dark");
+    } finally {
+      delete (globalThis as { matchMedia?: unknown }).matchMedia;
+      setTheme("dark");
+    }
+  });
+
+  test.serial("a flip storage refuses still holds for the tab", () => {
+    const move = fakeSystem(false);
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    try {
+      watchTheme();
+      setTheme("light");
+      move(true);
+      move(false);
+      expect(theme.value).toBe("light");
+      setTheme("dark");
+      move(true);
+      expect(theme.value).toBe("light");
+    } finally {
+      delete (globalThis as { matchMedia?: unknown }).matchMedia;
+      setTheme("dark");
+    }
   });
 });

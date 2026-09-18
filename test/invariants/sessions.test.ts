@@ -661,7 +661,7 @@ describe("agent deletion", () => {
     await finish(started.script);
     const used = await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`);
     expect(used.status).toBe(409);
-    expect(await used.json()).toEqual({ error: "a chat runs on coder" });
+    expect(await used.json()).toEqual({ error: "a chat uses coder" });
     expect(
       (await chat.member.call("DELETE", `/api/sessions/${started.sessionId}`))
         .status,
