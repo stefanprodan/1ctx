@@ -310,7 +310,6 @@ describe("knowledge routes", () => {
         {},
         { name: "../escape", text: "" },
         { name: "x", text: "\u0000" },
-        { name: "x", text: "\ufffd" },
         { name: "x", text: "\ud800" },
         { name: "x", text: "", unknown: 1 },
       ])

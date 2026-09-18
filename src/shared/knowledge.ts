@@ -114,14 +114,11 @@ export function knowledgeFolder(
   return { ok: true, name: result.name };
 }
 
-// Fatal decoding and string checks refuse corruption rather than keeping
-// replacement characters as if they were the input.
+// Fatal decoding refuses corrupt bytes, so a U+FFFD that survives it
+// was written in the file (a doc about encodings holds one) and is kept
+// like any other character.
 export function textFromString(value: string): string {
-  if (
-    !value.isWellFormed() ||
-    value.includes("\u0000") ||
-    value.includes("\ufffd")
-  ) {
+  if (!value.isWellFormed() || value.includes("\u0000")) {
     throw new Error("not a text file");
   }
   return value.startsWith("\ufeff") ? value.slice(1) : value;

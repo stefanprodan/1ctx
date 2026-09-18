@@ -121,11 +121,6 @@ describe("knowledge command mounts", () => {
     ["name", "echo bad > 'bad name'", "name must be"],
     ["NUL", "printf AA== | base64 -d > bad", "not a text file"],
     ["invalid UTF-8", "printf wyg= | base64 -d > bad", "not a text file"],
-    [
-      "replacement character",
-      "printf 77+9 | base64 -d > bad",
-      "not a text file",
-    ],
     ["symlink", "ln -s good link", "not a regular file"],
     ["directory symlink", "ln -s /tmp dir", "not a regular file"],
     [

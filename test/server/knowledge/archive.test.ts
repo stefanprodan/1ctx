@@ -384,6 +384,20 @@ test.serial(
   },
 );
 
+test("a member that holds a U+FFFD it was written with is text", async () => {
+  const s = setup();
+  try {
+    const result = await upload(
+      s,
+      await tar({ "docs/encodings.md": "bad byte: \ufffd\n" }),
+    );
+    expect(result.added).toBe(1);
+    expect(result.skipped).toEqual([]);
+  } finally {
+    s.db.close();
+  }
+});
+
 test("a smaller replacement survives a lowered file cap", async () => {
   const s = setup({ knowledgeFileBytes: 10 });
   try {

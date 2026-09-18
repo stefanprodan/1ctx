@@ -250,40 +250,50 @@ describe("upload picks", () => {
   );
 
   test.serial(
-    "rejects NUL, replacement characters and bad UTF-8 after byte 512",
+    "keeps a text file that holds a U+FFFD it was written with",
     async () => {
-      const malformed = new Uint8Array(900).fill(97);
-      malformed[850] = 0xff;
-      const files = [
-        new PickedFile("nul.txt", `${"a".repeat(800)}\0`),
-        new PickedFile("replacement.txt", `${"a".repeat(800)}\ufffd`),
-        new PickedFile("bad-byte.txt", malformed),
-      ];
+      // a doc about encodings can hold the character itself; strict
+      // decoding already refused every corrupt byte
       const h = setup();
-      await h.state.pick(files);
-      expect(outcomes(h.state)).toEqual(["skipped", "skipped", "skipped"]);
-      for (const item of h.state.items.value) {
-        expect(item.outcome).toEqual({ type: "skipped", reason: "not-text" });
-        expect(pickedWords(item)).toBe("not text");
-      }
-      expect(files.map((file) => file.reads)).toEqual([1, 1, 1]);
-      expect(h.state.ready).toEqual([]);
-      await h.state.run();
-      expect(h.calls).toHaveLength(0);
-      expect(h.reloads).toBe(0);
-      expect(h.state.phase.value).toBe("picked");
-      expect(uploadTotals(h.state.items.value)).toEqual({
-        added: 0,
-        replaced: 0,
-        unchanged: 0,
-        skipped: 3,
-        failed: 0,
-        bytes: 0,
-        sent: 0,
-        files: 0,
-      });
+      await h.state.pick([
+        new PickedFile("encodings.md", "bad byte: \ufffd\n"),
+      ]);
+      expect(h.state.items.value[0].outcome).toBeNull();
+      expect(h.state.ready).toHaveLength(1);
     },
   );
+
+  test.serial("rejects NUL and bad UTF-8 after byte 512", async () => {
+    const malformed = new Uint8Array(900).fill(97);
+    malformed[850] = 0xff;
+    const files = [
+      new PickedFile("nul.txt", `${"a".repeat(800)}\0`),
+      new PickedFile("bad-byte.txt", malformed),
+    ];
+    const h = setup();
+    await h.state.pick(files);
+    expect(outcomes(h.state)).toEqual(["skipped", "skipped"]);
+    for (const item of h.state.items.value) {
+      expect(item.outcome).toEqual({ type: "skipped", reason: "not-text" });
+      expect(pickedWords(item)).toBe("not text");
+    }
+    expect(files.map((file) => file.reads)).toEqual([1, 1]);
+    expect(h.state.ready).toEqual([]);
+    await h.state.run();
+    expect(h.calls).toHaveLength(0);
+    expect(h.reloads).toBe(0);
+    expect(h.state.phase.value).toBe("picked");
+    expect(uploadTotals(h.state.items.value)).toEqual({
+      added: 0,
+      replaced: 0,
+      unchanged: 0,
+      skipped: 2,
+      failed: 0,
+      bytes: 0,
+      sent: 0,
+      files: 0,
+    });
+  });
 
   test.serial(
     "accepts complete UTF-8 text, even across the sniff boundary",

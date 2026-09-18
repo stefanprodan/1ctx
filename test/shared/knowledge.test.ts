@@ -284,7 +284,13 @@ describe("knowledge text", () => {
   });
 
   test("preserves whitespace, newlines and Unicode text", () => {
-    for (const text of [" \t\r\n", "Café 日本語 😀\r\n", "a\ufeffb"]) {
+    // U+FFFD written in a file is a character like any other
+    for (const text of [
+      " \t\r\n",
+      "Café 日本語 😀\r\n",
+      "a\ufeffb",
+      "a\ufffdb",
+    ]) {
       expect(textFromString(text)).toBe(text);
       expect(textFromBytes(new TextEncoder().encode(text))).toBe(text);
     }
@@ -292,7 +298,6 @@ describe("knowledge text", () => {
 
   test.each([
     { name: "NUL", tail: [0] },
-    { name: "replacement character", tail: [0xef, 0xbf, 0xbd] },
     { name: "invalid continuation", tail: [0xc3, 0x28] },
     { name: "incomplete sequence", tail: [0xe2, 0x82] },
     { name: "unexpected continuation", tail: [0x80] },
