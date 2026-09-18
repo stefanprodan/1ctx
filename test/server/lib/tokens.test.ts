@@ -14,3 +14,15 @@ describe("tokens", () => {
     expect(tokens("You are a senior software tester.")).toBe(7);
   });
 });
+
+describe("long text", () => {
+  test("is counted in pieces cut at a line break, in milliseconds", () => {
+    const lines = "lorem ipsum dolor sit amet\n".repeat(20_000);
+    // a piece boundary on a line break changes nothing
+    expect(tokens(lines)).toBe(20_000 * tokens("lorem ipsum dolor sit amet\n"));
+    const word = "a".repeat(256 * 1024);
+    const started = performance.now();
+    expect(tokens(word)).toBeGreaterThan(0);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+});
