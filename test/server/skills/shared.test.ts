@@ -21,6 +21,9 @@ describe("skill source forms", () => {
       path: "skills/ops",
     });
     expect(sourceForm("https://files.test/skill.tgz")?.kind).toBe("archive");
+    expect(sourceForm("https://files.test/skill.ZIP?download=1")?.kind).toBe(
+      "archive",
+    );
     expect(sourceForm("https://skills.test")?.kind).toBe("index");
     expect(sourceForm("https://skills.test/a/SKILL.md")?.kind).toBe("file");
     expect(

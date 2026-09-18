@@ -6,6 +6,9 @@ One continuous context for agents. Domain: 1ctx.dev.
   No Node. Packages are devDependencies bundled at build time, exact
   pins, official npm only, `bun install --ignore-scripts`. A new package
   needs the user's explicit go-ahead.
+  `src/server/lib/archive.ts` alone imports `@zip.js/zip.js` and
+  `modern-tar`. The modern-tar patch retains the raw header `typeflag`
+  to distinguish GNU sparse and unknown types from regular files.
 - **Status:** alpha. No backwards compatibility, no shims; the schema,
   the API and the socket may change freely; the schema grows by
   migration and is rewritten, with a wipe, only for a rename.
@@ -310,10 +313,12 @@ violation, and every rule has a rejected fixture under
   names or the tool's contract.
 - **A skill is stored text, never executable.** An admin adds a `SKILL.md`
   and its text files from a GitHub directory, an archive, a discovery
-  index or a raw file through the compose fetcher. An index digest is
-  checked on add and refresh. Refresh is explicit and never renames the
-  skill; deleting one an agent names is a 409. Stored text is cleaned and
-  shown as text, ingest caps live in `skills/limits.ts`, and nothing runs.
+  index or a raw file through the compose fetcher. Tar, tar.gz and zip
+  archives go through `lib/archive.ts`; duplicate member names are
+  refused. An index digest is checked on add and refresh. Refresh is
+  explicit and never renames the skill; deleting one an agent names is
+  a 409. Stored text is cleaned and shown as text, ingest caps live in
+  `skills/limits.ts`, and nothing runs.
   The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
   (a site or an index is looked up first and its entries listed with
   Add), a row's head is the name over its files and when it was fetched
