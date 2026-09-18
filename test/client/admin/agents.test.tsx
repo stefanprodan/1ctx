@@ -26,8 +26,11 @@ import {
 } from "../../../src/client/data/providers.ts";
 import { limits } from "../../../src/client/data/tools.ts";
 import { keyOptions } from "../../../src/client/lib/secrets.ts";
+import { AgentForm } from "../../../src/client/views/admin/AgentForm.tsx";
 import {
+  agentFieldOf,
   compactLine,
+  contextProblem,
   defaultThinking,
   effortApplies,
   effortChoices,
@@ -38,6 +41,9 @@ import {
   providerFieldOf,
   reserveOf,
   sentEffort,
+  statedFields,
+  statedModel,
+  statedProblem,
   thinkingChoices,
   thinkingLine,
   windowLine,
@@ -76,6 +82,7 @@ const flash: CatalogMatch = {
   completionPrice: 0.28,
   tools: true,
   reasoning: true,
+  described: true,
 };
 const coder: AgentSummary = {
   id: "ag1",
@@ -138,6 +145,17 @@ describe("the words", () => {
     expect(preset("openai-compatible").baseUrl).toBeNull();
     expect(preset("gemini").baseUrl).toContain("/v1beta");
     expect(preset("gemini").name).toBe("gemini");
+    expect(preset("openai-compatible")).toMatchObject({
+      label: "OpenAI-compatible",
+      text: "mlx-serve, oMLX, llama-server, Ollama",
+    });
+    expect(preset("openai-strict")).toEqual({
+      wire: "openai-strict",
+      label: "OpenAI-strict",
+      text: "GPT, Nvidia NIM, vLLM, Groq",
+      baseUrl: null,
+      name: "",
+    });
     expect(
       providerFieldOf("keyName must be provider- followed by a name"),
     ).toBe("keyName");
@@ -170,6 +188,10 @@ describe("the words", () => {
       value: null,
       label: "Default (on)",
     });
+    // a catalog that lists only ids does not say whether the model thinks
+    expect(
+      thinkingChoices({ ...flash, reasoning: false, described: false })[0],
+    ).toEqual({ value: null, label: "Default" });
     expect(effortChoices("openrouter").map((c) => c.value)).toEqual([
       null,
       "minimal",
@@ -236,6 +258,89 @@ describe("the words", () => {
     expect(sentEffort(flash, "on", "xhigh", "openai-compatible")).toBeNull();
     expect(sentEffort(flash, "on", "high", "openai-compatible")).toBe("high");
     expect(sentEffort(flash, "on", "high", undefined)).toBeNull();
+  });
+});
+
+describe("a model its catalog does not describe", () => {
+  const ultra: CatalogMatch = {
+    id: "nvidia/nemotron-3-ultra-550b-a55b",
+    name: "nvidia/nemotron-3-ultra-550b-a55b",
+    contextLength: null,
+    promptPrice: null,
+    completionPrice: null,
+    tools: false,
+    reasoning: false,
+    described: false,
+  };
+
+  test.serial(
+    "the window is a whole number in range, required with tools",
+    () => {
+      expect(contextProblem("", false)).toBeNull();
+      expect(contextProblem(" ", true)).toBe("Enter the context window");
+      expect(contextProblem("262,144", true)).toBeNull();
+      expect(contextProblem("262_144", true)).toBeNull();
+      expect(contextProblem("1023", false)).toBe(
+        "Enter a whole number from 1024 to 10000000",
+      );
+      expect(contextProblem("12.5k", false)).not.toBeNull();
+      expect(statedProblem(flash, "", true)).toBeNull();
+      expect(statedProblem(null, "", true)).toBeNull();
+      expect(statedProblem(ultra, "", true)).toBe("Enter the context window");
+      expect(
+        agentFieldOf("contextLength is required for a model with tools"),
+      ).toBe("contextLength");
+    },
+  );
+
+  test.serial(
+    "only an undescribed pick sends and shows what was stated",
+    () => {
+      expect(statedFields(flash, "4096", true)).toEqual({});
+      expect(statedFields(null, "4096", true)).toEqual({});
+      expect(statedFields(ultra, "262,144", true)).toEqual({
+        contextLength: 262144,
+        tools: true,
+      });
+      expect(statedFields(ultra, "", false)).toEqual({
+        contextLength: null,
+        tools: false,
+      });
+      expect(statedModel(flash, "4096", false)).toBe(flash);
+      expect(statedModel(ultra, "262144", true)).toEqual({
+        ...ultra,
+        contextLength: 262144,
+        tools: true,
+      });
+      // a window still being typed is no window yet
+      expect(statedModel(ultra, "12", true)?.contextLength).toBeNull();
+    },
+  );
+
+  test.serial("the form asks for them under the pick, and only then", () => {
+    const nvidia: ProviderSummary = {
+      ...router,
+      id: "pr2",
+      name: "nvidia",
+      wire: "openai-strict",
+    };
+    const nim: AgentSummary = {
+      ...coder,
+      providerId: "pr2",
+      model: { ...ultra, contextLength: 262144, tools: true },
+    };
+    const html = render(
+      <AgentForm agent={nim} providers={[nvidia]} onDone={() => {}} />,
+    );
+    expect(html).toContain("Context window");
+    expect(html).toMatch(/name="contextLength"[^>]*value="262144"/);
+    expect(html).toContain("262k · tools");
+    expect(html).toContain(">Default<");
+    expect(html).not.toContain("Default (off)");
+    const described = render(
+      <AgentForm agent={coder} providers={[router]} onDone={() => {}} />,
+    );
+    expect(described).not.toContain("Context window");
   });
 });
 
@@ -431,6 +536,27 @@ describe("the page", () => {
         "router · 128k · $0.14 / $0.28 · tools · reasoning",
       );
       expect(html).toContain("provider-router.key missing");
+      // a phone shows the window and the price alone
+      expect(html).toContain(
+        '<span class="rows-meta-short">128k · $0.14 / $0.28</span>',
+      );
+      agents.value = [
+        {
+          ...coder,
+          servers: [
+            { serverId: "s1", read: true, write: false },
+            { serverId: "s2", read: true, write: true },
+          ],
+        },
+      ];
+      expect(render(<Agents />)).toContain(
+        "router · 128k · $0.14 / $0.28 · tools · reasoning · 2 MCPs",
+      );
+      agents.value = [
+        { ...coder, servers: [{ serverId: "s1", read: true, write: false }] },
+      ];
+      expect(render(<Agents />)).toContain("reasoning · 1 MCP<");
+      agents.value = [{ ...coder }];
       agents.value = [{ ...coder, thinking: "on", effort: "xhigh" }];
       expect(render(<Agents />)).toContain(
         "reasoning · thinking on · effort xhigh",

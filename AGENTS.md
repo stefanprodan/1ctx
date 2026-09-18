@@ -793,7 +793,7 @@ violation, and every rule has a rejected fixture under
   `RowsButton` (an action) or `RowsLine` (neither; `as="label"` for a
   pick, `off` when it cannot be picked). Its head is only
   `RowsAvatar`, `RowsTitle` (mono for an identifier, `bad` for a
-  failed line) and `RowsMeta` (centred at the right), with
+  failed line) and `RowsMeta` (centred at the right; `short` is all a phone shows), with
   `RowsTag`, `RowsHandle` and `RowsBad` inside a line; its end is
   `RowsEnd` (buttons, after the words that ask or the failure),
   `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first

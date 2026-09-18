@@ -576,11 +576,14 @@ describe("the pages", () => {
           completionPrice: 0.28,
           tools: true,
           reasoning: true,
+          described: true,
         },
         thinking: null,
         effort: null,
         prompt: "",
         skills: [],
+        servers: [],
+        mcpMode: "auto",
         createdAt: 0,
       } as never,
     ];
@@ -589,7 +592,7 @@ describe("the pages", () => {
     expect(html).toContain("deepseek/deepseek-v4-flash");
     // no provider name for a member, and no form to open
     expect(html).toContain(
-      'class="rows-meta">128k · $0.14 / $0.28 · tools · reasoning<',
+      'class="rows-meta-long">128k · $0.14 / $0.28 · tools · reasoning<',
     );
     expect(html).not.toContain("rows-toggle");
     expect(html).toContain('class="rows-line rows-go" href="/agents/coder"');
