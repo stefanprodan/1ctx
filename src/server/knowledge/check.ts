@@ -6,10 +6,16 @@ import { BadRequest, Conflict } from "../lib/errors.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 
 export function checkNames(names: readonly string[]): void {
-  const sorted = [...names].sort();
-  for (let index = 1; index < sorted.length; index++) {
-    const name = sorted[index]!;
-    const other = prefixConflict(name, [sorted[index - 1]!]);
+  const live = new Set(names);
+  for (const name of names) {
+    const parts = name.split("/");
+    const parents = parts
+      .slice(0, -1)
+      .map((_, i) => parts.slice(0, i + 1).join("/"));
+    const other = prefixConflict(
+      name,
+      parents.filter((path) => live.has(path)),
+    );
     if (other !== null) {
       throw new Conflict(`${name} conflicts with file ${other}`);
     }

@@ -17,6 +17,7 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
+import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
 import { KnowledgeStore, summary } from "./store.ts";
 
@@ -47,6 +48,13 @@ export type KnowledgeCapability = {
   ): KnowledgeFile;
   snapshot(projectId: string): { files: number; recent: RecentFile[] };
   counts(projectId: string): KnowledgeCounts;
+  run(
+    projectId: string,
+    author: KnowledgeAuthor,
+    command: string,
+    caps: CommandCaps,
+    signal: AbortSignal,
+  ): Promise<CommandResult>;
   sweep(now: number): number;
 };
 export type KnowledgeArea = KnowledgeCapability & { store: KnowledgeStore };
@@ -74,6 +82,20 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     });
   return {
     store,
+    run: (projectId, author, command, caps, signal) =>
+      run(
+        {
+          db: deps.db,
+          store,
+          clock: deps.clock,
+          current: () => deps.limits.current(),
+        },
+        projectId,
+        author,
+        command,
+        caps,
+        signal,
+      ),
     list(projectId) {
       const caps = deps.limits.current();
       return {
