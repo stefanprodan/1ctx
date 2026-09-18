@@ -23,10 +23,12 @@ describe("command admission", () => {
         expect(await second).toEqual({
           error: false,
           content: "first\nexit 0",
+          tail: 6,
         });
         expect(await third).toEqual({
           error: false,
           content: "second\nexit 0",
+          tail: 6,
         });
         expect(scratchState(s)).toMatchObject({ cwd: "/tmp", revision: 3 });
         expect(heldSessions().has(s.session.id)).toBe(false);

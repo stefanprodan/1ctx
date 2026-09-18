@@ -29,7 +29,13 @@ function context(): ToolContext {
     actor: null,
     signal: new AbortController().signal,
     now: () => 0,
-    budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+    budget: {
+      bashCalls: 0,
+      fetches: 0,
+      searches: 0,
+      visualBytes: 0,
+      visuals: 0,
+    },
     caps: TOOL_CAPS,
   };
 }
@@ -50,6 +56,46 @@ function echo(text: string, fail = false): Registry {
 const call = { id: "c1", name: "echo", arguments: "{}" };
 
 describe("the registry's result cleaning", () => {
+  test.each([false, true])(
+    "sanitizes and preserves a result's ending characters with error=%s",
+    async (error) => {
+      const ctx = context();
+      ctx.caps = { ...ctx.caps, resultCut: 10 };
+      const tail = `ex${NUL}it 0`;
+      const tool: Tool<ToolResult> = {
+        name: "echo",
+        description: "",
+        parameters: {},
+        run: async () => ({
+          content: `a${NUL}bcdefgh\n${tail}`,
+          error,
+          tail: tail.length,
+        }),
+      };
+      expect(await new Registry([tool]).run(call, ctx)).toEqual({
+        content: "abcdexit 0",
+        error,
+        tail: 6,
+      });
+    },
+  );
+
+  test("a zero-length tail leaves the normal result cut", async () => {
+    const ctx = context();
+    ctx.caps = { ...ctx.caps, resultCut: 4 };
+    const tool: Tool<ToolResult> = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      run: async () => ({ content: "abcdef", error: false, tail: 0 }),
+    };
+    expect(await new Registry([tool]).run(call, ctx)).toEqual({
+      content: "abcd",
+      error: false,
+      tail: 0,
+    });
+  });
+
   test.each([false, true])(
     "cleans a structured result and preserves error=%s",
     async (error) => {

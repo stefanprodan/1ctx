@@ -20,7 +20,11 @@ import { type KnowledgeRow, type KnowledgeStore, summary } from "./store.ts";
 import { textFromBytes } from "./text.ts";
 
 export type CommandCaps = { callTimeoutMs: number; resultCut: number };
-export type CommandResult = { content: string; error: boolean };
+export type CommandResult = {
+  content: string;
+  error: boolean;
+  tail?: number;
+};
 type MountDeps = {
   db: Db;
   store: KnowledgeStore;
@@ -216,36 +220,38 @@ export async function run(
     const stdout = decodeBytesToUtf8(stdoutAsBytes(result));
     combined.throwIfAborted();
     if (result.exitCode === 124 || result.exitCode === 126) {
+      const printed = output(
+        stdout,
+        `${result.stderr}\nnothing saved: command stopped at a deadline or limit`,
+        result.exitCode,
+        [],
+        caps.resultCut - notice.length,
+      );
       return {
-        content:
-          notice +
-          output(
-            stdout,
-            `${result.stderr}\nnothing saved: command stopped at a deadline or limit`,
-            result.exitCode,
-            [],
-            caps.resultCut - notice.length,
-          ),
+        ...printed,
+        content: notice + printed.content,
         error: true,
       };
     }
     const changes = await diff(fs, rows, scratch, storage);
     changes.scratch.changes.cwd = await savedCwd(fs, result.env.PWD);
     combined.throwIfAborted();
-    const content =
-      notice +
-      commit(
-        deps,
-        projectId,
-        author,
-        changes.knowledge,
-        { sessionId, before: scratch, ...changes.scratch },
-        { stdout, stderr: result.stderr, exitCode: result.exitCode },
-        caps.resultCut - notice.length,
-        combined,
-        deps.clock(),
-      );
-    return { content, error: result.exitCode !== 0 };
+    const printed = commit(
+      deps,
+      projectId,
+      author,
+      changes.knowledge,
+      { sessionId, before: scratch, ...changes.scratch },
+      { stdout, stderr: result.stderr, exitCode: result.exitCode },
+      caps.resultCut - notice.length,
+      combined,
+      deps.clock(),
+    );
+    return {
+      ...printed,
+      content: notice + printed.content,
+      error: result.exitCode !== 0,
+    };
   } catch (error) {
     const result = failed(error, caps.resultCut - notice.length);
     return { ...result, content: notice + result.content };

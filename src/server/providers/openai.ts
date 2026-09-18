@@ -132,6 +132,15 @@ export function wireTokens(tools: readonly ChatTool[]): number {
   return tools.length === 0 ? 0 : tokens(JSON.stringify(wireTools(tools)));
 }
 
+export function requestTokens(req: ChatRequest): number {
+  return tokens(
+    JSON.stringify({
+      messages: req.messages,
+      tools: wireTools(req.tools ?? []),
+    }),
+  );
+}
+
 // Frames are returned as their joined data payload. Comments count as bytes
 // for liveness in the reader but carry no event for the runner.
 export function parseSse(

@@ -190,6 +190,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, `${edits}; false`)).toEqual({
         error: true,
         content: "exit 1\nwrote existing (rev 2, 1 lines)",
+        tail: "exit 1\nwrote existing (rev 2, 1 lines)".length,
       });
       expect(scratchState(s)).toMatchObject({
         revision: 2,
@@ -268,7 +269,11 @@ describe("atomic knowledge and scratch commits", () => {
   test("a fresh read-only command creates a scratch row and checks its revision", async () => {
     const s = setup();
     try {
-      expect(await run(s, "true")).toEqual({ content: "exit 0", error: false });
+      expect(await run(s, "true")).toEqual({
+        content: "exit 0",
+        error: false,
+        tail: 6,
+      });
       expect(scratchState(s)).toEqual({
         cwd: "/knowledge",
         revision: 1,
@@ -297,6 +302,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, "cat /knowledge/existing > /tmp/copied")).toEqual({
         content: "exit 0",
         error: false,
+        tail: 6,
       });
       expect(
         scratchState(s).entries.find((file) => file.path === "copied")?.data,

@@ -63,6 +63,23 @@ export class Registry {
         ...ctx,
         signal,
       });
+      if (typeof result !== "string" && result.tail !== undefined) {
+        const content = sanitize(result.content);
+        const start = Math.max(0, result.content.length - result.tail);
+        const tail = clean(result.content.slice(start), ctx.caps.resultCut);
+        return {
+          content:
+            content.slice(
+              0,
+              Math.min(
+                content.length - tail.length,
+                ctx.caps.resultCut - tail.length,
+              ),
+            ) + tail,
+          error: result.error,
+          tail: tail.length,
+        };
+      }
       return {
         content: clean(
           typeof result === "string" ? result : result.content,

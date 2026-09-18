@@ -17,13 +17,13 @@ export function output(
   exitCode: number,
   receipts: readonly string[],
   resultCut: number,
-): string {
+): { content: string; tail: number } {
   const tail = [`exit ${exitCode}`, ...receipts].join("\n");
   const printed = [stdout, stderr]
     .filter(Boolean)
     .join(stdout.endsWith("\n") ? "" : "\n");
   const whole = printed === "" ? tail : `${printed}\n${tail}`;
-  if (whole.length <= resultCut) return whole;
+  if (whole.length <= resultCut) return { content: whole, tail: tail.length };
   const mark = `... output cut at ${resultCut} characters, narrow with grep or sed -n`;
   const room = resultCut - mark.length - tail.length - 2;
   // A command cannot land writes whose receipts cannot be returned intact.
@@ -32,7 +32,10 @@ export function output(
       `change receipts exceed ${resultCut} characters, split the command`,
     );
   }
-  return `${cutText(printed, room)}\n${mark}\n${tail}`;
+  return {
+    content: `${cutText(printed, room)}\n${mark}\n${tail}`,
+    tail: tail.length,
+  };
 }
 
 export function failed(error: unknown, resultCut: number) {

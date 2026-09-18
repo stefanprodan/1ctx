@@ -27,12 +27,12 @@ function isTool(row: Message): boolean {
   return row.kind === "tool";
 }
 
-// the reason the runner ended the loop, from any reply of the send: the
-// answer round carries it when a cap forced the answer
 export function capWord(rows: Message[]): string | null {
   for (const row of rows) {
     if (row.kind !== "reply") continue;
     if (row.finishReason === "tool_limit") return "tool limit";
+    if (row.finishReason === "token_limit") return "token limit";
+    if (row.finishReason === "context_limit") return "context full";
     if (row.finishReason === "tool_loop") return "tool loop";
   }
   return null;

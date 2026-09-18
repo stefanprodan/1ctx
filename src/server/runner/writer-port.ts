@@ -76,6 +76,7 @@ export type SessionsPort = {
   // place a null-slot reply's slot without ending it
   markSlot(id: string, slot: "work" | "answer"): Message | null;
   finishReply(id: string, fields: ReplyFinish): Message | null;
+  capWork(id: string, finishReason: string): Message | null;
   // one streaming tool row per launched call, in call order
   addToolRows(
     calls: {

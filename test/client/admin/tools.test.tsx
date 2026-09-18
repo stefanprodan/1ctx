@@ -62,10 +62,10 @@ const admin: Me = {
 
 const row = (changes: Partial<LimitRow>): LimitRow => ({
   name: "rounds",
-  value: 10,
-  default: 10,
+  value: 100,
+  default: 100,
   min: 1,
-  max: 50,
+  max: 500,
   unit: "count",
   scope: "send",
   changedAt: null,
@@ -197,7 +197,7 @@ describe("the limit words and units", () => {
       expect(show(timeout, 1500)).toBe("1.5");
       expect(show(resultBytes, 2 * 1024 * 1024)).toBe("2");
       expect(show(searchBody, 512 * 1024)).toBe("0.5");
-      expect(show(rounds, 10)).toBe("10");
+      expect(show(rounds, 100)).toBe("100");
     },
   );
 
@@ -215,11 +215,11 @@ describe("the limit words and units", () => {
   });
 
   test.serial("the range check speaks the page's unit", () => {
-    expect(problem(rounds, "0")).toBe("Rounds is 1 to 50");
+    expect(problem(rounds, "0")).toBe("Rounds is 1 to 500");
     expect(problem(toolMs, "5")).toBe("Tool time is 10 to 3600 s");
     expect(problem(resultBytes, "64")).toBe("Result bytes is 0.0625 to 32 MB");
     expect(problem(rounds, "x")).toBe("Rounds needs a number");
-    expect(problem(rounds, "50")).toBeNull();
+    expect(problem(rounds, "500")).toBeNull();
   });
 
   test.serial("the draft, what a Save collects and what is dirty", () => {
@@ -229,7 +229,7 @@ describe("the limit words and units", () => {
     expect(dirty(rows, draft)).toBe(false);
     expect(collect(rows, draft) as unknown).toEqual({
       values: {
-        rounds: 10,
+        rounds: 100,
         toolMs: 600_000,
         resultBytes: 2 * 1024 * 1024,
         callTimeoutMs: 1500,
@@ -238,15 +238,15 @@ describe("the limit words and units", () => {
         contextReserve: 20_000,
       },
     });
-    const edited = { ...draft, rounds: "200" };
+    const edited = { ...draft, rounds: "501" };
     expect(dirty(rows, edited)).toBe(true);
     expect(collect(rows, edited)).toEqual({
-      problem: "Rounds is 1 to 50",
+      problem: "Rounds is 1 to 500",
       field: "rounds",
     });
     expect(defaultLine(timeout)).toBe("default 20 s");
     expect(defaultLine(searchBody)).toBe("default 1 MB");
-    expect(defaultLine(rounds)).toBe("default 10");
+    expect(defaultLine(rounds)).toBe("default 100");
   });
 
   test.serial("a scope's save carries the other scope's saved values", () => {
@@ -256,7 +256,7 @@ describe("the limit words and units", () => {
       resultCut: 40_000,
     });
     expect(sent).toMatchObject({
-      rounds: 10,
+      rounds: 100,
       toolMs: 600_000,
       callTimeoutMs: 2000,
       searchBodyBytes: 1024 * 1024,

@@ -14,7 +14,7 @@ const context = (): ToolContext => ({
   actor: null,
   signal: new AbortController().signal,
   now: () => 0,
-  budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+  budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
   caps: { ...TOOL_CAPS, visualBytes: 16, visualSendBytes: 24, maxVisuals: 10 },
 });
 const run = (args: unknown, ctx = context()) =>

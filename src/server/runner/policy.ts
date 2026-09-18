@@ -179,6 +179,7 @@ export function buildPolicy(input: {
       callsPerSend: input.limits.callsPerSend,
       toolMs: input.limits.toolMs,
       resultBytes: input.limits.resultBytes,
+      toolWorkTokens: input.limits.toolWorkTokens,
       contextReserve: input.limits.contextReserve,
       summaryMaxTokens: input.limits.summaryMaxTokens,
       memoryPhaseMs: input.limits.memoryPhaseMs,
@@ -187,6 +188,7 @@ export function buildPolicy(input: {
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,
       resultCut: input.limits.resultCut,
+      maxBashCalls: input.limits.maxBashCalls,
       maxFetches: input.limits.maxFetches,
       maxSearches: input.limits.maxSearches,
       fetchBodyBytes: input.limits.fetchBodyBytes,

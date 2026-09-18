@@ -5,7 +5,12 @@ import type { Message } from "../../shared/contracts/session.ts";
 import type { MessageKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
-import { MESSAGE_COLUMNS, message, type RawMessage } from "./rows.ts";
+import {
+  MESSAGE_COLUMNS,
+  message,
+  type RawMessage,
+  type ReplyFinish,
+} from "./rows.ts";
 
 type AgentMessageFields = {
   id?: string;
@@ -49,4 +54,35 @@ export function addAgentMessage(
     )
     .get(id)!;
   return message(raw);
+}
+
+export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {
+  return (
+    db
+      .query(
+        `update messages set content = ?, reasoning = ?, reasoning_details = ?, html = ?,
+       status = ?, error = ?, finish_reason = ?, slot = ?, tool_calls = ?,
+       ttft_ms = ?, thinking_ms = ?, finished_at = ?
+     where id = ? and status = 'streaming'`,
+      )
+      .run(
+        fields.content,
+        fields.reasoning,
+        fields.reasoningDetails.length > 0
+          ? JSON.stringify(fields.reasoningDetails)
+          : null,
+        fields.html,
+        fields.status,
+        fields.error,
+        fields.finishReason,
+        fields.slot,
+        fields.toolCalls && fields.toolCalls.length > 0
+          ? JSON.stringify(fields.toolCalls)
+          : null,
+        fields.ttftMs,
+        fields.thinkingMs,
+        fields.finishedAt,
+        id,
+      ).changes > 0
+  );
 }

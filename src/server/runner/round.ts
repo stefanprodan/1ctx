@@ -16,6 +16,7 @@ import {
   type ChatEvent,
   type ChatRequest,
   mergeReasoningDetail,
+  requestTokens,
 } from "../providers/index.ts";
 import {
   type ContextLookups,
@@ -117,6 +118,12 @@ export function buildRequest(
   if (send.answering && req.tools && req.tools.length > 0) {
     req.toolChoice = "none";
   }
+  // the retry after a call under tool_choice none carries no schemas, so
+  // a provider that ignored the choice has nothing left to call
+  if (send.bare) {
+    const { tools: _tools, toolChoice: _choice, ...bare } = req;
+    return bare;
+  }
   return req;
 }
 
@@ -205,6 +212,10 @@ export async function runRound(
     throw new Error("the stream ended early");
   }
   visuals?.flush();
+  round.tokens =
+    round.usage === null
+      ? requestTokens(req)
+      : round.usage.promptTokens + round.usage.completionTokens;
 }
 
 // the first tool call delta of a round marks it work, once; the round

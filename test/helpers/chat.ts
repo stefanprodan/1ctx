@@ -8,6 +8,8 @@
 // app with it, a provider, an agent and a member, and signs the member
 // in.
 
+import { tokens } from "../../src/server/lib/tokens.ts";
+import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import { hashPassword } from "../../src/server/users/index.ts";
@@ -68,15 +70,20 @@ export type Script = {
 export type Scripted = {
   fetcher: typeof fetch;
   scripts: Script[];
+  requests: { inputTokens: number; maxTokens: number; accepted: boolean }[];
   // the next script once a chat request arrives
   next(): Promise<Script>;
   // answer every chat request with an HTTP error
   refuse(status: number, body?: string): void;
 };
 
-export function scriptedFetch(fallback?: typeof fetch): Scripted {
+export function scriptedFetch(
+  fallback?: typeof fetch,
+  window?: number,
+): Scripted {
   const catalog = fakeFetch().fetcher;
   const scripts: Script[] = [];
+  const requests: Scripted["requests"] = [];
   const waiting: ((s: Script) => void)[] = [];
   let refusal: { status: number; body: string } | null = null;
   const fetcher = (async (
@@ -98,6 +105,24 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
     if (refusal !== null) {
       return new Response(refusal.body, { status: refusal.status });
     }
+    const body = JSON.parse(
+      typeof init?.body === "string" ? init.body : "{}",
+    ) as Record<string, unknown>;
+    if (window !== undefined) {
+      const inputTokens = tokens(
+        JSON.stringify({ messages: body.messages, tools: body.tools ?? [] }),
+      );
+      const maxTokens =
+        typeof body.max_tokens === "number" ? body.max_tokens : 0;
+      const accepted = inputTokens + maxTokens <= window;
+      requests.push({ inputTokens, maxTokens, accepted });
+      if (!accepted) {
+        return Response.json(
+          { error: { message: "input plus max_tokens exceeds the window" } },
+          { status: 400 },
+        );
+      }
+    }
     const encoder = new TextEncoder();
     let controller!: ReadableStreamDefaultController<Uint8Array>;
     const stream = new ReadableStream<Uint8Array>({
@@ -116,7 +141,7 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
       } catch {}
     };
     const script: Script = {
-      body: JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+      body,
       sse(text) {
         controller.enqueue(encoder.encode(text));
       },
@@ -206,6 +231,7 @@ export function scriptedFetch(fallback?: typeof fetch): Scripted {
   return {
     fetcher,
     scripts,
+    requests,
     next: () =>
       new Promise<Script>((resolve) => {
         waiting.push(resolve);
@@ -255,6 +281,17 @@ export type ChatApp = {
   makeAgent(fields: { name: string; model: string }): Promise<string>;
 };
 
+export async function setLimits(chat: ChatApp, values: Partial<Limits>) {
+  const response = await chat.admin.call("PUT", "/api/limits", {
+    body: { values: { ...DEFAULT_LIMITS, ...values } },
+  });
+  if (response.status !== 200) {
+    throw new Error(
+      `limits save answered ${response.status}: ${await response.text()}`,
+    );
+  }
+}
+
 export async function chatApp(
   options: {
     registry?: Registry;
@@ -267,9 +304,10 @@ export async function chatApp(
     wire?: Wire;
     tools?: Tools;
     fetcher?: typeof fetch;
+    window?: number;
   } = {},
 ): Promise<ChatApp> {
-  const scripted = scriptedFetch(options.fetcher);
+  const scripted = scriptedFetch(options.fetcher, options.window);
   const secrets = options.secrets ?? {};
   const app = await testApp({
     fetcher: scripted.fetcher,
@@ -313,6 +351,11 @@ export async function chatApp(
     name: "coder",
     model: options.model ?? (options.wire === "gemini" ? GEMINI_FLASH : FLASH),
   });
+  if (options.window !== undefined) {
+    app.db
+      .query("update agents set context_length = ? where id = ?")
+      .run(options.window, agentId);
+  }
   const user = app.createUser({
     username: "caelea",
     fullName: "Oana Mangiurea",

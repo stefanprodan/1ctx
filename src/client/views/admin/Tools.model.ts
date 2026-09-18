@@ -41,6 +41,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Result bytes",
     text: "Stored tool results over a send, weighed before a round launches.",
   },
+  toolWorkTokens: {
+    label: "Tool-work tokens",
+    text: "Tokens a send may spend on tools before it must answer.",
+  },
   callTimeoutMs: {
     label: "Call timeout",
     text: "How long one tool call may run.",
@@ -48,6 +52,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   resultCut: {
     label: "Result cut",
     text: "Characters a result is cut to before the model reads it.",
+  },
+  maxBashCalls: {
+    label: "Bash calls per send",
+    text: "bash calls a send may make.",
   },
   maxFetches: {
     label: "Fetches per send",
@@ -87,7 +95,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   contextReserve: {
     label: "Context reserve",
-    text: "Room kept in the window. A reply that leaves less is followed by a summary.",
+    text: "Room kept in the window. Reaching it ends tool work and answers. A chat then summarizes.",
   },
   summaryMaxTokens: {
     label: "Summary tokens",

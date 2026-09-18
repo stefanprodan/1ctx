@@ -58,7 +58,7 @@ export function commit(
   resultCut: number,
   signal: AbortSignal,
   now: number,
-): string {
+) {
   return transact(deps.db, () => {
     signal.throwIfAborted();
     const caps = deps.current();

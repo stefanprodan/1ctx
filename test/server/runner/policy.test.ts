@@ -106,6 +106,34 @@ describe("send policy thinking", () => {
     });
   });
 
+  test("snapshots the tool-work and bash limits separately from later changes", () => {
+    const limits = {
+      ...DEFAULT_LIMITS,
+      rounds: 250,
+      toolWorkTokens: 750_000,
+      maxBashCalls: 200,
+    };
+    const send = buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent,
+      now: 1,
+      tools: null,
+      knowledge: { files: 0, recent: [] },
+      limits,
+    });
+    limits.rounds = 20;
+    limits.toolWorkTokens = 50_000;
+    limits.maxBashCalls = 10;
+    expect(send.limits).toMatchObject({
+      rounds: 250,
+      toolWorkTokens: 750_000,
+    });
+    expect(send.toolCaps.maxBashCalls).toBe(200);
+    expect(send.limits).not.toHaveProperty("maxBashCalls");
+    expect(send.toolCaps).not.toHaveProperty("toolWorkTokens");
+  });
+
   test("copies the knowledge count and recent files without tools", () => {
     const knowledge = {
       files: 1,

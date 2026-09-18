@@ -31,6 +31,7 @@ export type RoundState = {
   htmlAt: number;
   finishReason: string | null;
   usage: Usage | null;
+  tokens: number;
   // the tool calls the provider assembled this round, once the stream
   // ends normally; the loop reads them after the round
   calls: ToolCall[];
@@ -46,7 +47,10 @@ export type Budget = {
   calls: number;
   toolMs: number;
   resultBytes: number;
+  tokens: number;
 };
+
+export type CapReason = "tool_limit" | "token_limit" | "context_limit";
 
 // the phase of a send: talking to the provider, running a round's
 // tools with no row streaming, or ended
@@ -69,8 +73,11 @@ export type ActiveSend = {
   toolBudget: ToolBudget;
   // the last three rounds' call signatures, for the loop check
   signatures: string[];
-  // the answer round forbids tools with tool_choice none
-  answering: boolean;
+  // the cap that forced the answer round; its tool_choice none forbids a call
+  answering: CapReason | null;
+  // a provider may call a tool under tool_choice none: the answer is then
+  // asked once more with no schemas at all, so it can only answer
+  bare: boolean;
   // summary rounds ignore calls and are always the send's last round
   summarizing: boolean;
   // the tokens the last counted round used, prompt plus completion: the
@@ -81,8 +88,7 @@ export type ActiveSend = {
   // the current round's launched tool rows still streaming, keyed by
   // the call object so duplicate provider call ids remain distinct
   openTools: Map<ToolCall, string>;
-  // the allSettled of the current round's calls, assigned in the same
-  // turn the calls launch; null between rounds
+  // Even aborted calls must release their mounts before the send unlocks.
   tools: Promise<void> | null;
   // the stream sequence, per send, from 1
   seq: number;
@@ -122,6 +128,7 @@ export function newRound(messageId: string, now: number): RoundState {
     htmlAt: 0,
     finishReason: null,
     usage: null,
+    tokens: 0,
     calls: [],
     drafts: new Map(),
     slotMarked: false,
@@ -158,10 +165,17 @@ export function newSend(fields: {
     round: newRound(fields.replyId, fields.now),
     roundNo: 1,
     phase: "provider",
-    budget: { calls: 0, toolMs: 0, resultBytes: 0 },
-    toolBudget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+    budget: { calls: 0, toolMs: 0, resultBytes: 0, tokens: 0 },
+    toolBudget: {
+      fetches: 0,
+      searches: 0,
+      visualBytes: 0,
+      visuals: 0,
+      bashCalls: 0,
+    },
     signatures: [],
-    answering: false,
+    answering: null,
+    bare: false,
     summarizing: fields.summarizing ?? false,
     used: fields.used ?? null,
     mcpNote: "",

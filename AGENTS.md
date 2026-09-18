@@ -613,12 +613,23 @@ violation, and every rule has a rejected fixture under
   runs, with `automation_id` set null.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
-  bytes) and the per-tool caps have their defaults, floors and
-  ceilings in one table, `limits/defaults.ts`; an admin's override is
-  a row in `limits`, `limits.current()` merges them, and
+  bytes, `toolWorkTokens`) and the per-tool caps have their defaults,
+  floors and ceilings in one table, `limits/defaults.ts`; an admin's
+  override is a row in `limits`, `limits.current()` merges them, and
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
-  the defaults; `tools/` never imports `runner/`. The offered set is
-  decided once per send in `runner/policy.ts` from the `tools` rows:
+  the defaults; `tools/` never imports `runner/`. `maxBashCalls` refuses
+  excess bash calls before queue or slot admission without ending the loop.
+  Main rounds spend prompt plus completion tokens, cached tokens included,
+  or a request estimate without usage. The tool-work threshold and the
+  window threshold are checked before calls, forcing one answer round.
+  An answer round that still calls is asked once more without schemas.
+  The crossing and answer rounds may pass the tool-work budget; summaries
+  and memory have their own limits. Results that outgrow the remaining
+  window are cut largest first before storage, keeping bash's exit and
+  receipts and a cut line. The work row carries `tool_limit`, `token_limit`
+  or `context_limit`; the answer keeps the provider's finish reason.
+  The offered set is decided once per send in `runner/policy.ts` from
+  the `tools` rows:
   a model that accepts tools always gets `datetime` and `bash` over the
   project's knowledge base, plus the web tools
   (`WEB_TOOLS`: `webfetch`, `websearch`, `visualize`, the only rows and

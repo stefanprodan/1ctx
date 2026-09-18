@@ -252,7 +252,13 @@ describe("memory chat receipts", () => {
       actor: null,
       signal: new AbortController().signal,
       now: () => now,
-      budget: { fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
+      budget: {
+        bashCalls: 0,
+        fetches: 0,
+        searches: 0,
+        visualBytes: 0,
+        visuals: 0,
+      },
       caps: { ...TOOL_CAPS, resultCut: 400 },
     };
     const pages: string[] = [];

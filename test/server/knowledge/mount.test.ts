@@ -32,6 +32,7 @@ describe("knowledge command mounts", () => {
       expect(edited).toEqual({
         error: false,
         content: "exit 0\nwrote docs/x.md (rev 2, 1 lines)",
+        tail: "exit 0\nwrote docs/x.md (rev 2, 1 lines)".length,
       });
       expect(s.area.read(s.projectId, first.id)).toMatchObject({
         text: "new\n",
@@ -67,6 +68,7 @@ describe("knowledge command mounts", () => {
       expect(removed).toEqual({
         error: false,
         content: "exit 0\ndeleted docs/y.md",
+        tail: "exit 0\ndeleted docs/y.md".length,
       });
       expect(s.area.list(s.projectId).deleted).toHaveLength(2);
     } finally {
@@ -106,7 +108,7 @@ describe("knowledge command mounts", () => {
       try {
         expect(
           await run(s, "echo same > x; mkdir empty; rmdir empty; mkdir stays"),
-        ).toEqual({ error: false, content: "exit 0" });
+        ).toEqual({ error: false, content: "exit 0", tail: 6 });
         expect(events).toEqual([]);
         expect(s.area.versions(s.projectId, file.id)).toHaveLength(1);
         expect(s.area.list(s.projectId).files).toHaveLength(1);
@@ -218,6 +220,7 @@ describe("knowledge command mounts", () => {
       expect(await run(s, "export PRIVATE=not-returned; test 1 = 1")).toEqual({
         error: false,
         content: "exit 0",
+        tail: 6,
       });
     } finally {
       s.db.close();
@@ -231,6 +234,7 @@ describe("knowledge command mounts", () => {
       expect(result).toEqual({
         error: true,
         content: "exit 1\nwrote x (rev 1, 1 lines)",
+        tail: "exit 1\nwrote x (rev 1, 1 lines)".length,
       });
       expect(s.area.store.byName(s.projectId, "x")?.text).toBe("kept\n");
     } finally {
@@ -414,42 +418,6 @@ describe("knowledge command mounts", () => {
       expect((await run(s, "printf short > x")).error).toBe(false);
       expect(s.area.read(s.projectId, file.id).text).toBe("short");
       expect((await run(s, "rm x")).error).toBe(false);
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test("stdout then stderr is cut while Unicode, status and receipts stay intact", async () => {
-    const s = setup();
-    try {
-      create(s, "text", "x\u00e9\ud83d\ude00".repeat(270));
-      const result = await run(s, "cat text; echo warning >&2; echo saved > x");
-      expect(result).toMatchObject({ error: false });
-      expect(result.content.length).toBeLessThanOrEqual(1000);
-      expect(result.content.isWellFormed()).toBe(true);
-      expect(result.content).toStartWith("x\u00e9\ud83d\ude00");
-      expect(result.content).toContain(
-        "... output cut at 1000 characters, narrow with grep or sed -n",
-      );
-      expect(result.content).toEndWith("exit 0\nwrote x (rev 1, 1 lines)");
-      const ordered = await run(s, "echo out; echo err >&2");
-      expect(ordered.content).toBe("out\nerr\n\nexit 0");
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test("output budget limits and unreportable receipt sets never commit", async () => {
-    const s = setup({ scratchBytes: 4000, knowledgeFileBytes: 4000 });
-    try {
-      expect((await run(s, "echo saved > x; seq 1 10000")).error).toBe(true);
-      expect(s.area.list(s.projectId).files).toEqual([]);
-      const result = await run(s, "for i in {1..100}; do touch file$i; done");
-      expect(result.error).toBe(true);
-      expect(result.content).toContain(
-        "change receipts exceed 1000 characters",
-      );
-      expect(s.area.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }

@@ -16,6 +16,7 @@ import type { MemorySnapshot } from "../sessions/index.ts";
 export type { ToolCaps } from "../limits/index.ts";
 
 export type ToolBudget = {
+  bashCalls: number;
   fetches: number;
   searches: number;
   visualBytes: number;
@@ -37,7 +38,11 @@ export type ToolContext = {
   caps: ToolCaps;
 };
 
-export type ToolResult = { content: string; error: boolean };
+export type ToolResult = {
+  content: string;
+  error: boolean;
+  tail?: number;
+};
 
 export type Tool<T extends string | ToolResult = string> = {
   name: string;

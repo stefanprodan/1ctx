@@ -11,10 +11,12 @@ describe("scratch across commands", () => {
       expect(await run(s, "cd /tmp; printf kept > draft")).toEqual({
         content: "exit 0",
         error: false,
+        tail: 6,
       });
       expect(await run(s, "pwd; cat draft")).toEqual({
         content: "/tmp\nkept\nexit 0",
         error: false,
+        tail: 6,
       });
       expect(s.area.list(s.projectId).files).toEqual([]);
       expect(scratchState(s)).toMatchObject({
@@ -73,7 +75,7 @@ describe("scratch across commands", () => {
         'cd /tmp; cat payload > copy; base64 payload > encoded; tar -cf bundle.tar payload; value=$(cat payload); printf %s "$value" > substituted',
         { ...callCaps, callTimeoutMs: 10_000 },
       );
-      expect(result).toEqual({ error: false, content: "exit 0" });
+      expect(result).toEqual({ error: false, content: "exit 0", tail: 6 });
       const files = new Map(
         scratchState(s).entries.map((file) => [file.path, file]),
       );
@@ -183,6 +185,7 @@ describe("the saved directory", () => {
         error: false,
         content:
           "started in /knowledge: /tmp/work no longer exists\n/knowledge\n\nexit 0",
+        tail: 6,
       });
       expect(scratchState(s).cwd).toBe("/knowledge");
     } finally {
