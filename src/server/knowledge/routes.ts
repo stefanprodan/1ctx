@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The project-scoped file and history API. Each lookup resolves project
+// access first, then addresses rows within that project, so a foreign id
+// is indistinguishable from a missing one and deleted history stays readable.
 
 import type {
   KnowledgeFileDetailResponse,

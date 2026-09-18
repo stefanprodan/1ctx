@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// One text rule for JSON uploads and command output, independent of file
+// extensions. Fatal byte decoding and string checks refuse corruption
+// instead of persisting replacement characters as if they were the input.
 
 export { kindOf } from "../../shared/knowledge.ts";
 

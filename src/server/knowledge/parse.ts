@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The request boundary for knowledge names, text and revisions. Files
+// use row ids in URLs because their names contain slashes; replacements
+// require a revision so a restore cannot silently overwrite a newer edit.
 
 import type {
   CreateKnowledgeFileRequest,

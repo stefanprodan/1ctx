@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// A command's changes land together against the identities and revisions
+// it mounted. Caps and receipt space are checked before writing so a
+// conflict or an unreportable change cannot leave a partial commit.
 
 import type {
   KnowledgeAuthor,

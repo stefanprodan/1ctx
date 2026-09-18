@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The knowledge capability shared by routes, tools and send policies.
+// Page writes bind the file, its history and its event in one transaction;
+// command writes use the same store so both paths share revisions and caps.
 
 import type {
   KnowledgeAuthor,

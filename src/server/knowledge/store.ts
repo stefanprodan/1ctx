@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Live project text and its metadata over the migrated tables. Writes
+// keep post-image versions, and recent files come from live rows rather
+// than a saved catalog that could still name a deleted file.
 
 import type {
   KnowledgeAuthor,

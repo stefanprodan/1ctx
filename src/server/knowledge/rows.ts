@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The database shapes and their wire summaries, kept separate from text.
+// Author names are stored at the write rather than joined from live users
+// or agents, so history remains attributable after its author is gone.
 
 import type {
   KnowledgeAuthor,

@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Immutable post-images and deletion records whose lifetime exceeds the
+// live file's. Eviction bounds history without blocking writes; age alone
+// expires only deleted-file history so live versions remain restorable.
 
 import type {
   KnowledgeDeleted,

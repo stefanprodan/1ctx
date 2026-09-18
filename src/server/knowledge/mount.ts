@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The sole just-bash boundary: a disposable filesystem with no host or
+// network access. Only changed regular files under /knowledge can commit;
+// aborts, execution limits and throws discard even writes already made.
 
 import { Bash, decodeBytesToUtf8, InMemoryFs, stdoutAsBytes } from "just-bash";
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";

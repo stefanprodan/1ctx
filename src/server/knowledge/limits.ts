@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The fixed budgets and command surface of a disposable knowledge mount.
+// Commands are pinned so a dependency upgrade cannot silently expose a
+// new runtime; the body budget leaves room for JSON escaping at the cap.
 
 import { LIMIT_DEFINITIONS } from "../limits/index.ts";
 

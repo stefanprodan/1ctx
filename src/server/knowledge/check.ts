@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// The storage checks shared by page writes and command commits. Names
+// must form a mountable tree, and lowered caps must still let an
+// oversized base shrink without allowing growth in another dimension.
 
 import { prefixConflict } from "../../shared/knowledge.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";

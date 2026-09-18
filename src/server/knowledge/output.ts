@@ -1,5 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+//
+// A bounded command result that reserves space for the exit and receipts.
+// A model must see what was saved even when stdout is cut, so receipts
+// that cannot fit refuse the write rather than hiding its outcome.
 
 export function cutText(text: string, length: number): string {
   const cut = text.slice(0, Math.max(0, length));
