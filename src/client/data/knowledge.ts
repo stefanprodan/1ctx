@@ -9,7 +9,7 @@
 // run applies straight to the list by revision, so an open tab follows
 // what an agent writes without asking again.
 
-import { effect, signal } from "@preact/signals";
+import { batch, effect, signal } from "@preact/signals";
 import type {
   CreateKnowledgeFileRequest,
   KnowledgeFileDetailResponse,
@@ -24,11 +24,12 @@ import type {
   KnowledgeFile,
   KnowledgeList,
   KnowledgeTotals,
+  KnowledgeUploadResult,
   KnowledgeVersion,
 } from "../../shared/contracts/knowledge.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { api, upload } from "./api.ts";
 import { me } from "./me.ts";
 import { project } from "./projects.ts";
 import { onSocketEvent } from "./socket.ts";
@@ -107,14 +108,29 @@ function shape(list: KnowledgeList): KnowledgeList {
 }
 
 function put(projectId: string, list: KnowledgeList): void {
-  const next = new Map(lists.value);
-  next.set(projectId, shape(list));
-  lists.value = next;
-  if (listErrors.value.has(projectId)) {
-    const errors = new Map(listErrors.value);
-    errors.delete(projectId);
-    listErrors.value = errors;
-  }
+  const shaped = shape(list);
+  const held = lists.value.get(projectId);
+  batch(() => {
+    if (held !== undefined) {
+      const revisions = new Map(
+        [...shaped.files, ...shaped.deleted].map((file) => [
+          file.id,
+          file.revision,
+        ]),
+      );
+      for (const file of [...held.files, ...held.deleted]) {
+        if (revisions.get(file.id) !== file.revision) dropCached(file.id);
+      }
+    }
+    const next = new Map(lists.value);
+    next.set(projectId, shaped);
+    lists.value = next;
+    if (listErrors.value.has(projectId)) {
+      const errors = new Map(listErrors.value);
+      errors.delete(projectId);
+      listErrors.value = errors;
+    }
+  });
 }
 
 // what was read of a file is stale the moment it is written or deleted
@@ -129,6 +145,14 @@ function dropCached(fileId: string): void {
     delete held[fileId];
     fileVersions.value = held;
   }
+}
+
+function revisionOf(projectId: string, fileId: string): number | undefined {
+  const held = lists.value.get(projectId);
+  return (
+    held?.files.find((file) => file.id === fileId) ??
+    held?.deleted.find((file) => file.id === fileId)
+  )?.revision;
 }
 
 const bump = (projectId: string) => {
@@ -176,10 +200,15 @@ export async function readFile(
   if (held !== undefined) return held;
   const forUser = owner;
   const mine = turns.get(projectId) ?? 0;
+  const revision = revisionOf(projectId, fileId);
   const answer = await api<KnowledgeFileDetailResponse>(
     filePath(projectId, fileId),
   );
-  if (owner === forUser && turns.get(projectId) === mine) {
+  if (
+    owner === forUser &&
+    turns.get(projectId) === mine &&
+    revisionOf(projectId, fileId) === revision
+  ) {
     fileTexts.value = { ...fileTexts.value, [fileId]: answer.file.text };
   }
   return answer.file.text;
@@ -193,10 +222,15 @@ export async function loadVersions(
   if (held !== undefined) return held;
   const forUser = owner;
   const mine = turns.get(projectId) ?? 0;
+  const revision = revisionOf(projectId, fileId);
   const answer = await api<KnowledgeVersionsResponse>(
     `${filePath(projectId, fileId)}/versions`,
   );
-  if (owner === forUser && turns.get(projectId) === mine) {
+  if (
+    owner === forUser &&
+    turns.get(projectId) === mine &&
+    revisionOf(projectId, fileId) === revision
+  ) {
     fileVersions.value = { ...fileVersions.value, [fileId]: answer.versions };
   }
   return answer.versions;
@@ -235,6 +269,23 @@ export async function addFile(
   bump(projectId);
   if (owner === forUser) keepFile(projectId, answer.file);
   return answer.file;
+}
+
+export function uploadFile(
+  projectId: string,
+  file: File,
+  folder: string,
+  options: {
+    onProgress?: (sent: number, total: number) => void;
+    signal?: AbortSignal;
+  } = {},
+): Promise<KnowledgeUploadResult> {
+  const query = new URLSearchParams({ folder, name: file.name });
+  return upload<KnowledgeUploadResult>(
+    `${base(projectId)}/upload?${query}`,
+    file,
+    options,
+  );
 }
 
 export async function replaceFile(

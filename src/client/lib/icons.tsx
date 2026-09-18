@@ -99,6 +99,7 @@ const PATHS: Record<string, string> = {
   "arrow-right": "M2.5 8h11M9 3.5 13.5 8 9 12.5",
   pencil: "M10.5 3 13 5.5 6 12.5H3.5V10zM9 4.5 11.5 7",
   download: "M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10",
+  upload: "M8 10V2.5M5 5.5l3-3 3 3M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2",
   stop: "M4 4h8v8H4z",
   chat: "M3 3.5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-3 2.5v-2.5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z",
   agents:

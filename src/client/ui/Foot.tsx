@@ -20,10 +20,12 @@ export function Foot({
   label,
   start,
   before,
+  children,
 }: {
-  save: Save;
-  dirty: boolean;
-  label: string;
+  save: Pick<Save, "status" | "busy" | "notice">;
+  dirty?: boolean;
+  label?: string;
+  children?: ComponentChildren;
   // what sits at the left end, apart from the submit: a Delete
   start?: ComponentChildren;
   // what sits right before the submit: a Cancel
@@ -51,20 +53,22 @@ export function Foot({
       )}
       {start && <div class="foot-start">{start}</div>}
       {before}
-      <button
-        type="submit"
-        class={`btn btn-primary${done ? " foot-done" : ""}`}
-        disabled={save.busy || done || !dirty}
-      >
-        <span class="foot-labels">
-          <span class={on(!busy && !done)}>{label}</span>
-          <span class={on(busy)}>Saving</span>
-          <span class={on(done)}>
-            <Icon name="check" size={14} />
-            Saved
+      {children ?? (
+        <button
+          type="submit"
+          class={`btn btn-primary${done ? " foot-done" : ""}`}
+          disabled={save.busy || done || !dirty}
+        >
+          <span class="foot-labels">
+            <span class={on(!busy && !done)}>{label}</span>
+            <span class={on(busy)}>Saving</span>
+            <span class={on(done)}>
+              <Icon name="check" size={14} />
+              Saved
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+      )}
     </div>
   );
 }

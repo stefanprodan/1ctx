@@ -3,7 +3,10 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  FOLDER_ONCE,
+  isFolderRefusal,
   kindOf,
+  knowledgeFolder,
   normalizeKnowledgePath,
   splitRawPath,
   textFromBytes,
@@ -310,5 +313,30 @@ describe("knowledge text", () => {
     expect(kindOf(".gitignore")).toBe("");
     expect(kindOf("Makefile")).toBe("");
     expect(kindOf("dir.with.dot/main.go")).toBe("go");
+  });
+});
+
+describe("the upload folder", () => {
+  test("is normalized, the root when empty, and refused in plain words", () => {
+    expect(knowledgeFolder("")).toEqual({ ok: true, name: "" });
+    expect(knowledgeFolder("My Docs/On Call")).toEqual({
+      ok: true,
+      name: "my-docs/on-call",
+    });
+    const refusals = [
+      ["../x", "folder cannot contain .."],
+      ["a/日本語", "folder needs a letter or a digit in every part"],
+      ["a/b/c/d/e/f/g/h", "folder is at most 7 levels and 180 characters"],
+      ["x".repeat(181), "folder is at most 7 levels and 180 characters"],
+    ] as const;
+    for (const [raw, words] of refusals) {
+      expect(knowledgeFolder(raw)).toEqual({ ok: false, words });
+      expect(isFolderRefusal(words)).toBe(true);
+    }
+    expect(isFolderRefusal(FOLDER_ONCE)).toBe(true);
+    // a file named folder has refusals that start the same way
+    expect(isFolderRefusal("folder changed while uploading, try again")).toBe(
+      false,
+    );
   });
 });

@@ -3,7 +3,7 @@
 //
 // A project's Knowledge tab: the text files its members seed and its
 // agents keep with the bash tool. One card of rows, searched by name,
-// with Add file at its head, and a second card of the files that were
+// with Upload at its head, and a second card of the files that were
 // deleted and can still be brought back.
 
 import { useSignal } from "@preact/signals";
@@ -36,12 +36,12 @@ import {
   lastLiveVersion,
   shownFiles,
 } from "./Knowledge.model.ts";
-import { KnowledgeForm } from "./KnowledgeForm.tsx";
 import { Author, KnowledgeRow } from "./KnowledgeRow.tsx";
+import { KnowledgeUpload } from "./KnowledgeUpload.tsx";
 import "./knowledge.css";
 
 const EMPTY =
-  "No files yet. Add one, or ask an agent to create one with the bash tool.";
+  "No files yet. Upload files, or ask an agent to create one with the bash tool.";
 const ABOUT =
   "Every agent in this project sees this list and reads a file when it needs it. Ask an agent to add or change a file.";
 
@@ -109,18 +109,18 @@ function Base({ projectId }: { projectId: string }) {
         }
         action={
           <RowsAdd
-            label="Add file"
+            label="Upload"
             disabled={adding.value}
             onClick={() => {
               adding.value = true;
-              open.value = null;
             }}
           />
         }
       >
         {adding.value && (
           <RowsNew>
-            <KnowledgeForm
+            <KnowledgeUpload
+              key={projectId}
               projectId={projectId}
               names={list.files.map((file) => file.name)}
               limits={list.limits}
@@ -142,7 +142,6 @@ function Base({ projectId }: { projectId: string }) {
             open={open.value === file.id}
             onToggle={() => {
               open.value = open.value === file.id ? null : file.id;
-              adding.value = false;
             }}
           />
         ))}

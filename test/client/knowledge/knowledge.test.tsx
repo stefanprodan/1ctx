@@ -6,6 +6,7 @@
 // knowledge frame to the list it holds.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { options } from "preact";
 import { render } from "preact-render-to-string";
 import {
   applyKnowledge,
@@ -21,26 +22,19 @@ import { me } from "../../../src/client/data/me.ts";
 import { project } from "../../../src/client/data/projects.ts";
 import {
   authorOf,
-  baseName,
-  bodyProblem,
   deletedHint,
   deletedLine,
-  fieldOf,
   headLine,
   knowledgeWords,
   lastLiveVersion,
-  nameProblem,
-  shapeKnowledgeName,
   shownFiles,
   sizeWords,
   textBox,
-  textHint,
-  textProblem,
   versionLine,
 } from "../../../src/client/views/knowledge/Knowledge.model.ts";
 import { Knowledge } from "../../../src/client/views/knowledge/Knowledge.tsx";
-import { KnowledgeForm } from "../../../src/client/views/knowledge/KnowledgeForm.tsx";
 import { KnowledgeRow } from "../../../src/client/views/knowledge/KnowledgeRow.tsx";
+import { KnowledgeUpload } from "../../../src/client/views/knowledge/KnowledgeUpload.tsx";
 import type {
   KnowledgeAuthor,
   KnowledgeDeleted,
@@ -255,72 +249,63 @@ describe("the knowledge words", () => {
   });
 });
 
-describe("the add checks", () => {
-  const names = ["docs", "notes/old.md"];
-
-  test("a name is one to eight segments, free of the live names", () => {
-    expect(nameProblem("", names)).toBe("Enter a name");
-    expect(nameProblem("docs/../x", names)).toContain("One to eight segments");
-    expect(nameProblem("notes/old.md", names)).toBe(
-      "a file named notes/old.md exists",
-    );
-    // no file is another file's directory, either way round
-    expect(nameProblem("docs/x.md", names)).toBe("docs is a file");
-    expect(nameProblem("notes", names)).toBe("notes/old.md is inside it");
-    expect(nameProblem(" runbook.md ", names)).toBeNull();
-  });
-
-  test("a text is asked for, and read as UTF-8 under the cap", () => {
-    const cap = 262_144;
-    expect(textProblem("", cap)).toBe("Add some text");
-    expect(textProblem("hello", cap)).toBeNull();
-    // the browser decodes what it cannot read into U+FFFD
-    expect(textProblem("hi\uFFFD!", cap)).toBe("Not a text file");
-    expect(textProblem("hi\u0000", cap)).toBe("Not a text file");
-    expect(textProblem("a".repeat(307_200), cap)).toBe(
-      "Too large: 300 KB, the cap is 256 KB",
-    );
-    // a multibyte character counts its bytes
-    expect(textProblem("é".repeat(cap), cap)).toContain("Too large: 512 KB");
-  });
-
-  test("what escaping adds is measured against the body cap", () => {
-    const cap = 4096;
-    expect(bodyProblem({ name: "x.md", text: "hello" }, cap)).toBeNull();
-    // a quote or a control character grows to six bytes on the wire
-    const words = bodyProblem(
-      { name: "x.md", text: "\u0001".repeat(3000) },
-      cap,
-    );
-    expect(words).toContain("Too large to send");
-    expect(words).toContain("the cap is 12 KB");
-  });
-
-  test("a name is shaped as it is typed, and a picked file names itself", () => {
-    expect(shapeKnowledgeName("  my notes.md  ")).toBe("my-notes.md");
-    expect(baseName("docs/runbook.md")).toBe("runbook.md");
-    expect(baseName("runbook.md")).toBe("runbook.md");
-    expect(sizeWords(262_144)).toBe("256 KB");
-    expect(sizeWords(4 * 1024 * 1024)).toBe("4 MB");
-    expect(textHint(262_144)).toBe("Any UTF-8 text up to 256 KB");
-  });
-
-  test("the server's words land at the field they are about", () => {
-    expect(fieldOf("a file named docs/x.md exists")).toBe("name");
-    expect(fieldOf("docs is a file")).toBe("name");
-    expect(fieldOf("name must be one to eight segments")).toBe("name");
-    expect(fieldOf("not a text file")).toBe("text");
-    expect(fieldOf("the project is over its cap")).toBeUndefined();
-  });
+test("file sizes keep their units", () => {
+  expect(sizeWords(262_144)).toBe("256 KB");
+  expect(sizeWords(4 * 1024 * 1024)).toBe("4 MB");
 });
 
 describe("the page", () => {
-  test.serial("the card heads with the search, the totals and Add file", () => {
+  test.serial(
+    "the form prevents file-drop navigation even without a drop target",
+    () => {
+      const previous = options.vnode;
+      let drop: ((event: Event) => void) | undefined;
+      let drag: ((event: Event) => void) | undefined;
+      options.vnode = (node) => {
+        previous?.(node);
+        const props = node.props;
+        if (
+          node.type === "form" &&
+          "class" in props &&
+          props.class === "knowledge-form"
+        ) {
+          if ("onDrop" in props && typeof props.onDrop === "function") {
+            const handler = props.onDrop;
+            drop = (event) => handler(event);
+          }
+          if ("onDragOver" in props && typeof props.onDragOver === "function") {
+            const handler = props.onDragOver;
+            drag = (event) => handler(event);
+          }
+        }
+      };
+      try {
+        render(
+          <KnowledgeUpload
+            projectId="p1"
+            names={[]}
+            limits={list().limits}
+            onDone={() => {}}
+          />,
+        );
+        for (const handler of [drop, drag]) {
+          const event = new Event("drop", { cancelable: true });
+          handler?.(event);
+          expect(event.defaultPrevented).toBe(true);
+        }
+      } finally {
+        options.vnode = previous;
+      }
+    },
+  );
+
+  test.serial("the card heads with the search, the totals and Upload", () => {
     lists.value = new Map([["p1", list()]]);
     const html = render(<Knowledge params={{ id: "p1" }} />);
     expect(html).toContain('placeholder="Search files"');
     expect(html).toContain("1 file · 620 tokens");
-    expect(html).toContain("Add file");
+    expect(html).toContain("Upload");
+    expect(html).not.toContain("Add file");
     expect(html).toContain("docs/runbook.md");
     // the head is a button, so it carries no link
     expect(html).not.toContain('href="/agents/sre"');
@@ -381,24 +366,29 @@ describe("the page", () => {
     expect(html).toContain("btn-danger");
   });
 
-  test.serial("the add form takes a name, a file and a text", () => {
-    const html = render(
-      <KnowledgeForm
-        projectId="p1"
-        names={[]}
-        limits={list().limits}
-        onDone={() => {}}
-      />,
-    );
-    expect(html).toContain('name="name"');
-    expect(html).toContain('name="text"');
-    expect(html).toContain("One to eight segments");
-    expect(html).toContain("Drop a text file here, or");
-    expect(html).toContain("Choose file");
-    expect(html).toContain('type="file"');
-    expect(html).toContain("Any UTF-8 text up to 256 KB");
-    expect(html).toContain("Cancel");
-  });
+  test.serial(
+    "the uploader takes a folder and multiple files, not a name or text",
+    () => {
+      const html = render(
+        <KnowledgeUpload
+          projectId="p1"
+          names={[]}
+          limits={list().limits}
+          onDone={() => {}}
+        />,
+      );
+      expect(html).toContain('name="folder"');
+      expect(html).not.toContain('name="name"');
+      expect(html).not.toContain("<textarea");
+      expect(html).toContain("The root when empty");
+      expect(html).toContain("Drop files or archives here");
+      expect(html).toContain("Choose files");
+      expect(html).toContain('type="file"');
+      expect(html).toContain("multiple");
+      expect(html).toContain("up to 32 MB each");
+      expect(html).toContain("Cancel");
+    },
+  );
 });
 
 describe("a knowledge frame", () => {

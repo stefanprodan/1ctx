@@ -79,6 +79,41 @@ export function normalizeKnowledgePath(
   return { ok: true, name };
 }
 
+// the folder an upload lands in: normalized as any uploaded path, the
+// root when empty, and short enough that a file still fits beneath it.
+// The words are the refusal both the page and the server give.
+export const MAX_FOLDER_SEGMENTS = 7;
+export const MAX_FOLDER_CHARS = 180;
+
+const FOLDER_WORDS: Record<KnowledgePathReason, string> = {
+  outside: "folder cannot contain ..",
+  "no-letters": "folder needs a letter or a digit in every part",
+  "too-long": "folder is at most 7 levels and 180 characters",
+  "bad-name": "folder is not a valid path",
+};
+
+export const FOLDER_ONCE = "folder must be given at most once";
+
+// a refusal the Folder field owns, told apart by its exact words, since
+// a file named folder has refusals that start the same way
+export function isFolderRefusal(words: string): boolean {
+  return words === FOLDER_ONCE || Object.values(FOLDER_WORDS).includes(words);
+}
+
+export function knowledgeFolder(
+  raw: string,
+): { ok: true; name: string } | { ok: false; words: string } {
+  const result = normalizeKnowledgePath(raw, { folder: true });
+  if (!result.ok) return { ok: false, words: FOLDER_WORDS[result.reason] };
+  if (
+    result.name.length > MAX_FOLDER_CHARS ||
+    (result.name !== "" && result.name.split("/").length > MAX_FOLDER_SEGMENTS)
+  ) {
+    return { ok: false, words: FOLDER_WORDS["too-long"] };
+  }
+  return { ok: true, name: result.name };
+}
+
 // Fatal decoding and string checks refuse corruption rather than keeping
 // replacement characters as if they were the input.
 export function textFromString(value: string): string {

@@ -766,8 +766,12 @@ violation, and every rule has a rejected fixture under
   in a label row. A card's head holds `RowsAdd`, `RowsLink` or
   `RowsFilters`; `RowsNote` says why a list is empty, `RowsBlock` is a
   row of text. The controls live in `ui/RowsControls.tsx`, exported
-  through `Rows.tsx`. A view never draws a row, a head, a list box, a
-  switch, a box or filter chips of its own; its stylesheet holds only
+  through `Rows.tsx`. Compact outcome logs use `RowsLog`,
+  `RowsLogGroup`, `RowsLogLine` (name, note, failure and status tag)
+  and `RowsLogMore`; names ellipsize and notes wrap only when needed.
+  Card head buttons never wrap; hints stay on one ellipsized line. A
+  view never draws a row, a head, a list box, a switch, a box or filter
+  chips of its own; its stylesheet holds only
   what an open row's body or a meta holds. The stream's session row
   (`stream/Row.tsx`) is the one row outside Rows, a denser feed line
   inside a `RowsCard`. A card whose
@@ -783,14 +787,18 @@ violation, and every rule has a rejected fixture under
   rows by name in place. A project's tabs are Feed, Automations, Memory,
   Knowledge, then Members for a team or Settings for a personal one.
   The Knowledge tab is one card of the base's files, searched by name,
-  with the totals as its hint and Add file at its head: a row opens to
+  with the totals as its hint and Upload at its head: a row opens to
   who wrote it and from where, its text folded at twelve lines with
   Show all, History with Restore on every past version, and Delete; a
-  second card lists the deleted files whose text is still kept. Add file
-  is a name box, a drop target with Choose file behind it, and the text,
-  which a pick, a drop or a paste fills; the name rule, a text the
-  browser could not decode and the file and body caps are refused at
-  their field before anything is sent.
+  second card lists the deleted files whose text is still kept. Upload
+  takes a Folder and multiple text files or archives, judged at pick
+  with the shared name, archive and text rules. Items send sequentially
+  under a byte progress bar; outcomes and skips are compact Rows logs,
+  cut at ten with Show all. Stop aborts the request and leaves earlier
+  saves; a fully sent unanswered item may have saved. A 401, a changed
+  user, unmount or a folder refusal stops the run. The list reloads
+  once at the end, including Stop; changed or removed revisions drop
+  cached text and History even without socket frames.
   `data/knowledge.ts` holds the list per project, a file's text and its
   versions once read, and applies a `knowledge` frame by revision, so a
   run's write lands on the open tab. A team project's Members tab is the
@@ -839,9 +847,13 @@ violation, and every rule has a rejected fixture under
   place of its hint, and `useFocusField()` moves the focus to the
   control carrying that `name`. Any other refusal is the notice `Foot`
   draws over the buttons, "Could not delete." then the server's words.
-  No form shows a refusal anywhere else. A page whose load failed is
-  `Page`'s `error`: a card saying the page did not load, the words and
-  Try again. A failure is words first: `api()` passes the server's own
+  The uploader is the exception: `Upload.state.ts`, not `useSave()`,
+  owns busy state; Stop alone stays enabled during a run. An item's
+  refusal is its log line with a status tag, a folder refusal is the
+  field's, and a run refusal such as a picked-file read failure is
+  the `Foot`'s. No other form shows a refusal elsewhere. A page whose
+  load failed is `Page`'s `error`: a card saying the page did not load,
+  the words and Try again. A failure is words first: `api()` passes the server's own
   words and gives an answer without them the words of `statusWords()`,
   never a bare status. The status rides beside them, `failure()` in
   `lib/format.ts` for a page's error signal and `status` on a form's

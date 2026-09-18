@@ -14,8 +14,6 @@ import type {
   KnowledgeTotals,
   KnowledgeVersion,
 } from "../../../shared/contracts/knowledge.ts";
-import { prefixConflict } from "../../../shared/knowledge.ts";
-import { isKnowledgeName } from "../../../shared/words.ts";
 import { ago, count } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { matches } from "../../lib/search.ts";
@@ -145,45 +143,6 @@ export function deletedHint(historyDays: number): string {
   return `kept ${plural(historyDays, "day")}`;
 }
 
-// the Name box's hint: the rule in words, since a path is not a name
-// the field can shape into shape on its own
-export const NAME_HINT =
-  "One to eight segments of letters, digits, dot, dash and underscore, like docs/runbook.md";
-
-// the name a new file may take: the rule, the names in the base, and
-// the rule that no file is another file's directory
-export function nameProblem(
-  value: string,
-  names: readonly string[],
-): string | null {
-  const name = value.trim();
-  if (name === "") return "Enter a name";
-  if (!isKnowledgeName(name)) return NAME_HINT;
-  if (names.includes(name)) return `a file named ${name} exists`;
-  const clash = prefixConflict(name, names);
-  if (clash === null) return null;
-  return name.startsWith(`${clash}/`)
-    ? `${clash} is a file`
-    : `${clash} is inside it`;
-}
-
-// the name box shapes what is typed, as every name field does: no
-// spaces and no ends to trim
-export function shapeKnowledgeName(value: string): string {
-  return value.trim().replace(/\s+/g, "-");
-}
-
-// a picked file's name without its directories
-export function baseName(fileName: string): string {
-  return fileName.slice(fileName.lastIndexOf("/") + 1);
-}
-
-const ENCODER = new TextEncoder();
-
-export function byteLength(text: string): number {
-  return ENCODER.encode(text).length;
-}
-
 // a size as a field says it: "256 KB", "4 MB"
 export function sizeWords(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -191,48 +150,4 @@ export function sizeWords(bytes: number): string {
     return `${Number((bytes / 1024).toPrecision(3))} KB`;
   }
   return `${Number((bytes / (1024 * 1024)).toPrecision(3))} MB`;
-}
-
-export function textHint(fileBytes: number): string {
-  return `Any UTF-8 text up to ${sizeWords(fileBytes)}`;
-}
-
-// the browser decodes a file it cannot read into U+FFFD, so a text
-// holding one, or a NUL, is not a text file the base takes
-export function textProblem(text: string, fileBytes: number): string | null {
-  if (text === "") return "Add some text";
-  if (text.includes("\uFFFD") || text.includes("\u0000")) {
-    return "Not a text file";
-  }
-  const bytes = byteLength(text);
-  if (bytes > fileBytes) {
-    return `Too large: ${sizeWords(bytes)}, the cap is ${sizeWords(fileBytes)}`;
-  }
-  return null;
-}
-
-// JSON escaping can grow a character to six bytes, so what goes on the
-// wire is measured too, against the cap the route reads a body with
-export const BODY_FACTOR = 3;
-
-export function bodyProblem(body: unknown, fileBytes: number): string | null {
-  const bytes = byteLength(JSON.stringify(body));
-  const cap = fileBytes * BODY_FACTOR;
-  if (bytes <= cap) return null;
-  return `Too large to send: ${sizeWords(bytes)}, the cap is ${sizeWords(cap)}`;
-}
-
-// which field the server's refusal is about
-export function fieldOf(message: string): string | undefined {
-  const words = message.toLowerCase();
-  if (
-    words.startsWith("name") ||
-    words.includes("a file named") ||
-    words.includes("is a file") ||
-    words.includes("is inside")
-  ) {
-    return "name";
-  }
-  if (words.startsWith("text") || words.includes("text file")) return "text";
-  return undefined;
 }

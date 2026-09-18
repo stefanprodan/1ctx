@@ -14,6 +14,8 @@ import type {
   KnowledgeUploadResult,
 } from "../../shared/contracts/knowledge.ts";
 import {
+  FOLDER_ONCE,
+  knowledgeFolder,
   normalizeKnowledgePath,
   prefixConflict,
   splitRawPath,
@@ -49,21 +51,11 @@ type UploadDeps = {
 export function parseFolder(params: URLSearchParams): string {
   const folders = params.getAll("folder");
   if (folders.length > 1) {
-    throw new BadRequest("folder must be given at most once");
+    throw new BadRequest(FOLDER_ONCE);
   }
-  const normalized = normalizeKnowledgePath(folders[0] ?? "", {
-    folder: true,
-  });
-  if (
-    !normalized.ok ||
-    normalized.name.length > 180 ||
-    (normalized.name !== "" && normalized.name.split("/").length > 7)
-  ) {
-    throw new BadRequest(
-      "folder must be a valid path of at most 7 segments and 180 characters, never ..",
-    );
-  }
-  return normalized.name;
+  const folder = knowledgeFolder(folders[0] ?? "");
+  if (!folder.ok) throw new BadRequest(folder.words);
+  return folder.name;
 }
 
 function skip(
