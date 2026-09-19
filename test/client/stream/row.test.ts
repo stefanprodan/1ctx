@@ -41,6 +41,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   createdAt: now - 3_600_000,
   lastActivityAt: now - 12 * 60_000,
   usage: null,
+  disabledCapabilities: [],
   ...changes,
 });
 

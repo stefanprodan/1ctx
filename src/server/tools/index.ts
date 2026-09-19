@@ -8,16 +8,14 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
+import { WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
-import {
-  type McpMode,
-  type SearchProvider,
-  WEB_TOOLS,
-  type WebTool,
-} from "../../shared/words.ts";
+import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
+import type { McpMode, SearchProvider } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { KnowledgeCapability } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
@@ -44,6 +42,7 @@ import {
 } from "./builtin/websearch.ts";
 import { builtinCatalog, fillYear, parametersHtml } from "./catalog.ts";
 import { offered, type SkillsPort } from "./offer.ts";
+import type { ToolName } from "./parse.ts";
 import { Registry } from "./registry.ts";
 import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
@@ -59,7 +58,12 @@ export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
 export { isMemoryTool, MEMORY_WRITE_RULES } from "./builtin/memory.ts";
 export { TOOL_CAPS } from "./limits.ts";
 export type { SkillsPort } from "./offer.ts";
-export { parseHosts, parseToolName, parseToolPatch } from "./parse.ts";
+export {
+  parseHosts,
+  parseToolName,
+  parseToolPatch,
+  parseWebDomains,
+} from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
 export type {
   MemoryHandle,
@@ -100,12 +104,14 @@ export type ToolsDeps = {
 };
 
 export type Tools = {
+  capabilities(): string[];
   offered(
     now: number,
     agentId: string,
     agentServers?: AgentServer[],
     mode?: McpMode,
     scope?: MemoryScope,
+    disabledCapabilities?: readonly string[],
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
@@ -113,6 +119,7 @@ export type Tools = {
 };
 
 export type ToolsArea = Tools & {
+  webAccess(): WebAccess;
   store: ToolStore;
   routes: RouteDescriptor[];
 };
@@ -180,19 +187,24 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   };
 
   const toolsFor = (
-    search: SearchProvider,
+    search: SearchProvider | null,
     hosts: readonly string[],
+    web: WebSnapshot | null,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
-    makeWebfetchTool(deps.version, fetchDeps),
-    makeWebsearchTool(
-      () => deps.secret(`search-${search}`),
-      search,
-      deps.version,
-      searchDeps,
-    ),
+    ...(web === null ? [] : [makeWebfetchTool(deps.version, fetchDeps, web)]),
+    ...(search === null
+      ? []
+      : [
+          makeWebsearchTool(
+            () => deps.secret(`search-${search}`),
+            search,
+            deps.version,
+            searchDeps,
+          ),
+        ]),
     makeVisualizeTool(hosts),
-    makeBashTool(deps.knowledge),
+    makeBashTool(deps.knowledge, web),
   ];
 
   const mcpTools = (servers: OfferedServer[], ctx: ToolContext): Tool[] =>
@@ -218,31 +230,32 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       }),
     );
 
+  const webAccess = (): WebAccess => {
+    const row = store.rows().find((row) => row.name === "web")!;
+    return {
+      mode: row.mode!,
+      domains: row.hosts,
+      updatedAt: row.updatedAt,
+    };
+  };
+
   const response = (now: number): ToolsResponse => {
     const rows = new Map(store.rows().map((row) => [row.name, row]));
-    const selected = rows.get("websearch")?.provider ?? "exa";
-    const schemas = new Map(
-      fillYear(toolsFor(selected, rows.get("visualize")!.hosts), now).map(
-        (tool) => [tool.name, tool],
-      ),
-    );
-    const web = WEB_TOOLS.map((name): ToolsResponse["web"][number] => {
-      const row = rows.get(name)!;
-      const tool = schemas.get(name)!;
-      return {
-        name,
+    const visual = rows.get("visualize")!;
+    const tool = fillYear([makeVisualizeTool(visual.hosts)], now)[0]!;
+    return {
+      builtin: builtinCatalog(now, deps.render),
+      access: webAccess(),
+      visualize: {
+        name: "visualize",
         description: tool.description,
         parameters: tool.parameters,
         parametersHtml: parametersHtml(tool, deps.render),
         tokens: wireTokens([tool]),
-        enabled: row.enabled,
-        hosts: row.hosts,
-        updatedAt: row.updatedAt,
-      };
-    });
-    return {
-      builtin: builtinCatalog(now, deps.render),
-      web,
+        enabled: visual.enabled,
+        hosts: visual.hosts,
+        updatedAt: visual.updatedAt,
+      },
       search: {
         provider: rows.get("websearch")!.provider,
         keys: {
@@ -255,13 +268,21 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   };
 
   const patch = (
-    name: WebTool,
+    name: ToolName,
     change: PatchToolRequest,
     now: number,
   ): void => {
     transact(deps.db, () => {
+      if (name === "web") {
+        const row = store.rows().find((row) => row.name === "web")!;
+        const mode = change.mode ?? row.mode!;
+        const domains = change.domains ?? row.hosts;
+        if (mode === "listed" && domains.length === 0)
+          throw new BadRequest("list at least one host");
+        store.setAccess(mode, domains, now);
+      }
       if (change.enabled !== undefined) {
-        store.setEnabled(name, change.enabled, now);
+        store.setEnabled("visualize", change.enabled, now);
       }
       if ("provider" in change) store.setProvider(change.provider ?? null, now);
       if (change.hosts !== undefined) store.setHosts(change.hosts, now);
@@ -271,8 +292,17 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
 
   const area: ToolsArea = {
     store,
+    webAccess,
+    capabilities: () => (webAccess().mode === "off" ? [] : [WEB]),
     routes: [],
-    offered(now, agentId, agentServers, requestedMode, scope) {
+    offered(
+      now,
+      agentId,
+      agentServers,
+      requestedMode,
+      scope,
+      disabledCapabilities,
+    ) {
       return offered(
         {
           store,
@@ -288,12 +318,14 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         agentServers,
         requestedMode,
         scope,
+        disabledCapabilities,
       );
     },
     toolName(offered, call) {
       return mcpCallName(offered.mcp, call) ?? call.name;
     },
     async run(offered, call, ctx) {
+      ctx = { ...ctx, web: offered.web };
       const memory = offered.memory;
       if (
         memory !== null &&
@@ -304,10 +336,12 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const base = [
-        ...toolsFor(offered.search ?? "exa", []).filter((tool) =>
+        ...toolsFor(offered.search, [], offered.web).filter((tool) =>
           allowed.has(tool.name),
         ),
-        ...makeSkillTools(offered.skills.skills, skillStore),
+        ...makeSkillTools(offered.skills.skills, skillStore).filter((tool) =>
+          allowed.has(tool.name),
+        ),
       ];
       const direct = mcpTools(offered.mcp, ctx);
       if (call.name === "mcp_call" && allowed.has("mcp_call")) {

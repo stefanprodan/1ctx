@@ -120,6 +120,8 @@ const PATHS: Record<string, string> = {
   skill: "M4 2.5h5.5L13 6v7.5H4zM9.5 2.5V6H13M6.5 9h3M6.5 11.5h3",
   plug: "M6 2.5v3M10 2.5v3M4.5 5.5h7v2.5a3.5 3.5 0 0 1-7 0zM8 11.5v2",
   // files added to a chat: the clip, and what each one is
+  globe:
+    "M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8zM2 8h12M8 2c2.2 2 2.2 10 0 12M8 2c-2.2 2-2.2 10 0 12",
   clip: "m14.29 7.37-6.13 6.13a4 4 0 0 1-5.66-5.66l5.71-5.71A2.67 2.67 0 1 1 12 5.89l-5.73 5.71a1.33 1.33 0 0 1-1.89-1.89l5.66-5.65",
   file: "M4 1.5h5l3 3V14a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 14zM9 1.5v3h3",
   archive: "M2 3h12v3H2zM3 6v7.5h10V6M6.5 9h3",

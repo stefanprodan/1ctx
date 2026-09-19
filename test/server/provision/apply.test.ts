@@ -90,6 +90,8 @@ describe("provision through the composed app", () => {
         "mcpserver",
         "agent",
         "tool",
+        "tool",
+        "tool",
       ]);
       const zed = app.users.byUsername("zed-user")!;
       expect(zed).toMatchObject({
@@ -127,7 +129,14 @@ describe("provision through the composed app", () => {
       const client = app.client();
       expect((await client.login("admin", "hunter2-test")).status).toBe(200);
       const tools = await client.call("GET", "/api/tools");
-      expect((await tools.json()).search.provider).toBe("exa");
+      expect(await tools.json()).toMatchObject({
+        access: {
+          mode: "listed",
+          domains: ["api.example.test", "docs.example.test"],
+        },
+        search: { provider: "exa" },
+        visualize: { enabled: true, hosts: ["https://assets.example.test"] },
+      });
       await client.call("POST", "/api/logout");
     } finally {
       await app.shutdown();
@@ -624,7 +633,7 @@ describe("provision through the composed app", () => {
       await expect(
         app.provision.apply(
           documents(
-            object("Tool", "webfetch", { enabled: false }),
+            object("Tool", "web", { mode: "off" }),
             agent({ model: "missing-model" }),
             user(),
             provider(),
@@ -646,11 +655,7 @@ describe("provision through the composed app", () => {
       const client = app.client();
       expect((await client.login("admin", "hunter2-test")).status).toBe(200);
       const response = await client.call("GET", "/api/tools");
-      expect(
-        (await response.json()).web.find(
-          (tool: { name: string }) => tool.name === "webfetch",
-        ).enabled,
-      ).toBeTrue();
+      expect((await response.json()).access.mode).toBe("all");
     } finally {
       await app.shutdown();
     }

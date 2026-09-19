@@ -7,14 +7,18 @@
 
 import type {
   CreateSessionRequest,
+  RegenerateRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
-import { jsonBody } from "../lib/body.ts";
+import { jsonBody, readBody } from "../lib/body.ts";
+import { BadRequest } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import {
+  MAX_REGENERATE_BODY,
   MAX_SESSION_BODY,
   parseCreateSession,
+  parseRegenerate,
   parseSendMessage,
 } from "../sessions/index.ts";
 
@@ -25,7 +29,11 @@ export type RoutesDeps = {
     sessionId: string,
     fields: SendMessageRequest,
   ): SessionDetail;
-  regenerate(principal: Principal, sessionId: string): SessionDetail;
+  regenerate(
+    principal: Principal,
+    sessionId: string,
+    fields: RegenerateRequest,
+  ): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string): void;
 };
@@ -56,8 +64,21 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       method: "POST",
       path: "/api/sessions/:id/regenerate",
       policy: "authenticated",
-      handle(_req, ctx) {
-        return json(deps.regenerate(ctx.principal!, ctx.params.id), 201);
+      async handle(req, ctx) {
+        const text = await readBody(req, MAX_REGENERATE_BODY);
+        let body: unknown = {};
+        if (text !== "") {
+          try {
+            body = JSON.parse(text);
+          } catch {
+            throw new BadRequest("body must be JSON");
+          }
+        }
+        const fields = parseRegenerate(body);
+        return json(
+          deps.regenerate(ctx.principal!, ctx.params.id, fields),
+          201,
+        );
       },
     },
     {

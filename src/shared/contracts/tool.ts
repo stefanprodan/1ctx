@@ -41,7 +41,10 @@ export type ToolWhen =
   | "skillFiles"
   | "mcpCatalog"
   | "projectMemory"
-  | "memory";
+  | "memory"
+  // while the send has web access, and for websearch a provider too
+  | "web"
+  | "webSearch";
 
 // a tool as the tools page shows it: the schema the model gets, with
 // the year already filled, and its tokens as the wire carries it. The
@@ -57,16 +60,16 @@ type ToolSchema = {
 // a built-in, never switched: a schema naming skills or MCP tools is
 // counted with no names, and memory_edit's own-note text is the variant
 export type BuiltinToolSummary = ToolSchema & {
-  name: BuiltinTool;
+  name: BuiltinTool | "webfetch" | "websearch";
   when: ToolWhen;
   // the tool lists names a send fills in, each adding tokens
   names: boolean;
   variant: { description: string; tokens: number } | null;
 };
 
-// a web tool with its server-wide switch
+// visualize, the one tool with a server-wide switch of its own
 export type WebToolSummary = ToolSchema & {
-  name: WebTool;
+  name: Extract<WebTool, "visualize">;
   enabled: boolean;
   hosts: string[];
   updatedAt: number;

@@ -59,6 +59,7 @@ function finishStoredReply(
 
 function fixedTools(content: string): Tools {
   return {
+    capabilities: () => [],
     offered: () => ({
       tools: [
         {
@@ -73,6 +74,7 @@ function fixedTools(content: string): Tools {
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
       memory: null,
+      web: null,
     }),
     run: () => Promise.resolve({ content, error: false }),
   };
@@ -632,6 +634,7 @@ describe("GET /api/projects/:id/agents", () => {
     expect(visible.status).toBe(200);
     expect(await visible.json()).toEqual({
       agents: [expect.objectContaining({ id: chat.agentId, name: "coder" })],
+      capabilities: ["web"],
     });
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
     expect(

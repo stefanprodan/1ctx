@@ -4,6 +4,7 @@
 // Request and response bodies of the session routes: the stream, one
 // session, a new chat, a message into it, a rename, a stop.
 
+import type { CapabilityChange } from "../capabilities.ts";
 import type { AgentSummary } from "../contracts/agent.ts";
 import type {
   LastLine,
@@ -57,10 +58,20 @@ export type CreateSessionRequest = {
   agentId: string;
   message: string;
   uploads?: string[];
+  capabilities?: CapabilityChange;
 };
 
 // POST /api/sessions/:id/messages
-export type SendMessageRequest = { message: string; uploads?: string[] };
+// capabilities carries only the switches the person touched; the server
+// applies it to the chat's set inside the send's first transaction
+export type SendMessageRequest = {
+  message: string;
+  uploads?: string[];
+  capabilities?: CapabilityChange;
+};
+
+// POST /api/sessions/:id/regenerate: the body is optional
+export type RegenerateRequest = { capabilities?: CapabilityChange };
 
 // PATCH /api/sessions/:id: a new title, one line up to the title cap
 export type RenameSessionRequest = { title: string };
@@ -80,5 +91,10 @@ export type ForkSessionRequest = {
 // an unsent user turn carried, empty for any other fork
 export type ForkSessionResponse = SessionDetail & { draftUploads: string[] };
 
-// GET /api/projects/:id/agents: the agents the composer offers
-export type ProjectAgentsResponse = { agents: AgentSummary[] };
+// GET /api/projects/:id/agents: the agents the composer offers, and the
+// capability keys a send starting now could turn off: `web` while the
+// admin's web access is not off
+export type ProjectAgentsResponse = {
+  agents: AgentSummary[];
+  capabilities: string[];
+};

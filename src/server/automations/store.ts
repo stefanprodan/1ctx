@@ -26,6 +26,7 @@ type Raw = {
   project_memory: number;
   own_memory: number;
   memory_guidance: string;
+  disabled_capabilities: string;
   suspended_at: number | null;
   suspended_by: string | null;
   suspended_by_name: string | null;
@@ -65,6 +66,7 @@ const row = (raw: Raw): AutomationSummary => ({
   projectMemory: raw.project_memory === 1,
   ownMemory: raw.own_memory === 1,
   memoryGuidance: raw.memory_guidance,
+  disabledCapabilities: JSON.parse(raw.disabled_capabilities),
   suspendedAt: raw.suspended_at,
   suspendedBy:
     raw.suspended_by === null
@@ -97,6 +99,7 @@ export type AutomationFields = Pick<
   | "projectMemory"
   | "ownMemory"
   | "memoryGuidance"
+  | "disabledCapabilities"
 >;
 
 export class AutomationStore {
@@ -185,9 +188,9 @@ export class AutomationStore {
         `insert into automations
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
            tz, deadline_ms, retention_days, project_memory, own_memory,
-           memory_guidance,
+           memory_guidance, disabled_capabilities,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -203,6 +206,7 @@ export class AutomationStore {
         fields.projectMemory ? 1 : 0,
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
+        JSON.stringify(fields.disabledCapabilities),
         fields.nextAt,
         fields.now,
         fields.now,
@@ -225,6 +229,7 @@ export class AutomationStore {
       | "projectMemory"
       | "ownMemory"
       | "memoryGuidance"
+      | "disabledCapabilities"
     > & { now: number },
   ): AutomationSummary | null {
     this.db
@@ -232,6 +237,7 @@ export class AutomationStore {
         `update automations set agent_id = ?, name = ?, instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
            next_at = ?, project_memory = ?, own_memory = ?, memory_guidance = ?,
+           disabled_capabilities = ?,
            revision = revision + 1, updated_at = ? where id = ?`,
       )
       .run(
@@ -246,6 +252,7 @@ export class AutomationStore {
         fields.projectMemory ? 1 : 0,
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
+        JSON.stringify(fields.disabledCapabilities),
         fields.now,
         id,
       );

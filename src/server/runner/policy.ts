@@ -12,6 +12,7 @@
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
+import type { WebSnapshot } from "../../shared/web.ts";
 import type {
   Effort,
   EventSource,
@@ -50,6 +51,7 @@ export type ToolsPort = {
     agentServers: AgentRow["servers"],
     mode: AgentRow["mcpMode"],
     scope: MemoryScope,
+    disabledCapabilities?: readonly string[],
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
@@ -81,6 +83,8 @@ export type SendPolicy = {
   effort: Effort | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
+  disabledCapabilities: string[];
+  web: WebSnapshot | null;
   memoryOffered: Offered | null;
   projectMemory: MemoryEntry[];
   automationMemory: MemoryEntry[];
@@ -109,6 +113,7 @@ const NONE: Offered = {
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
   memory: null,
+  web: null,
 };
 
 export function buildPolicy(input: {
@@ -120,6 +125,7 @@ export function buildPolicy(input: {
   // the tools area, or none when the model does not accept tools; the
   // one place the set is decided
   tools: ToolsPort | null;
+  disabledCapabilities?: readonly string[];
   limits: Limits;
   knowledge: SendPolicy["knowledge"];
   automation?: SendPolicy["automation"];
@@ -128,6 +134,7 @@ export function buildPolicy(input: {
   deadlineMs?: number | null;
 }): SendPolicy {
   const { user, agent } = input;
+  const disabledCapabilities = [...(input.disabledCapabilities ?? [])];
   const automationScope =
     input.automation === undefined || input.automation === null
       ? null
@@ -138,11 +145,18 @@ export function buildPolicy(input: {
         };
   const offered =
     input.tools !== null && agent.model.tools
-      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
-          projectId: input.project.id,
-          automation: automationScope,
-          phase: "main",
-        })
+      ? input.tools.offered(
+          input.now,
+          agent.id,
+          agent.servers,
+          agent.mcpMode,
+          {
+            projectId: input.project.id,
+            automation: automationScope,
+            phase: "main",
+          },
+          disabledCapabilities,
+        )
       : NONE;
   const memoryOffered =
     input.tools !== null && agent.model.tools && automationScope?.ownMemory
@@ -175,6 +189,8 @@ export function buildPolicy(input: {
     thinkingOff: agent.thinking === "off",
     effort: thinking ? agent.effort : null,
     offered,
+    disabledCapabilities,
+    web: offered.web,
     memoryOffered,
     projectMemory: (input.projectMemory ?? []).map((entry) => ({ ...entry })),
     automationMemory: (input.automationMemory ?? []).map((entry) => ({

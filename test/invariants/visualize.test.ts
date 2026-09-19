@@ -24,7 +24,7 @@ describe("visual tool administration", () => {
       });
       expect(res.status).toBe(200);
       const body: ToolsResponse = await res.json();
-      const catalog = body.web.find((tool) => tool.name === "visualize")!;
+      const catalog = body.visualize;
       expect(catalog.hosts).toEqual(["https://a.test", "https://z.test"]);
       expect(catalog.updatedAt).toBe(chat.app.now.value);
       expect(catalog.description).toContain("https://a.test, https://z.test");
@@ -58,14 +58,14 @@ describe("visual tool administration", () => {
       });
       expect(saved.status).toBe(200);
       const body: ToolsResponse = await saved.json();
-      expect(body.web.find((tool) => tool.name === "visualize")).toMatchObject({
+      expect(body.visualize).toMatchObject({
         hosts: [],
         description: expect.stringContaining("inline only"),
       });
       const reload: ToolsResponse = await (
         await chat.admin.call("GET", "/api/tools")
       ).json();
-      expect(reload.web).toEqual(body.web);
+      expect(reload.visualize).toEqual(body.visualize);
       for (const hosts of [
         ["https://assets.test/path"],
         ["https://assets.test?q=1"],
@@ -82,13 +82,13 @@ describe("visual tool administration", () => {
         expect(refused.status).toBe(400);
         expect((await refused.json()).error).toContain("hosts");
       }
-      for (const name of ["webfetch", "websearch"]) {
+      for (const name of ["webfetch", "websearch", "web"]) {
         const refused = await chat.admin.call("PATCH", `/api/tools/${name}`, {
           body: { hosts: [], enabled: false },
         });
         expect(refused.status).toBe(400);
         expect(await refused.json()).toEqual({
-          error: "hosts is only valid on visualize",
+          error: name === "webfetch" ? "no such tool" : "unknown field hosts",
         });
       }
       expect(
@@ -101,7 +101,7 @@ describe("visual tool administration", () => {
       const after: ToolsResponse = await (
         await chat.admin.call("GET", "/api/tools")
       ).json();
-      expect(after.web).toEqual(body.web);
+      expect(after.visualize).toEqual(body.visualize);
     } finally {
       await chat.app.shutdown();
     }

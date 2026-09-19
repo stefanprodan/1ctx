@@ -22,11 +22,15 @@ import {
   toolsError,
 } from "../../../src/client/data/tools.ts";
 import {
+  ACCESS_WORDS,
   collect,
+  DOMAINS_HINT,
   defaultLine,
   defaultsOf,
   dirty,
   displayOf,
+  domainsFieldOf,
+  domainsOf,
   draftOf,
   firstSentence,
   keyLine,
@@ -43,6 +47,7 @@ import {
   withSaved,
 } from "../../../src/client/views/admin/Tools.model.ts";
 import { Tools } from "../../../src/client/views/admin/Tools.tsx";
+import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
 import type {
   BuiltinToolSummary,
@@ -50,6 +55,7 @@ import type {
   WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import type { WebAccess } from "../../../src/shared/web.ts";
 import { LIMIT_NAMES } from "../../../src/shared/words.ts";
 
 const admin: Me = {
@@ -145,8 +151,8 @@ const time: BuiltinToolSummary = {
   variant: null,
 };
 const fetchTool: WebToolSummary = {
-  name: "webfetch",
-  description: "Fetch a page by URL. Read it as text.",
+  name: "visualize",
+  description: "Draw a visual in the chat. It runs in a frame.",
   parameters: { type: "object", properties: {} },
   parametersHtml: html,
   tokens: 2716,
@@ -154,7 +160,13 @@ const fetchTool: WebToolSummary = {
   hosts: [],
   updatedAt: 0,
 };
-const body = (web = fetchTool) => ({ builtin: [time], web: [web], search });
+const access: WebAccess = { mode: "all", domains: [], updatedAt: 0 };
+const body = (visualize = fetchTool, web = access): ToolsResponse => ({
+  builtin: [time],
+  access: web,
+  search,
+  visualize,
+});
 const search: SearchState = {
   provider: "exa",
   keys: { exa: true, firecrawl: false, tavily: false },
@@ -281,16 +293,45 @@ describe("the limit words and units", () => {
   test.serial("the search lines and the first sentence", () => {
     expect(keyLine("exa", true)).toBe("search-exa.key present");
     expect(keyLine("firecrawl", false)).toBe("search-firecrawl.key keyless");
-    expect(searchLine(search)).toBe("websearch runs on exa.");
-    expect(searchLine({ ...search, provider: "firecrawl" })).toBe(
+    expect(searchLine(search, "all")).toBe("websearch runs on exa.");
+    expect(searchLine({ ...search, provider: "firecrawl" }, "listed")).toBe(
       "websearch runs on firecrawl keyless. " +
         "Add search-firecrawl.key for a higher rate.",
     );
-    expect(searchLine({ ...search, provider: null })).toContain("Choose");
+    expect(searchLine({ ...search, provider: null }, "all")).toBe(
+      "websearch is not offered.",
+    );
+    expect(searchLine(search, "off")).toBe(
+      "Web access is off. websearch is not offered.",
+    );
     expect(firstSentence(time.description)).toBe(
       "The current date and time in a timezone.",
     );
     expect(firstSentence("no end")).toBe("no end");
+  });
+});
+
+describe("the domains box", () => {
+  test("gives the sorted hosts a save sends", () => {
+    expect(domainsOf("GitHub.com\n\n docs.example.com \n")).toEqual({
+      domains: ["docs.example.com", "github.com"],
+    });
+  });
+
+  test("an empty box and a line that is not a host are the field's words", () => {
+    expect(domainsOf(" \n")).toEqual({ error: "List at least one host." });
+    expect(domainsOf("github.com\n*.github.com")).toEqual({
+      error: "Line 2, *.github.com, is not a host name.",
+    });
+    expect(domainsOf("https://github.com")).toEqual({
+      error: "Line 1, https://github.com, is not a host name.",
+    });
+  });
+
+  test("a refusal about hosts belongs to the box", () => {
+    expect(domainsFieldOf("domains line 2 is not a host name")).toBe("domains");
+    expect(domainsFieldOf("list at least one host")).toBe("domains");
+    expect(domainsFieldOf("forbidden")).toBeUndefined();
   });
 });
 
@@ -302,7 +343,7 @@ describe("the tools entity", () => {
         : Response.json({ limits: rows });
     await loadTools();
     expect(tools.value?.builtin[0]?.name).toBe("datetime");
-    expect(tools.value?.web[0]?.name).toBe("webfetch");
+    expect(tools.value?.visualize.name).toBe("visualize");
     expect(limits.value?.length).toBe(rows.length);
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadTools();
@@ -322,10 +363,10 @@ describe("the tools entity", () => {
           limits: [{ ...rounds, value: 3, changedAt: 9 }],
         });
       };
-      await patchTool("webfetch", { enabled: false });
-      expect(tools.value?.web[0]?.enabled).toBe(false);
+      await patchTool("visualize", { enabled: false });
+      expect(tools.value?.visualize.enabled).toBe(false);
       expect(calls[0]).toMatchObject({
-        url: "/api/tools/webfetch",
+        url: "/api/tools/visualize",
         method: "PATCH",
         body: '{"enabled":false}',
       });
@@ -348,15 +389,15 @@ describe("the tools entity", () => {
         await new Promise<void>((release) => pending.push(release));
         return realAnswer(url, init);
       }) as unknown as typeof fetch;
-      const first = patchTool("webfetch", { enabled: false });
-      const second = patchTool("webfetch", { enabled: true });
+      const first = patchTool("visualize", { enabled: false });
+      const second = patchTool("visualize", { enabled: true });
       while (pending.length < 2) await Promise.resolve();
       pending[1]();
       await second;
-      expect(tools.value?.web[0]?.enabled).toBe(true);
+      expect(tools.value?.visualize.enabled).toBe(true);
       pending[0]();
       await first;
-      expect(tools.value?.web[0]?.enabled).toBe(true);
+      expect(tools.value?.visualize.enabled).toBe(true);
     },
   );
 
@@ -423,12 +464,25 @@ describe("the page", () => {
     expect(html).not.toContain("Per send");
   });
 
-  test.serial("Web renders the switches and the providers", () => {
+  test.serial("Web renders web access, the providers and visualize", () => {
     tools.value = body();
     limits.value = rows;
     path.value = "/admin/tools/web";
     const html = render(<Tools />);
-    expect(html).toContain("webfetch");
+    // no row and no switch for the two web tools any more
+    expect(html).not.toContain("webfetch");
+    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    // the modes in the card's head, the picked one pressed, one line under
+    expect(html).toMatch(
+      /Web access<\/span><nav class="seg seg-small rows-filters"/,
+    );
+    expect(html).toMatch(/seg-on" aria-pressed="true">All domains/);
+    expect(html).toContain(ACCESS_WORDS.all);
+    expect(html).not.toContain('name="domains"');
+    // None comes first among the providers
+    expect(html.indexOf('value="none"')).toBeLessThan(
+      html.indexOf('value="exa"'),
+    );
     // the total in the head, never a row's
     expect(html.match(/2\.72k tokens/g)).toHaveLength(1);
     expect(html).toMatch(/rows-hint[^>]*>2\.72k tokens/);
@@ -442,6 +496,37 @@ describe("the page", () => {
     expect(html).not.toContain("rows-meta-bad");
     expect(html).toContain("websearch runs on exa.");
     expect(html).not.toContain("Per send");
+  });
+
+  test.serial("Listed domains shows the stored hosts in the box", () => {
+    tools.value = body(fetchTool, {
+      mode: "listed",
+      domains: ["docs.example.com", "github.com"],
+      updatedAt: 0,
+    });
+    limits.value = rows;
+    path.value = "/admin/tools/web";
+    const html = render(<Tools />);
+    expect(html).toMatch(/seg-on" aria-pressed="true">Listed domains/);
+    expect(html).toContain(ACCESS_WORDS.listed);
+    expect(html).toMatch(
+      /<textarea name="domains"[^>]*>docs\.example\.com\ngithub\.com</,
+    );
+    expect(html).toContain(DOMAINS_HINT);
+    expect(html).toMatch(/foot-label-on">Save</);
+    // nothing to save until the list is edited
+    expect(html).toMatch(/type="submit"[^>]*disabled/);
+  });
+
+  test.serial("Off says so under the providers, a pick kept", () => {
+    tools.value = body(fetchTool, { mode: "off", domains: [], updatedAt: 0 });
+    limits.value = rows;
+    path.value = "/admin/tools/web";
+    const html = render(<Tools />);
+    expect(html).toContain(ACCESS_WORDS.off);
+    expect(html).toContain("Web access is off. websearch is not offered.");
+    // visualize is apart from web access
+    expect(html).toContain('aria-label="visualize on"');
   });
 
   test.serial("Limits renders the fields", () => {

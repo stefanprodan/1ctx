@@ -5,6 +5,11 @@ import type {
   PatchAutomationRequest,
   SaveAutomationRequest,
 } from "../../shared/api/automations.ts";
+import {
+  MAX_CAPABILITY_KEY,
+  MAX_DISABLED_CAPABILITIES,
+  parseSet,
+} from "../../shared/capabilities.ts";
 import { sanitize } from "../../shared/memory.ts";
 import {
   isName,
@@ -20,7 +25,10 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export const MAX_AUTOMATION_BODY =
-  MAX_MESSAGE_BYTES + MAX_MEMORY_GUIDANCE + 2048;
+  MAX_MESSAGE_BYTES +
+  MAX_MEMORY_GUIDANCE +
+  MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) +
+  2048;
 const KEYS = [
   "name",
   "agentId",
@@ -112,13 +120,27 @@ function parseValues(
     }
     out.memoryGuidance = guidance;
   }
+  if (take("disabledCapabilities")) {
+    const parsed = parseSet(
+      Object.hasOwn(body, "disabledCapabilities")
+        ? body.disabledCapabilities
+        : [],
+      "disabledCapabilities",
+    );
+    if (!parsed.ok) throw new BadRequest(parsed.error);
+    out.disabledCapabilities = parsed.set;
+  }
   return out;
 }
 
 export function parseSaveAutomation(
   body: unknown,
 ): Required<SaveAutomationRequest> {
-  const parsed = fields(body, [...KEYS, "memoryGuidance"]);
+  const parsed = fields(body, [
+    ...KEYS,
+    "memoryGuidance",
+    "disabledCapabilities",
+  ]);
   for (const key of KEYS) {
     if (!Object.hasOwn(parsed, key))
       throw new BadRequest(`missing field ${key}`);
@@ -127,7 +149,11 @@ export function parseSaveAutomation(
 }
 
 export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
-  const parsed = fields(body, [...KEYS, "memoryGuidance"]);
+  const parsed = fields(body, [
+    ...KEYS,
+    "memoryGuidance",
+    "disabledCapabilities",
+  ]);
   if (Object.keys(parsed).length === 0) throw new BadRequest("empty patch");
   return parseValues(parsed, false);
 }

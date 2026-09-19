@@ -40,7 +40,7 @@ describe("tools administration", () => {
     const res = await chat.admin.call("GET", "/api/tools");
     expect(res.status).toBe(200);
     const body = await res.json();
-    const tool = body.web.find(
+    const tool = body.builtin.find(
       (candidate: { name: string }) => candidate.name === "webfetch",
     );
     expect(tool).toBeDefined();
@@ -65,6 +65,8 @@ describe("tools administration", () => {
       "sessions_list",
       "skill",
       "skill_file",
+      "webfetch",
+      "websearch",
     ]);
     expect(codeJson(body.builtin[0].parametersHtml)).toEqual(
       body.builtin[0].parameters,
@@ -72,42 +74,53 @@ describe("tools administration", () => {
     chat.app.socket.dispose();
   });
 
-  test("a switch changes the next send and PATCH answers the full safe body", async () => {
+  test("web access changes the next send and PATCH answers the full safe body", async () => {
     const chat = await chatApp({
       secrets: { "search-exa": "never-return-this-key" },
     });
     const first = await startChat(chat, "first");
     const active = chat.app.runner.registry.get(first.sessionId)!;
     expect(names(active.policy.offered)).toContain("webfetch");
+    expect(active.policy.offered.web).toEqual({ mode: "all", domains: [] });
 
-    const changed = await chat.admin.call("PATCH", "/api/tools/webfetch", {
-      body: { enabled: false },
+    const changed = await chat.admin.call("PATCH", "/api/tools/web", {
+      body: { mode: "off" },
     });
     expect(changed.status).toBe(200);
     const text = await changed.text();
     expect(text).not.toContain("never-return-this-key");
     const body = JSON.parse(text);
-    expect(body.web).toHaveLength(3);
-    expect(body.builtin).toHaveLength(9);
+    expect(Object.keys(body).sort()).toEqual([
+      "access",
+      "builtin",
+      "search",
+      "visualize",
+    ]);
+    expect(body.builtin).toHaveLength(11);
     expect(body.search).toEqual({
       provider: null,
       keys: { exa: true, firecrawl: false, tavily: false },
     });
-    expect(
-      body.web.find((tool: { name: string }) => tool.name === "webfetch"),
-    ).toMatchObject({
-      enabled: false,
-      description: expect.any(String),
-      parameters: expect.any(Object),
+    expect(body.access).toEqual({
+      mode: "off",
+      domains: [],
       updatedAt: chat.app.now.value,
     });
+    expect(body.visualize).toMatchObject({ name: "visualize", enabled: true });
 
     expect(names(active.policy.offered)).toContain("webfetch");
+    expect(active.policy.offered.web).toEqual({ mode: "all", domains: [] });
     await finish(chat, first.script);
     const second = await startChat(chat, "second");
     expect(
       names(chat.app.runner.registry.get(second.sessionId)!.policy.offered),
     ).not.toContain("webfetch");
+    expect(
+      chat.app.runner.registry.get(second.sessionId)!.policy.offered.web,
+    ).toBeNull();
+    expect(
+      names(chat.app.runner.registry.get(second.sessionId)!.policy.offered),
+    ).toContain("visualize");
     await finish(chat, second.script);
     chat.app.socket.dispose();
   });
@@ -155,12 +168,12 @@ describe("tools administration", () => {
 
   test("a provider on a non-search tool is refused", async () => {
     const chat = await chatApp();
-    const res = await chat.admin.call("PATCH", "/api/tools/webfetch", {
+    const res = await chat.admin.call("PATCH", "/api/tools/visualize", {
       body: { provider: "exa" },
     });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: "provider is only valid on websearch",
+      error: "unknown field provider",
     });
     chat.app.socket.dispose();
   });
@@ -230,14 +243,14 @@ describe("tools administration", () => {
     chat.app.socket.dispose();
   });
 
-  test("the migrations leave exactly the three web tool rows", async () => {
+  test("the migrations leave the web access row beside the three tool rows", async () => {
     const chat = await chatApp();
     expect(
       chat.app.db
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["webfetch", "websearch", "visualize"]);
+    ).toEqual(["webfetch", "websearch", "visualize", "web"]);
     chat.app.socket.dispose();
   });
 });

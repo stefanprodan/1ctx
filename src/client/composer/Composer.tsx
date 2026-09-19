@@ -12,9 +12,11 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
+import { WEB } from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
+import { dropFlips, flip, isOff, switchable } from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
 import {
   askedOf,
@@ -28,6 +30,7 @@ import {
   takeStamp,
 } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
+import { webItem } from "./Add.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
 import { AttachState } from "./Attach.state.ts";
@@ -58,6 +61,8 @@ export const MAX_HEIGHT = 160;
 
 export type Scope = { sessionId: string } | { projectId: string };
 
+const NONE_OFF: readonly string[] = [];
+
 export function Composer({
   scope,
   filesProjectId,
@@ -72,6 +77,7 @@ export function Composer({
   onRename,
   onFork,
   project,
+  off = NONE_OFF,
   placeholder: idle = "Send a message",
 }: {
   scope: Scope;
@@ -88,6 +94,8 @@ export function Composer({
   // the session's last counted round, for the context readout; none
   // for a chat not started yet
   usage?: RoundUsage | null;
+  // what the chat has turned off, empty for one not started yet
+  off?: readonly string[];
   // uploads are the staged ids the send claims
   onSend: (text: string, agentId: string, uploads: string[]) => Promise<void>;
   onStop: () => Promise<void>;
@@ -171,6 +179,14 @@ export function Composer({
 
   const ready = agent !== null && !busy && !running;
   const readable = list.find((a) => a.id === agent)?.model.tools ?? false;
+  const chat = "sessionId" in scope ? scope.sessionId : null;
+  // a flip never sent does not wait for the next visit to the chat
+  useEffect(() => () => dropFlips(chat), [chat]);
+  const web = webItem({
+    tools: readable,
+    switchable: switchable.value,
+    off: isOff(chat, off, WEB),
+  });
   const attach = (picked: File[]) => {
     failure.value = null;
     void files.add(picked, readable);
@@ -335,7 +351,12 @@ export function Composer({
         </div>
       )}
       <div class="composer-row">
-        <Add readable={readable} onFiles={attach} />
+        <Add
+          readable={readable}
+          onFiles={attach}
+          web={web}
+          onWeb={() => flip(chat, off, WEB)}
+        />
         {project && (
           <ProjectPicker
             projects={project.projects}

@@ -8,9 +8,16 @@
 import type {
   CreateSessionRequest,
   ForkSessionRequest,
+  RegenerateRequest,
   RenameSessionRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
+import {
+  type CapabilityChange,
+  MAX_CAPABILITY_KEY,
+  MAX_DISABLED_CAPABILITIES,
+  parseChange,
+} from "../../shared/capabilities.ts";
 import { MAX_LAST_LINE } from "../../shared/contracts/session.ts";
 import { MAX_UPLOADS_PER_MESSAGE } from "../../shared/uploads.ts";
 import {
@@ -23,7 +30,9 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 // the body cap: the message plus the JSON around it
-export const MAX_SESSION_BODY = MAX_MESSAGE_BYTES + 1024;
+export const MAX_REGENERATE_BODY =
+  MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) + 128;
+export const MAX_SESSION_BODY = MAX_MESSAGE_BYTES + 1024 + MAX_REGENERATE_BODY;
 export const MAX_SMALL_BODY = 1024;
 
 export function parseMessage(value: unknown): string {
@@ -76,18 +85,42 @@ export function parseVisualParams(value: unknown): {
 }
 
 export function parseCreateSession(body: unknown): CreateSessionRequest {
-  const b = fields(body, ["projectId", "agentId", "message", "uploads"]);
+  const b = fields(body, [
+    "projectId",
+    "agentId",
+    "message",
+    "uploads",
+    "capabilities",
+  ]);
   return {
     projectId: id(b.projectId, "projectId"),
     agentId: id(b.agentId, "agentId"),
     message: parseMessage(b.message),
     ...parseUploads(b),
+    ...parseCapabilities(b),
   };
 }
 
 export function parseSendMessage(body: unknown): SendMessageRequest {
-  const b = fields(body, ["message", "uploads"]);
-  return { message: parseMessage(b.message), ...parseUploads(b) };
+  const b = fields(body, ["message", "uploads", "capabilities"]);
+  return {
+    message: parseMessage(b.message),
+    ...parseUploads(b),
+    ...parseCapabilities(b),
+  };
+}
+
+export function parseRegenerate(body: unknown): RegenerateRequest {
+  return parseCapabilities(fields(body, ["capabilities"]));
+}
+
+function parseCapabilities(body: Record<string, unknown>): {
+  capabilities?: CapabilityChange;
+} {
+  if (!Object.hasOwn(body, "capabilities")) return {};
+  const parsed = parseChange(body.capabilities, "capabilities");
+  if (!parsed.ok) throw new BadRequest(parsed.error);
+  return { capabilities: parsed.change };
 }
 
 function parseUploads(body: Record<string, unknown>): { uploads?: string[] } {

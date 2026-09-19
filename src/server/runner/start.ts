@@ -4,6 +4,11 @@
 // The first transaction of a send: its rows, regeneration cleanup and
 // the previous MCP snapshot the runner compares before launch.
 
+import {
+  applyChange,
+  type CapabilityChange,
+  sameSet,
+} from "../../shared/capabilities.ts";
 import type {
   Message,
   SendSummary,
@@ -13,6 +18,7 @@ import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import { BadRequest, NotFound } from "../lib/errors.ts";
 import type { SessionRow } from "../sessions/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
@@ -40,6 +46,7 @@ export type StartFields = {
   policy: SendPolicy;
   text: string;
   uploads?: readonly string[];
+  capabilities?: CapabilityChange;
   mcpDigest: McpDigest | null;
 };
 
@@ -55,19 +62,26 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
   const { policy } = fields;
   const now = deps.clock();
   return transact(deps.db, () => {
-    const base =
-      fields.session ??
-      deps.sessions.create({
-        id: fields.sessionId,
-        projectId: policy.projectId,
-        ownerId: policy.userId,
-        agentId: policy.agentId,
-        origin: fields.origin,
-        automationId: fields.automationId,
-        runSource: policy.automation?.source ?? null,
-        title: fields.title,
-        now,
-      });
+    const base = fields.session
+      ? deps.sessions.byId(fields.sessionId)
+      : deps.sessions.create({
+          id: fields.sessionId,
+          projectId: policy.projectId,
+          ownerId: policy.userId,
+          agentId: policy.agentId,
+          origin: fields.origin,
+          automationId: fields.automationId,
+          runSource: policy.automation?.source ?? null,
+          disabledCapabilities: policy.disabledCapabilities,
+          title: fields.title,
+          now,
+        });
+    if (base === null) throw new NotFound("no such chat");
+    const changed = applyChange(base.disabledCapabilities, fields.capabilities);
+    if (!changed.ok) throw new BadRequest(changed.error);
+    if (!sameSet(base.disabledCapabilities, changed.set)) {
+      deps.sessions.setDisabledCapabilities(base.id, changed.set);
+    }
     const send = deps.sessions.createSend({
       id: fields.sendId,
       kind: fields.kind ?? "chat",

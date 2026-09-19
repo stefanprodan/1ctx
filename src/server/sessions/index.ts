@@ -32,12 +32,14 @@ export {
 export { type MemorySnapshot, memorySnapshot } from "./memory.ts";
 export {
   lineFrom,
+  MAX_REGENERATE_BODY,
   MAX_SESSION_BODY,
   MAX_SMALL_BODY,
   parseCreateSession,
   parseForkSession,
   parseMessage,
   parseMessageId,
+  parseRegenerate,
   parseRenameSession,
   parseSendMessage,
   parseStreamQuery,

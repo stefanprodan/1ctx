@@ -2,21 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The plus at the start of the composer's row and its menu, placed as
-// the agent list is. One item for now, Add files, which opens the file
-// picker. An agent whose model takes no tools cannot read a file, so
-// the item is off and says why on a line of its own.
+// the agent list is. Add files opens the file picker. Web access is a
+// switch, drawn as the rail's theme switch is, and flipping it leaves
+// the menu open. An item that cannot be used is off and says why on a
+// line of its own.
 
 import { useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
+import type { WebItem } from "./Add.model.ts";
 import { useMenu } from "./menu.ts";
 
 export function Add({
   readable,
   onFiles,
+  web,
+  onWeb,
 }: {
   // the picked agent can read files
   readable: boolean;
   onFiles: (files: File[]) => void;
+  web: WebItem;
+  onWeb: () => void;
 }) {
   const { open, root } = useMenu();
   const picker = useRef<HTMLInputElement>(null);
@@ -63,6 +69,27 @@ export function Add({
               {!readable && (
                 <span class="composer-add-block">Agent cannot read files</span>
               )}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={web.on}
+            class="menu-item composer-add-item"
+            disabled={!web.live}
+            onClick={onWeb}
+          >
+            <Icon name="globe" size={14} class="composer-add-icon" />
+            <span class="composer-add-words">
+              <span>Web access</span>
+              {web.reason !== null && (
+                <span class="composer-add-block">{web.reason}</span>
+              )}
+            </span>
+            <span
+              class={`composer-add-switch switch${web.on ? " switch-on" : ""}`}
+            >
+              <span class="switch-knob" />
             </span>
           </button>
         </div>

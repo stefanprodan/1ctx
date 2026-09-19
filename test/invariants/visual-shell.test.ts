@@ -11,9 +11,7 @@ test("the visual shell authenticates its GET and uses the latest hosts", async (
     const settings: ToolsResponse = await (
       await chat.admin.call("GET", "/api/tools")
     ).json();
-    const defaults = settings.web.find(
-      (tool) => tool.name === "visualize",
-    )!.hosts;
+    const defaults = settings.visualize.hosts;
     const res = await chat.member.call("GET", "/api/visual", {
       headers: { origin: "https://outside.test" },
     });

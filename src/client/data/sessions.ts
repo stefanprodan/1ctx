@@ -8,6 +8,7 @@ import { effect, signal } from "@preact/signals";
 import type {
   CreateSessionRequest,
   ProjectAgentsResponse,
+  RegenerateRequest,
   RenameSessionRequest,
   SendMessageRequest,
   SessionResponse,
@@ -31,6 +32,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
+import { accepted, changeOf, switchable } from "./capabilities.ts";
 import { me } from "./me.ts";
 import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
@@ -177,7 +179,9 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
     const body = await api<ProjectAgentsResponse>(
       `/api/projects/${encodeURIComponent(projectId)}/agents`,
     );
-    if (current()) projectAgents.value = body.agents;
+    if (!current()) return;
+    projectAgents.value = body.agents;
+    switchable.value = body.capabilities;
   } catch {
     if (current()) projectAgents.value = null;
   }
@@ -206,7 +210,13 @@ export async function createSession(
 ): Promise<SessionDetail> {
   sending.value = true;
   try {
-    const detail = await api<SessionResponse>("/api/sessions", "POST", body);
+    // the flips made before the chat existed go with its first message
+    const sent = changeOf(null);
+    const detail = await api<SessionResponse>("/api/sessions", "POST", {
+      ...body,
+      ...sent,
+    });
+    accepted(null, sent);
     navigate(`/chat/${detail.session.id}`);
     return detail;
   } finally {
@@ -214,55 +224,39 @@ export async function createSession(
   }
 }
 
-export async function sendMessage(
+// a send of any kind answers the detail; the flips the person made ride
+// on the two kinds that take them and are forgotten once taken
+async function post(id: string, path: string, body?: object): Promise<void> {
+  sending.value = true;
+  try {
+    const at = `/api/sessions/${encodeURIComponent(id)}/${path}`;
+    take(await api<SessionResponse>(at, "POST", body));
+    if (body !== undefined) accepted(id, body);
+  } finally {
+    sending.value = false;
+  }
+}
+
+export function sendMessage(
   id: string,
   message: string,
   uploads: string[],
 ): Promise<void> {
-  sending.value = true;
-  try {
-    const body: SendMessageRequest = {
-      message,
-      ...(uploads.length === 0 ? {} : { uploads }),
-    };
-    const detail = await api<SessionResponse>(
-      `/api/sessions/${encodeURIComponent(id)}/messages`,
-      "POST",
-      body,
-    );
-    take(detail);
-  } finally {
-    sending.value = false;
-  }
+  const body: SendMessageRequest = {
+    message,
+    ...(uploads.length === 0 ? {} : { uploads }),
+    ...changeOf(id),
+  };
+  return post(id, "messages", body);
 }
 
 // the last turn goes and its user message is sent again
-export async function regenerateSession(id: string): Promise<void> {
-  sending.value = true;
-  try {
-    const detail = await api<SessionResponse>(
-      `/api/sessions/${encodeURIComponent(id)}/regenerate`,
-      "POST",
-    );
-    take(detail);
-  } finally {
-    sending.value = false;
-  }
-}
+export const regenerateSession = (id: string): Promise<void> =>
+  post(id, "regenerate", changeOf(id) satisfies RegenerateRequest);
 
 // a summary round on its own; the next reply starts from the summary
-export async function compactSession(id: string): Promise<void> {
-  sending.value = true;
-  try {
-    const detail = await api<SessionResponse>(
-      `/api/sessions/${encodeURIComponent(id)}/compact`,
-      "POST",
-    );
-    take(detail);
-  } finally {
-    sending.value = false;
-  }
-}
+export const compactSession = (id: string): Promise<void> =>
+  post(id, "compact");
 
 // the answer is empty: the end of the send arrives as an envelope
 export async function stopSession(id: string): Promise<void> {

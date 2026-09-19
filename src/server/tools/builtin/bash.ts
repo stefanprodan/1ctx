@@ -4,16 +4,29 @@
 // The schema needs no project or session so the agent page can count it;
 // execution takes its identity only from the runner's call context.
 
+import type { WebSnapshot } from "../../../shared/web.ts";
 import type { KnowledgeCapability } from "../../knowledge/index.ts";
 import type { Tool, ToolResult } from "../types.ts";
+import { domainWords } from "../web.ts";
+
+// the description is about the docs, the tool's main job, so the
+// network gets one sentence: what curl is good for and where it reaches
+function networkWords(web: WebSnapshot | null): string {
+  if (web === null) return "No network.";
+  const where =
+    web.mode === "all" ? "any host" : `these hosts only: ${domainWords(web)}`;
+  return `curl calls HTTP APIs on ${where}, JSON in and out with -X, -H, -d and jq. Save downloads in /tmp.`;
+}
 
 export function makeBashTool(
   knowledge?: Pick<KnowledgeCapability, "run">,
+  web: WebSnapshot | null = null,
 ): Tool<ToolResult> {
   return {
     name: "bash",
     description:
-      "Run a bash command. The project's knowledge base, which people may call the project docs, is mounted at /knowledge: UTF-8 text files shared with everyone who can see the project. Use ls, find, grep -n, sed -n and sed -i, awk, jq, yq, diff, and cat > file <<'EOF' to write. Put independent commands in one round because calls run in parallel, and one command may read several files. Files you change there are saved when the command ends, each as a new version. If another writer changed one during the command nothing is saved and the result says so, so read it again and retry. Edit in place with sed -i. Read a file again in the same command before replacing it whole. Keep many small focused files, Markdown for prose, the file's purpose in its first line. /tmp is this session's scratch: any bytes, no versions, kept between commands until the session is deleted or unused for days. /uploads holds the files the user attached in this chat, text only, read-only: what you change there is not kept. Nothing else is kept. Each command starts a new shell in the directory the last one ended in. Variables and functions do not carry over. File names use letters, digits, dot, dash and underscore. No network. The result is the output and the exit status, cut when long. Never write secrets: anyone who can see this session or the project can read what you write.",
+      "Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. jq, yq, awk and diff are there, git, python and node are not. Never write secrets, since others can read this chat and the project. " +
+      networkWords(web),
     parameters: {
       type: "object",
       properties: {
@@ -44,6 +57,10 @@ export function makeBashTool(
         };
       }
       ctx.budget.bashCalls++;
+      const caps = {
+        callTimeoutMs: ctx.caps.callTimeoutMs,
+        resultCut: ctx.caps.resultCut,
+      };
       return knowledge.run(
         actor.projectId,
         actor.sessionId,
@@ -55,10 +72,14 @@ export function makeBashTool(
           origin: actor.origin,
         },
         args.command,
-        {
-          callTimeoutMs: ctx.caps.callTimeoutMs,
-          resultCut: ctx.caps.resultCut,
-        },
+        ctx.web === null
+          ? caps
+          : {
+              ...caps,
+              web: ctx.web,
+              fetchDeadlineMs: ctx.caps.fetchDeadlineMs,
+              fetchBodyBytes: ctx.caps.fetchBodyBytes,
+            },
         ctx.signal,
       );
     },

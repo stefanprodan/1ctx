@@ -6,6 +6,7 @@
 
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
+import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
@@ -24,6 +25,7 @@ export type ToolBudget = {
 };
 
 export type ToolContext = {
+  web: WebSnapshot | null;
   actor: {
     projectId: string;
     userId: string;
@@ -80,6 +82,7 @@ export type MemoryHandle = {
 
 export type Offered = {
   tools: ChatTool[];
+  web: WebSnapshot | null;
   search: SearchProvider | null;
   skills: { block: string; skills: OfferedSkill[] };
   mcp: OfferedServer[];

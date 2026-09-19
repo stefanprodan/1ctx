@@ -131,6 +131,7 @@ describe("Home", () => {
           createdAt: 0,
           lastActivityAt: Date.now() - 120_000,
           usage: null,
+          disabledCapabilities: [],
         },
         agent: "assistant",
         send: null,

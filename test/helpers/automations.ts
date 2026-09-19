@@ -16,6 +16,7 @@ export const automationBody = (
     projectMemory: boolean;
     ownMemory: boolean;
     memoryGuidance: string;
+    disabledCapabilities: string[];
   }> = {},
 ) => ({
   name: fields.name ?? "daily-run",
@@ -27,6 +28,9 @@ export const automationBody = (
   retentionDays: fields.retentionDays ?? 30,
   projectMemory: fields.projectMemory ?? false,
   ownMemory: fields.ownMemory ?? false,
+  ...(fields.disabledCapabilities === undefined
+    ? {}
+    : { disabledCapabilities: fields.disabledCapabilities }),
   ...(fields.memoryGuidance === undefined
     ? {}
     : { memoryGuidance: fields.memoryGuidance }),

@@ -35,6 +35,7 @@ export type CreateSession = {
   forkedFromSessionId?: string | null;
   forkedFromMessageId?: string | null;
   status?: SessionStatus;
+  disabledCapabilities?: readonly string[];
   title: string;
   now: number;
 };
@@ -61,6 +62,7 @@ export type RawSession = {
   forked_from_message_id: string | null;
   title: string;
   status: SessionStatus;
+  disabled_capabilities: string;
   revision: number;
   created_at: number;
   last_activity_at: number;
@@ -86,6 +88,7 @@ export const session = (
   forkedFromId: raw.forked_from_session_id,
   title: raw.title,
   status: raw.status,
+  disabledCapabilities: JSON.parse(raw.disabled_capabilities),
   revision: raw.revision,
   createdAt: raw.created_at,
   lastActivityAt: raw.last_activity_at,

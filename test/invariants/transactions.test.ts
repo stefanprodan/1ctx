@@ -297,6 +297,7 @@ describe("finishTool rollback", () => {
         | null = null;
       let siblingAborted = false;
       const tools: Tools = {
+        capabilities: () => [],
         offered: () => ({
           search: null,
           skills: { block: "", skills: [] },
@@ -304,6 +305,7 @@ describe("finishTool rollback", () => {
           mcpPrompt: { text: "", digest: {} },
           mcpCatalog: "",
           memory: null,
+          web: null,
           tools: [
             {
               name: "datetime",
@@ -409,6 +411,7 @@ describe("finishTool rollback", () => {
 describe("finalizeSend rollback", () => {
   test("a retry still stops tool rows rolled back by the first attempt", async () => {
     const tools: Tools = {
+      capabilities: () => [],
       offered: () => ({
         search: null,
         skills: { block: "", skills: [] },
@@ -416,6 +419,7 @@ describe("finalizeSend rollback", () => {
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        web: null,
         tools: [
           {
             name: "datetime",

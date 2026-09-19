@@ -38,6 +38,20 @@
     margin-bottom: var(--space-4);
   }
 
+  /* the hosts of Listed domains, under the card's note, so the form
+     gives up its top room */
+  .tools-web {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 0 var(--space-4) var(--space-4);
+  }
+  .tools-web-domains {
+    min-height: 120px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+
   /* the buttons under a hairline across the card, Reset under the
      labels and Save ending where the boxes end, before the unit slot
      and the column of defaults */

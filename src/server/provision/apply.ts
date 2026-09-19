@@ -302,12 +302,16 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
 
 async function tool(api: Client, doc: Of<"Tool">): Promise<Action> {
   const found = await api.call<ToolsResponse>("GET", "/api/tools");
-  const before = found.web.find((row) => row.name === doc.name);
+  const before =
+    doc.name === "web"
+      ? found.access
+      : doc.name === "websearch"
+        ? found.search
+        : doc.name === "visualize"
+          ? found.visualize
+          : null;
   if (!before) throw new Error("no such tool");
-  const patch = difference(
-    { ...before, provider: found.search.provider },
-    doc.spec,
-  );
+  const patch = difference(before, doc.spec);
   if (!Object.keys(patch).length) return "unchanged";
   await api.call("PATCH", `/api/tools/${doc.name}`, patch);
   return "updated";

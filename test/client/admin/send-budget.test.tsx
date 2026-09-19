@@ -91,10 +91,20 @@ describe("send budget fields", () => {
       limits.value = rows;
       tools.value = {
         builtin: [],
-        web: [],
+        access: { mode: "all", domains: [], updatedAt: 0 },
         search: {
           provider: null,
           keys: { exa: false, firecrawl: false, tavily: false },
+        },
+        visualize: {
+          name: "visualize",
+          description: "Draw a visual.",
+          parameters: {},
+          parametersHtml: "",
+          tokens: 1,
+          enabled: true,
+          hosts: [],
+          updatedAt: 0,
         },
       };
       toolsError.value = null;

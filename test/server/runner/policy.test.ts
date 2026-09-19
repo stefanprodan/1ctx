@@ -75,6 +75,25 @@ function policy(
 }
 
 describe("send policy thinking", () => {
+  test("copies the disabled set even when the model takes no tools", () => {
+    const disabledCapabilities = ["web"];
+    const send = buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent,
+      now: 1,
+      tools: null,
+      disabledCapabilities,
+      knowledge: { files: 0, recent: [] },
+      limits: DEFAULT_LIMITS,
+    });
+    disabledCapabilities.length = 0;
+    expect(send.disabledCapabilities).toEqual(["web"]);
+    expect(send.web).toBeNull();
+    expect(send.offered.web).toBeNull();
+    expect(send.offered.tools).toEqual([]);
+  });
+
   test("copies automation guidance instead of keeping the caller's object", () => {
     const automation: NonNullable<SendPolicy["automation"]> = {
       id: "automation",

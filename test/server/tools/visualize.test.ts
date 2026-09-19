@@ -12,6 +12,7 @@ import { MAX_TITLE } from "../../../src/shared/words.ts";
 const registry = new Registry([makeVisualizeTool([])]);
 const context = (): ToolContext => ({
   actor: null,
+  web: null,
   signal: new AbortController().signal,
   now: () => 0,
   budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },

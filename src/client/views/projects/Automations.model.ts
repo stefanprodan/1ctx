@@ -10,6 +10,7 @@
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
+import { WEB } from "../../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
@@ -247,6 +248,8 @@ export type Draft = {
   memory: MemoryMode;
   // what the run's own note keeps, as typed
   memoryGuidance: string;
+  // its runs may reach the web, while the instance lets them
+  web: boolean;
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -271,6 +274,7 @@ export function draftOf(
       retention: "30",
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
+      web: true,
     };
   }
   return {
@@ -283,6 +287,7 @@ export function draftOf(
     retention: String(a.retentionDays),
     memory: modeOf(a),
     memoryGuidance: a.memoryGuidance,
+    web: !a.disabledCapabilities.includes(WEB),
   };
 }
 
@@ -373,6 +378,8 @@ export function requestOf(
       projectMemory: d.memory === "project",
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
+      // web is the one capability with a switch here
+      disabledCapabilities: d.web ? [] : [WEB],
     },
   };
 }

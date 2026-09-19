@@ -241,6 +241,7 @@ async function runCalls(
       now: deps.clock,
       budget: send.toolBudget,
       caps: send.policy.toolCaps,
+      web: send.policy.web,
     };
     let result: ToolResult;
     try {

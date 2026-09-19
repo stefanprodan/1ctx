@@ -11,7 +11,7 @@ import type {
   BuiltinToolSummary,
   ToolWhen,
 } from "../../shared/contracts/tool.ts";
-import { BUILTIN_TOOLS, type BuiltinTool } from "../../shared/words.ts";
+import { BUILTIN_TOOLS } from "../../shared/words.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type { MemoryWork } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
@@ -28,6 +28,8 @@ import {
   makeMemoryTools,
 } from "./builtin/memory.ts";
 import { makeSkillTools } from "./builtin/skill.ts";
+import { makeWebfetchTool } from "./builtin/webfetch.ts";
+import { makeWebsearchTool } from "./builtin/websearch.ts";
 import type { Tool, ToolResult } from "./types.ts";
 
 export function fillYear(tools: ChatTool[], now: number): ChatTool[] {
@@ -55,7 +57,7 @@ export function parametersHtml(
   return render(`\`\`\`json\n${json}\n\`\`\``, false);
 }
 
-const WHEN: Record<BuiltinTool, ToolWhen> = {
+const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
   bash: "knowledge",
   datetime: "always",
   skill: "skills",
@@ -65,6 +67,8 @@ const WHEN: Record<BuiltinTool, ToolWhen> = {
   sessions_list: "projectMemory",
   session_read: "projectMemory",
   memory_edit: "memory",
+  webfetch: "web",
+  websearch: "webSearch",
 };
 
 // the schemas are built, never run, so the ports answer nothing
@@ -116,8 +120,10 @@ export function builtinCatalog(
   const own = fillYear(memoryTools("").map(schema), now);
   const tools = fillYear(
     [
-      makeBashTool(),
+      makeBashTool(undefined, { mode: "all", domains: [] }),
       datetimeTool,
+      makeWebfetchTool(""),
+      makeWebsearchTool(() => null, "exa", ""),
       ...makeSkillTools([skill], {
         body: () => null,
         file: () => null,
@@ -128,7 +134,12 @@ export function builtinCatalog(
     now,
   );
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
-  return BUILTIN_TOOLS.map((name) => {
+  const names: BuiltinToolSummary["name"][] = [
+    ...BUILTIN_TOOLS,
+    "webfetch",
+    "websearch",
+  ];
+  return names.sort().map((name) => {
     const tool = byName.get(name);
     if (tool === undefined) throw new Error(`no schema for ${name}`);
     const variant = own.find((other) => other.name === name);

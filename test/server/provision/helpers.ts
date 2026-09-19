@@ -198,7 +198,7 @@ export const loginCount = (db: Db) =>
   db.query<{ n: number }, []>("select count(*) as n from logins").get()!.n;
 
 export async function recompose(
-  app: TestApp,
+  app: Pick<TestApp, "db" | "now">,
   fetcher: typeof fetch,
   secrets: Record<string, string> = {},
 ): Promise<App> {

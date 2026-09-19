@@ -15,6 +15,7 @@ import type { AutomationSummary } from "../../../shared/contracts/automation.ts"
 import { RETENTION_DAYS } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
+import { webItem } from "../../composer/Add.model.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import {
   automationError,
@@ -26,6 +27,7 @@ import {
   runDeadlineMs,
   updateAutomation,
 } from "../../data/automations.ts";
+import { switchable } from "../../data/capabilities.ts";
 import { me } from "../../data/me.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
@@ -33,6 +35,7 @@ import { useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { RowsSwitch } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import {
@@ -126,6 +129,11 @@ function Editor({
   const d = draft.value;
   const takesTools =
     agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
+  const web = webItem({
+    tools: takesTools,
+    switchable: switchable.value,
+    off: false,
+  });
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
@@ -217,6 +225,24 @@ function Editor({
               <FieldError save={save} field="memoryGuidance" />
             </label>
           )}
+        </div>
+      </Section>
+      <Section title="Web access" text="Fetch, search and curl">
+        <div class="field">
+          <div class="automations-web">
+            <RowsSwitch
+              on={web.on && d.web}
+              label="Web access"
+              disabled={off || !web.live}
+              onClick={() => set({ web: !d.web })}
+            />
+            <span>
+              {web.on && d.web
+                ? "Runs can reach the web"
+                : "Runs cannot reach the web"}
+            </span>
+          </div>
+          {web.reason !== null && <span class="hint">{web.reason}</span>}
         </div>
       </Section>
       <Section title="When" text="In the time zone you pick">

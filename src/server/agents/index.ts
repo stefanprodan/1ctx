@@ -16,6 +16,7 @@ import {
 import {
   type AccessPort,
   type AutomationsPort,
+  type CapabilitiesPort,
   type ProvidersPort,
   routes,
   type SessionsPort,
@@ -52,7 +53,7 @@ export type AgentsDeps = {
   providers: ProvidersPort;
   skills: SkillsPort & SkillsListPort & { assigned(agentId: string): string[] };
   mcp: Pick<Mcp, "agentServers" | "setAgentServers">;
-  tools: ToolsPort;
+  tools: ToolsPort & CapabilitiesPort;
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -82,6 +83,7 @@ export function agentsArea(deps: AgentsDeps): Agents {
         providers: deps.providers,
         skills: deps.skills,
         mcp: deps.mcp,
+        tools: deps.tools,
         access: deps.access,
         sessions: deps.sessions,
         automations: deps.automations,

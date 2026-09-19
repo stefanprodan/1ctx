@@ -197,6 +197,7 @@ export function Chat({ params }: { params: Params }) {
                   running={shown.session.status === "running"}
                   busy={sending.value}
                   usage={shown.session.usage}
+                  off={shown.session.disabledCapabilities}
                   onSend={(text, _agentId, uploads) =>
                     sendMessage(shown.session.id, text, uploads)
                   }

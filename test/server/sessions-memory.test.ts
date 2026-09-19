@@ -48,6 +48,7 @@ const session: SessionRow = {
   runSource: null,
   title: incident.title,
   status: "done",
+  disabledCapabilities: [],
   revision: 1,
   createdAt: now,
   lastActivityAt: now + 120_000,
@@ -251,6 +252,7 @@ describe("memory chat receipts", () => {
     const read = tools.find((tool) => tool.name === "session_read")!;
     const ctx: ToolContext = {
       actor: null,
+      web: null,
       signal: new AbortController().signal,
       now: () => now,
       budget: {

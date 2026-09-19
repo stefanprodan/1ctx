@@ -104,6 +104,60 @@ describe("the schema", () => {
     return db;
   }
 
+  test("0018 defaults existing sessions and automations to an empty set without losing rows", () => {
+    const db = seed(MIGRATIONS.slice(0, 17));
+    try {
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at)
+          values ('auto', 'p', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 1000, 0, 0);
+      `);
+      const tables = [
+        "users",
+        "projects",
+        "providers",
+        "agents",
+        "sessions",
+        "automations",
+        "messages",
+        "sends",
+        "usage",
+      ];
+      const before = tables.map((name) =>
+        db
+          .query<Record<string, unknown>, []>(
+            `select * from ${name} order by id`,
+          )
+          .all(),
+      );
+      expect(migrate(db)).toEqual(["0018-web-access"]);
+      expect(
+        tables.map((name) =>
+          db.query(`select * from ${name} order by id`).all(),
+        ),
+      ).toEqual(
+        before.map((rows, index) =>
+          ["sessions", "automations"].includes(tables[index]!)
+            ? rows.map((row) => ({ ...row, disabled_capabilities: "[]" }))
+            : rows,
+        ),
+      );
+      for (const table of ["sessions", "automations"]) {
+        expect(() =>
+          db.query(`update ${table} set disabled_capabilities = null`).run(),
+        ).toThrow();
+      }
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   test("0012 adds nullable fork source ids without references or a rebuild", () => {
     const db = seed(MIGRATIONS.slice(0, 11));
     try {
@@ -162,7 +216,7 @@ describe("the schema", () => {
           )
           .all(),
       );
-      expect(migrate(db)).toEqual([
+      expect(migrate(db, MIGRATIONS.slice(0, 17))).toEqual([
         "0015-knowledge",
         "0016-openai-strict",
         "0017-chat-uploads",
@@ -260,7 +314,7 @@ describe("the schema", () => {
       expect(db.query("pragma foreign_keys").get()).toEqual({
         foreign_keys: 1,
       });
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 17))).toEqual([]);
     } finally {
       db.close();
     }
@@ -303,7 +357,9 @@ describe("the schema", () => {
           "select * from messages order by seq",
         )
         .all();
-      expect(migrate(db)).toEqual(["0017-chat-uploads"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 17))).toEqual([
+        "0017-chat-uploads",
+      ]);
       expect(MIGRATIONS[16]?.rebuild).toBeUndefined();
       expect(
         tables.map((table) =>
@@ -383,7 +439,7 @@ describe("the schema", () => {
       expect(db.query("pragma foreign_keys").get()).toEqual({
         foreign_keys: 1,
       });
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 17))).toEqual([]);
       expect(
         db.query("select uploads from messages where id = 'm1'").get(),
       ).toEqual({ uploads: record });
@@ -426,7 +482,7 @@ describe("the schema", () => {
       expect(db.query("pragma foreign_keys").get()).toEqual({
         foreign_keys: 1,
       });
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 17))).toEqual([]);
       db.exec("delete from sessions where id = 'sess'");
       expect(db.query("select * from session_upload_files").all()).toEqual([]);
     } finally {
@@ -545,6 +601,7 @@ describe("the schema", () => {
       { name: "webfetch", enabled: 1, provider: null, updated_at: 0 },
       { name: "websearch", enabled: 1, provider: null, updated_at: 0 },
       { name: "visualize", enabled: 1, provider: null, updated_at: 0 },
+      { name: "web", enabled: 1, provider: null, updated_at: 0 },
     ]);
     expect(db.query("select count(*) as n from limits").get()).toEqual({
       n: 0,
@@ -664,6 +721,7 @@ describe("additive migrations", () => {
       "0015-knowledge",
       "0016-openai-strict",
       "0017-chat-uploads",
+      "0018-web-access",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -717,6 +775,7 @@ describe("0005", () => {
       "0015-knowledge",
       "0016-openai-strict",
       "0017-chat-uploads",
+      "0018-web-access",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -779,6 +838,7 @@ describe("rebuild migrations", () => {
       "0015-knowledge",
       "0016-openai-strict",
       "0017-chat-uploads",
+      "0018-web-access",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -874,6 +934,7 @@ describe("0006 skills migration", () => {
       "0015-knowledge",
       "0016-openai-strict",
       "0017-chat-uploads",
+      "0018-web-access",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -928,6 +989,7 @@ describe("0007 user tz migration", () => {
       "0015-knowledge",
       "0016-openai-strict",
       "0017-chat-uploads",
+      "0018-web-access",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -961,6 +1023,7 @@ describe("0009 mcp migration", () => {
       "0015-knowledge",
       "0016-openai-strict",
       "0017-chat-uploads",
+      "0018-web-access",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1210,6 +1273,7 @@ describe("0008 search tavily migration", () => {
         expect(migrate(db)).toEqual([
           "0016-openai-strict",
           "0017-chat-uploads",
+          "0018-web-access",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(
