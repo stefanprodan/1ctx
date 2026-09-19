@@ -5,17 +5,44 @@ import { describe, expect, test } from "bun:test";
 import {
   applyChange,
   isCapabilityKey,
+  MAX_CAPABILITY_KEY,
   MAX_DISABLED_CAPABILITIES,
+  mcpKey,
+  mcpOffLine,
   parseChange,
   parseSet,
   sameSet,
+  serverOf,
   WEB,
 } from "../../src/shared/capabilities.ts";
 
 describe("capability keys", () => {
-  test("web is the one key this build knows", () => {
+  test("an MCP server is a key by its id, checked by shape alone", () => {
+    expect(mcpKey("k3v9a0q1z2xy")).toBe("mcp:k3v9a0q1z2xy");
+    expect(isCapabilityKey("mcp:k3v9a0q1z2xy")).toBe(true);
+    expect(serverOf("mcp:k3v9a0q1z2xy")).toBe("k3v9a0q1z2xy");
+    expect(serverOf(WEB)).toBeNull();
+    const long = `mcp:${"a".repeat(MAX_CAPABILITY_KEY)}`;
+    for (const key of ["mcp", "mcp:", "mcp:A1", "mcp:a-b", "mcp:a:b", long]) {
+      expect(isCapabilityKey(key)).toBe(false);
+    }
+  });
+  test("a change may mix web and servers", () => {
+    expect(
+      parseChange({ disable: ["web", "mcp:b2"], enable: ["mcp:a1"] }, "c"),
+    ).toEqual({
+      ok: true,
+      change: { disable: ["mcp:b2", "web"], enable: ["mcp:a1"] },
+    });
+  });
+  test("the servers-off line names them sorted", () => {
+    expect(mcpOffLine(["github", "flux"])).toBe(
+      "The user turned these MCP servers off for this chat: flux, github. Their tools are not available. Say so if one is needed.",
+    );
+  });
+  test("web and servers are the keys this build knows", () => {
     expect(isCapabilityKey(WEB)).toBe(true);
-    for (const key of ["", "Web", "web:", "mcp:abc", "skill:x", 7, null]) {
+    for (const key of ["", "Web", "web:", "skill:x", 7, null]) {
       expect(isCapabilityKey(key)).toBe(false);
     }
   });

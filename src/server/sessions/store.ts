@@ -167,6 +167,19 @@ export class SessionStore {
       .run(JSON.stringify(set), id);
   }
 
+  forgetCapability(key: string): void {
+    this.db
+      .query(
+        `update sessions set disabled_capabilities = (
+           select json_group_array(value order by value)
+           from json_each(sessions.disabled_capabilities) where value != ?
+         ) where exists (
+           select 1 from json_each(sessions.disabled_capabilities) where value = ?
+         )`,
+      )
+      .run(key, key);
+  }
+
   touch(
     id: string,
     fields: { status: SessionStatus; now: number },

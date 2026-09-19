@@ -184,6 +184,7 @@ export function history(
     | "automationMemory"
     | "knowledge"
     | "disabledCapabilities"
+    | "mcpOff"
   >,
   lookups: ContextLookups,
   now: number,

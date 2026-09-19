@@ -433,13 +433,18 @@ violation, and every rule has a rejected fixture under
   `offered()` intersects the server's and the agent's switches. One
   refresh coordinator per `mcpArea`, never module state, closed in
   `shutdown()` after the runner; a delete aborts a discovery in flight
-  and is a 409 while an agent references the server. Every server
+  and is a 409 while an agent references the server. Its delete forgets
+  `mcp:<server id>` in sessions and automations in the same transaction,
+  without revisions or envelopes; unassigning forgets nothing. Every server
   string is shown as text; `parametersHtml` is the one HTML, rendered on
   the server. The name never changes.
 - **An agent's MCP tools are one send snapshot, decided in the policy.**
   An agent carries `servers` (a server id with `read` and `write`,
   saved with the agent row in one `transact()` through the mcp
-  capability) and `mcpMode`. The offered set is the intersection of the
+  capability) and `mcpMode`. Before `mcp.offered()`, `tools/offer.ts`
+  removes links whose `mcp:<server id>` is disabled; schemas, mode,
+  catalog, instructions and digest all come from the remaining links.
+  The offered set is the intersection of the
   server's and the agent's switches over the patterns, through
   `offeredServers()` in `shared/mcp.ts`, so the page's preview and the
   send agree: each schema lean (`wireSchema`, `wireDescription`, the
@@ -460,7 +465,14 @@ violation, and every rule has a rejected fixture under
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
   off per server), the two memory blocks, the knowledge block, the date
-  line, the chat's web-off line when applicable, and last the change note.
+  line, the chat's web-off line when applicable, the MCP-off line when
+  applicable, and last the change note. The policy's `mcpOff` holds the
+  sorted names of disabled linked servers with otherwise-offered tools,
+  empty for a model without tools; `mcpOffLine()` names them.
+  `GET /api/projects/:id/agents` also answers `servers`, keyed by agent id,
+  with `{id, name, tools}` from `mcp.switchableBy()` in name order, over
+  one read of the catalogs, without prompt caps or hashing. Agents with no switchable servers have no entry;
+  members and admins get the same map.
   A send records a content-addressed
   digest of what it offered from MCP (`mcp_digests`, `sends.mcp`, null
   for a compact send, swept with the logins); `startSend` compares it with the
@@ -520,7 +532,9 @@ violation, and every rule has a rejected fixture under
   commit. Create and send accept up to ten distinct staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys, currently `web` alone.
+  change with `disable` and `enable` keys: `web` and `mcp:<server id>`.
+  The MCP parser checks only the id's shape, 1 to 32 lowercase ASCII
+  letters or digits; unknown or unassigned server keys are kept and ignored.
   The policy resolves it before schemas are built; `startSend` applies
   it again to the current row in its transaction, with the message's
   revision and envelope. A refused start writes nothing; a later failure

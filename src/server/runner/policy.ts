@@ -10,6 +10,7 @@
 // same moment, copied onto the policy so a send runs under the caps it
 // started on whatever an admin changes later.
 
+import { mcpKey } from "../../shared/capabilities.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
@@ -45,6 +46,7 @@ export type {
 // port is the runner's own interface over the area's types; compose
 // passes the tools area
 export type ToolsPort = {
+  serverNames(links: AgentRow["servers"]): string[];
   offered(
     now: number,
     agentId: string,
@@ -84,6 +86,7 @@ export type SendPolicy = {
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
   disabledCapabilities: string[];
+  mcpOff: string[];
   web: WebSnapshot | null;
   memoryOffered: Offered | null;
   projectMemory: MemoryEntry[];
@@ -190,6 +193,16 @@ export function buildPolicy(input: {
     effort: thinking ? agent.effort : null,
     offered,
     disabledCapabilities,
+    mcpOff:
+      input.tools !== null && agent.model.tools
+        ? input.tools
+            .serverNames(
+              agent.servers.filter((link) =>
+                disabledCapabilities.includes(mcpKey(link.serverId)),
+              ),
+            )
+            .sort()
+        : [],
     web: offered.web,
     memoryOffered,
     projectMemory: (input.projectMemory ?? []).map((entry) => ({ ...entry })),

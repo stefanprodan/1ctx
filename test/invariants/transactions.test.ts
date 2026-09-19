@@ -298,6 +298,7 @@ describe("finishTool rollback", () => {
       let siblingAborted = false;
       const tools: Tools = {
         capabilities: () => [],
+        serverNames: () => [],
         offered: () => ({
           search: null,
           skills: { block: "", skills: [] },
@@ -412,6 +413,7 @@ describe("finalizeSend rollback", () => {
   test("a retry still stops tool rows rolled back by the first attempt", async () => {
     const tools: Tools = {
       capabilities: () => [],
+      serverNames: () => [],
       offered: () => ({
         search: null,
         skills: { block: "", skills: [] },

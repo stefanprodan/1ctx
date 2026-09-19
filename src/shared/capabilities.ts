@@ -5,13 +5,24 @@
 // what is off, since on is the default: a thing added to an agent later
 // is on everywhere without a write, and the empty set is every chat that
 // never touched a switch. A key is a kind, or a kind and a name after a
-// colon. Web access is the first kind; a server or a skill joins this
-// grammar later with no change to what is stored or sent.
+// colon. Web access is a kind alone. An MCP server is `mcp:<server id>`:
+// the id, since the name is not what an agent's links hold. A skill joins
+// this grammar later with no change to what is stored or sent.
 
 export const WEB = "web";
+export const MCP = "mcp";
 
-// the kinds this build accepts; a kind with names lists them after ":"
-const KINDS: readonly string[] = [WEB];
+// a row id, as lib/ids.ts makes them
+const ID = /^[0-9a-z]{1,32}$/;
+
+export const mcpKey = (serverId: string) => `${MCP}:${serverId}`;
+
+// the server a key names, null for any other key
+export function serverOf(key: string): string | null {
+  if (!key.startsWith(`${MCP}:`)) return null;
+  const id = key.slice(MCP.length + 1);
+  return ID.test(id) ? id : null;
+}
 
 export const MAX_CAPABILITY_KEY = 64;
 export const MAX_DISABLED_CAPABILITIES = 64;
@@ -20,7 +31,9 @@ export function isCapabilityKey(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length <= MAX_CAPABILITY_KEY &&
-    KINDS.includes(value)
+    // the shape alone: a key naming no server, or one the agent does not
+    // have, is kept and ignored, so a fork onto another agent still sends
+    (value === WEB || serverOf(value) !== null)
   );
 }
 
@@ -105,3 +118,9 @@ export const sameSet = (a: readonly string[], b: readonly string[]) =>
 // has web access off: constant, so every send after the flip shares it
 export const WEB_OFF_LINE =
   "The user turned web access off for this chat. Do not call webfetch or websearch or use curl. Say so if the web is needed.";
+
+// the line after it while a chat has servers off that its agent would
+// otherwise be offered: names sorted, so it is constant between flips
+export function mcpOffLine(names: readonly string[]): string {
+  return `The user turned these MCP servers off for this chat: ${[...names].sort().join(", ")}. Their tools are not available. Say so if one is needed.`;
+}

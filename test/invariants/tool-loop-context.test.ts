@@ -197,6 +197,7 @@ test("stopping a buffered round settles its calls without writing late results",
     window: 20_000,
     tools: {
       capabilities: () => [],
+      serverNames: () => [],
       offered: () => ({
         tools: [{ name: "datetime", description: "time", parameters: {} }],
         search: null,

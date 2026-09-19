@@ -270,6 +270,19 @@ export class AutomationStore {
     return this.byId(id);
   }
 
+  forgetCapability(key: string): void {
+    this.db
+      .query(
+        `update automations set disabled_capabilities = (
+           select json_group_array(value order by value)
+           from json_each(automations.disabled_capabilities) where value != ?
+         ) where exists (
+           select 1 from json_each(automations.disabled_capabilities) where value = ?
+         )`,
+      )
+      .run(key, key);
+  }
+
   resume(id: string, nextAt: number, now: number): AutomationSummary | null {
     this.db
       .query(
