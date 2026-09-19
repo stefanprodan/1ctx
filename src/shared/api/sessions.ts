@@ -91,10 +91,16 @@ export type ForkSessionRequest = {
 // an unsent user turn carried, empty for any other fork
 export type ForkSessionResponse = SessionDetail & { draftUploads: string[] };
 
-// GET /api/projects/:id/agents: the agents the composer offers, and the
-// capability keys a send starting now could turn off: `web` while the
-// admin's web access is not off
+// an MCP server a chat can turn off: one an agent is offered now, with
+// how many of its tools that is
+export type SwitchableServer = { id: string; name: string; tools: number };
+
+// GET /api/projects/:id/agents: the agents the composer offers, the
+// capability keys a send starting now could turn off (`web` while the
+// admin's web access is not off), and by agent id the MCP servers it is
+// offered now, in name order; an agent without one has no entry
 export type ProjectAgentsResponse = {
   agents: AgentSummary[];
   capabilities: string[];
+  servers: Record<string, SwitchableServer[]>;
 };

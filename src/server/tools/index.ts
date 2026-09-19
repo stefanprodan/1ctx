@@ -85,7 +85,7 @@ export type ToolsDeps = {
   version: string;
   render: (markdown: string, streaming: boolean) => string;
   skills: SkillsPort;
-  mcp?: Pick<Mcp, "offered" | "call" | "validateArguments">;
+  mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
   memory?: Pick<MemoryCapability, "work">;
   knowledge?: Pick<KnowledgeCapability, "run">;
   sessions?: {
@@ -105,6 +105,7 @@ export type ToolsDeps = {
 
 export type Tools = {
   capabilities(): string[];
+  serverNames(links: AgentServer[]): string[];
   offered(
     now: number,
     agentId: string,
@@ -134,6 +135,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
   const skillStore: SkillsPort = deps.skills;
   const mcpService = deps.mcp ?? {
+    switchable: () => [],
     offered: () => ({
       servers: [],
       prompt: {
@@ -294,6 +296,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     store,
     webAccess,
     capabilities: () => (webAccess().mode === "off" ? [] : [WEB]),
+    serverNames: (links) =>
+      mcpService.switchable(links).map((server) => server.name),
     routes: [],
     offered(
       now,

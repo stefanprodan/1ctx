@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SwitchableServer } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
   classify,
@@ -94,12 +95,19 @@ export type McpDeps = {
   // the limits' call timeout of the moment, for the form's hint
   callTimeoutMs: () => number;
   render: (markdown: string, streaming?: boolean) => string;
+  capabilities: { forget(key: string): void };
 };
 
 export type Mcp = {
   store: McpServerStore;
   routes: RouteDescriptor[];
   offered(agentServers: AgentServer[]): McpOffer;
+  switchable(links: AgentServer[]): SwitchableServer[];
+  // the same per agent id over one read of the catalogs, agents without a
+  // switchable server left out
+  switchableBy(
+    agents: { id: string; servers: AgentServer[] }[],
+  ): Record<string, SwitchableServer[]>;
   isWrite(name: string): boolean;
   refreshSoon(id: string, observed: string): void;
   start(): void;
@@ -117,6 +125,21 @@ export type Mcp = {
     options: McpCallOptions,
   ): Promise<string>;
 };
+
+function switchableOver(
+  rows: McpServerRow[],
+  links: AgentServer[],
+): SwitchableServer[] {
+  const counts = new Map(
+    promptRows(rows, links).map((server) => [server.name, server.tools.length]),
+  );
+  return rows
+    .flatMap((row) => {
+      const tools = counts.get(row.name);
+      return tools === undefined ? [] : [{ id: row.id, name: row.name, tools }];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 function promptRows(
   rows: McpServerRow[],
@@ -231,6 +254,22 @@ export function mcpArea(deps: McpDeps): Mcp {
     store,
     routes: [],
     offered,
+    switchable(links) {
+      return links.length === 0 ? [] : switchableOver(store.list(), links);
+    },
+    switchableBy(agents) {
+      if (agents.every((agent) => agent.servers.length === 0)) return {};
+      const rows = store.list();
+      return Object.fromEntries(
+        agents.flatMap((agent) => {
+          const servers =
+            agent.servers.length === 0
+              ? []
+              : switchableOver(rows, agent.servers);
+          return servers.length === 0 ? [] : [[agent.id, servers]];
+        }),
+      );
+    },
     isWrite(name) {
       const split = splitWireName(name);
       if (split === null) return false;
@@ -283,7 +322,9 @@ export function mcpArea(deps: McpDeps): Mcp {
     },
   };
   area.routes = routes({
+    db: deps.db,
     store,
+    capabilities: deps.capabilities,
     coordinator,
     clock: deps.clock,
     log: deps.log,

@@ -6,6 +6,7 @@ import {
   accepted,
   changeOf,
   dropFlips,
+  dropKind,
   flip,
   isOff,
 } from "../../../src/client/data/capabilities.ts";
@@ -98,6 +99,16 @@ describe("pending capability flips", () => {
       expect(isOff("s1", [], WEB)).toBe(true);
     },
   );
+
+  test.serial("another agent's pick drops the server flips alone", () => {
+    flip(null, [], WEB);
+    flip(null, [], "mcp:a1");
+    dropKind(null, "mcp");
+    expect(changeOf(null)).toEqual({ capabilities: { disable: [WEB] } });
+    // the flips of another chat are not this composer's to drop
+    dropKind("s1", "mcp");
+    expect(isOff(null, [], WEB)).toBe(true);
+  });
 
   test.serial("leaving the chat gives up what was never sent", () => {
     flip("s1", [], WEB);

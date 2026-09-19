@@ -149,6 +149,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: options.log("mcp"),
     version: options.version,
     render: renderMarkdown,
+    capabilities: {
+      forget(key) {
+        sessions.store.forgetCapability(key);
+        automations.store.forgetCapability(key);
+      },
+    },
   });
   const skills: Skills = skillsArea({
     db,

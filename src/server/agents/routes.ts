@@ -6,7 +6,10 @@
 // about it is kept on the row so a list never asks again.
 
 import type { AgentResponse, AgentsResponse } from "../../shared/api/agents.ts";
-import type { ProjectAgentsResponse } from "../../shared/api/sessions.ts";
+import type {
+  ProjectAgentsResponse,
+  SwitchableServer,
+} from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
@@ -46,6 +49,9 @@ export type SkillsPort = {
 
 export type McpPort = {
   setAgentServers(agentId: string, rows: AgentServer[]): void;
+  switchableBy(
+    agents: { id: string; servers: AgentServer[] }[],
+  ): Record<string, SwitchableServer[]>;
 };
 
 export type CapabilitiesPort = {
@@ -211,9 +217,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         deps.access.project(ctx.principal!, ctx.params.id);
+        const agents = deps.store.list().map(summary);
         const body: ProjectAgentsResponse = {
-          agents: deps.store.list().map(summary),
+          agents,
           capabilities: deps.tools.capabilities(),
+          servers: deps.mcp.switchableBy(agents),
         };
         return json(body);
       },

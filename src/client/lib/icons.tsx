@@ -79,6 +79,7 @@ const PATHS: Record<string, string> = {
   plus: "M8 3v10M3 8h10",
   chevron: "M5 6.5l3 3 3-3",
   "chevron-right": "M6.5 5l3 3-3 3",
+  "chevron-left": "M9.5 5l-3 3 3 3",
   check: "M3 8.5l3 3 7-7",
   alert: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8 4.75v3.75M8 11h.01",
   copy: "M6 6h7a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3.5 10.5h-.5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6.5a1 1 0 0 1 1 1v.5",
@@ -118,7 +119,9 @@ const PATHS: Record<string, string> = {
   tools:
     "M10 2.5a3.5 3.5 0 0 0-4.2 4.6L2.5 10.4l3.1 3.1 3.3-3.3a3.5 3.5 0 0 0 4.6-4.2L11.3 8.2 7.8 4.7z",
   skill: "M4 2.5h5.5L13 6v7.5H4zM9.5 2.5V6H13M6.5 9h3M6.5 11.5h3",
-  plug: "M6 2.5v3M10 2.5v3M4.5 5.5h7v2.5a3.5 3.5 0 0 1-7 0zM8 11.5v2",
+  // the Model Context Protocol mark, scaled to the 16 box; wherever MCP
+  // servers are listed
+  mcp: "M1.98 7.55L7.69 1.84C8.48 1.05 9.76 1.05 10.54 1.84C11.33 2.63 11.33 3.91 10.54 4.69L6.23 9M6.29 8.94L10.54 4.69C11.33 3.91 12.61 3.91 13.4 4.69L13.43 4.72C14.21 5.51 14.21 6.79 13.43 7.58L8.26 12.74C8 13 8 13.43 8.26 13.69L9.32 14.75M9.12 3.27L4.9 7.49C4.11 8.28 4.11 9.55 4.9 10.34C5.68 11.13 6.96 11.13 7.75 10.34L11.97 6.12",
   // files added to a chat: the clip, and what each one is
   globe:
     "M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8zM2 8h12M8 2c2.2 2 2.2 10 0 12M8 2c-2.2 2-2.2 10 0 12",
@@ -128,6 +131,9 @@ const PATHS: Record<string, string> = {
 };
 
 export type IconName = keyof typeof PATHS;
+
+// the MCP mark's three strands sit close: the usual stroke closes them
+const THIN: ReadonlySet<IconName> = new Set(["mcp"]);
 
 // a personal project is its owner's alone, so it wears the lock
 export const projectIcon = (kind: "personal" | "team"): IconName =>
@@ -149,7 +155,7 @@ export function Icon({
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      stroke-width="1.5"
+      stroke-width={THIN.has(name) ? 1 : 1.5}
       stroke-linecap="round"
       stroke-linejoin="round"
       class={cls}

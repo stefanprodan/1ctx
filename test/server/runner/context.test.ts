@@ -78,6 +78,7 @@ const policy: SendPolicy = {
   effort: "high",
   offered: WITH_BASH,
   disabledCapabilities: [],
+  mcpOff: [],
   web: null,
   memoryOffered: null,
   projectMemory: [],

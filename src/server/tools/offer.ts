@@ -5,7 +5,7 @@
 // apart from dispatch lets the agent page and the runner share the same
 // offered set without needing a live call context.
 
-import { WEB } from "../../shared/capabilities.ts";
+import { mcpKey, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import {
@@ -166,7 +166,11 @@ export function offered(
     ].map(schema),
     now,
   );
-  const offered = deps.mcp.offered(agentServers);
+  const offered = deps.mcp.offered(
+    agentServers.filter(
+      (link) => !disabledCapabilities.includes(mcpKey(link.serverId)),
+    ),
+  );
   let mcp = offered.servers;
   let mcpPrompt = {
     text: offered.prompt.text,

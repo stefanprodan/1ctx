@@ -12,11 +12,18 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import { WEB } from "../../shared/capabilities.ts";
+import { MCP, WEB } from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
-import { dropFlips, flip, isOff, switchable } from "../data/capabilities.ts";
+import {
+  dropFlips,
+  dropKind,
+  flip,
+  isOff,
+  servers,
+  switchable,
+} from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
 import {
   askedOf,
@@ -30,7 +37,7 @@ import {
   takeStamp,
 } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
-import { webItem } from "./Add.model.ts";
+import { agentMoved, serversItem, webItem } from "./Add.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
 import { AttachState } from "./Attach.state.ts";
@@ -186,6 +193,17 @@ export function Composer({
     tools: readable,
     switchable: switchable.value,
     off: isOff(chat, off, WEB),
+  });
+  // another agent's servers are other keys, so its flips go with it
+  const lastAgent = useRef<string | null>(null);
+  useEffect(() => {
+    if (agentMoved(lastAgent.current, agent)) dropKind(chat, MCP);
+    if (agent !== null) lastAgent.current = agent;
+  }, [chat, agent]);
+  const mcp = serversItem({
+    tools: readable,
+    servers: (agent === null ? undefined : servers.value[agent]) ?? [],
+    isOff: (key) => isOff(chat, off, key),
   });
   const attach = (picked: File[]) => {
     failure.value = null;
@@ -356,6 +374,8 @@ export function Composer({
           onFiles={attach}
           web={web}
           onWeb={() => flip(chat, off, WEB)}
+          servers={mcp}
+          onServer={(key) => flip(chat, off, key)}
         />
         {project && (
           <ProjectPicker

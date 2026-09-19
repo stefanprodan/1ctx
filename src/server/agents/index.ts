@@ -52,7 +52,7 @@ export type AgentsDeps = {
   clock: Clock;
   providers: ProvidersPort;
   skills: SkillsPort & SkillsListPort & { assigned(agentId: string): string[] };
-  mcp: Pick<Mcp, "agentServers" | "setAgentServers">;
+  mcp: Pick<Mcp, "agentServers" | "setAgentServers" | "switchableBy">;
   tools: ToolsPort & CapabilitiesPort;
   access: AccessPort;
   sessions: SessionsPort;

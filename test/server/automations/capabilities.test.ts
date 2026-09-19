@@ -91,7 +91,7 @@ describe("automation capability sets", () => {
         {},
         [1],
         ["unknown"],
-        ["mcp:server"],
+        ["mcp:"],
         Array(MAX_DISABLED_CAPABILITIES + 1).fill("web"),
       ]) {
         expect(() =>

@@ -27,7 +27,7 @@ import {
   runDeadlineMs,
   updateAutomation,
 } from "../../data/automations.ts";
-import { switchable } from "../../data/capabilities.ts";
+import { servers, switchable } from "../../data/capabilities.ts";
 import { me } from "../../data/me.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
@@ -35,9 +35,9 @@ import { useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { RowsSwitch } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AccessSection } from "./AccessSection.tsx";
 import {
   automationFieldOf,
   browserZone,
@@ -86,7 +86,9 @@ function Editor({
     );
     if (next !== draft.value) draft.value = next;
   }, [automation?.deadlineMs, limitMs]);
-  const request = requestOf(draft.value, limitMs);
+  // the picked agent's servers, read when a call runs as the draft is
+  const serversOf = () => servers.value[draft.value.agentId] ?? [];
+  const request = requestOf(draft.value, limitMs, serversOf());
   const back =
     automation === null
       ? `/projects/${projectId}/automations`
@@ -94,7 +96,7 @@ function Editor({
   // the call is kept from the first render, so it reads the draft's
   // signal when it runs rather than this render's request
   const save = useSave(async () => {
-    const current = requestOf(draft.value, limitRef.current);
+    const current = requestOf(draft.value, limitRef.current, serversOf());
     if (!("body" in current)) throw new Error(current.problem);
     const saved =
       automation === null
@@ -227,24 +229,21 @@ function Editor({
           )}
         </div>
       </Section>
-      <Section title="Web access" text="Fetch, search and curl">
-        <div class="field">
-          <div class="automations-web">
-            <RowsSwitch
-              on={web.on && d.web}
-              label="Web access"
-              disabled={off || !web.live}
-              onClick={() => set({ web: !d.web })}
-            />
-            <span>
-              {web.on && d.web
-                ? "Runs can reach the web"
-                : "Runs cannot reach the web"}
-            </span>
-          </div>
-          {web.reason !== null && <span class="hint">{web.reason}</span>}
-        </div>
-      </Section>
+      <AccessSection
+        web={web}
+        webOn={d.web}
+        onWeb={() => set({ web: !d.web })}
+        servers={takesTools ? serversOf() : []}
+        mcpOff={d.mcpOff}
+        onServer={(key) =>
+          set({
+            mcpOff: d.mcpOff.includes(key)
+              ? d.mcpOff.filter((k) => k !== key)
+              : [...d.mcpOff, key],
+          })
+        }
+        disabled={off}
+      />
       <Section title="When" text="In the time zone you pick">
         <ScheduleField
           projectId={projectId}

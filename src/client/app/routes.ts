@@ -384,7 +384,7 @@ export const ROUTES: Route[] = [
     title: () => "MCP",
     role: "admin",
     load: () => loadMcp(),
-    nav: { label: "MCP", icon: "plug", order: 13, group: "Admin" },
+    nav: { label: "MCP", icon: "mcp", order: 13, group: "Admin" },
   },
   {
     path: "/users/:username",

@@ -78,6 +78,7 @@ describe("MCP refresh coordinator", () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -117,6 +118,7 @@ describe("MCP refresh coordinator", () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -141,6 +143,7 @@ describe("MCP refresh coordinator", () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -171,6 +174,7 @@ describe("MCP refresh coordinator", () => {
       return new Response("failed", { status: 500 });
     }) as unknown as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -223,6 +227,7 @@ describe("MCP refresh coordinator", () => {
       return new Response("failed", { status: 500 });
     }) as unknown as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -276,6 +281,7 @@ describe("MCP refresh coordinator", () => {
       });
     }) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -318,6 +324,7 @@ describe("MCP refresh coordinator", () => {
       });
     }) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -360,7 +367,9 @@ describe("MCP refresh coordinator", () => {
       discover,
     });
     const route = routes({
+      db,
       store,
+      capabilities: { forget: () => {} },
       coordinator,
       clock: time.clock,
       log: () => {},
@@ -398,6 +407,7 @@ describe("MCP refresh coordinator", () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -445,6 +455,7 @@ describe("MCP refresh coordinator", () => {
     const time = fakeClock();
     const make = (db: typeof firstDb, fetcher: typeof fetch) =>
       mcpArea({
+        capabilities: { forget: () => {} },
         db,
         fetcher,
         secret: () => null,
@@ -503,6 +514,7 @@ describe("MCP refresh routes", () => {
       });
     }) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -551,6 +563,7 @@ describe("MCP refresh routes", () => {
       });
     }) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -604,6 +617,7 @@ describe("MCP refresh routes", () => {
       });
     }) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -659,6 +673,7 @@ describe("MCP refresh routes", () => {
         });
       })) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -707,6 +722,7 @@ describe("MCP refresh routes", () => {
       });
     }) as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,
@@ -748,6 +764,7 @@ describe("MCP refresh routes", () => {
     const fetcher = (async () =>
       new Response("failed", { status: 500 })) as unknown as typeof fetch;
     const area = mcpArea({
+      capabilities: { forget: () => {} },
       db,
       fetcher,
       secret: () => null,

@@ -19,6 +19,7 @@ import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
 import {
+  accessOf,
   automationFieldOf,
   canChange,
   type Draft,
@@ -266,6 +267,7 @@ describe("the form", () => {
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
+      mcpOff: [],
     });
   });
 
@@ -350,6 +352,45 @@ describe("the form", () => {
     };
     expect(body(false)).toEqual(["web"]);
     expect(body(true)).toEqual([]);
+  });
+
+  test("servers off follow the row and save only for the picked agent", () => {
+    const row = automation({ disabledCapabilities: ["mcp:a1", "mcp:gone"] });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.mcpOff).toEqual(["mcp:a1", "mcp:gone"]);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, mcpOff: ["mcp:a1"] }, row, LIMIT)).toBe(true);
+    const servers = [
+      { id: "a1", name: "flux", tools: 18 },
+      { id: "b2", name: "github", tools: 42 },
+    ];
+    const request = requestOf(
+      filled({ web: false, mcpOff: ["mcp:gone", "mcp:a1"] }),
+      LIMIT,
+      servers,
+    );
+    expect("body" in request && request.body.disabledCapabilities).toEqual([
+      "mcp:a1",
+      "web",
+    ]);
+  });
+
+  test("the page's aside names what the row keeps its runs from", () => {
+    const servers = [
+      { id: "b2", name: "github", tools: 42 },
+      { id: "a1", name: "flux", tools: 18 },
+    ];
+    expect(accessOf(automation({}), servers)).toEqual({
+      web: true,
+      mcpOff: [],
+    });
+    const row = automation({
+      disabledCapabilities: ["mcp:a1", "mcp:b2", "mcp:gone", "web"],
+    });
+    expect(accessOf(row, servers)).toEqual({
+      web: false,
+      mcpOff: ["flux", "github"],
+    });
   });
 
   test("memory is one of none, own and project, never both notes", () => {

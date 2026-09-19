@@ -56,6 +56,7 @@ import {
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
+import { AccessLines } from "./AutomationAccess.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
   browserZone,
@@ -356,6 +357,7 @@ export function Automation({ params }: { params: Params }) {
                   Deadline
                   <span class="split-strong">{deadlineText(deadlineMs)}</span>
                 </div>
+                <AccessLines row={row} />
                 <div class="split-line">
                   Owner
                   <a class="split-strong" href={userHref(row.ownerName)}>

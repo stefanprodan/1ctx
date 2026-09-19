@@ -60,6 +60,7 @@ function finishStoredReply(
 function fixedTools(content: string): Tools {
   return {
     capabilities: () => [],
+    serverNames: () => [],
     offered: () => ({
       tools: [
         {
@@ -635,6 +636,7 @@ describe("GET /api/projects/:id/agents", () => {
     expect(await visible.json()).toEqual({
       agents: [expect.objectContaining({ id: chat.agentId, name: "coder" })],
       capabilities: ["web"],
+      servers: {},
     });
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
     expect(

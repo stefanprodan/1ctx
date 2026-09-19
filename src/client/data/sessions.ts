@@ -32,7 +32,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { accepted, changeOf, switchable } from "./capabilities.ts";
+import { accepted, changeOf, servers, switchable } from "./capabilities.ts";
 import { me } from "./me.ts";
 import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
@@ -182,6 +182,7 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
     if (!current()) return;
     projectAgents.value = body.agents;
     switchable.value = body.capabilities;
+    servers.value = body.servers;
   } catch {
     if (current()) projectAgents.value = null;
   }

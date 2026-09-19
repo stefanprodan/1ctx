@@ -7,6 +7,8 @@ import type {
   PatchMcpEndpoint,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
+import { mcpKey } from "../../shared/capabilities.ts";
+import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import {
@@ -22,7 +24,9 @@ import type { RefreshCoordinator, RefreshKind } from "./refresh.ts";
 import { type McpServerRow, type McpServerStore, summary } from "./store.ts";
 
 export type RoutesDeps = {
+  db: Db;
   store: McpServerStore;
+  capabilities: { forget(key: string): void };
   coordinator: RefreshCoordinator;
   clock: Clock;
   log: (line: string) => void;
@@ -173,11 +177,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         deps.coordinator.abort(ctx.params.id);
-        const deleted = deps.store.deleteUnreferenced(ctx.params.id);
-        if (deleted === "missing") throw new NotFound("no such MCP server");
-        if (deleted === "referenced") {
-          throw new Conflict("an agent uses the MCP server");
-        }
+        transact(deps.db, () => {
+          const deleted = deps.store.deleteUnreferenced(ctx.params.id);
+          if (deleted === "missing") throw new NotFound("no such MCP server");
+          if (deleted === "referenced") {
+            throw new Conflict("an agent uses the MCP server");
+          }
+          deps.capabilities.forget(mcpKey(ctx.params.id));
+          return { result: undefined };
+        });
         return new Response(null, { status: 204 });
       },
     },
