@@ -84,9 +84,7 @@ describe("bash", () => {
     });
     expect(listed.tokens).toBe(wireTokens([tool]));
     expect(tool.description).not.toContain("{{year}}");
-    expect(tool.description).toContain(
-      "Use curl for HTTP requests to any host.",
-    );
+    expect(tool.description).toContain("curl calls HTTP APIs on any host,");
     expect(tool.description).not.toContain(";");
     expect(tool.description).not.toContain("\n");
     expect(makeBashTool().description.endsWith("No network.")).toBe(true);

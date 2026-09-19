@@ -259,7 +259,11 @@ violation, and every rule has a rejected fixture under
   non-text bytes in `/knowledge` fail the save. just-bash's curl is an
   HTTP client, not curl: `-w` knows `http_code`, `content_type`,
   `url_effective` and `size_download` and prints any other variable's
-  name, so the bash description says what it cannot measure. Four commands at most
+  name, with no timing, DNS or TLS detail and no `-k` or `--retry`. It is
+  good for calling HTTP APIs, which is all the bash description says of
+  it, and it sends Bun's user agent unless `-A` is given. The description
+  is about the docs first: find the file, read a part, patch in place.
+  Four commands at most
   hold disposable mounts of `/knowledge`, the session's `/tmp` and
   `/uploads`; the per-session queue is taken before the process slot and
   released last. Aborts, exits 124/126 and throws discard both writable

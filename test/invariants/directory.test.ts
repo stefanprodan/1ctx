@@ -165,7 +165,7 @@ describe("the directory", () => {
     expect(catalogResponse.status).toBe(200);
     const catalog: ToolsResponse = await catalogResponse.json();
     const bash = catalog.builtin.find((tool) => tool.name === "bash")!;
-    expect(bash.tokens).toBe(443);
+    expect(bash.tokens).toBe(407);
     expect(bash.tokens).toBe(
       wireTokens(offered.filter((tool) => tool.name === "bash")),
     );

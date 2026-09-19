@@ -198,8 +198,7 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
   );
   expect(tool.description).toContain("host9.test and 2 more");
   expect(tool.description).not.toContain("host10.test");
-  expect(tool.description).toContain("Download into /tmp");
-  expect(tool.description).toContain("non-text bytes in /knowledge fail");
+  expect(tool.description).toContain("Save downloads in /tmp");
   expect(tool.description).not.toContain(";");
   expect(tool.description).not.toContain("\n");
   expect(await tool.run({ command: "true" }, ctx)).toEqual({
