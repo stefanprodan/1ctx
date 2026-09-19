@@ -16,6 +16,7 @@
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
+import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
 import type {
   ChatMessageIn,
   ChatRequest,
@@ -79,7 +80,9 @@ function userMessage(
         : lookups.usernameOf(row.userId);
   return {
     role: "user",
-    content: row.content,
+    content: row.uploads?.length
+      ? `${row.content}\n\n${uploadsBlock(row.uploads)}`
+      : row.content,
     ...(name === null ? {} : { name }),
   };
 }
@@ -211,9 +214,14 @@ export function historyMessages(
       );
       const remembered =
         names.length === 0 ? "" : `\n\n${SKILLS_LEAD} ${names.join(", ")}`;
+      const uploads = rows
+        .slice(0, i)
+        .some((row) => row.kind === "user" && row.uploads?.length)
+        ? `\n\n${UPLOADS_SUMMARY_LINE}`
+        : "";
       out.push({
         role: "user",
-        content: `${SUMMARY_LEAD}\n\n${row.content}${remembered}`,
+        content: `${SUMMARY_LEAD}\n\n${row.content}${remembered}${uploads}`,
       });
       start = i + 1;
       break;

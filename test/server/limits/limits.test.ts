@@ -111,11 +111,11 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
-      expect(rows).toHaveLength(33);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(33);
+      expect(rows).toHaveLength(35);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(35);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(11);
-      expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(9);
+      expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(11);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 500_000,
@@ -143,7 +143,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(33);
+      expect(body.limits).toHaveLength(35);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),
@@ -184,7 +184,21 @@ describe("limits area", () => {
       unit: "count",
     },
     { name: "scratchIdleDays", default: 7, min: 1, max: 90, unit: "days" },
-  ])("defines the scratch limit %p", ({ name, ...definition }) => {
+    {
+      name: "uploadBytes",
+      default: 16 * 1024 * 1024,
+      min: 1024 * 1024,
+      max: 64 * 1024 * 1024,
+      unit: "bytes",
+    },
+    {
+      name: "uploadFiles",
+      default: 1000,
+      min: 10,
+      max: 10_000,
+      unit: "count",
+    },
+  ])("defines the session tree limit %p", ({ name, ...definition }) => {
     const db = memoryDb();
     try {
       const area = limitsArea({ db, clock: () => 100 });
@@ -265,7 +279,7 @@ describe("limits area", () => {
     }
   });
 
-  test("round-trips all nine knowledge caps with their scope and units", () => {
+  test("round-trips all eleven knowledge caps with their scope and units", () => {
     const db = memoryDb();
     try {
       const area = limitsArea({ db, clock: () => 100 });
@@ -280,12 +294,14 @@ describe("limits area", () => {
         scratchBytes: 1024 * 1024,
         scratchFiles: 10,
         scratchIdleDays: 1,
+        uploadBytes: 1024 * 1024,
+        uploadFiles: 10,
       };
       expect(parseLimits({ values })).toEqual({ values });
       area.set(values, 100);
       expect(area.current()).toEqual(values);
       const rows = area.rows().filter((row) => row.scope === "knowledge");
-      expect(rows).toHaveLength(9);
+      expect(rows).toHaveLength(11);
       expect(
         rows.find((row) => row.name === "knowledgeHistoryDays")?.unit,
       ).toBe("days");

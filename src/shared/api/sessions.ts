@@ -50,26 +50,35 @@ export type ToolVisualResponse = {
 };
 
 // POST /api/sessions: a chat in a project with an agent, and its first
-// message
+// message. uploads names the caller's staged items in the project, at
+// most MAX_UPLOADS_PER_MESSAGE distinct ids, claimed by the send
 export type CreateSessionRequest = {
   projectId: string;
   agentId: string;
   message: string;
+  uploads?: string[];
 };
 
 // POST /api/sessions/:id/messages
-export type SendMessageRequest = { message: string };
+export type SendMessageRequest = { message: string; uploads?: string[] };
 
 // PATCH /api/sessions/:id: a new title, one line up to the title cap
 export type RenameSessionRequest = { title: string };
 
 // POST /api/sessions/:id/fork: the turn to fork at, the agent the fork
 // runs on, and its title, "Fork of <the source's>" when absent
+// A fork at a user turn leaves that message unsent: its text is the new
+// chat's draft, and the files it carried are staged again for the
+// caller, their ids answered beside the session as `draftUploads`
 export type ForkSessionRequest = {
   messageId: string;
   agentId: string;
   title?: string;
 };
+
+// the fork's answer, 201: the new chat, and the staged ids of the files
+// an unsent user turn carried, empty for any other fork
+export type ForkSessionResponse = SessionDetail & { draftUploads: string[] };
 
 // GET /api/projects/:id/agents: the agents the composer offers
 export type ProjectAgentsResponse = { agents: AgentSummary[] };

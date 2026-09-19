@@ -6,6 +6,7 @@
 // The revision counts the session's transactions; a client applies an
 // event only when its revision is above the one it holds.
 
+import type { MessageUpload } from "../uploads.ts";
 import type {
   EventSource,
   MessageKind,
@@ -76,6 +77,9 @@ export type Message = {
   // a tool result stays in storage but travels as empty content; every
   // other row carries its content unchanged
   content: string;
+  // the files a user message carried, as they were at the send; null on
+  // every other row and on a message without files
+  uploads: MessageUpload[] | null;
   // the UTF-8 byte length of stored tool content on the wire; null on
   // every non-tool row
   resultBytes: number | null;

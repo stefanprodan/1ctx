@@ -88,6 +88,41 @@ export type KnowledgeUploadReason =
   | "clash"
   | "clash-live";
 
+// one picked item staged for a chat, before a send claims it. An item
+// that left no file is answered with a null id and staged nothing
+export type StagedUpload = {
+  id: string | null;
+  // the id the client minted for the try, so a lost answer is found
+  attempt: string;
+  // the picked item's name, cut for display
+  name: string;
+  archive: boolean;
+  // the folder the item's files were put under, without slashes at its
+  // ends: empty for a loose file, and for an archive whose members all
+  // sit under one top-level folder of their own
+  folder: string;
+  files: number;
+  bytes: number;
+  saved: string[];
+  skipped: KnowledgeUploadResult["skipped"];
+  skippedTotal: number;
+  renamed: number;
+  // null with a null id
+  expiresAt: number | null;
+};
+
+// the values in force, what the composer judges a pick with
+export type UploadLimits = {
+  itemBytes: number;
+  fileBytes: number;
+  uploadBytes: number;
+  uploadFiles: number;
+  perMessage: number;
+  stagedItems: number;
+};
+
+export type StagedUploads = { items: StagedUpload[]; limits: UploadLimits };
+
 export type KnowledgeUploadResult = {
   added: number;
   replaced: number;

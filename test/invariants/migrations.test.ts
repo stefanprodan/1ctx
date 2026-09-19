@@ -156,15 +156,29 @@ describe("the schema", () => {
     try {
       const tables = ["users", "projects", "sessions", "messages", "sends"];
       const before = tables.map((name) =>
-        db.query(`select * from ${name} order by id`).all(),
+        db
+          .query<Record<string, unknown>, []>(
+            `select * from ${name} order by id`,
+          )
+          .all(),
       );
-      expect(migrate(db)).toEqual(["0015-knowledge", "0016-openai-strict"]);
+      expect(migrate(db)).toEqual([
+        "0015-knowledge",
+        "0016-openai-strict",
+        "0017-chat-uploads",
+      ]);
       expect(MIGRATIONS[14]?.rebuild).toBeUndefined();
       expect(
         tables.map((name) =>
           db.query(`select * from ${name} order by id`).all(),
         ),
-      ).toEqual(before);
+      ).toEqual(
+        before.map((rows, index) =>
+          tables[index] === "messages"
+            ? rows.map((row) => ({ ...row, uploads: null }))
+            : rows,
+        ),
+      );
       const fileColumns = db
         .query<{ name: string }, []>("pragma table_info(knowledge_files)")
         .all()
@@ -247,6 +261,174 @@ describe("the schema", () => {
         foreign_keys: 1,
       });
       expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0017 adds ordered upload storage and nullable message records without a rebuild", () => {
+    const db = seed(MIGRATIONS.slice(0, 16));
+    try {
+      db.exec(`
+        insert into knowledge_files values (
+          'f', 'p', 'docs/x.md', 'md', 'hello', 5, 1, 'digest', 1, 1,
+          'user', 'u', 'user', null, null, 1, 1
+        );
+        insert into knowledge_versions values (
+          'v', 'f', 'p', 'docs/x.md', 1, 'hello', 5, 1,
+          'user', 'u', 'user', null, null, 1, 0, null
+        );
+        insert into session_scratch values ('sess', '/tmp/work', 2, 3, 1, 7);
+        insert into session_scratch_files
+          values ('sess', 'work/data.bin', x'00ff01', 384);
+      `);
+      const tables = [
+        "users",
+        "projects",
+        "providers",
+        "agents",
+        "sessions",
+        "sends",
+        "usage",
+        "knowledge_files",
+        "knowledge_versions",
+        "session_scratch",
+        "session_scratch_files",
+      ];
+      const before = tables.map((table) =>
+        db.query(`select * from ${table} order by rowid`).all(),
+      );
+      const messages = db
+        .query<Record<string, unknown>, []>(
+          "select * from messages order by seq",
+        )
+        .all();
+      expect(migrate(db)).toEqual(["0017-chat-uploads"]);
+      expect(MIGRATIONS[16]?.rebuild).toBeUndefined();
+      expect(
+        tables.map((table) =>
+          db.query(`select * from ${table} order by rowid`).all(),
+        ),
+      ).toEqual(before);
+      expect(db.query("select * from messages order by seq").all()).toEqual(
+        messages.map((message) => ({ ...message, uploads: null })),
+      );
+      for (const table of [
+        "upload_staged",
+        "upload_staged_files",
+        "session_uploads",
+        "session_upload_files",
+      ]) {
+        expect(db.query(`select * from ${table}`).all()).toEqual([]);
+      }
+      expect(db.query("pragma table_info(messages)").all()).toContainEqual(
+        expect.objectContaining({
+          name: "uploads",
+          type: "TEXT",
+          notnull: 0,
+          dflt_value: null,
+        }),
+      );
+      expect(
+        db
+          .query<{ from: string }, []>("pragma foreign_key_list(messages)")
+          .all()
+          .some((key) => key.from === "uploads"),
+      ).toBeFalse();
+      const record = JSON.stringify([
+        {
+          name: "notes.zip",
+          archive: true,
+          files: 1,
+          bytes: 5,
+          saved: ["notes/a.md"],
+        },
+      ]);
+      db.query("update messages set uploads = ? where id = 'm1'").run(record);
+      db.exec(`
+        insert into upload_staged values
+          ('staged', 'u', 'p', 'attempt', 'notes.zip', 1, 1, 5, '{}', 0, 100);
+        insert into upload_staged_files values
+          ('staged', 0, 'notes/a.md', 'hello', 5);
+        insert into session_uploads values ('sess', 1, 5, 1);
+        insert into session_upload_files
+          (session_id, name, text, bytes, message_id, item, archive, folder, created_at)
+          values ('sess', 'notes/a.md', 'hello', 5, 'gone-message', 'notes.zip', 1, 'notes', 1);
+      `);
+      expect(
+        db
+          .query<{ from: string }, []>(
+            "pragma foreign_key_list(session_upload_files)",
+          )
+          .all()
+          .map((key) => key.from),
+      ).toEqual(["session_id"]);
+      expect(() =>
+        db.query("update upload_staged set archive = 2").run(),
+      ).toThrow();
+      expect(() =>
+        db.query("update session_upload_files set archive = 2").run(),
+      ).toThrow();
+      expect(() =>
+        db
+          .query(
+            `insert into upload_staged
+             select 'duplicate', user_id, project_id, attempt, name, archive,
+                    files, bytes, result, created_at, expires_at
+             from upload_staged`,
+          )
+          .run(),
+      ).toThrow();
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+      expect(migrate(db)).toEqual([]);
+      expect(
+        db.query("select uploads from messages where id = 'm1'").get(),
+      ).toEqual({ uploads: record });
+      expect(
+        db.query("select * from session_upload_files").get(),
+      ).toMatchObject({
+        text: "hello",
+        folder: "notes",
+        item_index: 0,
+        position: 0,
+      });
+      const columns = db.query("pragma table_info(session_upload_files)").all();
+      expect(columns).toContainEqual(
+        expect.objectContaining({ name: "folder", type: "TEXT", notnull: 1 }),
+      );
+      expect(() =>
+        db.query("update session_upload_files set folder = null").run(),
+      ).toThrow();
+      for (const name of ["item_index", "position"]) {
+        expect(columns).toContainEqual(
+          expect.objectContaining({
+            name,
+            type: "INTEGER",
+            notnull: 1,
+            dflt_value: "0",
+          }),
+        );
+        expect(() =>
+          db.query(`update session_upload_files set ${name} = null`).run(),
+        ).toThrow();
+        expect(() =>
+          db.query(`update session_upload_files set ${name} = -1`).run(),
+        ).toThrow();
+      }
+      db.exec("update session_upload_files set item_index = 2, position = 3");
+      expect(
+        db.query("select item_index, position from session_upload_files").get(),
+      ).toEqual({ item_index: 2, position: 3 });
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+      expect(migrate(db)).toEqual([]);
+      db.exec("delete from sessions where id = 'sess'");
+      expect(db.query("select * from session_upload_files").all()).toEqual([]);
     } finally {
       db.close();
     }
@@ -481,6 +663,7 @@ describe("additive migrations", () => {
       "0014-visualize",
       "0015-knowledge",
       "0016-openai-strict",
+      "0017-chat-uploads",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -533,6 +716,7 @@ describe("0005", () => {
       "0014-visualize",
       "0015-knowledge",
       "0016-openai-strict",
+      "0017-chat-uploads",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -594,6 +778,7 @@ describe("rebuild migrations", () => {
       "0014-visualize",
       "0015-knowledge",
       "0016-openai-strict",
+      "0017-chat-uploads",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -688,6 +873,7 @@ describe("0006 skills migration", () => {
       "0014-visualize",
       "0015-knowledge",
       "0016-openai-strict",
+      "0017-chat-uploads",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -741,6 +927,7 @@ describe("0007 user tz migration", () => {
       "0014-visualize",
       "0015-knowledge",
       "0016-openai-strict",
+      "0017-chat-uploads",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -773,6 +960,7 @@ describe("0009 mcp migration", () => {
       "0014-visualize",
       "0015-knowledge",
       "0016-openai-strict",
+      "0017-chat-uploads",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1019,7 +1207,10 @@ describe("0008 search tavily migration", () => {
             )
             .run(),
         ).toThrow();
-        expect(migrate(db)).toEqual(["0016-openai-strict"]);
+        expect(migrate(db)).toEqual([
+          "0016-openai-strict",
+          "0017-chat-uploads",
+        ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(
           providers,

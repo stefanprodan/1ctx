@@ -33,6 +33,7 @@ function result(changes: Partial<Message> = {}): Message {
     userId: null,
     agentId: null,
     content: "result",
+    uploads: null,
     resultBytes: 6,
     promptTokens: null,
     reasoning: "",

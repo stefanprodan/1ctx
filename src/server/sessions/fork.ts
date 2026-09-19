@@ -93,7 +93,7 @@ export function readForkPoint(db: Db, sessionId: string, messageId: string) {
 export function copyRows(
   db: Db,
   fields: { sessionId: string; rows: Message[]; now: number },
-): void {
+): ReadonlyMap<string, string> {
   const ids = new Map(fields.rows.map((row) => [row.id, newId()]));
   const sendIds = new Map<string, string>();
   const grouped = new Map<string, Message[]>();
@@ -138,11 +138,11 @@ export function copyRows(
     `insert into messages (id, session_id, seq, kind, send_id, round, slot,
        user_id, agent_id, content, reasoning, html, status, error,
        finish_reason, reasoning_details, tool_calls, tool_call_id, tool_name,
-       model, ttft_ms, thinking_ms, created_at, finished_at)
+       model, ttft_ms, thinking_ms, created_at, finished_at, uploads)
      select ?, ?, seq, kind, ?, round, slot, user_id, agent_id, content,
        reasoning, html, status, error, finish_reason, reasoning_details,
        tool_calls, tool_call_id, tool_name, model, ttft_ms, thinking_ms,
-       created_at, finished_at from messages where id = ?`,
+       created_at, finished_at, uploads from messages where id = ?`,
   );
   for (const row of fields.rows) {
     insertMessage.run(
@@ -152,6 +152,7 @@ export function copyRows(
       row.id,
     );
   }
+  return ids;
 }
 
 export function forkedFrom(db: Db, id: string): SessionDetail["forkedFrom"] {

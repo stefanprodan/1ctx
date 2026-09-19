@@ -28,6 +28,7 @@ const row = (fields: Partial<ExportRow>): ExportRow => ({
   finishReason: null,
   author: null,
   content: "",
+  uploads: null,
   toolCalls: null,
   toolCallId: null,
   toolName: null,

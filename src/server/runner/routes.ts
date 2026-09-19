@@ -5,6 +5,10 @@
 // sessions because the runner sits below it in the layer order and a
 // route above calling down would be one more forward closure.
 
+import type {
+  CreateSessionRequest,
+  SendMessageRequest,
+} from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import { jsonBody } from "../lib/body.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
@@ -15,11 +19,12 @@ import {
 } from "../sessions/index.ts";
 
 export type RoutesDeps = {
-  start(
+  start(principal: Principal, fields: CreateSessionRequest): SessionDetail;
+  send(
     principal: Principal,
-    fields: { projectId: string; agentId: string; message: string },
+    sessionId: string,
+    fields: SendMessageRequest,
   ): SessionDetail;
-  send(principal: Principal, sessionId: string, message: string): SessionDetail;
   regenerate(principal: Principal, sessionId: string): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string): void;
@@ -43,10 +48,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/sessions/:id/messages",
       policy: "authenticated",
       async handle(req, ctx) {
-        const { message } = parseSendMessage(
-          await jsonBody(req, MAX_SESSION_BODY),
-        );
-        return json(deps.send(ctx.principal!, ctx.params.id, message), 201);
+        const fields = parseSendMessage(await jsonBody(req, MAX_SESSION_BODY));
+        return json(deps.send(ctx.principal!, ctx.params.id, fields), 201);
       },
     },
     {

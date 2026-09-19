@@ -30,6 +30,7 @@ function answer(changes: Partial<Message> = {}): Message {
     agentId: "agent-1",
     content: "done",
     resultBytes: null,
+    uploads: null,
     promptTokens: null,
     reasoning: "",
     html: '<p class="md-p">done</p>',

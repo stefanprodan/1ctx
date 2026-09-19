@@ -18,6 +18,7 @@ import { acquire, acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
 import { type KnowledgeRow, type KnowledgeStore, summary } from "./store.ts";
 import { textFromBytes } from "./text.ts";
+import type { UploadStore, UploadTree } from "./uploads.ts";
 
 export type CommandCaps = { callTimeoutMs: number; resultCut: number };
 export type CommandResult = {
@@ -29,6 +30,7 @@ type MountDeps = {
   db: Db;
   store: KnowledgeStore;
   scratch: ScratchStore;
+  uploads: UploadStore;
   clock: Clock;
   current(): KnowledgeCaps;
 };
@@ -112,6 +114,40 @@ async function directory(fs: InMemoryFs, path: string): Promise<boolean> {
   return (await fs.exists(path)) && (await fs.stat(path)).isDirectory;
 }
 
+async function uploadsChanged(
+  fs: InMemoryFs,
+  uploads: UploadTree,
+): Promise<boolean> {
+  const paths = fs.getAllPaths().sort();
+  if (!paths.includes("/uploads")) return true;
+  const root = await fs.lstat("/uploads");
+  if (!root.isDirectory || root.isSymbolicLink) return true;
+  const expected = new Map<string, string | null>();
+  for (const file of uploads.entries) {
+    const parts = file.name.split("/");
+    for (let end = 1; end < parts.length; end++)
+      expected.set(`/uploads/${parts.slice(0, end).join("/")}`, null);
+    expected.set(`/uploads/${file.name}`, file.text);
+  }
+  for (const path of paths) {
+    if (!path.startsWith("/uploads/")) continue;
+    const before = expected.get(path);
+    if (before === undefined) return true;
+    const stat = await fs.lstat(path);
+    if (stat.isSymbolicLink) return true;
+    if (before === null) {
+      if (!stat.isDirectory) return true;
+    } else if (
+      !stat.isFile ||
+      !Buffer.from(before).equals(await fs.readFileBuffer(path))
+    ) {
+      return true;
+    }
+    expected.delete(path);
+  }
+  return expected.size !== 0;
+}
+
 async function savedCwd(
   fs: InMemoryFs,
   pwd: string | undefined,
@@ -127,8 +163,10 @@ async function savedCwd(
   if (
     path !== "/knowledge" &&
     path !== "/tmp" &&
+    path !== "/uploads" &&
     !path.startsWith("/knowledge/") &&
-    !path.startsWith("/tmp/")
+    !path.startsWith("/tmp/") &&
+    !path.startsWith("/uploads/")
   )
     return "/knowledge";
   return (await directory(fs, path)) ? path : "/knowledge";
@@ -160,6 +198,7 @@ export async function run(
     const storage = deps.current();
     const rows = deps.store.read(projectId);
     const scratch = deps.scratch.read(sessionId);
+    const uploads = deps.uploads.read(sessionId);
     // A lowered cap still permits deleting or shrinking the mounted base.
     const projectBytes = Math.max(
       storage.knowledgeProjectBytes,
@@ -168,23 +207,28 @@ export async function run(
     const mountBytes =
       projectBytes +
       Math.max(storage.scratchBytes, scratch.bytes) +
+      Math.max(storage.uploadBytes, uploads.bytes) +
       2 * 1024 * 1024;
     const fs = new InMemoryFs({}, { maxTotalBytes: mountBytes });
     fs.mkdirSync("/knowledge", { recursive: true });
     fs.mkdirSync("/tmp", { recursive: true });
+    fs.mkdirSync("/uploads", { recursive: true });
     for (const row of rows)
       fs.writeFileSync(`/knowledge/${row.name}`, row.text);
     for (const file of scratch.entries)
       fs.writeFileSync(`/tmp/${file.path}`, file.data, undefined, {
         mode: file.mode,
       });
-    const cwd = (await directory(fs, scratch.cwd)) ? scratch.cwd : "/knowledge";
+    for (const file of uploads.entries)
+      fs.writeFileSync(`/uploads/${file.name}`, file.text);
+    const cwd = await savedCwd(fs, scratch.cwd);
     if (cwd !== scratch.cwd)
       notice = `started in /knowledge: ${scratch.cwd} no longer exists\n`;
     const ioBytes = Math.max(
       4 * caps.resultCut,
       storage.scratchBytes,
       storage.knowledgeFileBytes,
+      ...uploads.entries.map((file) => file.bytes),
     );
     const bash = new Bash({
       fs,
@@ -219,6 +263,11 @@ export async function run(
     });
     const stdout = decodeBytesToUtf8(stdoutAsBytes(result));
     combined.throwIfAborted();
+    if (await uploadsChanged(fs, uploads)) {
+      notice =
+        "changes under /uploads were discarded: copy a file to /tmp to change it\n" +
+        notice;
+    }
     if (result.exitCode === 124 || result.exitCode === 126) {
       const printed = output(
         stdout,

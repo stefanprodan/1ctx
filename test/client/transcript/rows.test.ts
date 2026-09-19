@@ -226,6 +226,7 @@ const message = (
   agentId: kind === "user" || kind === "tool" ? null : "a1",
   content: id,
   resultBytes: null,
+  uploads: null,
   promptTokens: null,
   reasoning: "",
   html: kind === "user" || kind === "tool" ? "" : `<p>${id}</p>`,

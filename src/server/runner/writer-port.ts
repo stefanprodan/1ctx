@@ -7,6 +7,7 @@
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
+import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
   EventSource,
   SendCause,
@@ -15,6 +16,16 @@ import type {
 } from "../../shared/words.ts";
 import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
+
+export type UploadsPort = {
+  claimUploads(
+    userId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    ids: readonly string[],
+  ): MessageUpload[];
+};
 
 export type SessionsPort = {
   create(fields: {
@@ -38,6 +49,7 @@ export type SessionsPort = {
     sendId: string;
     userId: string;
     content: string;
+    uploads?: MessageUpload[] | null;
     now: number;
   }): Message;
   replaceSend(

@@ -68,6 +68,7 @@ export function forkRow(fields: Partial<Message>): Message {
     agentId: fields.kind === "user" ? null : "agent-id",
     content: "the answer",
     resultBytes: null,
+    uploads: null,
     promptTokens: null,
     reasoning: "",
     html: "",

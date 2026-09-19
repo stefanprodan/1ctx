@@ -3,6 +3,7 @@
 
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
+import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { changeNote } from "../mcp/index.ts";
@@ -32,6 +33,8 @@ export function prepareSend(fields: {
   session: SessionRow | null;
   policy: SendPolicy;
   text: string;
+  uploads?: readonly string[];
+  checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   title: string;
   kind: SendKind;
   origin: SessionOrigin;
@@ -40,6 +43,19 @@ export function prepareSend(fields: {
   now: number;
 }): PreparedRun {
   const now = fields.now;
+  if (fields.uploads?.length) {
+    if (fields.kind !== "chat" || fields.existingUser !== null) {
+      throw new BadRequest("uploads require a new chat message");
+    }
+    fields.checkUploads(
+      fields.policy.userId,
+      fields.policy.projectId,
+      fields.uploads,
+    );
+    if (!fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
+      throw new BadRequest("this agent cannot read files");
+    }
+  }
   fields.registry.admit(fields.sessionId, fields.policy.userId);
   const sendId = newId();
   const userId = fields.existingUser?.id ?? newId();
@@ -72,6 +88,7 @@ export function prepareSend(fields: {
       title: fields.title,
       policy: fields.policy,
       text: fields.text,
+      uploads: fields.uploads,
       mcpDigest: fields.policy.offered.mcpPrompt.digest,
     });
     send.mcpNote = changeNote(

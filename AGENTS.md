@@ -249,9 +249,10 @@ violation, and every rule has a rejected fixture under
   History eviction may drop replaced versions near its caps.
   `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
   host or network, and `defenseInDepth: true`. Four commands at most
-  hold disposable mounts of `/knowledge` and the session's `/tmp`; the
-  per-session queue is taken before the process slot and released last.
-  Aborts, exits 124/126 and throws discard both trees. Every ordinary
+  hold disposable mounts of `/knowledge`, the session's `/tmp` and
+  `/uploads`; the per-session queue is taken before the process slot and
+  released last. Aborts, exits 124/126 and throws discard both writable
+  trees. Every ordinary
   exit, nonzero included, commits in one transaction: knowledge changes
   under mounted ids, revisions, absence and current caps, with one
   version and `knowledge.changed` per file; scratch changes under its
@@ -268,8 +269,8 @@ violation, and every rule has a rejected fixture under
   check the scratch revision. `/tmp` keeps regular files of any bytes
   and their modes, with the knowledge name and prefix-free rules;
   symlinks and other types fail the command whole. Empty directories
-  are not kept. The cwd is kept only for directories under either
-  tree; a missing saved directory starts in `/knowledge` with a notice.
+  are not kept.   The cwd is kept only for directories under these
+  trees; a missing saved directory starts in `/knowledge` with a notice.
   The hourly knowledge sweep also drops scratch past the current
   `scratchIdleDays`, cascading its files and skipping sessions holding
   the per-session queue, including commands waiting for a process slot.
@@ -279,6 +280,23 @@ violation, and every rule has a rejected fixture under
   the Limits tab.
   The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
   so best-effort hardening runs; sqlite3's unpatched worker stays out.
+  `knowledge/judge.ts` shares archive selection and judging between the
+  knowledge uploader and attachment staging.
+  A chat archive whose name-selected members all sit under one top-level
+  folder, with at least one member before size and text judging, expands
+  as it is; otherwise staging adds the archive's named folder.
+  `POST`, `GET` and `DELETE`
+  under `/api/projects/:id/uploads` address only the caller's staging
+  rows after project access. POST requires `name` and `attempt`; its
+  answer is kept for list recovery, and an empty result has no row.
+  `UploadStore` is built in the area's factory. Staging expires after
+  24 hours and shares upload admission; its per-user/project quotas are
+  20 items and the current `uploadBytes` and `uploadFiles`. The hourly
+  sweep removes expired staging, never session uploads. Claim and copy
+  methods require the caller's transaction. `/uploads` changes never
+  commit: names, types or bytes trigger a discard notice; modes and
+  times do not. Mount budgets include existing uploads even over lowered
+  caps, and the largest uploaded file sets an I/O budget floor.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
   secrets directory. The closed kinds are `user-`, `provider-`, `search-`
   and `mcp-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
@@ -477,7 +495,16 @@ violation, and every rule has a rejected fixture under
   its usage row) and `finalizeSend` (the send's end and the session's
   state, with the last round inside it). Each bumps the session's
   revision once and publishes one `session.changed` envelope after
-  commit. The reply in flight is checkpointed every 250 ms or 2 KB
+  commit. Create and send accept up to ten distinct staged `uploads` ids.
+  Synchronous preflight checks their user, project and lease and requires
+  `bash` in the offered set. Inside `startSend`, after the session exists,
+  the claim rechecks staging and current caps, merges the files in order
+  and writes the bounded `messages.uploads` record with the user message.
+  A later throw rolls back the tree, staging and rows and frees the lock.
+  User history appends `uploadsBlock()` from that record alone; a done
+  summary gains `UPLOADS_SUMMARY_LINE` only from earlier user records.
+  Runs have no uploads; regenerate and compaction keep the tree.
+  The reply in flight is checkpointed every 250 ms or 2 KB
   without a revision. A send ends for one cause (finish, stop,
   failure, shutdown, deadline) through one compare-and-set in the
   runner, and
@@ -507,6 +534,11 @@ violation, and every rule has a rejected fixture under
   "Fork of <the source's>"; the composer's `/fork <name>` forks at the
   last turn on the same agent under that name, and a run is forked
   whole from its foot on the agent its chip names.
+  Fork copies the upload tree and message records in the same transaction,
+  checking current session caps. Files last written by an unsent user turn
+  are restaged for the caller, one item per original item in record order,
+  under a fresh lease outside staging quotas; `draftUploads` carries their
+  ids. Copied file provenance follows the copied message ids.
   Reasoning details stay with their provider and model, and tool call
   signatures with their model.
   An agent is in use when sessions, sends or messages name it.
@@ -521,7 +553,9 @@ violation, and every rule has a rejected fixture under
   per send the user message and the agent's turn under `@author
   YYYY-MM-DD HH:mm` in the zone, the answer with the transcript's cut
   line (stopped, the error, cut at max tokens); no work, tools,
-  summaries or running turns, and the title and errors escaped. The
+  summaries or running turns, and the title and errors escaped. User
+  records add an escaped `attachedLine()` under the text in downloads and
+  memory snapshots. The
   chat menu offers Download to everyone and, to the owner and admins,
   Rename and Delete; its `<h1>` is the title button alone, or, while
   Rename is open, the title box in the button's place and type (Enter

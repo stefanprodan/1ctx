@@ -22,6 +22,7 @@ import { m0013 } from "./0013-web-tools.ts";
 import { m0014 } from "./0014-visualize.ts";
 import { m0015 } from "./0015-knowledge.ts";
 import { m0016 } from "./0016-openai-strict.ts";
+import { m0017 } from "./0017-chat-uploads.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -40,4 +41,5 @@ export const MIGRATIONS: Migration[] = [
   m0014,
   m0015,
   m0016,
+  m0017,
 ];

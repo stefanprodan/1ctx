@@ -61,6 +61,14 @@ export function checkScratchTotals(
   checkUsage(before, after, caps.scratchFiles, caps.scratchBytes, "scratch");
 }
 
+export function checkUploadTotals(
+  before: { files: number; bytes: number },
+  after: { files: number; bytes: number },
+  caps: { uploadFiles: number; uploadBytes: number },
+): void {
+  checkUsage(before, after, caps.uploadFiles, caps.uploadBytes, "uploads");
+}
+
 function checkUsage(
   before: { files: number; bytes: number },
   after: { files: number; bytes: number },

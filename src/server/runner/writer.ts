@@ -34,7 +34,7 @@ import {
   startCompact as startCompactRows,
   startSummary as startSummaryRows,
 } from "./summary.ts";
-import type { SessionsPort } from "./writer-port.ts";
+import type { SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type { Started } from "./start.ts";
 export { HTML_EVERY_MS, WRITE_EVERY_BYTES, WRITE_EVERY_MS } from "./stream.ts";
@@ -49,6 +49,7 @@ export type WriterDeps = {
   db: Db;
   clock: Clock;
   sessions: SessionsPort;
+  uploads: UploadsPort;
   usage: {
     record(fields: UsageFields): unknown;
     deleteSend(sendId: string): boolean;

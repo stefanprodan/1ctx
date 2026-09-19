@@ -21,6 +21,7 @@ function summary(changes: Partial<Message> = {}): Message {
     agentId: "agent-1",
     content: "## Goal\n- ship",
     resultBytes: null,
+    uploads: null,
     promptTokens: 41_200,
     reasoning: "",
     html: '<h2 class="md-h2">Goal</h2>',

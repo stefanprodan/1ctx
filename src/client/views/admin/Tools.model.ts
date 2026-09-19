@@ -153,6 +153,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Scratch idle days",
     text: "How long an unused session scratch is kept.",
   },
+  uploadBytes: {
+    label: "Chat files size",
+    text: "Bytes the files added to one chat may hold together.",
+  },
+  uploadFiles: {
+    label: "Chat files",
+    text: "Files one chat may hold.",
+  },
 };
 
 // when a send carries a built-in, over its description

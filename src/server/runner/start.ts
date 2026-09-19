@@ -16,7 +16,7 @@ import type { Clock } from "../lib/clock.ts";
 import type { SessionRow } from "../sessions/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
-import type { SessionsPort } from "./writer-port.ts";
+import type { SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type Started = {
   session: SessionSummary;
@@ -39,6 +39,7 @@ export type StartFields = {
   title: string;
   policy: SendPolicy;
   text: string;
+  uploads?: readonly string[];
   mcpDigest: McpDigest | null;
 };
 
@@ -46,6 +47,7 @@ type StartDeps = {
   db: Db;
   clock: Clock;
   sessions: SessionsPort;
+  uploads: UploadsPort;
   usage: { deleteSend(sendId: string): boolean };
 };
 
@@ -81,12 +83,22 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
     let removedMessageIds: string[] = [];
     let user: Message;
     if (fields.existingUser === undefined) {
+      const uploads = fields.uploads?.length
+        ? deps.uploads.claimUploads(
+            policy.userId,
+            policy.projectId,
+            base.id,
+            fields.userId,
+            fields.uploads,
+          )
+        : null;
       user = deps.sessions.addUserMessage({
         id: fields.userId,
         sessionId: base.id,
         sendId: send.id,
         userId: policy.userId,
         content: fields.text,
+        uploads,
         now,
       });
     } else {
