@@ -232,7 +232,7 @@ export function Agent({ params }: { params: Params }) {
                   return (
                     <RowsLine key={server.name} flush>
                       <RowsAvatar>
-                        <Icon name="plug" size={14} />
+                        <Icon name="mcp" size={14} />
                       </RowsAvatar>
                       <RowsTitle
                         name={server.name}

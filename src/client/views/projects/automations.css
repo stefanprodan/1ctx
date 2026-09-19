@@ -239,6 +239,11 @@
   }
 
   /* the web access switch beside what it means */
+  .automations-access {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
   .automations-web {
     display: flex;
     align-items: center;

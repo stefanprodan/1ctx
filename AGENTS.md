@@ -973,9 +973,14 @@ violation, and every rule has a rejected fixture under
   its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
   done run's length and its send's `tokens` (prompt plus completion over
   its counted rounds, summed from `usage` by the send queries).
-  The editor's Web access section is one switch, on for a new task,
-  saved as the row's whole `disabledCapabilities`, and off with the
-  composer's reasons when it cannot be switched.
+  The editor's Access section (`AccessSection.tsx`) is the Web access
+  switch, on for a new task and off with the composer's reasons when it
+  cannot be switched, then a `RowsList` with a switch per MCP server of
+  the picked agent. The row's whole `disabledCapabilities` is saved:
+  `web` and the keys of the shown servers that are off, so a key for a
+  server the picked agent lacks is dropped. The automation page's Setup
+  aside (`AutomationAccess.tsx`) says Web access Off and names the
+  servers off, and nothing while all is on.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -1025,6 +1030,19 @@ violation, and every rule has a rejected fixture under
   them, and so does a flip made while the send was on its way. Leaving
   the chat and a reload forget them, a slash command carries none. Nothing
   outside the menu says web access is off.
+  The third item, MCP servers, is there when the picked agent has an
+  entry in `servers` of the same answer, held beside `switchable`. It
+  says how many are off and swaps the menu's rows, inside the same
+  `.menu` box, for `composer/AddServers.tsx`: a back row, then a
+  `role="switch"` item per server with its tool count. Escape or Back
+  returns to the menu through `useMenu(back)`; a flip leaves the pane
+  open. There is no switch for all servers. Picking another agent in a
+  chat not made yet drops the pending `mcp:` flips through `dropKind()`;
+  the list going away for a moment is no pick (`agentMoved()`). A row
+  that leaves the page on its own click stops the click, or the menu
+  reads it as one outside; the pane takes the focus and gives it back.
+  The `mcp` icon is the Model Context Protocol mark, drawn at a stroke
+  of 1 (`THIN` in `lib/icons.tsx`), wherever MCP servers are listed.
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
   ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one

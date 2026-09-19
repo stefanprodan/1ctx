@@ -9,8 +9,11 @@
 // for any shape they do not know.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
-import type { StreamRow } from "../../../shared/api/sessions.ts";
-import { WEB } from "../../../shared/capabilities.ts";
+import type {
+  StreamRow,
+  SwitchableServer,
+} from "../../../shared/api/sessions.ts";
+import { mcpKey, serverOf, WEB } from "../../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
@@ -250,6 +253,8 @@ export type Draft = {
   memoryGuidance: string;
   // its runs may reach the web, while the instance lets them
   web: boolean;
+  // the keys of the MCP servers its runs go without
+  mcpOff: string[];
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -275,6 +280,7 @@ export function draftOf(
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
+      mcpOff: [],
     };
   }
   return {
@@ -288,6 +294,7 @@ export function draftOf(
     memory: modeOf(a),
     memoryGuidance: a.memoryGuidance,
     web: !a.disabledCapabilities.includes(WEB),
+    mcpOff: a.disabledCapabilities.filter((key) => serverOf(key) !== null),
   };
 }
 
@@ -335,9 +342,12 @@ export function automationFieldOf(
   return undefined;
 }
 
+// `servers` are the picked agent's: a key for any other server is not
+// shown, so it is not saved
 export function requestOf(
   d: Draft,
   limitMs: number,
+  servers: readonly SwitchableServer[] = [],
 ):
   | { body: SaveAutomationRequest }
   | { problem: string; field: AutomationField } {
@@ -378,9 +388,28 @@ export function requestOf(
       projectMemory: d.memory === "project",
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
-      // web is the one capability with a switch here
-      disabledCapabilities: d.web ? [] : [WEB],
+      disabledCapabilities: [
+        ...(d.web ? [] : [WEB]),
+        ...servers
+          .map((server) => mcpKey(server.id))
+          .filter((key) => d.mcpOff.includes(key)),
+      ].sort(),
     },
+  };
+}
+
+// what the row keeps its runs from, for the page's aside: the names of
+// its agent's servers that are off, in name order
+export function accessOf(
+  a: Pick<AutomationSummary, "disabledCapabilities">,
+  servers: readonly SwitchableServer[],
+): { web: boolean; mcpOff: string[] } {
+  return {
+    web: !a.disabledCapabilities.includes(WEB),
+    mcpOff: servers
+      .filter((server) => a.disabledCapabilities.includes(mcpKey(server.id)))
+      .map((server) => server.name)
+      .sort(),
   };
 }
 
@@ -395,6 +424,9 @@ export function dirtyOf(
   return (Object.keys(base) as (keyof Draft)[]).some((k) => {
     const left = d[k];
     const right = base[k];
+    if (Array.isArray(left) && Array.isArray(right)) {
+      return [...left].sort().join() !== [...right].sort().join();
+    }
     return typeof left === "string" && typeof right === "string"
       ? left.trim() !== right.trim()
       : left !== right;
