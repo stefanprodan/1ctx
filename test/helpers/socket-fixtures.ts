@@ -113,6 +113,7 @@ export type ToolPlan = {
 };
 
 type FakeToolsCap = {
+  capabilities(): string[];
   offered(now: number): Offered;
   run(
     offered: Offered,
@@ -138,6 +139,7 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
   ];
   return {
     tools: {
+      capabilities: () => [],
       offered: () => ({
         tools: schemas,
         search: null,
@@ -146,6 +148,7 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        web: null,
       }),
       async run(_offered, c, ctx) {
         const plan = plans[c.id] ?? {

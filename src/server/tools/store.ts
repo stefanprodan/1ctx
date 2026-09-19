@@ -1,22 +1,25 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { WebAccessMode } from "../../shared/web.ts";
 import type { SearchProvider, WebTool } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 
 export type ToolRow = {
-  name: WebTool;
+  name: WebTool | "web";
   enabled: boolean;
   provider: SearchProvider | null;
   hosts: string[];
+  mode: WebAccessMode | null;
   updatedAt: number;
 };
 
 type Raw = {
-  name: WebTool;
+  name: WebTool | "web";
   enabled: number;
   provider: SearchProvider | null;
   hosts: string;
+  mode: WebAccessMode | null;
   updated_at: number;
 };
 
@@ -25,6 +28,7 @@ const row = (raw: Raw): ToolRow => ({
   enabled: raw.enabled === 1,
   provider: raw.provider,
   hosts: JSON.parse(raw.hosts),
+  mode: raw.mode,
   updatedAt: raw.updated_at,
 });
 
@@ -34,11 +38,23 @@ export class ToolStore {
   rows(): ToolRow[] {
     return this.db
       .query<Raw, []>(
-        `select name, enabled, provider, hosts, updated_at from tools
+        `select name, enabled, provider, hosts, mode, updated_at from tools
          order by rowid`,
       )
       .all()
       .map(row);
+  }
+
+  setAccess(
+    mode: WebAccessMode,
+    domains: readonly string[],
+    now: number,
+  ): void {
+    this.db
+      .query(
+        "update tools set mode = ?, hosts = ?, updated_at = ? where name = 'web'",
+      )
+      .run(mode, JSON.stringify(domains), now);
   }
 
   setEnabled(name: WebTool, enabled: boolean, now: number): void {

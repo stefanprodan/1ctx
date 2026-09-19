@@ -5,18 +5,16 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import type { WebTool } from "../../shared/words.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { parseToolName, parseToolPatch } from "./parse.ts";
+import { parseToolName, parseToolPatch, type ToolName } from "./parse.ts";
 import { visualShell } from "./visual-shell.ts";
 
 export type RoutesDeps = {
   clock: Clock;
   response(now: number): ToolsResponse;
-  patch(name: WebTool, patch: PatchToolRequest, now: number): void;
+  patch(name: ToolName, patch: PatchToolRequest, now: number): void;
   visualHosts(): string[];
 };
 
@@ -44,13 +42,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(req, ctx) {
         const name = parseToolName(ctx.params.name);
-        const patch = parseToolPatch(await jsonBody(req));
-        if ("provider" in patch && name !== "websearch") {
-          throw new BadRequest("provider is only valid on websearch");
-        }
-        if ("hosts" in patch && name !== "visualize") {
-          throw new BadRequest("hosts is only valid on visualize");
-        }
+        const patch = parseToolPatch(await jsonBody(req), name);
         const now = deps.clock();
         deps.patch(name, patch, now);
         return json(deps.response(now));

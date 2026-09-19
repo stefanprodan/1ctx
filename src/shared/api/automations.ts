@@ -33,6 +33,8 @@ export type SaveAutomationRequest = {
   retentionDays: number;
   projectMemory: boolean;
   ownMemory: boolean;
+  // the whole set, empty when absent on create
+  disabledCapabilities?: string[];
   memoryGuidance?: string;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;

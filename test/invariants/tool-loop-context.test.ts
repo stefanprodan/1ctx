@@ -196,6 +196,7 @@ test("stopping a buffered round settles its calls without writing late results",
   const chat = await chatApp({
     window: 20_000,
     tools: {
+      capabilities: () => [],
       offered: () => ({
         tools: [{ name: "datetime", description: "time", parameters: {} }],
         search: null,
@@ -204,6 +205,7 @@ test("stopping a buffered round settles its calls without writing late results",
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        web: null,
       }),
       run: async (_offered, call, ctx) => {
         started.push(call.id);

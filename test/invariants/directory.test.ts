@@ -165,7 +165,7 @@ describe("the directory", () => {
     expect(catalogResponse.status).toBe(200);
     const catalog: ToolsResponse = await catalogResponse.json();
     const bash = catalog.builtin.find((tool) => tool.name === "bash")!;
-    expect(bash.tokens).toBe(359);
+    expect(bash.tokens).toBe(443);
     expect(bash.tokens).toBe(
       wireTokens(offered.filter((tool) => tool.name === "bash")),
     );
@@ -177,8 +177,8 @@ describe("the directory", () => {
         wireTokens(offered.filter((tool) => tool.name !== "bash")),
     ).toBeGreaterThan(0);
     started.script.reply("done");
-    const off = await chat.admin.call("PATCH", "/api/tools/webfetch", {
-      body: { enabled: false },
+    const off = await chat.admin.call("PATCH", "/api/tools/web", {
+      body: { mode: "off" },
     });
     expect(off.status).toBe(200);
     const after: DirectoryAgentResponse = await (
@@ -195,6 +195,13 @@ describe("the directory", () => {
       body: { provider: "exa" },
     });
     expect(search.status).toBe(200);
+    expect(
+      (
+        await chat.admin.call("PATCH", "/api/tools/web", {
+          body: { mode: "all" },
+        })
+      ).status,
+    ).toBe(200);
     const searching: DirectoryAgentResponse = await (
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();

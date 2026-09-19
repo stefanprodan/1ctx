@@ -80,6 +80,7 @@ export function area(): ToolsArea {
 export function context(resultCut = TOOL_CAPS.resultCut): ToolContext {
   return {
     actor: null,
+    web: null,
     signal: new AbortController().signal,
     now: () => now,
     budget: {

@@ -48,12 +48,17 @@ export type McpPort = {
   setAgentServers(agentId: string, rows: AgentServer[]): void;
 };
 
+export type CapabilitiesPort = {
+  capabilities(): string[];
+};
+
 export type RoutesDeps = {
   db: Db;
   store: AgentStore;
   providers: ProvidersPort;
   skills: SkillsPort;
   mcp: McpPort;
+  tools: CapabilitiesPort;
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -208,6 +213,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         deps.access.project(ctx.principal!, ctx.params.id);
         const body: ProjectAgentsResponse = {
           agents: deps.store.list().map(summary),
+          capabilities: deps.tools.capabilities(),
         };
         return json(body);
       },

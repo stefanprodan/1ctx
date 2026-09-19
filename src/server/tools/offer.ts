@@ -5,6 +5,7 @@
 // apart from dispatch lets the agent page and the runner share the same
 // offered set without needing a live call context.
 
+import { WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import {
@@ -14,6 +15,7 @@ import {
   resolveMode,
 } from "../../shared/mcp.ts";
 import { catalog } from "../../shared/skills.ts";
+import type { WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
@@ -49,8 +51,9 @@ type OfferDeps = {
   memory?: Pick<MemoryCapability, "work">;
   memorySessions: MemorySessionsPort;
   toolsFor(
-    search: SearchProvider,
+    search: SearchProvider | null,
     hosts: readonly string[],
+    web: WebSnapshot | null,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -110,6 +113,7 @@ export function offered(
   agentServers: AgentServer[] = [],
   requestedMode: McpMode = "auto",
   scope?: MemoryScope,
+  disabledCapabilities: readonly string[] = [],
 ): Offered {
   const memory = memoryFor(deps.memory, scope);
   if (scope?.phase === "memory") {
@@ -117,6 +121,7 @@ export function offered(
       memory === null ? [] : makeMemoryTools(memory, deps.memorySessions);
     return {
       tools: fillYear(phaseTools.map(schema), now),
+      web: null,
       search: null,
       skills: { block: "", skills: [] },
       mcp: [],
@@ -127,17 +132,21 @@ export function offered(
   }
   const rows = new Map(deps.store.rows().map((row) => [row.name, row]));
   const searchRow = rows.get("websearch")!;
-  const search =
-    searchRow.enabled && searchRow.provider !== null
-      ? searchRow.provider
-      : null;
-  // datetime and bash have no switches; a web tool has its row
+  const access = rows.get("web")!;
+  const web: WebSnapshot | null =
+    access.mode === "off" || disabledCapabilities.includes(WEB)
+      ? null
+      : {
+          mode: access.mode as WebSnapshot["mode"],
+          domains: [...access.hosts],
+        };
+  const search = web === null ? null : searchRow.provider;
   const allowed = new Set<string>([
     "datetime",
     "bash",
-    ...[...rows.values()]
-      .filter((row) => row.enabled && (row.name !== "websearch" || search))
-      .map((row) => row.name),
+    ...(web === null ? [] : ["webfetch"]),
+    ...(search === null ? [] : ["websearch"]),
+    ...(rows.get("visualize")!.enabled ? ["visualize"] : []),
   ]);
   const skillCatalog = catalog(deps.skills.forAgent(agentId), CATALOG_CAP);
   for (const name of skillCatalog.leftOut) {
@@ -150,7 +159,7 @@ export function offered(
   const baseTools = fillYear(
     [
       ...deps
-        .toolsFor(search ?? "exa", rows.get("visualize")!.hosts)
+        .toolsFor(search, rows.get("visualize")!.hosts, web)
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory, deps.memorySessions)),
@@ -184,6 +193,7 @@ export function offered(
   }
   return {
     tools: [...baseTools, ...mcpSchemas],
+    web,
     search,
     skills,
     mcp,

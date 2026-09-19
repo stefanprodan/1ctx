@@ -40,6 +40,9 @@ export type SessionSummary = {
   lastActivityAt: number;
   // the last round the provider counted; null before the first
   usage: RoundUsage | null;
+  // what the chat turned off for itself, sorted keys of
+  // shared/capabilities.ts; empty for a run, whose automation holds its own
+  disabledCapabilities: string[];
 };
 
 // what the provider counted for one round: the prompt is the whole

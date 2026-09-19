@@ -15,6 +15,7 @@ export type Event = {
     projectMemory: boolean;
     ownMemory: boolean;
     memoryGuidance: string;
+    disabledCapabilities: string[];
   };
   instructions: string;
   dueAt: number;

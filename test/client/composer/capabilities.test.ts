@@ -1,0 +1,111 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
+import { beforeEach, describe, expect, test } from "bun:test";
+import {
+  accepted,
+  changeOf,
+  dropFlips,
+  flip,
+  isOff,
+} from "../../../src/client/data/capabilities.ts";
+import { WEB } from "../../../src/shared/capabilities.ts";
+
+// the pending flips are module state
+describe("pending capability flips", () => {
+  beforeEach(() => {
+    dropFlips(null);
+    dropFlips("s1");
+    dropFlips("s2");
+  });
+
+  test.serial(
+    "nothing touched shows the chat's set and sends no change",
+    () => {
+      expect(isOff("s1", [], WEB)).toBe(false);
+      expect(isOff("s1", [WEB], WEB)).toBe(true);
+      expect(changeOf("s1")).toEqual({});
+    },
+  );
+
+  test.serial("a flip lies over the set and rides as a change", () => {
+    flip("s1", [], WEB);
+    expect(isOff("s1", [], WEB)).toBe(true);
+    expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+  });
+
+  test.serial("turning on what the chat has off is an enable", () => {
+    flip("s1", [WEB], WEB);
+    expect(isOff("s1", [WEB], WEB)).toBe(false);
+    expect(changeOf("s1")).toEqual({ capabilities: { enable: [WEB] } });
+  });
+
+  test.serial("a flip back to what the chat holds is no flip", () => {
+    flip("s1", [], WEB);
+    flip("s1", [], WEB);
+    expect(isOff("s1", [], WEB)).toBe(false);
+    expect(changeOf("s1")).toEqual({});
+  });
+
+  test.serial("another member's envelope moves a key left alone", () => {
+    // untouched here: what shows follows the session's set as it moves
+    expect(isOff("s1", [], WEB)).toBe(false);
+    expect(isOff("s1", [WEB], WEB)).toBe(true);
+    expect(changeOf("s1")).toEqual({});
+  });
+
+  test.serial("a touched key keeps the person's word under an envelope", () => {
+    flip("s1", [], WEB);
+    // the other member turned it off too: the flip still says off, and
+    // the change still disables, which the server applies as a no-op
+    expect(isOff("s1", [WEB], WEB)).toBe(true);
+    expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+  });
+
+  test.serial("flips belong to one chat, a new chat's to none yet", () => {
+    flip(null, [], WEB);
+    expect(isOff(null, [], WEB)).toBe(true);
+    expect(isOff("s1", [], WEB)).toBe(false);
+    expect(changeOf("s1")).toEqual({});
+    // moving to a chat and flipping there lets go of the new chat's
+    flip("s1", [], WEB);
+    expect(changeOf(null)).toEqual({});
+  });
+
+  test.serial(
+    "an accepted send forgets what it carried, another chat's stay",
+    () => {
+      flip("s1", [], WEB);
+      const sent = changeOf("s1");
+      accepted("s2", sent);
+      expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+      accepted("s1", sent);
+      expect(changeOf("s1")).toEqual({});
+      expect(isOff("s1", [], WEB)).toBe(false);
+    },
+  );
+
+  test.serial(
+    "a flip made while a send is on its way outlives that send",
+    () => {
+      // the message left with nothing touched, then the person turned it off
+      const sent = changeOf("s1");
+      flip("s1", [], WEB);
+      accepted("s1", sent);
+      expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+      // and a send that carried the opposite word does not clear it either
+      accepted("s1", { capabilities: { enable: [WEB] } });
+      expect(isOff("s1", [], WEB)).toBe(true);
+    },
+  );
+
+  test.serial("leaving the chat gives up what was never sent", () => {
+    flip("s1", [], WEB);
+    // another chat's composer leaving changes nothing here
+    dropFlips("s2");
+    expect(isOff("s1", [], WEB)).toBe(true);
+    dropFlips("s1");
+    expect(isOff("s1", [], WEB)).toBe(false);
+    expect(changeOf("s1")).toEqual({});
+  });
+});

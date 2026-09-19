@@ -183,6 +183,7 @@ export function history(
     | "projectMemory"
     | "automationMemory"
     | "knowledge"
+    | "disabledCapabilities"
   >,
   lookups: ContextLookups,
   now: number,

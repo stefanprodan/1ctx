@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tools page's entities: the built-ins, the web tools with the
-// search state, and the limits, all admin's, loaded when the page is
+// The tools page's entities: the built-ins, web access with the search
+// state, visualize, and the limits, all admin's, loaded when the page is
 // reached and dropped with the signed-in user. A write answers the
 // server's rows, so what shows is what was saved; a change applies to
 // the next send.
@@ -17,7 +17,6 @@ import type {
   ToolsResponse,
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
-import type { WebTool } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
@@ -67,8 +66,11 @@ export async function loadTools(): Promise<void> {
 let toolWrites = 0;
 let limitWrites = 0;
 
+// the rows an admin writes: web access, the search provider, visualize
+export type PatchedTool = "web" | "websearch" | "visualize";
+
 export async function patchTool(
-  name: WebTool,
+  name: PatchedTool,
   body: PatchToolRequest,
 ): Promise<void> {
   const forUser = owner;

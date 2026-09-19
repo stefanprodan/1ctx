@@ -122,8 +122,9 @@
     background: var(--hover);
     color: var(--fg);
   }
+  /* room for the switch and an item's reason on one line */
   .composer-add-menu {
-    min-width: 200px;
+    min-width: 260px;
   }
   /* an item that cannot be picked says why on a line under its name */
   .composer-add-item {
@@ -144,6 +145,12 @@
   .composer-add-block {
     font-size: var(--text-small);
     color: var(--faint);
+  }
+  /* the switch at the item's end, as the rail's theme switch sits */
+  .composer-add-switch {
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: auto;
   }
 
   /* one panel for everything added: a line that says where the files

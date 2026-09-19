@@ -2,26 +2,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { PatchToolRequest } from "../../shared/api/tools.ts";
-import {
-  isSearchProvider,
-  isWebTool,
-  type WebTool,
-} from "../../shared/words.ts";
+import { isWebAccessMode, parseDomains } from "../../shared/web.ts";
+import { isSearchProvider } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export function parseToolName(value: unknown): WebTool {
-  if (!isWebTool(value)) throw new BadRequest("no such tool");
+export type ToolName = "web" | "websearch" | "visualize";
+
+export function parseToolName(value: unknown): ToolName {
+  if (value !== "web" && value !== "websearch" && value !== "visualize")
+    throw new BadRequest("no such tool");
   return value;
 }
 
-export function parseToolPatch(body: unknown): PatchToolRequest {
-  const input = fields(body, ["enabled", "provider", "hosts"]);
+export function parseToolPatch(
+  body: unknown,
+  name?: ToolName,
+): PatchToolRequest {
+  const allowed =
+    name === "web"
+      ? ["mode", "domains"]
+      : name === "websearch"
+        ? ["provider"]
+        : name === "visualize"
+          ? ["enabled", "hosts"]
+          : ["mode", "domains", "enabled", "provider", "hosts"];
+  const input = fields(body, allowed);
   const hasEnabled = Object.hasOwn(input, "enabled");
   const hasProvider = Object.hasOwn(input, "provider");
   const hasHosts = Object.hasOwn(input, "hosts");
-  if (!hasEnabled && !hasProvider && !hasHosts) {
-    throw new BadRequest("enabled, provider or hosts is required");
+  const hasMode = Object.hasOwn(input, "mode");
+  const hasDomains = Object.hasOwn(input, "domains");
+  if (!hasEnabled && !hasProvider && !hasHosts && !hasMode && !hasDomains) {
+    throw new BadRequest(`${allowed.join(", ")} is required`);
   }
   const patch: PatchToolRequest = {};
   if (hasEnabled) {
@@ -37,7 +50,30 @@ export function parseToolPatch(body: unknown): PatchToolRequest {
     patch.provider = input.provider;
   }
   if (hasHosts) patch.hosts = parseHosts(input.hosts);
+  if (hasMode) {
+    if (!isWebAccessMode(input.mode))
+      throw new BadRequest("mode must be off, all or listed");
+    patch.mode = input.mode;
+  }
+  if (hasDomains) {
+    patch.domains = parseWebDomains(input.domains);
+  }
+  if (patch.mode === "listed" && patch.domains?.length === 0)
+    throw new BadRequest("list at least one host");
   return patch;
+}
+
+export function parseWebDomains(value: unknown): string[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every((domain) => typeof domain === "string")
+  ) {
+    throw new BadRequest("domains must be a list of hosts");
+  }
+  const parsed = parseDomains(value);
+  if (!parsed.ok)
+    throw new BadRequest(`domains line ${parsed.line} ${parsed.error}`);
+  return parsed.domains;
 }
 
 export function parseHosts(value: unknown): string[] {

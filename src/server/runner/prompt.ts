@@ -10,6 +10,7 @@
 // policy's offered snapshot; memory and knowledge are captured once per
 // send so a tool's writes cannot move the prefix between rounds.
 
+import { WEB, WEB_OFF_LINE } from "../../shared/capabilities.ts";
 import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
 import type { SendPolicy } from "./policy.ts";
@@ -80,6 +81,7 @@ export function systemPrompt(
     | "projectMemory"
     | "automationMemory"
     | "knowledge"
+    | "disabledCapabilities"
   >,
   now: number,
   mcpNote = "",
@@ -112,6 +114,12 @@ export function systemPrompt(
     parts.push(knowledgeBlock(policy.knowledge.files, policy.knowledge.recent));
   }
   parts.push(dateLine(now));
+  if (
+    policy.disabledCapabilities.includes(WEB) &&
+    policy.offered.tools.length > 0
+  ) {
+    parts.push(WEB_OFF_LINE);
+  }
   if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");
 }

@@ -59,6 +59,7 @@ const session: SessionRow = {
   runSource: null,
   title: "*Chat*",
   status: "done",
+  disabledCapabilities: [],
   revision: 1,
   createdAt: now,
   lastActivityAt: now,

@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { WebAccess } from "../../shared/web.ts";
 import {
   isName,
   isServerName,
   isSkillName,
   isUsername,
-  isWebTool,
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD,
   PERSONAL_PROJECT_NAME,
@@ -74,7 +74,8 @@ function document(value: unknown, source: string): Document {
       Skill: isSkillName,
       McpServer: isServerName,
       Agent: isName,
-      Tool: isWebTool,
+      Tool: (name: unknown): name is string =>
+        name === "web" || name === "websearch" || name === "visualize",
     }[kind];
     if (!guard(meta.name)) throw new Error("metadata.name is invalid");
     const name = meta.name;
@@ -168,6 +169,7 @@ export function preflight(
   documents: Document[],
   inventory: Inventory,
   secret: (kind: SecretKind, name: string) => string | null,
+  web: Pick<WebAccess, "mode" | "domains">,
 ): void {
   duplicate(documents);
   const known = Object.fromEntries(
@@ -250,6 +252,13 @@ export function preflight(
           reference("servers", "McpServer", server.name);
         break;
       case "Tool":
+        if (
+          doc.name === "web" &&
+          (doc.spec.mode ?? web.mode) === "listed" &&
+          (doc.spec.domains ?? web.domains).length === 0
+        ) {
+          fail("domains", "list at least one host");
+        }
         break;
     }
   }

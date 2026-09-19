@@ -37,7 +37,8 @@ const visual: WebToolSummary = {
 
 const response = (hosts: string[]): ToolsResponse => ({
   builtin: [],
-  web: [{ ...visual, hosts }],
+  access: { mode: "all", domains: [], updatedAt: 0 },
+  visualize: { ...visual, hosts },
   search: {
     provider: null,
     keys: { exa: false, firecrawl: false, tavily: false },
@@ -198,18 +199,18 @@ describe("the visual hosts entity", () => {
           host: "HTTPS://MIRROR.EXAMPLE.COM/",
         }),
       });
-      expect(tools.value?.web[0]?.hosts).toEqual(canonical);
+      expect(tools.value?.visualize.hosts).toEqual(canonical);
       await patchTool("visualize", {
-        hosts: editHosts(tools.value!.web[0]!.hosts, {
+        hosts: editHosts(tools.value!.visualize.hosts, {
           type: "remove",
           host: canonical[0]!,
         }),
       });
-      expect(tools.value?.web[0]?.hosts).toEqual([canonical[1]!]);
+      expect(tools.value?.visualize.hosts).toEqual([canonical[1]!]);
       await patchTool("visualize", { hosts: [] });
-      expect(tools.value?.web[0]?.hosts).toEqual([]);
+      expect(tools.value?.visualize.hosts).toEqual([]);
       await patchTool("visualize", { hosts: editHosts([], { type: "reset" }) });
-      expect(tools.value?.web[0]?.hosts).toEqual([...DEFAULT_VISUAL_HOSTS]);
+      expect(tools.value?.visualize.hosts).toEqual([...DEFAULT_VISUAL_HOSTS]);
       expect(bodies).toEqual([
         { hosts: ["https://cdn.example.com", "HTTPS://MIRROR.EXAMPLE.COM/"] },
         { hosts: ["https://mirror.example.com"] },
@@ -230,7 +231,7 @@ describe("the visual hosts entity", () => {
       await expect(
         patchTool("visualize", { hosts: ["invalid"] }),
       ).rejects.toMatchObject({ message, status: 400 });
-      expect(tools.value?.web[0]?.hosts).toEqual(visual.hosts);
+      expect(tools.value?.visualize.hosts).toEqual(visual.hosts);
     },
   );
 
@@ -250,7 +251,7 @@ describe("the visual hosts entity", () => {
     await patchTool("visualize", { hosts: [] });
     release(Response.json(response(visual.hosts)));
     await loading;
-    expect(tools.value?.web[0]?.hosts).toEqual([]);
+    expect(tools.value?.visualize.hosts).toEqual([]);
   });
 });
 
@@ -290,7 +291,16 @@ describe("the visual hosts row", () => {
     expect(
       render(
         <ToolRow
-          tool={{ ...visual, name: "webfetch" }}
+          tool={{
+            name: "webfetch",
+            description: visual.description,
+            parameters: visual.parameters,
+            parametersHtml: visual.parametersHtml,
+            tokens: visual.tokens,
+            when: "web",
+            names: false,
+            variant: null,
+          }}
           open
           onToggle={() => {}}
         />,

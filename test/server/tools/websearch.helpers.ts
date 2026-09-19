@@ -43,6 +43,7 @@ export function context(
 ): ToolContext {
   return {
     actor: null,
+    web: null,
     signal,
     now: Date.now,
     budget: shared,

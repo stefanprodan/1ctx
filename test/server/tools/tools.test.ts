@@ -23,7 +23,6 @@ import type { OfferedSkill } from "../../../src/shared/contracts/skill.ts";
 import {
   BUILTIN_TOOLS,
   type SearchProvider,
-  WEB_TOOLS,
 } from "../../../src/shared/words.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
@@ -66,6 +65,7 @@ function budget(): ToolBudget {
 function context(shared: ToolBudget = budget()): ToolContext {
   return {
     actor: null,
+    web: null,
     signal: new AbortController().signal,
     now: () => now,
     budget: shared,
@@ -144,8 +144,9 @@ describe("offered", () => {
       "webfetch",
       "websearch",
       "visualize",
+      "web",
     ]);
-    tools.store.setEnabled("webfetch", false, now);
+    tools.store.setAccess("off", [], now);
     expect(tools.offered(now, "").tools.map((tool) => tool.name)).toEqual([
       "datetime",
       "visualize",
@@ -153,7 +154,7 @@ describe("offered", () => {
     ]);
   });
 
-  test.each([...WEB_TOOLS])(
+  test.each(["visualize"] as const)(
     "does not offer %s when its switch is off",
     (name) => {
       const tools = area({ "search-exa": "e" }, "exa");
@@ -211,7 +212,9 @@ describe("the built-in catalog", () => {
   const catalog = builtinCatalog(now, (md) => md);
 
   test("lists every built-in by name, each with its tokens", () => {
-    expect(catalog.map((tool) => tool.name)).toEqual([...BUILTIN_TOOLS]);
+    expect(catalog.map((tool) => tool.name)).toEqual(
+      ([...BUILTIN_TOOLS, "webfetch", "websearch"] as const).toSorted(),
+    );
     expect([...BUILTIN_TOOLS]).toEqual([...BUILTIN_TOOLS].sort());
     for (const tool of catalog) {
       expect(tool.tokens).toBeGreaterThan(0);
@@ -250,6 +253,8 @@ describe("the built-in catalog", () => {
       sessions_list: "projectMemory",
       session_read: "projectMemory",
       memory_edit: "memory",
+      webfetch: "web",
+      websearch: "webSearch",
     });
     const edit = catalog.find((tool) => tool.name === "memory_edit")!;
     expect(edit.description).toContain("the project's memory");
@@ -360,7 +365,7 @@ describe("run", () => {
 
   test("a switched-off tool named by the model is not run", async () => {
     const tools = area();
-    tools.store.setEnabled("webfetch", false, now);
+    tools.store.setAccess("off", [], now);
     const offered = tools.offered(now, "");
     const result = await tools.run(
       offered,

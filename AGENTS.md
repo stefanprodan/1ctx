@@ -102,7 +102,9 @@ bootstrap and leaves session repair and the scheduler off; apply reports
 bootstrap first. No listener, sweep or MCP refresh loop runs. Stop the
 server before provisioning. Omitted fields stay, supplied membership
 lists replace, passwords and their change flag are creation-only, and
-objects not named are never deleted.
+objects not named are never deleted. Tool objects configure `web` with
+mode and domains, `websearch` with a nullable provider, and `visualize`
+with its switch and hosts; webfetch is read-only.
 
 ## Rules the structure test enforces
 
@@ -248,7 +250,16 @@ violation, and every rule has a rejected fixture under
   reason codes and clash indexes.
   History eviction may drop replaced versions near its caps.
   `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
-  host or network, and `defenseInDepth: true`. Four commands at most
+  host filesystem and `defenseInDepth: true`. The send's web snapshot
+  alone enables network and curl, never wget: all mode allows full
+  internet access, listed mode uses `urlPrefixes()` and all seven HTTP
+  methods. Both set `denyPrivateRanges: false` explicitly, since Bun
+  cannot pin DNS, and use the fetch deadline and body caps. No snapshot
+  leaves the mount networkless. Downloads belong in `/tmp`, since
+  non-text bytes in `/knowledge` fail the save. just-bash's curl is an
+  HTTP client, not curl: `-w` knows `http_code`, `content_type`,
+  `url_effective` and `size_download` and prints any other variable's
+  name, so the bash description says what it cannot measure. Four commands at most
   hold disposable mounts of `/knowledge`, the session's `/tmp` and
   `/uploads`; the per-session queue is taken before the process slot and
   released last. Aborts, exits 124/126 and throws discard both writable
@@ -442,7 +453,8 @@ violation, and every rule has a rejected fixture under
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
   off per server), the two memory blocks, the knowledge block, the date
-  line, and last the change note. A send records a content-addressed
+  line, the chat's web-off line when applicable, and last the change note.
+  A send records a content-addressed
   digest of what it offered from MCP (`mcp_digests`, `sends.mcp`, null
   for a compact send, swept with the logins); `startSend` compares it with the
   session's previous send (a regenerated turn against the turn before
@@ -499,6 +511,14 @@ violation, and every rule has a rejected fixture under
   state, with the last round inside it). Each bumps the session's
   revision once and publishes one `session.changed` envelope after
   commit. Create and send accept up to ten distinct staged `uploads` ids.
+  A session stores a sorted `disabledCapabilities` set, empty by
+  default. Create, send and regenerate accept an optional `capabilities`
+  change with `disable` and `enable` keys, currently `web` alone.
+  The policy resolves it before schemas are built; `startSend` applies
+  it again to the current row in its transaction, with the message's
+  revision and envelope. A refused start writes nothing; a later failure
+  keeps the choice. Compact takes no change. A fork copies the source
+  session's current set, including a run's saved automation set.
   Synchronous preflight checks their user, project and lease and requires
   `bash` in the offered set. Inside `startSend`, after the session exists,
   the claim rechecks staging and current caps, merges the files in order
@@ -528,7 +548,8 @@ violation, and every rule has a rejected fixture under
   reuses the last user message: inside `startSend`'s transaction the
   rows after it, their send and its usage go, and the envelope names
   them in `removedMessageIds`; 409 while the session runs, 400 when
-  the last message is the user's.
+  the last message is the user's. Its optional JSON body goes through
+  `readBody()` under `MAX_REGENERATE_BODY` and `parseRegenerate()`.
   Fork (`POST /api/sessions/:id/fork`) copies the rows through a settled
   turn and its following done summaries, never memory phase rows, into
   a chat owned by the caller on the picked agent, recording the source
@@ -627,7 +648,10 @@ violation, and every rule has a rejected fixture under
   in `automations/schedule.ts` (fires at least `MIN_GAP_MINUTES` apart
   by the minute field, a schedule that never fires is a 400), a
   deadline that may only tighten the `runDeadlineMs` limit, and a
-  retention in days. Anyone who sees the project creates it, runs it
+  retention in days. Its `disabledCapabilities` is a whole sorted set
+  on create and PATCH, empty on an omitted create and kept on an omitted
+  PATCH. Each run snapshots it and stores a copy on its session.
+  Anyone who sees the project creates it, runs it
   now, suspends, resumes and stops a run; the owner or, in a team
   project, an admin edits and deletes it, else 403. At most
   `MAX_AUTOMATIONS_PER_PROJECT`; an agent an automation names is a 409
@@ -690,21 +714,42 @@ violation, and every rule has a rejected fixture under
   The offered set is decided once per send in `runner/policy.ts` from
   the `tools` rows:
   a model that accepts tools always gets `datetime` and `bash` over the
-  project's knowledge base, plus the web tools
-  (`WEB_TOOLS`: `webfetch`, `websearch`, `visualize`, the only rows and
-  switches) that an admin has not switched off, websearch only once a
-  search provider is chosen. The memory phase offers `memory_edit` alone.
+  project's knowledge base. The admin's `web` row has one mode, `off`,
+  `all` or `listed`, with plain hosts in `hosts`; off and all keep the
+  saved list. The send's disabled set is applied before schemas are
+  built: `web` off removes webfetch, websearch and bash's network.
+  Websearch also needs a provider, null for None and on a fresh instance.
+  Webfetch checks every redirect against the listed origins. The send
+  keeps its web snapshot, domains included. Visualize keeps its separate
+  switch and is unaffected. The old webfetch and websearch `enabled`
+  columns are never read or writable. `GET /api/projects/:id/agents`
+  answers the tools capability's `capabilities()`, `["web"]` unless
+  the admin's mode is off, through a forward port.
+  The prompt adds `WEB_OFF_LINE` after the date and before the MCP note
+  exactly when the send's set holds `web` and it offers tools, regardless
+  of the admin's mode. The memory phase offers `memory_edit` alone.
   Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
   a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
   `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
-  `BUILTIN_TOOLS` schema, including `bash`, by name from
+  built-in schema, including `bash`, `webfetch` and `websearch`, by name from
   `tools/catalog.ts`, built by the send's own factories with sample
   inputs (name enums empty,
   `memory_edit`'s own-note text as the variant), each row `RowsTitle`
   (the name over the first sentence) with its tokens by `wireTokens()`
-  as `RowsMeta`, read-only; Web's rows carry the switch and no tokens,
-  websearch's provider and visualize's hosts with Add, Remove and Reset.
+  as `RowsMeta`, read-only. The bash catalog sample uses all-mode words.
+  The Web tab's API holds `access` (mode and domains), `search` (nullable
+  provider and key presence), and `visualize` (its switch and hosts).
+  The one `PATCH /api/tools/:name` descriptor accepts web mode/domains,
+  websearch provider, or visualize enabled/hosts, never webfetch.
+  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
+  its modes, Off, All domains and Listed domains, in the card's head as
+  `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
+  and All domains save on the click, Listed domains opens the hosts box,
+  checked through `parseDomains()` in `shared/web.ts`, and saves the mode
+  with the list. Web search is the providers as radio rows with None
+  first. Visuals is the visualize row with its switch and its hosts with
+  Add, Remove and Reset, apart from web access.
   The hosts field warns that loaded URLs can send the visual's data;
   each card's head has its total. Limits is a form per scope, each
   saving the full set with the other scope's saved values. A change on
@@ -907,6 +952,9 @@ violation, and every rule has a rejected fixture under
   its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
   done run's length and its send's `tokens` (prompt plus completion over
   its counted rounds, summed from `usage` by the send queries).
+  The editor's Web access section is one switch, on for a new task,
+  saved as the row's whole `disabledCapabilities`, and off with the
+  composer's reasons when it cannot be switched.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -943,6 +991,19 @@ violation, and every rule has a rejected fixture under
   for another shape. A slash command carries no files and clears none.
   A user message draws its `uploads` record as `ui/FileChip.tsx` chips
   inside its card.
+  The plus menu's second item is Web access, a `role="switch"` item
+  drawn as the rail's theme switch is, which leaves the menu open.
+  `composer/Add.model.ts` decides it: off with "Agent cannot use tools"
+  or "Turned off by an admin" under it when it cannot be switched, the
+  second from `capabilities` on `GET /api/projects/:id/agents`, held as
+  `switchable` in `data/capabilities.ts`. That module keeps the flips a
+  person made and has not sent, only the keys touched, over the chat's
+  `disabledCapabilities`, so another member's envelope moves every key
+  left alone. A create, a message and Regenerate carry them as a change
+  and forget them once the server took the send; a refused send keeps
+  them, and so does a flip made while the send was on its way. Leaving
+  the chat and a reload forget them, a slash command carries none. Nothing
+  outside the menu says web access is off.
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
   ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one

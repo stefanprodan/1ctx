@@ -28,6 +28,8 @@ export type UploadsPort = {
 };
 
 export type SessionsPort = {
+  byId(id: string): SessionRow | null;
+  setDisabledCapabilities(id: string, keys: readonly string[]): void;
   create(fields: {
     id?: string;
     projectId: string;
@@ -36,6 +38,7 @@ export type SessionsPort = {
     origin?: "chat" | "automation";
     automationId?: string | null;
     runSource?: EventSource | null;
+    disabledCapabilities?: readonly string[];
     title: string;
     now: number;
   }): SessionRow;

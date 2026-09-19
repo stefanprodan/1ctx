@@ -102,8 +102,9 @@ export class SessionStore {
       .query(
         `insert into sessions (id, project_id, owner_id, agent_id, origin,
            automation_id, run_source, title, status, revision, created_at,
-           last_activity_at, forked_from_session_id, forked_from_message_id)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+           last_activity_at, forked_from_session_id, forked_from_message_id,
+           disabled_capabilities)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -119,6 +120,7 @@ export class SessionStore {
         fields.now,
         fields.forkedFromSessionId ?? null,
         fields.forkedFromMessageId ?? null,
+        JSON.stringify(fields.disabledCapabilities ?? []),
       );
     return this.byId(id)!;
   }
@@ -140,6 +142,7 @@ export class SessionStore {
       status: "done",
       forkedFromSessionId: source.id,
       forkedFromMessageId: messageId,
+      disabledCapabilities: source.disabledCapabilities,
     });
     const messageIds = copyRows(this.db, {
       sessionId: session.id,
@@ -156,6 +159,12 @@ export class SessionStore {
 
   forkedFrom(id: string) {
     return readForkedFrom(this.db, id);
+  }
+
+  setDisabledCapabilities(id: string, set: readonly string[]): void {
+    this.db
+      .query("update sessions set disabled_capabilities = ? where id = ?")
+      .run(JSON.stringify(set), id);
   }
 
   touch(

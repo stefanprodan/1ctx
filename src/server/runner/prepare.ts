@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -34,6 +35,7 @@ export function prepareSend(fields: {
   policy: SendPolicy;
   text: string;
   uploads?: readonly string[];
+  capabilities?: CapabilityChange;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   title: string;
   kind: SendKind;
@@ -89,6 +91,7 @@ export function prepareSend(fields: {
       policy: fields.policy,
       text: fields.text,
       uploads: fields.uploads,
+      capabilities: fields.capabilities,
       mcpDigest: fields.policy.offered.mcpPrompt.digest,
     });
     send.mcpNote = changeNote(

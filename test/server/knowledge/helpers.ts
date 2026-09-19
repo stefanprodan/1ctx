@@ -4,6 +4,7 @@
 import { AgentStore } from "../../../src/server/agents/index.ts";
 import { transact } from "../../../src/server/db/index.ts";
 import { knowledgeArea } from "../../../src/server/knowledge/index.ts";
+import type { CommandCaps } from "../../../src/server/knowledge/mount.ts";
 import type { ScratchChanges } from "../../../src/server/knowledge/scratch.ts";
 import { NotFound } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
@@ -140,7 +141,7 @@ export type Setup = ReturnType<typeof setup>;
 export const run = (
   s: Setup,
   command: string,
-  caps = callCaps,
+  caps: CommandCaps = callCaps,
   signal = freshSignal(),
   sessionId = s.session.id,
 ) =>

@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The webfetch tool: a plain fetch that follows redirects, cuts the body
-// at the cap and reaches under the deadline. There is no address
-// classification, no pinned resolver and no reachable-set (decision 2):
-// the tool reaches whatever the server can reach; a later doc adds a
-// network policy as a port. The fetch comes from the dependency, so the
+// at the cap and reaches under the deadline. Listed access checks every
+// origin before a request, including redirects. The fetch comes from the dependency, so the
 // suite passes a fake and never leaves the process. The body cap, the
 // deadline and the result cut come from the tool caps on the context.
 
+import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
@@ -78,7 +77,10 @@ function normalizedHost(hostname: string): string {
   return host;
 }
 
-export function parseFetchUrl(input: string): URL {
+export function parseFetchUrl(
+  input: string,
+  web: WebSnapshot | null = null,
+): URL {
   let url: URL;
   try {
     url = new URL(input);
@@ -90,6 +92,9 @@ export function parseFetchUrl(input: string): URL {
   }
   if (url.username !== "" || url.password !== "") {
     throw new Error("credentials in URLs are not allowed");
+  }
+  if (web?.mode === "listed" && !originAllowed(url, web.domains)) {
+    throw new Error(`not an allowed domain: ${url.host}`);
   }
   const host = normalizedHost(url.hostname);
   if (host === "") throw new Error("URL has no host");
@@ -341,7 +346,7 @@ export async function fetchText(
     AbortSignal.timeout(ctx.caps.fetchDeadlineMs),
   ]);
   try {
-    let url = parseFetchUrl(args.url);
+    let url = parseFetchUrl(args.url, ctx.web);
     let redirects = 0;
 
     while (true) {
@@ -366,7 +371,7 @@ export async function fetchText(
           throw new Error("redirect limit exceeded after 3 hops");
         }
         try {
-          url = parseFetchUrl(new URL(location, url).href);
+          url = parseFetchUrl(new URL(location, url).href, ctx.web);
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
           throw new Error(`redirect refused: ${reason}`);
@@ -406,11 +411,15 @@ export async function fetchText(
 export function makeWebfetchTool(
   version: string,
   dependencies: FetchDependencies = { fetch },
+  web: WebSnapshot | null = null,
 ): Tool {
   return {
     name: "webfetch",
     description:
-      "Fetch a URL and return its text. Long pages are returned in slices; call webfetch again with start_index set to the next index named in the truncation message.",
+      "Fetch a URL and return its text. Long pages are returned in slices; call webfetch again with start_index set to the next index named in the truncation message." +
+      (web?.mode === "listed"
+        ? ` Only these hosts are allowed: ${web.domains.join(", ")}.`
+        : ""),
     parameters: {
       type: "object",
       properties: {

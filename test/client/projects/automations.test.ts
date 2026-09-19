@@ -77,6 +77,7 @@ const automation = (
   revision: 1,
   createdAt: now - 24 * HOUR,
   updatedAt: now - 24 * HOUR,
+  disabledCapabilities: [],
   ...changes,
 });
 
@@ -95,6 +96,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   createdAt: now,
   lastActivityAt: now,
   usage: null,
+  disabledCapabilities: [],
   ...changes,
 });
 
@@ -263,6 +265,7 @@ describe("the form", () => {
       retention: "30",
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
+      web: true,
     });
   });
 
@@ -281,6 +284,7 @@ describe("the form", () => {
         projectMemory: false,
         ownMemory: true,
         memoryGuidance: OWN_MEMORY_GUIDANCE,
+        disabledCapabilities: [],
       },
     });
     const empty = requestOf(filled({ deadline: "" }), LIMIT);
@@ -331,6 +335,21 @@ describe("the form", () => {
     const shown = draftOf(none, "ignored", "ignored", LIMIT);
     expect(shown.deadline).toBe("10");
     expect(dirtyOf(shown, none, LIMIT)).toBe(false);
+  });
+
+  test("web access is on for a new task, follows the row, and saves as the set", () => {
+    expect(draftOf(null, "a1", "UTC", LIMIT).web).toBe(true);
+    const off = automation({ disabledCapabilities: ["web"] });
+    const shown = draftOf(off, "ignored", "ignored", LIMIT);
+    expect(shown.web).toBe(false);
+    expect(dirtyOf(shown, off, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, web: true }, off, LIMIT)).toBe(true);
+    const body = (web: boolean) => {
+      const request = requestOf(filled({ web }), LIMIT);
+      return "body" in request ? request.body.disabledCapabilities : null;
+    };
+    expect(body(false)).toEqual(["web"]);
+    expect(body(true)).toEqual([]);
   });
 
   test("memory is one of none, own and project, never both notes", () => {

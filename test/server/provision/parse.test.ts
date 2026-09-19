@@ -29,9 +29,10 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   Skill: [],
   McpServer: [],
   Agent: [],
-  Tool: ["webfetch", "websearch", "visualize"],
+  Tool: ["web", "websearch", "visualize"],
   ...existing,
 });
+const web = { mode: "all" as const, domains: [] };
 const secret = (kind: SecretKind, name: string) =>
   kind === "user-" && name === "user-zed" ? "test-password" : null;
 function source(
@@ -51,13 +52,13 @@ function source(
   };
 }
 function check(docs: Document[], existing: Partial<Inventory> = {}) {
-  return preflight(docs, inventory(existing), secret);
+  return preflight(docs, inventory(existing), secret, web);
 }
 
 describe("provision documents", () => {
   test("parses all seven kinds and resolves forward references without I/O", async () => {
     const docs = parse([await fixture("good")]);
-    expect(docs.map((doc) => doc.kind)).toEqual([...KINDS]);
+    expect([...new Set(docs.map((doc) => doc.kind))]).toEqual([...KINDS]);
     expect(docs.every((doc) => doc.source === `${ROOT}/good.yaml`)).toBe(true);
     expect(docs.find((doc) => doc.kind === "Agent")?.spec.servers).toEqual([
       { name: "toolbox", read: true, write: false },
@@ -137,7 +138,7 @@ describe("provision documents", () => {
   test("keeps native YAML block scalars, directives and document ends", async () => {
     const docs = parse([
       await fixture("stream"),
-      source("Tool", "webfetch", { enabled: true }, "next.yaml"),
+      source("Tool", "web", { mode: "all" }, "next.yaml"),
     ]);
     expect(docs).toHaveLength(3);
     expect(docs[0]?.spec).toEqual({ prompt: "First.\n---\nLast.\n..." });
@@ -149,7 +150,7 @@ describe("provision documents", () => {
     const first = source("Project", "nebula", {}, "first.yaml");
     const later = {
       path: "later.yml",
-      text: `${source("Tool", "webfetch", { enabled: true }).text}\n---\n${source("Agent", "guide", { mcpMode: "unknown" }).text}`,
+      text: `${source("Tool", "web", { mode: "all" }).text}\n---\n${source("Agent", "guide", { mcpMode: "unknown" }).text}`,
     };
     expect(() => parse([first, later])).toThrow(
       "later.yml: Agent/guide: spec.mcpMode",
@@ -211,6 +212,8 @@ describe("provision documents", () => {
     ["McpServer", "bad_name", {}],
     ["McpServer", "a".repeat(25), {}],
     ["Tool", "datetime", { enabled: true }],
+    ["Tool", "webfetch", { enabled: true }],
+    ["Tool", "webfetch", {}],
   ] satisfies [Kind, string, unknown][])(
     "checks %s/%s identity with its own name guard",
     (kind, name, spec) => {
@@ -282,9 +285,14 @@ describe("provision documents", () => {
       { servers: [{ name: "toolbox" }, { name: "toolbox" }] },
       "servers[1].name",
     ],
-    ["Tool", "webfetch", { provider: null }, "provider"],
+    ["Tool", "web", { provider: null }, "provider"],
+    ["Tool", "web", { enabled: false }, "enabled"],
+    ["Tool", "web", { hosts: [] }, "hosts"],
+    ["Tool", "websearch", { enabled: false }, "enabled"],
+    ["Tool", "websearch", { mode: "all" }, "mode"],
     ["Tool", "websearch", { hosts: [] }, "hosts"],
     ["Tool", "visualize", { hosts: ["http://assets.test"] }, "hosts"],
+    ["Tool", "visualize", { domains: [] }, "domains"],
     ["Tool", "websearch", { provider: "other" }, "provider"],
   ] satisfies [Kind, string, unknown, string][])(
     "checks %s/%s field shape",
@@ -437,10 +445,10 @@ describe("provision preflight", () => {
       source("User", "zed-user", { role: "member", passwordFrom: "user-zed" }),
     ]);
     expect(() =>
-      preflight(docs, inventory({ User: ["zed-user"] }), () => null),
+      preflight(docs, inventory({ User: ["zed-user"] }), () => null, web),
     ).toThrow("spec.passwordFrom");
     expect(
-      preflight(docs, inventory({ User: ["zed-user"] }), () => "short"),
+      preflight(docs, inventory({ User: ["zed-user"] }), () => "short", web),
     ).toBeUndefined();
     expect(JSON.stringify(docs)).not.toContain("short");
   });
@@ -448,16 +456,16 @@ describe("provision preflight", () => {
   test("new user passwords have the API floor and byte cap, without revealing a value", async () => {
     const docs = parse([await fixture("good")]);
     for (const value of ["short", "é".repeat(MAX_PASSWORD_BYTES / 2 + 1)]) {
-      expect(() => preflight(docs, inventory(), () => value)).toThrow(
+      expect(() => preflight(docs, inventory(), () => value, web)).toThrow(
         "spec.passwordFrom",
       );
       try {
-        preflight(docs, inventory(), () => value);
+        preflight(docs, inventory(), () => value, web);
       } catch (error) {
         expect((error as Error).message).not.toContain(value);
       }
     }
-    preflight(docs, inventory(), () => "é".repeat(MAX_PASSWORD_BYTES / 2));
+    preflight(docs, inventory(), () => "é".repeat(MAX_PASSWORD_BYTES / 2), web);
   });
 
   test("secret failures never echo the callback error or returned values", () => {
@@ -475,7 +483,7 @@ describe("provision preflight", () => {
       },
     ]) {
       try {
-        preflight(docs, inventory(), read);
+        preflight(docs, inventory(), read, web);
         throw new Error("expected missing secret");
       } catch (error) {
         expect((error as Error).message).toContain("spec.keyFrom");
@@ -504,7 +512,7 @@ describe("provision input loading", () => {
     let reads = 0;
     const stdin = async () => {
       reads++;
-      return source("Tool", "webfetch", { enabled: false }).text;
+      return source("Tool", "web", { mode: "off" }).text;
     };
     const inputs = await readSources(
       ["-", `${ROOT}/inputs/10-user.yaml`, "-"],
@@ -517,7 +525,7 @@ describe("provision input loading", () => {
       "-",
     ]);
     expect(() => parse(inputs)).toThrow(
-      "-: Tool/webfetch: metadata.name is duplicated",
+      "-: Tool/web: metadata.name is duplicated",
     );
   });
 
@@ -527,7 +535,7 @@ describe("provision input loading", () => {
     ).rejects.toThrow(`${ROOT}/absent.yaml: could not read input`);
     const inputs = await readSources(
       [`${ROOT}/inputs`, "-"],
-      async () => source("Tool", "webfetch", { enabled: true }).text,
+      async () => source("Tool", "web", { mode: "all" }).text,
     );
     expect(parse(inputs)).toHaveLength(3);
   });

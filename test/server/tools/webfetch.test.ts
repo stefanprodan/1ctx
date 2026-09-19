@@ -30,7 +30,14 @@ function context(signal = new AbortController().signal): ToolContext {
     visualBytes: 0,
     visuals: 0,
   };
-  return { actor: null, signal, now: () => 0, budget, caps: TOOL_CAPS };
+  return {
+    actor: null,
+    web: { mode: "all", domains: [] },
+    signal,
+    now: () => 0,
+    budget,
+    caps: TOOL_CAPS,
+  };
 }
 
 function dependencies(
@@ -55,6 +62,101 @@ function textResponse(
 
 const run = (args: Record<string, unknown>, deps: FetchDependencies) =>
   fetchText(args, context(), "vtest", deps);
+
+describe("listed web access", () => {
+  test("the schema names every listed host and changes with the full list", () => {
+    const domains = Array.from(
+      { length: 12 },
+      (_, index) => `host${index}.test`,
+    );
+    const deps = dependencies(() => textResponse());
+    const first = makeWebfetchTool("test", deps, { mode: "listed", domains });
+    expect(first.description).toContain(domains.join(", "));
+    const changed = makeWebfetchTool("test", deps, {
+      mode: "listed",
+      domains: [...domains.slice(0, 11), "another.test"],
+    });
+    expect(changed.description).not.toBe(first.description);
+    expect(changed.description).toContain("another.test");
+  });
+
+  test.each([
+    ["https://docs.test/path", true],
+    ["http://DOCS.TEST/path", true],
+    ["https://docs.test:443/path", true],
+    ["https://sub.docs.test/path", false],
+    ["https://other.test/path", false],
+    ["https://docs.test:8443/path", false],
+    ["https://docs.test./path", false],
+  ] as const)("checks the initial origin of %s", async (url, allowed) => {
+    const ctx = context();
+    ctx.web = { mode: "listed", domains: ["docs.test"] };
+    let calls = 0;
+    const result = fetchText(
+      { url },
+      ctx,
+      "test",
+      dependencies(() => {
+        calls++;
+        return textResponse("page");
+      }),
+    );
+    if (allowed) expect(await result).toBe("page");
+    else await expect(result).rejects.toThrow("not an allowed domain:");
+    expect(calls).toBe(allowed ? 1 : 0);
+  });
+
+  test.each([
+    "https://other.test/page",
+    "https://docs.test:8443/page",
+    "https://docs.test./page",
+  ])("checks the redirected origin %s before fetching it", async (target) => {
+    const ctx = context();
+    ctx.web = { mode: "listed", domains: ["docs.test"] };
+    let calls = 0;
+    const result = fetchText(
+      { url: "https://docs.test/start" },
+      ctx,
+      "test",
+      dependencies(() => {
+        calls++;
+        return new Response(null, {
+          status: 302,
+          headers: { location: target },
+        });
+      }),
+    );
+    await expect(result).rejects.toThrow(
+      "redirect refused: not an allowed domain:",
+    );
+    expect(calls).toBe(1);
+  });
+
+  test("checks every hop while permitting redirects within listed origins", async () => {
+    const ctx = context();
+    ctx.web = { mode: "listed", domains: ["docs.test", "assets.test"] };
+    const requested: string[] = [];
+    const result = await fetchText(
+      { url: "https://docs.test/start" },
+      ctx,
+      "test",
+      dependencies((url) => {
+        requested.push(url);
+        if (requested.length === 1)
+          return new Response(null, {
+            status: 302,
+            headers: { location: "http://assets.test/file" },
+          });
+        return textResponse("download");
+      }),
+    );
+    expect(result).toBe("download");
+    expect(requested).toEqual([
+      "https://docs.test/start",
+      "http://assets.test/file",
+    ]);
+  });
+});
 
 describe("fetch URL guard", () => {
   test("normalizes upper-case hosts and trailing dots", () => {
@@ -158,6 +260,7 @@ describe("fetch URL guard", () => {
     };
     const ctx: ToolContext = {
       actor: null,
+      web: { mode: "all", domains: [] },
       signal: new AbortController().signal,
       now: () => 0,
       budget: shared,
@@ -332,6 +435,7 @@ describe("fetch deadline", () => {
   test("times out a fetch that never resolves", async () => {
     const ctx: ToolContext = {
       actor: null,
+      web: { mode: "all", domains: [] },
       signal: new AbortController().signal,
       now: () => 0,
       budget: {

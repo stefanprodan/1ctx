@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { sourceKind } from "../../shared/skills.ts";
+import { isWebAccessMode, type WebAccessMode } from "../../shared/web.ts";
 import {
   type Avatar,
   isAvatar,
@@ -42,7 +43,7 @@ import {
 } from "../mcp/index.ts";
 import { parseBaseUrl, parseKeyName } from "../providers/index.ts";
 import { MAX_SKILL_URL, validPath } from "../skills/index.ts";
-import { parseHosts } from "../tools/index.ts";
+import { parseHosts, parseWebDomains } from "../tools/index.ts";
 import { at, boolean, guarded, names, object, optional } from "./fields.ts";
 
 export type UserSpec = {
@@ -101,6 +102,8 @@ export type AgentSpec = {
 };
 
 export type ToolSpec = {
+  mode?: WebAccessMode;
+  domains?: string[];
   enabled?: boolean;
   provider?: SearchProvider | null;
   hosts?: string[];
@@ -336,27 +339,28 @@ export function agent(value: unknown): AgentSpec {
 }
 
 export function tool(value: unknown, name: string): ToolSpec {
-  const spec = optional<ToolSpec>(
-    object(value, ["enabled", "provider", "hosts"], "spec"),
-    {
-      enabled: boolean,
-      provider: (v) => {
-        if (v !== null && !isSearchProvider(v)) {
-          throw new BadRequest("must be exa, firecrawl, tavily or null");
-        }
-        return v;
-      },
-      hosts: parseHosts,
+  const allowed =
+    name === "web"
+      ? ["mode", "domains"]
+      : name === "websearch"
+        ? ["provider"]
+        : ["enabled", "hosts"];
+  const spec = optional<ToolSpec>(object(value, allowed, "spec"), {
+    mode: guarded(isWebAccessMode, "mode must be off, all or listed"),
+    domains: parseWebDomains,
+    enabled: boolean,
+    provider: (v) => {
+      if (v !== null && !isSearchProvider(v)) {
+        throw new BadRequest("must be exa, firecrawl, tavily or null");
+      }
+      return v;
     },
-  );
-  if ("provider" in spec && name !== "websearch") {
-    throw new Error("spec.provider is only valid on websearch");
-  }
-  if ("hosts" in spec && name !== "visualize") {
-    throw new Error("spec.hosts is only valid on visualize");
-  }
+    hosts: parseHosts,
+  });
   if (Object.keys(spec).length === 0) {
-    throw new Error("spec.enabled, spec.provider or spec.hosts is required");
+    throw new Error(
+      `${allowed.map((field) => `spec.${field}`).join(" or ")} is required`,
+    );
   }
   return spec;
 }

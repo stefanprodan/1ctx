@@ -13,11 +13,13 @@ import {
   type SearchState,
   type ToolWhen,
 } from "../../../shared/contracts/tool.ts";
+import { parseDomains, type WebAccessMode } from "../../../shared/web.ts";
 import type {
   LimitName,
   LimitScope,
   SearchProvider,
 } from "../../../shared/words.ts";
+import { sentence } from "../../lib/format.ts";
 
 // the label over each field and the line under it
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
@@ -173,6 +175,8 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
   memory:
     "Sent in a run that updates the project's memory, and in the step after a run that updates its own memory.",
   knowledge: "Sent in every chat and run, over the project's knowledge base.",
+  web: "Sent while web access is on for the chat or the run.",
+  webSearch: "Sent while web access is on and a search provider is chosen.",
 };
 
 export const NAMES_WORDS =
@@ -325,10 +329,9 @@ export function keyLine(provider: SearchProvider, present: boolean): string {
 }
 
 // what the search section says under the providers
-export function searchLine(state: SearchState): string {
-  if (state.provider === null) {
-    return "Choose a provider. websearch is not offered until one is chosen.";
-  }
+export function searchLine(state: SearchState, mode: WebAccessMode): string {
+  if (mode === "off") return "Web access is off. websearch is not offered.";
+  if (state.provider === null) return "websearch is not offered.";
   const line = `websearch runs on ${state.provider}`;
   if (!state.keys[state.provider]) {
     const key = `search-${state.provider}.key`;
@@ -359,3 +362,43 @@ export function hostsFieldOf(message: string): "hosts" | undefined {
 
 // the first sentence of a description, for the row
 export { firstSentence, tokensText } from "../../lib/format.ts";
+
+// web access: the three modes in the card's head, and what each means
+export const ACCESS_MODES: { value: WebAccessMode; label: string }[] = [
+  { value: "off", label: "Off" },
+  { value: "all", label: "All domains" },
+  { value: "listed", label: "Listed domains" },
+];
+
+export const ACCESS_WORDS: Record<WebAccessMode, string> = {
+  off: "Agents cannot fetch pages, search the web or use curl.",
+  all: "Agents fetch pages, search the web and use curl in bash, on any address this server reaches.",
+  listed: "Agents fetch pages and use curl in bash, only on these hosts.",
+};
+
+export const DOMAINS_HINT =
+  "One host per line. A subdomain needs its own line.";
+
+// the box as typed to the list a save sends, or the words for its field
+export function domainsOf(
+  text: string,
+): { domains: string[] } | { error: string } {
+  const result = parseDomains(text.split("\n"));
+  if (!result.ok) {
+    return {
+      error:
+        result.value === ""
+          ? sentence(result.error)
+          : `Line ${result.line}, ${result.value}, ${result.error}.`,
+    };
+  }
+  if (result.domains.length === 0) return { error: "List at least one host." };
+  return { domains: result.domains };
+}
+
+// a refusal of the web row that names the list belongs to the box
+export function domainsFieldOf(message: string): "domains" | undefined {
+  return message.startsWith("domains ") || message.includes("host")
+    ? "domains"
+    : undefined;
+}

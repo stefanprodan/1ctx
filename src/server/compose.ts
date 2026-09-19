@@ -197,6 +197,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     skills,
     mcp,
     tools: {
+      capabilities: () => tools.capabilities(),
       offered: (now, agentId, agentServers, mode, scope) =>
         tools.offered(now, agentId, agentServers, mode, scope),
     },
@@ -228,29 +229,28 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     isWrite: (name) => mcp.isWrite(name),
   });
-  const tools =
-    options.tools ??
-    toolsArea({
-      db,
-      fetcher: options.fetcher ?? fetch,
-      secret: (name) => secret("search-", name),
-      clock,
-      log: options.log("tools"),
-      version: options.version,
-      render: renderMarkdown,
-      skills,
-      mcp,
-      memory,
-      knowledge,
-      sessions: {
-        memorySnapshot: (projectId, sessionId) =>
-          sessions.memorySnapshot(projectId, sessionId),
-      },
-      markers: {
-        unread: (automationId, projectId, cap, exclude) =>
-          automations.unread(automationId, projectId, cap, exclude),
-      },
-    });
+  const configuredTools = toolsArea({
+    db,
+    fetcher: options.fetcher ?? fetch,
+    secret: (name) => secret("search-", name),
+    clock,
+    log: options.log("tools"),
+    version: options.version,
+    render: renderMarkdown,
+    skills,
+    mcp,
+    memory,
+    knowledge,
+    sessions: {
+      memorySnapshot: (projectId, sessionId) =>
+        sessions.memorySnapshot(projectId, sessionId),
+    },
+    markers: {
+      unread: (automationId, projectId, cap, exclude) =>
+        automations.unread(automationId, projectId, cap, exclude),
+    },
+  });
+  const tools = options.tools ?? configuredTools;
   const socket = socketArea({
     refresh: (principal) => access.refresh(principal),
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
@@ -334,6 +334,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const provision = provisionArea({
     handle,
     secret,
+    webAccess: () => configuredTools.webAccess(),
     bootstrap: async () => (await users.bootstrap()) !== null,
     inventory: () => {
       const names = users.list().map((row) => row.username);
@@ -346,7 +347,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         Skill: skills.store.summaries(() => []).map((row) => row.name),
         McpServer: mcp.store.list().map((row) => row.name),
         Agent: agents.store.list().map((row) => row.name),
-        Tool: ["webfetch", "websearch", "visualize"],
+        Tool: ["web", "websearch", "visualize"],
       };
     },
   });

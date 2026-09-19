@@ -71,7 +71,25 @@ spec:
 apiVersion: config.1ctx.dev/v1
 kind: Tool
 metadata:
+  name: web
+spec:
+  mode: listed
+  domains:
+    - DOCS.example.test.
+    - api.example.test
+    - docs.example.test
+---
+apiVersion: config.1ctx.dev/v1
+kind: Tool
+metadata:
   name: websearch
 spec:
-  enabled: true
   provider: exa
+---
+apiVersion: config.1ctx.dev/v1
+kind: Tool
+metadata:
+  name: visualize
+spec:
+  enabled: true
+  hosts: ["https://assets.example.test"]

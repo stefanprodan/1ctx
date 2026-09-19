@@ -11,6 +11,7 @@ import {
   type ProviderRow,
 } from "../../src/server/providers/index.ts";
 import { fakeFetch, NIM_URL, PROVIDER_URL, testApp } from "../helpers/app.ts";
+import { chatApp } from "../helpers/chat.ts";
 import { refuses } from "../helpers/refuses.ts";
 
 const setup = async () => {
@@ -47,6 +48,30 @@ const defaults = {
   servers: [],
   mcpMode: "auto",
 } as const;
+
+test("project agents report the admin's capabilities through the tools port", async () => {
+  const chat = await chatApp();
+  try {
+    for (const mode of ["all", "off", "listed"] as const) {
+      const changed = await chat.admin.call("PATCH", "/api/tools/web", {
+        body: { mode, domains: ["docs.test"] },
+      });
+      expect(changed.status).toBe(200);
+      const response = await chat.member.call(
+        "GET",
+        `/api/projects/${chat.projectId}/agents`,
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.capabilities).toEqual(mode === "off" ? [] : ["web"]);
+      expect(body.agents.map((agent: { id: string }) => agent.id)).toContain(
+        chat.agentId,
+      );
+    }
+  } finally {
+    await chat.app.shutdown();
+  }
+});
 
 describe("parseAgent", () => {
   refuses(

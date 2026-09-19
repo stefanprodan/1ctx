@@ -148,6 +148,7 @@ describe("send deadlines", () => {
             projectMemory: false,
             ownMemory: false,
             memoryGuidance: "",
+            disabledCapabilities: [],
           },
           instructions: "check",
           dueAt: chat.app.now.value,

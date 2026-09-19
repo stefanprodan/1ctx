@@ -3,27 +3,38 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { path, query } from "../../../src/client/app/router.ts";
+import {
+  changeOf,
+  dropFlips,
+  flip,
+  switchable,
+} from "../../../src/client/data/capabilities.ts";
 import { forking, forkSession } from "../../../src/client/data/fork.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   BUFFER_MAX,
   compactSession,
+  createSession,
   deleteSession,
   leaveSession,
   list,
   live,
   loadList,
+  loadProjectAgents,
   loadSession,
   onSocket,
   projectAgents,
+  regenerateSession,
   renameSession,
   sending,
+  sendMessage,
   session,
   sessionError,
   toolResults,
 } from "../../../src/client/data/sessions.ts";
 import { applyAutomationFrame } from "../../../src/client/data/stream.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import { WEB } from "../../../src/shared/capabilities.ts";
 import type {
   Message,
   SendSummary,
@@ -47,6 +58,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
     createdAt: 10,
     lastActivityAt: 20,
     usage: null,
+    disabledCapabilities: [],
     ...changes,
   };
 }
@@ -1140,5 +1152,109 @@ describe("the sessions entity", () => {
     expect(list.value).toBeNull();
     expect(projectAgents.value).toBeNull();
     expect(sending.value).toBe(false);
+  });
+});
+
+describe("capability flips on a send", () => {
+  const bodies: unknown[] = [];
+  const take = (status = 200) => {
+    bodies.length = 0;
+    answer = (url, init) => {
+      if (url === "/api/sessions/s1") return Response.json(detail("s1"));
+      bodies.push(init?.body ? JSON.parse(String(init.body)) : undefined);
+      return status === 200
+        ? Response.json(
+            detail("s1", { session: summary({ id: "s1", revision: 9 }) }),
+          )
+        : Response.json({ error: "a send is running" }, { status });
+    };
+  };
+  beforeEach(() => {
+    dropFlips(null);
+    dropFlips("s1");
+  });
+
+  test.serial(
+    "a message carries the flips and forgets them once taken",
+    async () => {
+      take();
+      await loadSession("s1");
+      flip("s1", [], WEB);
+      await sendMessage("s1", "hello", []);
+      expect(bodies).toEqual([
+        { message: "hello", capabilities: { disable: [WEB] } },
+      ]);
+      await sendMessage("s1", "again", []);
+      expect(bodies[1]).toEqual({ message: "again" });
+    },
+  );
+
+  test.serial("a refused send keeps the flips for the next try", async () => {
+    take(409);
+    await loadSession("s1");
+    flip("s1", [], WEB);
+    await expect(sendMessage("s1", "hello", [])).rejects.toThrow();
+    expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+    expect(sending.value).toBe(false);
+  });
+
+  test.serial(
+    "a flip made while the message is on its way is kept",
+    async () => {
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      answer = async (url) => {
+        if (url === "/api/sessions/s1") return Response.json(detail("s1"));
+        await gate;
+        return Response.json(
+          detail("s1", { session: summary({ id: "s1", revision: 9 }) }),
+        );
+      };
+      await loadSession("s1");
+      const sending = sendMessage("s1", "hello", []);
+      flip("s1", [], WEB);
+      release();
+      await sending;
+      expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+    },
+  );
+
+  test.serial("regenerate carries them too, compact never", async () => {
+    take();
+    await loadSession("s1");
+    flip("s1", [WEB], WEB);
+    await compactSession("s1");
+    expect(bodies[0]).toBeUndefined();
+    expect(changeOf("s1")).toEqual({ capabilities: { enable: [WEB] } });
+    await regenerateSession("s1");
+    expect(bodies[1]).toEqual({ capabilities: { enable: [WEB] } });
+    expect(changeOf("s1")).toEqual({});
+  });
+
+  test.serial(
+    "a new chat's first message carries what was flipped before it",
+    async () => {
+      take();
+      flip(null, [], WEB);
+      await createSession({ projectId: "p1", agentId: "a1", message: "hi" });
+      expect(bodies[0]).toEqual({
+        projectId: "p1",
+        agentId: "a1",
+        message: "hi",
+        capabilities: { disable: [WEB] },
+      });
+      expect(changeOf(null)).toEqual({});
+    },
+  );
+
+  test.serial("the project's agents answer what can be switched", async () => {
+    answer = () => Response.json({ agents: [], capabilities: [WEB] });
+    await loadProjectAgents("p1");
+    expect(switchable.value).toEqual([WEB]);
+    answer = () => Response.json({ agents: [], capabilities: [] });
+    await loadProjectAgents("p1");
+    expect(switchable.value).toEqual([]);
   });
 });

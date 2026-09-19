@@ -51,6 +51,7 @@ export function visualDetail(): SessionDetail {
       agentId: "agent0000001", origin: "chat", forkedFromId: null,
       automationId: null, runSource: null, title: "Visual",
       status: "running", revision: 1, createdAt: 1, lastActivityAt: 1,
+      disabledCapabilities: [],
       usage: null,
     },
     forkedFrom: null,

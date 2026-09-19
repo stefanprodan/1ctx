@@ -161,7 +161,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "PATCH",
     path: "/api/tools/:name",
-    body: { enabled: true },
+    body: { mode: "all" },
     expect: { anonymous: 401, member: 403, admin: 400 },
   },
   {
@@ -527,6 +527,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/sessions/:id/regenerate",
+    body: { capabilities: { disable: ["web"] } },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

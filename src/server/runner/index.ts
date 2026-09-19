@@ -12,8 +12,13 @@
 
 import type {
   CreateSessionRequest,
+  RegenerateRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
+import {
+  applyChange,
+  type CapabilityChange,
+} from "../../shared/capabilities.ts";
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause, Wire } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
@@ -39,6 +44,7 @@ import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { buildPolicy, type ToolsPort } from "./policy.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
+import { regenerateUser } from "./regenerate.ts";
 import { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
@@ -106,7 +112,11 @@ export type Runner = {
     sessionId: string,
     fields: SendMessageRequest,
   ): SessionDetail;
-  regenerate(principal: Principal, sessionId: string): SessionDetail;
+  regenerate(
+    principal: Principal,
+    sessionId: string,
+    fields?: RegenerateRequest,
+  ): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
   startRun(event: Event): PreparedRun;
   stop(principal: Principal, sessionId: string): void;
@@ -216,6 +226,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     agent: AgentRow,
     event: Event | null = null,
     offerTools = true,
+    disabledCapabilities: readonly string[] = [],
   ) => {
     const limits = deps.limits.current();
     const automation =
@@ -233,6 +244,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       wire: deps.providers.byId(agent.providerId)?.wire ?? null,
       now: deps.clock(),
       tools: offerTools && agent.model.tools ? deps.tools : null,
+      disabledCapabilities,
       limits,
       automation,
       knowledge: deps.knowledge.snapshot(project.id),
@@ -274,8 +286,16 @@ export function runnerArea(deps: RunnerDeps): Runner {
     event: Event | null = null,
     existingUser: Message | null = null,
     uploads?: readonly string[],
-  ): PreparedRun =>
-    prepareSend({
+    capabilities?: CapabilityChange,
+  ): PreparedRun => {
+    const changed = applyChange(
+      event?.automation.disabledCapabilities ??
+        session?.disabledCapabilities ??
+        [],
+      capabilities,
+    );
+    if (!changed.ok) throw new BadRequest(changed.error);
+    return prepareSend({
       registry,
       writer,
       sessions: deps.sessions,
@@ -283,7 +303,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       run: (send) => void run(send),
       sessionId,
       session,
-      policy: policyFor(project, user, agent, event),
+      policy: policyFor(project, user, agent, event, true, changed.set),
       text,
       title,
       kind: event === null ? "chat" : "run",
@@ -291,9 +311,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
       automationId: event?.automation.id ?? null,
       existingUser,
       uploads,
+      capabilities,
       checkUploads: deps.uploads.checkUploads,
       now: deps.clock(),
     });
+  };
 
   const begin = (
     sessionId: string,
@@ -305,6 +327,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     title: string,
     existingUser: Message | null = null,
     uploads?: readonly string[],
+    capabilities?: CapabilityChange,
   ): SessionDetail => {
     const prepared = prepare(
       sessionId,
@@ -317,6 +340,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       null,
       existingUser,
       uploads,
+      capabilities,
     );
     prepared.launch();
     return prepared.detail;
@@ -343,6 +367,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         titleFrom(fields.message),
         null,
         fields.uploads,
+        fields.capabilities,
       );
     },
     send(principal, sessionId, fields) {
@@ -363,9 +388,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
         session.title,
         null,
         fields.uploads,
+        fields.capabilities,
       );
     },
-    regenerate(principal, sessionId) {
+    regenerate(principal, sessionId, fields = {}) {
       const session = deps.visible(principal, sessionId);
       if (session.origin === "automation") {
         throw new Conflict("a run cannot regenerate");
@@ -375,20 +401,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }
-      const messages = deps.sessions.messages(session.id);
-      if (messages.length === 0 || messages.at(-1)?.kind === "user") {
-        throw new BadRequest("nothing to regenerate");
-      }
-      let existingUser: Message | null = null;
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i]?.kind === "user") {
-          existingUser = messages[i]!;
-          break;
-        }
-      }
-      if (existingUser === null) {
-        throw new BadRequest("nothing to regenerate");
-      }
+      const existingUser = regenerateUser(deps.sessions.messages(session.id));
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
@@ -401,6 +414,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
         existingUser.content,
         session.title,
         existingUser,
+        undefined,
+        fields.capabilities,
       );
     },
     compact(principal, sessionId) {
@@ -416,7 +431,14 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
-      const policy = policyFor(project, user, agent, null, false);
+      const policy = policyFor(
+        project,
+        user,
+        agent,
+        null,
+        false,
+        session.disabledCapabilities,
+      );
       return compactSend({ ...deps, registry, writer, run }, session, policy);
     },
     startRun(event) {
@@ -454,7 +476,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),
     send: (principal, id, fields) => runner.send(principal, id, fields),
-    regenerate: (principal, id) => runner.regenerate(principal, id),
+    regenerate: (principal, id, fields) =>
+      runner.regenerate(principal, id, fields),
     compact: (principal, id) => runner.compact(principal, id),
     stop: (principal, id) => runner.stop(principal, id),
   });

@@ -23,6 +23,7 @@ import { chatApp, startChat, waitScript } from "../../helpers/chat.ts";
 import { freshSignal, type Setup, setup } from "../knowledge/helpers.ts";
 
 const context = (): ToolContext => ({
+  web: null,
   actor: {
     projectId: "project",
     userId: "user",
@@ -59,7 +60,7 @@ function mountedContext(s: Setup): ToolContext {
 
 describe("bash", () => {
   test("the catalog uses the command-only schema and its unfilled description", () => {
-    const tool = makeBashTool();
+    const tool = makeBashTool(undefined, { mode: "all", domains: [] });
     expect(tool.parameters).toEqual({
       type: "object",
       properties: {
@@ -80,13 +81,15 @@ describe("bash", () => {
       when: "knowledge",
       names: false,
       variant: null,
-      tokens: 359,
     });
     expect(listed.tokens).toBe(wireTokens([tool]));
     expect(tool.description).not.toContain("{{year}}");
-    expect(tool.description).toBe(
-      "Run a bash command. The project's knowledge base, which people may call the project docs, is mounted at /knowledge: UTF-8 text files shared with everyone who can see the project. Use ls, find, grep -n, sed -n and sed -i, awk, jq, yq, diff, and cat > file <<'EOF' to write. Put independent commands in one round because calls run in parallel, and one command may read several files. Files you change there are saved when the command ends, each as a new version. If another writer changed one during the command nothing is saved and the result says so, so read it again and retry. Edit in place with sed -i. Read a file again in the same command before replacing it whole. Keep many small focused files, Markdown for prose, the file's purpose in its first line. /tmp is this session's scratch: any bytes, no versions, kept between commands until the session is deleted or unused for days. /uploads holds the files the user attached in this chat, text only, read-only: what you change there is not kept. Nothing else is kept. Each command starts a new shell in the directory the last one ended in. Variables and functions do not carry over. File names use letters, digits, dot, dash and underscore. No network. The result is the output and the exit status, cut when long. Never write secrets: anyone who can see this session or the project can read what you write.",
+    expect(tool.description).toContain(
+      "Use curl for HTTP requests to any host.",
     );
+    expect(tool.description).not.toContain(";");
+    expect(tool.description).not.toContain("\n");
+    expect(makeBashTool().description.endsWith("No network.")).toBe(true);
   });
 
   test.each([false, true])(

@@ -23,6 +23,7 @@ import { dateLine, systemPrompt } from "../../../src/server/runner/prompt.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/index.ts";
+import { WEB_OFF_LINE } from "../../../src/shared/capabilities.ts";
 import { compactsAt, contextReserve } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import { knowledgeBlock } from "../../../src/shared/knowledge.ts";
@@ -50,6 +51,7 @@ const NONE: Offered = {
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
   memory: null,
+  web: null,
 };
 
 const WITH_BASH: Offered = { ...NONE, tools: [schema(makeBashTool())] };
@@ -75,6 +77,8 @@ const policy: SendPolicy = {
   thinkingOff: false,
   effort: "high",
   offered: WITH_BASH,
+  disabledCapabilities: [],
+  web: null,
   memoryOffered: null,
   projectMemory: [],
   automationMemory: [],
@@ -156,6 +160,27 @@ describe("compaction threshold", () => {
 });
 
 describe("systemPrompt", () => {
+  test("places the chat's web refusal after the date without moving the prefix", () => {
+    const note = "MCP tools changed: added mcp__docs__read.";
+    const on = systemPrompt(policy, NOW, note);
+    const off = systemPrompt(
+      { ...policy, disabledCapabilities: ["web"] },
+      NOW,
+      note,
+    );
+    const date = dateLine(NOW);
+    expect(off.slice(0, off.indexOf(date))).toBe(on.slice(0, on.indexOf(date)));
+    expect(off).toEndWith(`${date}\n\n${WEB_OFF_LINE}\n\n${note}`);
+    expect(on).not.toContain(WEB_OFF_LINE);
+    expect(
+      systemPrompt(
+        { ...policy, disabledCapabilities: ["web"], offered: NONE },
+        NOW,
+        note,
+      ),
+    ).not.toContain(WEB_OFF_LINE);
+  });
+
   test("joins the agent's prompt, the about text and the date", () => {
     expect(systemPrompt(policy, NOW)).toBe(
       `You write Go.\n\nYou work in the ops project: Incidents and pages.\nYou talk to @caelea (Oana Mangiurea), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\nToday is 2026-09-13.`,
@@ -891,6 +916,7 @@ describe("history", () => {
         summaryMaxTokens: 4096,
       },
       offered: {
+        ...NONE,
         tools: [{ name: "time", description: "d", parameters: {} }],
         search: null,
         skills: { block: "", skills: [] },
@@ -946,6 +972,7 @@ describe("history", () => {
     const withTools: SendPolicy = {
       ...policy,
       offered: {
+        ...NONE,
         tools: [{ name: "time", description: "d", parameters: {} }],
         search: null,
         skills: { block: "", skills: [] },
@@ -1001,6 +1028,7 @@ describe("skills after a summary", () => {
   const withSkills: SendPolicy = {
     ...policy,
     offered: {
+      ...NONE,
       tools: [],
       search: null,
       skills: {

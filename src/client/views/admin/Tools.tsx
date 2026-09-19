@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The tools, in three tabs. Built-in: every tool the server writes
-// itself, read-only, each with its tokens. Web: webfetch and websearch
-// with their switches, then the search provider, one row per provider,
-// with whether its key file is there. Limits: the caps a send and a call
+// itself, webfetch and websearch included, read-only, each with its
+// tokens. Web: web access for the instance, the search provider, None
+// first, one row per provider with whether its key file is there, and
+// visualize with its own switch, apart from web access. Limits: the caps a send and a call
 // run under. The tab is the address, and the three routes name this one
 // view, so a tab change keeps the page and its load. A change applies to
 // the next send.
@@ -42,6 +43,7 @@ import {
   toolsTab,
   totalTokens,
 } from "./Tools.model.ts";
+import { WebAccessCard } from "./WebAccessCard.tsx";
 import "./tools.css";
 
 // one card of rows, one open at a time, the schemas' tokens together
@@ -76,7 +78,7 @@ function SearchCard() {
   const busy = useSignal(false);
   const failure = useSignal<string | null>(null);
   if (!state) return null;
-  const choose = async (provider: SearchProvider) => {
+  const choose = async (provider: SearchProvider | null) => {
     if (provider === state.provider || busy.value) return;
     busy.value = true;
     failure.value = null;
@@ -89,6 +91,16 @@ function SearchCard() {
   };
   return (
     <RowsCard label="Web search">
+      <RowsLine as="label" flush>
+        <RowsRadio
+          name="search"
+          value="none"
+          checked={state.provider === null}
+          disabled={busy.value}
+          onChange={() => void choose(null)}
+        />
+        <RowsTitle name="None" mono />
+      </RowsLine>
       {SEARCH_PROVIDERS.map((provider) => (
         <RowsLine key={provider} as="label" flush>
           <RowsRadio
@@ -106,7 +118,7 @@ function SearchCard() {
         {failure.value ? (
           <span class="error">{failure.value}</span>
         ) : (
-          searchLine(state)
+          searchLine(state, tools.value?.access.mode ?? "all")
         )}
       </RowsNote>
     </RowsCard>
@@ -136,8 +148,9 @@ export function Tools() {
         )}
         {tab === "web" && state && (
           <>
-            <ToolsCard label="Web tools" rows={state.web} />
+            <WebAccessCard />
             <SearchCard />
+            <ToolsCard label="Visuals" rows={[state.visualize]} />
           </>
         )}
         {tab === "limits" && rows && (
