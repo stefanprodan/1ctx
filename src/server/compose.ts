@@ -14,6 +14,7 @@ import { type Automations, automationsArea } from "./automations/index.ts";
 import type { Db } from "./db/index.ts";
 import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
+import { withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import type { Log } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
@@ -128,13 +129,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
   });
+  const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
   const limits = limitsArea({ db, clock });
   const providers = providersArea({
     db,
     clock,
     secret: (name) => secret("provider-", name),
     keys: () => options.secretNames?.("provider-") ?? [],
-    fetcher: options.fetcher ?? fetch,
+    fetcher,
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
   });
   const mcp: Mcp = mcpArea({
@@ -143,7 +145,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret: (name) => secret(MCP_KEY_PREFIX, name),
     keys: () => options.secretNames?.(MCP_KEY_PREFIX) ?? [],
     callTimeoutMs: () => limits.current().callTimeoutMs,
-    fetcher: options.fetcher ?? fetch,
+    fetcher,
     log: options.log("mcp"),
     version: options.version,
     render: renderMarkdown,
@@ -152,7 +154,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     db,
     clock,
     log: options.log("skills"),
-    fetcher: options.fetcher ?? fetch,
+    fetcher,
     agents: {
       agentNames: (ids) =>
         ids.flatMap((id) => {
@@ -231,7 +233,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   });
   const configuredTools = toolsArea({
     db,
-    fetcher: options.fetcher ?? fetch,
+    fetcher,
     secret: (name) => secret("search-", name),
     clock,
     log: options.log("tools"),

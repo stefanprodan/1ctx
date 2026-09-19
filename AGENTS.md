@@ -336,7 +336,10 @@ violation, and every rule has a rejected fixture under
   provider and searched on the server; the browser never gets the whole
   list. Anything that reaches a provider goes through the `fetcher`
   compose option, so a test passes a fake and the suite never reaches a
-  network. A chat request goes out through the providers capability's
+  network. `compose.ts` wraps it once with `withUserAgent()` from
+  `lib/fetcher.ts`, so providers, MCP servers and skill hosts see
+  `1ctx/<version>`, never the runtime, and a caller's own header is kept.
+  A chat request goes out through the providers capability's
   `chat()`, over the row's wire (`providers/openai.ts`, the OpenRouter
   rules in `providers/openrouter.ts`, the Gemini rules in
   `providers/gemini.ts`: no unknown fields, thinking as

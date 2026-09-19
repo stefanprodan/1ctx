@@ -276,7 +276,10 @@ describe("GET /api/providers/:id/catalog", () => {
       expect(app.fetched).toEqual([
         {
           url: `${GEMINI_URL}/models?pageSize=1000`,
-          headers: { "x-goog-api-key": "gemini-test-key" },
+          headers: {
+            "user-agent": "1ctx/v0.0.0-test",
+            "x-goog-api-key": "gemini-test-key",
+          },
           body: null,
         },
       ]);
