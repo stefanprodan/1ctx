@@ -68,6 +68,16 @@
     overflow-wrap: anywhere;
   }
 
+  /* the files a message carried, under its words; the card keeps the
+     text's line breaks, the chips wrap on their own */
+  .transcript-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: var(--space-2);
+    white-space: normal;
+  }
+
   .transcript-body {
     display: flex;
     flex-direction: column;

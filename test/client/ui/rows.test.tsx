@@ -53,6 +53,23 @@ test("compact logs escape names and notes, and carry failures and expansion", ()
   );
 });
 
+test("a bare log with ends draws a remove button only on the lines that have one", () => {
+  const html = render(
+    <RowsLog bare ends>
+      <RowsLogLine name="notes.md" note="12 KB" onRemove={noop} />
+      <RowsLogLine name="shot.png" note="not text" />
+    </RowsLog>,
+  );
+  expect(html).toContain('class="rows-log rows-log-bare rows-log-ends"');
+  expect(html).toContain('class="rows-log-line rows-log-line-end"');
+  expect(html).toContain(
+    'class="btn-icon rows-log-drop" aria-label="Remove notes.md"',
+  );
+  expect(html.match(/rows-log-drop/g)).toHaveLength(1);
+  // the uploader's log keeps its frame and draws no button
+  expect(render(<RowsLog>x</RowsLog>)).toBe('<div class="rows-log">x</div>');
+});
+
 describe("RowsOpen", () => {
   test("a closed row draws the toggle as its line and no body", () => {
     const html = render(

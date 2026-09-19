@@ -45,13 +45,19 @@ export function Project({ params }: { params: Params }) {
         <>
           <Composer
             scope={{ projectId: shown.id }}
+            filesProjectId={shown.id}
             agents={projectAgents.value}
             agentId={null}
             placeholder={`Start a chat in ${shown.name}`}
             running={false}
             busy={sending.value}
-            onSend={async (message, agentId) => {
-              await createSession({ projectId: shown.id, agentId, message });
+            onSend={async (message, agentId, uploads) => {
+              await createSession({
+                projectId: shown.id,
+                agentId,
+                message,
+                ...(uploads.length === 0 ? {} : { uploads }),
+              });
             }}
             onStop={async () => {}}
           />

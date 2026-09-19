@@ -840,6 +840,9 @@ violation, and every rule has a rejected fixture under
   through `Rows.tsx`. Compact outcome logs use `RowsLog`,
   `RowsLogGroup`, `RowsLogLine` (name, note, failure and status tag)
   and `RowsLogMore`; names ellipsize and notes wrap only when needed.
+  `RowsLog` is `bare` inside a box that has its own frame, and `ends`
+  when a line carries `onRemove`, a small X kept on the line's first
+  row, so every line keeps room for one and the notes share an edge.
   Card head buttons never wrap; hints stay on one ellipsized line. A
   view never draws a row, a head, a list box, a switch, a box or filter
   chips of its own; its stylesheet holds only
@@ -911,6 +914,32 @@ violation, and every rule has a rejected fixture under
   failure's words come from `reason()` in `lib/format.ts`, raw for
   `fieldOf` to map; anywhere they are drawn they go through `says()` or
   `sentence()`, a capital and a full stop.
+- **The composer adds files through one panel.** `composer/Add.tsx` is
+  the plus at the start of the row; its `.menu` is placed as the agent
+  list is and holds Add files, off with "Agent cannot read files" under
+  it when the picked agent's model takes no tools. A drop on the card
+  and a paste of files add the same way. `composer/Attach.state.ts`
+  judges a pick through `lib/pick.ts` (the uploader's judging too) with
+  the limits `GET /api/projects/:id/uploads` answered, never a number
+  of its own, takes at most `perMessage` items, and stages one at a
+  time. An item ends staged or skipped; a skipped one (refused at pick
+  or by the server, a zero-file item, an id the list no longer holds,
+  an unanswered upload the list does not show) is a log line and blocks
+  nothing. Send waits only while something uploads or is checked.
+  `composer/Files.tsx` draws one framed line from `Attach.words.ts`
+  (a spinner, "Uploading 2 of 3" and the percent, or the clip, "45
+  files attached" and "7 skipped"), opened in place to two lists in a
+  bare `RowsLog`: Attached, each with its X, and Skipped, refused picks
+  first, then each archive's members under `StagedUpload.folder`. The
+  panel's X removes everything, the upload in flight included. An
+  upload let go before its answer is forgotten by its attempt in
+  `data/uploads.ts`, which deletes it when a list shows it; a write
+  supersedes a list load in flight. The draft (`composer/draft.ts`) is
+  keyed by user and holds `{text, uploads: {projectId, id, name}[]}`,
+  so Home's draft keeps each project's files apart; there is no reader
+  for another shape. A slash command carries no files and clears none.
+  A user message draws its `uploads` record as `ui/FileChip.tsx` chips
+  inside its card.
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
   ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
@@ -925,7 +954,10 @@ violation, and every rule has a rejected fixture under
   owns busy state; Stop alone stays enabled during a run. An item's
   refusal is its log line with a status tag, a folder refusal is the
   field's, and a run refusal such as a picked-file read failure is
-  the `Foot`'s. No other form shows a refusal elsewhere. A page whose
+  the `Foot`'s. The composer's files are the same exception: an item's
+  refusal is its Skipped line, a refusal of the whole pick is under the
+  box, and the panel's X stays enabled while it uploads. No other form
+  shows a refusal elsewhere. A page whose
   load failed is `Page`'s `error`: a card saying the page did not load,
   the words and Try again. A failure is words first: `api()` passes the server's own
   words and gives an answer without them the words of `statusWords()`,

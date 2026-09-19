@@ -7,24 +7,20 @@
 // each ending in exactly one outcome. The words are Upload.words.ts.
 
 import { signal } from "@preact/signals";
-import { sniffArchive } from "../../../shared/archive.ts";
-import type {
-  KnowledgeUploadReason,
-  KnowledgeUploadResult,
-} from "../../../shared/contracts/knowledge.ts";
+import type { KnowledgeUploadResult } from "../../../shared/contracts/knowledge.ts";
 import {
   isFolderRefusal,
   isLeftOut,
   knowledgeFolder,
   normalizeKnowledgePath,
-  textFromBytes,
 } from "../../../shared/knowledge.ts";
 import { failure } from "../../lib/format.ts";
+import { judgePick, type PickKind, type PickSkip } from "../../lib/pick.ts";
 import { type Problem, type Status, sentence } from "../../lib/save.ts";
 
 export const UPLOAD_BYTES = 32 * 1024 * 1024;
-type Kind = "zip" | "gzip" | "tar" | "text";
-export type Skip = KnowledgeUploadReason | "upload-size";
+type Kind = PickKind;
+export type Skip = PickSkip;
 type Outcome =
   | { type: "written" | "unchanged"; result: KnowledgeUploadResult }
   | { type: "skipped"; reason: Skip }
@@ -144,23 +140,10 @@ export class UploadState {
           )
         )
           continue;
-        let kind: Kind = "text";
-        let invalid: Skip | null = null;
-        if (file.size > UPLOAD_BYTES) invalid = "upload-size";
-        else {
-          kind =
-            sniffArchive(
-              new Uint8Array(await file.slice(0, 512).arrayBuffer()),
-            ) ?? "text";
-          if (kind === "text" && file.size <= this.ports.rules().fileBytes) {
-            const bytes = new Uint8Array(await file.arrayBuffer());
-            try {
-              textFromBytes(bytes);
-            } catch {
-              invalid = "not-text";
-            }
-          }
-        }
+        const { kind, invalid } = await judgePick(file, {
+          itemBytes: UPLOAD_BYTES,
+          fileBytes: this.ports.rules().fileBytes,
+        });
         if (!this.live || this.ports.currentUser() !== this.user) return;
         const item: UploadItem = {
           file,
