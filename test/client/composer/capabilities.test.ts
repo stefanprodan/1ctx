@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   accepted,
+  carry,
   changeOf,
   dropFlips,
   dropKind,
@@ -99,6 +100,47 @@ describe("pending capability flips", () => {
       expect(isOff("s1", [], WEB)).toBe(true);
     },
   );
+
+  // bug: off, sent, then on again before the answer: the flip back matched
+  // the set the chat still held, was forgotten, and the chat stayed off
+  test.serial(
+    "a flip reversed while its send is on its way is kept",
+    async () => {
+      flip("s1", [], WEB);
+      const sent = changeOf("s1");
+      let answer = () => {};
+      const request = carry(
+        "s1",
+        sent,
+        () => new Promise<void>((r) => (answer = r)),
+      );
+      flip("s1", [], WEB);
+      expect(isOff("s1", [], WEB)).toBe(false);
+      answer();
+      await request;
+      // the chat now holds it off, and the next send turns it on again
+      expect(isOff("s1", [WEB], WEB)).toBe(false);
+      expect(changeOf("s1")).toEqual({ capabilities: { enable: [WEB] } });
+      dropFlips("s1");
+    },
+  );
+
+  test.serial("a refused send keeps a flip made there and back", async () => {
+    flip("s1", [], WEB);
+    const sent = changeOf("s1");
+    let refuse = (_: Error) => {};
+    const request = carry(
+      "s1",
+      sent,
+      () => new Promise<void>((_, reject) => (refuse = reject)),
+    );
+    flip("s1", [], WEB);
+    flip("s1", [], WEB);
+    refuse(new Error("409"));
+    await expect(request).rejects.toThrow("409");
+    expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+    dropFlips("s1");
+  });
 
   test.serial("another agent's pick drops the server flips alone", () => {
     flip(null, [], WEB);

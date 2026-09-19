@@ -989,11 +989,12 @@ violation, and every rule has a rejected fixture under
   The editor's Access section (`AccessSection.tsx`) is the Web access
   switch, on for a new task and off with the composer's reasons when it
   cannot be switched, then a `RowsList` with a switch per MCP server of
-  the picked agent. The row's whole `disabledCapabilities` is saved:
-  `web` and the keys of the shown servers that are off, so a key for a
-  server the picked agent lacks is dropped. The automation page's Setup
-  aside (`AutomationAccess.tsx`) says Web access Off and names the
-  servers off, and nothing while all is on.
+  the picked agent and another per skill. The row's whole
+  `disabledCapabilities` is saved: `web` and the keys of the shown
+  servers and skills that are off, so a key for one the picked agent
+  lacks is dropped. The automation page's Setup aside
+  (`AutomationAccess.tsx`) says Web access Off and names the servers and
+  the skills off, and nothing while all is on.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -1040,17 +1041,22 @@ violation, and every rule has a rejected fixture under
   `disabledCapabilities`, so another member's envelope moves every key
   left alone. A create, a message and Regenerate carry them as a change
   and forget them once the server took the send; a refused send keeps
-  them, and so does a flip made while the send was on its way. Leaving
+  them, and so does a flip made while the send was on its way: `carry()`
+  holds what the request carries, so a flip back to the set the chat
+  still holds is kept. Leaving
   the chat and a reload forget them, a slash command carries none. Nothing
   outside the menu says web access is off.
   The third item, MCP servers, is there when the picked agent has an
   entry in `servers` of the same answer, held beside `switchable`. It
   says how many are off and swaps the menu's rows, inside the same
-  `.menu` box, for `composer/AddServers.tsx`: a back row, then a
-  `role="switch"` item per server with its tool count. Escape or Back
+  `.menu` box, for `composer/AddPane.tsx`: a back row, then a
+  `role="switch"` item per server with its tool count. The fourth item,
+  Skills, is the same pane over the agent's entry in `skills`, a switch
+  per skill with nothing to count. Escape or Back
   returns to the menu through `useMenu(back)`; a flip leaves the pane
-  open. There is no switch for all servers. Picking another agent in a
-  chat not made yet drops the pending `mcp:` flips through `dropKind()`;
+  open. There is no switch for all servers or all skills. Picking another
+  agent in a chat not made yet drops the pending `mcp:` and `skill:`
+  flips through `dropKind()`;
   the list going away for a moment is no pick (`agentMoved()`). A row
   that leaves the page on its own click stops the click, or the menu
   reads it as one outside; the pane takes the focus and gives it back.

@@ -32,7 +32,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { accepted, changeOf, servers, switchable } from "./capabilities.ts";
+import { answered, carry, changeOf } from "./capabilities.ts";
 import { me } from "./me.ts";
 import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
@@ -181,8 +181,7 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
     );
     if (!current()) return;
     projectAgents.value = body.agents;
-    switchable.value = body.capabilities;
-    servers.value = body.servers;
+    answered(body);
   } catch {
     if (current()) projectAgents.value = null;
   }
@@ -213,11 +212,9 @@ export async function createSession(
   try {
     // the flips made before the chat existed go with its first message
     const sent = changeOf(null);
-    const detail = await api<SessionResponse>("/api/sessions", "POST", {
-      ...body,
-      ...sent,
-    });
-    accepted(null, sent);
+    const detail = await carry(null, sent, () =>
+      api<SessionResponse>("/api/sessions", "POST", { ...body, ...sent }),
+    );
     navigate(`/chat/${detail.session.id}`);
     return detail;
   } finally {
@@ -231,8 +228,9 @@ async function post(id: string, path: string, body?: object): Promise<void> {
   sending.value = true;
   try {
     const at = `/api/sessions/${encodeURIComponent(id)}/${path}`;
-    take(await api<SessionResponse>(at, "POST", body));
-    if (body !== undefined) accepted(id, body);
+    take(
+      await carry(id, body ?? {}, () => api<SessionResponse>(at, "POST", body)),
+    );
   } finally {
     sending.value = false;
   }

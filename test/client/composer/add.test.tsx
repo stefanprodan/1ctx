@@ -5,10 +5,12 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   agentMoved,
+  panelessOf,
   serversItem,
+  skillsItem,
   webItem,
 } from "../../../src/client/composer/Add.model.ts";
-import { AddServers } from "../../../src/client/composer/AddServers.tsx";
+import { AddPane } from "../../../src/client/composer/AddPane.tsx";
 import { WEB } from "../../../src/shared/capabilities.ts";
 
 describe("the Web access item", () => {
@@ -79,8 +81,8 @@ describe("the MCP servers item", () => {
       reason: null,
       off: 1,
       rows: [
-        { id: "a1", name: "flux", tools: 18, key: "mcp:a1", on: false },
-        { id: "b2", name: "github", tools: 42, key: "mcp:b2", on: true },
+        { key: "mcp:a1", name: "flux", note: "18 tools", on: false },
+        { key: "mcp:b2", name: "github", note: "42 tools", on: true },
       ],
     });
   });
@@ -98,10 +100,12 @@ describe("the MCP servers item", () => {
 describe("the MCP servers pane", () => {
   test("is a back row, then a switch per server with its tools", () => {
     const html = render(
-      <AddServers
+      <AddPane
+        title="MCP servers"
+        icon="mcp"
         rows={[
-          { id: "a1", name: "<flux>", tools: 18, key: "mcp:a1", on: false },
-          { id: "b2", name: "github", tools: 42, key: "mcp:b2", on: true },
+          { key: "mcp:a1", name: "<flux>", note: "18 tools", on: false },
+          { key: "mcp:b2", name: "github", note: "42 tools", on: true },
         ]}
         onBack={() => {}}
         onFlip={() => {}}
@@ -114,6 +118,60 @@ describe("the MCP servers pane", () => {
     expect(html).toContain('role="switch" aria-checked="true"');
     expect(html).toContain("18 tools");
     expect(html.match(/switch-on/g)?.length).toBe(1);
+  });
+});
+
+describe("the Skills item", () => {
+  const skills = [
+    { id: "s1", name: "gitops" },
+    { id: "s2", name: "visualize" },
+  ];
+
+  test("is absent for an agent without skills", () => {
+    expect(
+      skillsItem({ tools: true, skills: [], isOff: () => false }),
+    ).toBeNull();
+  });
+
+  test("lists a switch per skill, with nothing to count, and the ones off", () => {
+    expect(
+      skillsItem({ tools: true, skills, isOff: (key) => key === "skill:s2" }),
+    ).toEqual({
+      live: true,
+      reason: null,
+      off: 1,
+      rows: [
+        { key: "skill:s1", name: "gitops", note: "", on: true },
+        { key: "skill:s2", name: "visualize", note: "", on: false },
+      ],
+    });
+  });
+
+  test("an agent without tools shows it off and says why", () => {
+    expect(skillsItem({ tools: false, skills, isOff: () => false })).toEqual({
+      live: false,
+      reason: "Agent cannot use tools",
+      off: 0,
+      rows: [],
+    });
+  });
+});
+
+// bug: back at the menu counted as a pane gone, so the reset queued there
+// undid a pane picked before it ran
+describe("the plus falling back to its menu", () => {
+  const live = { live: true, reason: null, off: 0, rows: [] };
+
+  test("never from the menu itself while open", () => {
+    expect(panelessOf(true, "menu", null)).toBe(false);
+  });
+
+  test("when closed, or when what the pane lists is gone or off", () => {
+    expect(panelessOf(false, "menu", null)).toBe(true);
+    expect(panelessOf(false, "skills", live)).toBe(true);
+    expect(panelessOf(true, "skills", live)).toBe(false);
+    expect(panelessOf(true, "skills", null)).toBe(true);
+    expect(panelessOf(true, "servers", { ...live, live: false })).toBe(true);
   });
 });
 

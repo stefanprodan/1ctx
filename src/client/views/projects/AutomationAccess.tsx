@@ -5,11 +5,15 @@
 // while everything is on.
 
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import { servers } from "../../data/capabilities.ts";
+import { servers, skills } from "../../data/capabilities.ts";
 import { accessOf } from "./Automations.model.ts";
 
 export function AccessLines({ row }: { row: AutomationSummary }) {
-  const access = accessOf(row, servers.value[row.agentId] ?? []);
+  const access = accessOf(
+    row,
+    servers.value[row.agentId] ?? [],
+    skills.value[row.agentId] ?? [],
+  );
   return (
     <>
       {!access.web && (
@@ -22,6 +26,12 @@ export function AccessLines({ row }: { row: AutomationSummary }) {
         <div class="split-line">
           MCP off
           <span class="split-strong">{access.mcpOff.join(", ")}</span>
+        </div>
+      )}
+      {access.skillsOff.length > 0 && (
+        <div class="split-line">
+          Skills off
+          <span class="split-strong">{access.skillsOff.join(", ")}</span>
         </div>
       )}
     </>

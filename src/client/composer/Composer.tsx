@@ -12,7 +12,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import { MCP, WEB } from "../../shared/capabilities.ts";
+import { MCP, SKILL, WEB } from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
@@ -22,6 +22,7 @@ import {
   flip,
   isOff,
   servers,
+  skills,
   switchable,
 } from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
@@ -37,7 +38,7 @@ import {
   takeStamp,
 } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
-import { agentMoved, serversItem, webItem } from "./Add.model.ts";
+import { agentMoved, serversItem, skillsItem, webItem } from "./Add.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
 import { AttachState } from "./Attach.state.ts";
@@ -194,15 +195,24 @@ export function Composer({
     switchable: switchable.value,
     off: isOff(chat, off, WEB),
   });
-  // another agent's servers are other keys, so its flips go with it
+  // another agent's servers and skills are other keys, so its flips go
+  // with it
   const lastAgent = useRef<string | null>(null);
   useEffect(() => {
-    if (agentMoved(lastAgent.current, agent)) dropKind(chat, MCP);
+    if (agentMoved(lastAgent.current, agent)) {
+      dropKind(chat, MCP);
+      dropKind(chat, SKILL);
+    }
     if (agent !== null) lastAgent.current = agent;
   }, [chat, agent]);
   const mcp = serversItem({
     tools: readable,
     servers: (agent === null ? undefined : servers.value[agent]) ?? [],
+    isOff: (key) => isOff(chat, off, key),
+  });
+  const skill = skillsItem({
+    tools: readable,
+    skills: (agent === null ? undefined : skills.value[agent]) ?? [],
     isOff: (key) => isOff(chat, off, key),
   });
   const attach = (picked: File[]) => {
@@ -375,7 +385,8 @@ export function Composer({
           web={web}
           onWeb={() => flip(chat, off, WEB)}
           servers={mcp}
-          onServer={(key) => flip(chat, off, key)}
+          skills={skill}
+          onFlip={(key) => flip(chat, off, key)}
         />
         {project && (
           <ProjectPicker
