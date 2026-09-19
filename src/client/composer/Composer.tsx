@@ -1,19 +1,36 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The card the user writes in: the text that grows with it, the
-// project chip on Home, the agent chip, the context readout, and Send, which is Stop while the reply
-// runs. Enter sends, Shift+Enter breaks a line. Two modes: a chat, where the message goes
-// into it, and a project, where it starts one. The draft survives a
+// The card the user writes in: the text that grows with it, the files
+// added to it, the plus, the project chip on Home, the agent chip, the
+// context readout, and Send, which is Stop while the reply runs. Enter
+// sends, Shift+Enter breaks a line. Two modes: a chat, where the message
+// goes into it, and a project, where it starts one. Files come from the
+// plus, a drop on the card or a paste, are staged as they are picked,
+// and go with the send. The draft, text and staged files, survives a
 // navigation; a refusal shows under the box until the next keystroke.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
+import { me } from "../data/me.ts";
+import {
+  askedOf,
+  claimed,
+  deleteUpload,
+  forgetUpload,
+  loadUploads,
+  staged,
+  stagedOf,
+  stageUpload,
+  takeStamp,
+} from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
+import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
+import { AttachState } from "./Attach.state.ts";
 import { Commands } from "./Commands.tsx";
 import {
   type Command,
@@ -25,7 +42,14 @@ import {
   runCommand,
 } from "./commands.ts";
 import { readout } from "./context.ts";
-import { draftKey, readDraft, writeDraft } from "./draft.ts";
+import {
+  draftKey,
+  dropDraftUploads,
+  readDraft,
+  writeDraftText,
+  writeDraftUploads,
+} from "./draft.ts";
+import { Files } from "./Files.tsx";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import "./composer.css";
 import { says } from "../lib/format.ts";
@@ -36,6 +60,7 @@ export type Scope = { sessionId: string } | { projectId: string };
 
 export function Composer({
   scope,
+  filesProjectId,
   agents,
   agentId,
   running,
@@ -50,6 +75,9 @@ export function Composer({
   placeholder: idle = "Send a message",
 }: {
   scope: Scope;
+  // the project a file is staged in: the chat's, or the one a new chat
+  // would start in
+  filesProjectId: string;
   agents: AgentSummary[] | null;
   // the session's agent; null for a chat not started yet
   agentId: string | null;
@@ -60,7 +88,8 @@ export function Composer({
   // the session's last counted round, for the context readout; none
   // for a chat not started yet
   usage?: RoundUsage | null;
-  onSend: (text: string, agentId: string) => Promise<void>;
+  // uploads are the staged ids the send claims
+  onSend: (text: string, agentId: string, uploads: string[]) => Promise<void>;
   onStop: () => Promise<void>;
   // /compact runs a summary round on the chat; a chat not started yet
   // has nothing to fold, so the command is refused without a call
@@ -79,8 +108,37 @@ export function Composer({
   // the box at rest, with an agent to send to
   placeholder?: string;
 }) {
-  const key = draftKey(scope);
-  const text = useSignal(readDraft(key));
+  const key = draftKey(me.value?.id ?? "", scope);
+  const text = useSignal(readDraft(key).text);
+  // files held over the card, by how deep the pointer is in its children
+  const over = useSignal(0);
+  const files = useMemo(
+    () =>
+      new AttachState(
+        {
+          stage: stageUpload,
+          remove: deleteUpload,
+          forget: (_projectId, attempt) => forgetUpload(attempt),
+          reload: loadUploads,
+          list: stagedOf,
+          stamp: takeStamp,
+          asked: askedOf,
+          wait: (ms) => new Promise((done) => setTimeout(done, ms)),
+          currentUser: () => me.value?.id ?? null,
+          mint: () => crypto.randomUUID(),
+          save: (uploads) => writeDraftUploads(key, uploads),
+        },
+        readDraft(key).uploads,
+      ),
+    [key],
+  );
+  useEffect(() => () => files.dispose(), [files]);
+  // before the paint, so Send is never drawn on for a draft whose files
+  // are not yet known to the state
+  useLayoutEffect(() => files.show(filesProjectId), [files, filesProjectId]);
+  const placed = files.projectId.value === filesProjectId;
+  const held = staged.value.get(filesProjectId) ?? null;
+  useEffect(() => files.reconcile(held), [files, held]);
   const picked = useSignal<string | null>(null);
   const failure = useSignal<string | null>(null);
   // the menu's highlight, and whether Escape shut it for this draft
@@ -105,13 +163,18 @@ export function Composer({
   };
   // the scope changed: the draft of the new one, and the cursor in the box
   useEffect(() => {
-    text.value = readDraft(key);
+    text.value = readDraft(key).text;
     failure.value = null;
     input.current?.focus();
   }, [key, text, failure]);
   useEffect(grow, [text.value]);
 
   const ready = agent !== null && !busy && !running;
+  const readable = list.find((a) => a.id === agent)?.model.tools ?? false;
+  const attach = (picked: File[]) => {
+    failure.value = null;
+    void files.add(picked, readable);
+  };
   const started =
     onCompact !== undefined && onRename !== undefined && onFork !== undefined;
   const block = (command: Command) =>
@@ -123,9 +186,11 @@ export function Composer({
     const content = text.value.trim();
     if (content === "" || agent === null || busy) return;
     const named = commandOf(content);
-    if (named === null && !ready) return;
+    if (named === null && (!ready || !placed || files.busy)) return;
     failure.value = null;
     const sent = text.value;
+    // a slash command carries no files and clears none
+    const uploads = named === null ? files.ids : [];
     try {
       if (named !== null) {
         await runCommand(named, block(named.command), {
@@ -133,14 +198,23 @@ export function Composer({
           onRename,
           onFork,
         });
-      } else await onSend(content, agent);
-      // what was typed while the send was on its way stays
-      if (text.value === sent) {
-        text.value = "";
-        writeDraft(key, "");
+      } else await onSend(content, agent, uploads);
+      // the send claimed them; the log of what was skipped goes too
+      // this composer may be gone by now (a new chat navigates away), so
+      // the stored draft is what loses them
+      if (named === null) {
+        files.sent(uploads);
+        dropDraftUploads(key, uploads);
+        claimed(filesProjectId, uploads);
       }
+      // what was typed while the send was on its way stays, here and in
+      // the stored draft, which another composer may have written since
+      if (text.value === sent) text.value = "";
+      if (readDraft(key).text === sent) writeDraftText(key, "");
     } catch (err) {
       failure.value = says(err);
+      // a file the send found gone moves to the log with the next list
+      if (uploads.length > 0) void loadUploads(filesProjectId);
     }
   };
   const context = readout(usage);
@@ -153,8 +227,30 @@ export function Composer({
       : running
         ? "Replying"
         : idle;
+  const refusal = failure.value ?? files.refusal.value;
   return (
-    <div class={`composer${tall ? " composer-tall" : ""} card`}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: a drop target has no role, and the plus does the same by keyboard
+    <div
+      class={`composer${tall ? " composer-tall" : ""}${over.value > 0 ? " composer-drop" : ""} card`}
+      onDragEnter={(ev) => {
+        if (!ev.dataTransfer?.types.includes("Files")) return;
+        ev.preventDefault();
+        over.value += 1;
+      }}
+      onDragOver={(ev) => {
+        if (ev.dataTransfer?.types.includes("Files")) ev.preventDefault();
+      }}
+      onDragLeave={() => {
+        over.value = Math.max(0, over.value - 1);
+      }}
+      onDrop={(ev) => {
+        const dropped = [...(ev.dataTransfer?.files ?? [])];
+        if (dropped.length === 0) return;
+        ev.preventDefault();
+        over.value = 0;
+        attach(dropped);
+      }}
+    >
       <textarea
         ref={input}
         class="composer-text"
@@ -169,7 +265,15 @@ export function Composer({
           failure.value = null;
           shut.value = false;
           highlight.value = 0;
-          writeDraft(key, ev.currentTarget.value);
+          files.refusal.value = null;
+          writeDraftText(key, ev.currentTarget.value);
+        }}
+        onPaste={(ev) => {
+          // pasted files are added, pasted text stays text
+          const pasted = [...(ev.clipboardData?.files ?? [])];
+          if (pasted.length === 0) return;
+          ev.preventDefault();
+          attach(pasted);
         }}
         onKeyDown={(ev) => {
           if (ev.isComposing) return;
@@ -193,7 +297,7 @@ export function Composer({
             ) {
               ev.preventDefault();
               text.value = fill;
-              writeDraft(key, fill);
+              writeDraftText(key, fill);
               return;
             }
           }
@@ -210,7 +314,7 @@ export function Composer({
           block={block}
           onPick={(command) => {
             text.value = commandFill(command);
-            writeDraft(key, text.value);
+            writeDraftText(key, text.value);
             input.current?.focus();
           }}
           onHover={(index) => {
@@ -218,8 +322,20 @@ export function Composer({
           }}
         />
       )}
-      {failure.value && <p class="composer-failure error">{failure.value}</p>}
+      <Files
+        items={files.shown}
+        onRemove={(item) => files.remove(item)}
+        onClear={() => files.clear()}
+      />
+      {refusal && <p class="composer-failure error">{refusal}</p>}
+      {over.value > 0 && (
+        <div class="composer-drop-words">
+          <Icon name="clip" size={16} class="composer-drop-icon" />
+          <span>Drop files to add them</span>
+        </div>
+      )}
       <div class="composer-row">
+        <Add readable={readable} onFiles={attach} />
         {project && (
           <ProjectPicker
             projects={project.projects}
@@ -253,7 +369,11 @@ export function Composer({
           type="button"
           class={`composer-send${running ? " composer-stop" : ""}`}
           aria-label={running ? "Stop" : "Send"}
-          disabled={running ? false : !ready || text.value.trim() === ""}
+          disabled={
+            running
+              ? false
+              : !ready || !placed || files.busy || text.value.trim() === ""
+          }
           onClick={() => {
             if (running) {
               onStop().catch((err) => {

@@ -15,6 +15,8 @@ export const MAX_ARCHIVE_UPLOAD = MAX_REQUEST_BYTES;
 export const MAX_ARCHIVE_EXPANDED = LIMIT_DEFINITIONS.knowledgeProjectBytes.max;
 export const MAX_ARCHIVE_MEMBERS = 2_000;
 export const ARCHIVE_DEADLINE_MS = 60_000;
+export const UPLOAD_LEASE_MS = 24 * 60 * 60 * 1_000;
+export const MAX_STAGED_ITEMS = 20;
 
 export const KNOWLEDGE_COMMANDS = [
   "ls",

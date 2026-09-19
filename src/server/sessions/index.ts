@@ -14,7 +14,13 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { MemorySnapshot } from "./memory.ts";
-import { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
+import {
+  type AccessPort,
+  detail,
+  type LivePort,
+  routes,
+  type UploadsPort,
+} from "./routes.ts";
 import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 
@@ -60,6 +66,7 @@ export type SessionsDeps = {
   agents: { byId(id: string): AgentRow | null };
   live: LivePort;
   usage: UsagePort;
+  uploads: UploadsPort;
   isWrite: (name: string) => boolean;
 };
 
@@ -155,6 +162,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       access: deps.access,
       live: deps.live,
       usage: deps.usage,
+      uploads: deps.uploads,
       visible,
     }),
   };

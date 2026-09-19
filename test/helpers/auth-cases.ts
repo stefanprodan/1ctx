@@ -20,6 +20,21 @@ export type AuthCase = {
 export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
+    path: "/api/projects/:id/uploads",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/uploads",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/uploads/:uploadId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
     path: "/api/login",
     body: { username: "nobody", password: "wrong" },
     // public: everyone reaches the handler; the wrong password is a 401

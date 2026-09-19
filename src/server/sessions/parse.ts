@@ -12,6 +12,7 @@ import type {
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
 import { MAX_LAST_LINE } from "../../shared/contracts/session.ts";
+import { MAX_UPLOADS_PER_MESSAGE } from "../../shared/uploads.ts";
 import {
   hasLineBreak,
   MAX_MESSAGE_BYTES,
@@ -75,17 +76,34 @@ export function parseVisualParams(value: unknown): {
 }
 
 export function parseCreateSession(body: unknown): CreateSessionRequest {
-  const b = fields(body, ["projectId", "agentId", "message"]);
+  const b = fields(body, ["projectId", "agentId", "message", "uploads"]);
   return {
     projectId: id(b.projectId, "projectId"),
     agentId: id(b.agentId, "agentId"),
     message: parseMessage(b.message),
+    ...parseUploads(b),
   };
 }
 
 export function parseSendMessage(body: unknown): SendMessageRequest {
-  const b = fields(body, ["message"]);
-  return { message: parseMessage(b.message) };
+  const b = fields(body, ["message", "uploads"]);
+  return { message: parseMessage(b.message), ...parseUploads(b) };
+}
+
+function parseUploads(body: Record<string, unknown>): { uploads?: string[] } {
+  if (!Object.hasOwn(body, "uploads")) return {};
+  const value = body.uploads;
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_UPLOADS_PER_MESSAGE ||
+    value.some((id) => typeof id !== "string" || id.trim() === "") ||
+    new Set(value).size !== value.length
+  ) {
+    throw new BadRequest(
+      `uploads must be at most ${MAX_UPLOADS_PER_MESSAGE} distinct non-empty ids`,
+    );
+  }
+  return { uploads: value };
 }
 
 export function parseForkSession(body: unknown): ForkSessionRequest {

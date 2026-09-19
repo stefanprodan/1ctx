@@ -10,6 +10,10 @@
 // the lock is let go after both the provider iteration and the round's
 // tools have settled.
 
+import type {
+  CreateSessionRequest,
+  SendMessageRequest,
+} from "../../shared/api/sessions.ts";
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause, Wire } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
@@ -26,10 +30,10 @@ import type { ProjectRow } from "../projects/index.ts";
 import {
   type SessionRow,
   type SessionStore,
-  sessionDetail,
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
@@ -38,7 +42,7 @@ import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
-import { type ActiveSend, claim, live, newSend } from "./send.ts";
+import { type ActiveSend, claim, live } from "./send.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { Writer, type WriterDeps } from "./writer.ts";
 
@@ -74,6 +78,13 @@ export type RunnerDeps = {
   tools: ToolsPort;
   memory: Pick<MemoryCapability, "read" | "commit">;
   knowledge: Pick<KnowledgeCapability, "snapshot">;
+  uploads: WriterDeps["uploads"] & {
+    checkUploads(
+      userId: string,
+      projectId: string,
+      ids: readonly string[],
+    ): void;
+  };
   markers: {
     mark(
       automationId: string,
@@ -89,11 +100,12 @@ export type RunnerDeps = {
 
 export type Runner = {
   registry: Registry;
-  start(
+  start(principal: Principal, fields: CreateSessionRequest): SessionDetail;
+  send(
     principal: Principal,
-    fields: { projectId: string; agentId: string; message: string },
+    sessionId: string,
+    fields: SendMessageRequest,
   ): SessionDetail;
-  send(principal: Principal, sessionId: string, message: string): SessionDetail;
   regenerate(principal: Principal, sessionId: string): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
   startRun(event: Event): PreparedRun;
@@ -111,6 +123,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     db: deps.db,
     clock: deps.clock,
     sessions: deps.sessions,
+    uploads: deps.uploads,
     usage: deps.usage,
     commitMemory: (send, cause) =>
       commitMemory({ memory: deps.memory, markers: deps.markers }, send, cause),
@@ -260,6 +273,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     title: string,
     event: Event | null = null,
     existingUser: Message | null = null,
+    uploads?: readonly string[],
   ): PreparedRun =>
     prepareSend({
       registry,
@@ -276,6 +290,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
       origin: event === null ? "chat" : "automation",
       automationId: event?.automation.id ?? null,
       existingUser,
+      uploads,
+      checkUploads: deps.uploads.checkUploads,
       now: deps.clock(),
     });
 
@@ -288,6 +304,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     text: string,
     title: string,
     existingUser: Message | null = null,
+    uploads?: readonly string[],
   ): SessionDetail => {
     const prepared = prepare(
       sessionId,
@@ -299,6 +316,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       title,
       null,
       existingUser,
+      uploads,
     );
     prepared.launch();
     return prepared.detail;
@@ -323,9 +341,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
         agent,
         fields.message,
         titleFrom(fields.message),
+        null,
+        fields.uploads,
       );
     },
-    send(principal, sessionId, message) {
+    send(principal, sessionId, fields) {
       const session = deps.visible(principal, sessionId);
       if (session.origin === "automation") {
         throw new Conflict("a run cannot continue");
@@ -339,8 +359,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
         project,
         user,
         agent,
-        message,
+        fields.message,
         session.title,
+        null,
+        fields.uploads,
       );
     },
     regenerate(principal, sessionId) {
@@ -391,67 +413,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }
-      const messages = deps.sessions.messages(session.id);
-      let lastSummarySeq = 0;
-      let lastUser: Message | null = null;
-      let hasAnswer = false;
-      for (const message of messages) {
-        if (message.kind === "summary" && message.status === "done") {
-          lastSummarySeq = message.seq;
-          hasAnswer = false;
-        } else if (
-          message.kind === "reply" &&
-          message.status === "done" &&
-          message.slot === "answer" &&
-          message.seq > lastSummarySeq
-        ) {
-          hasAnswer = true;
-        }
-        if (message.kind === "user") lastUser = message;
-      }
-      if (!hasAnswer || lastUser === null) {
-        throw new BadRequest("nothing to compact");
-      }
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
       const policy = policyFor(project, user, agent, null, false);
-      registry.admit(session.id, user.id);
-      const sendId = newId();
-      const summaryId = newId();
-      const send = newSend({
-        id: sendId,
-        sessionId: session.id,
-        projectId: project.id,
-        kind: "compact",
-        summarizing: true,
-        // the last counted round is the size the history has now
-        used:
-          session.usage === null
-            ? null
-            : session.usage.promptTokens + session.usage.completionTokens,
-        policy,
-        firstMessageId: lastUser.id,
-        replyId: summaryId,
-        now: deps.clock(),
-      });
-      registry.set(send);
-      let started: ReturnType<Writer["startCompact"]>;
-      try {
-        started = writer.startCompact({
-          sendId,
-          summaryId,
-          firstMessageId: lastUser.id,
-          session,
-          policy,
-        });
-      } catch (err) {
-        registry.free(send);
-        throw err;
-      }
-      deps.log(`chat ${session.id} compacted on ${policy.model}`);
-      void run(send);
-      return sessionDetail(deps.sessions, started.session, live(send));
+      return compactSend({ ...deps, registry, writer, run }, session, policy);
     },
     startRun(event) {
       return prepare(
@@ -487,7 +453,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),
-    send: (principal, id, message) => runner.send(principal, id, message),
+    send: (principal, id, fields) => runner.send(principal, id, fields),
     regenerate: (principal, id) => runner.regenerate(principal, id),
     compact: (principal, id) => runner.compact(principal, id),
     stop: (principal, id) => runner.stop(principal, id),

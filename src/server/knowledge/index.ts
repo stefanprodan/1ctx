@@ -11,6 +11,10 @@ import type {
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
+import {
+  MAX_UPLOADS_PER_MESSAGE,
+  type MessageUpload,
+} from "../../shared/uploads.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -19,12 +23,19 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
+import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
 import { heldSessions } from "./queue.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { ScratchStore } from "./scratch.ts";
+import { stage } from "./stage.ts";
 import { KnowledgeStore, summary } from "./store.ts";
+import {
+  type RestageUploads,
+  UploadStore,
+  type UploadTree,
+} from "./uploads.ts";
 
 export type LimitsPort = { current(): KnowledgeCaps };
 export type KnowledgeDeps = {
@@ -34,6 +45,21 @@ export type KnowledgeDeps = {
   access: AccessPort;
 };
 export type KnowledgeCapability = KnowledgePort & {
+  checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
+  claimUploads(
+    userId: string,
+    projectId: string,
+    sessionId: string,
+    messageId: string,
+    ids: readonly string[],
+  ): MessageUpload[];
+  copyUploads(
+    sourceSessionId: string,
+    targetSessionId: string,
+    restage?: RestageUploads,
+    messageIds?: ReadonlyMap<string, string>,
+  ): string[];
+  uploadsOf(sessionId: string): UploadTree;
   snapshot(projectId: string): { files: number; recent: RecentFile[] };
   counts(projectId: string): KnowledgeCounts;
   run(
@@ -49,12 +75,14 @@ export type KnowledgeCapability = KnowledgePort & {
 export type KnowledgeArea = KnowledgeCapability & {
   store: KnowledgeStore;
   scratch: ScratchStore;
+  uploads: UploadStore;
   routes: RouteDescriptor[];
 };
 
 export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
   const scratch = new ScratchStore(deps.db);
+  const uploads = new UploadStore(deps.db);
   const required = (projectId: string, fileId: string) => {
     const row = store.byId(projectId, fileId);
     if (row === null) throw new NotFound();
@@ -75,6 +103,59 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       return { result: file, events: [event] };
     });
   const capability: KnowledgeCapability = {
+    checkUploads: (userId, projectId, ids) =>
+      uploads.check(userId, projectId, ids, deps.clock()),
+    claimUploads: (userId, projectId, sessionId, messageId, ids) =>
+      uploads.claim(
+        userId,
+        projectId,
+        sessionId,
+        messageId,
+        ids,
+        deps.limits.current(),
+        deps.clock(),
+      ),
+    copyUploads: (sourceSessionId, targetSessionId, restage, messageIds) =>
+      uploads.copy(
+        sourceSessionId,
+        targetSessionId,
+        deps.limits.current(),
+        deps.clock(),
+        restage,
+        messageIds,
+      ),
+    uploadsOf: (sessionId) => uploads.read(sessionId),
+    stageUpload: (projectId, userId, req) =>
+      stage(
+        {
+          db: deps.db,
+          uploads,
+          clock: deps.clock,
+          current: () => deps.limits.current(),
+        },
+        projectId,
+        userId,
+        req,
+      ),
+    listUploads(projectId, userId) {
+      const caps = deps.limits.current();
+      return {
+        items: uploads.list(userId, projectId, deps.clock()),
+        limits: {
+          itemBytes: MAX_ARCHIVE_UPLOAD,
+          fileBytes: caps.knowledgeFileBytes,
+          uploadBytes: caps.uploadBytes,
+          uploadFiles: caps.uploadFiles,
+          perMessage: MAX_UPLOADS_PER_MESSAGE,
+          stagedItems: MAX_STAGED_ITEMS,
+        },
+      };
+    },
+    removeUpload(projectId, userId, uploadId) {
+      transact(deps.db, () => ({
+        result: uploads.remove(userId, projectId, uploadId, deps.clock()),
+      }));
+    },
     upload: (projectId, author, req) =>
       upload(
         {
@@ -93,6 +174,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
           db: deps.db,
           store,
           scratch,
+          uploads,
           clock: deps.clock,
           current: () => deps.limits.current(),
         },
@@ -203,13 +285,15 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       const caps = deps.limits.current();
       return (
         store.sweep(now, caps.knowledgeHistoryDays) +
-        scratch.sweep(now, caps.scratchIdleDays, heldSessions())
+        scratch.sweep(now, caps.scratchIdleDays, heldSessions()) +
+        uploads.sweep(now)
       );
     },
   };
   return {
     store,
     scratch,
+    uploads,
     ...capability,
     routes: routes({ access: deps.access, knowledge: capability }),
   };
@@ -222,3 +306,9 @@ export {
   ScratchStore,
 } from "./scratch.ts";
 export { type KnowledgeRow, KnowledgeStore } from "./store.ts";
+export {
+  type RestageUploads,
+  type UploadFile,
+  UploadStore,
+  type UploadTree,
+} from "./uploads.ts";

@@ -1,0 +1,27 @@
+/* A file as a chip: base.css's .tag with an icon, the name and a faint
+   note in a row. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .filechip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
+    height: 26px;
+    padding: 0 8px 0 7px;
+  }
+  .filechip-icon {
+    flex-shrink: 0;
+  }
+  .filechip-name {
+    max-width: 200px;
+    color: var(--fg);
+  }
+  .filechip-note {
+    flex-shrink: 0;
+  }
+}

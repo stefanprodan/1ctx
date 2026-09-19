@@ -343,6 +343,39 @@
     align-self: flex-start;
     margin: 4px var(--space-3) 0;
   }
+  .rows-log-bare {
+    padding: 4px 0 6px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
+  /* the button sits in room every line keeps, so a note that wraps
+     never pushes it onto a line of its own */
+  .rows-log-ends .rows-log-line {
+    position: relative;
+    padding-right: 38px;
+  }
+  .rows-log-drop {
+    position: absolute;
+    top: 0;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+  }
+  @media (max-width: 719px) {
+    .rows-log-ends .rows-log-line {
+      padding-right: 44px;
+    }
+    .rows-log-line-end {
+      min-height: 28px;
+      align-items: center;
+    }
+    .rows-log-drop {
+      width: 28px;
+      height: 28px;
+    }
+  }
   .rows-list-hint {
     font-family: var(--mono);
     font-size: var(--text-label);

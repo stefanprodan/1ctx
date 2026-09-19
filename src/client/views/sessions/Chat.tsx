@@ -191,12 +191,15 @@ export function Chat({ params }: { params: Params }) {
               ) : (
                 <Composer
                   scope={{ sessionId: shown.session.id }}
+                  filesProjectId={shown.session.projectId}
                   agents={projectAgents.value}
                   agentId={shown.session.agentId}
                   running={shown.session.status === "running"}
                   busy={sending.value}
                   usage={shown.session.usage}
-                  onSend={(text) => sendMessage(shown.session.id, text)}
+                  onSend={(text, _agentId, uploads) =>
+                    sendMessage(shown.session.id, text, uploads)
+                  }
                   onStop={() => stopSession(shown.session.id)}
                   onCompact={() => compactSession(shown.session.id)}
                   onRename={(title) => renameSession(shown.session.id, title)}

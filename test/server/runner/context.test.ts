@@ -89,6 +89,7 @@ const row = (
   fields: Partial<Message> & Pick<Message, "id" | "kind">,
 ): Message => ({
   sessionId: "s",
+  uploads: null,
   seq: 1,
   sendId: "snd1",
   round: 1,

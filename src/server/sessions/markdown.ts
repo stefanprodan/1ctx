@@ -9,6 +9,7 @@
 // context for the model, not conversation, so they stay out.
 
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { attachedLine, type MessageUpload } from "../../shared/uploads.ts";
 import type { MessageKind, MessageStatus } from "../../shared/words.ts";
 
 export type ExportRow = {
@@ -23,6 +24,7 @@ export type ExportRow = {
   // the username for a user row, the agent's name for an agent row
   author: string | null;
   content: string;
+  uploads: MessageUpload[] | null;
   toolCalls: ToolCall[] | null;
   toolCallId: string | null;
   toolName: string | null;
@@ -44,6 +46,9 @@ export function chatMarkdown(
     if (user !== undefined) {
       parts.push(heading(user.author ?? "someone", user.createdAt, stamp));
       parts.push(body(user.content));
+      if (user.uploads?.length) {
+        parts.push(escapeInline(attachedLine(user.uploads)));
+      }
     }
     const agent = agentTurn(turn, isWrite);
     if (agent === null) continue;

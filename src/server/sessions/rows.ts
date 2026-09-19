@@ -11,6 +11,7 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
   EventSource,
   MessageKind,
@@ -102,6 +103,7 @@ export type RawMessage = {
   user_id: string | null;
   agent_id: string | null;
   content: string;
+  uploads: string | null;
   reasoning: string;
   html: string;
   status: MessageStatus;
@@ -120,7 +122,8 @@ export type RawMessage = {
 
 export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, messages.kind,
    messages.send_id, messages.round, messages.slot, messages.user_id,
-   messages.agent_id, messages.content, messages.reasoning, messages.html,
+   messages.agent_id, messages.content, messages.uploads,
+   messages.reasoning, messages.html,
    messages.status, messages.error, messages.finish_reason,
    messages.tool_calls, messages.tool_call_id, messages.tool_name,
    messages.model, messages.ttft_ms, messages.thinking_ms,
@@ -139,6 +142,12 @@ const toolCalls = (raw: string | null): ToolCall[] | null => {
   }
 };
 
+export function messageUploads(raw: string | null): MessageUpload[] | null {
+  if (!raw) return null;
+  const record: MessageUpload[] = JSON.parse(raw);
+  return record.length > 0 ? record : null;
+}
+
 export const message = (raw: RawMessage): Message => ({
   id: raw.id,
   sessionId: raw.session_id,
@@ -151,6 +160,7 @@ export const message = (raw: RawMessage): Message => ({
   agentId: raw.agent_id,
   content: raw.content,
   resultBytes: null,
+  uploads: raw.kind === "user" ? messageUploads(raw.uploads) : null,
   promptTokens:
     raw.kind === "summary" && raw.status === "done" ? raw.prompt_tokens : null,
   reasoning: raw.reasoning,

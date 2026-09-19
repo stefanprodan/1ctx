@@ -1,5 +1,5 @@
-/* The composer: a card with the text, then a row with the agent chip
-   and its list, and Send. */
+/* The composer: a card with the text, the files added to it, then a
+   row with the plus, the agent chip and its list, and Send. */
 
 @layer tokens, base, owners;
 
@@ -108,6 +108,125 @@
     flex-shrink: 0;
     max-width: 60%;
     color: var(--faint);
+  }
+
+  /* the plus: a chip's size and frame, its menu placed as the agent
+     list is */
+  .composer-add {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--line);
+    color: var(--dim);
+  }
+  .composer-add-on {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .composer-add-menu {
+    min-width: 200px;
+  }
+  /* an item that cannot be picked says why on a line under its name */
+  .composer-add-item {
+    align-items: flex-start;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .composer-add-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .composer-add-words {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .composer-add-block {
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  /* one panel for everything added: a line that says where the files
+     stand and, under it when opened, what is attached and what was
+     skipped */
+  .composer-files {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--inset);
+    overflow: clip;
+  }
+  .composer-files-head {
+    display: flex;
+    align-items: stretch;
+    height: 32px;
+  }
+  .composer-files-open {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 1;
+    min-width: 0;
+    padding: 0 var(--space-2) 0 10px;
+    border: 0;
+    background: transparent;
+    font-size: var(--text-small);
+    color: var(--fg);
+    text-align: left;
+    cursor: pointer;
+  }
+  .composer-files-open:hover {
+    background: var(--hover);
+  }
+  .composer-files-icon {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .composer-files-spin {
+    flex-shrink: 0;
+    color: var(--brand);
+    animation: spin 0.8s linear infinite;
+  }
+  .composer-files-main {
+    flex-shrink: 0;
+  }
+  .composer-files-more {
+    color: var(--faint);
+  }
+  .composer-files-chevron {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--faint);
+    transition: transform 0.12s;
+  }
+  .composer-files-on .composer-files-chevron {
+    transform: rotate(180deg);
+  }
+  /* a .btn-icon as tall as the line, behind a rule */
+  .composer-files-x {
+    height: auto;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+  }
+
+  /* files held over the card: it takes the brand and says what a drop does */
+  .composer-drop {
+    border-color: var(--brand);
+  }
+  .composer-drop-words {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    border-radius: inherit;
+    background: var(--card);
+    font-size: var(--text-ui);
+    pointer-events: none;
+  }
+  .composer-drop-icon {
+    color: var(--brand);
   }
 
   /* in a form the picker is a field: full width, the height and the
@@ -266,6 +385,17 @@
   @media (max-width: 719px) {
     .composer-chip-model {
       max-width: 120px;
+    }
+    /* a finger's size */
+    .composer-add {
+      width: 32px;
+      height: 32px;
+    }
+    .composer-files-head {
+      height: 36px;
+    }
+    .composer-files-x {
+      width: 36px;
     }
     /* a chip near the right edge would carry its list off the screen,
        so on a phone the lists span the card */

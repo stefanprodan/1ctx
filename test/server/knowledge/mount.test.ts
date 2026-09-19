@@ -337,6 +337,7 @@ describe("knowledge command mounts", () => {
     const s = setup({
       knowledgeProjectBytes: 1024 * 1024,
       scratchBytes: 1024 * 1024,
+      uploadBytes: 1024 * 1024,
     });
     try {
       create(s, "source", "x\n".repeat(64 * 1024));

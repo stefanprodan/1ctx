@@ -36,6 +36,7 @@ import {
 } from "../data/sessions.ts";
 import { loadSkills } from "../data/skills.ts";
 import { loadTools } from "../data/tools.ts";
+import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
@@ -98,6 +99,9 @@ export const ROUTES: Route[] = [
         rows,
         spent,
         target === null ? Promise.resolve() : loadProjectAgents(target.id),
+        // the files staged for the composer's draft, and the limits a
+        // pick is judged with
+        target === null ? Promise.resolve() : loadUploads(target.id),
       ]);
     },
     nav: { label: "Home", icon: "home", order: 1 },
@@ -142,6 +146,7 @@ export const ROUTES: Route[] = [
         loadProjectAgents(params.id),
         loadAutomations(params.id),
         loadRecentDays(),
+        loadUploads(params.id),
       ]);
     },
   },
@@ -291,6 +296,8 @@ export const ROUTES: Route[] = [
       // a run names its automation under the title
       await Promise.all([
         loadProjectAgents(projectId),
+        // a run has no composer, so nothing is staged for it
+        detail.session.origin === "chat" ? loadUploads(projectId) : undefined,
         detail.session.automationId === null
           ? undefined
           : loadAutomations(projectId),

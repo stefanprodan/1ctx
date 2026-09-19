@@ -9,6 +9,7 @@
 // the chat to end, a rename does not.
 
 import type {
+  ForkSessionResponse,
   SessionResponse,
   SessionsResponse,
   ToolResultResponse,
@@ -45,6 +46,15 @@ export type AccessPort = {
 // after this area
 export type LivePort = (sessionId: string) => LiveSend | null;
 
+export type UploadsPort = {
+  copyUploads(
+    sourceId: string,
+    targetId: string,
+    restage?: { userId: string; projectId: string; messageId: string },
+    messageIds?: ReadonlyMap<string, string>,
+  ): string[];
+};
+
 export type RoutesDeps = {
   db: Db;
   clock: Clock;
@@ -53,6 +63,7 @@ export type RoutesDeps = {
   access: AccessPort;
   live: LivePort;
   usage: UsagePort;
+  uploads: UploadsPort;
   // the session when the principal may see it, else the one 404
   visible(principal: Principal, id: string): SessionRow;
 };
@@ -173,14 +184,30 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           if (deps.agents.byId(fields.agentId) === null) {
             throw new BadRequest("no such agent");
           }
-          const { session, messages } = deps.store.fork({
+          const { session, messages, messageIds, draft } = deps.store.fork({
             source,
             ...fields,
             ownerId: principal.userId,
             now: deps.clock(),
           });
+          const draftUploads = deps.uploads.copyUploads(
+            source.id,
+            session.id,
+            draft === null
+              ? undefined
+              : {
+                  userId: principal.userId,
+                  projectId: source.projectId,
+                  messageId: fields.messageId,
+                },
+            messageIds,
+          );
+          const result: ForkSessionResponse = {
+            ...detail(deps.store, session, null),
+            draftUploads,
+          };
           return {
-            result: detail(deps.store, session, null),
+            result,
             events: [
               {
                 type: "session.changed" as const,

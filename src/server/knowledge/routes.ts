@@ -12,6 +12,8 @@ import type {
   KnowledgeUploadResult,
   KnowledgeVersionDetailResponse,
   KnowledgeVersionsResponse,
+  StagedUploadResponse,
+  StagedUploadsResponse,
 } from "../../shared/api/knowledge.ts";
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -25,6 +27,13 @@ export type AccessPort = {
 };
 
 export type KnowledgePort = {
+  stageUpload(
+    projectId: string,
+    userId: string,
+    req: Request,
+  ): Promise<StagedUploadResponse>;
+  listUploads(projectId: string, userId: string): StagedUploadsResponse;
+  removeUpload(projectId: string, userId: string, uploadId: string): void;
   upload(
     projectId: string,
     author: KnowledgeAuthor,
@@ -74,6 +83,47 @@ function author(principal: Principal): KnowledgeAuthor {
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   return [
+    {
+      method: "POST",
+      path: "/api/projects/:id/uploads",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const body: StagedUploadResponse = await deps.knowledge.stageUpload(
+          project.id,
+          ctx.principal!.userId,
+          req,
+        );
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/projects/:id/uploads",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const body: StagedUploadsResponse = deps.knowledge.listUploads(
+          project.id,
+          ctx.principal!.userId,
+        );
+        return json(body);
+      },
+    },
+    {
+      method: "DELETE",
+      path: "/api/projects/:id/uploads/:uploadId",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        deps.knowledge.removeUpload(
+          project.id,
+          ctx.principal!.userId,
+          parseId(ctx.params.uploadId, "uploadId"),
+        );
+        return new Response(null, { status: 204 });
+      },
+    },
     {
       method: "POST",
       path: "/api/projects/:id/knowledge/upload",

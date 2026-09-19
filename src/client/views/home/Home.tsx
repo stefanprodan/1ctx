@@ -70,6 +70,7 @@ export function Home() {
         {target !== null && (
           <Composer
             scope={{ projectId: "home" }}
+            filesProjectId={target.id}
             project={{
               projects: projects.value ?? [],
               projectId: target.id,
@@ -80,8 +81,13 @@ export function Home() {
             placeholder={`Send a message to ${target.name}`}
             running={false}
             busy={sending.value}
-            onSend={async (message, agentId) => {
-              await createSession({ projectId: target.id, agentId, message });
+            onSend={async (message, agentId, uploads) => {
+              await createSession({
+                projectId: target.id,
+                agentId,
+                message,
+                ...(uploads.length === 0 ? {} : { uploads }),
+              });
             }}
             onStop={async () => {}}
           />

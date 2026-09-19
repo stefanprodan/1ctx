@@ -47,6 +47,7 @@ function packet(): MemoryPacket {
       agentId: null,
       content: "",
       resultBytes: null,
+      uploads: null,
       promptTokens: null,
       reasoning: "",
       html: "",

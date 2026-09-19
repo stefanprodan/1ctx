@@ -13,6 +13,11 @@
 //   GET    ./versions/:versionId      one version with its text
 // A stale revision, a taken name and a name prefixing a live one are
 // 409s with the words the page shows.
+//
+// The chat uploads, under /api/projects/:id/uploads, the caller's own:
+//   GET    .                          the staged items and the limits
+//   POST   .?name=&attempt=           one file or archive as bytes
+//   DELETE ./:uploadId                204
 
 import type {
   KnowledgeFile,
@@ -20,11 +25,16 @@ import type {
   KnowledgeList,
   KnowledgeVersion,
   KnowledgeVersionDetail,
+  StagedUpload,
+  StagedUploads,
 } from "../contracts/knowledge.ts";
 
 export type KnowledgeListResponse = KnowledgeList;
 
 export type { KnowledgeUploadResult } from "../contracts/knowledge.ts";
+
+export type StagedUploadsResponse = StagedUploads;
+export type StagedUploadResponse = StagedUpload;
 
 export type CreateKnowledgeFileRequest = { name: string; text: string };
 export type KnowledgeFileResponse = { file: KnowledgeFile };

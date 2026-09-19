@@ -80,6 +80,7 @@ function message(changes: Partial<Message> = {}): Message {
     agentId: "a1",
     content: "",
     resultBytes: null,
+    uploads: null,
     promptTokens: null,
     reasoning: "",
     html: "",
@@ -614,7 +615,22 @@ describe("the sessions entity", () => {
     "fork posts the turn and the agent, then opens the new chat",
     async () => {
       session.value = detail("s1", {
-        messages: [message({ id: "m1", kind: "user", content: "again?" })],
+        messages: [
+          message({
+            id: "m1",
+            kind: "user",
+            content: "again?",
+            uploads: [
+              {
+                name: "notes.md",
+                archive: false,
+                files: 1,
+                bytes: 12,
+                saved: ["notes.md"],
+              },
+            ],
+          }),
+        ],
       });
       path.value = "/chat/s1";
       const rows = new Map<string, string>();
@@ -634,11 +650,16 @@ describe("the sessions entity", () => {
         let hit = "";
         let sent: unknown = null;
         let busy = false;
+        let listed = "";
         answer = (url, init) => {
-          hit = `${init?.method ?? "GET"} ${url}`;
-          sent = JSON.parse(String(init?.body));
+          if (init?.method !== "POST") {
+            listed = url;
+            return Response.json({ items: [], limits: {} });
+          }
+          hit = `${init.method} ${url}`;
+          sent = JSON.parse(String(init.body));
           busy = forking.value;
-          return Response.json(detail("s9"));
+          return Response.json({ ...detail("s9"), draftUploads: ["up9"] });
         };
         await forkSession("s1", "m1", "a2");
         expect(hit).toBe("POST /api/sessions/s1/fork");
@@ -646,8 +667,65 @@ describe("the sessions entity", () => {
         expect(busy).toBe(true);
         expect(forking.value).toBe(false);
         expect(path.value).toBe("/chat/s9");
-        // a user message's text is the fork's draft
-        expect(rows.get("draft:chat:s9")).toBe("again?");
+        // a user message's text is the fork's draft, with the files it
+        // carried, staged again, under the names the message knew
+        expect(JSON.parse(rows.get(`draft:u${user}:chat:s9`) ?? "{}")).toEqual({
+          text: "again?",
+          uploads: [{ projectId: "p1", id: "up9", name: "notes.md" }],
+        });
+        expect(listed).toBe(`/api/projects/p1/uploads`);
+      } finally {
+        if (realStorage === undefined) {
+          Reflect.deleteProperty(globalThis, "localStorage");
+        } else {
+          Object.defineProperty(globalThis, "localStorage", realStorage);
+        }
+      }
+    },
+  );
+
+  test.serial(
+    "a fork answered after the person left keeps its draft and moves no page",
+    async () => {
+      session.value = detail("s1", {
+        messages: [message({ id: "m1", kind: "user", content: "again?" })],
+      });
+      path.value = "/chat/s1";
+      const rows = new Map<string, string>();
+      const realStorage = Object.getOwnPropertyDescriptor(
+        globalThis,
+        "localStorage",
+      );
+      Object.defineProperty(globalThis, "localStorage", {
+        configurable: true,
+        value: {
+          getItem: (key: string) => rows.get(key) ?? null,
+          setItem: (key: string, value: string) => rows.set(key, value),
+          removeItem: (key: string) => rows.delete(key),
+        },
+      });
+      try {
+        let release: (() => void) | null = null;
+        answer = (_url, init) =>
+          init?.method === "POST"
+            ? new Promise<Response>((resolve) => {
+                release = () =>
+                  resolve(
+                    Response.json({ ...detail("s9"), draftUploads: ["up9"] }),
+                  );
+              })
+            : Response.json({ items: [], limits: {} });
+        const forked = forkSession("s1", "m1", "a2");
+        // the person opens another chat before the fork answers
+        session.value = detail("s2");
+        path.value = "/chat/s2";
+        (release as (() => void) | null)?.();
+        await forked;
+        expect(path.value).toBe("/chat/s2");
+        // the restaged file is not orphaned: it waits in the fork's draft
+        expect(
+          JSON.parse(rows.get(`draft:u${user}:chat:s9`) ?? "{}").uploads,
+        ).toEqual([{ projectId: "p1", id: "up9", name: "a file" }]);
       } finally {
         if (realStorage === undefined) {
           Reflect.deleteProperty(globalThis, "localStorage");

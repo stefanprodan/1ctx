@@ -5,6 +5,7 @@ import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
+import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
   MessageStatus,
   RunFilter,
@@ -18,6 +19,7 @@ import {
   automationRuns,
   expiredAutomationRuns,
 } from "./automation.ts";
+import { exportRows } from "./export.ts";
 import {
   copyRows,
   type ForkFields,
@@ -121,7 +123,12 @@ export class SessionStore {
     return this.byId(id)!;
   }
 
-  fork(fields: ForkFields): { session: SessionRow; messages: Message[] } {
+  fork(fields: ForkFields): {
+    session: SessionRow;
+    messages: Message[];
+    messageIds: ReadonlyMap<string, string>;
+    draft: string | null;
+  } {
     const { source, messageId } = fields;
     const point = readForkPoint(this.db, source.id, messageId);
     const session = this.create({
@@ -134,12 +141,17 @@ export class SessionStore {
       forkedFromSessionId: source.id,
       forkedFromMessageId: messageId,
     });
-    copyRows(this.db, {
+    const messageIds = copyRows(this.db, {
       sessionId: session.id,
       rows: point.rows,
       now: fields.now,
     });
-    return { session, messages: this.messages(session.id) };
+    return {
+      session,
+      messages: this.messages(session.id),
+      messageIds,
+      draft: point.draft,
+    };
   }
 
   forkedFrom(id: string) {
@@ -213,35 +225,7 @@ export class SessionStore {
   }
 
   exportRows(sessionId: string): ExportRow[] {
-    return this.db
-      .query<
-        Omit<ExportRow, "toolCalls"> & { toolCalls: string | null },
-        [string]
-      >(
-        `select messages.send_id as sendId, messages.round,
-           sends.memory_round as memoryRound, messages.kind, messages.slot,
-           messages.status, messages.error,
-           messages.tool_calls as toolCalls,
-           messages.tool_call_id as toolCallId, messages.tool_name as toolName,
-           messages.finish_reason as finishReason,
-           coalesce(users.username, agents.name) as author,
-           case when messages.kind = 'user'
-               or (messages.kind = 'reply' and messages.slot = 'answer')
-             then messages.content else '' end as content,
-           messages.created_at as createdAt,
-           messages.finished_at as finishedAt
-         from messages
-         join sends on sends.id = messages.send_id
-         left join users on users.id = messages.user_id
-         left join agents on agents.id = messages.agent_id
-         where messages.session_id = ?
-         order by messages.seq`,
-      )
-      .all(sessionId)
-      .map((row) => ({
-        ...row,
-        toolCalls: row.toolCalls === null ? null : JSON.parse(row.toolCalls),
-      }));
+    return exportRows(this.db, sessionId);
   }
 
   memorySnapshot(
@@ -275,13 +259,15 @@ export class SessionStore {
     sendId: string;
     userId: string;
     content: string;
+    uploads?: MessageUpload[] | null;
     now: number;
   }): Message {
     const id = fields.id ?? newId();
     this.db
       .query(
-        `insert into messages (id, session_id, seq, kind, send_id, round, user_id, content, status, created_at, finished_at)
-         values (?, ?, ?, 'user', ?, 1, ?, ?, 'done', ?, ?)`,
+        `insert into messages (id, session_id, seq, kind, send_id, round,
+           user_id, content, uploads, status, created_at, finished_at)
+         values (?, ?, ?, 'user', ?, 1, ?, ?, ?, 'done', ?, ?)`,
       )
       .run(
         id,
@@ -290,6 +276,7 @@ export class SessionStore {
         fields.sendId,
         fields.userId,
         fields.content,
+        fields.uploads?.length ? JSON.stringify(fields.uploads) : null,
         fields.now,
         fields.now,
       );

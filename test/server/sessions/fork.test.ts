@@ -12,6 +12,7 @@ import type {
   RawSend,
   RawSession,
 } from "../../../src/server/sessions/rows.ts";
+import type { ForkSessionResponse } from "../../../src/shared/api/sessions.ts";
 import type {
   Message,
   SessionDetail,
@@ -74,7 +75,7 @@ async function fork(
   messageId: string,
   agentId = chat.agentId,
   client = chat.member,
-): Promise<SessionDetail> {
+): Promise<ForkSessionResponse> {
   const response = await client.call(
     "POST",
     `/api/sessions/${sessionId}/fork`,
@@ -338,7 +339,10 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(
         copied.messages.find((row) => row.slot === "work")?.toolCalls,
       ).toEqual([{ ...timeCall, signature: "opaque-source-model-signature" }]);
-      expect(await detail(chat.member, copied.session.id)).toEqual(copied);
+      expect(copied).toEqual({
+        ...(await detail(chat.member, copied.session.id)),
+        draftUploads: [],
+      });
       expect({
         session: store.byId(source.sessionId),
         messages: storedMessages(chat, source.sessionId),

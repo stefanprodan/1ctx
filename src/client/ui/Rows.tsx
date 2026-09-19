@@ -256,8 +256,25 @@ export function RowsList({ children }: { children: ComponentChildren }) {
   return <div class="rows-list">{children}</div>;
 }
 
-export function RowsLog({ children }: { children: ComponentChildren }) {
-  return <div class="rows-log">{children}</div>;
+// bare: inside a box that has its own frame, under a rule. ends: some
+// lines carry a remove button, so every line keeps room for one and the
+// notes share an edge
+export function RowsLog({
+  children,
+  bare,
+  ends,
+}: {
+  children: ComponentChildren;
+  bare?: boolean;
+  ends?: boolean;
+}) {
+  return (
+    <div
+      class={`rows-log${bare ? " rows-log-bare" : ""}${ends ? " rows-log-ends" : ""}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function RowsLogGroup({ children }: { children: ComponentChildren }) {
@@ -270,15 +287,20 @@ export function RowsLogLine({
   bad,
   running,
   status,
+  onRemove,
 }: {
   name: string;
   note: string;
   bad?: boolean;
   running?: boolean;
   status?: number | null;
+  // a small X at the line's end, in a log drawn with `ends`
+  onRemove?: () => void;
 }) {
   return (
-    <div class={`rows-log-line${bad ? " rows-log-bad" : ""}`}>
+    <div
+      class={`rows-log-line${bad ? " rows-log-bad" : ""}${onRemove ? " rows-log-line-end" : ""}`}
+    >
       <span class="rows-log-name cut" title={name}>
         {name}
       </span>
@@ -291,6 +313,16 @@ export function RowsLogLine({
           </>
         )}
       </span>
+      {onRemove && (
+        <button
+          type="button"
+          class="btn-icon rows-log-drop"
+          aria-label={`Remove ${name}`}
+          onClick={onRemove}
+        >
+          <Icon name="close" size={12} />
+        </button>
+      )}
     </div>
   );
 }

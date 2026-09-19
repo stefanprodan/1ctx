@@ -36,6 +36,7 @@ import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
 import { applyEnvelope, dropRow, revokeRows } from "./stream.ts";
+import { loadUploads } from "./uploads.ts";
 
 export {
   loadToolResult,
@@ -188,7 +189,7 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
 export async function pickHomeProject(projectId: string): Promise<void> {
   homeProjectId.value = projectId;
   projectAgents.value = null;
-  await loadProjectAgents(projectId);
+  await Promise.all([loadProjectAgents(projectId), loadUploads(projectId)]);
 }
 
 // a write's answer is the detail: applied like an envelope, so the
@@ -213,10 +214,17 @@ export async function createSession(
   }
 }
 
-export async function sendMessage(id: string, message: string): Promise<void> {
+export async function sendMessage(
+  id: string,
+  message: string,
+  uploads: string[],
+): Promise<void> {
   sending.value = true;
   try {
-    const body: SendMessageRequest = { message };
+    const body: SendMessageRequest = {
+      message,
+      ...(uploads.length === 0 ? {} : { uploads }),
+    };
     const detail = await api<SessionResponse>(
       `/api/sessions/${encodeURIComponent(id)}/messages`,
       "POST",

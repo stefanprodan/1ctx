@@ -222,6 +222,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     agents: { byId: (id) => agents.byId(id) },
     live: (sessionId) => runner.live(sessionId),
     usage,
+    uploads: {
+      copyUploads: (sourceId, targetId, restage, messageIds) =>
+        knowledge.copyUploads(sourceId, targetId, restage, messageIds),
+    },
     isWrite: (name) => mcp.isWrite(name),
   });
   const tools =
@@ -265,6 +269,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     tools,
     knowledge,
+    uploads: {
+      checkUploads: (userId, projectId, ids) =>
+        knowledge.checkUploads(userId, projectId, ids),
+      claimUploads: (userId, projectId, sessionId, messageId, ids) =>
+        knowledge.claimUploads(userId, projectId, sessionId, messageId, ids),
+    },
     memory: {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),
