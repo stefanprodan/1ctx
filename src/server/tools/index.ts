@@ -8,7 +8,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import { WEB } from "../../shared/capabilities.ts";
+import { skillKey, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
@@ -106,6 +106,8 @@ export type ToolsDeps = {
 export type Tools = {
   capabilities(): string[];
   serverNames(links: AgentServer[]): string[];
+  // the names of the agent's skills a disabled set turns off
+  skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
     now: number,
     agentId: string,
@@ -298,6 +300,11 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     capabilities: () => (webAccess().mode === "off" ? [] : [WEB]),
     serverNames: (links) =>
       mcpService.switchable(links).map((server) => server.name),
+    skillsOff: (agentId, disabledCapabilities) =>
+      skillStore
+        .forAgent(agentId)
+        .filter((skill) => disabledCapabilities.includes(skillKey(skill.id)))
+        .map((skill) => skill.name),
     routes: [],
     offered(
       now,

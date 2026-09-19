@@ -13,6 +13,9 @@ import {
   parseSet,
   sameSet,
   serverOf,
+  skillKey,
+  skillOf,
+  skillsOffLine,
   WEB,
 } from "../../src/shared/capabilities.ts";
 
@@ -27,6 +30,19 @@ describe("capability keys", () => {
       expect(isCapabilityKey(key)).toBe(false);
     }
   });
+  test("a skill is a key by its id, apart from a server's", () => {
+    expect(skillKey("k3v9a0q1z2xy")).toBe("skill:k3v9a0q1z2xy");
+    expect(isCapabilityKey("skill:k3v9a0q1z2xy")).toBe(true);
+    expect(skillOf("skill:k3v9a0q1z2xy")).toBe("k3v9a0q1z2xy");
+    expect(skillOf("mcp:k3v9a0q1z2xy")).toBeNull();
+    expect(serverOf("skill:k3v9a0q1z2xy")).toBeNull();
+    for (const key of ["skill", "skill:", "skill:A1", "skills:a1"]) {
+      expect(isCapabilityKey(key)).toBe(false);
+    }
+    expect(skillsOffLine(["plain", "gitops"])).toBe(
+      "The user turned these skills off for this chat: gitops, plain. Do not load or follow them.",
+    );
+  });
   test("a change may mix web and servers", () => {
     expect(
       parseChange({ disable: ["web", "mcp:b2"], enable: ["mcp:a1"] }, "c"),
@@ -40,9 +56,9 @@ describe("capability keys", () => {
       "The user turned these MCP servers off for this chat: flux, github. Their tools are not available. Say so if one is needed.",
     );
   });
-  test("web and servers are the keys this build knows", () => {
+  test("web, servers and skills are the keys this build knows", () => {
     expect(isCapabilityKey(WEB)).toBe(true);
-    for (const key of ["", "Web", "web:", "skill:x", 7, null]) {
+    for (const key of ["", "Web", "web:", "visualize:x", 7, null]) {
       expect(isCapabilityKey(key)).toBe(false);
     }
   });

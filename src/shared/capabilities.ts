@@ -6,23 +6,30 @@
 // is on everywhere without a write, and the empty set is every chat that
 // never touched a switch. A key is a kind, or a kind and a name after a
 // colon. Web access is a kind alone. An MCP server is `mcp:<server id>`:
-// the id, since the name is not what an agent's links hold. A skill joins
-// this grammar later with no change to what is stored or sent.
+// the id, since the name is not what an agent's links hold. A skill is
+// `skill:<skill id>`, by the same rule.
 
 export const WEB = "web";
 export const MCP = "mcp";
+export const SKILL = "skill";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
 
 export const mcpKey = (serverId: string) => `${MCP}:${serverId}`;
+export const skillKey = (skillId: string) => `${SKILL}:${skillId}`;
 
-// the server a key names, null for any other key
-export function serverOf(key: string): string | null {
-  if (!key.startsWith(`${MCP}:`)) return null;
-  const id = key.slice(MCP.length + 1);
+function idOf(kind: string, key: string): string | null {
+  if (!key.startsWith(`${kind}:`)) return null;
+  const id = key.slice(kind.length + 1);
   return ID.test(id) ? id : null;
 }
+
+// the server a key names, null for any other key
+export const serverOf = (key: string) => idOf(MCP, key);
+
+// the skill a key names, null for any other key
+export const skillOf = (key: string) => idOf(SKILL, key);
 
 export const MAX_CAPABILITY_KEY = 64;
 export const MAX_DISABLED_CAPABILITIES = 64;
@@ -31,9 +38,10 @@ export function isCapabilityKey(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length <= MAX_CAPABILITY_KEY &&
-    // the shape alone: a key naming no server, or one the agent does not
-    // have, is kept and ignored, so a fork onto another agent still sends
-    (value === WEB || serverOf(value) !== null)
+    // the shape alone: a key naming no server or skill, or one the agent
+    // does not have, is kept and ignored, so a fork onto another agent
+    // still sends
+    (value === WEB || serverOf(value) !== null || skillOf(value) !== null)
   );
 }
 
@@ -123,4 +131,10 @@ export const WEB_OFF_LINE =
 // otherwise be offered: names sorted, so it is constant between flips
 export function mcpOffLine(names: readonly string[]): string {
   return `The user turned these MCP servers off for this chat: ${[...names].sort().join(", ")}. Their tools are not available. Say so if one is needed.`;
+}
+
+// the line after that while a chat has skills of its agent off: one
+// loaded before the flip left its body in the history
+export function skillsOffLine(names: readonly string[]): string {
+  return `The user turned these skills off for this chat: ${[...names].sort().join(", ")}. Do not load or follow them.`;
 }

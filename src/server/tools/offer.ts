@@ -5,7 +5,7 @@
 // apart from dispatch lets the agent page and the runner share the same
 // offered set without needing a live call context.
 
-import { mcpKey, WEB } from "../../shared/capabilities.ts";
+import { mcpKey, skillKey, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import {
@@ -148,7 +148,14 @@ export function offered(
     ...(search === null ? [] : ["websearch"]),
     ...(rows.get("visualize")!.enabled ? ["visualize"] : []),
   ]);
-  const skillCatalog = catalog(deps.skills.forAgent(agentId), CATALOG_CAP);
+  // a skill the chat turned off is in no part of the send: the catalog,
+  // the skill tool's names and the file tool all come from what is left
+  const skillCatalog = catalog(
+    deps.skills
+      .forAgent(agentId)
+      .filter((skill) => !disabledCapabilities.includes(skillKey(skill.id))),
+    CATALOG_CAP,
+  );
   for (const name of skillCatalog.leftOut) {
     deps.log(`skill ${name} left out of the catalog`);
   }

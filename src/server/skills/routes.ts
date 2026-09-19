@@ -7,6 +7,8 @@ import type {
   SkillResponse,
   SkillsResponse,
 } from "../../shared/api/skills.ts";
+import { skillKey } from "../../shared/capabilities.ts";
+import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound, ServiceUnavailable } from "../lib/errors.ts";
@@ -19,7 +21,9 @@ import { loaded, type SkillRow, type SkillStore, summary } from "./store.ts";
 
 export type AgentsPort = { agentNames(ids: string[]): string[] };
 export type RoutesDeps = {
+  db: Db;
   store: SkillStore;
+  capabilities: { forget(key: string): void };
   agents: AgentsPort;
   fetcher: typeof fetch;
   clock: Clock;
@@ -172,7 +176,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const row = find(ctx.params.id);
         if (deps.refreshing.has(row.id))
           throw new Conflict("the skill is refreshing");
-        deps.store.delete(row.id);
+        // no agent has it, so its key in a chat or a task means nothing
+        transact(deps.db, () => {
+          deps.store.delete(row.id);
+          deps.capabilities.forget(skillKey(row.id));
+          return { result: undefined };
+        });
         return json({});
       },
     },

@@ -139,6 +139,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     fetcher,
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
   });
+  // a deleted server or skill leaves no key behind in a chat or a task
+  const capabilities = {
+    forget(key: string) {
+      sessions.store.forgetCapability(key);
+      automations.store.forgetCapability(key);
+    },
+  };
   const mcp: Mcp = mcpArea({
     db,
     clock,
@@ -149,18 +156,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: options.log("mcp"),
     version: options.version,
     render: renderMarkdown,
-    capabilities: {
-      forget(key) {
-        sessions.store.forgetCapability(key);
-        automations.store.forgetCapability(key);
-      },
-    },
+    capabilities,
   });
   const skills: Skills = skillsArea({
     db,
     clock,
     log: options.log("skills"),
     fetcher,
+    capabilities,
     agents: {
       agentNames: (ids) =>
         ids.flatMap((id) => {

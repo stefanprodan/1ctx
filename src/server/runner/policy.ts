@@ -47,6 +47,7 @@ export type {
 // passes the tools area
 export type ToolsPort = {
   serverNames(links: AgentRow["servers"]): string[];
+  skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
     now: number,
     agentId: string,
@@ -87,6 +88,7 @@ export type SendPolicy = {
   offered: Offered;
   disabledCapabilities: string[];
   mcpOff: string[];
+  skillsOff: string[];
   web: WebSnapshot | null;
   memoryOffered: Offered | null;
   projectMemory: MemoryEntry[];
@@ -202,6 +204,10 @@ export function buildPolicy(input: {
               ),
             )
             .sort()
+        : [],
+    skillsOff:
+      input.tools !== null && agent.model.tools
+        ? input.tools.skillsOff(agent.id, disabledCapabilities).sort()
         : [],
     web: offered.web,
     memoryOffered,

@@ -185,6 +185,7 @@ export function history(
     | "knowledge"
     | "disabledCapabilities"
     | "mcpOff"
+    | "skillsOff"
   >,
   lookups: ContextLookups,
   now: number,

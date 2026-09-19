@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SwitchableSkill } from "../../shared/api/sessions.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -8,6 +9,7 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { type AgentsPort, routes } from "./routes.ts";
 import { SkillStore } from "./store.ts";
+import { switchable } from "./switchable.ts";
 
 export { cleanText } from "./clean.ts";
 export { fetchSource, fetchText } from "./fetch.ts";
@@ -24,6 +26,9 @@ export type SkillsDeps = {
   log: Log;
   fetcher: typeof fetch;
   agents: AgentsPort;
+  // takes a deleted skill's key out of every disabled set; a closure,
+  // since sessions and automations are built later
+  capabilities: { forget(key: string): void };
 };
 
 export type SkillBody = {
@@ -38,6 +43,7 @@ export type Skills = {
   store: SkillStore;
   routes: RouteDescriptor[];
   forAgent(agentId: string): OfferedSkill[];
+  switchable(): Record<string, SwitchableSkill[]>;
   versions(
     agentId: string,
   ): { id: string; digest: string; fetchedAt: number }[];
@@ -56,8 +62,14 @@ export function skillsArea(deps: SkillsDeps): Skills {
   const store = new SkillStore(deps.db, deps.agents.agentNames);
   return {
     store,
-    routes: routes({ ...deps, store, shutdown: shutdown.signal, refreshing }),
+    routes: routes({
+      ...deps,
+      store,
+      shutdown: shutdown.signal,
+      refreshing,
+    }),
     forAgent: (agentId) => store.forAgent(agentId),
+    switchable: () => switchable(deps.db),
     versions: (agentId) => store.versions(agentId),
     bodyText: (id) => store.bodyText(id),
     body(id, name) {

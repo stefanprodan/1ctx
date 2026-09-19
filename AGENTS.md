@@ -396,7 +396,9 @@ violation, and every rule has a rejected fixture under
   archives go through `lib/archive.ts`; duplicate member names are
   refused. An index digest is checked on add and refresh. Refresh is
   explicit and never renames the skill; deleting one an agent names is
-  a 409. Stored text is cleaned and shown as text, ingest caps live in
+  a 409. Its delete forgets `skill:<skill id>` in sessions and
+  automations in the same transaction, without revisions or envelopes;
+  unassigning forgets nothing. Stored text is cleaned and shown as text, ingest caps live in
   `skills/limits.ts`, and nothing runs.
   The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
   (a site or an index is looked up first and its entries listed with
@@ -413,6 +415,15 @@ violation, and every rule has a rejected fixture under
   rows or the Tools page, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
   summary, the user message names still-offered skills loaded before it.
+  Before the catalog is built, `tools/offer.ts` removes the agent's skills
+  whose `skill:<skill id>` is disabled, so the block, the enum and
+  `skill_file` come from what is left, and all off means no block and no
+  tool. The policy's `skillsOff` holds their sorted names, empty for a
+  model without tools; `skillsOffLine()` names them after the MCP-off
+  line, since a skill loaded before the flip left its body in history.
+  `GET /api/projects/:id/agents` also answers `skills`, keyed by agent
+  id, with `{id, name}` in name order from `skills/switchable.ts`, one
+  read. Agents without skills have no entry.
 - **An MCP server is rows, discovered through the official SDK.** The
   wire is `@modelcontextprotocol/client` v2 over Streamable HTTP in
   `auto` negotiation (the modern stateless era, or the legacy
@@ -466,7 +477,8 @@ violation, and every rule has a rejected fixture under
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
   off per server), the two memory blocks, the knowledge block, the date
   line, the chat's web-off line when applicable, the MCP-off line when
-  applicable, and last the change note. The policy's `mcpOff` holds the
+  applicable, the skills-off line when applicable, and last the change
+  note. The policy's `mcpOff` holds the
   sorted names of disabled linked servers with otherwise-offered tools,
   empty for a model without tools; `mcpOffLine()` names them.
   `GET /api/projects/:id/agents` also answers `servers`, keyed by agent id,
@@ -532,9 +544,10 @@ violation, and every rule has a rejected fixture under
   commit. Create and send accept up to ten distinct staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys: `web` and `mcp:<server id>`.
-  The MCP parser checks only the id's shape, 1 to 32 lowercase ASCII
-  letters or digits; unknown or unassigned server keys are kept and ignored.
+  change with `disable` and `enable` keys: `web`, `mcp:<server id>` and
+  `skill:<skill id>`. The parser checks only an id's shape, 1 to 32
+  lowercase ASCII letters or digits; unknown or unassigned server and
+  skill keys are kept and ignored.
   The policy resolves it before schemas are built; `startSend` applies
   it again to the current row in its transaction, with the message's
   revision and envelope. A refused start writes nothing; a later failure
