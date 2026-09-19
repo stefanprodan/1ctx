@@ -280,6 +280,9 @@ violation, and every rule has a rejected fixture under
   the Limits tab.
   The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
   so best-effort hardening runs; sqlite3's unpatched worker stays out.
+  It also keeps curl's redirects on http and https, since Bun's fetch
+  reads `file:` URLs from the host's disk, and cancels the body of a
+  response refused for its length. Check both after a just-bash upgrade.
   `knowledge/judge.ts` shares archive selection and judging between the
   knowledge uploader and attachment staging.
   A chat archive whose name-selected members all sit under one top-level
