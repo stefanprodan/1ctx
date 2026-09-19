@@ -12,8 +12,15 @@ import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import type {
   StreamRow,
   SwitchableServer,
+  SwitchableSkill,
 } from "../../../shared/api/sessions.ts";
-import { mcpKey, serverOf, WEB } from "../../../shared/capabilities.ts";
+import {
+  mcpKey,
+  serverOf,
+  skillKey,
+  skillOf,
+  WEB,
+} from "../../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
@@ -255,6 +262,8 @@ export type Draft = {
   web: boolean;
   // the keys of the MCP servers its runs go without
   mcpOff: string[];
+  // the keys of the skills its runs go without
+  skillsOff: string[];
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -281,6 +290,7 @@ export function draftOf(
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
       mcpOff: [],
+      skillsOff: [],
     };
   }
   return {
@@ -295,6 +305,7 @@ export function draftOf(
     memoryGuidance: a.memoryGuidance,
     web: !a.disabledCapabilities.includes(WEB),
     mcpOff: a.disabledCapabilities.filter((key) => serverOf(key) !== null),
+    skillsOff: a.disabledCapabilities.filter((key) => skillOf(key) !== null),
   };
 }
 
@@ -342,12 +353,17 @@ export function automationFieldOf(
   return undefined;
 }
 
-// `servers` are the picked agent's: a key for any other server is not
-// shown, so it is not saved
+// a switch flipped: the key joins the list or leaves it
+export const toggled = (keys: readonly string[], key: string): string[] =>
+  keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key];
+
+// `servers` and `skills` are the picked agent's: a key for any other is
+// not shown, so it is not saved
 export function requestOf(
   d: Draft,
   limitMs: number,
   servers: readonly SwitchableServer[] = [],
+  skills: readonly SwitchableSkill[] = [],
 ):
   | { body: SaveAutomationRequest }
   | { problem: string; field: AutomationField } {
@@ -393,22 +409,30 @@ export function requestOf(
         ...servers
           .map((server) => mcpKey(server.id))
           .filter((key) => d.mcpOff.includes(key)),
+        ...skills
+          .map((skill) => skillKey(skill.id))
+          .filter((key) => d.skillsOff.includes(key)),
       ].sort(),
     },
   };
 }
 
 // what the row keeps its runs from, for the page's aside: the names of
-// its agent's servers that are off, in name order
+// its agent's servers and skills that are off, in name order
 export function accessOf(
   a: Pick<AutomationSummary, "disabledCapabilities">,
   servers: readonly SwitchableServer[],
-): { web: boolean; mcpOff: string[] } {
+  skills: readonly SwitchableSkill[] = [],
+): { web: boolean; mcpOff: string[]; skillsOff: string[] } {
   return {
     web: !a.disabledCapabilities.includes(WEB),
     mcpOff: servers
       .filter((server) => a.disabledCapabilities.includes(mcpKey(server.id)))
       .map((server) => server.name)
+      .sort(),
+    skillsOff: skills
+      .filter((skill) => a.disabledCapabilities.includes(skillKey(skill.id)))
+      .map((skill) => skill.name)
       .sort(),
   };
 }

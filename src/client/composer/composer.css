@@ -169,10 +169,10 @@
     border-radius: 0;
     margin-bottom: var(--space-1);
   }
-  .composer-add-server {
+  .composer-add-row {
     align-items: center;
   }
-  .composer-add-server .composer-add-icon {
+  .composer-add-row .composer-add-icon {
     margin-top: 0;
   }
   .composer-add-name {
@@ -181,7 +181,7 @@
     font-size: var(--text-label);
   }
   /* the counts share an edge before the switch */
-  .composer-add-server .composer-add-switch {
+  .composer-add-row .composer-add-switch {
     margin-left: var(--space-3);
   }
   .composer-add-count {

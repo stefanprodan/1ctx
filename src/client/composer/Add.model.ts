@@ -4,11 +4,15 @@
 // The switches of the plus menu. Web access is live when the picked
 // agent takes tools and the instance has web access on, and then on
 // unless the chat turned it off. MCP servers is there when the picked
-// agent is offered any, and leads to a switch per server. An item that
-// cannot be switched shows off and says why on a line under its name.
+// agent is offered any, and leads to a switch per server; Skills is the
+// same for the skills it carries. An item that cannot be switched shows
+// off and says why on a line under its name.
 
-import type { SwitchableServer } from "../../shared/api/sessions.ts";
-import { mcpKey, WEB } from "../../shared/capabilities.ts";
+import type {
+  SwitchableServer,
+  SwitchableSkill,
+} from "../../shared/api/sessions.ts";
+import { mcpKey, skillKey, WEB } from "../../shared/capabilities.ts";
 
 export type WebItem = { live: boolean; on: boolean; reason: string | null };
 
@@ -39,40 +43,82 @@ export function agentMoved(last: string | null, next: string | null): boolean {
   return last !== null && next !== null && last !== next;
 }
 
-export type ServerRow = SwitchableServer & { key: string; on: boolean };
-export type ServersItem = {
+// a switch of a pane: the key it flips, and what stands before the switch
+export type PaneRow = {
+  key: string;
+  name: string;
+  note: string;
+  on: boolean;
+};
+export type PaneItem = {
   live: boolean;
   reason: string | null;
   // how many are off, the words at the item's end; 0 says nothing
   off: number;
-  rows: ServerRow[];
+  rows: PaneRow[];
 };
 
-// null when the picked agent has no server to switch: no item at all
-export function serversItem(input: {
-  tools: boolean;
-  // the picked agent's servers, from the project's agents route
-  servers: readonly SwitchableServer[];
-  // whether a key is off, as the composer shows it
-  isOff: (key: string) => boolean;
-}): ServersItem | null {
-  if (input.servers.length === 0) return null;
-  if (!input.tools) {
-    return {
-      live: false,
-      reason: "Agent cannot use tools",
-      off: 0,
-      rows: [],
-    };
+// whether the plus falls back to its menu: closed, or what the open pane
+// lists gone. The menu itself is no such case, or the reset queued on the
+// way back from a pane would undo a pane picked before it ran
+export function panelessOf(
+  open: boolean,
+  pane: "menu" | "servers" | "skills",
+  shown: PaneItem | null,
+): boolean {
+  return !open || (pane !== "menu" && (shown === null || !shown.live));
+}
+
+// null when the picked agent has nothing to switch: no item at all
+function paneItem(
+  tools: boolean,
+  things: Omit<PaneRow, "on">[],
+  isOff: (key: string) => boolean,
+): PaneItem | null {
+  if (things.length === 0) return null;
+  if (!tools) {
+    return { live: false, reason: "Agent cannot use tools", off: 0, rows: [] };
   }
-  const rows = input.servers.map((server) => {
-    const key = mcpKey(server.id);
-    return { ...server, key, on: !input.isOff(key) };
-  });
+  const rows = things.map((thing) => ({ ...thing, on: !isOff(thing.key) }));
   return {
     live: true,
     reason: null,
     off: rows.filter((row) => !row.on).length,
     rows,
   };
+}
+
+export function serversItem(input: {
+  tools: boolean;
+  // the picked agent's servers, from the project's agents route
+  servers: readonly SwitchableServer[];
+  // whether a key is off, as the composer shows it
+  isOff: (key: string) => boolean;
+}): PaneItem | null {
+  return paneItem(
+    input.tools,
+    input.servers.map((server) => ({
+      key: mcpKey(server.id),
+      name: server.name,
+      note: `${server.tools} tools`,
+    })),
+    input.isOff,
+  );
+}
+
+// a skill is read through a tool, so an agent without tools has none
+export function skillsItem(input: {
+  tools: boolean;
+  skills: readonly SwitchableSkill[];
+  isOff: (key: string) => boolean;
+}): PaneItem | null {
+  return paneItem(
+    input.tools,
+    input.skills.map((skill) => ({
+      key: skillKey(skill.id),
+      name: skill.name,
+      note: "",
+    })),
+    input.isOff,
+  );
 }

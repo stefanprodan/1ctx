@@ -396,7 +396,9 @@ violation, and every rule has a rejected fixture under
   archives go through `lib/archive.ts`; duplicate member names are
   refused. An index digest is checked on add and refresh. Refresh is
   explicit and never renames the skill; deleting one an agent names is
-  a 409. Stored text is cleaned and shown as text, ingest caps live in
+  a 409. Its delete forgets `skill:<skill id>` in sessions and
+  automations in the same transaction, without revisions or envelopes;
+  unassigning forgets nothing. Stored text is cleaned and shown as text, ingest caps live in
   `skills/limits.ts`, and nothing runs.
   The Skills page, `/admin/skills`, is `Rows`: Add skill takes the URL
   (a site or an index is looked up first and its entries listed with
@@ -413,6 +415,15 @@ violation, and every rule has a rejected fixture under
   rows or the Tools page, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
   summary, the user message names still-offered skills loaded before it.
+  Before the catalog is built, `tools/offer.ts` removes the agent's skills
+  whose `skill:<skill id>` is disabled, so the block, the enum and
+  `skill_file` come from what is left, and all off means no block and no
+  tool. The policy's `skillsOff` holds their sorted names, empty for a
+  model without tools; `skillsOffLine()` names them after the MCP-off
+  line, since a skill loaded before the flip left its body in history.
+  `GET /api/projects/:id/agents` also answers `skills`, keyed by agent
+  id, with `{id, name}` in name order from `skills/switchable.ts`, one
+  read. Agents without skills have no entry.
 - **An MCP server is rows, discovered through the official SDK.** The
   wire is `@modelcontextprotocol/client` v2 over Streamable HTTP in
   `auto` negotiation (the modern stateless era, or the legacy
@@ -466,7 +477,8 @@ violation, and every rule has a rejected fixture under
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
   off per server), the two memory blocks, the knowledge block, the date
   line, the chat's web-off line when applicable, the MCP-off line when
-  applicable, and last the change note. The policy's `mcpOff` holds the
+  applicable, the skills-off line when applicable, and last the change
+  note. The policy's `mcpOff` holds the
   sorted names of disabled linked servers with otherwise-offered tools,
   empty for a model without tools; `mcpOffLine()` names them.
   `GET /api/projects/:id/agents` also answers `servers`, keyed by agent id,
@@ -532,9 +544,10 @@ violation, and every rule has a rejected fixture under
   commit. Create and send accept up to ten distinct staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys: `web` and `mcp:<server id>`.
-  The MCP parser checks only the id's shape, 1 to 32 lowercase ASCII
-  letters or digits; unknown or unassigned server keys are kept and ignored.
+  change with `disable` and `enable` keys: `web`, `mcp:<server id>` and
+  `skill:<skill id>`. The parser checks only an id's shape, 1 to 32
+  lowercase ASCII letters or digits; unknown or unassigned server and
+  skill keys are kept and ignored.
   The policy resolves it before schemas are built; `startSend` applies
   it again to the current row in its transaction, with the message's
   revision and envelope. A refused start writes nothing; a later failure
@@ -976,11 +989,12 @@ violation, and every rule has a rejected fixture under
   The editor's Access section (`AccessSection.tsx`) is the Web access
   switch, on for a new task and off with the composer's reasons when it
   cannot be switched, then a `RowsList` with a switch per MCP server of
-  the picked agent. The row's whole `disabledCapabilities` is saved:
-  `web` and the keys of the shown servers that are off, so a key for a
-  server the picked agent lacks is dropped. The automation page's Setup
-  aside (`AutomationAccess.tsx`) says Web access Off and names the
-  servers off, and nothing while all is on.
+  the picked agent and another per skill. The row's whole
+  `disabledCapabilities` is saved: `web` and the keys of the shown
+  servers and skills that are off, so a key for one the picked agent
+  lacks is dropped. The automation page's Setup aside
+  (`AutomationAccess.tsx`) says Web access Off and names the servers and
+  the skills off, and nothing while all is on.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -1027,17 +1041,22 @@ violation, and every rule has a rejected fixture under
   `disabledCapabilities`, so another member's envelope moves every key
   left alone. A create, a message and Regenerate carry them as a change
   and forget them once the server took the send; a refused send keeps
-  them, and so does a flip made while the send was on its way. Leaving
+  them, and so does a flip made while the send was on its way: `carry()`
+  holds what the request carries, so a flip back to the set the chat
+  still holds is kept. Leaving
   the chat and a reload forget them, a slash command carries none. Nothing
   outside the menu says web access is off.
   The third item, MCP servers, is there when the picked agent has an
   entry in `servers` of the same answer, held beside `switchable`. It
   says how many are off and swaps the menu's rows, inside the same
-  `.menu` box, for `composer/AddServers.tsx`: a back row, then a
-  `role="switch"` item per server with its tool count. Escape or Back
+  `.menu` box, for `composer/AddPane.tsx`: a back row, then a
+  `role="switch"` item per server with its tool count. The fourth item,
+  Skills, is the same pane over the agent's entry in `skills`, a switch
+  per skill with nothing to count. Escape or Back
   returns to the menu through `useMenu(back)`; a flip leaves the pane
-  open. There is no switch for all servers. Picking another agent in a
-  chat not made yet drops the pending `mcp:` flips through `dropKind()`;
+  open. There is no switch for all servers or all skills. Picking another
+  agent in a chat not made yet drops the pending `mcp:` and `skill:`
+  flips through `dropKind()`;
   the list going away for a moment is no pick (`agentMoved()`). A row
   that leaves the page on its own click stops the click, or the menu
   reads it as one outside; the pane takes the focus and gives it back.

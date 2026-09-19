@@ -95,12 +95,17 @@ export type ForkSessionResponse = SessionDetail & { draftUploads: string[] };
 // how many of its tools that is
 export type SwitchableServer = { id: string; name: string; tools: number };
 
+// a skill a chat can turn off: one its agent carries
+export type SwitchableSkill = { id: string; name: string };
+
 // GET /api/projects/:id/agents: the agents the composer offers, the
 // capability keys a send starting now could turn off (`web` while the
 // admin's web access is not off), and by agent id the MCP servers it is
-// offered now, in name order; an agent without one has no entry
+// offered now and the skills it carries, in name order; an agent without
+// one has no entry
 export type ProjectAgentsResponse = {
   agents: AgentSummary[];
   capabilities: string[];
   servers: Record<string, SwitchableServer[]>;
+  skills: Record<string, SwitchableSkill[]>;
 };

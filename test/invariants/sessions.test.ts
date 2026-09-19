@@ -61,6 +61,7 @@ function fixedTools(content: string): Tools {
   return {
     capabilities: () => [],
     serverNames: () => [],
+    skillsOff: () => [],
     offered: () => ({
       tools: [
         {
@@ -637,6 +638,7 @@ describe("GET /api/projects/:id/agents", () => {
       agents: [expect.objectContaining({ id: chat.agentId, name: "coder" })],
       capabilities: ["web"],
       servers: {},
+      skills: {},
     });
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
     expect(

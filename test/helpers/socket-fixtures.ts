@@ -115,6 +115,7 @@ export type ToolPlan = {
 type FakeToolsCap = {
   capabilities(): string[];
   serverNames(): string[];
+  skillsOff(): string[];
   offered(now: number): Offered;
   run(
     offered: Offered,
@@ -142,6 +143,7 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
     tools: {
       capabilities: () => [],
       serverNames: () => [],
+      skillsOff: () => [],
       offered: () => ({
         tools: schemas,
         search: null,

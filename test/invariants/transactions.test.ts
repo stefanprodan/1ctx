@@ -299,6 +299,7 @@ describe("finishTool rollback", () => {
       const tools: Tools = {
         capabilities: () => [],
         serverNames: () => [],
+        skillsOff: () => [],
         offered: () => ({
           search: null,
           skills: { block: "", skills: [] },
@@ -414,6 +415,7 @@ describe("finalizeSend rollback", () => {
     const tools: Tools = {
       capabilities: () => [],
       serverNames: () => [],
+      skillsOff: () => [],
       offered: () => ({
         search: null,
         skills: { block: "", skills: [] },

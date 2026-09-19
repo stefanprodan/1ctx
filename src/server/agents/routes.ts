@@ -9,6 +9,7 @@ import type { AgentResponse, AgentsResponse } from "../../shared/api/agents.ts";
 import type {
   ProjectAgentsResponse,
   SwitchableServer,
+  SwitchableSkill,
 } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
@@ -45,6 +46,7 @@ export type AutomationsPort = {
 export type SkillsPort = {
   exists(id: string): boolean;
   assign(agentId: string, ids: string[]): void;
+  switchable(): Record<string, SwitchableSkill[]>;
 };
 
 export type McpPort = {
@@ -222,6 +224,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           agents,
           capabilities: deps.tools.capabilities(),
           servers: deps.mcp.switchableBy(agents),
+          skills: deps.skills.switchable(),
         };
         return json(body);
       },

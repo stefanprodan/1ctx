@@ -27,7 +27,7 @@ import {
   runDeadlineMs,
   updateAutomation,
 } from "../../data/automations.ts";
-import { servers, switchable } from "../../data/capabilities.ts";
+import { servers, skills, switchable } from "../../data/capabilities.ts";
 import { me } from "../../data/me.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
@@ -49,6 +49,7 @@ import {
   MEMORY_MODES,
   pickMemory,
   requestOf,
+  toggled,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";
@@ -86,9 +87,11 @@ function Editor({
     );
     if (next !== draft.value) draft.value = next;
   }, [automation?.deadlineMs, limitMs]);
-  // the picked agent's servers, read when a call runs as the draft is
+  // the picked agent's servers and skills, read when a call runs as the
+  // draft is
   const serversOf = () => servers.value[draft.value.agentId] ?? [];
-  const request = requestOf(draft.value, limitMs, serversOf());
+  const skillsOf = () => skills.value[draft.value.agentId] ?? [];
+  const request = requestOf(draft.value, limitMs, serversOf(), skillsOf());
   const back =
     automation === null
       ? `/projects/${projectId}/automations`
@@ -96,7 +99,12 @@ function Editor({
   // the call is kept from the first render, so it reads the draft's
   // signal when it runs rather than this render's request
   const save = useSave(async () => {
-    const current = requestOf(draft.value, limitRef.current, serversOf());
+    const current = requestOf(
+      draft.value,
+      limitRef.current,
+      serversOf(),
+      skillsOf(),
+    );
     if (!("body" in current)) throw new Error(current.problem);
     const saved =
       automation === null
@@ -235,13 +243,10 @@ function Editor({
         onWeb={() => set({ web: !d.web })}
         servers={takesTools ? serversOf() : []}
         mcpOff={d.mcpOff}
-        onServer={(key) =>
-          set({
-            mcpOff: d.mcpOff.includes(key)
-              ? d.mcpOff.filter((k) => k !== key)
-              : [...d.mcpOff, key],
-          })
-        }
+        onServer={(key) => set({ mcpOff: toggled(d.mcpOff, key) })}
+        skills={takesTools ? skillsOf() : []}
+        skillsOff={d.skillsOff}
+        onSkill={(key) => set({ skillsOff: toggled(d.skillsOff, key) })}
         disabled={off}
       />
       <Section title="When" text="In the time zone you pick">

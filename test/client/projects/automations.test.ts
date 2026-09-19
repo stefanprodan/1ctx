@@ -268,6 +268,7 @@ describe("the form", () => {
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
       mcpOff: [],
+      skillsOff: [],
     });
   });
 
@@ -375,21 +376,56 @@ describe("the form", () => {
     ]);
   });
 
+  test("skills off follow the row and save only for the picked agent", () => {
+    const row = automation({
+      disabledCapabilities: ["skill:gone", "skill:s1"],
+    });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.skillsOff).toEqual(["skill:gone", "skill:s1"]);
+    expect(shown.mcpOff).toEqual([]);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, skillsOff: [] }, row, LIMIT)).toBe(true);
+    const request = requestOf(
+      filled({ mcpOff: ["mcp:a1"], skillsOff: ["skill:gone", "skill:s1"] }),
+      LIMIT,
+      [{ id: "a1", name: "flux", tools: 18 }],
+      [{ id: "s1", name: "gitops" }],
+    );
+    expect("body" in request && request.body.disabledCapabilities).toEqual([
+      "mcp:a1",
+      "skill:s1",
+    ]);
+  });
+
   test("the page's aside names what the row keeps its runs from", () => {
     const servers = [
       { id: "b2", name: "github", tools: 42 },
       { id: "a1", name: "flux", tools: 18 },
     ];
-    expect(accessOf(automation({}), servers)).toEqual({
+    const skills = [
+      { id: "s2", name: "visualize" },
+      { id: "s1", name: "gitops" },
+    ];
+    expect(accessOf(automation({}), servers, skills)).toEqual({
       web: true,
       mcpOff: [],
+      skillsOff: [],
     });
     const row = automation({
-      disabledCapabilities: ["mcp:a1", "mcp:b2", "mcp:gone", "web"],
+      disabledCapabilities: [
+        "mcp:a1",
+        "mcp:b2",
+        "mcp:gone",
+        "skill:gone",
+        "skill:s1",
+        "skill:s2",
+        "web",
+      ],
     });
-    expect(accessOf(row, servers)).toEqual({
+    expect(accessOf(row, servers, skills)).toEqual({
       web: false,
       mcpOff: ["flux", "github"],
+      skillsOff: ["gitops", "visualize"],
     });
   });
 

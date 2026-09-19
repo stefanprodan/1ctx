@@ -10,7 +10,11 @@
 // holds then. A reload forgets them, and so does leaving the chat.
 
 import { effect, signal } from "@preact/signals";
-import type { SwitchableServer } from "../../shared/api/sessions.ts";
+import type {
+  ProjectAgentsResponse,
+  SwitchableServer,
+  SwitchableSkill,
+} from "../../shared/api/sessions.ts";
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import { me } from "./me.ts";
 
@@ -22,6 +26,16 @@ export const switchable = signal<readonly string[] | null>(null);
 // answer; an agent without one has no entry
 export const servers = signal<Readonly<Record<string, SwitchableServer[]>>>({});
 
+// by agent id, the skills the agent carries, from the same answer
+export const skills = signal<Readonly<Record<string, SwitchableSkill[]>>>({});
+
+// the project's agents answered: what can be switched there now
+export function answered(body: ProjectAgentsResponse): void {
+  switchable.value = body.capabilities;
+  servers.value = body.servers;
+  skills.value = body.skills;
+}
+
 // the chat a flip belongs to, "" for one not made yet; key to off
 type Flips = ReadonlyMap<string, boolean>;
 const NEW = "";
@@ -30,6 +44,11 @@ const pending = signal<{ scope: string; flips: Flips }>({
   flips: new Map(),
 });
 
+// what a request on its way carries, key to off: until it is answered
+// the chat's set still holds the old word, so a flip back to that word
+// is a change to keep, not one to forget
+let carried: { scope: string; flips: Flips } = { scope: NEW, flips: new Map() };
+
 let owner: string | null = null;
 effect(() => {
   const id = me.value?.id ?? null;
@@ -37,7 +56,9 @@ effect(() => {
   owner = id;
   switchable.value = null;
   servers.value = {};
+  skills.value = {};
   pending.value = { scope: NEW, flips: new Map() };
+  carried = { scope: NEW, flips: new Map() };
 });
 
 const scopeOf = (sessionId: string | null) => sessionId ?? NEW;
@@ -56,7 +77,8 @@ export function isOff(
   return flipsOf(sessionId).get(key) ?? stored.includes(key);
 }
 
-// a flip back to what the session holds is no flip at all
+// a flip back to what the session holds, or will hold once the request
+// on its way is answered, is no flip at all
 export function flip(
   sessionId: string | null,
   stored: readonly string[],
@@ -64,7 +86,9 @@ export function flip(
 ): void {
   const off = !isOff(sessionId, stored, key);
   const flips = new Map(flipsOf(sessionId));
-  if (off === stored.includes(key)) flips.delete(key);
+  const sent =
+    carried.scope === scopeOf(sessionId) ? carried.flips.get(key) : undefined;
+  if (off === (sent ?? stored.includes(key))) flips.delete(key);
   else flips.set(key, off);
   pending.value = { scope: scopeOf(sessionId), flips };
 }
@@ -104,8 +128,38 @@ export function accepted(
   pending.value = { scope: pending.value.scope, flips };
 }
 
+// a send with the flips it carries: taken, its flips are the chat's; refused,
+// they wait for the next try, one flipped there and back while it was away
+// included
+export async function carry<T>(
+  sessionId: string | null,
+  sent: { capabilities?: CapabilityChange },
+  request: () => Promise<T>,
+): Promise<T> {
+  const scope = scopeOf(sessionId);
+  const flips = new Map<string, boolean>([
+    ...(sent.capabilities?.disable ?? []).map((k) => [k, true] as const),
+    ...(sent.capabilities?.enable ?? []).map((k) => [k, false] as const),
+  ]);
+  carried = { scope, flips };
+  try {
+    const answer = await request();
+    accepted(sessionId, sent);
+    return answer;
+  } catch (err) {
+    if (pending.value.scope === scope) {
+      const kept = new Map(pending.value.flips);
+      for (const [key, off] of flips) if (!kept.has(key)) kept.set(key, off);
+      pending.value = { scope, flips: kept };
+    }
+    throw err;
+  } finally {
+    if (carried.flips === flips) carried = { scope: NEW, flips: new Map() };
+  }
+}
+
 // another agent was picked in a chat not made yet: the flips of one kind
-// named the other agent's servers
+// named the other agent's servers or skills
 export function dropKind(sessionId: string | null, kind: string): void {
   if (pending.value.scope !== scopeOf(sessionId)) return;
   const flips = new Map(pending.value.flips);
