@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 }
 . scripts/staging.env
 HOST=$STAGING_SSH
-LISTEN=${STAGING_LISTEN:-0.0.0.0:1235}
+LISTEN=${STAGING_LISTEN:-0.0.0.0:11236}
 KEEP_BACKUPS=3
 
 # BatchMode fails fast instead of prompting
