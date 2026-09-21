@@ -52,13 +52,17 @@ db=~/.1ctx/1ctx.sqlite
 old=$(~/.1ctx/bin/1ctx -v 2>/dev/null || echo unknown)
 out=~/.1ctx/backups/1ctx-$(date -u +%Y%m%dT%H%M%SZ)-$old.sqlite
 sqlite3 "$db" ".backup '$out'"
+# The copy inherits WAL mode and would grow -shm and -wal files the
+# moment it is opened. A backup is one file: take it out of WAL first.
+sqlite3 "$out" 'pragma journal_mode=delete' >/dev/null
+rm -f "$out-shm" "$out-wal"
 [ "$(sqlite3 "$out" 'pragma integrity_check')" = ok ] || {
   echo "staging: the backup failed its integrity check: $out" >&2
   exit 1
 }
 echo "backup: $out"
 ls -1t ~/.1ctx/backups/1ctx-*.sqlite | tail -n +$((KEEP + 1)) | while read -r f; do
-  rm -f "$f"
+  rm -f "$f" "$f-shm" "$f-wal"
 done
 REMOTE
 
