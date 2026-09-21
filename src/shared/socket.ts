@@ -19,7 +19,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 12;
+export const PROTOCOL = 13;
 
 export type VisualFrame = {
   type: "visual";
@@ -39,7 +39,9 @@ export type SocketCommand =
   | { type: "unwatch"; sessionId: string };
 
 export type SocketEvent =
-  | { type: "hello"; protocol: number }
+  // version is the server's build: a tab that has seen another one is
+  // running the client an older server shipped, and reloads the page
+  | { type: "hello"; protocol: number; version: string }
   | VisualFrame
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and

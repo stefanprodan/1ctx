@@ -19,7 +19,10 @@
     "preview-log": "scripts/preview.sh log",
     "preview-clean": "scripts/preview.sh clean",
     "preview-provision": "scripts/preview.sh provision",
-    "preview-reset": "scripts/preview.sh reset"
+    "preview-reset": "scripts/preview.sh reset",
+    "staging-deploy": "scripts/staging.sh deploy",
+    "staging-provision": "scripts/staging.sh provision",
+    "staging-status": "scripts/staging.sh status"
   },
   "license": "Apache-2.0",
   "engines": {

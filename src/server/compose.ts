@@ -263,6 +263,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
+    version: options.version,
     refresh: (principal) => access.refresh(principal),
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
@@ -341,6 +342,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     resolve: (req) => access.resolve(req),
     trustProxy: options.trustProxy,
+    log: options.log("web"),
   });
   const provision = provisionArea({
     handle,

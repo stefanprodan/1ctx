@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import { json, type RouteDescriptor } from "../../../src/server/lib/http.ts";
+import { format, silent } from "../../../src/server/lib/log.ts";
 import {
   conflicts,
   type Router,
@@ -42,7 +43,12 @@ describe("conflicts", () => {
 
   test("the router refuses to start on one", () => {
     expect(() =>
-      router({ routes: [echo, echo], resolve: nobody, trustProxy: false }),
+      router({
+        routes: [echo, echo],
+        resolve: nobody,
+        trustProxy: false,
+        log: silent,
+      }),
     ).toThrow("overlaps");
   });
 });
@@ -115,7 +121,7 @@ describe("clientAddress", () => {
 
 describe("router", () => {
   const handle = answered(
-    router({ routes: [echo], resolve: nobody, trustProxy: false }),
+    router({ routes: [echo], resolve: nobody, trustProxy: false, log: silent }),
   );
   const get = (path: string) => handle(new Request(`http://x${path}`), "a");
 
@@ -131,7 +137,12 @@ describe("router", () => {
       },
     };
     const route = answered(
-      router({ routes: [upgrade], resolve: nobody, trustProxy: false }),
+      router({
+        routes: [upgrade],
+        resolve: nobody,
+        trustProxy: false,
+        log: silent,
+      }),
     );
     const cross = await route(
       new Request("http://x/api/socket", {
@@ -187,6 +198,7 @@ describe("router", () => {
         ],
         resolve: () => ({ principal: null, setCookie: "login=t; Max-Age=9" }),
         trustProxy: false,
+        log: silent,
       }),
     );
     const a = await renew(new Request("http://x/api/things/1"), "a");
@@ -220,6 +232,7 @@ describe("router", () => {
           setCookie: "login=t; Max-Age=9",
         }),
         trustProxy: false,
+        log: silent,
       }),
     );
     const denied = await renew(new Request("http://x/api/admin"), "a");
@@ -228,5 +241,79 @@ describe("router", () => {
     const failed = await renew(new Request("http://x/api/boom"), "a");
     expect(failed.status).toBe(400);
     expect(failed.headers.get("set-cookie")).toBe("login=t; Max-Age=9");
+  });
+});
+
+describe("a handler that throws", () => {
+  const boom: RouteDescriptor = {
+    ...echo,
+    path: "/api/boom",
+    policy: "authenticated",
+    handle: () => {
+      throw new TypeError("rows is undefined");
+    },
+  };
+  const principal = {
+    userId: "u1",
+    username: "maria",
+    fullName: "Maria",
+    role: "member" as const,
+    loginId: "l1",
+    mustChangePassword: false,
+  };
+
+  test("is logged with where and who, then thrown on", async () => {
+    const lines: string[] = [];
+    const handle = router({
+      routes: [boom],
+      resolve: () => ({ principal, setCookie: null }),
+      trustProxy: false,
+      log: (line) => lines.push(line),
+    });
+
+    await expect(
+      handle(new Request("http://x/api/boom?q=secret"), "a"),
+    ).rejects.toThrow("rows is undefined");
+
+    expect(lines).toEqual([
+      "GET /api/boom as maria failed: TypeError: rows is undefined",
+    ]);
+  });
+
+  test("an HttpError is an answer, not a log line", async () => {
+    const lines: string[] = [];
+    const handle = answered(
+      router({
+        routes: [
+          {
+            ...echo,
+            path: "/api/bad",
+            handle: () => {
+              throw new BadRequest("no");
+            },
+          },
+        ],
+        resolve: nobody,
+        trustProxy: false,
+        log: (line) => lines.push(line),
+      }),
+    );
+
+    const res = await handle(new Request("http://x/api/bad"), "a");
+
+    expect(res.status).toBe(400);
+    expect(lines).toEqual([]);
+  });
+});
+
+describe("log format", () => {
+  test("is the UTC time, the area, then the line", () => {
+    expect(
+      format(
+        new Date("2026-09-22T01:39:12.345Z"),
+        "runner",
+        "chat ab12 finish",
+      ),
+    ).toBe("2026-09-22T01:39:12.345Z runner: chat ab12 finish");
   });
 });

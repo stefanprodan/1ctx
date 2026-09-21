@@ -60,6 +60,8 @@ let timer: unknown = null;
 let attempt = 0;
 let watching: string | null = null;
 let stopped = false;
+// the server build this tab first heard from, which shipped its client
+let build: string | null = null;
 
 export function onSocketEvent(fn: Dispatch): () => void {
   dispatchers = [...dispatchers, fn];
@@ -121,10 +123,15 @@ function connect(): void {
     }
     if (!isEvent(parsed)) return;
     if (parsed.type === "hello") {
-      if (parsed.protocol !== PROTOCOL) {
+      // another protocol, or another build than the one this tab came
+      // from: the server was deployed over an open tab, whose client may
+      // no longer match the API
+      const moved = build !== null && build !== parsed.version;
+      if (parsed.protocol !== PROTOCOL || moved) {
         deps.reloadPage();
         return;
       }
+      build = parsed.version;
       attempt = 0;
       if (watching !== null) send({ type: "watch", sessionId: watching });
       void deps.reload();
@@ -180,6 +187,7 @@ export function startSocket(override?: Partial<SocketDeps>): () => void {
     dispose();
     disconnect();
     watching = null;
+    build = null;
   };
 }
 

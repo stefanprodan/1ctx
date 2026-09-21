@@ -34,6 +34,7 @@ export const LAYERS = [
   "runner",
   "automations",
   "provision",
+  "service",
   "web",
 ] as const;
 

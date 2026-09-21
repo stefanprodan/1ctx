@@ -14,6 +14,9 @@ import type {
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
+import { logger } from "./log.ts";
+
+const log = logger("bus");
 
 // the event map: one entry per event, payload by name
 export type BusEvents = {
@@ -73,7 +76,7 @@ export function publish(event: BusEvent): void {
     try {
       listener(event);
     } catch (err) {
-      console.error(`bus: listener failed on ${event.type}: ${String(err)}`);
+      log(`listener failed on ${event.type}: ${String(err)}`);
     }
   }
 }

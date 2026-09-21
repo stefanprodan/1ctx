@@ -9,9 +9,9 @@ One continuous context for agents. Domain: 1ctx.dev.
   `src/server/lib/archive.ts` alone imports `@zip.js/zip.js` and
   `modern-tar`. The modern-tar patch retains the raw header `typeflag`
   to distinguish GNU sparse and unknown types from regular files.
-- **Status:** alpha. No backwards compatibility, no shims; the schema,
-  the API and the socket may change freely; the schema grows by
-  migration and is rewritten, with a wipe, only for a rename.
+- **Status:** alpha. No backwards compatibility and no shims for the API
+  and the socket, which may change freely. Stored data is kept: every
+  schema change is an appended migration and no database is wiped.
 
 ## The dev loop
 
@@ -29,6 +29,9 @@ make lint           # biome check --write, then tsc; run after any code change
 make test           # bun test, concurrent; run after any code change, before finishing
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
+make staging-deploy     # build main, back the staging db up, swap the binary, restart
+make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
+make staging-status     # what the staging service says
 ```
 
 The preview runs the source with `ONECTX_DEV=1` (Bun's dev server: a
@@ -73,8 +76,10 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 scripted provider stream; auth-cases.ts is the
                 authorization matrix), fixtures/ (recorded bodies,
                 structure/ holds one violating root per layout rule).
-scripts/        preview.sh, and brand.py which regenerates the brand SVGs
-                in site/ from the brand book (`uv run scripts/brand.py`).
+scripts/        preview.sh, staging.sh (the staging instance over ssh, its
+                host in the gitignored scripts/staging.env), and brand.py
+                which regenerates the brand SVGs in site/ from the brand
+                book (`uv run scripts/brand.py`).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
@@ -105,6 +110,32 @@ lists replace, passwords and their change flag are creation-only, and
 objects not named are never deleted. Tool objects configure `web` with
 mode and domains, `websearch` with a nullable provider, and `visualize`
 with its switch and hosts; webfetch is read-only.
+
+`service/` is the CLI-only area after `provision/`; it imports only
+`lib/`, composes nothing and opens no database. `1ctx service
+install [options] [--restart]`, `status`, `start`, `stop`, `restart`
+and `uninstall [--purge]` run the compiled binary as a service of the
+signed-in user. `service.ts` holds the commands and knows no platform;
+it talks to the `ServiceBackend` in `backend.ts`. `launchd.ts` is the
+macOS backend, a LaunchAgent labelled `dev.1ctx.server`; any other
+platform answers "service is not supported on <platform> yet", and a
+new manager is a new backend picked in `backendFor()`. `install` parses
+its options with `parseCli()` in `lib/cli.ts`, the parser `main.ts`
+runs, so it refuses what the server would, pins relative paths and
+writes every option out through `optionsToArgs()`; `start`, `restart`
+and `status` read them back from the definition. A start waits for
+`GET /api/health`. The log is the manager's, `~/.1ctx/1ctx.log`,
+rotated at 8 MB only on an install. `--purge` removes the database and
+the log, never the secrets. The tests run the commands over a fake
+backend and the launchd backend over a fake `launchctl`, on any
+platform.
+
+Staging is a Mac that runs the binary through `1ctx service` with its
+data under `~/.1ctx`. It holds real data and takes `main` only:
+`staging-deploy` refuses another branch or a dirty checkout unless
+`ALLOW_BRANCH=1`, stamps the commit into the version, takes a `sqlite3
+.backup` there before the swap and keeps the last three. A migration
+that ran on staging is frozen as if merged.
 
 ## Rules the structure test enforces
 
@@ -521,11 +552,11 @@ violation, and every rule has a rejected fixture under
   rows for the truth.
 - **A schema change is a new migration.** `db/migrations/` is the
   ordered list and a store never creates a table. Adding a table, a
-  column or an index is a file appended to the list; the preview db
-  keeps its rows. Renaming or retyping what exists is not migrated:
-  while alpha there is no backwards compatibility, so the migration
-  that created it is edited in place and the preview db wiped with
-  `make preview-clean`. Say which of the two a PR does. A migration that
+  column or an index is a file appended to the list, and so is
+  renaming or retyping what exists: SQLite's rename where it is enough,
+  a table rebuild otherwise. A migration on `main` is never edited and
+  no database is wiped, since staging holds real data; one not yet on
+  `main` may still grow in its own file. A migration that
   rebuilds a table other tables reference sets `rebuild: true`:
   `migrate()` turns foreign keys off before its transaction, runs
   `pragma foreign_key_check` after `up()` and throws on a row, and turns
@@ -824,6 +855,10 @@ violation, and every rule has a rejected fixture under
   `upgrade: true` on the descriptor: the router applies the same-origin
   check as for a write and hands the handler `ctx.upgrade()`; without
   an upgrade the route answers 426. The protocol is `shared/socket.ts`.
+  `hello` carries `PROTOCOL` and the server's build version. The client
+  keeps the first version it hears and reloads the page on another
+  protocol or another version, so a tab left open over a deploy never
+  runs an older server's client; a sign out in the tab keeps it.
 - **Rendered HTML carries `md-` classes on every element** and
   highlight.js tokens keep `hljs-`, so a stylesheet owns those prefixes
   and styles nothing by element. Render is server-side in `render/`.
@@ -1116,6 +1151,13 @@ violation, and every rule has a rejected fixture under
   `.clamp`, `.cut`, `.meter`, `.notice-failed`, `.btn-text`,
   `.btn-icon`, `.status-*`); an owner adds only position, size and
   what is its own.
+- **A log line is the UTC time, the area, then the words,** one line per
+  event on stderr through `logger(area)` in `lib/log.ts`, which
+  `compose.ts` hands each area; nothing calls `console` for it, and a
+  test passes `silent`. Ids, names and counts only: never a secret, a
+  message, a prompt or a query string. The router logs a handler's throw
+  that is not an `HttpError` with the method, the path and the user,
+  then throws it on, so the listener answers 500.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

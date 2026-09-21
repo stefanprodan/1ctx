@@ -9,6 +9,7 @@ import {
   MAX_ARCHIVE_UPLOAD,
 } from "../../src/server/knowledge/limits.ts";
 import { MAX_BODY, readBytes } from "../../src/server/lib/body.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import { router } from "../../src/server/web/router.ts";
 import { serve } from "../../src/server/web/serve.ts";
 import page from "../fixtures/body.html";
@@ -23,6 +24,7 @@ test("the listener admits upload bytes while JSON routes keep their own caps", a
   const bytesRoute = router({
     resolve: () => ({ principal: null, setCookie: null }),
     trustProxy: false,
+    log: silent,
     routes: [
       {
         method: "POST",

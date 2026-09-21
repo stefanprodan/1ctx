@@ -8,7 +8,7 @@ export VERSION
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke
+.PHONY: help start dev test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke staging-deploy staging-provision staging-status
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -52,3 +52,12 @@ preview-provision: ## Apply a provision file to the preview (FILE=path.yaml)
 
 preview-reset: ## Wipe the preview and provision it again (FILE=path.yaml SECRETS=dir)
 	@bun run preview-reset $(FILE) $(SECRETS)
+
+staging-deploy: ## Build main, back the staging db up, swap the binary and restart its service
+	@bun run staging-deploy
+
+staging-provision: ## Stop staging, apply the objects, start it (FILE=path.yaml, SECRETS=dir to copy keys first)
+	@bun run staging-provision $(FILE) $(SECRETS)
+
+staging-status: ## What the staging service says
+	@bun run staging-status
