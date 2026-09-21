@@ -18,6 +18,7 @@ import {
   type RouteDescriptor,
   type RouteOutcome,
 } from "../lib/http.ts";
+import type { Log } from "../lib/log.ts";
 
 type Compiled = RouteDescriptor & { pattern: RegExp; names: string[] };
 
@@ -45,6 +46,7 @@ export type RouterDeps = {
   // behind a TLS-terminating proxy the request arrives as http; the
   // proxy's X-Forwarded-Proto says what the browser saw
   trustProxy: boolean;
+  log: Log;
 };
 
 export function compile(route: RouteDescriptor): Compiled {
@@ -111,7 +113,8 @@ export function sameOrigin(req: Request, url: URL, trustProxy: boolean) {
 }
 
 // the policy, the parameters and the handler; every outcome is a
-// Response, an HttpError included, and anything else is a bug
+// Response, an HttpError included. Anything else is a bug: it is logged
+// with where it happened and thrown on, which the listener answers 500.
 async function dispatch(
   route: Compiled,
   match: RegExpExecArray,
@@ -122,6 +125,7 @@ async function dispatch(
     address: string;
     upgrade?: (data: unknown) => boolean;
   },
+  log: Log,
 ): Promise<RouteOutcome> {
   if (route.policy === "authenticated" || route.policy === "admin") {
     if (principal === null) return json({ error: "sign in" }, 401);
@@ -152,6 +156,10 @@ async function dispatch(
     if (err instanceof HttpError) {
       return json({ error: err.message }, err.status);
     }
+    const who = principal === null ? "nobody" : principal.username;
+    const what =
+      err instanceof Error ? (err.stack ?? err.message) : String(err);
+    log(`${ctx.req.method} ${ctx.url.pathname} as ${who} failed: ${what}`);
     throw err;
   }
 }
@@ -189,12 +197,13 @@ export function router(deps: RouterDeps): Router {
                   : { "set-cookie": resolution.setCookie },
               )
           : undefined;
-      const res = await dispatch(route, match, resolution.principal, {
-        req,
-        url,
-        address,
-        upgrade,
-      });
+      const res = await dispatch(
+        route,
+        match,
+        resolution.principal,
+        { req, url, address, upgrade },
+        deps.log,
+      );
       if (res === undefined) return undefined;
       // the row already moved, so the browser's copy must move with it
       // whatever the answer was, unless the handler replaced the cookie

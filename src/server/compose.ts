@@ -341,6 +341,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     resolve: (req) => access.resolve(req),
     trustProxy: options.trustProxy,
+    log: options.log("web"),
   });
   const provision = provisionArea({
     handle,

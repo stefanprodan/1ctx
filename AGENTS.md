@@ -1147,6 +1147,13 @@ violation, and every rule has a rejected fixture under
   `.clamp`, `.cut`, `.meter`, `.notice-failed`, `.btn-text`,
   `.btn-icon`, `.status-*`); an owner adds only position, size and
   what is its own.
+- **A log line is the UTC time, the area, then the words,** one line per
+  event on stderr through `logger(area)` in `lib/log.ts`, which
+  `compose.ts` hands each area; nothing calls `console` for it, and a
+  test passes `silent`. Ids, names and counts only: never a secret, a
+  message, a prompt or a query string. The router logs a handler's throw
+  that is not an `HttpError` with the method, the path and the user,
+  then throws it on, so the listener answers 500.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state
