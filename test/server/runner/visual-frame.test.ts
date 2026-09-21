@@ -21,7 +21,7 @@ const frame: VisualFrame = {
 
 describe("visual socket frames", () => {
   test("accepts the frame with an optional title and UTF-16 offsets", () => {
-    expect(PROTOCOL).toBe(12);
+    expect(PROTOCOL).toBe(13);
     expect(isVisualFrame(frame)).toBe(true);
     expect(isVisualFrame({ ...frame, title: "Drawing", htmlAt: 5 })).toBe(true);
     expect(isVisualFrame({ ...frame, html: "", title: "Late" })).toBe(true);

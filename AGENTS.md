@@ -855,6 +855,10 @@ violation, and every rule has a rejected fixture under
   `upgrade: true` on the descriptor: the router applies the same-origin
   check as for a write and hands the handler `ctx.upgrade()`; without
   an upgrade the route answers 426. The protocol is `shared/socket.ts`.
+  `hello` carries `PROTOCOL` and the server's build version. The client
+  keeps the first version it hears and reloads the page on another
+  protocol or another version, so a tab left open over a deploy never
+  runs an older server's client; a sign out in the tab keeps it.
 - **Rendered HTML carries `md-` classes on every element** and
   highlight.js tokens keep `hljs-`, so a stylesheet owns those prefixes
   and styles nothing by element. Render is server-side in `render/`.

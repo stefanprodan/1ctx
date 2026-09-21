@@ -41,6 +41,9 @@ export type Conn = {
 };
 
 export type SocketDeps = {
+  // the build, told to every connection so a tab left open over a
+  // deploy reloads
+  version: string;
   // the current principal, or null for a user that is gone
   refresh(principal: Principal): Principal | null;
   // every project the user may see now, or null for a user that is gone
@@ -283,7 +286,11 @@ export function socketArea(deps: SocketDeps): Socket {
         byUser.set(conn.data.principal.userId, set);
       }
       set.add(conn);
-      deliver(conn, { type: "hello", protocol: PROTOCOL });
+      deliver(conn, {
+        type: "hello",
+        protocol: PROTOCOL,
+        version: deps.version,
+      });
     },
     message(conn, raw) {
       let parsed: unknown;

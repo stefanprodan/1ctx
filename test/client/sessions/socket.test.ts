@@ -106,6 +106,9 @@ afterEach(() => {
   me.value = undefined;
 });
 
+const hello = (version: string, protocol = PROTOCOL) =>
+  JSON.stringify({ type: "hello", protocol, version });
+
 describe("the tab socket", () => {
   test("opens for a signed-in user and closes when the user leaves", () => {
     start();
@@ -122,7 +125,7 @@ describe("the tab socket", () => {
     watch("s1");
     wires[0].sent = [];
 
-    wires[0].message(JSON.stringify({ type: "hello", protocol: PROTOCOL }));
+    wires[0].message(hello("v1"));
 
     expect(reloads).toBe(1);
     expect(pageReloads).toBe(0);
@@ -134,7 +137,7 @@ describe("the tab socket", () => {
   test("a hello for another protocol reloads the page", () => {
     start();
 
-    wires[0].message(JSON.stringify({ type: "hello", protocol: PROTOCOL + 1 }));
+    wires[0].message(hello("v1", PROTOCOL + 1));
 
     expect(pageReloads).toBe(1);
     expect(reloads).toBe(0);
@@ -148,6 +151,41 @@ describe("the tab socket", () => {
     expect(timers).toEqual([]);
     expect(wires).toHaveLength(1);
     expect(me.value).toBeNull();
+  });
+
+  test("a hello from another build after a restart reloads the page", () => {
+    start();
+    wires[0].message(hello("v1+aaa"));
+    wires[0].fireClose(CLOSE_RESTARTING);
+    runTimer();
+
+    wires[1].message(hello("v1+bbb"));
+
+    expect(pageReloads).toBe(1);
+    expect(reloads).toBe(1);
+  });
+
+  test("a hello from the same build after a restart reloads only data", () => {
+    start();
+    wires[0].message(hello("v1+aaa"));
+    wires[0].fireClose(CLOSE_RESTARTING);
+    runTimer();
+
+    wires[1].message(hello("v1+aaa"));
+
+    expect(pageReloads).toBe(0);
+    expect(reloads).toBe(2);
+  });
+
+  test("the build is kept over a sign out in the same tab", () => {
+    start();
+    wires[0].message(hello("v1+aaa"));
+    me.value = null;
+    me.value = caelea;
+
+    wires[1].message(hello("v1+bbb"));
+
+    expect(pageReloads).toBe(1);
   });
 
   test("a role frame gives the signed-in user the new role", () => {
