@@ -11,6 +11,7 @@ import type { ServiceBackend } from "./backend.ts";
 import { launchdBackend } from "./launchd.ts";
 
 const HEALTH_ATTEMPTS = 60;
+const VALUED = ["--listen", "--db", "--secrets", "--secrets-mode"];
 const USAGE = "usage: 1ctx service install|status|start|stop|restart|uninstall";
 
 export class ServiceError extends Error {}
@@ -115,11 +116,16 @@ async function install(argv: string[], r: Resolved): Promise<void> {
   if (r.main.endsWith(".ts")) {
     throw new ServiceError("service install needs the compiled binary");
   }
-  const restart = argv.includes("--restart");
-  const cli = parseCli(
-    argv.filter((argument) => argument !== "--restart"),
-    r.home,
-  );
+  // --restart is the switch wherever it cannot be a value, which is
+  // anywhere but right after a flag that takes one
+  const flags: string[] = [];
+  let restart = false;
+  for (const [i, argument] of argv.entries()) {
+    const value = i > 0 && VALUED.includes(argv[i - 1]);
+    if (argument === "--restart" && !value) restart = true;
+    else flags.push(argument);
+  }
+  const cli = parseCli(flags, r.home);
   if (cli.kind === "error") throw new ServiceError(cli.message);
   if (cli.kind !== "run") {
     throw new ServiceError("service install takes the server's options");
@@ -186,6 +192,13 @@ async function status(r: Resolved): Promise<void> {
 async function uninstall(purge: boolean, r: Resolved): Promise<void> {
   const args = await r.backend.installed();
   const options = args === null ? null : optionsOf(args.slice(1), r.home);
+  // a definition that names no readable database is never guessed at:
+  // purge would remove the wrong file
+  if (purge && args !== null && options === null) {
+    throw new ServiceError(
+      "service definition is invalid; uninstall without --purge",
+    );
+  }
   await r.backend.remove();
   if (purge) {
     const db = options?.dbPath ?? join(r.home, ".1ctx", "1ctx.sqlite");

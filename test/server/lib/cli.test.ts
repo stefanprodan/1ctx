@@ -64,6 +64,8 @@ describe("parseCli", () => {
     expect(error(["--nope"])).toBe("unknown option --nope");
     expect(error(["--db"])).toBe("--db needs a value");
     expect(error(["--listen", "nohost"])).toBe("--listen must be host:port");
+    expect(error(["--listen", ":1235"])).toBe("--listen must be host:port");
+    expect(error(["--db", ""])).toBe("--db is empty");
     expect(error(["--listen", "h:0"])).toBe("--listen port must be 1 to 65535");
     expect(error(["--listen", "h:70000"])).toBe(
       "--listen port must be 1 to 65535",

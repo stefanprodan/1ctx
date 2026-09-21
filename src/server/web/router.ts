@@ -157,8 +157,11 @@ async function dispatch(
       return json({ error: err.message }, err.status);
     }
     const who = principal === null ? "nobody" : principal.username;
-    const what =
-      err instanceof Error ? (err.stack ?? err.message) : String(err);
+    // the name and the message on one line, never the stack: a stack is
+    // many lines and an error's text may quote what it was given
+    const what = (
+      err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    ).split("\n")[0];
     log(`${ctx.req.method} ${ctx.url.pathname} as ${who} failed: ${what}`);
     throw err;
   }

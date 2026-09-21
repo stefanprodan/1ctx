@@ -130,6 +130,20 @@ describe("service install", () => {
     expect(calls).toEqual([]);
   });
 
+  test("--restart is the switch anywhere it cannot be a value", async () => {
+    const { backend, calls, definition } = fake({ args: [BIN], loaded: true });
+    const { all } = deps(backend);
+
+    await runService(["install", "--restart", "--listen", "h:1"], all);
+    await runService(["install", "--listen", "h:1", "--restart"], all);
+    expect(calls).toEqual(["install", "install"]);
+    // right after --db it is the database's name, and no switch
+    await expect(
+      runService(["install", "--db", "--restart"], all),
+    ).rejects.toThrow("service is running; use install --restart");
+    expect(definition()?.programArguments).not.toContain("--restart");
+  });
+
   test("a running service needs --restart", async () => {
     const { backend, calls } = fake({ args: [BIN], loaded: true });
     const { all } = deps(backend);
@@ -261,6 +275,19 @@ describe("service uninstall", () => {
     expect(calls).toEqual(["remove"]);
     expect(removed).toEqual([]);
     expect(lines).toEqual(["uninstalled fake.service"]);
+  });
+
+  test("--purge refuses a definition it cannot read", async () => {
+    const { backend, calls } = fake({ args: [BIN, "--gone"] });
+    const { all, removed } = deps(backend);
+
+    await expect(runService(["uninstall", "--purge"], all)).rejects.toThrow(
+      "uninstall without --purge",
+    );
+    expect(calls).toEqual([]);
+    expect(removed).toEqual([]);
+    await runService(["uninstall"], all);
+    expect(calls).toEqual(["remove"]);
   });
 
   test("--purge removes the database and the log, never the secrets", async () => {

@@ -48,6 +48,7 @@ const WAIT_MS = 60_000;
 const POLL_MS = 1_000;
 const BOOTSTRAP_RETRY_MS = 1_000;
 const LOG_LIMIT = 8 * 1024 * 1024;
+const NOT_FOUND = 113;
 
 async function bunSpawn(argv: string[]): Promise<SpawnResult> {
   const child = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe" });
@@ -133,9 +134,14 @@ export function launchdBackend(deps: LaunchdDeps): ServiceBackend {
     return new Error(`${argv.join(" ")}: ${detail}`);
   }
 
+  // launchctl answers 113 for a label it does not hold; any other failure
+  // is launchd's own trouble, never a sign the job is gone
   async function state(): Promise<ServiceState | null> {
-    const result = await spawn(["launchctl", "print", target]);
-    return result.code === 0 ? parseLaunchdPrint(result.stdout) : null;
+    const argv = ["launchctl", "print", target];
+    const result = await spawn(argv);
+    if (result.code === 0) return parseLaunchdPrint(result.stdout);
+    if (result.code === NOT_FOUND) return null;
+    throw failure(argv, result);
   }
 
   // Gone means both: launchd has dropped the label, and the process it

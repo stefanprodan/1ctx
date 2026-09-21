@@ -35,7 +35,9 @@ deploy() {
     [ -z "$dirty" ] || fail "the checkout has uncommitted changes"
   fi
   sha=$(git rev-parse --short HEAD)
-  [ -z "$dirty" ] || sha=$sha.dirty
+  # a dirty tree names its diff too, so two bypass deploys from one
+  # commit are two versions and open tabs reload between them
+  [ -z "$dirty" ] || sha=$sha.dirty$(git diff HEAD | shasum | cut -c1-6)
   local version
   version=v$(bun -e 'console.log(require("./package.json").version)')+$sha
 
@@ -77,6 +79,13 @@ provision() {
   local source=${1:-} keys=${2:-}
   [ -n "$source" ] || fail "provision needs FILE=<file|dir>"
   [ -e "$source" ] || fail "$source does not exist"
+  # the copy is applied as a directory, which reads .yaml and .yml only
+  if [ -f "$source" ]; then
+    case $source in
+      *.yaml | *.yml) ;;
+      *) fail "$source must end in .yaml or .yml" ;;
+    esac
+  fi
   ssh_ 'test -x ~/.1ctx/bin/1ctx' || fail "no binary there yet; deploy first"
 
   if [ -n "$keys" ]; then
@@ -94,16 +103,21 @@ provision() {
   fi
 
   # Applying needs the database to itself. The service is started again
-  # whatever provision answered, and its failure is the exit code.
+  # however this ends, a dropped connection included, and provision's
+  # failure is the exit code.
   ssh_ bash -s <<'REMOTE'
 set -uo pipefail
 bin=~/.1ctx/bin/1ctx
+code=1
+finish() {
+  rm -rf ~/.1ctx/provision.tmp
+  "$bin" service start || code=1
+  exit $code
+}
 "$bin" service stop || exit 1
+trap finish EXIT HUP INT TERM
 "$bin" provision -f ~/.1ctx/provision.tmp
 code=$?
-rm -rf ~/.1ctx/provision.tmp
-"$bin" service start || exit 1
-exit $code
 REMOTE
 }
 

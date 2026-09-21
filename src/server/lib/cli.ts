@@ -96,7 +96,7 @@ function parseListen(
   listen: string,
 ): { hostname: string; port: number } | string {
   const colon = listen.lastIndexOf(":");
-  if (colon === -1) return "--listen must be host:port";
+  if (colon < 1) return "--listen must be host:port";
   const port = Number(listen.slice(colon + 1));
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     return "--listen port must be 1 to 65535";
@@ -142,6 +142,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
         listen = value;
         break;
       case "--db":
+        if (value === "") return { kind: "error", message: "--db is empty" };
         dbPath = value;
         break;
       case "--secrets":

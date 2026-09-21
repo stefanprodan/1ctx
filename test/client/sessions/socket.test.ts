@@ -110,17 +110,20 @@ const hello = (version: string, protocol = PROTOCOL) =>
   JSON.stringify({ type: "hello", protocol, version });
 
 describe("the tab socket", () => {
-  test("opens for a signed-in user and closes when the user leaves", () => {
-    start();
-    expect(wires).toHaveLength(1);
-    expect(wires[0].closed).toBe(false);
+  test.serial(
+    "opens for a signed-in user and closes when the user leaves",
+    () => {
+      start();
+      expect(wires).toHaveLength(1);
+      expect(wires[0].closed).toBe(false);
 
-    me.value = null;
+      me.value = null;
 
-    expect(wires[0].closed).toBe(true);
-  });
+      expect(wires[0].closed).toBe(true);
+    },
+  );
 
-  test("a matching hello reloads data and sends the watch again", () => {
+  test.serial("a matching hello reloads data and sends the watch again", () => {
     start();
     watch("s1");
     wires[0].sent = [];
@@ -134,7 +137,7 @@ describe("the tab socket", () => {
     ]);
   });
 
-  test("a hello for another protocol reloads the page", () => {
+  test.serial("a hello for another protocol reloads the page", () => {
     start();
 
     wires[0].message(hello("v1", PROTOCOL + 1));
@@ -143,7 +146,7 @@ describe("the tab socket", () => {
     expect(reloads).toBe(0);
   });
 
-  test("a revoked close never reconnects and drops the user", () => {
+  test.serial("a revoked close never reconnects and drops the user", () => {
     start();
 
     wires[0].fireClose(CLOSE_REVOKED);
@@ -153,31 +156,37 @@ describe("the tab socket", () => {
     expect(me.value).toBeNull();
   });
 
-  test("a hello from another build after a restart reloads the page", () => {
-    start();
-    wires[0].message(hello("v1+aaa"));
-    wires[0].fireClose(CLOSE_RESTARTING);
-    runTimer();
+  test.serial(
+    "a hello from another build after a restart reloads the page",
+    () => {
+      start();
+      wires[0].message(hello("v1+aaa"));
+      wires[0].fireClose(CLOSE_RESTARTING);
+      runTimer();
 
-    wires[1].message(hello("v1+bbb"));
+      wires[1].message(hello("v1+bbb"));
 
-    expect(pageReloads).toBe(1);
-    expect(reloads).toBe(1);
-  });
+      expect(pageReloads).toBe(1);
+      expect(reloads).toBe(1);
+    },
+  );
 
-  test("a hello from the same build after a restart reloads only data", () => {
-    start();
-    wires[0].message(hello("v1+aaa"));
-    wires[0].fireClose(CLOSE_RESTARTING);
-    runTimer();
+  test.serial(
+    "a hello from the same build after a restart reloads only data",
+    () => {
+      start();
+      wires[0].message(hello("v1+aaa"));
+      wires[0].fireClose(CLOSE_RESTARTING);
+      runTimer();
 
-    wires[1].message(hello("v1+aaa"));
+      wires[1].message(hello("v1+aaa"));
 
-    expect(pageReloads).toBe(0);
-    expect(reloads).toBe(2);
-  });
+      expect(pageReloads).toBe(0);
+      expect(reloads).toBe(2);
+    },
+  );
 
-  test("the build is kept over a sign out in the same tab", () => {
+  test.serial("the build is kept over a sign out in the same tab", () => {
     start();
     wires[0].message(hello("v1+aaa"));
     me.value = null;
@@ -188,7 +197,7 @@ describe("the tab socket", () => {
     expect(pageReloads).toBe(1);
   });
 
-  test("a role frame gives the signed-in user the new role", () => {
+  test.serial("a role frame gives the signed-in user the new role", () => {
     start();
 
     wires[0].message(JSON.stringify({ type: "role", role: "admin" }));
@@ -196,7 +205,7 @@ describe("the tab socket", () => {
     expect(me.value).toEqual({ ...caelea, role: "admin" });
   });
 
-  test("a restarting close schedules one retry at 2000 ms", () => {
+  test.serial("a restarting close schedules one retry at 2000 ms", () => {
     start();
 
     wires[0].fireClose(CLOSE_RESTARTING);
@@ -207,7 +216,7 @@ describe("the tab socket", () => {
     expect(timers).toEqual([]);
   });
 
-  test("other closes back off and cap at 30000 ms", () => {
+  test.serial("other closes back off and cap at 30000 ms", () => {
     start();
     const waits: number[] = [];
 
@@ -220,7 +229,7 @@ describe("the tab socket", () => {
     expect(waits).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
   });
 
-  test("watch and unwatch send commands while open", () => {
+  test.serial("watch and unwatch send commands while open", () => {
     start();
 
     watch("s1");
@@ -232,7 +241,7 @@ describe("the tab socket", () => {
     ]);
   });
 
-  test("dispatches a socket frame to registered listeners", () => {
+  test.serial("dispatches a socket frame to registered listeners", () => {
     const seen: SocketEvent[] = [];
     offs.push(onSocketEvent((event) => seen.push(event)));
     start();
@@ -243,7 +252,7 @@ describe("the tab socket", () => {
     expect(seen).toEqual([event]);
   });
 
-  test("ignores malformed JSON", () => {
+  test.serial("ignores malformed JSON", () => {
     const seen: SocketEvent[] = [];
     offs.push(onSocketEvent((event) => seen.push(event)));
     start();

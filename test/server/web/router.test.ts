@@ -275,10 +275,9 @@ describe("a handler that throws", () => {
       handle(new Request("http://x/api/boom?q=secret"), "a"),
     ).rejects.toThrow("rows is undefined");
 
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toStartWith("GET /api/boom as maria failed: TypeError");
-    expect(lines[0]).toContain("rows is undefined");
-    expect(lines[0]).not.toContain("q=secret");
+    expect(lines).toEqual([
+      "GET /api/boom as maria failed: TypeError: rows is undefined",
+    ]);
   });
 
   test("an HttpError is an answer, not a log line", async () => {

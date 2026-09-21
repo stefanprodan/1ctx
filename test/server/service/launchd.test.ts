@@ -203,6 +203,18 @@ describe("launchd backend", () => {
     await expect(backend.stop()).rejects.toThrow("timed out waiting");
   });
 
+  test("a launchctl print that fails for another reason is an error", async () => {
+    const backend = launchdBackend({
+      home: HOME,
+      uid: 501,
+      spawn: async () => result(1, "", "Could not find service: not permitted"),
+      files: memoryFiles([]).files,
+    });
+
+    await expect(backend.stop()).rejects.toThrow("not permitted");
+    await expect(backend.install(definition)).rejects.toThrow("not permitted");
+  });
+
   test("stop on a service that is not loaded does nothing", async () => {
     const events: string[] = [];
     const backend = launchdBackend({
