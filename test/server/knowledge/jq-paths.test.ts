@@ -71,7 +71,8 @@ const CASES: Case[] = [
   [{ a: 1 }, '(.a | tostring) = "1"', null],
   [{ a: 1 }, ".a.b = 1", null],
   [[1], ".a = 1", null],
-  [null, ".[] = 1", null],
+  // null iterates to nothing here, as in mikefarah's yq; jq stops on it
+  [null, ".[] = 1", [null]],
   [[1, 2, 3], ".[-5] = 9", null],
   [
     {
@@ -106,6 +107,39 @@ const CASES: Case[] = [
     { metadata: { labels: { app: "web" } } },
     '.metadata.labels += {"team":"platform"}',
     [{ metadata: { labels: { app: "web", team: "platform" } } }],
+  ],
+  // deletions of one level go together, against it as it was
+  [[1, 2, 3, 4, 5], "del(.[-1], .[-2])", [[1, 2, 3]]],
+  [[1, 2, 3, 4, 5], "del(.[1:3], .[2])", [[1, 4, 5]]],
+  [[1, 2, 3, 4, 5], "del(.[1:3], .[0:2])", [[4, 5]]],
+  [[1, 2, 3, 4, 5], "(.[0], .[0]) |= empty", [[2, 3, 4, 5]]],
+  [[1, 2, 3, 4, 5], "del(.[-7], .[0])", [[2, 3, 4, 5]]],
+  [[1, [2, 3]], "delpaths([[0], [0, 1]])", [[[2, 3]]]],
+  [{ a: { d: [1, 2, 3] } }, "del(.a.d[:2], .a.d[1:])", [{ a: { d: [] } }]],
+  // what came before an error or a break is kept
+  [
+    [1, 2, 3, 4, 5],
+    "(label $f | (.[0] | ., break $f), .[1]) = 9",
+    [[9, 2, 3, 4, 5]],
+  ],
+  [[1, 2, 3], "(label $f | (.[0], break $f, .[1])?) = 9", [[9, 2, 3]]],
+  [
+    [{ spec: { replicas: 1 } }, { spec: "x" }, { spec: { replicas: 1 } }],
+    "(.[].spec.replicas)? = 3",
+    [[{ spec: { replicas: 3 } }, { spec: "x" }, { spec: { replicas: 1 } }]],
+  ],
+  [
+    [1, 2, 3, 4, 5],
+    "(try (.[0], .[1][0], .[2]) catch empty) = 9",
+    [[9, 2, 3, 4, 5]],
+  ],
+  // $x parameters are bound, in value and in path mode
+  [null, "def f($x): [$x, x]; f(3)", [[3, 3]]],
+  [null, "[def f($x): $x; f(1, 2)]", [[1, 2]]],
+  [
+    { spec: { r: 1 } },
+    'def f($x): .spec[$x]; f("r") = 42',
+    [{ spec: { r: 42 } }],
   ],
 ];
 

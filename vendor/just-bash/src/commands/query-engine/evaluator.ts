@@ -1597,7 +1597,30 @@ function evalBuiltin(
           }
         }
         const newCtx: EvalContext = { ...ctx, funcs: newFuncs };
-        return evaluate(value, userFunc.body, newCtx);
+        // `def f($x)` is `def f(x): x as $x`: the body runs once per value,
+        // with $x bound, which upstream left unbound (null) (1ctx)
+        const dollars = userFunc.params.filter((p) => p.startsWith("$"));
+        const bindDollars = (at: number, inner: EvalContext): QueryValue[] => {
+          if (at === dollars.length) return evaluate(value, userFunc.body, inner);
+          const param = dollars[at];
+          const choices = evaluate(
+            value,
+            { type: "Call", name: param, args: [] },
+            inner,
+          );
+          return boundedFlatMap(ctx, choices, (choice) => {
+            const funcs = new Map(inner.funcs ?? []);
+            funcs.set(`${param.slice(1)}/0`, {
+              params: [],
+              body: { type: "Literal", value: choice },
+            });
+            return bindDollars(
+              at + 1,
+              withVar({ ...inner, funcs }, param, choice),
+            );
+          });
+        };
+        return bindDollars(0, newCtx);
       }
       throw new Error(`Unknown function: ${name}`);
     }

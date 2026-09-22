@@ -163,6 +163,19 @@ interface ParsedArgs {
   /** where each file sits in args, to run one file at a time (1ctx) */
   fileAt: number[];
   inputFormatExplicit: boolean;
+  outputFormatExplicit: boolean;
+}
+
+// mikefarah's one-letter formats: -oj, -o y (1ctx)
+const SHORT_FORMATS: Record<string, string> = Object.assign(Object.create(null), {
+  y: "yaml",
+  j: "json",
+  x: "xml",
+  c: "csv",
+});
+
+function formatName(value: string | undefined): string | undefined {
+  return value === undefined ? value : (SHORT_FORMATS[value] ?? value);
 }
 
 function parseArgs(args: string[]): ParsedArgs | ExecResult {
@@ -176,6 +189,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     frontMatter: false,
   };
   let inputFormatExplicit = false;
+  let outputFormatExplicit = false;
 
   let filter = ".";
   let filterSet = false;
@@ -188,14 +202,15 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
 
     // Long options with values
     if (a.startsWith("--input-format=")) {
-      const format = a.slice(15);
+      const format = formatName(a.slice(15));
       if (!isValidInputFormat(format)) {
         return unknownOption("yq", `--input-format=${format}`);
       }
       options.inputFormat = format;
       inputFormatExplicit = true;
     } else if (a.startsWith("--output-format=")) {
-      const format = a.slice(16);
+      const format = formatName(a.slice(16));
+      outputFormatExplicit = true;
       if (!isValidOutputFormat(format)) {
         return unknownOption("yq", `--output-format=${format}`);
       }
@@ -216,14 +231,15 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     } else if (a === "--no-csv-header") {
       options.csvHeader = false;
     } else if (a === "-p" || a === "--input-format") {
-      const format = args[++i];
+      const format = formatName(args[++i]);
       if (!isValidInputFormat(format)) {
         return unknownOption("yq", `${a} ${format}`);
       }
       options.inputFormat = format;
       inputFormatExplicit = true;
     } else if (a === "-o" || a === "--output-format") {
-      const format = args[++i];
+      const format = formatName(args[++i]);
+      outputFormatExplicit = true;
       if (!isValidOutputFormat(format)) {
         return unknownOption("yq", `${a} ${format}`);
       }
@@ -267,7 +283,8 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     } else if (/^-[opI]=?./.test(a)) {
       // a value joined to its flag, as mikefarah's accepts: -ojson, -I0,
       // -o=json (1ctx)
-      const value = a.slice(a[2] === "=" ? 3 : 2);
+      const joined = a.slice(a[2] === "=" ? 3 : 2);
+      const value = a[1] === "I" ? joined : (formatName(joined) as string);
       if (a[1] === "I") {
         const indent = parseIndent(value);
         if (indent === null) return invalidIndent(value);
@@ -275,6 +292,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       } else if (a[1] === "o") {
         if (!isValidOutputFormat(value)) return unknownOption("yq", a);
         options.outputFormat = value;
+        outputFormatExplicit = true;
       } else {
         if (!isValidInputFormat(value)) return unknownOption("yq", a);
         options.inputFormat = value;
@@ -313,7 +331,14 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     }
   }
 
-  return { options, filter, files, fileAt, inputFormatExplicit };
+  return {
+    options,
+    filter,
+    files,
+    fileAt,
+    inputFormatExplicit,
+    outputFormatExplicit,
+  };
 }
 
 export const yqCommand: RuntimeCommand = {
@@ -335,7 +360,14 @@ export const yqCommand: RuntimeCommand = {
     const parsed = parseArgs(args);
     if ("exitCode" in parsed) return parsed;
 
-    const { options, filter, files, fileAt, inputFormatExplicit } = parsed;
+    const {
+      options,
+      filter,
+      files,
+      fileAt,
+      inputFormatExplicit,
+      outputFormatExplicit,
+    } = parsed;
 
     // mikefarah's yq reads every file in turn; this one read the first and
     // dropped the rest without a word (1ctx)
@@ -347,10 +379,25 @@ export const yqCommand: RuntimeCommand = {
           exitCode: 1,
         };
       }
+      if (options.inplace && files.includes("-")) {
+        return {
+          stdout: "",
+          stderr: "yq: -i/--inplace requires a file argument\n",
+          exitCode: 1,
+        };
+      }
       let stdout = "";
       let stderr = "";
       let misses = 0;
+      const seen = new Set<string>();
       for (const at of fileAt) {
+        // a file named twice is edited once, as mikefarah reads them all
+        // before writing
+        if (options.inplace) {
+          const path = ctx.fs.resolvePath(ctx.cwd, args[at]);
+          if (seen.has(path)) continue;
+          seen.add(path);
+        }
         const one = args.filter((_, i) => !fileAt.includes(i) || i === at);
         const result = await yqCommand.execute(one, ctx);
         stderr += result.stderr;
@@ -370,7 +417,7 @@ export const yqCommand: RuntimeCommand = {
       return {
         stdout,
         stderr,
-        exitCode: misses === fileAt.length ? 1 : 0,
+        exitCode: misses > 0 && misses === (options.inplace ? seen.size : fileAt.length) ? 1 : 0,
       };
     }
 
@@ -380,6 +427,15 @@ export const yqCommand: RuntimeCommand = {
       if (detected) {
         options.inputFormat = detected;
       }
+    }
+    // an in-place edit writes the file's own format back, as mikefarah's
+    // does, not YAML into a .json file (1ctx)
+    if (
+      options.inplace &&
+      !outputFormatExplicit &&
+      isValidOutputFormat(options.inputFormat)
+    ) {
+      options.outputFormat = options.inputFormat;
     }
 
     // Inplace requires a file
@@ -511,6 +567,14 @@ export const yqCommand: RuntimeCommand = {
           ctx.limits.maxStringLength,
           ctx.limits.maxOutputSize,
         );
+        if (values.length === 0) {
+          // mikefarah's answer, and no emptied file (1ctx)
+          return {
+            stdout: "",
+            stderr: "yq: no matches found, the file is left as it was\n",
+            exitCode: 1,
+          };
+        }
         const text = inPlaceText(values, documentOf, documents, documentValues, {
           format: (value) => formatOutput(value, options, maxBytes),
           maxDepth: ctx.limits.maxQueryDepth,
@@ -524,7 +588,11 @@ export const yqCommand: RuntimeCommand = {
         await withDefenseContext("in-place write", () =>
           ctx.fs.writeFile(filePath, text),
         );
-        return { stdout: "", stderr: "", exitCode: 0 };
+        return {
+          stdout: "",
+          stderr: "",
+          exitCode: options.exitStatus && missed(values) ? 1 : 0,
+        };
       }
 
       // Format output
@@ -600,18 +668,24 @@ export const yqCommand: RuntimeCommand = {
 
       // Handle inplace mode
       if (options.inplace && filePath) {
+        if (values.length === 0) {
+          return {
+            stdout: "",
+            stderr: "yq: no matches found, the file is left as it was\n",
+            exitCode: 1,
+          };
+        }
         await withDefenseContext("in-place write", () =>
           ctx.fs.writeFile(filePath, finalOutput),
         );
-        return { stdout: "", stderr: "", exitCode: 0 };
+        return {
+          stdout: "",
+          stderr: "",
+          exitCode: options.exitStatus && missed(values) ? 1 : 0,
+        };
       }
 
-      const exitCode =
-        options.exitStatus &&
-        (values.length === 0 ||
-          values.every((v) => v === null || v === undefined || v === false))
-          ? 1
-          : 0;
+      const exitCode = options.exitStatus && missed(values) ? 1 : 0;
 
       // yq emits text; the pipeline handles encoding.
       return {
@@ -688,15 +762,22 @@ function inPlaceText(
   let text = "";
   for (const [index, group] of groups.entries()) {
     if (group.length === 0) continue;
-    const kept =
-      group.length === 1
-        ? preservingText(documents[index], documentValues[index], group[0])
-        : null;
+    // several results for one document: mikefarah writes the last
+    const last = group[group.length - 1];
     const part =
-      kept ?? group.map(opts.format).filter((t) => t !== "").join("\n");
+      preservingText(documents[index], documentValues[index], last) ??
+      opts.format(last);
     if (part === "") continue;
     if (text !== "") text += /^---/.test(part) ? "\n" : "\n---\n";
     text += part;
   }
   return text === "" ? "" : `${text}\n`;
+}
+
+/** -e: nothing came out, or only null and false. */
+function missed(values: QueryValue[]): boolean {
+  return (
+    values.length === 0 ||
+    values.every((v) => v === null || v === undefined || v === false)
+  );
 }

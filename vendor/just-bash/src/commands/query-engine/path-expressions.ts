@@ -287,71 +287,102 @@ export class PathWriter {
     return this.fresh([...arr.slice(0, start), ...replaced, ...arr.slice(end)]);
   }
 
-  /** delpaths: every path read against the input, the last in jq's order first. */
+  /**
+   * delpaths as jq's delpaths_sorted and jv_dels: the paths sorted, grouped
+   * by their key at each level, a level's keys deleted together against
+   * that level as it was, so negative indices, slices and repeats agree.
+   */
   deleteAll(v: QueryValue, paths: readonly Path[]): QueryValue {
-    const sorted = [...paths].sort((a, b) => compareJq(a, b));
-    let result = v;
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      checkPath(sorted[i], this.ctx);
-      result = this.deleteFrom(result, sorted[i], 0);
-    }
-    return result;
+    for (const path of paths) checkPath(path, this.ctx);
+    if (paths.length === 0) return v;
+    const sorted = [...paths].sort(comparePaths);
+    if (sorted[0].length === 0) return null;
+    return this.deleteSorted(v, sorted, 0);
   }
 
-  private deleteFrom(v: QueryValue, path: readonly PathKey[], at: number): QueryValue {
-    chargeQueryWork(this.ctx);
-    if (path.length === 0) return null;
-    if (v === null) return null;
-    const key = path[at];
-    const last = at === path.length - 1;
-    if (typeof key === "string") {
-      const obj = asQueryRecord(v);
-      if (!obj) {
-        throw new Error(
-          Array.isArray(v)
-            ? "Cannot delete string element of array"
-            : `Cannot delete fields from ${typeName(v)}`,
-        );
+  private deleteSorted(v: QueryValue, paths: Path[], at: number): QueryValue {
+    const whole: PathKey[] = [];
+    let result = v;
+    for (let i = 0; i < paths.length; ) {
+      chargeQueryWork(this.ctx);
+      const key = paths[i][at];
+      let j = i;
+      while (j < paths.length && sameKey(key, paths[j][at])) j++;
+      if (paths[i].length === at + 1) {
+        // the key goes whole; deeper deletions under it do not matter
+        whole.push(key);
+      } else {
+        const inner = stepInto(result, key);
+        if (inner !== null) {
+          const updated = this.deleteSorted(inner, paths.slice(i, j), at + 1);
+          result = this.setFrom(result, [key], 0, updated);
+        }
       }
-      if (!Object.hasOwn(obj, key) || !isSafeKey(key)) return v;
-      const owned = this.own(obj);
-      if (last) delete owned[key];
-      else owned[key] = this.deleteFrom(owned[key] as QueryValue, path, at + 1);
-      return owned;
+      i = j;
     }
-    if (typeof key === "number") {
-      if (!Array.isArray(v)) {
-        throw new Error(
-          asQueryRecord(v)
-            ? "Cannot delete number field of object"
-            : `Cannot delete fields from ${typeName(v)}`,
-        );
-      }
-      const i = Math.trunc(key) < 0 ? v.length + Math.trunc(key) : Math.trunc(key);
-      if (i < 0 || i >= v.length) {
-        if (i < 0 && last) throw new Error("Out of bounds negative array index");
-        return v;
-      }
-      const owned = this.own(v);
-      if (last) owned.splice(i, 1);
-      else owned[i] = this.deleteFrom(owned[i], path, at + 1);
-      return owned;
-    }
-    if (!Array.isArray(v)) {
-      throw new Error(`Cannot delete slice of ${typeName(v)}`);
-    }
-    const [start, end] = sliceBounds(key, v.length);
-    if (last) {
-      const owned = this.own(v);
-      owned.splice(start, end - start);
-      return owned;
-    }
-    const inner = this.deleteFrom(v.slice(start, end), path, at + 1);
-    if (!Array.isArray(inner)) {
-      throw new Error("A slice of an array can only be assigned another array");
-    }
-    return this.fresh([...v.slice(0, start), ...inner, ...v.slice(end)]);
+    return whole.length > 0 ? this.deleteKeys(result, whole) : result;
   }
+
+  private deleteKeys(v: QueryValue, keys: PathKey[]): QueryValue {
+    if (v === null) return null;
+    if (Array.isArray(v)) {
+      const gone = new Set<number>();
+      const ranges: [number, number][] = [];
+      for (const key of keys) {
+        if (typeof key === "number") {
+          const i = Math.trunc(key) < 0 ? v.length + Math.trunc(key) : Math.trunc(key);
+          if (i >= 0) gone.add(i);
+        } else if (typeof key === "string") {
+          throw new Error("Cannot delete string element of array");
+        } else {
+          ranges.push(sliceBounds(key, v.length));
+        }
+      }
+      chargeQueryWork(this.ctx, v.length);
+      return this.fresh(
+        v.filter(
+          (_, i) => !gone.has(i) && !ranges.some(([s, e]) => s <= i && i < e),
+        ),
+      );
+    }
+    const obj = asQueryRecord(v);
+    if (!obj) throw new Error(`Cannot delete fields from ${typeName(v)}`);
+    const owned = this.own(obj);
+    for (const key of keys) {
+      if (typeof key !== "string") {
+        throw new Error(`Cannot delete ${typeof key === "number" ? "number" : "object"} field of object`);
+      }
+      if (isSafeKey(key)) delete owned[key];
+    }
+    return owned;
+  }
+}
+
+function keyRank(key: PathKey): number {
+  return typeof key === "number" ? 0 : typeof key === "string" ? 1 : 2;
+}
+
+function compareKeys(a: PathKey, b: PathKey): number {
+  const rank = keyRank(a) - keyRank(b);
+  if (rank !== 0) return rank;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
+  // jq orders objects by their keys, then values: end before start
+  const x = a as SliceKey;
+  const y = b as SliceKey;
+  return compareJq(x.end, y.end) || compareJq(x.start, y.start);
+}
+
+function comparePaths(a: Path, b: Path): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const c = compareKeys(a[i], b[i]);
+    if (c !== 0) return c;
+  }
+  return a.length - b.length;
+}
+
+function sameKey(a: PathKey, b: PathKey): boolean {
+  return b !== undefined && compareKeys(a, b) === 0;
 }
 
 const TYPE_SELECTORS: Record<string, (v: QueryValue) => boolean> = Object.assign(
@@ -385,7 +416,7 @@ function prefixed(ctx: EvalContext, prefix: Path, items: Located[], out: Located
   for (const item of items) push(ctx, out, { path: [...prefix, ...item.path], value: item.value });
 }
 
-function children(ctx: EvalContext, v: QueryValue, strict: boolean): Located[] {
+function children(ctx: EvalContext, v: QueryValue): Located[] {
   if (Array.isArray(v)) {
     assertQueryResultCapacity(ctx, 0, v.length);
     return v.map((value, index) => ({ path: [index], value }));
@@ -396,8 +427,65 @@ function children(ctx: EvalContext, v: QueryValue, strict: boolean): Located[] {
     assertQueryResultCapacity(ctx, 0, keys.length);
     return keys.map((key) => ({ path: [key], value: obj[key] as QueryValue }));
   }
-  if (strict) throw new Error(`Cannot iterate over ${described(v)}`);
   return [];
+}
+
+/**
+ * An error or a break met in path mode, with the locations yielded before
+ * it: jq streams its outputs, so `(.[0], error)?`, `first(f)` and a `break`
+ * keep what came first. `label` is null for an error, whose `cause` it is.
+ */
+class PathInterrupt extends Error {
+  constructor(
+    readonly label: string | null,
+    readonly cause: unknown,
+    readonly partial: Located[],
+  ) {
+    super(label === null ? "path error" : `break ${label}`);
+  }
+
+  after(before: Located[], prefix: Path): PathInterrupt {
+    return new PathInterrupt(this.label, this.cause, [
+      ...before,
+      ...this.partial.map((l) => ({ path: [...prefix, ...l.path], value: l.value })),
+    ]);
+  }
+}
+
+function interrupt(error: unknown, before: Located[], prefix: Path): unknown {
+  if (error instanceof ExecutionLimitError) return error;
+  if (error instanceof PathInterrupt) return error.after(before, prefix);
+  if (error instanceof BreakError) return new PathInterrupt(error.label, null, before);
+  return new PathInterrupt(null, error, before);
+}
+
+// Each located source through fn, the results prefixed by its path; when
+// the sources stopped early, what they gave still goes through fn first.
+function through(
+  ctx: EvalContext,
+  sources: () => Located[],
+  fn: (source: Located) => Located[],
+): Located[] {
+  let bases: Located[];
+  let stopped: PathInterrupt | null = null;
+  try {
+    bases = sources();
+  } catch (error) {
+    if (!(error instanceof PathInterrupt)) throw error;
+    bases = error.partial;
+    stopped = error;
+  }
+  const out: Located[] = [];
+  for (const base of bases) {
+    chargeQueryWork(ctx);
+    try {
+      prefixed(ctx, base.path, fn(base), out);
+    } catch (error) {
+      throw interrupt(error, out, base.path);
+    }
+  }
+  if (stopped) throw new PathInterrupt(stopped.label, stopped.cause, out);
+  return out;
 }
 
 // recurse(f; cond): ., (f | select(cond) | recurse(f; cond)), depth first.
@@ -413,7 +501,12 @@ function recursePaths(
     const entry = stack.pop() as Located;
     chargeQueryWork(ctx);
     push(ctx, out, entry);
-    const next = step(entry.value).filter((c) => keep(c.value));
+    let next: Located[];
+    try {
+      next = step(entry.value).filter((c) => keep(c.value));
+    } catch (error) {
+      throw interrupt(error, out, entry.path);
+    }
     assertQueryResultCapacity(ctx, stack.length, next.length);
     for (let i = next.length - 1; i >= 0; i--) {
       stack.push({ path: [...entry.path, ...next[i].path], value: next[i].value });
@@ -422,17 +515,30 @@ function recursePaths(
   return out;
 }
 
+// f? and try f: what f gave before an error, the error dropped.
 function optional(fn: () => Located[]): Located[] {
   try {
     return fn();
   } catch (error) {
-    if (error instanceof ExecutionLimitError || error instanceof BreakError) throw error;
-    return [];
+    if (error instanceof PathInterrupt && error.label === null) return error.partial;
+    throw error;
+  }
+}
+
+// The first n of fn's locations, which jq has before any later error.
+function leading(fn: () => Located[], n: number): Located[] {
+  try {
+    return fn().slice(0, n);
+  } catch (error) {
+    if (error instanceof PathInterrupt && error.partial.length >= n) {
+      return error.partial.slice(0, n);
+    }
+    throw error;
   }
 }
 
 /** Every location `ast` yields on `v`, with the value found there. */
-export function evaluatePaths(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
+function evaluatePaths(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
   chargeQueryWork(ctx);
   ctx.budget.callDepth++;
   if (ctx.budget.callDepth > ctx.limits.maxDepth) {
@@ -444,93 +550,95 @@ export function evaluatePaths(v: QueryValue, ast: AstNode, ctx: EvalContext): Lo
   }
   try {
     return pathsOf(v, ast, ctx);
+  } catch (error) {
+    throw interrupt(error, [], []);
   } finally {
     ctx.budget.callDepth--;
   }
 }
 
-function each(
-  ctx: EvalContext,
-  bases: Located[],
-  fn: (base: Located) => Located[],
-): Located[] {
-  const out: Located[] = [];
-  for (const base of bases) {
-    chargeQueryWork(ctx);
-    prefixed(ctx, base.path, fn(base), out);
-  }
-  return out;
-}
+const HERE = (v: QueryValue): Located[] => [{ path: [], value: v }];
 
 function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
   switch (ast.type) {
     case "Identity":
-      return [{ path: [], value: v }];
+      return HERE(v);
 
     case "Paren":
       return evaluatePaths(v, ast.expr, ctx);
 
     case "Field": {
-      const bases = ast.base ? evaluatePaths(v, ast.base, ctx) : [{ path: [], value: v }];
-      return each(ctx, bases, (b) => [
-        { path: [ast.name], value: stepInto(b.value, ast.name) },
-      ]);
+      const base = ast.base;
+      return through(
+        ctx,
+        () => (base ? evaluatePaths(v, base, ctx) : HERE(v)),
+        (b) => [{ path: [ast.name], value: stepInto(b.value, ast.name) }],
+      );
     }
 
     case "Index": {
-      const bases = ast.base ? evaluatePaths(v, ast.base, ctx) : [{ path: [], value: v }];
+      const base = ast.base;
       // The index is read from the input of the whole term: .a[.i]
       const indices = evaluate(v, ast.index, ctx);
-      return each(ctx, bases, (b) =>
-        indices.map((index) => {
-          if (typeof index === "string" || typeof index === "number") {
-            return { path: [index], value: stepInto(b.value, index) };
-          }
-          if (index === null && b.value === null) {
-            return { path: [null as unknown as PathKey], value: null };
-          }
-          throw new Error(`Cannot index ${typeName(b.value)} with ${typeName(index)}`);
-        }),
+      return through(
+        ctx,
+        () => (base ? evaluatePaths(v, base, ctx) : HERE(v)),
+        (b) =>
+          indices.map((index) => {
+            if (typeof index === "string" || typeof index === "number") {
+              return { path: [index], value: stepInto(b.value, index) };
+            }
+            throw new Error(`Cannot index ${typeName(b.value)} with ${typeName(index)}`);
+          }),
       );
     }
 
     case "Slice": {
-      const bases = ast.base ? evaluatePaths(v, ast.base, ctx) : [{ path: [], value: v }];
+      const base = ast.base;
       const starts = ast.start ? evaluate(v, ast.start, ctx) : [null];
       const ends = ast.end ? evaluate(v, ast.end, ctx) : [null];
-      return each(ctx, bases, (b) => {
-        const out: Located[] = [];
-        for (const start of starts) {
-          for (const end of ends) {
-            const key = sliceKey(start, end);
-            push(ctx, out, { path: [key], value: stepInto(b.value, key) });
+      return through(
+        ctx,
+        () => (base ? evaluatePaths(v, base, ctx) : HERE(v)),
+        (b) => {
+          const out: Located[] = [];
+          for (const start of starts) {
+            for (const end of ends) {
+              const key = sliceKey(start, end);
+              push(ctx, out, { path: [key], value: stepInto(b.value, key) });
+            }
           }
-        }
-        return out;
-      });
+          return out;
+        },
+      );
     }
 
     case "Iterate": {
-      const bases = ast.base ? evaluatePaths(v, ast.base, ctx) : [{ path: [], value: v }];
-      return each(ctx, bases, (b) => children(ctx, b.value, true));
+      const base = ast.base;
+      // null iterates to nothing, as mikefarah's yq and this engine's value
+      // mode do, so a stream edit skips the documents without the key; jq
+      // stops on it
+      return through(
+        ctx,
+        () => (base ? evaluatePaths(v, base, ctx) : HERE(v)),
+        (b) => {
+          if (b.value !== null && typeof b.value !== "object") {
+            throw new Error(`Cannot iterate over ${described(b.value)}`);
+          }
+          return children(ctx, b.value);
+        },
+      );
     }
 
     case "Recurse":
-      return recursePaths(v, (node) => children(ctx, node, false), () => true, ctx);
+      return recursePaths(v, (node) => children(ctx, node), () => true, ctx);
 
-    case "Pipe": {
-      const lefts = evaluatePaths(v, ast.left, ctx);
-      const out: Located[] = [];
-      for (const left of lefts) {
-        try {
-          prefixed(ctx, left.path, evaluatePaths(left.value, ast.right, ctx), out);
-        } catch (error) {
-          if (error instanceof PathBreak) throw error.withPrepended(out);
-          throw error;
-        }
-      }
-      return out;
-    }
+    case "Pipe":
+      return through(
+        ctx,
+        () => evaluatePaths(v, ast.left, ctx),
+        (left) => evaluatePaths(left.value, ast.right, ctx),
+      );
 
     case "Comma": {
       const out = evaluatePaths(v, ast.left, ctx);
@@ -538,8 +646,7 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
       try {
         right = evaluatePaths(v, ast.right, ctx);
       } catch (error) {
-        if (error instanceof PathBreak) throw error.withPrepended(out);
-        throw error;
+        throw interrupt(error, out, []);
       }
       assertQueryResultCapacity(ctx, out.length, right.length);
       return [...out, ...right];
@@ -549,35 +656,38 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
       return optional(() => evaluatePaths(v, ast.expr, ctx));
 
     case "Try": {
-      if (!ast.catch) return optional(() => evaluatePaths(v, ast.body, ctx));
+      const handler = ast.catch;
+      if (!handler) return optional(() => evaluatePaths(v, ast.body, ctx));
       try {
         return evaluatePaths(v, ast.body, ctx);
       } catch (error) {
-        if (error instanceof ExecutionLimitError || error instanceof PathBreak) throw error;
-        const message = error instanceof Error ? error.message : String(error);
-        const handled = evaluate(message, ast.catch, ctx);
-        if (handled.length === 0) return [];
-        throw invalidPath(handled[0]);
+        if (!(error instanceof PathInterrupt) || error.label !== null) throw error;
+        const cause = error.cause;
+        const message = cause instanceof Error ? cause.message : String(cause);
+        const handled = evaluate(message, handler, ctx);
+        if (handled.length > 0) throw invalidPath(handled[0]);
+        return error.partial;
       }
     }
 
-    case "Cond": {
-      const out: Located[] = [];
-      for (const cond of evaluate(v, ast.cond, ctx)) {
-        let branch: AstNode = ast.else ?? IDENTITY;
-        if (isTruthy(cond)) branch = ast.then;
-        else {
-          for (const elif of ast.elifs) {
-            if (evaluate(v, elif.cond, ctx).some(isTruthy)) {
-              branch = elif.then;
-              break;
+    case "Cond":
+      return through(
+        ctx,
+        () => evaluate(v, ast.cond, ctx).map((cond) => ({ path: [], value: cond })),
+        ({ value: cond }) => {
+          let branch: AstNode = ast.else ?? IDENTITY;
+          if (isTruthy(cond)) branch = ast.then;
+          else {
+            for (const elif of ast.elifs) {
+              if (evaluate(v, elif.cond, ctx).some(isTruthy)) {
+                branch = elif.then;
+                break;
+              }
             }
           }
-        }
-        prefixed(ctx, [], evaluatePaths(v, branch, ctx), out);
-      }
-      return out;
-    }
+          return evaluatePaths(v, branch, ctx);
+        },
+      );
 
     case "BinaryOp": {
       if (ast.op !== "//") break;
@@ -587,23 +697,22 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
       return lefts.length > 0 ? lefts : evaluatePaths(v, ast.right, ctx);
     }
 
-    case "VarBind": {
-      const out: Located[] = [];
-      for (const bound of evaluate(v, ast.value, ctx)) {
-        const patterns: DestructurePattern[] = [];
-        if (ast.pattern) patterns.push(ast.pattern);
-        else if (ast.name) patterns.push({ type: "var", name: ast.name });
-        if (ast.alternatives) patterns.push(...ast.alternatives);
-        let next: EvalContext | null = null;
-        for (const pattern of patterns) {
-          next = bindPattern(ctx, pattern, bound);
-          if (next !== null) break;
-        }
-        if (next === null) continue;
-        prefixed(ctx, [], evaluatePaths(v, ast.body, next), out);
-      }
-      return out;
-    }
+    case "VarBind":
+      return through(
+        ctx,
+        () => evaluate(v, ast.value, ctx).map((bound) => ({ path: [], value: bound })),
+        ({ value: bound }) => {
+          const patterns: DestructurePattern[] = [];
+          if (ast.pattern) patterns.push(ast.pattern);
+          else if (ast.name) patterns.push({ type: "var", name: ast.name });
+          if (ast.alternatives) patterns.push(...ast.alternatives);
+          for (const pattern of patterns) {
+            const next = bindPattern(ctx, pattern, bound);
+            if (next !== null) return evaluatePaths(v, ast.body, next);
+          }
+          return [];
+        },
+      );
 
     case "Def": {
       const funcs = new Map(ctx.funcs ?? []);
@@ -622,13 +731,15 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
           labels: new Set([...(ctx.labels ?? []), ast.name]),
         });
       } catch (error) {
-        if (error instanceof PathBreak && error.label === ast.name) return error.partial;
+        if (error instanceof PathInterrupt && error.label === ast.name) {
+          return error.partial;
+        }
         throw error;
       }
     }
 
     case "Break":
-      throw new PathBreak(ast.name);
+      throw new PathInterrupt(ast.name, null, []);
 
     case "Call": {
       const called = callPaths(v, ast.name, ast.args, ctx);
@@ -645,20 +756,6 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
   throw invalidPath(results[0]);
 }
 
-/** A break seen in path mode, carrying the locations yielded before it. */
-class PathBreak extends Error {
-  constructor(
-    readonly label: string,
-    readonly partial: Located[] = [],
-  ) {
-    super(`break ${label}`);
-  }
-
-  withPrepended(items: Located[]): PathBreak {
-    return new PathBreak(this.label, [...items, ...this.partial]);
-  }
-}
-
 function indexArg(v: QueryValue, arg: AstNode, ctx: EvalContext): number[] {
   return evaluate(v, arg, ctx).map((n) => {
     if (typeof n !== "number") throw new Error("Cannot index array with non-number");
@@ -673,7 +770,7 @@ function callPaths(
   ctx: EvalContext,
 ): Located[] | null {
   const selector = TYPE_SELECTORS[name];
-  if (selector && args.length === 0) return selector(v) ? [{ path: [], value: v }] : [];
+  if (selector && args.length === 0) return selector(v) ? HERE(v) : [];
 
   switch (`${name}/${args.length}`) {
     case "empty/0":
@@ -686,7 +783,7 @@ function callPaths(
       return out;
     }
     case "recurse/0":
-      return recursePaths(v, (node) => children(ctx, node, false), () => true, ctx);
+      return recursePaths(v, (node) => children(ctx, node), () => true, ctx);
     case "recurse/1":
       return recursePaths(v, (node) => evaluatePaths(node, args[0], ctx), () => true, ctx);
     case "recurse/2":
@@ -703,22 +800,22 @@ function callPaths(
     case "nth/1":
       return indexArg(v, args[0], ctx).map((n) => ({ path: [n], value: stepInto(v, n) }));
     case "first/1":
-      return evaluatePaths(v, args[0], ctx).slice(0, 1);
+      return leading(() => evaluatePaths(v, args[0], ctx), 1);
     case "last/1":
       return evaluatePaths(v, args[0], ctx).slice(-1);
     case "limit/2": {
       const out: Located[] = [];
       for (const n of indexArg(v, args[0], ctx)) {
-        if (n > 0) prefixed(ctx, [], evaluatePaths(v, args[1], ctx).slice(0, n), out);
+        if (n > 0) prefixed(ctx, [], leading(() => evaluatePaths(v, args[1], ctx), n), out);
       }
       return out;
     }
     case "nth/2": {
       const out: Located[] = [];
-      const all = evaluatePaths(v, args[1], ctx);
       for (const n of indexArg(v, args[0], ctx)) {
         if (n < 0) throw new Error("Out of bounds negative array index");
-        if (n < all.length) push(ctx, out, all[n]);
+        const found = leading(() => evaluatePaths(v, args[1], ctx), n + 1);
+        if (n < found.length) push(ctx, out, found[n]);
       }
       return out;
     }
@@ -734,32 +831,71 @@ function callPaths(
     case "debug/1":
     case "stderr/0":
       evaluate(v, { type: "Call", name, args }, ctx);
-      return [{ path: [], value: v }];
+      return HERE(v);
     default:
       break;
   }
 
-  // A function the query defined: its body in path mode, each argument a
-  // filter closed over the caller's functions, so `def f(g): g; f(.a) = 1`
-  // reaches .a as in jq.
+  // A function the query defined: its body in path mode. A filter argument
+  // is closed over the caller's functions, so `def f(g): g; f(.a) = 1`
+  // reaches .a; a `$x` argument runs the body once per value, bound as $x
+  // and as x, as jq defines it.
   const funcKey = `${name}/${args.length}`;
   const userFunc = ctx.funcs?.get(funcKey);
   if (!userFunc) return null;
   const funcs = new Map(userFunc.closure ?? ctx.funcs ?? new Map());
   funcs.set(funcKey, userFunc);
+  const values: { name: string; values: QueryValue[] }[] = [];
   for (let i = 0; i < userFunc.params.length; i++) {
-    funcs.set(`${userFunc.params[i]}/0`, {
-      params: [],
-      body: args[i],
-      closure: new Map(ctx.funcs ?? []),
-    });
+    const param = userFunc.params[i];
+    if (param.startsWith("$")) {
+      values.push({ name: param, values: evaluate(v, args[i], ctx) });
+    } else {
+      funcs.set(`${param}/0`, {
+        params: [],
+        body: args[i],
+        closure: new Map(ctx.funcs ?? []),
+      });
+    }
   }
-  return evaluatePaths(v, userFunc.body, { ...ctx, funcs } as EvalContext);
+  const bind = (at: number, inner: EvalContext): Located[] => {
+    if (at === values.length) return evaluatePaths(v, userFunc.body, inner);
+    const { name: param, values: choices } = values[at];
+    return through(
+      ctx,
+      () => choices.map((value) => ({ path: [], value })),
+      ({ value }) => {
+        const scoped = new Map(inner.funcs ?? []);
+        scoped.set(`${param.slice(1)}/0`, {
+          params: [],
+          body: { type: "Literal", value },
+        });
+        const next = bindPattern(
+          { ...inner, funcs: scoped },
+          { type: "var", name: param },
+          value,
+        );
+        return bind(at + 1, next ?? inner);
+      },
+    );
+  };
+  return bind(0, { ...ctx, funcs } as EvalContext);
+}
+
+/** The located values `f` yields, an error or a stray break as jq's. */
+function located(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
+  try {
+    return evaluatePaths(v, ast, ctx);
+  } catch (error) {
+    if (!(error instanceof PathInterrupt)) throw error;
+    if (error.label !== null) throw new BreakError(error.label);
+    throw error.cause;
+  }
 }
 
 /** The paths `f` yields on `v`, as `path(f)` outputs them. */
 export function pathsFor(v: QueryValue, ast: AstNode, ctx: EvalContext): Path[] {
-  return evaluatePaths(v, ast, ctx).map((located) => located.path);
+  return located(v, ast, ctx).map((l) => l.path);
 }
 
 /** `lhs |= f`, with `update` standing in for f. */

@@ -76,13 +76,32 @@ export function preservingText(
   after: QueryValue,
 ): string | null {
   if (!(isMap(after) || Array.isArray(after))) return null;
+  // a key the engine saw as a string but YAML typed (1: one) would be
+  // written beside the original instead of over it
+  let typedKey = false;
+  YAML.visit(doc, {
+    Pair(_, pair) {
+      if (YAML.isScalar(pair.key) && typeof pair.key.value !== "string") {
+        typedKey = true;
+        return YAML.visit.BREAK;
+      }
+    },
+  });
+  if (typedKey) return null;
   const copy = doc.clone();
   try {
     applyChanges(copy, [], before, after);
-    if (!same(copy.toJS({ maxAliasCount: 100 }) as QueryValue, after)) {
+    const text = copy
+      .toString({ flowCollectionPadding: false })
+      .replace(/\n+$/, "");
+    // what is written must read back as the result: a kept tag (!!str on a
+    // number set in its place) would not
+    const reread = YAML.parseDocument(text);
+    if (reread.errors.length > 0) return null;
+    if (!same(reread.toJS({ maxAliasCount: 100 }) as QueryValue, after)) {
       return null;
     }
-    return copy.toString({ flowCollectionPadding: false }).replace(/\n+$/, "");
+    return text;
   } catch {
     return null;
   }

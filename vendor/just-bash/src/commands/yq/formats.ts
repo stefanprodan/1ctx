@@ -264,7 +264,9 @@ export function parseAllYamlDocuments(
     if (lineEnd === -1) break;
     lineStart = lineEnd + 1;
   }
-  const docs = YAML.parseAllDocuments(input);
+  // yaml-1.1 compat: strings a YAML 1.1 reader (Kubernetes) would take for
+  // a bool or a number (yes, 1_000, 0b101) are written quoted (1ctx)
+  const docs = YAML.parseAllDocuments(input, { compat: "yaml-1.1" });
   if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
     throw new ExecutionLimitError(
@@ -370,6 +372,7 @@ export function formatOutput(
   switch (options.outputFormat) {
     case "yaml":
       serialized = YAML.stringify(value, {
+        compat: "yaml-1.1",
         indent: options.indent,
       }).trimEnd();
       break;

@@ -62,24 +62,50 @@ own.
 ### Where our jq still differs from jq
 
 `test/server/knowledge/jq-paths.test.ts` pins path expressions against
-jq 1.8. The value evaluator keeps upstream's leniencies, where jq
-stops with an error: `.[]` over null yields nothing, `-`, `*`, `/` and
-`%` with null give null (so `.a -= 1` on a missing key writes null),
-`to_entries` takes an array, and `?` covers the whole path before it
-(`.a.b?`) rather than its last step. `last(f)`,
-`limit(n; f)` and `nth(n; f)` also work as paths, which jq 1.8 refuses.
+jq 1.8. Where they part:
+
+- Iterating null yields nothing, in path mode too, as in mikefarah's
+  yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
+  skips the documents without the key, where jq stops with an error.
+  Iterating a number, a string or a boolean is still jq's error.
+- The value evaluator keeps upstream's leniencies where jq errors:
+  `-`, `*`, `/` and `%` with null give null (so `.a -= 1` on a missing
+  key writes null), `to_entries` on an array gives null (so
+  `with_entries` on one nulls it), `map_values(f)` keeps every output
+  of `f`, `walk` never reaches scalars, `$__loc__` is null, and `?`
+  covers the whole path before it (`.a.b?`) rather than its last step.
+- `//` in path mode drops an error on its left (`(error("x") // .z) = 1`
+  writes `.z`); jq 1.8 raises it.
+- `last(f)`, `limit(n; f)` and `nth(n; f)` also work as paths, which
+  jq 1.8 refuses; `setpath` with several paths and values orders its
+  outputs path first.
+- Numbers are JavaScript's: integers past 2^53 lose precision.
 
 ### Where our yq still differs from mikefarah's
 
 `test/server/knowledge/yq.test.ts` pins streams and in-place edits; on
-the podinfo manifests every `-i` write we compared was byte for byte
-mikefarah's. Printing to stdout still drops comments, since only `-i`
-goes through the parsed document. mikefarah prints `---` between the
-results of different documents only for values read from them, not for
-ones the filter computed (`"none"`, `[.kind]`), which a plain value
-cannot tell apart; ours prints it between every document's results.
-The jq leniencies above apply too: `map(f)` over a missing key gives
-null where mikefarah gives `[]`.
+the podinfo manifests the `-i` writes compared were mikefarah's byte
+for byte, or the same data with safer quoting. Where they part:
+
+- Strings a YAML 1.1 reader takes for a boolean or a number (`y`,
+  `yes`, `on`, `1_000`, `0b101`) are written quoted, since Kubernetes
+  reads YAML 1.1; mikefarah writes some of them bare.
+- Printing to stdout drops comments, since only `-i` goes through the
+  parsed document. An `-i` edit that cannot be carried over faithfully
+  (a tag that keeps the old type, a map key YAML typed, like `1:`) is
+  written plainly, its comments lost.
+- mikefarah prints `---` between the results of different documents
+  only for values read from them, not for ones the filter computed
+  (`"none"`, `[.kind]`); ours prints it between every document's
+  results.
+- An alias is a copy: editing an anchor's target leaves the aliased
+  places at the old value, and a plain write re-emits anchors.
+- mikefarah's own operators (`explode`, `style`, `tag`, `line_comment`,
+  `with`, `key`) and `eval-all` are not there, and `type` answers jq's
+  names (`object`), not `!!map`. An `-i` whose filter outputs nothing,
+  as `select(type == "!!map")` does, leaves the file and exits 1.
+- The jq leniencies above apply too: `map(f)` over a missing key gives
+  null where mikefarah gives `[]`.
 
 ## Its tests
 

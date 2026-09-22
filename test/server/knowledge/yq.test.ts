@@ -205,4 +205,51 @@ describe("yq over several documents", () => {
     const version = await yq("yq --version");
     expect(version.stdout).toContain("mikefarah");
   });
+
+  test("-i writes the last of several results for a document", async () => {
+    const result = await yq("yq -i '.a = (1, 2)' /m.yaml", "a: 1\n");
+    expect(result.file).toBe("a: 2\n");
+  });
+
+  test("-i that matches nothing leaves the file and exits 1", async () => {
+    for (const filter of [
+      'select(.kind == "Nope")',
+      'select(type == "!!map") | .a = 1',
+    ]) {
+      const result = await yq(`yq -i '${filter}' /m.yaml`);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("no matches found");
+      expect(result.file).toBe(MANIFESTS);
+    }
+  });
+
+  test("strings a YAML 1.1 reader would retype are quoted", async () => {
+    const result = await yq(
+      `yq -i '.a = "yes" | .b = "1_000" | .c = "0b101"' /m.yaml`,
+      "x: 1 # kept\n",
+    );
+    expect(result.file).toBe('x: 1 # kept\na: "yes"\nb: "1_000"\nc: "0b101"\n');
+  });
+
+  test("a tag that would keep the old type falls back to a plain write", async () => {
+    const result = await yq(
+      "yq -i '.port = 9090' /m.yaml",
+      "port: !!str 8080\n",
+    );
+    expect(result.file).toBe("port: 9090\n");
+  });
+
+  test("-i on JSON writes JSON, a file named twice is edited once", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/a.json", '{"a":1}\n');
+    fs.writeFileSync("/b.yaml", "a: 1\n");
+    const bash = new Bash({ fs });
+    await bash.exec("yq -i '.b = 2' /a.json");
+    expect(JSON.parse(await fs.readFile("/a.json"))).toEqual({ a: 1, b: 2 });
+    await bash.exec("yq -i '.a += 1' /b.yaml /b.yaml");
+    expect(await fs.readFile("/b.yaml")).toBe("a: 2\n");
+    const stdin = await bash.exec("yq -i '.z = 1' /b.yaml -");
+    expect(stdin.exitCode).toBe(1);
+    expect(await fs.readFile("/b.yaml")).toBe("a: 2\n");
+  });
 });
