@@ -223,6 +223,14 @@ describe("the socket", () => {
         ).toMatchObject({ revision: 2, deleted: true });
         expect(frames(admin, "knowledge")).toEqual([]);
 
+        chat.app.now.value += 1000;
+        const emptied = await chat.member.call("DELETE", `${path}/deleted`);
+        expect(emptied.status).toBe(200);
+        expect(frames(member, "knowledgeEmptied")).toEqual([
+          { type: "knowledgeEmptied", projectId: chat.projectId },
+        ]);
+        expect(frames(admin, "knowledgeEmptied")).toEqual([]);
+
         const activeClient = chat.app.client();
         await activeClient.login("casey", "pw");
         const active = await connection(chat, activeClient);

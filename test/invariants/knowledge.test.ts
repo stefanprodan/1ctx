@@ -498,6 +498,48 @@ describe("knowledge routes", () => {
     }
   });
 
+  test("emptying the bin drops deleted history and keeps live files", async () => {
+    const s = await setup();
+    try {
+      const gone = await add(s.client, s.projectId, "gone", "one");
+      await s.client.call("PUT", filePath(s.projectId, gone.id), {
+        body: { text: "two", revision: 1 },
+      });
+      await s.client.call("DELETE", filePath(s.projectId, gone.id));
+      const live = await add(s.client, s.projectId, "live", "keep");
+      expect((await list(s.client, s.projectId)).deleted).toHaveLength(1);
+
+      const emptied = await s.client.call(
+        "DELETE",
+        `${base(s.projectId)}/deleted`,
+      );
+      expect(emptied.status).toBe(200);
+      expect(await emptied.json()).toEqual({ files: 3 });
+
+      const after = await list(s.client, s.projectId);
+      expect(after.deleted).toEqual([]);
+      expect(after.files.map((file) => file.name)).toEqual(["live"]);
+      expect(await versions(s.client, s.projectId, live.id)).toHaveLength(1);
+      // the file and its history are both gone, so the route 404s
+      expect(
+        (
+          await s.client.call(
+            "GET",
+            `${filePath(s.projectId, gone.id)}/versions`,
+          )
+        ).status,
+      ).toBe(404);
+
+      const again = await s.client.call(
+        "DELETE",
+        `${base(s.projectId)}/deleted`,
+      );
+      expect(await again.json()).toEqual({ files: 0 });
+    } finally {
+      await s.close();
+    }
+  });
+
   test("deleting a team project cascades live files and already deleted histories", async () => {
     const s = await setup();
     try {

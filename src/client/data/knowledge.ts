@@ -12,6 +12,7 @@
 import { batch, effect, signal } from "@preact/signals";
 import type {
   CreateKnowledgeFileRequest,
+  EmptyBinResponse,
   KnowledgeFileDetailResponse,
   KnowledgeFileResponse,
   KnowledgeListResponse,
@@ -323,6 +324,25 @@ export async function removeFile(
   });
 }
 
+export async function emptyBin(projectId: string): Promise<number> {
+  const forUser = owner;
+  const answer = await api<EmptyBinResponse>(
+    `${base(projectId)}/deleted`,
+    "DELETE",
+  );
+  if (owner === forUser) forgetDeleted(projectId);
+  return answer.files;
+}
+
+// the Deleted card's rows go; their text and versions go with them
+function forgetDeleted(projectId: string): void {
+  const held = lists.value.get(projectId);
+  if (held === undefined) return;
+  bump(projectId);
+  for (const file of held.deleted) dropCached(file.id);
+  put(projectId, { ...held, deleted: [] });
+}
+
 // a write from a run or another tab: the row replaces the one held when
 // it is newer, or joins the list when it is unknown, and a delete moves
 // it to the Deleted card. Nothing is fetched, and a list in flight is
@@ -355,6 +375,10 @@ export function applyKnowledge(
 }
 
 export function onKnowledgeSocket(ev: SocketEvent): void {
+  if (ev.type === "knowledgeEmptied") {
+    forgetDeleted(ev.projectId);
+    return;
+  }
   if (ev.type !== "knowledge") return;
   applyKnowledge(ev.projectId, ev.file, ev.deleted);
 }

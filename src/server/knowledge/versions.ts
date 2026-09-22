@@ -125,6 +125,17 @@ export class KnowledgeVersions {
       .run(projectId, caps.knowledgeHistoryBytes);
   }
 
+  // every version of the project's deleted files: the bin, emptied
+  purge(projectId: string): number {
+    return this.db
+      .query(
+        `delete from knowledge_versions where project_id = ? and not exists (
+           select 1 from knowledge_files where id = knowledge_versions.file_id
+         )`,
+      )
+      .run(projectId).changes;
+  }
+
   sweep(now: number, days: number): number {
     return this.db
       .query(

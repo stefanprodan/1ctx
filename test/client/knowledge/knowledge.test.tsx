@@ -10,6 +10,7 @@ import { options } from "preact";
 import { render } from "preact-render-to-string";
 import {
   applyKnowledge,
+  emptyBin,
   fileTexts,
   fileVersions,
   listErrors,
@@ -455,6 +456,24 @@ describe("a knowledge frame", () => {
     const held = lists.value.get("p1");
     expect(held?.files.map((row) => row.id)).toEqual(["f9"]);
     expect(held?.deleted).toHaveLength(0);
+  });
+
+  test.serial("emptying the bin clears the Deleted card", async () => {
+    lists.value = new Map([["p1", list()]]);
+    applyKnowledge("p1", file({ revision: 4, updatedAt: NOW }), true);
+    expect(lists.value.get("p1")?.deleted).toHaveLength(1);
+    globalThis.fetch = (async () =>
+      Response.json({ files: 2 })) as unknown as typeof fetch;
+    expect(await emptyBin("p1")).toBe(2);
+    expect(lists.value.get("p1")?.deleted).toEqual([]);
+  });
+
+  test.serial("an emptied frame clears it for every other tab", () => {
+    lists.value = new Map([["p1", list()]]);
+    applyKnowledge("p1", file({ revision: 4, updatedAt: NOW }), true);
+    onKnowledgeSocket({ type: "knowledgeEmptied", projectId: "p1" });
+    expect(lists.value.get("p1")?.deleted).toEqual([]);
+    expect(lists.value.get("p1")?.files).toHaveLength(0);
   });
 
   test.serial("nothing is applied to a project whose list is not held", () => {

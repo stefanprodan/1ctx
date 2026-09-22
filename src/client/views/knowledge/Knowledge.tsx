@@ -4,19 +4,21 @@
 // A project's Knowledge tab: the text files its members seed and its
 // agents keep with the bash tool. One card of rows, searched by name,
 // with Upload at its head, and a second card of the files that were
-// deleted and can still be brought back.
+// deleted and can still be brought back, or dropped for good.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import {
   addFile,
+  emptyBin,
   knowledgeOf,
   listErrors,
   loadVersions,
   readVersion,
 } from "../../data/knowledge.ts";
 import { sentence } from "../../lib/format.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useSave } from "../../lib/save.ts";
 import {
   Rows,
@@ -53,6 +55,7 @@ function Base({ projectId }: { projectId: string }) {
   const adding = useSignal(false);
   const q = useSignal("");
   const acting = useSignal<string | null>(null);
+  const emptying = useSignal(false);
   const save = useSave(async () => {});
   // the ago words move by the minute
   const now = useSignal(Date.now());
@@ -152,7 +155,57 @@ function Base({ projectId }: { projectId: string }) {
         {list.files.length > 0 && <RowsNote>{ABOUT}</RowsNote>}
       </RowsCard>
       {list.deleted.length > 0 && (
-        <RowsCard label="Deleted" hint={deletedHint(list.limits.historyDays)}>
+        <RowsCard
+          label="Deleted"
+          hint={deletedHint(list.limits.historyDays)}
+          action={
+            emptying.value ? (
+              <>
+                <button
+                  type="button"
+                  class="btn btn-small"
+                  disabled={save.busy}
+                  onClick={() => {
+                    emptying.value = false;
+                  }}
+                >
+                  Keep
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-small btn-danger"
+                  disabled={save.busy}
+                  onClick={() => {
+                    acting.value = null;
+                    void save.act("empty", async () => {
+                      await emptyBin(projectId);
+                      emptying.value = false;
+                    });
+                  }}
+                >
+                  {save.pending.value === "empty"
+                    ? "Emptying"
+                    : "Delete for good"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                class="btn btn-small rows-add"
+                disabled={save.busy}
+                onClick={() => {
+                  emptying.value = true;
+                }}
+              >
+                <Icon name="trash" size={12} />
+                Empty bin
+              </button>
+            )
+          }
+        >
+          {notice !== null && acting.value === null && (
+            <RowsNote>{sentence(noticeOf(notice))}</RowsNote>
+          )}
           {list.deleted.map((file) => {
             const line = deletedLine(file, now.value);
             const failed =
