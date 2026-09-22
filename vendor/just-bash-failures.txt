@@ -130,5 +130,11 @@
 (fail) worker protocol runtime desync probes > python3 stdout shaped like worker control payload is treated as plain output
 (fail) worker protocol runtime desync probes > sqlite3 output shaped like worker control payload is treated as query data
 (fail) worker protocol runtime desync probes > sqlite3 timed-out worker query does not execute later and mutate database
-error: Cannot find package 'fast-check'
-error: Cannot find package 'tsx'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-sandbox.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/generators/grammar-generator.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-in-depth-lifecycle.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-runtime-capability.test.ts'
+error: expect(received).toBe(expected)

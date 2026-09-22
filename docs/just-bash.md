@@ -72,7 +72,9 @@ Others fail because of the trim: the removed commands, the documents
 and the fixtures. The fuzzers need `fast-check` and two lifecycle tests
 need `tsx`, which we do not install.
 
-`vendor/just-bash-failures.txt` lists every expected failure by name.
+`vendor/just-bash-failures.txt` lists every expected failure by name,
+and the first error line of every test file that failed to load, since
+such a file runs none of its tests.
 The run fails when the set moves either way, a new failure or a listed
 one passing. After a change that fixes one, or a sync, check each
 difference, then record it with `scripts/vendor-test.sh --update`. The
@@ -85,18 +87,29 @@ tests of what we removed.
 1. Read upstream's `CHANGELOG.md` for the new tag. For each row of
    "What we changed", check whether upstream fixed it; if it did, plan to
    take theirs and drop ours.
-2. Split the package out of a clone at the tag:
+2. Recreate the split the last sync recorded. The squash commit names it
+   in its `git-subtree-split:` line, but that commit lives only in the
+   clone that made it, and `git subtree merge` needs it. Splitting the
+   same tag from a depth-1 clone gives the same commit again:
+
+   ```sh
+   git log -1 --grep='^git-subtree-dir: vendor/just-bash$' --format=%B
+   git clone --depth 1 --branch just-bash@3.4.2 \
+     https://github.com/vercel-labs/just-bash /tmp/just-bash-old
+   git -C /tmp/just-bash-old subtree split --prefix=packages/just-bash -b vendor
+   git fetch /tmp/just-bash-old vendor
+   git cat-file -t <the git-subtree-split sha>   # commit
+   ```
+
+   Use the tag in "Where it comes from", the one being replaced.
+3. Split the new release the same way and merge it into the subtree, on
+   a branch:
 
    ```sh
    git clone --depth 1 --branch just-bash@X.Y.Z \
-     https://github.com/vercel-labs/just-bash /tmp/just-bash
-   git -C /tmp/just-bash subtree split --prefix=packages/just-bash -b vendor
-   ```
-
-3. On a branch, merge it into the subtree:
-
-   ```sh
-   git fetch /tmp/just-bash vendor
+     https://github.com/vercel-labs/just-bash /tmp/just-bash-new
+   git -C /tmp/just-bash-new subtree split --prefix=packages/just-bash -b vendor
+   git fetch /tmp/just-bash-new vendor
    git subtree merge --prefix=vendor/just-bash --squash FETCH_HEAD \
      -m "build: sync just-bash X.Y.Z"
    ```

@@ -9,8 +9,9 @@ One continuous context for agents. Domain: 1ctx.dev.
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
   change: `docs/just-bash.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
-  and `modern-tar`; the vendored tar command uses modern-tar too. The modern-tar patch retains the raw header `typeflag`
-  to distinguish GNU sparse and unknown types from regular files.
+  and `modern-tar`; the vendored tar command uses modern-tar too. The
+  modern-tar patch retains the raw header `typeflag` to distinguish GNU
+  sparse and unknown types from regular files.
 - **Status:** alpha. No backwards compatibility and no shims for the API
   and the socket, which may change freely. Stored data is kept: every
   schema change is an appended migration and no database is wiped.
