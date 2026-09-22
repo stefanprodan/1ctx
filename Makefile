@@ -8,7 +8,7 @@ export VERSION
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke staging-deploy staging-provision staging-status
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke staging-deploy staging-provision staging-status
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -22,6 +22,9 @@ dev: ## Run with hot reload of the page and restart on server changes (make dev 
 
 test: ## Run tests
 	@bun run test
+
+vendor-test: ## Run just-bash's own suite on vendor/just-bash against its expected failures
+	@bun run vendor-test
 
 lint: ## Format and lint with Biome, then type-check with tsc
 	@bun run lint

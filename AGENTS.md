@@ -5,10 +5,13 @@ One continuous context for agents. Domain: 1ctx.dev.
 - **Runtime:** Bun only, TypeScript run directly, one standalone binary.
   No Node. Packages are devDependencies bundled at build time, exact
   pins, official npm only, `bun install --ignore-scripts`. A new package
-  needs the user's explicit go-ahead.
-  `src/server/lib/archive.ts` alone imports `@zip.js/zip.js` and
-  `modern-tar`. The modern-tar patch retains the raw header `typeflag`
-  to distinguish GNU sparse and unknown types from regular files.
+  needs the user's explicit go-ahead. The one exception is just-bash,
+  whose TypeScript source lives in `vendor/just-bash/` and is ours to
+  change: `docs/just-bash.md` says what we changed and how to sync it.
+  In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
+  and `modern-tar`; the vendored tar command uses modern-tar too. The
+  modern-tar patch retains the raw header `typeflag` to distinguish GNU
+  sparse and unknown types from regular files.
 - **Status:** alpha. No backwards compatibility and no shims for the API
   and the socket, which may change freely. Stored data is kept: every
   schema change is an appended migration and no database is wiped.
@@ -27,6 +30,7 @@ make preview-provision FILE=x.yaml  # stop it, apply the objects, start it
 make preview-reset FILE=x.yaml SECRETS=dir  # wipe it, copy the secrets in, provision
 make lint           # biome check --write, then tsc; run after any code change
 make test           # bun test, concurrent; run after any code change, before finishing
+make vendor-test    # just-bash's own suite on vendor/just-bash, against its expected failures
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
@@ -79,11 +83,15 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
 scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 host in the gitignored scripts/staging.env), and brand.py
                 which regenerates the brand SVGs in site/ from the brand
-                book (`uv run scripts/brand.py`).
+                book (`uv run scripts/brand.py`), and vendor-test.sh.
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
                 by the app. site/README.md is the brand book.
+vendor/         just-bash/, the vendored source (a git subtree, outside
+                Biome and the structure rules), and
+                just-bash-failures.txt, what `make vendor-test` expects.
+docs/           just-bash.md: the fork, our changes, the upstream sync.
 ```
 
 An area under `src/server/<area>/` has `index.ts` (what others may
@@ -349,11 +357,13 @@ violation, and every rule has a rejected fixture under
   and `scratchIdleDays`. The project byte ceiling is 64 MiB; stored
   overrides are clamped to their ranges for both effective limits and
   the Limits tab.
-  The just-bash 3.4.2 patch fixes Bun's module-loader property descriptor
-  so best-effort hardening runs; sqlite3's unpatched worker stays out.
-  It also keeps curl's redirects on http and https, since Bun's fetch
-  reads `file:` URLs from the host's disk, and cancels the body of a
-  response refused for its length. Check both after a just-bash upgrade.
+  just-bash is vendored source, resolved through the `just-bash` path in
+  `tsconfig.json`. Our changes to it are marked `(1ctx)` and listed in
+  `docs/just-bash.md`: Bun's module-loader descriptor, so hardening runs;
+  curl's redirects kept on http and https, since Bun's fetch reads
+  `file:` URLs from the host's disk; the body of a response refused for
+  its length cancelled. Python, js-exec and sqlite3 are removed. A fix to
+  a command goes in the vendored source with a test, never around it.
   `knowledge/judge.ts` shares archive selection and judging between the
   knowledge uploader and attachment staging.
   A chat archive whose name-selected members all sit under one top-level

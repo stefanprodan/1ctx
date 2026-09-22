@@ -1,0 +1,140 @@
+(fail) AGENTS.npm.md Bash examples > should execute bash examples without errors
+(fail) AGENTS.npm.md Bash examples > should have bash code blocks
+(fail) AGENTS.npm.md validation > command list completeness > should list all registered commands
+(fail) Code execution exploit regressions > blocks python worker escape vectors (js bridge, ctypes, subprocess)
+(fail) Code execution exploit regressions > blocks sqlite3 extension loading attempts
+(fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md
+(fail) Documentation TypeScript examples > should have valid TypeScript syntax in all examples
+(fail) OverlayFs Security - Path Traversal Prevention > directory traversal via operations > should not allow mkdir outside root
+(fail) Python/SQLite Information Disclosure > python3 sys.path should not expose host or Node internal paths
+(fail) README validation > command list completeness > should list all registered commands
+(fail) ReadWriteFs > rm > should not throw with force option for non-existent files
+(fail) ReadWriteFs replacement mode and copy behavior > appends to a private write-only regular file
+(fail) ReadWriteFs replacement mode and copy behavior > changes metadata on a private mode-000 regular file
+(fail) ReadWriteFs special-file metadata operations > preserves a Unix socket during chmod and utimes
+(fail) WorkerDefenseInDepth > activation > should activate when enabled
+(fail) WorkerDefenseInDepth > activation > should deactivate and restore globals
+(fail) WorkerDefenseInDepth > activation > should generate an execution ID
+(fail) WorkerDefenseInDepth > audit mode > should log but not block in audit mode
+(fail) WorkerDefenseInDepth > audit mode > should record violations in audit mode
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow checking .constructor with typeof
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading .constructor.length
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading .constructor.name
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading .constructor.prototype
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading Function.prototype.constructor.name
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should block .constructor() invocation while allowing property reads
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block (() => {}).constructor
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block (async () => {}).constructor
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block (function*(){}).constructor
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block [].constructor.constructor
+(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block {}.constructor.constructor
+(fail) WorkerDefenseInDepth > blocking in worker context > Error.prepareStackTrace blocking > should allow Error.prepareStackTrace reading
+(fail) WorkerDefenseInDepth > blocking in worker context > Error.prepareStackTrace blocking > should block Error.prepareStackTrace assignment
+(fail) WorkerDefenseInDepth > blocking in worker context > Function constructor blocking > should block Function accessed via globalThis
+(fail) WorkerDefenseInDepth > blocking in worker context > Function constructor blocking > should block Function() call without new
+(fail) WorkerDefenseInDepth > blocking in worker context > Function constructor blocking > should block new Function()
+(fail) WorkerDefenseInDepth > blocking in worker context > Proxy blocking > should block new Proxy()
+(fail) WorkerDefenseInDepth > blocking in worker context > WebAssembly blocking > should block WebAssembly.Module access
+(fail) WorkerDefenseInDepth > blocking in worker context > eval blocking > should block direct eval
+(fail) WorkerDefenseInDepth > blocking in worker context > eval blocking > should block indirect eval via globalThis
+(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block Atomics access
+(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block FinalizationRegistry
+(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block SharedArrayBuffer
+(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block WeakRef
+(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should freeze Reflect and expose it through a read-only proxy
+(fail) WorkerDefenseInDepth > blocking in worker context > process.binding blocking > should block process.binding calls
+(fail) WorkerDefenseInDepth > blocking in worker context > process.binding blocking > should block process.dlopen calls
+(fail) WorkerDefenseInDepth > blocking in worker context > process.binding blocking > should block process.mainModule access when it exists (CJS contexts)
+(fail) WorkerDefenseInDepth > blocking in worker context > process.env blocking > should block process.env access
+(fail) WorkerDefenseInDepth > blocking in worker context > process.env blocking > should block process.env iteration
+(fail) WorkerDefenseInDepth > blocking in worker context > process.getBuiltinModule blocking > should block process.getBuiltinModule
+(fail) WorkerDefenseInDepth > blocking in worker context > setTimeout/setInterval blocking > should block setImmediate
+(fail) WorkerDefenseInDepth > blocking in worker context > setTimeout/setInterval blocking > should block setInterval
+(fail) WorkerDefenseInDepth > blocking in worker context > setTimeout/setInterval blocking > should block setTimeout
+(fail) WorkerDefenseInDepth > excludeViolationTypes > should allow excluded violation types to work normally
+(fail) WorkerDefenseInDepth > excludeViolationTypes > should allow multiple exclusions (as used by Python worker)
+(fail) WorkerDefenseInDepth > excludeViolationTypes > should allow setImmediate when excluded (as used by Python worker)
+(fail) WorkerDefenseInDepth > excludeViolationTypes > should exclude WebAssembly when specified
+(fail) WorkerDefenseInDepth > excludeViolationTypes > should not record violations for excluded types
+(fail) WorkerDefenseInDepth > excludeViolationTypes > should still block non-excluded violation types
+(fail) WorkerDefenseInDepth > restoration > should restore Function constructor after deactivation
+(fail) WorkerDefenseInDepth > restoration > should restore all globals after deactivation
+(fail) WorkerDefenseInDepth > violation recording > should clear violations when requested
+(fail) WorkerDefenseInDepth > violation recording > should include violations in stats
+(fail) WorkerDefenseInDepth > violation recording > should invoke onViolation callback
+(fail) WorkerDefenseInDepth > violation recording > should record violations with correct information
+(fail) WorkerDefenseInDepth > worker-specific behavior > blocks require and direct loader calls without consulting stack text
+(fail) WorkerDefenseInDepth > worker-specific behavior > should always block (no context tracking needed)
+(fail) WorkerDefenseInDepth > worker-specific behavior > should include 'worker context' in error messages
+(fail) browser bundle safety > browser-excluded commands list > should have browser-excluded commands available in Node.js registry
+(fail) browser bundle safety > bundle contents > should not contain direct node: protocol imports in bundle code
+(fail) browser bundle safety > bundle contents > should not contain native module artifacts
+(fail) browser bundle safety > bundle contents > should not contain sql.js imports
+(fail) browser bundle safety > bundle contents > should not contain sqlite3 command registration
+(fail) browser bundle safety > bundle contents > should not contain tar command registration
+(fail) browser bundle safety > bundle contents > should not contain xan command registration
+(fail) browser bundle safety > bundle contents > should not contain yq command registration
+(fail) browser bundle safety > sqlite3 in Node.js > sqlite3 should be available by default in Node.js
+(fail) js-exec exploit regressions > blocks breakout chains and command-injection attempts
+(fail) js-exec exploit regressions > keeps queued execution bounded after a concurrent timeout
+(fail) js-exec host runtime breakout probes > blocks nested js-exec when invoked through Symbol.for('jb:exec') bridge
+(fail) js-exec host runtime breakout probes > does not allow child_process.spawnSync('node', ...) to execute host Node.js
+(fail) js-exec host runtime breakout probes > does not allow path-qualified or wrapper-based host runtime execution from js-exec
+(fail) js-exec host runtime breakout probes > keeps Function-constructor blocked on host-bridged function objects
+(fail) js-exec recursion guard bypass probes > blocks delayed nested js-exec launched from background subshell
+(fail) js-exec recursion guard bypass probes > blocks nested js-exec from Promise microtask bridge callback
+(fail) js-exec recursion guard bypass probes > blocks nested js-exec through timeout wrapper
+(fail) js-exec recursion guard bypass probes > blocks nested js-exec via child_process.execSync
+(fail) js-exec recursion guard bypass probes > blocks nested js-exec via spawnSync structured args
+(fail) js-exec recursion guard bypass probes > blocks nested js-exec when backgrounded without wait
+(fail) js-exec recursion guard bypass probes > blocks nested js-exec when launched in background through bash -c
+(fail) process substitution - read-only /dev/fd is not scratch space > behaves the same whether or not a substitution ran first
+(fail) process substitution - read-only /dev/fd is not scratch space > refuses a write even with a descriptor still live
+(fail) process substitution - read-only /dev/fd is not scratch space > refuses a write to an unallocated descriptor
+(fail) process substitution - read-only /dev/fd is not scratch space > refuses an append to an unallocated descriptor
+(fail) process substitution - read-only /dev/fd is not scratch space > refuses creating a directory under /dev/fd
+(fail) process substitution - read-only filesystem > feeds a while-read loop
+(fail) process substitution - read-only filesystem > keeps the rest of /dev visible
+(fail) process substitution - read-only filesystem > leaves no backing file behind
+(fail) process substitution - read-only filesystem > reads from <(cmd)
+(fail) process substitution - read-only filesystem > still reads the underlying filesystem
+(fail) process substitution - read-only filesystem > still refuses ordinary writes
+(fail) process substitution - read-only filesystem > supports the comm idiom
+(fail) process substitution - read-only filesystem > supports the diff idiom
+(fail) process substitution - read-only filesystem > writes to >(cmd) through a command argument
+(fail) process substitution - read-only filesystem > writes to >(cmd) through a redirection
+(fail) published package declarations > includes declaration trees referenced by public declarations
+(fail) query format builtins in browser mode > decodes browser base64 bytes using defined UTF-8 replacement
+(fail) query format builtins in browser mode > encodes Unicode as UTF-8 before browser base64 conversion
+(fail) request-owned DNS connector lookup > creates independent pools without patching process-global DNS
+(fail) runtime error-forwarding leak probes > python3 script-open directory error does not expose host/internal markers
+(fail) runtime error-forwarding leak probes > sqlite3 open-directory error does not expose host/internal markers
+(fail) tar > auto-compress (-a) > should auto-detect xz from .tar.xz extension
+(fail) tar > auto-compress (-a) > should auto-detect zstd from .tar.zst extension
+(fail) tar > xz compression (-J) > should preserve xz compression by default
+(fail) tar > zstd compression (--zstd) > should preserve zstd compression by default
+(fail) tar bundled binary > should auto-detect compression from filename (-a)
+(fail) tar bundled binary > should create and extract a bzip2-compressed archive
+(fail) tar bundled binary > should create and extract a gzip-compressed archive
+(fail) tar bundled binary > should create and extract a tar archive
+(fail) tar bundled binary > should create and list a tar archive
+(fail) tar bundled binary > should handle verbose output (-v)
+(fail) tar bundled binary > should preserve file permissions
+(fail) tar bundled binary > should preserve xz codec behavior by default
+(fail) tar bundled binary > should preserve zstd codec behavior by default
+(fail) tar bundled binary > should show help
+(fail) tar bundled binary > should use exclude-from (-X)
+(fail) tar bundled binary > should use files-from (-T)
+(fail) tar with binary data > binary stdin piping > should preserve xz compression by default
+(fail) tar with binary data > binary stdin piping > should preserve zstd compression by default
+(fail) worker protocol runtime desync probes > python3 stdout shaped like worker control payload is treated as plain output
+(fail) worker protocol runtime desync probes > sqlite3 output shaped like worker control payload is treated as query data
+(fail) worker protocol runtime desync probes > sqlite3 timed-out worker query does not execute later and mutate database
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-sandbox.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/generators/grammar-generator.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-in-depth-lifecycle.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-runtime-capability.test.ts'
+error: expect(received).toBe(expected)
