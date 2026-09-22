@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Durable revisions win over old loads. Stream gaps refetch a snapshot
-// rather than leaving a partly applied reply or visual on screen.
+// rather than leaving a partly applied reply or visual on screen. A
+// settled chat is held once seen, so going back to it draws at once
+// while it loads again.
 
 import { effect, signal } from "@preact/signals";
 import type {
   CreateSessionRequest,
-  ProjectAgentsResponse,
   RegenerateRequest,
   RenameSessionRequest,
   SendMessageRequest,
   SessionResponse,
 } from "../../shared/api/sessions.ts";
-import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
@@ -32,14 +32,21 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { answered, carry, changeOf } from "./capabilities.ts";
+import { carry, changeOf } from "./capabilities.ts";
+import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
 import { applyEnvelope, dropRow, revokeRows } from "./stream.ts";
-import { loadUploads } from "./uploads.ts";
 
+export {
+  homeProjectId,
+  loadProjectAgents,
+  pickHomeProject,
+  projectAgentCount,
+  projectAgents,
+} from "./project-agents.ts";
 export {
   loadOpened,
   loadToolResult,
@@ -58,12 +65,6 @@ export const session = signal<SessionDetail | null>(null);
 export const sessionError = signal<Failure | null>(null);
 // the replies streaming on the chat on screen, by message id
 export const live = signal<ReadonlyMap<string, Live>>(new Map());
-// the stream's rows for the filter last asked for: Home's, every
-// project with a query, or one project's
-export const projectAgents = signal<AgentSummary[] | null>(null);
-// the project Home's composer starts a chat in, as the user picked it
-// for the life of the tab; null for the personal project
-export const homeProjectId = signal<string | null>(null);
 // a send the composer asked for and the server has not answered
 export const sending = signal(false);
 
@@ -78,8 +79,8 @@ let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 // the next frame must follow once answered
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
 let stream: { sendId: string; seq: number } | null = null;
-let agentsTurn = 0;
-let agentsFor: string | null = null;
+// the settled chats by id
+const chatsKept = new Held<SessionDetail>();
 
 const clock = () => Date.now();
 
@@ -93,9 +94,7 @@ effect(() => {
   live.value = new Map();
   resetValues();
   visualPreviews.value = new Map();
-  projectAgents.value = null;
-  agentsFor = null;
-  homeProjectId.value = null;
+  chatsKept.clear();
   sending.value = false;
   pending = null;
   stream = null;
@@ -115,16 +114,34 @@ function show(detail: SessionDetail): void {
       : { sendId: detail.live.sendId, seq: detail.live.seq };
 }
 
+// a chat is held only settled: a running one would miss its frames
+function keep(detail: SessionDetail | null): void {
+  if (detail === null) return;
+  if (detail.session.status === "running" || detail.live !== null) {
+    chatsKept.delete(detail.session.id);
+  } else chatsKept.set(detail.session.id, detail);
+}
+
+function clear(): void {
+  session.value = null;
+  live.value = new Map();
+  resetValues();
+  visualPreviews.value = new Map();
+}
+
 export async function loadSession(id: string): Promise<void> {
   const turn = wanted.turn + 1;
   wanted = { id, turn };
   sessionError.value = null;
-  if (session.value !== null && session.value.session.id !== id) {
-    session.value = null;
-    live.value = new Map();
-    resetValues();
-    visualPreviews.value = new Map();
+  if (session.value?.session.id !== id) {
+    keep(session.value);
+    clear();
+    const held = chatsKept.get(id);
+    if (held !== undefined) show(held);
   }
+  // what is on screen before the answer: a held copy the answer always
+  // replaces, unless a frame moved it while the answer was in flight
+  const before = session.value;
   try {
     const detail = await api<SessionResponse>(
       `/api/sessions/${encodeURIComponent(id)}`,
@@ -135,6 +152,7 @@ export async function loadSession(id: string): Promise<void> {
     const held = session.value;
     if (
       held === null ||
+      held === before ||
       held.session.id !== id ||
       detail.session.revision >= held.session.revision
     ) {
@@ -145,7 +163,11 @@ export async function loadSession(id: string): Promise<void> {
     pending = { buffer: [], overflow: false };
     watch(id);
   } catch (err) {
-    if (wanted.turn === turn) sessionError.value = failure(err);
+    if (wanted.turn !== turn) return;
+    // a held copy of a chat that is gone or no longer seen goes with it
+    chatsKept.delete(id);
+    if (session.value?.session.id === id) clear();
+    sessionError.value = failure(err);
   }
 }
 
@@ -159,43 +181,9 @@ export function leaveSession(id?: string): void {
   wanted = { id: "", turn: wanted.turn + 1 };
   pending = null;
   stream = null;
-  session.value = null;
-  live.value = new Map();
-  resetValues();
-  visualPreviews.value = new Map();
+  keep(session.value);
+  clear();
   watch(null);
-}
-
-export function projectAgentCount(projectId: string): number | null {
-  const list = projectAgents.value;
-  return list === null || agentsFor !== projectId ? null : list.length;
-}
-
-export async function loadProjectAgents(projectId: string): Promise<void> {
-  const forUser = owner;
-  const turn = ++agentsTurn;
-  if (agentsFor !== projectId) projectAgents.value = null;
-  agentsFor = projectId;
-  const current = () => owner === forUser && turn === agentsTurn;
-  try {
-    const body = await api<ProjectAgentsResponse>(
-      `/api/projects/${encodeURIComponent(projectId)}/agents`,
-    );
-    if (!current()) return;
-    projectAgents.value = body.agents;
-    answered(body);
-  } catch {
-    if (current()) projectAgents.value = null;
-  }
-}
-
-// Home's composer moves to another project: its agents replace the
-// last project's, none until they answer, so a send never pairs an
-// agent with a project it is not in
-export async function pickHomeProject(projectId: string): Promise<void> {
-  homeProjectId.value = projectId;
-  projectAgents.value = null;
-  await Promise.all([loadProjectAgents(projectId), loadUploads(projectId)]);
 }
 
 // a write's answer is the detail: applied like an envelope, so the
@@ -283,6 +271,7 @@ export async function renameSession(id: string, title: string): Promise<void> {
 // socket's deleted frame after a local delete then finds nothing
 function drop(sessionId: string, projectId: string): void {
   dropRow(sessionId, projectId);
+  chatsKept.delete(sessionId);
   if (wanted.id === sessionId || session.value?.session.id === sessionId) {
     leaveSession();
     navigate(`/projects/${projectId}`);
@@ -308,7 +297,11 @@ export const markdownHref = (id: string): string =>
 function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   applyEnvelope(ev);
   const held = session.value;
-  if (held === null || held.session.id !== ev.session.id) return;
+  if (held === null || held.session.id !== ev.session.id) {
+    // a held chat that moved is loaded again when it is opened
+    chatsKept.delete(ev.session.id);
+    return;
+  }
   if (ev.session.revision <= held.session.revision) return;
   const removed = new Set(ev.removedMessageIds ?? []);
   const messages = upsert(
@@ -464,6 +457,9 @@ export function onSocket(ev: SocketEvent): void {
       break;
     case "revoked": {
       revokeRows(ev.projectId);
+      chatsKept.update((detail) =>
+        detail.session.projectId === ev.projectId ? null : detail,
+      );
       const held = session.value;
       // the page leaves the chat as a navigation would, so an answer
       // in flight for it and its watch are dropped too

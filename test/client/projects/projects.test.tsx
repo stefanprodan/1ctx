@@ -29,6 +29,7 @@ import {
   aboutLine,
   listedProjects,
   peopleLine,
+  settledCounts,
   tabsOf,
 } from "../../../src/client/views/projects/Project.model.ts";
 import { Project } from "../../../src/client/views/projects/Project.tsx";
@@ -316,6 +317,26 @@ describe("Project.model", () => {
     expect(peopleLine({ kind: "personal", memberCount: 1 })).toBe("only you");
     expect(peopleLine({ kind: "team", memberCount: 1 })).toBe("1 member");
     expect(peopleLine({ kind: "team", memberCount: 4 })).toBe("4 members");
+  });
+
+  test("the tab counts show together once every one is known", () => {
+    const counts = { automations: 2, knowledge: 5, members: 3, agents: null };
+    const none = {
+      automations: null,
+      knowledge: null,
+      members: null,
+      agents: null,
+    };
+    expect(settledCounts("team", counts)).toEqual(none);
+    expect(settledCounts("team", { ...counts, agents: 1 })).toEqual({
+      ...counts,
+      agents: 1,
+    });
+    // a personal project's tabs count neither members nor agents
+    expect(settledCounts("personal", counts)).toBe(counts);
+    expect(settledCounts("personal", { ...counts, knowledge: null })).toEqual(
+      none,
+    );
   });
 
   test("a personal project has Settings where a team has Members", () => {

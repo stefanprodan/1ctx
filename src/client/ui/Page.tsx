@@ -141,3 +141,9 @@ export function Page({
     </div>
   );
 }
+
+// the loading line of a page whose head is drawn while a part of its
+// content loads
+export function PageLoading() {
+  return <p class="page-state">Loading</p>;
+}

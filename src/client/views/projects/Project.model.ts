@@ -47,6 +47,18 @@ const NO_COUNTS: TabCounts = {
 
 const counted = (n: number | null) => (n === null ? {} : { count: n });
 
+// the counts once every one the tabs show is known, else none: they
+// arrive from separate loads, and one at a time would move the row
+// with each
+export function settledCounts(kind: ProjectKind, counts: TabCounts): TabCounts {
+  const shown = [
+    counts.automations,
+    counts.knowledge,
+    ...(kind === "team" ? [counts.members, counts.agents] : []),
+  ];
+  return shown.every((n) => n !== null) ? counts : NO_COUNTS;
+}
+
 // every project has automations; a team's people are its Members, and
 // a personal project has one person, who describes it in Settings.
 // Members counts the users and the agents the tab lists

@@ -27,6 +27,15 @@ import type { SocketEvent } from "../../shared/socket.ts";
 import type { RunFilter } from "../../shared/words.ts";
 import { type Failure, failure, reason } from "../lib/format.ts";
 import { api } from "./api.ts";
+import {
+  matchesFilter,
+  upsertAutomation,
+  upsertRun,
+} from "./automations-rows.ts";
+
+export { matchesFilter, upsertAutomation, upsertRun };
+
+import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { keyOf, loadMemory } from "./memory.ts";
 import { loadProject } from "./projects.ts";
@@ -66,6 +75,12 @@ export const preview = signal<Preview | null>(null);
 
 let owner: string | null = null;
 let projectFor: string | null = null;
+// the lists of the projects seen before, drawn at once on the way back
+// while they load again
+const kept = new Held<{
+  list: AutomationSummary[];
+  deadline: number | null;
+}>();
 let listTurn = 0;
 let runsTurn = 0;
 let pageTurn = 0;
@@ -76,6 +91,7 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   projectFor = null;
+  kept.clear();
   listTurn++;
   runsTurn++;
   automations.value = null;
@@ -95,42 +111,6 @@ export function automationCount(projectId: string): number | null {
   return list === null || projectFor !== projectId ? null : list.length;
 }
 
-const byName = (a: AutomationSummary, b: AutomationSummary) =>
-  a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
-
-// the row into the list by the revision rule: a held row at or above
-// the incoming revision keeps its word
-export function upsertAutomation(
-  list: AutomationSummary[],
-  row: AutomationSummary,
-): AutomationSummary[] {
-  const held = list.find((a) => a.id === row.id);
-  if (held !== undefined && held.revision >= row.revision) return list;
-  return [...list.filter((a) => a.id !== row.id), row].sort(byName);
-}
-
-// whether a run belongs under a filter
-export function matchesFilter(
-  row: Pick<StreamRow, "session">,
-  filter: RunFilter | null,
-): boolean {
-  if (filter === "failed") return row.session.status === "failed";
-  if (filter === "manual") return row.session.runSource === "manual";
-  return true;
-}
-
-// a run's envelope into the held runs: a held row moves when the
-// revision is above its own, newest first by when it was opened
-export function upsertRun(rows: StreamRow[], next: StreamRow): StreamRow[] {
-  const held = rows.find((r) => r.session.id === next.session.id);
-  if (held !== undefined && held.session.revision >= next.session.revision) {
-    return rows;
-  }
-  return [...rows.filter((r) => r.session.id !== next.session.id), next].sort(
-    (a, b) => b.session.createdAt - a.session.createdAt,
-  );
-}
-
 const path = (id: string) => `/api/automations/${encodeURIComponent(id)}`;
 
 // the stream row's label for a run of a held automation
@@ -143,8 +123,15 @@ export async function loadAutomations(projectId: string): Promise<void> {
   const forUser = owner;
   const turn = ++listTurn;
   if (projectFor !== projectId) {
-    automations.value = null;
-    runDeadlineMs.value = null;
+    if (projectFor !== null && automations.value !== null) {
+      kept.set(projectFor, {
+        list: automations.value,
+        deadline: runDeadlineMs.value,
+      });
+    }
+    const held = kept.get(projectId);
+    automations.value = held?.list ?? null;
+    runDeadlineMs.value = held?.deadline ?? null;
     runs.value = null;
     runsTurn++;
   }
@@ -406,6 +393,15 @@ export async function deleteAutomation(id: string): Promise<void> {
 }
 
 export function onAutomationsSocket(ev: SocketEvent): void {
+  // a held list of a project off screen is loaded again when it is
+  // opened rather than kept current here
+  if (
+    ev.type === "revoked" ||
+    ((ev.type === "automation" || ev.type === "automationDeleted") &&
+      ev.projectId !== projectFor)
+  ) {
+    kept.delete(ev.projectId);
+  }
   switch (ev.type) {
     case "automation": {
       if (ev.projectId === projectFor) {

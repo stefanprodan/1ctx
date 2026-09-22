@@ -87,15 +87,17 @@ export const ROUTES: Route[] = [
     role: "authenticated",
     // the stream for the query, the week for the aside, and the agents of
     // the composer's project, the picked one or the personal; it comes
-    // from the rail's list
+    // from the rail's list, waited for only when none is held
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
       const origin = originOf(`?${query.toString()}`);
       const rows = loadList({ project: null, q, origin });
       const spent = loadWeek();
-      await loadProjects();
+      const listed = loadProjects();
+      if (projects.value === null) await listed;
       const target = composeProjectOf(projects.value, homeProjectId.value);
       await Promise.all([
+        listed,
         rows,
         spent,
         target === null ? Promise.resolve() : loadProjectAgents(target.id),
@@ -118,9 +120,11 @@ export const ROUTES: Route[] = [
     load: async () => {
       const spent = loadWeek();
       const activity = loadDays();
-      await loadProjects();
+      const listed = loadProjects();
+      if (projects.value === null) await listed;
       const personal = composeProjectOf(projects.value, null);
       await Promise.all([
+        listed,
         spent,
         activity,
         personal === null ? Promise.resolve() : loadProjectAgents(personal.id),

@@ -5,13 +5,16 @@
 // the user may see with a query, or one project's. The rows come from
 // the route; the socket keeps them current through the sessions
 // entity, which hands the frames here. An answer is kept only for the
-// user and the turn it was asked for, as every entity does.
+// user and the turn it was asked for, as every entity does. The rows
+// of the filters seen before are held, so going back to one draws its
+// rows at once while they load again.
 
 import { effect, signal } from "@preact/signals";
 import type { SessionsResponse, StreamRow } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
 import { api } from "./api.ts";
+import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { ordered } from "./sessions-rows.ts";
 
@@ -30,6 +33,10 @@ let listFor: Required<ListFilter> & { turn: number } = {
   origin: null,
   turn: 0,
 };
+const kept = new Held<StreamRow[]>();
+
+const keyOf = (f: ListFilter) =>
+  JSON.stringify([f.project, f.q, f.origin ?? null]);
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -37,6 +44,7 @@ effect(() => {
   owner = id;
   listFor = { project: "", q: "", origin: null, turn: listFor.turn + 1 };
   list.value = null;
+  kept.clear();
 });
 
 const sameFilter = (a: ListFilter, b: ListFilter) =>
@@ -67,11 +75,15 @@ function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
   );
 }
 
-// the rows for a filter; a different filter drops the rows on screen
-// so a page never shows another filter's list while its own loads
+// the rows for a filter; a different filter puts the rows on screen
+// away and shows the ones held for it, or none, so a page never shows
+// another filter's list while its own loads
 export async function loadList(filter: ListFilter): Promise<void> {
   const turn = listFor.turn + 1;
-  if (!sameFilter(listFor, filter)) list.value = null;
+  if (!sameFilter(listFor, filter)) {
+    if (list.value !== null) kept.set(keyOf(listFor), list.value);
+    list.value = kept.get(keyOf(filter)) ?? null;
+  }
   listFor = { ...filter, origin: filter.origin ?? null, turn };
   const params = new URLSearchParams();
   if (filter.project !== null) params.set("project", filter.project);
@@ -100,6 +112,7 @@ function reload(): Promise<void> {
 // the row goes, and the list is loaded again when the filter covers
 // the project, since an answer in flight may still hold the row
 export function dropRow(sessionId: string, projectId: string): void {
+  kept.update((rows) => rows.filter((row) => row.session.id !== sessionId));
   const rows = list.value;
   if (rows !== null) {
     list.value = rows.filter((row) => row.session.id !== sessionId);
@@ -111,6 +124,11 @@ export function dropRow(sessionId: string, projectId: string): void {
 // it was the project's own, and an answer in flight goes with them
 // since it may still hold rows of that project
 export function revokeRows(projectId: string): void {
+  kept.update((rows, key) =>
+    JSON.parse(key)[0] === projectId
+      ? null
+      : rows.filter((row) => row.session.projectId !== projectId),
+  );
   const rows = list.value;
   listFor = { ...listFor, turn: listFor.turn + 1 };
   if (listFor.project === projectId) list.value = null;
