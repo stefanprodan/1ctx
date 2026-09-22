@@ -171,4 +171,38 @@ describe("yq over several documents", () => {
     expect(result.exitCode).toBe(0);
     expect(result.file).toBe("a: 5\n---\na: 5\n");
   });
+
+  test("eval as a subcommand reads as mikefarah's", async () => {
+    const result = await yq("yq eval '.metadata.name' /m.yaml");
+    expect(result.stdout).toBe("settings\n---\nbackend\n---\nbackend\n");
+    const short = await yq("yq e -i '.a = 2' /m.yaml", "a: 1\n");
+    expect(short.file).toBe("a: 2\n");
+    const all = await yq("yq ea '.' /m.yaml");
+    expect(all.exitCode).toBe(1);
+    expect(all.stderr).toContain("-s reads every document");
+  });
+
+  test("several files are read in turn, and -i writes each", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/a.yaml", "a: 1\n");
+    fs.writeFileSync("/b.yaml", "a: 2\n---\na: 3\n");
+    const bash = new Bash({ fs });
+    const read = await bash.exec("yq '.a' /a.yaml /b.yaml");
+    expect(read.stdout).toBe("1\n---\n2\n---\n3\n");
+    const json = await bash.exec("yq -o json -I0 '.' /a.yaml /b.yaml");
+    expect(json.stdout).toBe('{"a":1}\n{"a":2}\n{"a":3}\n');
+    const missing = await bash.exec("yq '.a' /a.yaml /none.yaml");
+    expect(missing.exitCode).not.toBe(0);
+    expect(missing.stdout).toBe("1\n");
+    await bash.exec("yq -i '.b = 1' /a.yaml /b.yaml");
+    expect(await fs.readFile("/a.yaml")).toBe("a: 1\nb: 1\n");
+    expect(await fs.readFile("/b.yaml")).toBe("a: 2\nb: 1\n---\na: 3\nb: 1\n");
+  });
+
+  test("a value joined to its flag, and --version", async () => {
+    const joined = await yq("yq -ojson -I0 '.' /m.yaml", "a: 1\n");
+    expect(joined.stdout).toBe('{"a":1}\n');
+    const version = await yq("yq --version");
+    expect(version.stdout).toContain("mikefarah");
+  });
 });

@@ -160,6 +160,8 @@ interface ParsedArgs {
   options: YqOptions;
   filter: string;
   files: string[];
+  /** where each file sits in args, to run one file at a time (1ctx) */
+  fileAt: number[];
   inputFormatExplicit: boolean;
 }
 
@@ -177,7 +179,9 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
 
   let filter = ".";
   let filterSet = false;
+  let command = false;
   const files: string[] = [];
+  const fileAt: number[] = [];
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -249,8 +253,33 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       options.prettyPrint = true;
     } else if (a === "-") {
       files.push("-");
+      fileAt.push(i);
+    } else if (a === "--version" || a === "-V") {
+      // models check the version to pick mikefarah's syntax (1ctx)
+      return {
+        stdout:
+          "yq (just-bash) version 4, the syntax of https://github.com/mikefarah/yq/\n",
+        stderr: "",
+        exitCode: 0,
+      };
     } else if (a.startsWith("--")) {
       return unknownOption("yq", a);
+    } else if (/^-[opI]=?./.test(a)) {
+      // a value joined to its flag, as mikefarah's accepts: -ojson, -I0,
+      // -o=json (1ctx)
+      const value = a.slice(a[2] === "=" ? 3 : 2);
+      if (a[1] === "I") {
+        const indent = parseIndent(value);
+        if (indent === null) return invalidIndent(value);
+        options.indent = indent;
+      } else if (a[1] === "o") {
+        if (!isValidOutputFormat(value)) return unknownOption("yq", a);
+        options.outputFormat = value;
+      } else {
+        if (!isValidInputFormat(value)) return unknownOption("yq", a);
+        options.inputFormat = value;
+        inputFormatExplicit = true;
+      }
     } else if (a.startsWith("-")) {
       // Handle combined short options like -rc
       for (const c of a.slice(1)) {
@@ -265,15 +294,26 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
         else if (c === "P") options.prettyPrint = true;
         else return unknownOption("yq", `-${c}`);
       }
+    } else if (!filterSet && !command && (a === "eval" || a === "e")) {
+      // mikefarah's `yq eval <filter> <file>` (1ctx)
+      command = true;
+    } else if (!filterSet && !command && (a === "eval-all" || a === "ea")) {
+      return {
+        stdout: "",
+        stderr:
+          "yq: eval-all is not supported: -s reads every document into one array\n",
+        exitCode: 1,
+      };
     } else if (!filterSet) {
       filter = a;
       filterSet = true;
     } else {
       files.push(a);
+      fileAt.push(i);
     }
   }
 
-  return { options, filter, files, inputFormatExplicit };
+  return { options, filter, files, fileAt, inputFormatExplicit };
 }
 
 export const yqCommand: RuntimeCommand = {
@@ -295,7 +335,44 @@ export const yqCommand: RuntimeCommand = {
     const parsed = parseArgs(args);
     if ("exitCode" in parsed) return parsed;
 
-    const { options, filter, files, inputFormatExplicit } = parsed;
+    const { options, filter, files, fileAt, inputFormatExplicit } = parsed;
+
+    // mikefarah's yq reads every file in turn; this one read the first and
+    // dropped the rest without a word (1ctx)
+    if (files.length > 1) {
+      if (options.slurp || options.nullInput) {
+        return {
+          stdout: "",
+          stderr: "yq: -s and -n read one file\n",
+          exitCode: 1,
+        };
+      }
+      let stdout = "";
+      let stderr = "";
+      let misses = 0;
+      for (const at of fileAt) {
+        const one = args.filter((_, i) => !fileAt.includes(i) || i === at);
+        const result = await yqCommand.execute(one, ctx);
+        stderr += result.stderr;
+        const miss = options.exitStatus && result.exitCode === 1;
+        if (result.exitCode !== 0 && !miss) {
+          return { stdout, stderr, exitCode: result.exitCode };
+        }
+        if (miss) misses++;
+        if (result.stdout !== "") {
+          const between =
+            stdout !== "" && options.outputFormat === "yaml" && !options.joinOutput
+              ? "---\n"
+              : "";
+          stdout += between + result.stdout;
+        }
+      }
+      return {
+        stdout,
+        stderr,
+        exitCode: misses === fileAt.length ? 1 : 0,
+      };
+    }
 
     // Auto-detect format from file extension if not explicitly set
     if (!inputFormatExplicit && files.length > 0 && files[0] !== "-") {

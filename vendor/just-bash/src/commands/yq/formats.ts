@@ -376,7 +376,8 @@ export function formatOutput(
 
     case "json": {
       return formatJsonValue(value, maxBytes, {
-        compact: options.compact,
+        // -I0 is one line, as mikefarah's -o json -I0 (1ctx)
+        compact: options.compact || options.indent === 0,
         raw: options.raw,
         indent: options.indent,
       });
