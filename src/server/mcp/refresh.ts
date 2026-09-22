@@ -81,7 +81,13 @@ export class RefreshCoordinator {
       try {
         const found = await this.deps.discover(row, signal);
         if (signal.aborted) return;
-        this.deps.store.applyDiscovery(row.id, found);
+        const applied = this.deps.store.applyDiscovery(row.id, found);
+        if (applied !== null) {
+          this.deps.log.info("server refreshed", {
+            server: row.name,
+            tools: found.tools.length,
+          });
+        }
       } catch (error) {
         if (signal.aborted) return;
         const words = error instanceof Error ? error.message : String(error);

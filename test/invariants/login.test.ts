@@ -264,12 +264,19 @@ describe("the sliding cookie", () => {
 
 describe("sweep", () => {
   test("removes the rows whose expiry passed", async () => {
-    const app = await testApp();
+    const logs = collectLogs();
+    const app = await testApp({ logFactory: logs.logFactory });
     await app.client().login("admin", "hunter2-test");
     app.now.value += LOGIN_TTL_MS / 2;
     await app.client().login("admin", "hunter2-test");
     app.now.value += LOGIN_TTL_MS / 2;
     expect(app.sweep()).toBe(1);
+    expect(logs.events.findLast((event) => event.msg === "sweep")).toEqual({
+      level: "info",
+      area: "sweep",
+      msg: "sweep",
+      fields: { logins: 1, knowledge: 0, digests: 0, removed: 1 },
+    });
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({
       n: 1,
     });

@@ -209,9 +209,15 @@ export async function runRound(
           ? `${event.reason}/${event.details}`
           : event.reason;
         break;
-      case "usage":
+      case "usage": {
+        const previous = round.usage;
         round.usage = event.usage;
+        send.promptTokens +=
+          event.usage.promptTokens - (previous?.promptTokens ?? 0);
+        send.completionTokens +=
+          event.usage.completionTokens - (previous?.completionTokens ?? 0);
         break;
+      }
       case "error":
         throw new Error(event.message);
       default:

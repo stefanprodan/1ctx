@@ -10,6 +10,7 @@ import { RefreshCoordinator } from "../../../src/server/mcp/refresh.ts";
 import { routes } from "../../../src/server/mcp/routes.ts";
 import { McpServerStore } from "../../../src/server/mcp/store.ts";
 import type { CreateMcpRequest } from "../../../src/shared/api/mcp.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { fixture, mcpFetch } from "./fake.ts";
 
@@ -75,6 +76,7 @@ const settle = () => Bun.sleep(10);
 describe("MCP refresh coordinator", () => {
   test("coalesces drift refreshes and honors the five minute hold", async () => {
     const db = memoryDb();
+    const logs = collectLogs();
     const time = fakeClock();
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
@@ -86,7 +88,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: silent,
+      log: logs.logFactory("mcp"),
       version: "test",
       render: (text) => text,
     });
@@ -109,6 +111,22 @@ describe("MCP refresh coordinator", () => {
     expect(
       fake.requests.filter((request) => request.method === "server/discover"),
     ).toHaveLength(2);
+    expect(
+      logs.events.filter((event) => event.msg === "server refreshed"),
+    ).toEqual([
+      {
+        level: "info",
+        area: "mcp",
+        msg: "server refreshed",
+        fields: { server: "cluster", tools: expect.any(Number) },
+      },
+      {
+        level: "info",
+        area: "mcp",
+        msg: "server refreshed",
+        fields: { server: "cluster", tools: expect.any(Number) },
+      },
+    ]);
     await area.close();
     db.close();
   });

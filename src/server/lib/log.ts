@@ -211,7 +211,7 @@ export function scrubErrors(log: Log, values: () => string[]): Log {
     for (const value of values().sort((a, b) => b.length - a.length)) {
       if (value !== "") error = error.replaceAll(value, "[key]");
     }
-    return { ...fields, error };
+    return { ...fields, error: cut(error) };
   };
   const write = (level: LogLevel) => (msg: string, fields?: LogFields) =>
     log[level](msg, scrub(fields));

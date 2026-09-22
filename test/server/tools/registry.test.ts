@@ -153,9 +153,11 @@ describe("the registry's result cleaning", () => {
         throw new Error("MCP request timed out");
       },
     };
-    expect(await new Registry([tool]).run(call, context())).toEqual({
+    const result = await new Registry([tool]).run(call, context());
+    expect(result).toEqual({
       content: "Error: tool timed out after 0 seconds",
       error: true,
     });
+    expect(result.timedOut).toBeTrue();
   });
 });

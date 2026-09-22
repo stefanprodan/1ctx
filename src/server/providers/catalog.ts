@@ -7,6 +7,7 @@
 
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Clock } from "../lib/clock.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
 import type { ProviderRow } from "./store.ts";
 import { CatalogError, type Fetcher } from "./types.ts";
@@ -155,6 +156,7 @@ export class Catalogs {
       fetcher: Fetcher;
       clock: Clock;
       secret: (name: string) => string | null;
+      log?: Log;
       ttlMs?: number;
     },
   ) {}
@@ -175,8 +177,19 @@ export class Catalogs {
       .then((models) => {
         if (this.inflight.get(provider.id) === run) {
           this.cached.set(provider.id, { at: this.deps.clock(), models });
+          this.deps.log?.info("catalog refreshed", {
+            provider: provider.name,
+            models: models.length,
+          });
         }
         return models;
+      })
+      .catch((error) => {
+        this.deps.log?.warn("catalog refresh failed", {
+          provider: provider.name,
+          ...errorFields(error, false),
+        });
+        throw error;
       })
       .finally(() => {
         if (this.inflight.get(provider.id) === run) {

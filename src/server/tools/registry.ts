@@ -96,15 +96,19 @@ export class Registry {
       const late =
         timeoutSignal !== null &&
         (timeoutSignal.aborted || performance.now() - started >= timeoutMs);
-      const failure =
-        late && !ctx.signal.aborted
-          ? new DOMException("the tool call timed out", "TimeoutError")
-          : error;
+      const timedOut = late && !ctx.signal.aborted;
+      const failure = timedOut
+        ? new DOMException("the tool call timed out", "TimeoutError")
+        : error;
       const message = describe(failure, timeoutMs);
-      return {
+      const result: ToolResult = {
         content: clean(`Error: ${message}`, ctx.caps.resultCut),
         error: true,
       };
+      Object.defineProperty(result, timedOut ? "timedOut" : "failure", {
+        value: timedOut ? true : failure,
+      });
+      return result;
     }
   }
 }

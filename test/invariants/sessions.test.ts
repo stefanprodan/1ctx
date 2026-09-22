@@ -745,6 +745,8 @@ describe("boot repair", () => {
       });
       stop();
 
+      expect(repaired.repaired).toBe(1);
+      expect(repaired.reconciled).toBe(0);
       expect(repaired.sessions.byId(session.id)).toMatchObject({
         status: "failed",
         revision: before.revision + 1,

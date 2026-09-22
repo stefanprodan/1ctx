@@ -20,15 +20,17 @@ describe("migrations", () => {
   });
 
   test("a fresh file gets them all and a reopen gets none", () => {
-    const { db, path, cleanup } = fileDb();
+    const { db, path, migrations, cleanup } = fileDb();
     try {
+      expect(migrations).toEqual(MIGRATIONS.map((migration) => migration.id));
       const applied = db
         .query<{ id: string }, []>("select id from migrations order by id")
         .all()
         .map((r) => r.id);
       expect(applied).toEqual(MIGRATIONS.map((m) => m.id));
       db.close();
-      const again = open(path);
+      const { db: again, migrations: reopenedMigrations } = open(path);
+      expect(reopenedMigrations).toEqual([]);
       expect(migrate(again)).toEqual([]);
       again.close();
     } finally {

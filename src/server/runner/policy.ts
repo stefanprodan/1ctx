@@ -74,6 +74,7 @@ export type SendPolicy = {
   agentId: string;
   agentName: string;
   providerId: string;
+  providerName: string;
   // the provider's wire, null when its row is gone; the answer round's
   // retries depend on whether a local server caches the conversation
   wire: Wire | null;
@@ -126,6 +127,7 @@ export function buildPolicy(input: {
   project: Pick<ProjectRow, "id" | "kind" | "name" | "description">;
   user: UserRow;
   agent: AgentRow;
+  providerName?: string;
   wire?: Wire | null;
   now: number;
   // the tools area, or none when the model does not accept tools; the
@@ -187,6 +189,7 @@ export function buildPolicy(input: {
     agentId: agent.id,
     agentName: agent.name,
     providerId: agent.providerId,
+    providerName: input.providerName ?? "",
     wire: input.wire ?? null,
     model: agent.model.id,
     contextLength: agent.model.contextLength,

@@ -15,7 +15,7 @@ import {
 } from "../sessions/index.ts";
 import type { SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
-import { live, newSend } from "./send.ts";
+import { live, newSend, type SendOp } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
 export type PreparedRun = {
@@ -33,6 +33,7 @@ export function prepareSend(fields: {
   sessionId: string;
   session: SessionRow | null;
   policy: SendPolicy;
+  op: SendOp;
   text: string;
   uploads?: readonly string[];
   capabilities?: CapabilityChange;
@@ -67,6 +68,7 @@ export function prepareSend(fields: {
     sessionId: fields.sessionId,
     projectId: fields.policy.projectId,
     kind: fields.kind,
+    op: fields.op,
     policy: fields.policy,
     firstMessageId: userId,
     replyId,
@@ -108,10 +110,13 @@ export function prepareSend(fields: {
     launch() {
       if (settled) return;
       settled = true;
-      fields.log.info("chat launched", {
+      fields.log.info("send start", {
         chat: fields.sessionId,
+        user: fields.policy.username,
         agent: fields.policy.agentName,
+        provider: fields.policy.providerName,
         model: fields.policy.model,
+        op: fields.op,
       });
       fields.run(send);
     },

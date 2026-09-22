@@ -385,7 +385,7 @@ describe("scratch lifecycle", () => {
       const path = join(directory, "scratch.sqlite");
       writeFileSync(path, fixture.db.serialize());
       fixture.db.close();
-      db = open(path);
+      db = open(path).db;
       const scratch = new ScratchStore(db);
       transact(db, () => ({
         result: scratch.write(
@@ -414,7 +414,7 @@ describe("scratch lifecycle", () => {
       });
 
       db.close();
-      db = open(path);
+      db = open(path).db;
       expect(state(db, fixture.session.id)).toEqual(before);
       expect(rows(db, fixture.session.id)).toEqual({ scratches: 1, files: 2 });
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);

@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { SUMMARIZE, SUMMARY_LEAD } from "../../src/server/runner/context.ts";
 import type { Message } from "../../src/shared/contracts/session.ts";
+import { collectLogs } from "../helpers/app.ts";
 import type { ChatApp, Script } from "../helpers/chat.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 
@@ -271,7 +272,8 @@ describe("compaction", () => {
   });
 
   test("compact on demand is one locked summary send", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const started = await startChat(chat, "question");
     const locked = await chat.member.call(
       "POST",
@@ -285,6 +287,16 @@ describe("compaction", () => {
     expect(first.response.status).toBe(200);
     const detail = await first.response.json();
     expect(detail.send).toMatchObject({ kind: "compact", rounds: 1 });
+    expect(
+      logs.events.findLast(
+        (event) => event.msg === "send start" && event.fields.op === "compact",
+      )?.fields,
+    ).toMatchObject({
+      chat: started.sessionId,
+      user: "caelea",
+      agent: "coder",
+      provider: "local",
+    });
     expect(first.script.body.tools).toBeUndefined();
     finish(first.script, "## Goal\n\n- First");
     await settle(chat, started.sessionId);

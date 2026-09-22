@@ -37,7 +37,7 @@ type Deps = {
 };
 
 export type Scheduler = {
-  start(): void;
+  start(): number;
   stop(): void;
   wake(): void;
   pass(): Promise<void>;
@@ -137,8 +137,14 @@ export function scheduler(deps: Deps): Scheduler {
     actor: UserRow | null,
   ): { detail: SessionDetail; launch: () => void } | null => {
     const holder: { value: PreparedRun | null } = { value: null };
+    const recorded: {
+      value:
+        | { msg: "fire"; user: string }
+        | { msg: "skip"; reason: string }
+        | null;
+    } = { value: null };
     try {
-      return transact(deps.db, () => {
+      const result = transact(deps.db, () => {
         const row = deps.store.byId(id);
         if (row === null) {
           if (source === "manual") throw new Conflict("no such automation");
@@ -183,6 +189,7 @@ export function scheduler(deps: Deps): Scheduler {
             nextAt,
             runSessionId: prepared.detail.session.id,
           })!;
+          recorded.value = { msg: "fire", user: resolved.user.username };
           return {
             result: { detail: prepared.detail, launch: prepared.launch },
             events: [changed(updated)],
@@ -199,9 +206,23 @@ export function scheduler(deps: Deps): Scheduler {
             reason: err.message,
             nextAt,
           })!;
+          recorded.value = { msg: "skip", reason: err.message };
           return { result: null, events: [changed(updated)] };
         }
       });
+      if (recorded.value?.msg === "fire") {
+        deps.log.info("fire", {
+          automation: id,
+          source,
+          user: recorded.value.user,
+        });
+      } else if (recorded.value?.msg === "skip") {
+        deps.log.info("skip", {
+          automation: id,
+          reason: recorded.value.reason,
+        });
+      }
+      return result;
     } catch (err) {
       holder.value?.abandon();
       throw err;
@@ -278,6 +299,7 @@ export function scheduler(deps: Deps): Scheduler {
         });
       }
     }
+    if (count > 0) deps.log.info("retention", { removed: count });
     return count;
   };
 
@@ -368,13 +390,14 @@ export function scheduler(deps: Deps): Scheduler {
 
   return {
     start() {
-      if (running) return;
+      if (running) return 0;
       running = true;
-      reconcile();
+      const reconciled = reconcile();
       unsubscribe ??= subscribe(onSession, deps.log);
       void loop().catch((err) =>
         deps.log.error("scheduler stopped", errorFields(err)),
       );
+      return reconciled;
     },
     stop() {
       running = false;

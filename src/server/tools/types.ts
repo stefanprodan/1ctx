@@ -46,6 +46,9 @@ export type ToolResult = {
   error: boolean;
   tail?: number;
   opened?: OpenedRecord[];
+  // Kept in memory for the log and deliberately omitted from stored rows.
+  failure?: unknown;
+  timedOut?: boolean;
 };
 
 export type Tool<T extends string | ToolResult = string> = {

@@ -9,6 +9,7 @@ import {
 } from "./memory-phase.ts";
 import type { ActiveSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
+import { statusOf } from "./writer.ts";
 
 export const FINALIZE_ATTEMPTS = 3;
 export const FINALIZE_RETRY_MS = 100;
@@ -81,9 +82,16 @@ export async function endSend(
   }
   const finalized = await finalize(deps, send);
   const log = send.cause === "failure" ? deps.log.error : deps.log.info;
-  log("chat ended", {
+  log("send end", {
     chat: send.sessionId,
+    op: send.op,
     cause: send.cause,
+    status: statusOf(send.cause),
+    rounds: send.roundNo,
+    tools: send.budget.calls,
+    prompt_tokens: send.promptTokens,
+    completion_tokens: send.completionTokens,
+    duration: deps.phase.clock() - send.startedAt,
     ...(send.error === null ? {} : errorFields(send.error, false)),
   });
   send.end(finalized);

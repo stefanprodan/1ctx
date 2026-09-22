@@ -56,11 +56,15 @@ export type CapReason = "tool_limit" | "token_limit" | "context_limit";
 // tools with no row streaming, or ended
 export type SendPhase = "provider" | "tools" | "memory" | "terminal";
 
+export type SendOp = "message" | "regenerate" | "compact" | "run";
+
 export type ActiveSend = {
   id: string;
   sessionId: string;
   projectId: string;
   kind: SendKind;
+  op: SendOp;
+  startedAt: number;
   policy: SendPolicy;
   firstMessageId: string;
   // the round streaming now, or null while its tools run
@@ -68,6 +72,8 @@ export type ActiveSend = {
   roundNo: number;
   phase: SendPhase;
   budget: Budget;
+  promptTokens: number;
+  completionTokens: number;
   // the counters the built-ins share across parallel
   // calls and rounds
   toolBudget: ToolBudget;
@@ -142,6 +148,7 @@ export function newSend(fields: {
   sessionId: string;
   projectId: string;
   kind?: SendKind;
+  op: SendOp;
   summarizing?: boolean;
   used?: number | null;
   policy: SendPolicy;
@@ -162,12 +169,16 @@ export function newSend(fields: {
     sessionId: fields.sessionId,
     projectId: fields.projectId,
     kind: fields.kind ?? "chat",
+    op: fields.op,
+    startedAt: fields.now,
     policy: fields.policy,
     firstMessageId: fields.firstMessageId,
     round: newRound(fields.replyId, fields.now),
     roundNo: 1,
     phase: "provider",
     budget: { calls: 0, toolMs: 0, resultBytes: 0, tokens: 0 },
+    promptTokens: 0,
+    completionTokens: 0,
     toolBudget: {
       fetches: 0,
       searches: 0,

@@ -11,13 +11,16 @@ import {
   MAX_REPLY_BYTES,
   STREAM_IDLE_MS,
 } from "../../src/server/runner/round.ts";
-import { chatApp, startChat, tick } from "../helpers/chat.ts";
+import { collectLogs } from "../helpers/app.ts";
+import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 
 describe("the terminal transition", () => {
   test("a provider failure ends the send as failed with the message", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const { detail, script, sessionId } = await startChat(chat);
     script.content("so far");
+    chat.app.now.value += 25;
     script.end();
     await tick();
     await tick();
@@ -29,6 +32,88 @@ describe("the terminal transition", () => {
     expect(send).toMatchObject({ status: "failed", cause: "failure" });
     expect(chat.app.sessions.byId(sessionId)!.status).toBe("failed");
     expect(chat.app.runner.registry.size).toBe(0);
+    expect(logs.events.find((event) => event.msg === "send start")).toEqual({
+      level: "info",
+      area: "runner",
+      msg: "send start",
+      fields: {
+        chat: sessionId,
+        user: "caelea",
+        agent: "coder",
+        provider: "local",
+        model: expect.any(String),
+        op: "message",
+      },
+    });
+    expect(logs.events.find((event) => event.msg === "round failed")).toEqual({
+      level: "warn",
+      area: "runner",
+      msg: "round failed",
+      fields: {
+        chat: sessionId,
+        round: 1,
+        error_type: "Error",
+        error: "stream ended early",
+      },
+    });
+    expect(logs.events.find((event) => event.msg === "send end")).toEqual({
+      level: "error",
+      area: "runner",
+      msg: "send end",
+      fields: {
+        chat: sessionId,
+        op: "message",
+        cause: "failure",
+        status: "failed",
+        rounds: 1,
+        tools: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        duration: 25,
+        error_type: "exception",
+        error: "stream ended early",
+      },
+    });
+  });
+
+  test("a completed send reports rounds, tools and token kinds", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
+    const { script, sessionId } = await startChat(chat, "use time");
+    script.toolRound(
+      [
+        {
+          id: "time",
+          name: "datetime",
+          arguments: '{"timezone":"UTC"}',
+        },
+      ],
+      { prompt: 11, completion: 2 },
+    );
+    script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    answer.content("done");
+    answer.finish();
+    answer.usage({ prompt: 17, completion: 3 });
+    answer.end();
+    await tick();
+    await tick();
+    expect(logs.events.findLast((event) => event.msg === "send end")).toEqual({
+      level: "info",
+      area: "runner",
+      msg: "send end",
+      fields: {
+        chat: sessionId,
+        op: "message",
+        cause: "finish",
+        status: "done",
+        rounds: 2,
+        tools: 1,
+        prompt_tokens: 28,
+        completion_tokens: 5,
+        duration: 0,
+      },
+    });
   });
 
   test("a refused request is a failure with the provider's words, and no key", async () => {
@@ -84,7 +169,8 @@ describe("the terminal transition", () => {
     const b = await startChat(chat, "b");
     a.script.content("a1");
     await tick();
-    await chat.app.shutdown();
+    const result = await chat.app.shutdown();
+    expect(result).toEqual({ ended: 2, timedOut: false });
     for (const { detail } of [a, b]) {
       expect(chat.app.sessions.send(detail.send.id)!).toMatchObject({
         status: "stopped",

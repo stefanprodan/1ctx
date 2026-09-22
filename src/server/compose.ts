@@ -16,7 +16,7 @@ import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import { withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
-import { type LogFactory, scrubErrors } from "./lib/log.ts";
+import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import {
@@ -34,7 +34,12 @@ import {
 } from "./providers/index.ts";
 import { type Provision, provisionArea } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
-import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
+import {
+  type Registry,
+  type Runner,
+  runnerArea,
+  type ShutdownResult,
+} from "./runner/index.ts";
 import {
   type SessionStore,
   type Sessions,
@@ -99,13 +104,15 @@ export type App = {
   routes: RouteDescriptor[];
   handle: Router;
   provision: Provision;
+  repaired: number;
+  reconciled: number;
   // drop expired logins; called at start and every hour
   sweep(): number;
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
   mcpStart(): void;
   // terminate every send and close every socket, in that order
-  shutdown(): Promise<void>;
+  shutdown(): Promise<ShutdownResult>;
 };
 
 const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-"];
@@ -152,6 +159,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret: (name) => secret("provider-", name),
     keys: () => options.secretNames?.("provider-") ?? [],
     fetcher,
+    log: log("providers"),
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
   });
   // a deleted server or skill leaves no key behind in a chat or a task
@@ -330,10 +338,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     runner,
   });
+  let repaired = 0;
+  let reconciled = 0;
   if (options.activate !== false) {
     await users.bootstrap();
-    sessions.repair();
-    automations.start();
+    repaired = sessions.repair();
+    reconciled = automations.start();
   }
   const routes: RouteDescriptor[] = [
     ...users.routes,
@@ -380,6 +390,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       };
     },
   });
+  const sweepLog = log("sweep");
   return {
     users: users.store,
     projects: projects.store,
@@ -401,18 +412,39 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     handle,
     provision,
-    sweep: () =>
-      access.sweep() + knowledge.sweep(clock()) + sessions.store.sweepDigests(),
+    repaired,
+    reconciled,
+    sweep: () => {
+      try {
+        const logins = access.sweep();
+        const knowledgeRows = knowledge.sweep(clock());
+        const digests = sessions.store.sweepDigests();
+        const removed = logins + knowledgeRows + digests;
+        if (removed > 0) {
+          sweepLog.info("sweep", {
+            logins,
+            knowledge: knowledgeRows,
+            digests,
+            removed,
+          });
+        }
+        return removed;
+      } catch (error) {
+        sweepLog.warn("sweep failed", errorFields(error, false));
+        throw error;
+      }
+    },
     mcpStart: () => mcp.start(),
     // the runner first, whose ending calls may still ask for a refresh
     // that the MCP close then refuses; nothing touches the db after
     async shutdown() {
       skills.close();
       automations.stop();
-      await runner.shutdown();
+      const result = await runner.shutdown();
       await mcp.close();
       automations.dispose();
       socket.dispose();
+      return result;
     },
   };
 }

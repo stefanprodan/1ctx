@@ -15,7 +15,7 @@ import {
   parseCatalog,
   search,
 } from "../../../src/server/providers/index.ts";
-import { fakeFetch, PROVIDER_URL } from "../../helpers/app.ts";
+import { collectLogs, fakeFetch, PROVIDER_URL } from "../../helpers/app.ts";
 
 const body = JSON.parse(
   readFileSync(
@@ -164,11 +164,13 @@ describe("fetchCatalog", () => {
 describe("Catalogs", () => {
   test("fetches once an hour per provider and shares a fetch in flight", async () => {
     const fake = fakeFetch();
+    const logs = collectLogs();
     const now = { value: 0 };
     const catalogs = new Catalogs({
       fetcher: fake.fetcher,
       clock: () => now.value,
       secret: (name) => (name === "provider-router" ? "sk-router" : null),
+      log: logs.logFactory("providers"),
     });
     const [a, b] = await Promise.all([
       catalogs.search(provider, "opus 5"),
@@ -187,6 +189,16 @@ describe("Catalogs", () => {
     catalogs.forget(provider.id);
     await catalogs.model(provider, "none");
     expect(fake.calls.length).toBe(3);
+    expect(
+      logs.events.filter((event) => event.msg === "catalog refreshed"),
+    ).toEqual(
+      Array.from({ length: 3 }, () => ({
+        level: "info",
+        area: "providers",
+        msg: "catalog refreshed",
+        fields: { provider: "router", models: 52 },
+      })),
+    );
   });
 
   test("a forget() while the fetch runs caches nothing", async () => {
@@ -223,6 +235,7 @@ describe("Catalogs", () => {
 
   test("a failure is not cached", async () => {
     let fail = true;
+    const logs = collectLogs();
     const fake = fakeFetch();
     const fetcher = ((input: string, init?: RequestInit) => {
       if (fail) throw new TypeError("down");
@@ -232,8 +245,19 @@ describe("Catalogs", () => {
       fetcher,
       clock: () => 0,
       secret: () => null,
+      log: logs.logFactory("providers"),
     });
     await expect(catalogs.search(provider, "x")).rejects.toThrow(CatalogError);
+    expect(logs.events[0]).toMatchObject({
+      level: "warn",
+      area: "providers",
+      msg: "catalog refresh failed",
+      fields: {
+        provider: "router",
+        error: "the provider did not answer: down",
+        error_type: "CatalogError",
+      },
+    });
     fail = false;
     expect((await catalogs.search(provider, "opus 5")).length).toBe(2);
   });

@@ -15,13 +15,15 @@ export type Db = Database;
 
 export type Transaction<T> = { result: T; events?: BusEvent[] };
 
-export function open(path: string): Db {
+export type OpenedDb = { db: Db; migrations: string[] };
+
+export function open(path: string): OpenedDb {
   const db = new Database(path, { create: true, strict: true });
   db.exec("pragma journal_mode = wal");
   db.exec("pragma foreign_keys = on");
   db.exec("pragma busy_timeout = 5000");
-  migrate(db);
-  return db;
+  const migrations = migrate(db);
+  return { db, migrations };
 }
 
 // Whether this process can have the file to itself. A running server

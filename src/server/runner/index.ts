@@ -48,7 +48,8 @@ import { regenerateUser } from "./regenerate.ts";
 import { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
-import { type ActiveSend, claim, live } from "./send.ts";
+import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
+import { type ShutdownResult, shutdownRunner } from "./shutdown.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { Writer, type WriterDeps } from "./writer.ts";
 
@@ -56,6 +57,7 @@ export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
 export { MAX_RUNNING, MAX_RUNNING_PER_USER, Registry } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
+export type { ShutdownResult } from "./shutdown.ts";
 export {
   HTML_EVERY_MS,
   statusOf,
@@ -79,7 +81,7 @@ export type RunnerDeps = {
   users: { byId(id: string): UserRow | null };
   providers: {
     chat: RoundDeps["chat"];
-    byId(id: string): { wire: Wire } | null;
+    byId(id: string): { name: string; wire: Wire } | null;
   };
   tools: ToolsPort;
   memory: Pick<MemoryCapability, "read" | "commit">;
@@ -123,7 +125,7 @@ export type Runner = {
   live: (sessionId: string) => ReturnType<typeof live> | null;
   // every send terminated with cause shutdown and its stream let go,
   // or the deadline passed
-  shutdown(): Promise<void>;
+  shutdown(): Promise<ShutdownResult>;
   routes: RouteDescriptor[];
 };
 
@@ -175,6 +177,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     writer,
     tools: deps.tools,
     clock: deps.clock,
+    log: deps.log,
     historyOf,
     fail: (send, error) => {
       void terminate(send, "failure", error);
@@ -187,6 +190,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     round: roundDeps,
     writer,
     tools: deps.tools,
+    log: deps.log,
     historyOf,
     pause,
   };
@@ -237,11 +241,13 @@ export function runnerArea(deps: RunnerDeps): Runner {
             source: event.source,
             dueAt: event.dueAt,
           };
+    const provider = deps.providers.byId(agent.providerId);
     return buildPolicy({
       project,
       user,
       agent,
-      wire: deps.providers.byId(agent.providerId)?.wire ?? null,
+      providerName: provider?.name,
+      wire: provider?.wire ?? null,
       now: deps.clock(),
       tools: offerTools && agent.model.tools ? deps.tools : null,
       disabledCapabilities,
@@ -295,6 +301,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
       capabilities,
     );
     if (!changed.ok) throw new BadRequest(changed.error);
+    const op: SendOp =
+      event !== null ? "run" : existingUser !== null ? "regenerate" : "message";
     return prepareSend({
       registry,
       writer,
@@ -304,6 +312,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       sessionId,
       session,
       policy: policyFor(project, user, agent, event, true, changed.set),
+      op,
       text,
       title,
       kind: event === null ? "chat" : "run",
@@ -459,18 +468,13 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (send !== null) void terminate(send, "stop");
     },
     live: liveOf,
-    async shutdown() {
-      registry.close();
-      const sends = registry.values();
-      for (const send of sends) void terminate(send, "shutdown");
-      const deadline = new Promise<void>((resolve) =>
-        setTimeout(resolve, SHUTDOWN_DRAIN_MS),
-      );
-      await Promise.race([
-        Promise.all(sends.map((send) => send.drained)),
-        deadline,
-      ]);
-    },
+    shutdown: () =>
+      shutdownRunner(
+        registry,
+        deps.clock,
+        (send) => void terminate(send, "shutdown"),
+        SHUTDOWN_DRAIN_MS,
+      ),
     routes: [],
   };
   runner.routes = routes({
