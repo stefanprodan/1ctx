@@ -18,6 +18,8 @@ cd "$(dirname "$0")/.."
 . scripts/staging.env
 HOST=$STAGING_SSH
 LISTEN=${STAGING_LISTEN:-0.0.0.0:11236}
+# more server flags for the install, such as --trust-proxy behind a tunnel
+FLAGS=${STAGING_FLAGS:-}
 KEEP_BACKUPS=3
 
 # BatchMode fails fast instead of prompting
@@ -72,7 +74,7 @@ REMOTE
   # leave the service manager restarting a truncated executable.
   scp -q bin/1ctx "$HOST:~/.1ctx/bin/1ctx.new"
   ssh_ "mv -f ~/.1ctx/bin/1ctx.new ~/.1ctx/bin/1ctx &&
-    ~/.1ctx/bin/1ctx service install --restart --listen $LISTEN"
+    ~/.1ctx/bin/1ctx service install --restart --listen $LISTEN $FLAGS"
 }
 
 provision() {
