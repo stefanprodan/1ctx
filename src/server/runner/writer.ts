@@ -16,6 +16,7 @@ import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
+import { writeKeptFiles } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
 import type { UsageFields } from "../usage/index.ts";
@@ -252,6 +253,7 @@ export class Writer {
         opened: result.opened,
       });
       if (row === null) return { result: false, events: [] };
+      if (result.kept?.length) writeKeptFiles(this.deps.db, rowId, result.kept);
       const session = this.session(send.sessionId, now);
       return { result: true, events: [envelope(session, [row], null)] };
     });

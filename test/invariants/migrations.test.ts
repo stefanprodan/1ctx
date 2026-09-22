@@ -496,7 +496,7 @@ describe("the schema", () => {
     const db = seed(MIGRATIONS.slice(0, 18));
     try {
       const before = db.query("select * from messages order by seq").all();
-      expect(migrate(db)).toEqual(["0019-open"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 19))).toEqual(["0019-open"]);
       expect(db.query("select * from messages order by seq").all()).toEqual(
         before,
       );
@@ -548,6 +548,41 @@ describe("the schema", () => {
       expect(db.query("pragma foreign_keys").get()).toEqual({
         foreign_keys: 1,
       });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0020 keeps MCP files with their row and counts the folders", () => {
+    const db = seed(MIGRATIONS.slice(0, 19));
+    try {
+      expect(migrate(db)).toEqual(["0020-mcp-kept"]);
+      expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
+      expect(
+        db.query("select mcp_folders from sessions where id = 'sess'").get(),
+      ).toEqual({ mcp_folders: 0 });
+      db.exec(`
+        insert into mcp_kept_files values
+          ('m2', 0, 'sess', 1, '0001-get', 'result.txt', 1, 'a', null),
+          ('m2', 1, 'sess', 1, '0001-get', 'a.png', 1, null, x'00');
+      `);
+      expect(() =>
+        db
+          .query(
+            "insert into mcp_kept_files values ('m2', 2, 'sess', 1, 'd', 'n', 1, 'a', x'00')",
+          )
+          .run(),
+      ).toThrow();
+      expect(() =>
+        db
+          .query(
+            "insert into mcp_kept_files values ('m2', 3, 'sess', 0, 'd', 'n', 1, 'a', null)",
+          )
+          .run(),
+      ).toThrow();
+      db.query("delete from messages where id = 'm2'").run();
+      expect(db.query("select * from mcp_kept_files").all()).toEqual([]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();
     }
@@ -786,6 +821,7 @@ describe("additive migrations", () => {
       "0017-chat-uploads",
       "0018-web-access",
       "0019-open",
+      "0020-mcp-kept",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -841,6 +877,7 @@ describe("0005", () => {
       "0017-chat-uploads",
       "0018-web-access",
       "0019-open",
+      "0020-mcp-kept",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -905,6 +942,7 @@ describe("rebuild migrations", () => {
       "0017-chat-uploads",
       "0018-web-access",
       "0019-open",
+      "0020-mcp-kept",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1002,6 +1040,7 @@ describe("0006 skills migration", () => {
       "0017-chat-uploads",
       "0018-web-access",
       "0019-open",
+      "0020-mcp-kept",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1058,6 +1097,7 @@ describe("0007 user tz migration", () => {
       "0017-chat-uploads",
       "0018-web-access",
       "0019-open",
+      "0020-mcp-kept",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1093,6 +1133,7 @@ describe("0009 mcp migration", () => {
       "0017-chat-uploads",
       "0018-web-access",
       "0019-open",
+      "0020-mcp-kept",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1344,6 +1385,7 @@ describe("0008 search tavily migration", () => {
           "0017-chat-uploads",
           "0018-web-access",
           "0019-open",
+          "0020-mcp-kept",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

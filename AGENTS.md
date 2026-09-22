@@ -567,6 +567,30 @@ violation, and every rule has a rejected fixture under
   it), and a difference is the note after the date line naming added,
   removed and changed wire names, so the stable prefix stays cacheable.
   A running send never changes its set.
+- **An MCP result the context cannot hold is kept under `/mcp`.** In a
+  send that offers bash, `tools/kept.ts` shapes each MCP answer from the
+  scrubbed parts `mcp.call()` returns beside the flattened text: text
+  over `resultCut` is kept whole as `result.json` (an object or array)
+  or `result.txt`, never YAML by guess, and the context gets its start,
+  cut at a line, then `whole result: <path>, N lines, S: query it with
+  ...`; every embedded resource with text or a blob is a file named
+  from its URI's last segment (made safe, `resource-<n>` when that
+  leaves nothing, `-2` for a repeat), inlined too while under the cut,
+  with a `saved: <path>` line. The path lines are the result's `tail`,
+  so the registry, `cutResult` and `fitResults` keep them. A call keeps
+  at most `MAX_KEPT_PER_CALL` files and nothing past the chat's
+  `mcpKeptBytes`, saying so. Files are rows of `mcp_kept_files`,
+  written by the writer's `finishTool` in the row's transaction,
+  cascading with the message, copied by fork; each call's folder is
+  `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`, never
+  reused. `prepareSend` trims the oldest folders to `mcpKeptBytes` and
+  `mcpKeptFiles` (knowledge scope) through `knowledge.startKept()`
+  under the runner's lock, so no command loses a file while it reads.
+  The mount adds each as a lazy file (`writeFileLazy`), sized into
+  `mountBytes` and `ioBytes`; `/mcp` is never committed, an added or
+  removed name there gives a discard notice found from `getAllPaths()`
+  alone (a `stat` would load every file), and `open` and the saved cwd
+  accept it. A kept name is server text and never reaches a log field.
 - **The MCP page shows the loaded rows as a send would carry them.**
   `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
   by `shapeServerName()`, the key a `Select` of the `mcp-` files the

@@ -85,7 +85,7 @@ export type RunnerDeps = {
   };
   tools: ToolsPort;
   memory: Pick<MemoryCapability, "read" | "commit">;
-  knowledge: Pick<KnowledgeCapability, "snapshot">;
+  knowledge: Pick<KnowledgeCapability, "snapshot" | "startKept">;
   uploads: WriterDeps["uploads"] & {
     checkUploads(
       userId: string,
@@ -323,6 +323,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       uploads,
       capabilities,
       checkUploads: deps.uploads.checkUploads,
+      startKept: (id) => deps.knowledge.startKept(id),
       now: deps.clock(),
     });
   };

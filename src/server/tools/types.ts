@@ -8,7 +8,7 @@ import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
-import type { OpenedRecord } from "../knowledge/index.ts";
+import type { KeptFile, OpenedRecord } from "../knowledge/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type { MemoryWork } from "../memory/index.ts";
@@ -25,6 +25,10 @@ export type ToolBudget = {
   visuals: number;
 };
 
+// A send that offers bash keeps MCP results past the cut under /mcp:
+// take() hands out the next folder number, maxBytes is the chat's budget.
+export type KeepPort = { take(): number; maxBytes: number };
+
 export type ToolContext = {
   web: WebSnapshot | null;
   actor: {
@@ -39,6 +43,7 @@ export type ToolContext = {
   now(): number;
   budget: ToolBudget;
   caps: ToolCaps;
+  keep?: KeepPort | null;
 };
 
 export type ToolResult = {
@@ -46,6 +51,8 @@ export type ToolResult = {
   error: boolean;
   tail?: number;
   opened?: OpenedRecord[];
+  // MCP results and resources kept under /mcp, written with the row
+  kept?: KeptFile[];
   // Kept in memory for the log and deliberately omitted from stored rows.
   failure?: unknown;
   timedOut?: boolean;

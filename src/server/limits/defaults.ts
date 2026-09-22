@@ -53,6 +53,8 @@ export type KnowledgeCaps = {
   scratchIdleDays: number;
   uploadBytes: number;
   uploadFiles: number;
+  mcpKeptBytes: number;
+  mcpKeptFiles: number;
 };
 
 export type Limits = LoopLimits &
@@ -304,6 +306,20 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     default: 1000,
     min: 10,
     max: 10_000,
+    unit: "count",
+    scope: "knowledge",
+  },
+  mcpKeptBytes: {
+    default: 32 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 256 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  mcpKeptFiles: {
+    default: 2000,
+    min: 10,
+    max: 20_000,
     unit: "count",
     scope: "knowledge",
   },

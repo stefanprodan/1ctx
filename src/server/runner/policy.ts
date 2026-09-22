@@ -34,6 +34,7 @@ import type {
 import type { UserRow } from "../users/index.ts";
 
 export type {
+  KeepPort,
   Offered,
   ToolBudget,
   ToolCaps,

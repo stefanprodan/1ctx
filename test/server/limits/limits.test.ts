@@ -111,11 +111,11 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
-      expect(rows).toHaveLength(35);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(35);
+      expect(rows).toHaveLength(37);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(37);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(11);
-      expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(11);
+      expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 500_000,
@@ -143,7 +143,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(35);
+      expect(body.limits).toHaveLength(37);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),
@@ -279,7 +279,7 @@ describe("limits area", () => {
     }
   });
 
-  test("round-trips all eleven knowledge caps with their scope and units", () => {
+  test("round-trips all thirteen knowledge caps with their scope and units", () => {
     const db = memoryDb();
     try {
       const area = limitsArea({ db, clock: () => 100 });
@@ -296,12 +296,14 @@ describe("limits area", () => {
         scratchIdleDays: 1,
         uploadBytes: 1024 * 1024,
         uploadFiles: 10,
+        mcpKeptBytes: 1024 * 1024,
+        mcpKeptFiles: 10,
       };
       expect(parseLimits({ values })).toEqual({ values });
       area.set(values, 100);
       expect(area.current()).toEqual(values);
       const rows = area.rows().filter((row) => row.scope === "knowledge");
-      expect(rows).toHaveLength(11);
+      expect(rows).toHaveLength(13);
       expect(
         rows.find((row) => row.name === "knowledgeHistoryDays")?.unit,
       ).toBe("days");
