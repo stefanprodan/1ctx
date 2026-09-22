@@ -54,6 +54,17 @@ own.
 | `src/commands/tar/archive.ts` | gzip through the platform's `CompressionStream` and `DecompressionStream` | modern-tar 0.8, the version we pin, dropped `createGzipEncoder` and `createGzipDecoder`, thin wrappers over the same streams |
 | `src/commands/query-engine/builtins/object-builtins.ts` | `key` typed as `QueryValue` | TypeScript 7 cannot infer it (TS7022) |
 | `src/commands/registry.ts`, `src/commands/fuzz-flags.ts` | the removed commands' entries | the trim |
+| `src/commands/query-engine/path-expressions.ts` (new), `evaluator.ts`, `builtins/path-builtins.ts` | jq and yq assignments (`=`, `\|=`, `+=` and the rest), `path`, `del`, `delpaths`, `setpath`, `getpath` and `pick` evaluate the left side as jq's path expression, then set or delete each path it yields; `path-operations.ts` and the old setter are gone | upstream guessed paths from the shape of the query: `select(.kind == "Deployment").spec.replicas = 3` set every document, a pipe or `,` on the left replaced the whole input, `del` with `select` deleted nothing, and each exited 0 |
+
+### Where our jq still differs from jq
+
+`test/server/knowledge/jq-paths.test.ts` pins path expressions against
+jq 1.8. The value evaluator keeps upstream's leniencies, where jq
+stops with an error: `.[]` over null yields nothing, `-`, `*`, `/` and
+`%` with null give null (so `.a -= 1` on a missing key writes null),
+`to_entries` takes an array, and `?` covers the whole path before it
+(`.a.b?`) rather than its last step. `last(f)`,
+`limit(n; f)` and `nth(n; f)` also work as paths, which jq 1.8 refuses.
 
 ## Its tests
 
