@@ -926,7 +926,15 @@ violation, and every rule has a rejected fixture under
   before the view renders, and again on `reload()`; the rail's
   project list loads there too, once per user. An entity keeps only
   the latest word on its row: a later load or a write supersedes a
-  load in flight. Any 401
+  load in flight. An entity that shows one key at a time (the stream
+  per filter, a project, its agents and automations, a settled chat,
+  a directory page) holds the answers of keys seen before in
+  `data/held.ts`, so a page seen before draws them at once while its
+  load runs again; never a running chat, and nothing past a user
+  change, a revocation, a deletion or a failed load of that key. A
+  project's head and tabs draw from the rail's row, and the tab counts
+  show only once all are known. A load waits for the project list only
+  when none is held. Any 401
   from `api()` drops the signed-in user, so a revoked login leaves the
   shell at once. A view with real logic gets `Name.model.ts` or
   `Name.state.ts`, tested without a DOM. Every route is one entry in

@@ -1259,3 +1259,183 @@ describe("capability flips on a send", () => {
     expect(switchable.value).toEqual([]);
   });
 });
+
+describe("answers held for the way back", () => {
+  test.serial(
+    "a filter seen before draws its rows at once, and loads again",
+    async () => {
+      answer = (url) =>
+        Response.json({
+          rows: url.includes("project=p1") ? [row({ id: "a" })] : [row()],
+        });
+      await loadList({ project: "p1", q: "" });
+      await loadList({ project: null, q: "" });
+      let seen: StreamRow[] | null | undefined;
+      answer = () => {
+        seen = list.value;
+        return Response.json({ rows: [row({ id: "a" }), row({ id: "b" })] });
+      };
+      await loadList({ project: "p1", q: "" });
+      expect(ids(seen ?? null)).toEqual(["a"]);
+      expect(ids(list.value)).toEqual(["a", "b"]);
+    },
+  );
+
+  test.serial("a revoked project leaves every held list", async () => {
+    answer = (url) =>
+      Response.json({
+        rows: url.includes("project=p2")
+          ? [row({ id: "b", projectId: "p2" })]
+          : [row({ id: "a" }), row({ id: "b", projectId: "p2" })],
+      });
+    await loadList({ project: null, q: "" });
+    await loadList({ project: "p2", q: "" });
+    await loadList({ project: "p1", q: "" });
+    onSocket({ type: "revoked", projectId: "p2" });
+    const seen: (StreamRow[] | null)[] = [];
+    answer = () => {
+      seen.push(list.value);
+      return Response.json({ rows: [] });
+    };
+    await loadList({ project: null, q: "" });
+    await loadList({ project: "p2", q: "" });
+    expect(seen.map(ids)).toEqual([["a"], undefined]);
+  });
+
+  test.serial("a deleted chat leaves every held list", async () => {
+    answer = () => Response.json({ rows: [row({ id: "a" }), row()] });
+    await loadList({ project: null, q: "" });
+    await loadList({ project: "p1", q: "" });
+    onSocket({ type: "deleted", sessionId: "a", projectId: "p1" });
+    let seen: StreamRow[] | null | undefined;
+    answer = () => {
+      seen = list.value;
+      return Response.json({ rows: [] });
+    };
+    await loadList({ project: null, q: "" });
+    expect(ids(seen ?? null)).toEqual(["s1"]);
+  });
+
+  test.serial(
+    "a project's agents seen before come back with what they switch",
+    async () => {
+      answer = (url) =>
+        Response.json({
+          agents: [],
+          capabilities: url.includes("/p1/") ? [WEB] : [],
+        });
+      await loadProjectAgents("p1");
+      await loadProjectAgents("p2");
+      expect(switchable.value).toEqual([]);
+      let seen: unknown = null;
+      answer = () => {
+        seen = switchable.value;
+        return Response.json({ agents: [], capabilities: [WEB] });
+      };
+      await loadProjectAgents("p1");
+      expect(seen).toEqual([WEB]);
+      expect(projectAgents.value).toEqual([]);
+    },
+  );
+
+  test.serial(
+    "a project never seen shows no agents while they load",
+    async () => {
+      answer = () => Response.json({ agents: [], capabilities: [] });
+      await loadProjectAgents("p1");
+      let seen: unknown = "unset";
+      answer = () => {
+        seen = projectAgents.value;
+        return Response.json({ agents: [], capabilities: [] });
+      };
+      await loadProjectAgents("p9");
+      expect(seen).toBeNull();
+    },
+  );
+
+  test.serial("a settled chat seen before is drawn at once", async () => {
+    answer = (url) => Response.json(detail(url.endsWith("s1") ? "s1" : "s2"));
+    await loadSession("s1");
+    await loadSession("s2");
+    let seen: string | undefined;
+    answer = () => {
+      seen = session.value?.session.id;
+      return Response.json(
+        detail("s1", { session: summary({ id: "s1", title: "Fresh" }) }),
+      );
+    };
+    await loadSession("s1");
+    expect(seen).toBe("s1");
+    expect(session.value?.session.title).toBe("Fresh");
+  });
+
+  test.serial("a running chat is not held", async () => {
+    answer = () => Response.json(liveDetail());
+    await loadSession("s1");
+    answer = () => Response.json(detail("s2"));
+    await loadSession("s2");
+    let seen: unknown = "unset";
+    answer = () => {
+      seen = session.value;
+      return Response.json(detail("s1"));
+    };
+    await loadSession("s1");
+    expect(seen).toBeNull();
+  });
+
+  test.serial(
+    "a held chat that moves off screen, fails or is revoked goes",
+    async () => {
+      answer = (url) => Response.json(detail(url.endsWith("s1") ? "s1" : "s2"));
+      await loadSession("s1");
+      await loadSession("s2");
+      onSocket({
+        type: "session",
+        projectId: "p1",
+        session: summary({ id: "s1", revision: 2 }),
+        messages: [],
+        send: null,
+      });
+      let seen: unknown = "unset";
+      answer = () => {
+        seen = session.value;
+        return Response.json({ error: "gone" }, { status: 404 });
+      };
+      await loadSession("s1");
+      expect(seen).toBeNull();
+      expect(session.value).toBeNull();
+
+      answer = (url) => Response.json(detail(url.endsWith("s1") ? "s1" : "s2"));
+      await loadSession("s1");
+      await loadSession("s2");
+      onSocket({ type: "revoked", projectId: "p1" });
+      seen = "unset";
+      answer = () => {
+        seen = session.value;
+        return Response.json(detail("s1"));
+      };
+      await loadSession("s1");
+      expect(seen).toBeNull();
+    },
+  );
+
+  test.serial("a new user starts with nothing held", async () => {
+    answer = () => Response.json({ rows: [row()] });
+    await loadList({ project: "p1", q: "" });
+    await loadList({ project: null, q: "" });
+    me.value = {
+      id: "someone-else",
+      username: "ana",
+      fullName: "Ana",
+      role: "member",
+      mustChangePassword: false,
+    };
+    let seen: unknown = "unset";
+    answer = () => {
+      seen = list.value;
+      return Response.json({ rows: [] });
+    };
+    await loadList({ project: "p1", q: "" });
+    expect(seen).toBeNull();
+  });
+});

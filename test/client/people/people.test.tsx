@@ -138,11 +138,52 @@ describe("the directory entity", () => {
   test.serial("another name drops the page shown at once", async () => {
     person.value = personOf("bogdan");
     const gates = gated((name) => Response.json(personOf(name)));
-    const pending = loadPerson("elena");
+    const pending = loadPerson("dana");
     expect(person.value).toBeNull();
     gates[0]();
     await pending;
-    expect(person.value?.user.username).toBe("elena");
+    expect(person.value?.user.username).toBe("dana");
+  });
+
+  test.serial(
+    "a page seen before is drawn at once and loaded again",
+    async () => {
+      const gates = gated((name) => Response.json(personOf(name)));
+      const first = loadPerson("radu");
+      gates[0]();
+      await first;
+      const second = loadPerson("irina");
+      gates[1]();
+      await second;
+      const back = loadPerson("radu");
+      expect(person.value?.user.username).toBe("radu");
+      gates[2]();
+      await back;
+      expect(person.value?.user.username).toBe("radu");
+    },
+  );
+
+  test.serial("a failed page is not drawn from what was held", async () => {
+    let status = 200;
+    globalThis.fetch = (async (url: string) =>
+      status === 200
+        ? Response.json(
+            personOf(decodeURIComponent(url.split("/").pop() ?? "")),
+          )
+        : Response.json(
+            { error: "no such user" },
+            { status },
+          )) as unknown as typeof fetch;
+    await loadPerson("ion");
+    await loadPerson("maria");
+    status = 404;
+    await loadPerson("ion");
+    expect(person.value).toBeNull();
+    status = 200;
+    await loadPerson("maria");
+    const pending = loadPerson("ion");
+    expect(person.value).toBeNull();
+    await pending;
   });
 
   test.serial(
