@@ -13,7 +13,10 @@ import { memoryDb } from "../../helpers/db.ts";
 import { link, seedServer } from "../mcp/switches.helpers.ts";
 import { context } from "./memory.helpers.ts";
 
-function setup(large = false) {
+function setup(
+  large = false,
+  knowledge?: Parameters<typeof toolsArea>[0]["knowledge"],
+) {
   const db = memoryDb();
   const fetched = fakeFetch();
   const mcp = mcpArea({
@@ -41,6 +44,7 @@ function setup(large = false) {
     render: (text) => text,
     skills: { forAgent: () => [], body: () => null, file: () => null },
     mcp,
+    knowledge,
     memory: {
       work: (projectId, automationId) => ({
         target: { projectId, automationId },
@@ -275,3 +279,59 @@ test("switchableBy reads the catalogs once for every agent", async () => {
     db.close();
   }
 });
+
+test.each(["all", "catalog"] as const)(
+  "%s: bash names a tool typed as a command",
+  async (mode) => {
+    const printed = [
+      "bash: mcp_call: command not found",
+      "bash: mcp__docs__get_item0: command not found",
+      "bash: frobnicate: command not found",
+    ].join("\n");
+    const { db, tools, links } = setup(false, {
+      run: async () => ({
+        content: `${printed}\nexit 127`,
+        error: true,
+        tail: 8,
+      }),
+    });
+    try {
+      const offered = tools.offered(1, "", links, mode);
+      const result = await tools.run(
+        offered,
+        {
+          id: "typed",
+          name: "bash",
+          arguments: JSON.stringify({ command: "mcp_call" }),
+        },
+        {
+          ...context(),
+          actor: {
+            projectId: "project",
+            userId: "user",
+            agentId: "agent",
+            agentName: "coder",
+            sessionId: "session",
+            origin: "chat",
+          },
+        },
+      );
+      const tool =
+        "is one of your tools, not a command: call it as a tool, outside bash.";
+      expect(result.content).toBe(
+        [
+          "bash: mcp_call: command not found",
+          ...(mode === "catalog" ? [`mcp_call ${tool}`] : []),
+          "bash: mcp__docs__get_item0: command not found",
+          mode === "catalog"
+            ? "mcp__docs__get_item0 is an MCP tool, not a command: call the mcp_call tool with name mcp__docs__get_item0, outside bash."
+            : `mcp__docs__get_item0 ${tool}`,
+          "bash: frobnicate: command not found",
+          "exit 127",
+        ].join("\n"),
+      );
+    } finally {
+      db.close();
+    }
+  },
+);
