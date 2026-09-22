@@ -45,6 +45,7 @@ const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
 
 const NONE: Offered = {
   tools: [],
+  visuals: false,
   search: null,
   skills: { block: "", skills: [] },
   mcp: [],
@@ -96,6 +97,7 @@ const row = (
 ): Message => ({
   sessionId: "s",
   uploads: null,
+  files: null,
   seq: 1,
   sendId: "snd1",
   round: 1,

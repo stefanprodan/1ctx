@@ -301,6 +301,7 @@ describe("finishTool rollback", () => {
         serverNames: () => [],
         skillsOff: () => [],
         offered: () => ({
+          visuals: false,
           search: null,
           skills: { block: "", skills: [] },
           mcp: [],
@@ -417,6 +418,7 @@ describe("finalizeSend rollback", () => {
       serverNames: () => [],
       skillsOff: () => [],
       offered: () => ({
+        visuals: false,
         search: null,
         skills: { block: "", skills: [] },
         mcp: [],

@@ -63,6 +63,7 @@ function fixedTools(content: string): Tools {
     serverNames: () => [],
     skillsOff: () => [],
     offered: () => ({
+      visuals: false,
       tools: [
         {
           name: "datetime",

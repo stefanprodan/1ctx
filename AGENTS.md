@@ -252,7 +252,20 @@ violation, and every rule has a rejected fixture under
   People call the base the project docs or the project files; the prompt
   block names both and the Knowledge tab, only when bash is offered.
   The bash description separates shared, versioned UTF-8 `/knowledge`
-  from the session's unversioned, any-byte `/tmp`.
+  from the session's unversioned, any-byte `/tmp`. `open <file>`
+  (`knowledge/open.ts`, a just-bash custom command with `trusted:
+  false`) copies a mounted text file onto the chat page as it is at that
+  moment: `.html`, `.htm` and `.svg` as a visual while the admin's
+  Visuals row was on at send start (`Offered.visuals`, through the bash
+  tool's caps) and the text is at most `VISUAL_FRAME_BYTES` in
+  `shared/words.ts`, else as code; `.md` and `.markdown` rendered; any
+  other name as code with the language a map in `open.ts` gives. A path
+  outside the three trees, a symlink in any component, a directory, a
+  file over `knowledgeFileBytes`, the eleventh open of a command
+  (`MAX_OPENS_PER_COMMAND`) and non-text bytes are refusals on stderr
+  that stop nothing. The command prints nothing; its receipts follow
+  the knowledge receipts in the reserved tail and are discarded with
+  the trees on an abort, 124, 126 or a throw.
   The eight authenticated routes under `/api/projects/:id/knowledge`
   use `access.project()`: list and create, read/replace/delete by
   `/files/:fileId`, that file's `/versions`, `/versions/:versionId`, and
@@ -280,6 +293,14 @@ violation, and every rule has a rejected fixture under
   200 skips, raw names cut to 200 characters and 300 JSON bytes, with
   reason codes and clash indexes.
   History eviction may drop replaced versions near its caps.
+  The copies are rows of `opened_files`, written by the writer's
+  `finishTool` in the transaction that ends the bash row and cascading
+  with the message; fork copies them. `MESSAGE_COLUMNS` projects their
+  metadata in position order as `Message.files`, never the text, which
+  `GET /api/sessions/:id/messages/:messageId/files/:index` answers whole
+  as `OpenedFileResponse` (`sessions/opened.ts`). The client draws them
+  in the reply with the visual cards, in call order: a visual through
+  `Visual.tsx`, Markdown and code as `transcript/FileCard.tsx`.
   `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
   host filesystem and `defenseInDepth: true`. The send's web snapshot
   alone enables network and curl, never wget: all mode allows full

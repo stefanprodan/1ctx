@@ -55,6 +55,7 @@ export function commit(
   changes: readonly Change[],
   scratch: ScratchCommit,
   result: CommandOutput,
+  extraReceipts: readonly string[],
   resultCut: number,
   signal: AbortSignal,
   now: number,
@@ -81,7 +82,7 @@ export function commit(
       result.stdout,
       result.stderr,
       result.exitCode,
-      receipts,
+      [...receipts, ...extraReceipts],
       resultCut,
     );
     return { result: content, events };

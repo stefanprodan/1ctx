@@ -14,6 +14,7 @@ import type {
   SendKind,
   SessionStatus,
 } from "../../shared/words.ts";
+import type { OpenedRecord } from "../knowledge/index.ts";
 import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
@@ -113,6 +114,7 @@ export type SessionsPort = {
       status: "done" | "failed" | "stopped";
       error: string | null;
       finishedAt: number;
+      opened?: OpenedRecord[] | null;
     },
   ): Message | null;
   createSend(fields: {

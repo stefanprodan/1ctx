@@ -22,6 +22,9 @@ import { Conflict, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
+
+export type { OpenedRecord } from "./open.ts";
+
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";

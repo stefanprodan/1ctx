@@ -34,7 +34,9 @@ describe("0018 web access", () => {
             "select * from tools order by rowid",
           )
           .all();
-        expect(migrate(db)).toEqual(["0018-web-access"]);
+        expect(migrate(db, MIGRATIONS.slice(0, 18))).toEqual([
+          "0018-web-access",
+        ]);
         expect(MIGRATIONS[17]?.rebuild).toBeUndefined();
         const after = db.query("select * from tools order by rowid").all();
         expect(after.slice(0, 3)).toEqual(
@@ -56,7 +58,7 @@ describe("0018 web access", () => {
           foreign_keys: 1,
         });
         expect(db.query("pragma foreign_key_check").all()).toEqual([]);
-        expect(migrate(db)).toEqual([]);
+        expect(migrate(db, MIGRATIONS.slice(0, 18))).toEqual([]);
       } finally {
         db.close();
       }

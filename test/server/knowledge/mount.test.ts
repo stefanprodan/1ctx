@@ -32,6 +32,7 @@ describe("knowledge command mounts", () => {
       expect(edited).toEqual({
         error: false,
         content: "exit 0\nwrote docs/x.md (rev 2, 1 lines)",
+        opened: [],
         tail: "exit 0\nwrote docs/x.md (rev 2, 1 lines)".length,
       });
       expect(s.area.read(s.projectId, first.id)).toMatchObject({
@@ -68,6 +69,7 @@ describe("knowledge command mounts", () => {
       expect(removed).toEqual({
         error: false,
         content: "exit 0\ndeleted docs/y.md",
+        opened: [],
         tail: "exit 0\ndeleted docs/y.md".length,
       });
       expect(s.area.list(s.projectId).deleted).toHaveLength(2);
@@ -108,7 +110,7 @@ describe("knowledge command mounts", () => {
       try {
         expect(
           await run(s, "echo same > x; mkdir empty; rmdir empty; mkdir stays"),
-        ).toEqual({ error: false, content: "exit 0", tail: 6 });
+        ).toEqual({ error: false, content: "exit 0", opened: [], tail: 6 });
         expect(events).toEqual([]);
         expect(s.area.versions(s.projectId, file.id)).toHaveLength(1);
         expect(s.area.list(s.projectId).files).toHaveLength(1);
@@ -201,7 +203,7 @@ describe("knowledge command mounts", () => {
         .trim()
         .split(/\s+/)
         .sort();
-      expect(words).toEqual([...KNOWLEDGE_COMMANDS].sort());
+      expect(words).toEqual([...KNOWLEDGE_COMMANDS, "open"].sort());
       for (const command of [
         "curl",
         "wget",
@@ -220,6 +222,7 @@ describe("knowledge command mounts", () => {
       expect(await run(s, "export PRIVATE=not-returned; test 1 = 1")).toEqual({
         error: false,
         content: "exit 0",
+        opened: [],
         tail: 6,
       });
     } finally {
@@ -234,6 +237,7 @@ describe("knowledge command mounts", () => {
       expect(result).toEqual({
         error: true,
         content: "exit 1\nwrote x (rev 1, 1 lines)",
+        opened: [],
         tail: "exit 1\nwrote x (rev 1, 1 lines)".length,
       });
       expect(s.area.store.byName(s.projectId, "x")?.text).toBe("kept\n");
@@ -287,6 +291,7 @@ describe("knowledge command mounts", () => {
           await run(s, "echo discarded > x; sleep 1", {
             callTimeoutMs: 20,
             resultCut: 1000,
+            visuals: true,
           })
         ).error,
       ).toBe(true);

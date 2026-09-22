@@ -254,3 +254,35 @@ describe("tools administration", () => {
     chat.app.socket.dispose();
   });
 });
+
+test("bash documents open and snapshots the Visuals row", async () => {
+  const chat = await chatApp();
+  const response = await chat.admin.call("GET", "/api/tools");
+  const body = await response.json();
+  const bash = body.builtin.find(
+    (tool: { name: string }) => tool.name === "bash",
+  );
+  expect(bash.description).toContain(
+    "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out.",
+  );
+  expect(bash.tokens).toBe(449);
+
+  const first = await startChat(chat, "first");
+  const active = chat.app.runner.registry.get(first.sessionId)!;
+  expect(active.policy.offered.visuals).toBe(true);
+  expect(
+    (
+      await chat.admin.call("PATCH", "/api/tools/visualize", {
+        body: { enabled: false },
+      })
+    ).status,
+  ).toBe(200);
+  expect(active.policy.offered.visuals).toBe(true);
+  await finish(chat, first.script);
+  const second = await startChat(chat, "second");
+  expect(
+    chat.app.runner.registry.get(second.sessionId)!.policy.offered.visuals,
+  ).toBe(false);
+  await finish(chat, second.script);
+  chat.app.socket.dispose();
+});

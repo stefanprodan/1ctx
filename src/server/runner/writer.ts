@@ -249,6 +249,7 @@ export class Writer {
         status: result.error ? "failed" : "done",
         error: result.error ? result.content : null,
         finishedAt: now,
+        opened: result.opened,
       });
       if (row === null) return { result: false, events: [] };
       const session = this.session(send.sessionId, now);

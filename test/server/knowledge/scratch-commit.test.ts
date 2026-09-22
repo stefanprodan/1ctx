@@ -190,6 +190,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, `${edits}; false`)).toEqual({
         error: true,
         content: "exit 1\nwrote existing (rev 2, 1 lines)",
+        opened: [],
         tail: "exit 1\nwrote existing (rev 2, 1 lines)".length,
       });
       expect(scratchState(s)).toMatchObject({
@@ -272,6 +273,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, "true")).toEqual({
         content: "exit 0",
         error: false,
+        opened: [],
         tail: 6,
       });
       expect(scratchState(s)).toEqual({
@@ -302,6 +304,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, "cat /knowledge/existing > /tmp/copied")).toEqual({
         content: "exit 0",
         error: false,
+        opened: [],
         tail: 6,
       });
       expect(

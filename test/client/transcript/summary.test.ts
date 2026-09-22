@@ -22,6 +22,7 @@ function summary(changes: Partial<Message> = {}): Message {
     content: "## Goal\n- ship",
     resultBytes: null,
     uploads: null,
+    files: null,
     promptTokens: 41_200,
     reasoning: "",
     html: '<h2 class="md-h2">Goal</h2>',

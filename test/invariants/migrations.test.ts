@@ -132,7 +132,7 @@ describe("the schema", () => {
           )
           .all(),
       );
-      expect(migrate(db)).toEqual(["0018-web-access"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 18))).toEqual(["0018-web-access"]);
       expect(
         tables.map((name) =>
           db.query(`select * from ${name} order by id`).all(),
@@ -490,6 +490,67 @@ describe("the schema", () => {
     }
   });
 
+  test("0019 adds ordered opened copies that cascade with messages", () => {
+    const db = seed(MIGRATIONS.slice(0, 18));
+    try {
+      const before = db.query("select * from messages order by seq").all();
+      expect(migrate(db)).toEqual(["0019-open"]);
+      expect(db.query("select * from messages order by seq").all()).toEqual(
+        before,
+      );
+      expect(MIGRATIONS[18]?.rebuild).toBeUndefined();
+      expect(
+        db
+          .query<{ name: string }, []>("pragma table_info(opened_files)")
+          .all()
+          .map((row) => row.name),
+      ).toEqual([
+        "message_id",
+        "position",
+        "path",
+        "kind",
+        "language",
+        "bytes",
+        "lines",
+        "title",
+        "text",
+      ]);
+      expect(
+        db
+          .query<{ from: string; on_delete: string }, []>(
+            "pragma foreign_key_list(opened_files)",
+          )
+          .get(),
+      ).toMatchObject({ from: "message_id", on_delete: "CASCADE" });
+      db.exec(`
+        insert into opened_files values
+          ('m2', 0, '/tmp/a.html', 'visual', null, 8, 1, 'A', '<p>A</p>'),
+          ('m2', 1, '/tmp/a.md', 'markdown', null, 3, 1, null, '# A');
+      `);
+      expect(() =>
+        db.query("update opened_files set position = -1").run(),
+      ).toThrow();
+      expect(() =>
+        db.query("update opened_files set kind = 'image'").run(),
+      ).toThrow();
+      expect(() =>
+        db
+          .query(
+            "insert into opened_files select message_id, 0, path, kind, language, bytes, lines, title, text from opened_files where position = 1",
+          )
+          .run(),
+      ).toThrow();
+      db.query("delete from messages where id = 'm2'").run();
+      expect(db.query("select * from opened_files").all()).toEqual([]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   test("a provider accepts every known wire and refuses anything else", () => {
     const db = seed();
     try {
@@ -722,6 +783,7 @@ describe("additive migrations", () => {
       "0016-openai-strict",
       "0017-chat-uploads",
       "0018-web-access",
+      "0019-open",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -776,6 +838,7 @@ describe("0005", () => {
       "0016-openai-strict",
       "0017-chat-uploads",
       "0018-web-access",
+      "0019-open",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -839,6 +902,7 @@ describe("rebuild migrations", () => {
       "0016-openai-strict",
       "0017-chat-uploads",
       "0018-web-access",
+      "0019-open",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -935,6 +999,7 @@ describe("0006 skills migration", () => {
       "0016-openai-strict",
       "0017-chat-uploads",
       "0018-web-access",
+      "0019-open",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -990,6 +1055,7 @@ describe("0007 user tz migration", () => {
       "0016-openai-strict",
       "0017-chat-uploads",
       "0018-web-access",
+      "0019-open",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1024,6 +1090,7 @@ describe("0009 mcp migration", () => {
       "0016-openai-strict",
       "0017-chat-uploads",
       "0018-web-access",
+      "0019-open",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1274,6 +1341,7 @@ describe("0008 search tavily migration", () => {
           "0016-openai-strict",
           "0017-chat-uploads",
           "0018-web-access",
+          "0019-open",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

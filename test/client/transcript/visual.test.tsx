@@ -20,6 +20,7 @@ import {
 import { Visual } from "../../../src/client/transcript/Visual.tsx";
 import {
   applyVisual,
+  isFileCard,
   reconcileVisuals,
   snapshotVisuals,
   visualCards,
@@ -280,17 +281,16 @@ test("stored cards follow call order, never a failed whole call or memory row", 
     }),
   ];
   const node = groupRows(detail.messages, detail.send)[0] as ReplyNode;
-  expect(visualCards(node, new Map()).map((card) => card.callIndex)).toEqual([
-    0,
-  ]);
+  const drawn = visualCards(node, new Map()).flatMap((card) =>
+    isFileCard(card) ? [] : [card],
+  );
+  expect(drawn.map((card) => card.callIndex)).toEqual([0]);
   const markup = render(
     <Reply
       node={node}
       live={new Map()}
       agent={null}
-      visuals={visualCards(node, new Map()).map((card) => (
-        <Visual card={card} />
-      ))}
+      visuals={drawn.map((card) => <Visual card={card} />)}
     />,
   );
   expect(markup).toContain('src="/api/visual"');

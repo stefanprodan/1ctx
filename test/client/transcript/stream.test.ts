@@ -39,6 +39,7 @@ const message = (fields: Partial<Message> = {}): Message => ({
   agentId: "a1",
   content: "",
   uploads: null,
+  files: null,
   reasoning: "",
   html: "",
   status: "streaming",

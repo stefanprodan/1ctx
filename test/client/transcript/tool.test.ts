@@ -34,6 +34,7 @@ function result(changes: Partial<Message> = {}): Message {
     agentId: null,
     content: "result",
     uploads: null,
+    files: null,
     resultBytes: 6,
     promptTokens: null,
     reasoning: "",

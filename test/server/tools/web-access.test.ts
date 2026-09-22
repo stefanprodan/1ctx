@@ -186,6 +186,7 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
         expect(caps).toEqual({
           callTimeoutMs: TOOL_CAPS.callTimeoutMs,
           resultCut: TOOL_CAPS.resultCut,
+          visuals: true,
           fetchDeadlineMs: TOOL_CAPS.fetchDeadlineMs,
           fetchBodyBytes: TOOL_CAPS.fetchBodyBytes,
           web,

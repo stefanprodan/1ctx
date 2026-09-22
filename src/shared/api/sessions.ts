@@ -8,6 +8,7 @@ import type { CapabilityChange } from "../capabilities.ts";
 import type { AgentSummary } from "../contracts/agent.ts";
 import type {
   LastLine,
+  OpenedFile,
   SendSummary,
   SessionDetail,
   SessionSummary,
@@ -49,6 +50,13 @@ export type ToolVisualResponse = {
   title: string;
   html: string;
 };
+
+// GET /api/sessions/:id/messages/:messageId/files/:index: one file a
+// bash row opened, whole. html is the document itself for a visual, the
+// md- rendering for Markdown, and for code the highlighted (hljs-) or
+// escaped text without the pre and code elements; text is the source
+// for Markdown and code, what Copy takes, and empty for a visual
+export type OpenedFileResponse = OpenedFile & { html: string; text: string };
 
 // POST /api/sessions: a chat in a project with an agent, and its first
 // message. uploads names the caller's staged items in the project, at

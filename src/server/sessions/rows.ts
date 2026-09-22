@@ -6,6 +6,7 @@
 
 import type {
   Message,
+  OpenedFile,
   RoundUsage,
   SendSummary,
   SessionSummary,
@@ -107,6 +108,7 @@ export type RawMessage = {
   agent_id: string | null;
   content: string;
   uploads: string | null;
+  files: string | null;
   reasoning: string;
   html: string;
   status: MessageStatus;
@@ -126,6 +128,10 @@ export type RawMessage = {
 export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, messages.kind,
    messages.send_id, messages.round, messages.slot, messages.user_id,
    messages.agent_id, messages.content, messages.uploads,
+   (select json_group_array(json_object(
+      'path', path, 'kind', kind, 'language', language,
+      'bytes', bytes, 'lines', lines, 'title', title) order by position)
+    from opened_files where message_id = messages.id) as files,
    messages.reasoning, messages.html,
    messages.status, messages.error, messages.finish_reason,
    messages.tool_calls, messages.tool_call_id, messages.tool_name,
@@ -151,6 +157,12 @@ export function messageUploads(raw: string | null): MessageUpload[] | null {
   return record.length > 0 ? record : null;
 }
 
+function messageFiles(raw: string | null): OpenedFile[] | null {
+  if (!raw) return null;
+  const record: OpenedFile[] = JSON.parse(raw);
+  return record.length > 0 ? record : null;
+}
+
 export const message = (raw: RawMessage): Message => ({
   id: raw.id,
   sessionId: raw.session_id,
@@ -164,6 +176,7 @@ export const message = (raw: RawMessage): Message => ({
   content: raw.content,
   resultBytes: null,
   uploads: raw.kind === "user" ? messageUploads(raw.uploads) : null,
+  files: raw.kind === "tool" ? messageFiles(raw.files) : null,
   promptTokens:
     raw.kind === "summary" && raw.status === "done" ? raw.prompt_tokens : null,
   reasoning: raw.reasoning,

@@ -201,6 +201,7 @@ test("stopping a buffered round settles its calls without writing late results",
       skillsOff: () => [],
       offered: () => ({
         tools: [{ name: "datetime", description: "time", parameters: {} }],
+        visuals: false,
         search: null,
         skills: { block: "", skills: [] },
         mcp: [],

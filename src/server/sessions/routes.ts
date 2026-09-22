@@ -10,6 +10,7 @@
 
 import type {
   ForkSessionResponse,
+  OpenedFileResponse,
   SessionResponse,
   SessionsResponse,
   ToolResultResponse,
@@ -24,6 +25,7 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { chatMarkdown, markdownFilename } from "./markdown.ts";
+import { openedFileResponse } from "./opened.ts";
 import {
   MAX_SMALL_BODY,
   parseForkSession,
@@ -152,6 +154,23 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           ...cutResult(message.content),
           bytes: Buffer.byteLength(message.content, "utf8"),
         };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/sessions/:id/messages/:messageId/files/:index",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const session = deps.visible(ctx.principal!, ctx.params.id);
+        const params = parseVisualParams(ctx.params);
+        const message = deps.store.message(params.messageId);
+        const file =
+          message?.sessionId === session.id && message.kind === "tool"
+            ? deps.store.openedFile(message.id, params.index)
+            : null;
+        if (file === null) throw new NotFound("no such file");
+        const body: OpenedFileResponse = openedFileResponse(file);
         return json(body);
       },
     },

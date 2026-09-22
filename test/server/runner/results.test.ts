@@ -114,3 +114,27 @@ test("the early-storage bound covers every JSON byte and unknown windows", () =>
   const actual = calls.reduce((sum, _, i) => sum + size(i, escaped), 0);
   expect(actual).toBeLessThanOrEqual(1_000_000);
 });
+
+test("opened copies survive character and context result cuts", () => {
+  const opened = [
+    {
+      path: "/tmp/page.html",
+      kind: "visual" as const,
+      language: null,
+      bytes: 12,
+      lines: 1,
+      title: "Page",
+      text: "<p>Page</p>",
+    },
+  ];
+  const result = {
+    content: `${"read output ".repeat(100)}exit 0`,
+    error: false,
+    tail: 6,
+    opened,
+  };
+  expect(cutResult(result, 40).opened).toBe(opened);
+  const fitted = fitResults([calls[0]!], [result], 20);
+  expect(fitted.cut).toBe(true);
+  expect(fitted.results[0]!.opened).toBe(opened);
+});

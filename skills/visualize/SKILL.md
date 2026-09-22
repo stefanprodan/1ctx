@@ -9,6 +9,9 @@ Use this skill only when the `visualize` tool is offered. Otherwise,
 answer in text. Take the allowed library hosts from the tool description,
 not from this skill: an administrator may change them or allow none.
 
+With bash, you may also write the visual to a file under /tmp and run
+`open <file>` to show it. These rules hold for both routes.
+
 ## Choose a useful visual
 
 Draw to clarify a relationship, make a quantity comparable or let someone

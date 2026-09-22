@@ -112,6 +112,7 @@ export type SendPolicy = {
 
 const NONE: Offered = {
   tools: [],
+  visuals: false,
   search: null,
   skills: { block: "", skills: [] },
   mcp: [],

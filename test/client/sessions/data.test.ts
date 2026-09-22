@@ -93,6 +93,7 @@ function message(changes: Partial<Message> = {}): Message {
     content: "",
     resultBytes: null,
     uploads: null,
+    files: null,
     promptTokens: null,
     reasoning: "",
     html: "",
