@@ -444,7 +444,12 @@ violation, and every rule has a rejected fixture under
   `tools/visual-theme.ts` alone defines the frame's colours; its CSS is
   a separate document, outside the client stylesheet rules. The parent
   supplies the theme; the frame sets `data-theme` and dispatches
-  `visualtheme`. Change `skills/visualize/` in the same commit as the frame's
+  `visualtheme`. The frame rewrites the visual's `prefers-color-scheme`
+  queries and `matchMedia` to answer the chat's theme, not the system's
+  (`tools/visual-scheme.ts`). A whole page (`<html>` or `<body>`) loses its
+  plain backdrop, padding and margin only when its text reads on the
+  chat's ground at 4.5:1, and the height counts the body's own spacing.
+  Change `skills/visualize/` in the same commit as the frame's
   names or the tool's contract.
 - **A skill is stored text, never executable.** An admin adds a `SKILL.md`
   and its text files from a GitHub directory, an archive, a discovery

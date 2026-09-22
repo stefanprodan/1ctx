@@ -126,6 +126,9 @@ svg .leader {
 }
 * { box-sizing: border-box; margin: 0; }
 html, body { background: transparent; }
+:root[data-visual-bare], :root[data-visual-bare] body {
+  background: transparent !important; margin: 0 !important; padding: 0 !important;
+}
 body {
   font-family: var(--font-sans); font-size: 16px; line-height: 1.7;
   color: var(--color-text-primary); -webkit-font-smoothing: antialiased;
