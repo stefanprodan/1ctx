@@ -38,6 +38,8 @@ jobs:
           fi
       - name: Test
         run: make test
+      - name: Test vendored just-bash
+        run: make vendor-test
       - name: Build
         run: make build
       - name: Smoke test binary

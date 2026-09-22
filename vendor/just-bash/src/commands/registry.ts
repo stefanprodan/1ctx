@@ -492,39 +492,15 @@ if (typeof __BROWSER__ === "undefined" || !__BROWSER__) {
     name: "xan" as CommandName,
     load: async () => (await import("./xan/xan.js")).xanCommand,
   });
-  commandLoaders.push({
-    name: "sqlite3" as CommandName,
-    load: async () => (await import("./sqlite3/sqlite3.js")).sqlite3Command,
-  });
 }
 
 // Python commands - only registered when python is explicitly enabled
 // These introduce additional security surface (arbitrary code execution)
 const pythonCommandLoaders: LazyCommandDef<PythonCommandName>[] = [];
 // __BROWSER__ is defined by esbuild at build time for browser bundles
-if (typeof __BROWSER__ === "undefined" || !__BROWSER__) {
-  pythonCommandLoaders.push({
-    name: "python3",
-    load: async () => (await import("./python3/python3.js")).python3Command,
-  });
-  pythonCommandLoaders.push({
-    name: "python",
-    load: async () => (await import("./python3/python3.js")).pythonCommand,
-  });
-}
 
 // JavaScript commands - only registered when javascript is explicitly enabled
 const jsCommandLoaders: LazyCommandDef<JavaScriptCommandName>[] = [];
-if (typeof __BROWSER__ === "undefined" || !__BROWSER__) {
-  jsCommandLoaders.push({
-    name: "js-exec",
-    load: async () => (await import("./js-exec/js-exec.js")).jsExecCommand,
-  });
-  jsCommandLoaders.push({
-    name: "node",
-    load: async () => (await import("./js-exec/js-exec.js")).nodeStubCommand,
-  });
-}
 
 // Network commands - only registered when network is configured
 const networkCommandLoaders: LazyCommandDef<NetworkCommandName>[] = [

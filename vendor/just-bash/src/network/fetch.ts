@@ -456,6 +456,11 @@ export function createSecureFetch(config: NetworkConfig): SecureFetch {
               cancelResponseBody(response),
               combinedAbort.signal,
             );
+            // Bun's fetch reads file: URLs from the host's disk, and full
+            // internet access checks no scheme. (1ctx)
+            if (!/^https?:/i.test(redirectUrl)) {
+              throw new RedirectNotAllowedError(redirectUrl);
+            }
             try {
               pinned = await checkAllowed(redirectUrl, combinedAbort.signal);
             } catch {
@@ -549,6 +554,8 @@ async function responseToResult(
     if (contentLength) {
       const size = parseInt(contentLength, 10);
       if (!Number.isNaN(size) && size > maxResponseSize) {
+        // Refused before reading: let the connection go. (1ctx)
+        response.body?.cancel().catch(() => {});
         throw new ResponseTooLargeError(maxResponseSize);
       }
     }

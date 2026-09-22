@@ -14,7 +14,10 @@
     "noUncheckedIndexedAccess": false,
     "types": ["bun"],
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
+    "paths": {
+      "just-bash": ["./vendor/just-bash/src/index.ts"]
+    }
   },
   "include": [
     "src/**/*.ts",

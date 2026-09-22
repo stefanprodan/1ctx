@@ -91,7 +91,6 @@ import { flagsForFuzzing as seq } from "./seq/seq.js";
 import { flagsForFuzzing as sleep } from "./sleep/sleep.js";
 import { flagsForFuzzing as sort } from "./sort/sort.js";
 import { flagsForFuzzing as split } from "./split/split.js";
-import { flagsForFuzzing as sqlite3 } from "./sqlite3/sqlite3.js";
 import { flagsForFuzzing as stat } from "./stat/stat.js";
 import { flagsForFuzzing as strings } from "./strings/strings.js";
 // Misc utilities
@@ -203,7 +202,6 @@ const allFuzzInfo: CommandFuzzInfo[] = [
   tar,
   yq,
   xan,
-  sqlite3,
 ];
 
 /** Get all command fuzz info entries */

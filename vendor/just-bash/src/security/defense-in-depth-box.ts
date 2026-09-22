@@ -62,6 +62,19 @@ const IS_BROWSER = typeof __BROWSER__ !== "undefined" && __BROWSER__;
 /**
  * Generate a random UUID. Works in both Node.js and browsers.
  */
+/**
+ * A data descriptor carrying `value`. Bun reports some Module statics as
+ * accessors, and a spread of `get` or `set` beside `value` makes
+ * defineProperty throw, which failed every critical patch. (1ctx)
+ */
+function withValue(
+  descriptor: PropertyDescriptor | undefined,
+  value: unknown,
+): PropertyDescriptor {
+  const { get: _get, set: _set, ...rest } = descriptor ?? {};
+  return { writable: true, ...rest, value };
+}
+
 function generateUUID(): string {
   // Use Web Crypto API (available in both Node.js 19+ and browsers)
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -2190,10 +2203,7 @@ export class DefenseInDepthBox {
         prop,
         descriptor,
       });
-      Object.defineProperty(ModuleClass, prop, {
-        ...descriptor,
-        value: proxy,
-      });
+      Object.defineProperty(ModuleClass, prop, withValue(descriptor, proxy));
 
       const installed = Object.getOwnPropertyDescriptor(ModuleClass, prop);
       if (ModuleClass[prop] !== proxy || installed?.value !== proxy) {
@@ -2231,10 +2241,7 @@ export class DefenseInDepthBox {
             path,
             violationType,
           );
-          Object.defineProperty(target, prop, {
-            ...descriptor,
-            value: proxy,
-          });
+          Object.defineProperty(target, prop, withValue(descriptor, proxy));
         }
       } else {
         // For throw strategy, create a blocking proxy

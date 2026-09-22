@@ -10,6 +10,7 @@
     "start": "bun src/server/main.ts",
     "dev": "ONECTX_DEV=1 bun --watch src/server/main.ts",
     "test": "bun test --concurrent --max-concurrency 4 test/",
+    "vendor-test": "scripts/vendor-test.sh",
     "lint": "bun biome check --write . && bun tsc --noEmit",
     "build": "mkdir -p bin && bun build src/server/main.ts --compile --sourcemap --define \"process.env.ONECTX_BUILD_VERSION=\\\"${VERSION:-}\\\"\" --outfile bin/1ctx && rm -f .*.bun-build",
     "smoke": "scripts/smoke.sh",
@@ -31,20 +32,37 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
     "@modelcontextprotocol/client": "2.0.0",
+    "@mongodb-js/zstd": "7.0.0",
     "@preact/signals": "2.11.2",
     "@types/bun": "1.4.0",
+    "@types/ini": "4.1.1",
+    "@types/papaparse": "5.5.2",
+    "@types/sprintf-js": "1.1.4",
+    "@types/turndown": "5.0.6",
     "@zip.js/zip.js": "2.15.0",
+    "diff": "8.0.4",
+    "fast-xml-parser": "5.11.1",
+    "file-type": "21.3.4",
     "gpt-tokenizer": "4.0.0",
     "highlight.js": "11.12.0",
     "idiomorph": "0.8.0",
-    "just-bash": "3.4.2",
+    "ini": "6.0.0",
+    "minimatch": "10.2.6",
     "modern-tar": "0.8.5",
+    "node-liblzma": "2.2.0",
+    "papaparse": "5.7.0",
     "preact": "10.29.8",
     "preact-render-to-string": "6.7.0",
-    "typescript": "7.0.2"
+    "re2js": "1.4.0",
+    "seek-bzip": "2.0.0",
+    "smol-toml": "1.8.0",
+    "sprintf-js": "1.1.3",
+    "turndown": "7.2.4",
+    "typescript": "7.0.2",
+    "undici": "7.29.1",
+    "yaml": "2.9.1"
   },
   "patchedDependencies": {
-    "just-bash@3.4.2": "patches/just-bash@3.4.2.patch",
     "modern-tar@0.8.5": "patches/modern-tar@0.8.5.patch"
   }
 }

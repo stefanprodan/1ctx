@@ -451,7 +451,7 @@ export function evalObjectBuiltin(
         // Navigate to parent and set value
         let current: QueryValue = result;
         for (let i = 0; i < path.length - 1; i++) {
-          const key = path[i];
+          const key: QueryValue = path[i];
           const nextKey = path[i + 1];
           if (Array.isArray(current) && typeof key === "number") {
             // Extend array if needed
