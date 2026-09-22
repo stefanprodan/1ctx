@@ -12,7 +12,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import { MCP, SKILL, WEB } from "../../shared/capabilities.ts";
+import { MCP, SKILL, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
@@ -38,7 +38,13 @@ import {
   takeStamp,
 } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
-import { agentMoved, serversItem, skillsItem, webItem } from "./Add.model.ts";
+import {
+  agentMoved,
+  serversItem,
+  skillsItem,
+  visualsItem,
+  webItem,
+} from "./Add.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
 import { AttachState } from "./Attach.state.ts";
@@ -194,6 +200,11 @@ export function Composer({
     tools: readable,
     switchable: switchable.value,
     off: isOff(chat, off, WEB),
+  });
+  const visuals = visualsItem({
+    tools: readable,
+    switchable: switchable.value,
+    off: isOff(chat, off, VISUALIZE),
   });
   // another agent's servers and skills are other keys, so its flips go
   // with it
@@ -384,6 +395,8 @@ export function Composer({
           onFiles={attach}
           web={web}
           onWeb={() => flip(chat, off, WEB)}
+          visuals={visuals}
+          onVisuals={() => flip(chat, off, VISUALIZE)}
           servers={mcp}
           skills={skill}
           onFlip={(key) => flip(chat, off, key)}

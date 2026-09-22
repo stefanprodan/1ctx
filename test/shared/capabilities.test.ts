@@ -16,10 +16,21 @@ import {
   skillKey,
   skillOf,
   skillsOffLine,
+  VISUALIZE,
   WEB,
 } from "../../src/shared/capabilities.ts";
 
 describe("capability keys", () => {
+  test("the visualize tool is a kind alone, like web access", () => {
+    expect(isCapabilityKey(VISUALIZE)).toBe(true);
+    expect(serverOf(VISUALIZE)).toBeNull();
+    expect(skillOf(VISUALIZE)).toBeNull();
+    expect(isCapabilityKey("visualize:x")).toBe(false);
+    expect(parseSet([VISUALIZE, WEB], "set")).toEqual({
+      ok: true,
+      set: ["visualize", "web"],
+    });
+  });
   test("an MCP server is a key by its id, checked by shape alone", () => {
     expect(mcpKey("k3v9a0q1z2xy")).toBe("mcp:k3v9a0q1z2xy");
     expect(isCapabilityKey("mcp:k3v9a0q1z2xy")).toBe(true);

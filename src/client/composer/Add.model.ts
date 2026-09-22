@@ -12,9 +12,30 @@ import type {
   SwitchableServer,
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
-import { mcpKey, skillKey, WEB } from "../../shared/capabilities.ts";
+import { mcpKey, skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 
 export type WebItem = { live: boolean; on: boolean; reason: string | null };
+
+// a switch for a kind alone, web access or the visualize tool: live when
+// the picked agent takes tools and the admin has the kind on
+function kindItem(
+  key: string,
+  input: {
+    tools: boolean;
+    switchable: readonly string[] | null;
+    off: boolean;
+  },
+): WebItem {
+  if (!input.tools) {
+    return { live: false, on: false, reason: "Agent cannot use tools" };
+  }
+  if (input.switchable === null)
+    return { live: false, on: false, reason: null };
+  if (!input.switchable.includes(key)) {
+    return { live: false, on: false, reason: "Turned off by an admin" };
+  }
+  return { live: true, on: !input.off, reason: null };
+}
 
 export function webItem(input: {
   // the picked agent's model takes tools
@@ -25,15 +46,17 @@ export function webItem(input: {
   // the chat has it off, as the composer shows it
   off: boolean;
 }): WebItem {
-  if (!input.tools) {
-    return { live: false, on: false, reason: "Agent cannot use tools" };
-  }
-  if (input.switchable === null)
-    return { live: false, on: false, reason: null };
-  if (!input.switchable.includes(WEB)) {
-    return { live: false, on: false, reason: "Turned off by an admin" };
-  }
-  return { live: true, on: !input.off, reason: null };
+  return kindItem(WEB, input);
+}
+
+// the Visuals item, the admin's name for the tool so one word means it
+// on both pages
+export function visualsItem(input: {
+  tools: boolean;
+  switchable: readonly string[] | null;
+  off: boolean;
+}): WebItem {
+  return kindItem(VISUALIZE, input);
 }
 
 // whether another agent was picked. The list going away for a moment,

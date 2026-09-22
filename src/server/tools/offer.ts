@@ -5,7 +5,7 @@
 // apart from dispatch lets the agent page and the runner share the same
 // offered set without needing a live call context.
 
-import { mcpKey, skillKey, WEB } from "../../shared/capabilities.ts";
+import { mcpKey, skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import {
@@ -149,7 +149,11 @@ export function offered(
     "bash",
     ...(web === null ? [] : ["webfetch"]),
     ...(search === null ? [] : ["websearch"]),
-    ...(visuals ? ["visualize"] : []),
+    // the chat's own switch removes the tool and only the tool: open
+    // and the skill read the admin's row alone
+    ...(visuals && !disabledCapabilities.includes(VISUALIZE)
+      ? ["visualize"]
+      : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,
   // the skill tool's names and the file tool all come from what is left

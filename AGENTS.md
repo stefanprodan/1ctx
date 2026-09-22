@@ -528,9 +528,9 @@ violation, and every rule has a rejected fixture under
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
   off per server), the two memory blocks, the knowledge block, the date
-  line, the chat's web-off line when applicable, the MCP-off line when
-  applicable, the skills-off line when applicable, and last the change
-  note. The policy's `mcpOff` holds the
+  line, the chat's web-off line when applicable, the visualize-off line
+  when applicable, the MCP-off line when applicable, the skills-off line
+  when applicable, and last the change note. The policy's `mcpOff` holds the
   sorted names of disabled linked servers with otherwise-offered tools,
   empty for a model without tools; `mcpOffLine()` names them.
   `GET /api/projects/:id/agents` also answers `servers`, keyed by agent id,
@@ -813,7 +813,12 @@ violation, and every rule has a rejected fixture under
   the admin's mode is off, through a forward port.
   The prompt adds `WEB_OFF_LINE` after the date and before the MCP note
   exactly when the send's set holds `web` and it offers tools, regardless
-  of the admin's mode. The memory phase offers `memory_edit` alone.
+  of the admin's mode. `visualize` is the second kind-alone key of the
+  set (`VISUALIZE` in `shared/capabilities.ts`): `tools/offer.ts` drops
+  the `visualize` tool and only the tool when the send's set holds it,
+  `open` and the skill untouched, and the prompt adds the constant
+  `VISUALIZE_OFF_LINE` after the web line by the same rule. The
+  capabilities answer names it while the admin's Visuals row is on. The memory phase offers `memory_edit` alone.
   Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
   a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
@@ -1044,13 +1049,13 @@ violation, and every rule has a rejected fixture under
   its counted rounds, summed from `usage` by the send queries).
   The editor's Access section (`AccessSection.tsx`) is the Web access
   switch, on for a new task and off with the composer's reasons when it
-  cannot be switched, then a `RowsList` with a switch per MCP server of
+  cannot be switched, the Visuals switch by the same rule, then a `RowsList` with a switch per MCP server of
   the picked agent and another per skill. The row's whole
   `disabledCapabilities` is saved: `web` and the keys of the shown
   servers and skills that are off, so a key for one the picked agent
   lacks is dropped. The automation page's Setup aside
-  (`AutomationAccess.tsx`) says Web access Off and names the servers and
-  the skills off, and nothing while all is on.
+  (`AutomationAccess.tsx`) says Web access Off, Visuals Off, and names the servers
+  and the skills off, and nothing while all is on.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -1088,7 +1093,10 @@ violation, and every rule has a rejected fixture under
   A user message draws its `uploads` record as `ui/FileChip.tsx` chips
   inside its card.
   The plus menu's second item is Web access, a `role="switch"` item
-  drawn as the rail's theme switch is, which leaves the menu open.
+  drawn as the rail's theme switch is, which leaves the menu open, and
+  the third is Visuals, the same switch over the `visualize` key
+  (`visualsItem()` beside `webItem()` in `Add.model.ts`), off with the
+  same reasons.
   `composer/Add.model.ts` decides it: off with "Agent cannot use tools"
   or "Turned off by an admin" under it when it cannot be switched, the
   second from `capabilities` on `GET /api/projects/:id/agents`, held as
@@ -1102,11 +1110,11 @@ violation, and every rule has a rejected fixture under
   still holds is kept. Leaving
   the chat and a reload forget them, a slash command carries none. Nothing
   outside the menu says web access is off.
-  The third item, MCP servers, is there when the picked agent has an
+  The fourth item, MCP servers, is there when the picked agent has an
   entry in `servers` of the same answer, held beside `switchable`. It
   says how many are off and swaps the menu's rows, inside the same
   `.menu` box, for `composer/AddPane.tsx`: a back row, then a
-  `role="switch"` item per server with its tool count. The fourth item,
+  `role="switch"` item per server with its tool count. The fifth item,
   Skills, is the same pane over the agent's entry in `skills`, a switch
   per skill with nothing to count. Escape or Back
   returns to the menu through `useMenu(back)`; a flip leaves the pane

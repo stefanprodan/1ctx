@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's Access step: whether runs reach the web, then a
-// switch per MCP server and per skill of the picked agent. A switch that
+// The task editor's Access step: whether runs reach the web and may
+// draw visuals, then a switch per MCP server and per skill of the picked
+// agent. A switch that
 // cannot be flipped is off and says why.
 
 import type {
@@ -78,6 +79,9 @@ export function AccessSection({
   web,
   webOn,
   onWeb,
+  visuals,
+  visualsOn,
+  onVisuals,
   servers,
   mcpOff,
   onServer,
@@ -90,6 +94,10 @@ export function AccessSection({
   // the draft has web access on
   webOn: boolean;
   onWeb: () => void;
+  visuals: WebItem;
+  // the draft has visuals on
+  visualsOn: boolean;
+  onVisuals: () => void;
   // the picked agent's servers, none when its model takes no tools
   servers: readonly SwitchableServer[];
   mcpOff: readonly string[];
@@ -101,6 +109,7 @@ export function AccessSection({
   disabled: boolean;
 }) {
   const on = web.on && webOn;
+  const drawing = visuals.on && visualsOn;
   return (
     <Section title="Access" text={words(servers.length, skills.length)}>
       <div class="automations-access">
@@ -117,6 +126,22 @@ export function AccessSection({
             </span>
           </div>
           {web.reason !== null && <span class="hint">{web.reason}</span>}
+        </div>
+        <div class="field">
+          <div class="automations-web">
+            <RowsSwitch
+              on={drawing}
+              label="Visuals"
+              disabled={disabled || !visuals.live}
+              onClick={onVisuals}
+            />
+            <span>
+              {drawing ? "Runs can draw visuals" : "Runs cannot draw visuals"}
+            </span>
+          </div>
+          {visuals.reason !== null && (
+            <span class="hint">{visuals.reason}</span>
+          )}
         </div>
         <Switches
           label="MCP servers"

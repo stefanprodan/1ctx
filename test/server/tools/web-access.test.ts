@@ -75,7 +75,9 @@ for (const mode of ["off", "all", "listed"] as const) {
           expect(offered.web).toEqual(
             on ? { mode, domains: ["docs.test"] } : null,
           );
-          expect(tools.capabilities()).toEqual(mode === "off" ? [] : ["web"]);
+          expect(tools.capabilities()).toEqual(
+            mode === "off" ? ["visualize"] : ["web", "visualize"],
+          );
           const bash = offered.tools.find((tool) => tool.name === "bash")!;
           expect(bash.description.endsWith("No network.")).toBe(!on);
           if (on) expect(bash.description).toContain("curl");

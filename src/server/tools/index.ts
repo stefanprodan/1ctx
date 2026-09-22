@@ -8,7 +8,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import { skillKey, WEB } from "../../shared/capabilities.ts";
+import { skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
@@ -298,7 +298,12 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const area: ToolsArea = {
     store,
     webAccess,
-    capabilities: () => (webAccess().mode === "off" ? [] : [WEB]),
+    capabilities: () => [
+      ...(webAccess().mode === "off" ? [] : [WEB]),
+      ...(store.rows().find((row) => row.name === "visualize")!.enabled
+        ? [VISUALIZE]
+        : []),
+    ],
     serverNames: (links) =>
       mcpService.switchable(links).map((server) => server.name),
     skillsOff: (agentId, disabledCapabilities) =>
