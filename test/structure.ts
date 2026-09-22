@@ -499,7 +499,8 @@ export function tokenLiteral(property: string, value: string): string | null {
     return "colour literal";
   }
   // a fallback in var() is a literal by another route
-  const isVar = /^var\(--[a-z0-9-]+\)$/i.test(value) || value === "inherit";
+  const bare = value.replace(/\s*!important$/i, "");
+  const isVar = /^var\(--[a-z0-9-]+\)$/i.test(bare) || bare === "inherit";
   if (property === "font" && value !== "inherit") return "font shorthand";
   if (property === "font-family" && !isVar) return "font family";
   if (property === "font-size" && !isVar) return "font size";

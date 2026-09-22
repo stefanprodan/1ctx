@@ -11,10 +11,20 @@
 
   /* the attribute hides whatever display an owner gave the element:
      an important declaration in this layer beats a normal one in the
-     owners layer, which is the one place the cascade is turned */
+     owners layer, one of the two places the cascade is turned */
   [hidden] {
     /* biome-ignore lint/complexity/noImportantStyles: the layer order puts owners above base, and important is how base's hidden wins */
     display: none !important;
+  }
+
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select,
+    [contenteditable] {
+      /* biome-ignore lint/complexity/noImportantStyles: every owner sets its own field size, and only important in base wins over them all */
+      font-size: var(--text-touch) !important;
+    }
   }
 
   html,
