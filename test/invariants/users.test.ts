@@ -7,9 +7,11 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import type { RouteDescriptor } from "../../src/server/lib/http.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
 import {
+  collectLogs,
   ORIGIN,
   type TestApp,
   type TestClient,
@@ -190,23 +192,34 @@ describe("admin users", () => {
   });
 
   test("create rolls back details and the personal project if disabling fails", async () => {
-    const app = await testApp();
+    const logs = collectLogs();
+    const app = await testApp({ logFactory: logs.logFactory });
     const client = await admin(app);
     const original = app.users.setDisabled.bind(app.users);
     app.users.setDisabled = () => {
       throw new Error("disabled write failed");
     };
     try {
-      await expect(
-        client.call("POST", "/api/users", {
-          body: {
-            ...userBody("robin"),
-            about: "Unavailable.",
-            disabled: true,
-            mustChangePassword: false,
-          },
-        }),
-      ).rejects.toThrow("disabled write failed");
+      const response = await client.call("POST", "/api/users", {
+        body: {
+          ...userBody("robin"),
+          about: "Unavailable.",
+          disabled: true,
+          mustChangePassword: false,
+        },
+      });
+      expect(response.status).toBe(500);
+      expect(
+        logs.events.findLast((event) => event.level === "error"),
+      ).toMatchObject({
+        area: "router",
+        msg: "request",
+        fields: {
+          route: "/api/users",
+          status: 500,
+          error: "disabled write failed",
+        },
+      });
     } finally {
       app.users.setDisabled = original;
     }
@@ -258,16 +271,29 @@ describe("admin users", () => {
   });
 
   test("create rolls the user back when its personal project fails", async () => {
-    const app = await testApp();
+    const logs = collectLogs();
+    const app = await testApp({ logFactory: logs.logFactory });
     const client = await admin(app);
     const original = app.projects.createPersonal.bind(app.projects);
     app.projects.createPersonal = () => {
       throw new Error("project write failed");
     };
     try {
-      await expect(
-        client.call("POST", "/api/users", { body: userBody("ghost") }),
-      ).rejects.toThrow("project write failed");
+      const response = await client.call("POST", "/api/users", {
+        body: userBody("ghost"),
+      });
+      expect(response.status).toBe(500);
+      expect(
+        logs.events.findLast((event) => event.level === "error"),
+      ).toMatchObject({
+        area: "router",
+        msg: "request",
+        fields: {
+          route: "/api/users",
+          status: 500,
+          error: "project write failed",
+        },
+      });
     } finally {
       app.projects.createPersonal = original;
     }
@@ -516,7 +542,7 @@ describe("admin users", () => {
       app.socket.open(conn);
       expect(conn.data.projects.has("team")).toBe(false);
       const seen: BusEvent[] = [];
-      const stop = subscribe((event) => seen.push(event));
+      const stop = subscribe((event) => seen.push(event), silent);
       try {
         const promoted = await client.call("PATCH", `/api/users/${user.id}`, {
           body: { role: "admin" },

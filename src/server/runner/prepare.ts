@@ -108,9 +108,11 @@ export function prepareSend(fields: {
     launch() {
       if (settled) return;
       settled = true;
-      fields.log(
-        `chat ${fields.sessionId} sent to ${fields.policy.agentName} on ${fields.policy.model}`,
-      );
+      fields.log.info("chat launched", {
+        chat: fields.sessionId,
+        agent: fields.policy.agentName,
+        model: fields.policy.model,
+      });
       fields.run(send);
     },
     abandon() {

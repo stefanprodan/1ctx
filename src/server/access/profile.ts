@@ -119,7 +119,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
                 : [],
           };
         });
-        deps.log(`${user.username} changed their password`);
+        deps.log.info("password changed", { user: user.username });
         const body: ProfileResponse = { user: profile(updated) };
         return json(body);
       },

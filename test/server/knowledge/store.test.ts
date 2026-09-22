@@ -8,6 +8,7 @@ import { KNOWLEDGE_COMMANDS } from "../../../src/server/knowledge/limits.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { Conflict, NotFound } from "../../../src/server/lib/errors.ts";
 import { sha256 } from "../../../src/server/lib/ids.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { tokens } from "../../../src/server/lib/tokens.ts";
 import { scratchState, seedScratch, setup } from "./helpers.ts";
 
@@ -304,7 +305,7 @@ describe("knowledge store and area", () => {
             area.store.versions(projectId, event.data.file.id),
           ).not.toHaveLength(0);
         }
-      });
+      }, silent);
       try {
         expect(() =>
           transact(db, () => {

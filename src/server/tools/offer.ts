@@ -164,7 +164,7 @@ export function offered(
     CATALOG_CAP,
   );
   for (const name of skillCatalog.leftOut) {
-    deps.log(`skill ${name} left out of the catalog`);
+    deps.log.warn("skill omitted", { skill: name, reason: "catalog cap" });
   }
   const skills = {
     block: skillCatalog.text,
@@ -198,7 +198,10 @@ export function offered(
   if (mode === "catalog" && mcp.length > 0) {
     const catalogOffer = mcpCatalog(promptServers(mcp));
     for (const name of catalogOffer.leftOut) {
-      deps.log(`server ${name} left out: its catalog is over the prompt cap`);
+      deps.log.warn("server omitted", {
+        server: name,
+        reason: "catalog cap",
+      });
     }
     const included = new Set(catalogOffer.included);
     mcp = mcp.filter((server) => included.has(server.name));

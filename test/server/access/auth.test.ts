@@ -133,7 +133,7 @@ describe("access", () => {
     const { login, setCookie } = access.open(user);
     db.query("update logins set expires_at = 0 where id = ?").run(login.id);
     const events: BusEvent[] = [];
-    const unsubscribe = subscribe((event) => events.push(event));
+    const unsubscribe = subscribe((event) => events.push(event), silent);
     try {
       const req = new Request("http://x", {
         headers: { cookie: setCookie.split(";")[0] },

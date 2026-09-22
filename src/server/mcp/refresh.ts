@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Clock } from "../lib/clock.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { AUTOMATIC_HOLD_MS, REFRESH_INTERVAL_MS } from "./limits.ts";
 import type { McpServerRow, McpServerStore } from "./store.ts";
@@ -86,7 +86,10 @@ export class RefreshCoordinator {
         if (signal.aborted) return;
         const words = error instanceof Error ? error.message : String(error);
         this.deps.store.recordFailure(row.id, words, this.deps.clock());
-        this.deps.log(`server ${row.name} refresh failed: ${words}`);
+        this.deps.log.warn("server refresh failed", {
+          server: row.name,
+          ...errorFields(error, false),
+        });
       }
     });
     if (taken.status !== "taken") return null;
@@ -99,8 +102,7 @@ export class RefreshCoordinator {
       const row = this.deps.store.byId(id);
       if (row !== null) this.startAutomatic(row, observed);
     } catch (error) {
-      const words = error instanceof Error ? error.message : String(error);
-      this.deps.log(`server refresh could not start: ${words}`);
+      this.deps.log.error("server refresh start failed", errorFields(error));
     }
   }
 

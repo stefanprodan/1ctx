@@ -9,7 +9,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type App, compose } from "../../src/server/compose.ts";
 import type { Db } from "../../src/server/db/index.ts";
-import { silent } from "../../src/server/lib/log.ts";
+import {
+  type LogFactory,
+  type LogFields,
+  type LogLevel,
+  silent,
+} from "../../src/server/lib/log.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import {
@@ -148,6 +153,31 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
 }
 export const VERSION = "v0.0.0-test";
 
+export type CollectedLog = {
+  level: LogLevel;
+  area: string;
+  msg: string;
+  fields: LogFields;
+};
+
+export function collectLogs(): {
+  events: CollectedLog[];
+  logFactory: LogFactory;
+} {
+  const events: CollectedLog[] = [];
+  const logFactory: LogFactory = (area) => {
+    const record = (level: LogLevel) => (msg: string, fields?: LogFields) => {
+      events.push({ level, area, msg, fields: { ...fields } });
+    };
+    return {
+      info: record("info"),
+      warn: record("warn"),
+      error: record("error"),
+    };
+  };
+  return { events, logFactory };
+}
+
 export type TestApp = App & {
   db: Db;
   now: { value: number };
@@ -178,6 +208,7 @@ export async function testApp(
     adminPassword?: string | null;
     trustProxy?: boolean;
     fetcher?: typeof fetch;
+    logFactory?: LogFactory;
     // the secrets beside user-admin.key
     secrets?: Record<string, string>;
     // a fake tools capability for runner state-machine tests
@@ -234,7 +265,7 @@ export async function testApp(
     },
     clock,
     fetcher: options.fetcher ?? fake.fetcher,
-    log: () => silent,
+    log: options.logFactory ?? (() => silent),
     version: VERSION,
     secureCookie: false,
     trustProxy,

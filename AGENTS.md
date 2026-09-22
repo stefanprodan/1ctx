@@ -1180,13 +1180,23 @@ violation, and every rule has a rejected fixture under
   `.clamp`, `.cut`, `.meter`, `.notice-failed`, `.btn-text`,
   `.btn-icon`, `.status-*`); an owner adds only position, size and
   what is its own.
-- **A log line is the UTC time, the area, then the words,** one line per
-  event on stderr through `logger(area)` in `lib/log.ts`, which
-  `compose.ts` hands each area; nothing calls `console` for it, and a
-  test passes `silent`. Ids, names and counts only: never a secret, a
-  message, a prompt or a query string. The router logs a handler's throw
-  that is not an `HttpError` with the method, the path and the user,
-  then throws it on, so the listener answers 500.
+- **A log line is slog text,** one event on stderr through the `Log`
+  methods `info`, `warn` and `error` from `logger(area)` in `lib/log.ts`.
+  Its fields are flat and ordered after UTC `time`, `level`, `msg` and
+  `area`; `duration` is whole milliseconds. Messages are fixed lowercase
+  phrases. Fields hold only ids, usernames, configured names and models,
+  route patterns, counts, statuses, closed words, durations, client
+  addresses, error fields, and startup paths. Never a secret, message,
+  prompt, description, tool input or output, query string, raw request
+  path, a knowledge or upload file's name or text, email, attempted
+  login name, body or socket reason. `errorFields()` keeps the first
+  line, which `format()` cuts at 200 characters after `compose.ts` has
+  scrubbed the current provider, search and MCP keys from it, and the
+  source frames as `stack`; the build passes `--sourcemap` so a binary's
+  frames name source files. The router logs one `request` for non-GETs
+  and errors, never health, and answers an unexpected throw with a
+  renewed JSON 500. `subscribe()` on the bus takes the subscriber's
+  `Log`; a test collects events with `testApp({logFactory})`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

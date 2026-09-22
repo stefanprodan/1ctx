@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import {
   type MemoryPhaseDeps,
   memoryPhase,
@@ -39,9 +39,10 @@ async function finalize(deps: EndingDeps, send: ActiveSend): Promise<boolean> {
       await deps.pause(FINALIZE_RETRY_MS);
     }
   }
-  deps.log(
-    `chat ${send.sessionId} could not be finalized: ${String(lastError)}`,
-  );
+  deps.log.error("chat finalize failed", {
+    chat: send.sessionId,
+    ...errorFields(lastError),
+  });
   return false;
 }
 
@@ -79,11 +80,12 @@ export async function endSend(
     }
   }
   const finalized = await finalize(deps, send);
-  deps.log(
-    `chat ${send.sessionId} ${send.cause}${
-      send.error === null ? "" : `: ${send.error}`
-    }`,
-  );
+  const log = send.cause === "failure" ? deps.log.error : deps.log.info;
+  log("chat ended", {
+    chat: send.sessionId,
+    cause: send.cause,
+    ...(send.error === null ? {} : errorFields(send.error, false)),
+  });
   send.end(finalized);
   return finalized;
 }

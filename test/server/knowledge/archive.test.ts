@@ -11,6 +11,7 @@ import { commitKnowledge } from "../../../src/server/knowledge/commit.ts";
 import type { ArchiveMember } from "../../../src/server/lib/archive.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type {
   KnowledgeUploadReason,
@@ -345,7 +346,7 @@ test.serial(
         events.push(event);
         visibleCounts.push(s.area.list(s.projectId).files.length);
       }
-    });
+    }, silent);
     try {
       s.now.value++;
       expect(
@@ -457,7 +458,7 @@ test.serial(
     const before = s.area.store.read(s.projectId);
     const versions = s.area.versions(s.projectId, file.id);
     const events: BusEvent[] = [];
-    const off = subscribe((event) => events.push(event));
+    const off = subscribe((event) => events.push(event), silent);
     const changes = () =>
       s.db.query<{ n: number }, []>("select total_changes() as n").get()!.n;
     const previous = changes();

@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { BadRequest, NotFound } from "../../../src/server/lib/errors.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { SUMMARY_LEAD } from "../../../src/server/runner/context.ts";
 import { forkPoint } from "../../../src/server/sessions/fork.ts";
 import { MAX_SMALL_BODY } from "../../../src/server/sessions/parse.ts";
@@ -22,7 +23,7 @@ import {
   forkRow,
   forkSends,
 } from "../../fixtures/sessions/fork.ts";
-import type { TestClient } from "../../helpers/app.ts";
+import { collectLogs, type TestClient } from "../../helpers/app.ts";
 import {
   createAutomation,
   settleRun as settle,
@@ -445,7 +446,7 @@ describe("POST /api/sessions/:id/fork", () => {
               chat.app.sessions.byId(event.data.session.id) !== null,
             rows: chat.app.sessions.messages(event.data.session.id),
           });
-        });
+        }, silent);
         const copied = await fork(chat, source.sessionId, answer.id);
         expect(observed).toHaveLength(1);
         const observation = observed[0]!;
@@ -480,7 +481,8 @@ describe("POST /api/sessions/:id/fork", () => {
   test.serial(
     "rolls back sessions, sends and messages and emits nothing on a copy failure",
     async () => {
-      const chat = await chatApp();
+      const logs = collectLogs();
+      const chat = await chatApp({ logFactory: logs.logFactory });
       let off = () => {};
       try {
         const source = await startChat(chat);
@@ -500,12 +502,24 @@ describe("POST /api/sessions/:id/fork", () => {
         end;
       `);
         const events: BusEvent[] = [];
-        off = subscribe((event) => events.push(event));
-        await expect(
-          chat.member.call("POST", `/api/sessions/${source.sessionId}/fork`, {
-            body: { messageId: answer.id, agentId: chat.agentId },
-          }),
-        ).rejects.toThrow("injected fork copy failure");
+        off = subscribe((event) => events.push(event), silent);
+        const response = await chat.member.call(
+          "POST",
+          `/api/sessions/${source.sessionId}/fork`,
+          { body: { messageId: answer.id, agentId: chat.agentId } },
+        );
+        expect(response.status).toBe(500);
+        expect(
+          logs.events.findLast((event) => event.level === "error"),
+        ).toMatchObject({
+          area: "router",
+          msg: "request",
+          fields: {
+            route: "/api/sessions/:id/fork",
+            status: 500,
+            error: "injected fork copy failure",
+          },
+        });
         expect(events).toEqual([]);
         expect(chat.app.db.inTransaction).toBeFalse();
         expect({

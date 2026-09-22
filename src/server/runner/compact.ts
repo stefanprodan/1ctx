@@ -82,7 +82,10 @@ export function compactSend(
     deps.registry.free(send);
     throw err;
   }
-  deps.log(`chat ${session.id} compacted on ${policy.model}`);
+  deps.log.info("chat compacted", {
+    chat: session.id,
+    model: policy.model,
+  });
   void deps.run(send);
   return sessionDetail(deps.sessions, started.session, live(send));
 }

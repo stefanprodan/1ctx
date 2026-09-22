@@ -234,10 +234,16 @@ export function mcpArea(deps: McpDeps): Mcp {
     const prompts = promptRows(rows, links);
     const snapshot = promptSnapshot(prompts, sha256);
     for (const name of snapshot.leftForSchemas) {
-      deps.log(`server ${name} left out: its tools are over the schema cap`);
+      deps.log.warn("server omitted", {
+        server: name,
+        reason: "schema cap",
+      });
     }
     for (const name of snapshot.leftForInstructions) {
-      deps.log(`server ${name} instructions left out: over the prompt cap`);
+      deps.log.warn("server instructions omitted", {
+        server: name,
+        reason: "prompt cap",
+      });
     }
     const included = new Set(snapshot.included);
     const byName = new Map(rows.map((row) => [row.name, row]));

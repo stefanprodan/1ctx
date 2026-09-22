@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { LOGIN_TTL_MS, TOUCH_AFTER_MS } from "../../src/server/access/index.ts";
 import { LOGIN_LIMIT } from "../../src/server/access/routes.ts";
 import { MAX_BODY } from "../../src/server/lib/body.ts";
-import { testApp } from "../helpers/app.ts";
+import { collectLogs, testApp } from "../helpers/app.ts";
 
 describe("bootstrap", () => {
   test("creates admin from the secret when there are no users", async () => {
@@ -70,13 +70,30 @@ describe("login", () => {
   });
 
   test("answers a wrong password and an unknown username the same way", async () => {
-    const app = await testApp();
+    const logs = collectLogs();
+    const app = await testApp({ logFactory: logs.logFactory });
     const wrong = await app.client().login("admin", "nope");
     const unknown = await app.client().login("ghost", "nope");
     expect(wrong.status).toBe(401);
     expect(unknown.status).toBe(401);
     expect(await wrong.json()).toEqual(await unknown.json());
     expect(wrong.headers.get("set-cookie")).toBeNull();
+    expect(logs.events.filter((event) => event.msg === "login failed")).toEqual(
+      [
+        {
+          level: "warn",
+          area: "access",
+          msg: "login failed",
+          fields: { addr: "127.0.0.1" },
+        },
+        {
+          level: "warn",
+          area: "access",
+          msg: "login failed",
+          fields: { addr: "127.0.0.1" },
+        },
+      ],
+    );
   });
 
   test("me answers the user with the cookie and null without", async () => {
@@ -188,12 +205,21 @@ describe("same origin", () => {
 
 describe("rate limit", () => {
   test("blocks an address after the limit within a minute", async () => {
-    const app = await testApp();
+    const logs = collectLogs();
+    const app = await testApp({ logFactory: logs.logFactory });
     const client = app.client("10.0.0.9");
     for (let i = 0; i < LOGIN_LIMIT; i++) {
       expect((await client.login("admin", "wrong")).status).toBe(401);
     }
     expect((await client.login("admin", "hunter2-test")).status).toBe(429);
+    expect(
+      logs.events.findLast((event) => event.msg === "login limited"),
+    ).toEqual({
+      level: "warn",
+      area: "access",
+      msg: "login limited",
+      fields: { addr: "10.0.0.9" },
+    });
     expect(
       (await app.client("10.0.0.10").login("admin", "hunter2-test")).status,
     ).toBe(200);

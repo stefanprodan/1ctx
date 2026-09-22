@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { callCaps, run, scratchState, seedScratch, setup } from "./helpers.ts";
 
 const edits =
@@ -216,7 +217,7 @@ describe("atomic knowledge and scratch commits", () => {
           event.data.projectId === s.projectId
         )
           events.push(event);
-      });
+      }, silent);
       try {
         for (const [i, command] of [
           "echo draft > /tmp/file",
@@ -251,7 +252,7 @@ describe("atomic knowledge and scratch commits", () => {
           event.data.projectId === s.projectId
         )
           events.push(event);
-      });
+      }, silent);
       try {
         const result = await run(
           s,

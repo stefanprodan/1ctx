@@ -3,8 +3,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { subscribe } from "../../src/server/lib/bus.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS, limitsArea } from "../../src/server/limits/index.ts";
 import type { SessionDetail } from "../../src/shared/contracts/session.ts";
+import { collectLogs } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -38,7 +40,8 @@ describe("upload claim atomicity", () => {
     test.serial(
       `a failed user write restores staging and ${existing ? "the existing" : "the new"} tree`,
       async () => {
-        const chat = await chatApp();
+        const logs = collectLogs();
+        const chat = await chatApp({ logFactory: logs.logFactory });
         let stop = () => {};
         try {
           let sessionId: string | undefined;
@@ -58,7 +61,7 @@ describe("upload claim atomicity", () => {
             { name: "extra", text: "new" },
           ]);
           const events: unknown[] = [];
-          stop = subscribe((event) => events.push(event));
+          stop = subscribe((event) => events.push(event), silent);
           const original = store.addUserMessage.bind(store);
           let claimed = false;
           store.addUserMessage = (fields) => {
@@ -74,9 +77,21 @@ describe("upload claim atomicity", () => {
             throw new Error("user write failed after claim");
           };
           try {
-            await expect(send(chat, [staged.id!], sessionId)).rejects.toThrow(
-              "user write failed after claim",
-            );
+            const response = await send(chat, [staged.id!], sessionId);
+            expect(response.status).toBe(500);
+            expect(
+              logs.events.findLast((event) => event.level === "error"),
+            ).toMatchObject({
+              area: "router",
+              msg: "request",
+              fields: {
+                route: sessionId
+                  ? "/api/sessions/:id/messages"
+                  : "/api/sessions",
+                status: 500,
+                error: "user write failed after claim",
+              },
+            });
           } finally {
             store.addUserMessage = original;
           }
@@ -127,7 +142,7 @@ describe("upload claim atomicity", () => {
       const registry = chat.app.runner.registry;
       const original = registry.set.bind(registry);
       const events: unknown[] = [];
-      const stop = subscribe((event) => events.push(event));
+      const stop = subscribe((event) => events.push(event), silent);
       let preflight = false;
       const check = chat.app.knowledge.checkUploads;
       chat.app.knowledge.checkUploads = (...args) => {
@@ -219,7 +234,7 @@ describe("upload claim atomicity", () => {
           );
         };
         const events: unknown[] = [];
-        const stop = subscribe((event) => events.push(event));
+        const stop = subscribe((event) => events.push(event), silent);
         try {
           const response = await send(chat, [staged.id!]);
           expect(response.status).toBe(400);

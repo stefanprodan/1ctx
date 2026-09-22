@@ -13,7 +13,7 @@ import { type ComposeOptions, compose } from "./compose.ts";
 import { heldByAnother, inspect, open } from "./db/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { wallClock } from "./lib/clock.ts";
-import { logger, silent } from "./lib/log.ts";
+import { logger, scrubErrors, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { parse, readSources } from "./provision/index.ts";
 import { defaultDir, secrets } from "./secrets/index.ts";
@@ -108,14 +108,21 @@ if (cli.kind === "provision") {
 const { hostname, port, dbPath, secretsDir, secretsMode } = cli.options;
 const { secureCookie, trustProxy } = cli.options;
 
-const log = logger("1ctx");
 if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
 const db = open(dbPath);
 const store = secrets(
   secretsDir ?? defaultDir(Bun.main, process.execPath),
   secretsMode,
 );
-log(`secrets: ${store.dir} (${store.mode})`);
+const log = scrubErrors(logger("1ctx"), () =>
+  (["provider-", "search-", "mcp-"] as const).flatMap((kind) =>
+    store.list(kind).flatMap((name) => {
+      const value = store.read(kind, name);
+      return value === null ? [] : [value];
+    }),
+  ),
+);
+log.info("secrets ready", { path: store.dir, mode: store.mode });
 
 const app = await compose({
   db,
@@ -140,7 +147,10 @@ const { server, stop } = serve({
   trustProxy,
   development: process.env.ONECTX_DEV === "1",
 });
-log(`${VERSION} listening on http://${server.hostname}:${server.port}`);
+log.info("server started", {
+  version: VERSION,
+  listen: `http://${server.hostname}:${server.port}`,
+});
 
 // in order: no more sends, every send ended and its rows written, the
 // sockets closed with the restart code, the listener stopped without
@@ -149,7 +159,7 @@ let stopping = false;
 const shutdown = async (signal: string) => {
   if (stopping) return;
   stopping = true;
-  log(`${signal}: shutting down`);
+  log.info("shutdown", { signal });
   await app.shutdown();
   await stop();
   db.close();

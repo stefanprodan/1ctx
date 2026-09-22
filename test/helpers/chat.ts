@@ -8,6 +8,7 @@
 // app with it, a provider, an agent and a member, and signs the member
 // in.
 
+import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
 import type { Registry } from "../../src/server/runner/index.ts";
@@ -304,6 +305,7 @@ export async function chatApp(
     wire?: Wire;
     tools?: Tools;
     fetcher?: typeof fetch;
+    logFactory?: LogFactory;
     window?: number;
   } = {},
 ): Promise<ChatApp> {
@@ -311,6 +313,7 @@ export async function chatApp(
   const secrets = options.secrets ?? {};
   const app = await testApp({
     fetcher: scripted.fetcher,
+    logFactory: options.logFactory,
     registry: options.registry,
     secrets,
     tools: options.tools,

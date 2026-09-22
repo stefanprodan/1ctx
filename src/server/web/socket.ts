@@ -17,6 +17,7 @@ import {
 } from "../../shared/socket.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import type { Log } from "../lib/log.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
 export const CLOSE_DROPPED = 1013;
@@ -44,6 +45,7 @@ export type SocketDeps = {
   // the build, told to every connection so a tab left open over a
   // deploy reloads
   version: string;
+  log: Log;
   // the current principal, or null for a user that is gone
   refresh(principal: Principal): Principal | null;
   // every project the user may see now, or null for a user that is gone
@@ -249,7 +251,7 @@ export function socketArea(deps: SocketDeps): Socket {
         break;
     }
   };
-  const unsubscribe = subscribe(onBus);
+  const unsubscribe = subscribe(onBus, deps.log);
 
   return {
     route: {

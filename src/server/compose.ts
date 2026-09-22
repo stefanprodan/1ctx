@@ -16,7 +16,7 @@ import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import { withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
-import type { Log } from "./lib/log.ts";
+import { type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import {
@@ -63,7 +63,7 @@ export type ComposeOptions = {
   clock: Clock;
   // what reaches a provider; a test passes a fake
   fetcher?: Fetcher;
-  log: (area: string) => Log;
+  log: LogFactory;
   version: string;
   secureCookie: boolean;
   trustProxy: boolean;
@@ -108,8 +108,23 @@ export type App = {
   shutdown(): Promise<void>;
 };
 
+const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-"];
+
+function scrubbedLogs(options: ComposeOptions): LogFactory {
+  return (area) =>
+    scrubErrors(options.log(area), () =>
+      SCRUB_KINDS.flatMap((kind) =>
+        (options.secretNames?.(kind) ?? []).flatMap((name) => {
+          const value = options.secret(kind, name);
+          return value === null ? [] : [value];
+        }),
+      ),
+    );
+}
+
 export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock, secret } = options;
+  const log = scrubbedLogs(options);
   // Ports that point down the list, at an area built after the one that
   // holds them, are closures called once the list is complete: a user
   // is made with its personal project, project routes read sessions and
@@ -125,7 +140,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     db,
     secret: (name) => secret("user-", name),
     clock,
-    log: options.log("users"),
+    log: log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
   });
@@ -153,7 +168,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     keys: () => options.secretNames?.(MCP_KEY_PREFIX) ?? [],
     callTimeoutMs: () => limits.current().callTimeoutMs,
     fetcher,
-    log: options.log("mcp"),
+    log: log("mcp"),
     version: options.version,
     render: renderMarkdown,
     capabilities,
@@ -161,7 +176,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const skills: Skills = skillsArea({
     db,
     clock,
-    log: options.log("skills"),
+    log: log("skills"),
     fetcher,
     capabilities,
     agents: {
@@ -189,7 +204,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const access: Access = accessArea({
     db,
     clock,
-    log: options.log("access"),
+    log: log("access"),
     secureCookie: options.secureCookie,
     users,
     projects,
@@ -229,7 +244,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   sessions = sessionsArea({
     db,
     clock,
-    log: options.log("sessions"),
+    log: log("sessions"),
     access,
     agents: { byId: (id) => agents.byId(id) },
     live: (sessionId) => runner.live(sessionId),
@@ -245,7 +260,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     fetcher,
     secret: (name) => secret("search-", name),
     clock,
-    log: options.log("tools"),
+    log: log("tools"),
     version: options.version,
     render: renderMarkdown,
     skills,
@@ -264,6 +279,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
     version: options.version,
+    log: log("socket"),
     refresh: (principal) => access.refresh(principal),
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
@@ -272,7 +288,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const runner = runnerArea({
     db,
     clock,
-    log: options.log("runner"),
+    log: log("runner"),
     sessions: sessions.store,
     access,
     visible: (principal, id) => sessions.visible(principal, id),
@@ -303,7 +319,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   automations = automationsArea({
     db,
     clock,
-    log: options.log("automations"),
+    log: log("automations"),
     access,
     users,
     projects,
@@ -342,7 +358,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     resolve: (req) => access.resolve(req),
     trustProxy: options.trustProxy,
-    log: options.log("web"),
+    log: log("router"),
   });
   const provision = provisionArea({
     handle,

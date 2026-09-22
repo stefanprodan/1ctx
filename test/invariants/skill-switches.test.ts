@@ -3,6 +3,7 @@
 
 import { expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import { type LogFactory, silent } from "../../src/server/lib/log.ts";
 import type { LoadedSkill } from "../../src/server/skills/index.ts";
 import type { ProjectAgentsResponse } from "../../src/shared/api/sessions.ts";
 import {
@@ -13,6 +14,7 @@ import {
 } from "../../src/shared/capabilities.ts";
 import type { SessionDetail } from "../../src/shared/contracts/session.ts";
 import { CATALOG_LEAD } from "../../src/shared/skills.ts";
+import { collectLogs } from "../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -44,8 +46,8 @@ const loaded = (name: string, files: LoadedSkill["files"] = []) => ({
   files,
 });
 
-async function setup(model?: string) {
-  const chat = await chatApp({ model });
+async function setup(model?: string, logFactory?: LogFactory) {
+  const chat = await chatApp({ model, logFactory });
   chat.app.automationScheduler.stop();
   const gitops = chat.app.skills.create(
     loaded("gitops", [{ path: "runbook.md", content: "Step one.", bytes: 9 }]),
@@ -261,7 +263,8 @@ test("project agents answer the skills each agent carries, in name order", async
 test.serial(
   "skill deletion forgets only its key atomically, without revisions or events",
   async () => {
-    const { chat, gitops, plain } = await setup();
+    const logs = collectLogs();
+    const { chat, gitops, plain } = await setup(undefined, logs.logFactory);
     const events: BusEvent[] = [];
     let unsubscribe = () => {};
     try {
@@ -283,7 +286,7 @@ test.serial(
           createAutomation(chat, { name: `task-${i}`, disabledCapabilities }),
         ),
       );
-      unsubscribe = subscribe((event) => events.push(event));
+      unsubscribe = subscribe((event) => events.push(event), silent);
       const path = `/api/skills/${gitops.id}`;
       expect((await chat.admin.call("DELETE", path)).status).toBe(409);
       chat.app.skills.assign(chat.agentId, [plain.id]);
@@ -296,9 +299,19 @@ test.serial(
         throw new Error("forget failed");
       };
       try {
-        await expect(chat.admin.call("DELETE", path)).rejects.toThrow(
-          "forget failed",
-        );
+        const response = await chat.admin.call("DELETE", path);
+        expect(response.status).toBe(500);
+        expect(
+          logs.events.findLast((event) => event.level === "error"),
+        ).toMatchObject({
+          area: "router",
+          msg: "request",
+          fields: {
+            route: "/api/skills/:id",
+            status: 500,
+            error: "forget failed",
+          },
+        });
       } finally {
         chat.app.automations.forgetCapability = forget;
       }

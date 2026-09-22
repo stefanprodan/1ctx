@@ -9,7 +9,7 @@ import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
 import type { SessionStore, UsagePort } from "../sessions/index.ts";
@@ -227,9 +227,10 @@ export function scheduler(deps: Deps): Scheduler {
         return { result: undefined, events: [changed(updated)] };
       });
     } catch (writeError) {
-      deps.log(
-        `automation ${id} could not record a skipped event: ${String(writeError)}`,
-      );
+      deps.log.error("skip record failed", {
+        automation: id,
+        ...errorFields(writeError),
+      });
     }
   };
 
@@ -240,7 +241,10 @@ export function scheduler(deps: Deps): Scheduler {
       return result?.detail ?? null;
     } catch (err) {
       recordUnexpected(id, err);
-      deps.log(`automation ${id} failed to fire: ${String(err)}`);
+      deps.log.error("fire failed", {
+        automation: id,
+        ...errorFields(err),
+      });
       return null;
     }
   };
@@ -268,9 +272,10 @@ export function scheduler(deps: Deps): Scheduler {
           };
         });
       } catch (err) {
-        deps.log(
-          `automation run ${session.id} could not be swept: ${String(err)}`,
-        );
+        deps.log.warn("retention delete failed", {
+          chat: session.id,
+          ...errorFields(err, false),
+        });
       }
     }
     return count;
@@ -315,9 +320,10 @@ export function scheduler(deps: Deps): Scheduler {
         };
       });
     } catch (err) {
-      deps.log(
-        `automation ${session.automationId} could not record its run: ${String(err)}`,
-      );
+      deps.log.error("run record failed", {
+        automation: session.automationId,
+        ...errorFields(err),
+      });
     }
   };
 
@@ -333,7 +339,7 @@ export function scheduler(deps: Deps): Scheduler {
         sweep();
         lastSweep = now;
       } catch (err) {
-        deps.log(`automation retention sweep failed: ${String(err)}`);
+        deps.log.warn("retention failed", errorFields(err, false));
       }
     }
   };
@@ -365,8 +371,10 @@ export function scheduler(deps: Deps): Scheduler {
       if (running) return;
       running = true;
       reconcile();
-      unsubscribe ??= subscribe(onSession);
-      void loop().catch((err) => deps.log(`scheduler stopped: ${String(err)}`));
+      unsubscribe ??= subscribe(onSession, deps.log);
+      void loop().catch((err) =>
+        deps.log.error("scheduler stopped", errorFields(err)),
+      );
     },
     stop() {
       running = false;

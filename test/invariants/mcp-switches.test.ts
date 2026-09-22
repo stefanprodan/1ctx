@@ -3,6 +3,7 @@
 
 import { expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import { type LogFactory, silent } from "../../src/server/lib/log.ts";
 import type { ProjectAgentsResponse } from "../../src/shared/api/sessions.ts";
 import {
   type CapabilityChange,
@@ -14,6 +15,7 @@ import type { AgentServer } from "../../src/shared/contracts/mcp.ts";
 import type { SessionDetail } from "../../src/shared/contracts/session.ts";
 import { CATALOG_LEAD } from "../../src/shared/mcp.ts";
 import type { McpMode } from "../../src/shared/words.ts";
+import { collectLogs } from "../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -51,8 +53,8 @@ async function assign(
   expect(response.status, await response.text()).toBe(200);
 }
 
-async function setup(model?: string) {
-  const chat = await chatApp({ model });
+async function setup(model?: string, logFactory?: LogFactory) {
+  const chat = await chatApp({ model, logFactory });
   chat.app.automationScheduler.stop();
   const flux = seedServer(chat.app.mcp, "flux");
   const docs = seedServer(chat.app.mcp, "docs");
@@ -103,7 +105,7 @@ test.serial(
       ) {
         events.push(event);
       }
-    });
+    }, silent);
     try {
       const first = await startChat(chat);
       const on = system(first.script);
@@ -385,7 +387,8 @@ test("project agents expose the same switchable map to members and admins", asyn
 test.serial(
   "server deletion forgets only its key atomically, without revisions or events",
   async () => {
-    const { chat, flux, docs } = await setup();
+    const logs = collectLogs();
+    const { chat, flux, docs } = await setup(undefined, logs.logFactory);
     const events: BusEvent[] = [];
     let unsubscribe = () => {};
     try {
@@ -407,7 +410,7 @@ test.serial(
           createAutomation(chat, { name: `task-${i}`, disabledCapabilities }),
         ),
       );
-      unsubscribe = subscribe((event) => events.push(event));
+      unsubscribe = subscribe((event) => events.push(event), silent);
       expect(
         (await chat.admin.call("DELETE", `/api/mcp/${flux.id}`)).status,
       ).toBe(409);
@@ -424,9 +427,19 @@ test.serial(
         throw new Error("forget failed");
       };
       try {
-        await expect(
-          chat.admin.call("DELETE", `/api/mcp/${flux.id}`),
-        ).rejects.toThrow("forget failed");
+        const response = await chat.admin.call("DELETE", `/api/mcp/${flux.id}`);
+        expect(response.status).toBe(500);
+        expect(
+          logs.events.findLast((event) => event.level === "error"),
+        ).toMatchObject({
+          area: "router",
+          msg: "request",
+          fields: {
+            route: "/api/mcp/:id",
+            status: 500,
+            error: "forget failed",
+          },
+        });
       } finally {
         chat.app.automations.forgetCapability = forget;
       }

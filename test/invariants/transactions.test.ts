@@ -8,15 +8,17 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import { FINALIZE_RETRY_MS } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
+import { collectLogs } from "../helpers/app.ts";
 import { chatApp, startChat, tick } from "../helpers/chat.ts";
 
 function envelopes() {
   const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
   const stop = subscribe((e) => {
     if (e.type === "session.changed") seen.push(e.data);
-  });
+  }, silent);
   return { seen, stop };
 }
 
@@ -81,7 +83,8 @@ describe("startSend", () => {
   );
 
   test.serial("a write that fails leaves no row and no lock", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const { seen, stop } = envelopes();
     try {
       const store = chat.app.sessions;
@@ -90,18 +93,28 @@ describe("startSend", () => {
         throw new Error("disk full");
       };
       try {
-        // a store failure is a bug, and the router lets it propagate
-        await expect(
-          chat.member.call("POST", "/api/sessions", {
-            body: {
-              projectId: chat.projectId,
-              agentId: chat.agentId,
-              message: "x",
-            },
-          }),
-        ).rejects.toThrow("disk full");
+        const response = await chat.member.call("POST", "/api/sessions", {
+          body: {
+            projectId: chat.projectId,
+            agentId: chat.agentId,
+            message: "x",
+          },
+        });
+        expect(response.status).toBe(500);
+        expect(await response.json()).toEqual({ error: "internal error" });
       } finally {
         store.createSend = original;
+        expect(
+          logs.events.findLast((event) => event.level === "error"),
+        ).toMatchObject({
+          area: "router",
+          msg: "request",
+          fields: {
+            route: "/api/sessions",
+            status: 500,
+            error: "disk full",
+          },
+        });
       }
       expect(seen).toEqual([]);
       expect(store.list([chat.projectId], "")).toEqual([]);
