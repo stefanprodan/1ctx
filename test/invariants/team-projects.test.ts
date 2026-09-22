@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ProjectDetail } from "../../src/shared/contracts/project.ts";
+import type { SessionDetail } from "../../src/shared/contracts/session.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
 import { hashPassword, ORIGIN, type TestClient } from "../helpers/app.ts";
 import {
@@ -171,7 +173,7 @@ describe("team project administration", () => {
     expect(reserved.status).toBe(409);
     expect(await reserved.json()).toEqual({ error: "name is taken" });
     // a username names no project any more
-    expect((await createTeam(chat, "caelea")).name).toBe("caelea");
+    expect((await createTeam(chat, "casey")).name).toBe("casey");
     expect((await createTeam(chat, "on_call")).name).toBe("on_call");
     expect((await createTeam(chat, "a".repeat(80))).name).toHaveLength(80);
     for (const name of ["on.call", "On-call", "a".repeat(81)]) {
@@ -303,6 +305,26 @@ describe("team project administration", () => {
       "You work in the ops project: Incidents and pages",
     );
     await finish(chat, script);
+    chat.app.socket.dispose();
+  });
+
+  test("a chat names its authors, an admin outside the project too", async () => {
+    const chat = await chatApp();
+    const ops = await createTeam(chat, "ops");
+    await addMember(chat, ops.id, chat.memberId);
+    const { script, sessionId } = await startChat(
+      chat,
+      "hi",
+      chat.admin,
+      ops.id,
+    );
+    await finish(chat, script);
+    const res = await chat.member.call("GET", `/api/sessions/${sessionId}`);
+    expect(res.status).toBe(200);
+    const detail: SessionDetail = await res.json();
+    expect(detail.authors).toEqual([
+      { id: chat.adminId, username: "admin", fullName: expect.any(String) },
+    ]);
     chat.app.socket.dispose();
   });
 
@@ -459,8 +481,8 @@ describe("team project chat lifecycle", () => {
     const detail = chat.app.runner.start(
       {
         userId: chat.memberId,
-        username: "caelea",
-        fullName: "Oana Mangiurea",
+        username: "casey",
+        fullName: "Casey Doe",
         role: "member",
         mustChangePassword: false,
         loginId: "test",

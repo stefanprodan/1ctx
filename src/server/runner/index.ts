@@ -151,6 +151,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         deps.sessions.reasoningDetails(messageId, providerId, model),
     },
     clock: deps.clock,
+    log: deps.log,
   };
   const pause =
     deps.clock.sleep ??

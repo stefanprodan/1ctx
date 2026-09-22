@@ -95,7 +95,7 @@ export type ChatEvent =
   | { kind: "toolCalls"; calls: ToolCall[] }
   | { kind: "finish"; reason: string; details: string | null }
   | { kind: "usage"; usage: Usage }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; unanswered?: boolean };
 
 // one provider row, ready to talk to
 export interface Provider {

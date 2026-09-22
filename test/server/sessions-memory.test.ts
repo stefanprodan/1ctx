@@ -77,7 +77,7 @@ describe("memory chat receipts", () => {
     const result = snapshot();
     expect(result.lastActivityAt).toBe(session.lastActivityAt);
     expect(result.markdown).toBe(
-      `# ${incident.title}\n\n## @caelea 2026-09-16 10:00\n\n${rows[0]!.content}\n\n## @coder 2026-09-16 10:02\n\nTools:\n${incident.receipts.join("\n")}\n\n${rows.at(-1)!.content}\n`,
+      `# ${incident.title}\n\n## @casey 2026-09-16 10:00\n\n${rows[0]!.content}\n\n## @coder 2026-09-16 10:02\n\nTools:\n${incident.receipts.join("\n")}\n\n${rows.at(-1)!.content}\n`,
     );
     for (const text of incident.absent) {
       expect(result.markdown).not.toContain(text);
@@ -87,7 +87,7 @@ describe("memory chat receipts", () => {
 
   test("Download stays the answer only", () => {
     expect(chatMarkdown(incident.title, rows, "UTC")).toBe(
-      `# ${incident.title}\n\n## @caelea 2026-09-16 10:00\n\n${rows[0]!.content}\n\n## @coder 2026-09-16 10:02\n\n${rows.at(-1)!.content}\n`,
+      `# ${incident.title}\n\n## @casey 2026-09-16 10:00\n\n${rows[0]!.content}\n\n## @coder 2026-09-16 10:02\n\n${rows.at(-1)!.content}\n`,
     );
   });
 

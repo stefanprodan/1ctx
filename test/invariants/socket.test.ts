@@ -122,13 +122,13 @@ describe("the socket", () => {
         level: "info",
         area: "socket",
         msg: "socket open",
-        fields: { user: "caelea" },
+        fields: { user: "casey" },
       },
       {
         level: "info",
         area: "socket",
         msg: "socket close",
-        fields: { user: "caelea", code: 1001, cause: undefined },
+        fields: { user: "casey", code: 1001, cause: undefined },
       },
     ]);
   });
@@ -224,7 +224,7 @@ describe("the socket", () => {
         expect(frames(admin, "knowledge")).toEqual([]);
 
         const activeClient = chat.app.client();
-        await activeClient.login("caelea", "pw");
+        await activeClient.login("casey", "pw");
         const active = await connection(chat, activeClient);
         chat.app.socket.open(active);
         const logout = await chat.member.call("POST", "/api/logout");
@@ -339,7 +339,7 @@ describe("the socket", () => {
         {
           kind: "user",
           id: chat.memberId,
-          name: "caelea",
+          name: "casey",
           sessionId: null,
           origin: null,
         },
@@ -454,7 +454,7 @@ describe("the socket", () => {
       area: "socket",
       msg: "socket close",
       fields: {
-        user: "caelea",
+        user: "casey",
         code: CLOSE_BAD_COMMAND,
         cause: "protocol",
       },
@@ -576,8 +576,8 @@ describe("the socket", () => {
         .filter((event) => event.msg === "socket close")
         .map((event) => event.fields),
     ).toEqual([
-      { user: "caelea", code: CLOSE_DROPPED, cause: "dropped" },
-      { user: "caelea", code: 1006, cause: "backpressure" },
+      { user: "casey", code: CLOSE_DROPPED, cause: "dropped" },
+      { user: "casey", code: 1006, cause: "backpressure" },
     ]);
   });
 
@@ -615,7 +615,7 @@ describe("the socket", () => {
         .filter((event) => event.msg === "socket close")
         .map((event) => event.fields),
     ).toEqual([
-      { user: "caelea", code: 1012, cause: "shutdown" },
+      { user: "casey", code: 1012, cause: "shutdown" },
       { user: "admin", code: 1012, cause: "shutdown" },
     ]);
   });

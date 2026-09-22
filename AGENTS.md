@@ -623,7 +623,10 @@ violation, and every rule has a rejected fixture under
   has let go. A stream quiet for two minutes after its first event
   (the wait for the first is bounded only by the deadline, since a
   local server reads a long prompt in silence) or a reply past 1 MB is
-  a failure (`runner/round.ts`). A chat send (a message, regenerate or
+  a failure (`runner/round.ts`). The headers wait is two minutes; a
+  request with no response at all (the headers wait or a failed
+  connection) is asked again once per round, never an HTTP error. A
+  chat send (a message, regenerate or
   compact) past the `sendDeadlineMs` limit, thirty minutes by default, ends
   with cause `deadline`, status `stopped`; a run has its own deadline.
   A `finalizeSend` that fails after
@@ -661,6 +664,8 @@ violation, and every rule has a rejected fixture under
   revision and one envelope without rows and is allowed while the chat
   runs, since a send never writes the title; a delete waits for the
   end and removes its usage rows.
+  The detail's `authors` names the owner and every user who wrote in
+  the chat, so the page names an admin outside the project.
   `GET /api/sessions/:id/markdown?tz=` is the chat as a file for
   anyone who sees it (`sessions/markdown.ts`, pure): the title, then
   per send the user message and the agent's turn under `@author

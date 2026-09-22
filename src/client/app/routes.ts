@@ -296,9 +296,9 @@ export const ROUTES: Route[] = [
       const detail = session.value;
       if (detail === null || detail.session.id !== params.id) return;
       const projectId = detail.session.projectId;
-      if (project.value?.id !== projectId) await loadProject(projectId);
       // a run names its automation under the title
       await Promise.all([
+        project.value?.id === projectId ? undefined : loadProject(projectId),
         loadProjectAgents(projectId),
         // a run has no composer, so nothing is staged for it
         detail.session.origin === "chat" ? loadUploads(projectId) : undefined,

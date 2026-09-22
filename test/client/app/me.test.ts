@@ -8,10 +8,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { loadMe, login, logout, me } from "../../../src/client/data/me.ts";
 
-const caelea = {
+const casey = {
   id: "u1",
-  username: "caelea",
-  fullName: "Oana",
+  username: "casey",
+  fullName: "Casey",
   role: "member" as const,
   mustChangePassword: false,
 };
@@ -28,7 +28,7 @@ beforeEach(() => {
       await new Promise<void>((r) => gates.push(r));
       return Response.json({ user: null });
     }
-    if (url === "/api/login") return Response.json({ user: caelea });
+    if (url === "/api/login") return Response.json({ user: casey });
     if (url === "/api/logout") return Response.json({ ok: true });
     throw new Error(`unexpected ${url}`);
   }) as unknown as typeof fetch;
@@ -42,19 +42,19 @@ afterEach(() => {
 describe("me", () => {
   test("a late first load does not undo a sign-in", async () => {
     const first = loadMe();
-    await login({ username: "caelea", password: "pw" });
-    expect(me.value).toEqual(caelea);
+    await login({ username: "casey", password: "pw" });
+    expect(me.value).toEqual(casey);
     gates.shift()?.();
     await first;
-    expect(me.value).toEqual(caelea);
+    expect(me.value).toEqual(casey);
   });
 
   test("a late load does not undo a sign-out either", async () => {
-    await login({ username: "caelea", password: "pw" });
+    await login({ username: "casey", password: "pw" });
     globalThis.fetch = (async (url: string) => {
       if (url === "/api/me") {
         await new Promise<void>((r) => gates.push(r));
-        return Response.json({ user: caelea });
+        return Response.json({ user: casey });
       }
       return Response.json({ ok: true });
     }) as unknown as typeof fetch;
@@ -72,9 +72,9 @@ describe("me", () => {
     gates[1]();
     await second;
     expect(me.value).toBeNull();
-    me.value = caelea;
+    me.value = casey;
     gates[0]();
     await first;
-    expect(me.value).toEqual(caelea);
+    expect(me.value).toEqual(casey);
   });
 });

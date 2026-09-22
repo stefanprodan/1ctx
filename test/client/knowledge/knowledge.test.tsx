@@ -47,10 +47,10 @@ import type { Me } from "../../../src/shared/contracts/user.ts";
 // the page draws against the real clock, so the fixtures sit behind it
 const NOW = Date.now();
 
-const caelea: Me = {
+const casey: Me = {
   id: "u1",
-  username: "caelea",
-  fullName: "Oana Mangiurea",
+  username: "casey",
+  fullName: "Casey Doe",
   role: "member",
   mustChangePassword: false,
 };
@@ -58,7 +58,7 @@ const caelea: Me = {
 const byUser: KnowledgeAuthor = {
   kind: "user",
   id: "u1",
-  name: "caelea",
+  name: "casey",
   sessionId: null,
   origin: null,
 };
@@ -147,7 +147,7 @@ const shown = {
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
-  me.value = caelea;
+  me.value = casey;
   lists.value = new Map();
   listErrors.value = new Map();
   fileTexts.value = {};
@@ -190,7 +190,7 @@ describe("the knowledge words", () => {
     });
     expect(authorOf({ ...byAgent, origin: "chat" }).where).toBe("in a chat");
     const user = authorOf(byUser);
-    expect(user.href).toBe("/users/caelea");
+    expect(user.href).toBe("/users/casey");
     expect(user.handle).toBe(true);
     // a write from the page belongs to no session
     expect(user.where).toBeNull();

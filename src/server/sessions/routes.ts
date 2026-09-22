@@ -81,6 +81,7 @@ export function detail(
     messages: store.messages(session.id).map(offWire),
     send: store.lastSend(session.id),
     live,
+    authors: store.authors(session.id),
   };
 }
 

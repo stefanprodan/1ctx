@@ -37,10 +37,10 @@ import { Projects } from "../../../src/client/views/projects/Projects.tsx";
 import { Settings } from "../../../src/client/views/projects/Settings.tsx";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 
-const caelea: Me = {
+const casey: Me = {
   id: "u1",
-  username: "caelea",
-  fullName: "Oana Mangiurea",
+  username: "casey",
+  fullName: "Casey Doe",
   role: "member",
   mustChangePassword: false,
 };
@@ -56,7 +56,7 @@ const realFetch = globalThis.fetch;
 let answer: () => unknown;
 
 beforeEach(() => {
-  me.value = caelea;
+  me.value = casey;
   projects.value = null;
   project.value = null;
   globalThis.fetch = (async () =>
@@ -76,7 +76,7 @@ describe("the projects entity", () => {
         description: "Scratch work",
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
-        members: [caelea],
+        members: [casey],
       };
       project.value = { ...saved, description: "" };
       projectError.value = { words: "stale failure", status: 500 };
@@ -120,7 +120,7 @@ describe("the projects entity", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
-      members: [caelea],
+      members: [casey],
     };
     me.value = null;
     expect(projects.value).toBeNull();
@@ -131,7 +131,7 @@ describe("the projects entity", () => {
     "drops a list that answers after another user signed in",
     async () => {
       answer = () => {
-        me.value = { ...caelea, id: "u2", username: "admin" };
+        me.value = { ...casey, id: "u2", username: "admin" };
         return { projects: [personal] };
       };
       await loadProjects();
@@ -143,7 +143,7 @@ describe("the projects entity", () => {
     "drops a failure that answers after another user signed in",
     async () => {
       globalThis.fetch = (async () => {
-        me.value = { ...caelea, id: "u2", username: "admin" };
+        me.value = { ...casey, id: "u2", username: "admin" };
         return Response.json({ error: "gone" }, { status: 500 });
       }) as unknown as typeof fetch;
       await loadProjects();
@@ -240,9 +240,7 @@ describe("the rail", () => {
       personal,
       { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 1 },
     ];
-    const html = render(
-      <Rail user={caelea} narrow={false} onHide={() => {}} />,
-    );
+    const html = render(<Rail user={casey} narrow={false} onHide={() => {}} />);
     expect(html).toContain('href="/projects"');
     expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
       html.indexOf('href="/projects/p2"'),
@@ -259,9 +257,7 @@ describe("the rail", () => {
   test("marks the project on screen as the current page", () => {
     projects.value = [personal];
     path.value = "/projects/p1";
-    const html = render(
-      <Rail user={caelea} narrow={false} onHide={() => {}} />,
-    );
+    const html = render(<Rail user={casey} narrow={false} onHide={() => {}} />);
     expect(html).toContain(
       'class="rail-sub rail-sub-icon rail-sub-on" aria-current="page"',
     );
@@ -271,9 +267,7 @@ describe("the rail", () => {
   test("keeps the project on inside its other pages", () => {
     projects.value = [personal];
     path.value = "/projects/p1/members";
-    const html = render(
-      <Rail user={caelea} narrow={false} onHide={() => {}} />,
-    );
+    const html = render(<Rail user={casey} narrow={false} onHide={() => {}} />);
     expect(html).toContain(
       'href="/projects/p1" class="rail-sub rail-sub-icon rail-sub-on">',
     );
@@ -424,7 +418,7 @@ describe("the pages", () => {
       expect(html).toContain(">3 members<");
       // a member does not manage teams
       expect(html).not.toContain('href="/admin/projects"');
-      me.value = { ...caelea, role: "admin" };
+      me.value = { ...casey, role: "admin" };
       expect(render(<Projects />)).toContain('href="/admin/projects"');
     },
   );
@@ -460,7 +454,7 @@ describe("the pages", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
-      members: [caelea],
+      members: [casey],
     };
     projectAgents.value = [];
     const html = render(<Project params={{ id: "p1" }} />);
@@ -478,7 +472,7 @@ describe("the pages", () => {
     expect(html).toContain('href="/projects/p1/settings"');
     expect(html).toContain('class="tabs-tab tabs-tab-on" href="/projects/p1"');
     expect(html).toContain('placeholder="Search sessions"');
-    expect(html).not.toContain("@caelea");
+    expect(html).not.toContain("@casey");
     projectAgents.value = null;
     expect(render(<Project params={{ id: "p1" }} />)).toContain(
       'placeholder="Start a chat in personal"',
@@ -493,7 +487,7 @@ describe("the pages", () => {
       description: "Incidents and pages",
       chats: 12,
       knowledge: { files: 0, tokens: 0 },
-      members: [caelea],
+      members: [casey],
     };
     let html = render(<Project params={{ id: "p1" }} />);
     expect(html).toContain('<div class="split-line">Incidents and pages</div>');
@@ -512,7 +506,7 @@ describe("the pages", () => {
       description: "Scratch work",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
-      members: [caelea],
+      members: [casey],
     };
     let html = render(<Settings params={{ id: "p1" }} />);
     expect(html).toContain(
@@ -537,7 +531,7 @@ describe("the pages", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
-      members: [caelea],
+      members: [casey],
     };
     projectAgents.value = [];
     const html = render(<Members params={{ id: "p1" }} />);
@@ -554,11 +548,11 @@ describe("the pages", () => {
         description: "",
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
-        members: [caelea],
+        members: [casey],
       };
       projectAgents.value = [];
       expect(render(<Members params={{ id: "p1" }} />)).not.toContain("Manage");
-      me.value = { ...caelea, role: "admin" };
+      me.value = { ...casey, role: "admin" };
       const html = render(<Members params={{ id: "p1" }} />);
       expect(html).toContain('href="/admin/projects?open=p1">Manage<');
       expect(html).toContain('href="/admin/agents">Manage<');
@@ -572,16 +566,16 @@ describe("the pages", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
-      members: [caelea],
+      members: [casey],
     };
     projectAgents.value = null;
     let html = render(<Members params={{ id: "p1" }} />);
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/projects/p1/members"',
     );
-    expect(html).toContain('class="avatar">OM<');
-    expect(html).toContain('class="rows-sub">@caelea<');
-    expect(html).toContain('class="rows-line rows-go" href="/users/caelea"');
+    expect(html).toContain('class="avatar">CD<');
+    expect(html).toContain('class="rows-sub">@casey<');
+    expect(html).toContain('class="rows-line rows-go" href="/users/casey"');
     expect(html).toContain("Loading");
     projectAgents.value = [
       {

@@ -352,7 +352,11 @@ describe("OpenRouter stream", () => {
       events.push(event);
     }
     expect(events).toEqual([
-      { kind: "error", message: "router failed: refused for [key]" },
+      {
+        kind: "error",
+        message: "router failed: refused for [key]",
+        unanswered: true,
+      },
     ]);
   });
 

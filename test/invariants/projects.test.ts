@@ -10,9 +10,9 @@ import { hashPassword, testApp } from "../helpers/app.ts";
 
 const member = async (app: Awaited<ReturnType<typeof testApp>>) =>
   app.createUser({
-    username: "caelea",
-    fullName: "Oana Mangiurea",
-    email: "caelea@example.com",
+    username: "casey",
+    fullName: "Casey Doe",
+    email: "casey@example.com",
     role: "member",
     passwordHash: await hashPassword("hunter2-test"),
     mustChangePassword: false,
@@ -31,8 +31,8 @@ describe("the personal project", () => {
       createdAt: admin.createdAt,
     });
     expect(app.projects.isMember(project!.id, admin.id)).toBe(true);
-    const caelea = await member(app);
-    expect(app.projects.personal(caelea.id)?.name).toBe("personal");
+    const casey = await member(app);
+    expect(app.projects.personal(casey.id)?.name).toBe("personal");
   });
 
   test("a user is never made without it", async () => {
@@ -72,9 +72,9 @@ describe("the personal project", () => {
 
   test("goes with the user", async () => {
     const app = await testApp();
-    const caelea = await member(app);
-    const project = app.projects.personal(caelea.id)!;
-    app.db.query("delete from users where id = ?").run(caelea.id);
+    const casey = await member(app);
+    const project = app.projects.personal(casey.id)!;
+    app.db.query("delete from users where id = ?").run(casey.id);
     expect(app.projects.byId(project.id)).toBeNull();
     expect(app.projects.memberIds(project.id)).toEqual([]);
   });
@@ -160,8 +160,8 @@ describe("GET /api/projects/:id", () => {
 
   test("another user's personal project is a 404, for an admin too", async () => {
     const app = await testApp();
-    const caelea = await member(app);
-    const project = app.projects.personal(caelea.id)!;
+    const casey = await member(app);
+    const project = app.projects.personal(casey.id)!;
     const admin = app.client();
     await admin.login("admin", "hunter2-test");
     const res = await admin.call("GET", `/api/projects/${project.id}`);
@@ -170,7 +170,7 @@ describe("GET /api/projects/:id", () => {
     expect(missing.status).toBe(404);
     expect(await res.json()).toEqual(await missing.json());
     const her = app.client();
-    await her.login("caelea", "hunter2-test");
+    await her.login("casey", "hunter2-test");
     expect((await her.call("GET", `/api/projects/${project.id}`)).status).toBe(
       200,
     );

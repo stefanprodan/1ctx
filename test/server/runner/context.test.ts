@@ -60,8 +60,8 @@ const WITH_BASH: Offered = { ...NONE, tools: [schema(makeBashTool())] };
 const policy: SendPolicy = {
   projectId: "p",
   userId: "u1",
-  username: "caelea",
-  fullName: "Oana Mangiurea",
+  username: "casey",
+  fullName: "Casey Doe",
   about: "I run clusters.",
   tz: "Europe/Bucharest",
   projectName: "ops",
@@ -188,7 +188,7 @@ describe("systemPrompt", () => {
 
   test("joins the agent's prompt, the about text and the date", () => {
     expect(systemPrompt(policy, NOW)).toBe(
-      `You write Go.\n\nYou work in the ops project: Incidents and pages.\nYou talk to @caelea (Oana Mangiurea), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\nToday is 2026-09-13.`,
+      `You write Go.\n\nYou work in the ops project: Incidents and pages.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\nToday is 2026-09-13.`,
     );
   });
 
@@ -199,7 +199,7 @@ describe("systemPrompt", () => {
         NOW,
       ),
     ).toBe(
-      `You work in the ops project.\nYou talk to @caelea (Oana Mangiurea), in the Europe/Bucharest time zone.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
+      `You work in the ops project.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
     );
   });
 
@@ -215,7 +215,7 @@ describe("systemPrompt", () => {
         NOW,
       ),
     ).toBe(
-      `You work in @caelea's personal project: Incidents and pages.\nYou talk to @caelea (Oana Mangiurea), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
+      `You work in @casey's personal project: Incidents and pages.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
     );
   });
 
@@ -243,7 +243,7 @@ describe("systemPrompt", () => {
     expect(run("manual")).toContain(
       "This is a manual run of the morning-check",
     );
-    expect(run("manual")).not.toContain("@caelea");
+    expect(run("manual")).not.toContain("@casey");
   });
   test("orders MCP, memory, knowledge, date and the change note", () => {
     const offered: Offered = {
@@ -450,7 +450,7 @@ describe("knowledge send snapshot", () => {
       const author = {
         kind: "user" as const,
         id: chat.memberId,
-        name: "caelea",
+        name: "casey",
         sessionId: null,
         origin: null,
       };
@@ -473,7 +473,7 @@ describe("knowledge send snapshot", () => {
           .reverse()
           .map((file) => ({
             name: file.name,
-            author: "caelea",
+            author: "casey",
             updatedAt: file.updatedAt,
           })),
       });
@@ -545,7 +545,7 @@ describe("knowledge send snapshot", () => {
             {
               kind: "user",
               id: chat.memberId,
-              name: "caelea",
+              name: "casey",
               sessionId: null,
               origin: null,
             },
@@ -691,7 +691,7 @@ describe("history", () => {
     ];
     expect(history(rows, policy, lookups, NOW)).toEqual([
       { role: "system", content: systemPrompt(policy, NOW) },
-      { role: "user", content: "hi", name: "caelea" },
+      { role: "user", content: "hi", name: "casey" },
       { role: "assistant", content: "hello" },
       { role: "user", content: "and me", name: "mihai" },
       {
@@ -752,7 +752,7 @@ describe("history", () => {
     ];
     const out = history(rows, policy, lookups, NOW);
     expect(out.slice(1)).toEqual([
-      { role: "user", content: "when and what", name: "caelea" },
+      { role: "user", content: "when and what", name: "casey" },
       {
         role: "assistant",
         content: "let me check",
@@ -878,7 +878,7 @@ describe("history", () => {
       row({ id: "r1", kind: "reply", agentId: "a", content: "hello" }),
     ];
     expect(history(rows, policy, lookups, NOW).slice(1)).toEqual([
-      { role: "user", content: "hi", name: "caelea" },
+      { role: "user", content: "hi", name: "casey" },
       { role: "assistant", content: "hello" },
     ]);
   });
@@ -906,7 +906,7 @@ describe("history", () => {
     ];
     expect(history(rows, policy, lookups, NOW).slice(1)).toEqual([
       { role: "user", content: `${SUMMARY_LEAD}\n\nlatest summary` },
-      { role: "user", content: "new", name: "caelea" },
+      { role: "user", content: "new", name: "casey" },
       { role: "assistant", content: "answer" },
     ]);
   });

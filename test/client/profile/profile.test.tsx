@@ -15,7 +15,7 @@ import { Profile } from "../../../src/client/views/profile/Profile.tsx";
 describe("initials", () => {
   test("first letters of the first two words, else two letters", () => {
     expect(initials("Stefan Prodan")).toBe("SP");
-    expect(initials("Oana Maria Mangiurea")).toBe("OM");
+    expect(initials("Casey Maria Doe")).toBe("CM");
     expect(initials("admin")).toBe("AD");
     expect(initials("  x ")).toBe("X");
     expect(initials("")).toBe("");
@@ -30,8 +30,8 @@ describe("longDate", () => {
 
 describe("Profile.model", () => {
   test("the full name rule", () => {
-    expect(fullNameProblem("Oana")).toBeNull();
-    expect(fullNameProblem(" Oana ")).toBeNull();
+    expect(fullNameProblem("Casey")).toBeNull();
+    expect(fullNameProblem(" Casey ")).toBeNull();
     expect(fullNameProblem("")).toBe("Enter a name");
     expect(fullNameProblem("a".repeat(65))).toContain("under 64");
     expect(fullNameProblem("a\nb")).toBe("One line only");
@@ -60,9 +60,9 @@ describe("Profile", () => {
   test("renders the head and the two sections with the classes profile.css depends on", () => {
     profile.value = {
       id: "u1",
-      username: "caelea",
-      fullName: "Oana Mangiurea",
-      email: "caelea@example.com",
+      username: "casey",
+      fullName: "Casey Doe",
+      email: "casey@example.com",
       tz: "Europe/Bucharest",
       disabled: false,
       mustChangePassword: false,
@@ -72,12 +72,12 @@ describe("Profile", () => {
     };
     const html = render(<Profile />);
     expect(html).toContain('class="profile"');
-    expect(html).toContain('class="avatar avatar-56">OM<');
-    expect(html).toContain("@caelea");
+    expect(html).toContain('class="avatar avatar-56">CD<');
+    expect(html).toContain("@casey");
     expect(html).toContain('class="section"');
     expect(html).toContain('class="split-aside"');
     expect(html).toContain(">Account<");
-    expect(html).toContain(">caelea@example.com<");
+    expect(html).toContain(">casey@example.com<");
     expect(html).toContain(">Member<");
     expect(html).toContain("12 September 2026");
     expect(html).toContain('autocomplete="name"');
@@ -91,9 +91,9 @@ describe("Profile", () => {
   test("tells a person with a handed password to change it", () => {
     profile.value = {
       id: "u1",
-      username: "caelea",
-      fullName: "Oana Mangiurea",
-      email: "caelea@example.com",
+      username: "casey",
+      fullName: "Casey Doe",
+      email: "casey@example.com",
       tz: "Europe/Bucharest",
       disabled: false,
       mustChangePassword: true,

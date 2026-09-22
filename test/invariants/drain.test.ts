@@ -51,8 +51,8 @@ describe("drain", () => {
       data: {
         principal: {
           userId: chat.memberId,
-          username: "caelea",
-          fullName: "Oana Mangiurea",
+          username: "casey",
+          fullName: "Casey Doe",
           role: "member" as const,
           mustChangePassword: false,
           loginId: "l",

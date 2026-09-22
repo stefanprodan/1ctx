@@ -76,6 +76,11 @@ export type Scripted = {
   next(): Promise<Script>;
   // answer every chat request with an HTTP error
   refuse(status: number, body?: string): void;
+  // fail the next `count` chat requests before any response, as a reset
+  // connection or a headers timeout does
+  drop(count: number): void;
+  // the chat requests made, the dropped ones included
+  chats(): number;
 };
 
 export function scriptedFetch(
@@ -87,6 +92,8 @@ export function scriptedFetch(
   const requests: Scripted["requests"] = [];
   const waiting: ((s: Script) => void)[] = [];
   let refusal: { status: number; body: string } | null = null;
+  let dropping = 0;
+  let chats = 0;
   const fetcher = (async (
     input: string | URL | Request,
     init?: RequestInit,
@@ -102,6 +109,11 @@ export function scriptedFetch(
     if (!gemini && url !== `${PROVIDER_URL}/chat/completions`) {
       if (fallback !== undefined) return fallback(input, init);
       throw new TypeError("unable to connect");
+    }
+    chats++;
+    if (dropping > 0) {
+      dropping--;
+      throw new TypeError("the connection was reset");
     }
     if (refusal !== null) {
       return new Response(refusal.body, { status: refusal.status });
@@ -240,6 +252,10 @@ export function scriptedFetch(
     refuse(status, body = "") {
       refusal = { status, body };
     },
+    drop(count) {
+      dropping = count;
+    },
+    chats: () => chats,
   };
 }
 
@@ -360,16 +376,16 @@ export async function chatApp(
       .run(options.window, agentId);
   }
   const user = app.createUser({
-    username: "caelea",
-    fullName: "Oana Mangiurea",
-    email: "caelea@example.com",
+    username: "casey",
+    fullName: "Casey Doe",
+    email: "casey@example.com",
     role: "member",
     passwordHash: await hashPassword("pw"),
     mustChangePassword: false,
     now: app.now.value,
   });
   const member = app.client();
-  await member.login("caelea", "pw");
+  await member.login("casey", "pw");
   return {
     app,
     scripted,

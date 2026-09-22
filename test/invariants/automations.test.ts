@@ -121,7 +121,7 @@ describe("automations", () => {
     chat.app.automationScheduler.stop();
     await tick();
     chat.app.now.value = Date.parse("2026-03-08T06:30:00.000Z");
-    await chat.member.login("caelea", "pw");
+    await chat.member.login("casey", "pw");
     const changedSchedule = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
@@ -462,7 +462,7 @@ describe("automation rights", () => {
       id: other.id,
       username: "other",
     });
-    expect(suspendedRow.ownerName).toBe("caelea");
+    expect(suspendedRow.ownerName).toBe("casey");
     const resumed = await otherClient.call(
       "POST",
       `/api/automations/${automation.id}/resume`,

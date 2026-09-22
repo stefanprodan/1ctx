@@ -12,6 +12,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Clock } from "../lib/clock.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import {
   type ChatEvent,
   type ChatRequest,
@@ -38,6 +39,7 @@ export type RoundDeps = {
   writer: Writer;
   lookups: ContextLookups;
   clock: Clock;
+  log: Log;
 };
 
 export const STREAM_IDLE_MS = 120_000;
@@ -142,8 +144,10 @@ export async function runRound(
   const signal = options.signal ?? send.controller.signal;
   const req =
     options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
-  const events = deps.chat(send.policy.providerId, req, signal);
-  const iterator = events[Symbol.asyncIterator]();
+  const open = () =>
+    deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
+  let iterator = open();
+  let retried = false;
   const visuals =
     send.phase === "provider" &&
     send.kind !== "compact" &&
@@ -162,10 +166,20 @@ export async function runRound(
       started ? STREAM_IDLE_MS : null,
     );
     if (next.kind === "idle") throw new Error("the provider went quiet");
-    started = true;
     if (next.result.done) break;
     const event = next.result.value;
     if (signal.aborted) return;
+    if (!started && !retried && event.kind === "error" && event.unanswered) {
+      retried = true;
+      deps.log.warn("round retried", {
+        chat: send.sessionId,
+        round: send.roundNo,
+        ...errorFields(new Error(event.message), false),
+      });
+      iterator = open();
+      continue;
+    }
+    started = true;
     switch (event.kind) {
       case "reasoning":
         if (send.summarizing) break;

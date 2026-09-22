@@ -19,7 +19,7 @@ describe("admission", () => {
       { body: { message: "again" } },
     );
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "Oana Mangiurea is sending" });
+    expect(await res.json()).toEqual({ error: "Casey Doe is sending" });
     // nothing was written for the refused send
     expect(chat.app.sessions.messages(sessionId)).toHaveLength(2);
     script.reply("ok");
@@ -100,7 +100,7 @@ describe("admission", () => {
       { body: { message: "again" } },
     );
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "Oana Mangiurea is sending" });
+    expect(await res.json()).toEqual({ error: "Casey Doe is sending" });
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
     await tick();
     await tick();

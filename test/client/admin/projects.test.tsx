@@ -58,12 +58,12 @@ const root: UserAccount = {
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
 };
-const caelea: UserAccount = {
+const casey: UserAccount = {
   id: "u2",
-  username: "caelea",
-  fullName: "Oana Mangiurea",
+  username: "casey",
+  fullName: "Casey Doe",
   role: "member",
-  email: "caelea@example.com",
+  email: "casey@example.com",
   tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
@@ -86,7 +86,7 @@ const team: ProjectSummary = {
 const detail: ProjectDetail = {
   ...team,
   description: "",
-  members: [caelea],
+  members: [casey],
   chats: 3,
   knowledge: { files: 0, tokens: 0 },
 };
@@ -102,7 +102,7 @@ beforeEach(() => {
   adminProject.value = null;
   adminProjectError.value = null;
   projects.value = null;
-  users.value = [root, caelea];
+  users.value = [root, casey];
   usersError.value = null;
   globalThis.fetch = (async (url: string, init?: RequestInit) =>
     answer(url, init)) as unknown as typeof fetch;
@@ -140,28 +140,28 @@ describe("the words", () => {
 
   test("offers the people not in the project, by any of their names", () => {
     const mira: UserAccount = {
-      ...caelea,
+      ...casey,
       id: "u3",
       username: "mira",
       fullName: "Mira Pop",
       email: "mira@corp.dev",
       disabled: true,
     };
-    const all = [caelea, root, mira];
+    const all = [casey, root, mira];
     const none = new Set<string>();
     expect(candidates(all, none, "").map((u) => u.username)).toEqual([
+      "casey",
       "mira",
-      "caelea",
       "admin",
     ]);
-    expect(candidates(all, new Set(["u2"]), "")).not.toContain(caelea);
-    expect(candidates(all, none, "MANG")).toEqual([caelea]);
+    expect(candidates(all, new Set(["u2"]), "")).not.toContain(casey);
+    expect(candidates(all, none, "DOE")).toEqual([casey]);
     expect(candidates(all, none, "@mira")).toEqual([mira]);
     expect(candidates(all, none, "corp.dev")).toEqual([mira]);
     expect(candidates(all, none, " nobody ")).toEqual([]);
     expect(candidateNote(mira)).toBe("disabled");
     expect(candidateNote(root)).toBe("admin");
-    expect(candidateNote(caelea)).toBe("");
+    expect(candidateNote(casey)).toBe("");
   });
 
   test("the arrows wrap at either end of the list", () => {
@@ -338,7 +338,7 @@ describe("the page", () => {
     expect(html).not.toContain('class="avatar"');
     expect(html).toContain('class="rows-sub">3 members<');
     expect(html).toContain(">since 14 September 2026<");
-    expect(html).not.toContain("Oana Mangiurea");
+    expect(html).not.toContain("Casey Doe");
     expect(html).not.toContain(">Members<");
   });
 
@@ -349,21 +349,21 @@ describe("the page", () => {
     const html = render(<AdminProjects />);
     query.value = "";
     expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain("Oana Mangiurea");
+    expect(html).toContain("Casey Doe");
   });
 
   test("an open row shows the description, members, remove, add, and delete", () => {
     const html = render(
       <ProjectForm
         project={{ ...detail, description: "Incidents and pages" }}
-        users={[root, caelea]}
+        users={[root, casey]}
         onDone={() => {}}
       />,
     );
     expect(html).toContain('name="description"');
     expect(html).toContain(">Incidents and pages</textarea>");
-    expect(html).toContain("Oana Mangiurea");
-    expect(html).toContain("@caelea");
+    expect(html).toContain("Casey Doe");
+    expect(html).toContain("@casey");
     expect(html).toContain(">Remove<");
     expect(html).toContain("Add member");
     expect(html).not.toContain("Search people");

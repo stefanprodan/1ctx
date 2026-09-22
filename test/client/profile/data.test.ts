@@ -14,11 +14,11 @@ import {
 } from "../../../src/client/data/profile.ts";
 import type { Profile } from "../../../src/shared/contracts/user.ts";
 
-const caelea: Profile = {
+const casey: Profile = {
   id: "u1",
-  username: "caelea",
-  fullName: "Oana",
-  email: "caelea@example.com",
+  username: "casey",
+  fullName: "Casey",
+  email: "casey@example.com",
   tz: "UTC",
   disabled: false,
   mustChangePassword: false,
@@ -27,7 +27,7 @@ const caelea: Profile = {
   createdAt: 1,
 };
 const admin: Profile = {
-  ...caelea,
+  ...casey,
   id: "u2",
   username: "admin",
   role: "admin",
@@ -50,18 +50,18 @@ describe("the profile entity", () => {
   test("keeps the row and updates me for the signed-in user", async () => {
     me.value = {
       id: "u1",
-      username: "caelea",
+      username: "casey",
       fullName: "O",
       role: "member",
       mustChangePassword: false,
     };
-    answer = () => caelea;
+    answer = () => casey;
     await loadProfile();
-    expect(profile.value).toEqual(caelea);
+    expect(profile.value).toEqual(casey);
     expect(me.value).toEqual({
       id: "u1",
-      username: "caelea",
-      fullName: "Oana",
+      username: "casey",
+      fullName: "Casey",
       role: "member",
       mustChangePassword: false,
     });
@@ -75,22 +75,22 @@ describe("the profile entity", () => {
       role: "admin",
       mustChangePassword: false,
     };
-    answer = () => caelea;
-    await saveProfile({ fullName: "Oana", about: "", tz: "UTC" });
+    answer = () => casey;
+    await saveProfile({ fullName: "Casey", about: "", tz: "UTC" });
     expect(profile.value).toBeNull();
     expect(me.value?.id).toBe("u2");
   });
 
   test("drops a row that answers after the sign out", async () => {
     me.value = null;
-    answer = () => caelea;
+    answer = () => casey;
     await loadProfile();
     expect(profile.value).toBeNull();
     expect(me.value).toBeNull();
   });
 
   test("the previous user's row goes before the next load", async () => {
-    profile.value = caelea;
+    profile.value = casey;
     me.value = {
       id: "u2",
       username: "admin",

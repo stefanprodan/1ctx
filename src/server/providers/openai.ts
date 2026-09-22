@@ -18,7 +18,8 @@ import type {
   ToolCall,
 } from "./types.ts";
 
-export const CHAT_HEADERS_TIMEOUT_MS = 30_000;
+// Gemini holds the headers while it thinks on a long prompt
+export const CHAT_HEADERS_TIMEOUT_MS = 120_000;
 const CHAT_SILENCE_TIMEOUT_MS = 5 * 60_000;
 export const MAX_SSE_FRAME_BYTES = 1024 * 1024;
 const CHAT_ERROR_BODY_MAX_BYTES = 4 * 1024;
@@ -373,6 +374,9 @@ async function readErrorBody(
   }
 }
 
+// no response at all, so asking again is safe
+export class Unanswered extends Error {}
+
 export type StreamOptions = {
   mapEvents?: (json: string) => ChatEvent[];
   headers?: Record<string, string>;
@@ -401,6 +405,9 @@ export async function* streamChat(
       body: JSON.stringify(body),
       signal: combined,
     });
+  } catch (err) {
+    if (signal.aborted) throw err;
+    throw new Unanswered(err instanceof Error ? err.message : String(err));
   } finally {
     clearTimeout(headersTimer);
   }
