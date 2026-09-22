@@ -1198,9 +1198,11 @@ violation, and every rule has a rejected fixture under
   line, which `format()` cuts at 200 characters after `compose.ts` has
   scrubbed the current provider, search and MCP keys from it, and the
   source frames as `stack`; the build passes `--sourcemap` so a binary's
-  frames name source files. The router logs one `request` for non-GETs
-  and errors, never health, and answers an unexpected throw with a
-  renewed JSON 500. Startup is one event with paths, migrations, flags,
+  frames name source files. The router logs a `request` for a signed-in
+  user's writes and 4xx answers and for any 5xx, never an anonymous 4xx
+  or health, and answers an unexpected throw with a renewed JSON 500.
+  `login limited` is logged once when an address's window closes, not
+  per refusal. Startup is one event with paths, migrations, flags,
   inventory and repair counts; shutdown reports ended sends and drain
   timing. Catalog and MCP refreshes and hourly sweeps log only work done
   or a failure. `subscribe()` on the bus takes the subscriber's `Log`; a

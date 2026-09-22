@@ -324,7 +324,7 @@ describe("a handler that throws", () => {
             },
           },
         ],
-        resolve: nobody,
+        resolve: () => ({ principal, setCookie: null }),
         trustProxy: false,
         log: collected.logFactory("router"),
       }),
@@ -342,10 +342,47 @@ describe("a handler that throws", () => {
         method: "GET",
         route: "/api/bad",
         status: 400,
-        user: "nobody",
+        user: "maria",
         addr: "invalid",
       },
     });
     expect(collected.events[0]!.fields).not.toHaveProperty("error");
+  });
+
+  test("an anonymous 4xx is not logged, a 5xx is", async () => {
+    const collected = collectLogs();
+    const handle = answered(
+      router({
+        routes: [
+          {
+            ...echo,
+            path: "/api/bad",
+            handle: () => {
+              throw new BadRequest("no");
+            },
+          },
+          { ...boom, policy: "public" },
+        ],
+        resolve: nobody,
+        trustProxy: false,
+        log: collected.logFactory("router"),
+      }),
+    );
+
+    expect(
+      (await handle(new Request("http://x/api/bad"), "1.2.3.4")).status,
+    ).toBe(400);
+    expect(
+      (await handle(new Request("http://x/wp-login.php"), "1.2.3.4")).status,
+    ).toBe(404);
+    expect(collected.events).toHaveLength(0);
+    expect(
+      (await handle(new Request("http://x/api/boom"), "1.2.3.4")).status,
+    ).toBe(500);
+    expect(collected.events).toHaveLength(1);
+    expect(collected.events[0]).toMatchObject({
+      level: "error",
+      fields: { route: "/api/boom", status: 500, user: "nobody" },
+    });
   });
 });

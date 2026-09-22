@@ -34,6 +34,12 @@ export class RateLimit {
     return w.count <= this.limit;
   }
 
+  // true for the one refused hit that closed the key's window, so a
+  // caller can report the closing once rather than every refusal
+  closed(key: string): boolean {
+    return this.windows.get(key)?.count === this.limit + 1;
+  }
+
   get size(): number {
     return this.windows.size;
   }

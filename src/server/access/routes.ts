@@ -46,9 +46,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "public",
       async handle(req, ctx) {
         if (!limit.hit(ctx.address, deps.clock())) {
-          deps.log.warn("login limited", {
-            addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
-          });
+          if (limit.closed(ctx.address)) {
+            deps.log.warn("login limited", {
+              addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
+            });
+          }
           throw new TooManyRequests("too many sign-in attempts. Wait a minute");
         }
         const { username, password } = parseLogin(await jsonBody(req));

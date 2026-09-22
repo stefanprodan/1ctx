@@ -198,7 +198,13 @@ function recordRequest(
   error?: unknown,
 ): void {
   if (health) return;
-  if (method === "GET" && status < 400) return;
+  // a 5xx is our bug whoever asked; below that only a signed-in user's
+  // requests say anything, since our client never calls a missing route
+  // or writes cross-origin, and a scanner's 4xx would fill the disk
+  if (status < 500) {
+    if (principal === null || principal === undefined) return;
+    if (method === "GET" && status < 400) return;
+  }
   const fields = requestFields(
     method,
     route,

@@ -212,9 +212,11 @@ describe("rate limit", () => {
       expect((await client.login("admin", "wrong")).status).toBe(401);
     }
     expect((await client.login("admin", "hunter2-test")).status).toBe(429);
-    expect(
-      logs.events.findLast((event) => event.msg === "login limited"),
-    ).toEqual({
+    expect((await client.login("admin", "hunter2-test")).status).toBe(429);
+    const limited = logs.events.filter((e) => e.msg === "login limited");
+    // once when the window closes, never per refusal
+    expect(limited).toHaveLength(1);
+    expect(limited[0]).toEqual({
       level: "warn",
       area: "access",
       msg: "login limited",
