@@ -374,7 +374,10 @@ export async function createCompressedArchive(
     },
   });
 
-  const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+  const compressedStream = stream.pipeThrough(
+    // modern-tar 0.8 dropped its gzip helpers (1ctx)
+    new CompressionStream("gzip"),
+  );
   const reader = compressedStream.getReader();
   const chunks: Uint8Array[] = [];
   const chunkLeases: ResourceLease[] = [];
@@ -555,7 +558,10 @@ export async function parseCompressedArchive(
       },
     });
 
-    const decompressedStream = stream.pipeThrough(new DecompressionStream("gzip"));
+    const decompressedStream = stream.pipeThrough(
+      // modern-tar 0.8 dropped its gzip helpers (1ctx)
+      new DecompressionStream("gzip"),
+    );
     const reader = decompressedStream.getReader();
     const chunks: Uint8Array[] = [];
     let totalLength = 0;

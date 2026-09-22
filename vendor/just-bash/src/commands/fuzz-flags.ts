@@ -89,6 +89,7 @@ import { flagsForFuzzing as rmdir } from "./rmdir/rmdir.js";
 import { flagsForFuzzing as sed } from "./sed/sed.js";
 import { flagsForFuzzing as seq } from "./seq/seq.js";
 import { flagsForFuzzing as sleep } from "./sleep/sleep.js";
+// sqlite3 is removed from this copy (1ctx)
 import { flagsForFuzzing as sort } from "./sort/sort.js";
 import { flagsForFuzzing as split } from "./split/split.js";
 import { flagsForFuzzing as stat } from "./stat/stat.js";

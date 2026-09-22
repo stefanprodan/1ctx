@@ -494,6 +494,8 @@ if (typeof __BROWSER__ === "undefined" || !__BROWSER__) {
   });
 }
 
+// python3, js-exec and sqlite3 are removed from this copy (1ctx)
+
 // Python commands - only registered when python is explicitly enabled
 // These introduce additional security surface (arbitrary code execution)
 const pythonCommandLoaders: LazyCommandDef<PythonCommandName>[] = [];
