@@ -8,6 +8,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useId, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
+import { touch } from "../lib/touch.ts";
 import {
   clampHighlight,
   filterOptions,
@@ -78,7 +79,7 @@ export function Select({
     }
     // The list opens on the picked option, in sight.
     at.value = initialHighlight(options, value);
-    if (search) box.current?.focus();
+    if (search && !touch()) box.current?.focus();
     else list.current?.focus();
     const onPress = (ev: PointerEvent) => {
       if (!root.current?.contains(ev.target as Node)) close(false);

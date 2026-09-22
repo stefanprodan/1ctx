@@ -70,6 +70,7 @@ import { Files } from "./Files.tsx";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import "./composer.css";
 import { says } from "../lib/format.ts";
+import { touch } from "../lib/touch.ts";
 
 export const MAX_HEIGHT = 160;
 
@@ -187,7 +188,7 @@ export function Composer({
   useEffect(() => {
     text.value = readDraft(key).text;
     failure.value = null;
-    input.current?.focus();
+    if (!touch()) input.current?.focus();
   }, [key, text, failure]);
   useEffect(grow, [text.value]);
 

@@ -77,6 +77,8 @@
     --text-mono: 13px;
     --text-input: 14px;
     --text-tiny: 10px;
+    /* iOS zooms into a field under 16px on focus and never zooms back */
+    --text-touch: 16px;
 
     --radius: 6px;
     --radius-cell: 2px;

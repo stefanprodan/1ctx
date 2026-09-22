@@ -1187,6 +1187,10 @@ violation, and every rule has a rejected fixture under
   the view on the page head's row. The width is `NARROW` in `shell.ts`
   and the same number in `shell.css`. The rail never becomes a header
   row and there is no top bar.
+  On a touch screen (`pointer: coarse`, `lib/touch.ts`) every field is
+  `--text-touch`, 16px, since iOS zooms into a smaller one and stays
+  zoomed, and nothing takes the focus the person did not give: the
+  composer and a searchable `Select` open without the keyboard.
   No box that comes and goes inside the shell's scroll box scrolls on
   its own: one that does (a tool value under a fold) leaves Chrome's
   stuck head and foot riding with the rows until a reload, so a long
