@@ -11,6 +11,27 @@ const create = (s: Setup, name: string, text: string) =>
   s.area.create(s.projectId, s.author, name, text);
 
 describe("knowledge command mounts", () => {
+  test("yq edits a multi-document manifest in place, every document kept", async () => {
+    const s = setup();
+    try {
+      const manifest = create(
+        s,
+        "deploy/app.yaml",
+        "kind: ConfigMap\nmetadata:\n  name: a\n---\nkind: Service\nmetadata:\n  name: b\n",
+      );
+      const result = await run(
+        s,
+        `yq -i '.metadata.labels.team = "web"' deploy/app.yaml && yq '.metadata.labels.team' deploy/app.yaml`,
+      );
+      expect(result.error).toBe(false);
+      expect(result.content).toContain("web\n---\nweb");
+      const text = s.area.read(s.projectId, manifest.id)?.text ?? "";
+      expect(text.split("\n---\n")).toHaveLength(2);
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("ls and recursive grep see only the project's rows", async () => {
     const s = setup();
     try {

@@ -22,6 +22,7 @@ import type {
   RuntimeCommand,
   RuntimeCommandContext,
 } from "../../types.js";
+import type YAML from "yaml";
 import { hasHelpFlag, showHelp, unknownOption } from "../help.js";
 import {
   type EvaluateOptions,
@@ -41,6 +42,7 @@ import {
   parseAllYamlDocuments,
   parseInput,
 } from "./formats.js";
+import { preservingText } from "./preserve.js";
 
 const yqHelp = {
   name: "yq",
@@ -347,6 +349,10 @@ export const yqCommand: RuntimeCommand = {
         maxSourceLength: ctx.limits.maxStringLength,
       });
       let values: QueryValue[];
+      // the document each value came from, when the input was a stream
+      const documentOf: number[] = [];
+      const documents: YAML.Document[] = [];
+      let documentValues: QueryValue[] = [];
 
       const evalOptions: EvaluateOptions = {
         limits: ctx.limits
@@ -392,8 +398,56 @@ export const yqCommand: RuntimeCommand = {
         }
         values = evaluate(items, ast, evalOptions);
       } else {
-        const parsed = parseInput(input, options, dataLimits);
-        values = evaluate(parsed, ast, evalOptions);
+        // mikefarah's yq runs the filter on each document of a YAML stream,
+        // where this one refused a stream it was not told to slurp (1ctx)
+        // -i reads every YAML file this way, to write its comments back
+        if (
+          options.inputFormat === "yaml" &&
+          (options.inplace || /^---/m.test(input))
+        ) {
+          documentValues = parseAllYamlDocuments(input, dataLimits, documents);
+        }
+        if (
+          documentValues.length > 1 ||
+          (options.inplace && documentValues.length === 1)
+        ) {
+          values = [];
+          for (const [index, document] of documentValues.entries()) {
+            for (const value of evaluate(document, ast, evalOptions)) {
+              values.push(value);
+              documentOf.push(index);
+            }
+          }
+        } else {
+          const parsed = parseInput(input, options, dataLimits);
+          values = evaluate(parsed, ast, evalOptions);
+        }
+      }
+
+      if (
+        options.inplace &&
+        filePath &&
+        options.outputFormat === "yaml" &&
+        documents.length > 0
+      ) {
+        const maxBytes = Math.min(
+          ctx.limits.maxStringLength,
+          ctx.limits.maxOutputSize,
+        );
+        const text = inPlaceText(values, documentOf, documents, documentValues, {
+          format: (value) => formatOutput(value, options, maxBytes),
+          maxDepth: ctx.limits.maxQueryDepth,
+        });
+        if (text.length > maxBytes) {
+          throw new ExecutionLimitError(
+            `output size limit exceeded (${maxBytes} bytes)`,
+            "output_size",
+          );
+        }
+        await withDefenseContext("in-place write", () =>
+          ctx.fs.writeFile(filePath, text),
+        );
+        return { stdout: "", stderr: "", exitCode: 0 };
       }
 
       // Format output
@@ -412,7 +466,13 @@ export const yqCommand: RuntimeCommand = {
           ),
       );
       let formattedValues = 0;
-      for (const value of values) {
+      let lastDocument = -1;
+      // results of different documents print apart, as mikefarah's do
+      const documentSeparator =
+        options.outputFormat === "yaml" && !options.joinOutput
+          ? "\n---\n"
+          : separator;
+      for (const [index, value] of values.entries()) {
         if (
           getValueDepth(value, ctx.limits.maxQueryDepth + 1) >
           ctx.limits.maxQueryDepth
@@ -422,7 +482,12 @@ export const yqCommand: RuntimeCommand = {
             "recursion",
           );
         }
-        const separatorBytes = formattedValues > 0 ? separator.length : 0;
+        const document = documentOf[index] ?? 0;
+        const between =
+          document !== lastDocument && formattedValues > 0
+            ? documentSeparator
+            : separator;
+        const separatorBytes = formattedValues > 0 ? between.length : 0;
         const finalNewlineBytes = options.joinOutput ? 0 : 1;
         const remainingBytes =
           output.remainingBytes - separatorBytes - finalNewlineBytes;
@@ -448,9 +513,10 @@ export const yqCommand: RuntimeCommand = {
           serializationLease?.release();
         }
         if (text === "") continue;
-        if (formattedValues > 0) output.append(separator);
+        if (formattedValues > 0) output.append(between);
         output.append(text);
         formattedValues++;
+        lastDocument = document;
       }
       if (formattedValues > 0 && !options.joinOutput) output.append("\n");
       const finalOutput = output.build();
@@ -519,3 +585,41 @@ export const flagsForFuzzing: CommandFuzzInfo = {
   stdinType: "text",
   needsArgs: true,
 };
+
+/**
+ * The file an in-place edit writes: each document's results, a single
+ * container result applied onto the parsed document so its comments stay,
+ * documents apart by ---, one dropped when its filter output nothing. (1ctx)
+ */
+function inPlaceText(
+  values: QueryValue[],
+  documentOf: number[],
+  documents: YAML.Document[],
+  documentValues: QueryValue[],
+  opts: { format: (value: QueryValue) => string; maxDepth: number },
+): string {
+  const groups: QueryValue[][] = documents.map(() => []);
+  for (const [index, value] of values.entries()) {
+    if (getValueDepth(value, opts.maxDepth + 1) > opts.maxDepth) {
+      throw new ExecutionLimitError(
+        `query depth limit exceeded (${opts.maxDepth})`,
+        "recursion",
+      );
+    }
+    groups[documentOf[index] ?? 0].push(value);
+  }
+  let text = "";
+  for (const [index, group] of groups.entries()) {
+    if (group.length === 0) continue;
+    const kept =
+      group.length === 1
+        ? preservingText(documents[index], documentValues[index], group[0])
+        : null;
+    const part =
+      kept ?? group.map(opts.format).filter((t) => t !== "").join("\n");
+    if (part === "") continue;
+    if (text !== "") text += /^---/.test(part) ? "\n" : "\n---\n";
+    text += part;
+  }
+  return text === "" ? "" : `${text}\n`;
+}

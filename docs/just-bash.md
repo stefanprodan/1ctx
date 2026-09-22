@@ -55,6 +55,8 @@ own.
 | `src/commands/query-engine/builtins/object-builtins.ts` | `key` typed as `QueryValue` | TypeScript 7 cannot infer it (TS7022) |
 | `src/commands/registry.ts`, `src/commands/fuzz-flags.ts` | the removed commands' entries | the trim |
 | `src/commands/query-engine/path-expressions.ts` (new), `evaluator.ts`, `builtins/path-builtins.ts` | jq and yq assignments (`=`, `\|=`, `+=` and the rest), `path`, `del`, `delpaths`, `setpath`, `getpath` and `pick` evaluate the left side as jq's path expression, then set or delete each path it yields; `path-operations.ts` and the old setter are gone | upstream guessed paths from the shape of the query: `select(.kind == "Deployment").spec.replicas = 3` set every document, a pipe or `,` on the left replaced the whole input, `del` with `select` deleted nothing, and each exited 0 |
+| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | a YAML input of several documents runs the filter on each, results of different documents printed apart by `---`, and `-i` writes them all back; a document that does not parse fails the whole input | upstream refused a stream unless `-s` was given, and mikefarah's yq, the one models know, runs per document: every Kubernetes manifest and Flux list is several |
+| `src/commands/yq/preserve.ts` (new) | `yq -i` applies the change between each document and its result to the parsed document, so untouched nodes keep their comments, quoting and style; a result that does not read back exactly is printed plainly | the engine works on plain values, so every in-place edit deleted the file's comments |
 
 ### Where our jq still differs from jq
 
@@ -65,6 +67,18 @@ stops with an error: `.[]` over null yields nothing, `-`, `*`, `/` and
 `to_entries` takes an array, and `?` covers the whole path before it
 (`.a.b?`) rather than its last step. `last(f)`,
 `limit(n; f)` and `nth(n; f)` also work as paths, which jq 1.8 refuses.
+
+### Where our yq still differs from mikefarah's
+
+`test/server/knowledge/yq.test.ts` pins streams and in-place edits; on
+the podinfo manifests every `-i` write we compared was byte for byte
+mikefarah's. Printing to stdout still drops comments, since only `-i`
+goes through the parsed document. mikefarah prints `---` between the
+results of different documents only for values read from them, not for
+ones the filter computed (`"none"`, `[.kind]`), which a plain value
+cannot tell apart; ours prints it between every document's results.
+The jq leniencies above apply too: `map(f)` over a missing key gives
+null where mikefarah gives `[]`.
 
 ## Its tests
 

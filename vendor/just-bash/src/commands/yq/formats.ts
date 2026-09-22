@@ -233,6 +233,8 @@ export function parseInput(
 export function parseAllYamlDocuments(
   input: string,
   limits: SanitizeParsedDataLimits = {},
+  // the parsed documents, for a write that keeps their comments (1ctx)
+  parsed?: YAML.Document[],
 ): QueryValue[] {
   const maxDocuments = limits.maxElements ?? 1_000_000;
   let documents = input.trim() ? 1 : 0;
@@ -263,6 +265,7 @@ export function parseAllYamlDocuments(
     lineStart = lineEnd + 1;
   }
   const docs = YAML.parseAllDocuments(input);
+  if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
     throw new ExecutionLimitError(
       `query input document limit exceeded (${maxDocuments})`,
@@ -271,7 +274,16 @@ export function parseAllYamlDocuments(
   }
   const elementBudget = { used: docs.length };
   const values: QueryValue[] = [];
-  for (const doc of docs) {
+  for (const [index, doc] of docs.entries()) {
+    parsed?.push(doc);
+    // toJS keeps going past a syntax error; a broken document fails the
+    // whole stream, so -i never writes a half-read file (1ctx)
+    const problem = doc.errors[0];
+    if (problem) {
+      throw new Error(
+        `document ${index + 1}: ${problem.message.split("\n")[0]}`,
+      );
+    }
     values.push(
       sanitizeParsedData(doc.toJS({ maxAliasCount: 100 }), {
         ...limits,
