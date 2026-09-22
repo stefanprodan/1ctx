@@ -8,6 +8,10 @@ import type {
 } from "../../../src/server/tools/visual-inert.ts";
 import { bootVisual } from "../../../src/server/tools/visual-painter.ts";
 import {
+  visualContrast,
+  visualSchemeQuery,
+} from "../../../src/server/tools/visual-scheme.ts";
+import {
   cleanVisual,
   inertVisual,
   visualAttributeRule,
@@ -271,6 +275,7 @@ function painter(scripts: VisualScript[]) {
   }> = [];
   const morphs: boolean[] = [];
   const styles: Record<string, string> = {};
+  const flags = new Set<string>();
   let themeEvents = 0;
   let next = 1;
   let final = false;
@@ -312,6 +317,10 @@ function painter(scripts: VisualScript[]) {
     getElementById: () => root,
     documentElement: {
       dataset: {},
+      toggleAttribute(name: string, on: boolean) {
+        if (on) flags.add(name);
+        else flags.delete(name);
+      },
       style: {
         setProperty(name: string, value: string) {
           styles[name] = value;
@@ -366,6 +375,8 @@ function painter(scripts: VisualScript[]) {
       message: visualMessage,
       theme: visualThemeValues,
       measure: () => 123,
+      query: visualSchemeQuery,
+      contrast: visualContrast,
     },
     { morph: () => morphs.push(final) },
   );
@@ -376,6 +387,7 @@ function painter(scripts: VisualScript[]) {
     appended,
     morphs,
     styles,
+    flags,
     timers,
     events,
     get themeEvents() {
@@ -527,4 +539,89 @@ test("height measurement neutralizes authored viewport heights and restores styl
   expect(run(root as unknown as HTMLElement)).toBe(80);
   expect(child.style.getPropertyValue("height")).toBe("100dvh");
   expect(root.style.getPropertyValue("height")).toBe("");
+});
+
+test("height measurement counts the body's padding and margins", () => {
+  const style = (entries: Record<string, string>) => ({
+    getPropertyValue: (name: string) => entries[name] ?? "",
+    getPropertyPriority: () => "",
+    setProperty: () => {},
+    removeProperty: () => {},
+  });
+  class Element {
+    style = style({});
+    constructor(
+      private box: { top: number; bottom: number },
+      entries: Record<string, string> = {},
+    ) {
+      this.style = style(entries);
+    }
+    getBoundingClientRect() {
+      return { ...this.box, height: this.box.bottom - this.box.top };
+    }
+  }
+  // A body padded 14px with an 8px margin on the page: the root sits 22px
+  // down and the page ends 22px below it.
+  const html = new Element({ top: 0, bottom: 124 }, { "margin-bottom": "0" });
+  const root = Object.assign(new Element({ top: 22, bottom: 102 }), {
+    scrollHeight: 80,
+    querySelectorAll: () => [],
+  });
+  const document = {
+    documentElement: html,
+    body: new Element({ top: 8, bottom: 116 }),
+    styleSheets: [],
+    querySelectorAll: () => [],
+  };
+  const run = new Function(
+    "document",
+    "HTMLElement",
+    "SVGElement",
+    "CSSStyleRule",
+    "getComputedStyle",
+    `return (${measureVisual.toString()})`,
+  )(
+    document,
+    Element,
+    Element,
+    class {},
+    (element: Element) => element.style,
+  ) as typeof measureVisual;
+  expect(run(root as unknown as HTMLElement)).toBe(124);
+});
+
+test("a page's colour scheme queries follow the chat's theme", () => {
+  expect(visualSchemeQuery("(prefers-color-scheme: light)", "light")).toBe(
+    "(min-width: 0px)",
+  );
+  expect(visualSchemeQuery("(prefers-color-scheme: light)", "dark")).toBe(
+    "(max-width: 0px)",
+  );
+  expect(
+    visualSchemeQuery("screen and (PREFERS-COLOR-SCHEME : Dark)", "dark"),
+  ).toBe("screen and (min-width: 0px)");
+  expect(
+    visualSchemeQuery("not all and (prefers-color-scheme: dark)", "light"),
+  ).toBe("not all and (max-width: 0px)");
+  expect(visualSchemeQuery("(prefers-color-scheme)", "light")).toBe(
+    "(min-width: 0px)",
+  );
+  expect(visualSchemeQuery("(max-width: 600px)", "dark")).toBe(
+    "(max-width: 600px)",
+  );
+});
+
+test("contrast is the WCAG ratio in either order", () => {
+  expect(visualContrast([0, 0, 0], [255, 255, 255])).toBeCloseTo(21, 5);
+  expect(visualContrast([255, 255, 255], [0, 0, 0])).toBeCloseTo(21, 5);
+  expect(visualContrast([119, 119, 119], [255, 255, 255])).toBeCloseTo(4.48, 2);
+  expect(visualContrast([26, 26, 24], [26, 26, 24])).toBe(1);
+});
+
+test("a fragment keeps the frame's ground untouched", async () => {
+  const app = painter([]);
+  app.connect();
+  app.port.send({ type: "final", html: "<div>fragment</div>" });
+  await tick();
+  expect(app.flags.has("data-visual-bare")).toBe(false);
 });

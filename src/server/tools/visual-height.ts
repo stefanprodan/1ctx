@@ -91,10 +91,20 @@ export function measureVisual(root: HTMLElement): number {
     for (const element of [document.documentElement, document.body, root]) {
       for (const property of properties) neutralize(element, property);
     }
+    // From the document's edge, so a visual's padding or margin on the body
+    // is counted and the frame never scrolls by that much.
+    const html = document.documentElement;
+    const margin = (side: string) =>
+      Number.parseFloat(getComputedStyle(html).getPropertyValue(side)) || 0;
+    const page = html.getBoundingClientRect();
+    const top = page.top - margin("margin-top");
     const box = root.getBoundingClientRect();
-    let height = Math.max(box.height, root.scrollHeight);
+    let height = Math.max(
+      page.bottom + margin("margin-bottom") - top,
+      box.top + root.scrollHeight - top,
+    );
     for (const child of root.querySelectorAll("*")) {
-      height = Math.max(height, child.getBoundingClientRect().bottom - box.top);
+      height = Math.max(height, child.getBoundingClientRect().bottom - top);
     }
     return Number.isFinite(height) ? Math.max(0, Math.ceil(height)) : 0;
   } finally {
