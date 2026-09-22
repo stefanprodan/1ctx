@@ -6,6 +6,7 @@
 // is indistinguishable from a missing one and deleted history stays readable.
 
 import type {
+  EmptyBinResponse,
   KnowledgeFileDetailResponse,
   KnowledgeFileResponse,
   KnowledgeListResponse,
@@ -67,6 +68,7 @@ export type KnowledgePort = {
     author: KnowledgeAuthor,
     fileId: string,
   ): KnowledgeFileResponse["file"];
+  emptyBin(projectId: string): number;
 };
 
 export type RoutesDeps = { access: AccessPort; knowledge: KnowledgePort };
@@ -213,6 +215,18 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           parseId(ctx.params.fileId, "fileId"),
         );
         return new Response(null, { status: 204 });
+      },
+    },
+    {
+      method: "DELETE",
+      path: "/api/projects/:id/knowledge/deleted",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const body: EmptyBinResponse = {
+          files: deps.knowledge.emptyBin(project.id),
+        };
+        return json(body);
       },
     },
     {

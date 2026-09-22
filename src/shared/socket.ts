@@ -75,6 +75,8 @@ export type SocketEvent =
       file: KnowledgeFile;
       deleted: boolean;
     }
+  // the project's deleted files and their history are gone
+  | { type: "knowledgeEmptied"; projectId: string }
   // the connection may now see the project
   | { type: "granted"; projectId: string }
   // the connection may no longer see the project

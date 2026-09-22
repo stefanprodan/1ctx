@@ -36,6 +36,8 @@ export type { KnowledgeUploadResult } from "../contracts/knowledge.ts";
 export type StagedUploadsResponse = StagedUploads;
 export type StagedUploadResponse = StagedUpload;
 
+export type EmptyBinResponse = { files: number };
+
 export type CreateKnowledgeFileRequest = { name: string; text: string };
 export type KnowledgeFileResponse = { file: KnowledgeFile };
 

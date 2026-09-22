@@ -49,6 +49,7 @@ export type BusEvents = {
     file: KnowledgeFile;
     deleted: boolean;
   };
+  "knowledge.emptied": { projectId: string };
   // what these users may see changed (a membership, a role, a team
   // project made or gone); null means everyone recomputes
   "access.changed": { userIds: string[] | null };

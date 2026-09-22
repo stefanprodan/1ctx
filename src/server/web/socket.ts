@@ -226,6 +226,16 @@ export function socketArea(deps: SocketDeps): Socket {
           }
         });
         break;
+      case "knowledge.emptied":
+        each((conn) => {
+          if (
+            !conn.data.principal.mustChangePassword &&
+            conn.data.projects.has(event.data.projectId)
+          ) {
+            deliver(conn, { type: "knowledgeEmptied", ...event.data });
+          }
+        });
+        break;
       case "access.changed":
         each((conn) => {
           const ids = event.data.userIds;

@@ -266,10 +266,14 @@ violation, and every rule has a rejected fixture under
   that stop nothing. The command prints nothing; its receipts follow
   the knowledge receipts in the reserved tail and are discarded with
   the trees on an abort, 124, 126 or a throw.
-  The eight authenticated routes under `/api/projects/:id/knowledge`
+  The nine authenticated routes under `/api/projects/:id/knowledge`
   use `access.project()`: list and create, read/replace/delete by
-  `/files/:fileId`, that file's `/versions`, `/versions/:versionId`, and
-  `POST /upload?folder=&name=` for one archive or text file.
+  `/files/:fileId`, that file's `/versions`, `/versions/:versionId`,
+  `POST /upload?folder=&name=` for one archive or text file, and
+  `DELETE /deleted`, which drops the history of every deleted file in
+  the project, answers how many went and reaches the project's
+  connections as a `knowledgeEmptied` frame. The Knowledge tab's
+  Deleted card empties it behind Empty bin, which asks once.
   Replacements check the revision; deleted-name restores create new ids.
   Uploads normalize paths through `shared/knowledge.ts`: both separators,
   Unicode normalization and Latin transliteration, lowercase with dashes,

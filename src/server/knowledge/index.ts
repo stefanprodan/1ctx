@@ -65,6 +65,7 @@ export type KnowledgeCapability = KnowledgePort & {
   uploadsOf(sessionId: string): UploadTree;
   snapshot(projectId: string): { files: number; recent: RecentFile[] };
   counts(projectId: string): KnowledgeCounts;
+  emptyBin(projectId: string): number;
   run(
     projectId: string,
     sessionId: string,
@@ -278,6 +279,15 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         ),
         deleted: true,
       }));
+    },
+    emptyBin(projectId) {
+      return transact(deps.db, () => {
+        const files = store.purge(projectId);
+        return {
+          result: files,
+          events: [{ type: "knowledge.emptied" as const, data: { projectId } }],
+        };
+      });
     },
     counts: (projectId) => store.counts(projectId),
     snapshot: (projectId) => ({
