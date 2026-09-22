@@ -5,7 +5,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "what time is it?",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -50,7 +50,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nwhat time is it?\n\n## @coder 1970-01-01 00:17\n\nIt is noon.\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nwhat time is it?\n\n## @coder 1970-01-01 00:17\n\nIt is noon.\n"
   },
   {
     "name": "a stopped answer keeps its part and says it was stopped",
@@ -58,7 +58,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "write a poem",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -79,7 +79,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nwrite a poem\n\n## @coder 1970-01-01 00:17\n\nRoses are\n\n_stopped_\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nwrite a poem\n\n## @coder 1970-01-01 00:17\n\nRoses are\n\n_stopped_\n"
   },
   {
     "name": "a failed turn with no answer leaves the error",
@@ -87,7 +87,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "look it up",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -120,7 +120,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nlook it up\n\n## @coder 1970-01-01 00:17\n\n_tool timed out_\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlook it up\n\n## @coder 1970-01-01 00:17\n\n_tool timed out_\n"
   },
   {
     "name": "a failed answer without an error says failed",
@@ -128,7 +128,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "hi",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -149,7 +149,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_failed_\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_failed_\n"
   },
   {
     "name": "an answer cut at the token cap says so",
@@ -157,7 +157,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "long",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -178,7 +178,7 @@
         "error": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nand then\n\n_cut at max tokens_\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nand then\n\n_cut at max tokens_\n"
   },
   {
     "name": "a running turn and a summary stay out, a compact send leaves nothing",
@@ -186,7 +186,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "first",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -233,7 +233,7 @@
       {
         "sendId": "s3",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "second",
         "createdAt": 1120000,
         "finishedAt": 1120000,
@@ -254,7 +254,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\nfirst\n\n## @coder 1970-01-01 00:17\n\none\n\n## @caelea 1970-01-01 00:18\n\nsecond\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nfirst\n\n## @coder 1970-01-01 00:17\n\none\n\n## @casey 1970-01-01 00:18\n\nsecond\n"
   },
   {
     "name": "indentation and hard breaks survive, blank lines around go",
@@ -262,7 +262,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "\n\n    indented code\nline with break  \nend\n\n",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -283,7 +283,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\n    indented code\nline with break  \nend\n\n## @coder 1970-01-01 00:17\n\n  - nested\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\n    indented code\nline with break  \nend\n\n## @coder 1970-01-01 00:17\n\n  - nested\n"
   },
   {
     "name": "a title and an error are written as plain text",
@@ -292,7 +292,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "hi",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -313,7 +313,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# \\[x\\](http://evil) \\# \\*bold\\* \\<b\\>\\&amp;\n\n## @caelea 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_bad \\_thing\\_ happened_\n"
+    "expected": "# \\[x\\](http://evil) \\# \\*bold\\* \\<b\\>\\&amp;\n\n## @casey 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_bad \\_thing\\_ happened_\n"
   },
   {
     "name": "times follow the zone across a daylight saving change",
@@ -322,7 +322,7 @@
       {
         "sendId": "s1",
         "kind": "user",
-        "author": "caelea",
+        "author": "casey",
         "content": "before",
         "createdAt": 1774744200000,
         "finishedAt": 1774744200000,
@@ -343,7 +343,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 2026-03-29 02:30\n\nbefore\n\n## @coder 2026-03-29 04:30\n\nafter\n"
+    "expected": "# chat\n\n## @casey 2026-03-29 02:30\n\nbefore\n\n## @coder 2026-03-29 04:30\n\nafter\n"
   },
   {
     "name": "a row whose author is gone falls back",
@@ -383,7 +383,7 @@
         "memoryRound": 2,
         "kind": "user",
         "status": "done",
-        "author": "caelea",
+        "author": "casey",
         "content": "check it",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -420,7 +420,7 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\n_provider failed_\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\n_provider failed_\n"
   },
   {
     "name": "memory phase text does not replace the run answer",
@@ -431,7 +431,7 @@
         "memoryRound": 2,
         "kind": "user",
         "status": "done",
-        "author": "caelea",
+        "author": "casey",
         "content": "check it",
         "createdAt": 1000000,
         "finishedAt": 1000000,
@@ -468,6 +468,6 @@
         "finishReason": null
       }
     ],
-    "expected": "# chat\n\n## @caelea 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\nrun answer\n"
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\nrun answer\n"
   }
 ]

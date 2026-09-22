@@ -123,14 +123,14 @@ describe("the directory", () => {
     // an admin sees every team, but shares none with bogdan
     expect(await names(chat.admin, "bogdan")).toEqual([]);
     // your own page is your team projects, never the personal one
-    expect(await names(chat.member, "caelea")).toEqual(["mine", "shared"]);
+    expect(await names(chat.member, "casey")).toEqual(["mine", "shared"]);
   });
 
   test("a disabled user's page still opens, marked disabled", async () => {
     const chat = await chatApp();
     chat.app.users.setDisabled(chat.memberId, true);
     const body: DirectoryUserResponse = await (
-      await chat.admin.call("GET", "/api/directory/users/caelea")
+      await chat.admin.call("GET", "/api/directory/users/casey")
     ).json();
     expect(body.user.disabled).toBe(true);
   });

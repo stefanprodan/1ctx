@@ -13,10 +13,10 @@ import {
 } from "../../../src/client/data/socket.ts";
 import { PROTOCOL, type SocketEvent } from "../../../src/shared/socket.ts";
 
-const caelea = {
+const casey = {
   id: "u1",
-  username: "caelea",
-  fullName: "Oana",
+  username: "casey",
+  fullName: "Casey",
   role: "member" as const,
   mustChangePassword: false,
 };
@@ -90,7 +90,7 @@ function runTimer(): void {
 }
 
 beforeEach(() => {
-  me.value = caelea;
+  me.value = casey;
   watch(null);
   wires = [];
   timers = [];
@@ -190,7 +190,7 @@ describe("the tab socket", () => {
     start();
     wires[0].message(hello("v1+aaa"));
     me.value = null;
-    me.value = caelea;
+    me.value = casey;
 
     wires[1].message(hello("v1+bbb"));
 
@@ -202,7 +202,7 @@ describe("the tab socket", () => {
 
     wires[0].message(JSON.stringify({ type: "role", role: "admin" }));
 
-    expect(me.value).toEqual({ ...caelea, role: "admin" });
+    expect(me.value).toEqual({ ...casey, role: "admin" });
   });
 
   test.serial("a restarting close schedules one retry at 2000 ms", () => {

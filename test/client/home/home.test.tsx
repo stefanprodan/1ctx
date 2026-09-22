@@ -22,10 +22,10 @@ import { Login } from "../../../src/client/views/home/Login.tsx";
 describe("Home.model", () => {
   test("greets by the hour", () => {
     const at = (h: number) => new Date(2026, 8, 12, h);
-    expect(greeting(at(3), "Oana")).toBe("Good night, Oana");
-    expect(greeting(at(9), "Oana")).toBe("Good morning, Oana");
-    expect(greeting(at(14), "Oana")).toBe("Good afternoon, Oana");
-    expect(greeting(at(21), "Oana")).toBe("Good evening, Oana");
+    expect(greeting(at(3), "Casey")).toBe("Good night, Casey");
+    expect(greeting(at(9), "Casey")).toBe("Good morning, Casey");
+    expect(greeting(at(14), "Casey")).toBe("Good afternoon, Casey");
+    expect(greeting(at(21), "Casey")).toBe("Good evening, Casey");
   });
 
   test("the date line is weekday, day and month", () => {
@@ -37,8 +37,8 @@ describe("Home", () => {
   beforeEach(() => {
     me.value = {
       id: "u1",
-      username: "caelea",
-      fullName: "Oana",
+      username: "casey",
+      fullName: "Casey",
       role: "member",
       mustChangePassword: false,
     };
@@ -85,7 +85,7 @@ describe("Home", () => {
   test("renders the head, the composer and the search", () => {
     const html = render(<Home />);
     expect(html).toContain('class="page-title"');
-    expect(html).toContain(", Oana</h1>");
+    expect(html).toContain(", Casey</h1>");
     expect(html).toContain('class="composer composer-tall card"');
     expect(html).toContain('rows="2"');
     expect(html).toContain('placeholder="Search sessions"');

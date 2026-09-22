@@ -38,7 +38,7 @@ describe("the terminal transition", () => {
       msg: "send start",
       fields: {
         chat: sessionId,
-        user: "caelea",
+        user: "casey",
         agent: "coder",
         provider: "local",
         model: expect.any(String),
@@ -132,6 +132,55 @@ describe("the terminal transition", () => {
       error: 'HTTP 429: {"error":{"message":"slow down"}}',
     });
     expect(chat.app.sessions.byId(session.id)!.status).toBe("failed");
+  });
+
+  test("a request with no answer is asked again once", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
+    chat.scripted.drop(1);
+    const { script, detail } = await startChat(chat);
+    script.reply("hello");
+    await tick();
+    await tick();
+    expect(chat.scripted.chats()).toBe(2);
+    expect(chat.app.sessions.send(detail.send.id)!.status).toBe("done");
+    const retried = logs.events.filter((e) => e.msg === "round retried");
+    expect(retried).toHaveLength(1);
+    expect(retried[0]!.level).toBe("warn");
+    expect(retried[0]!.fields).toMatchObject({
+      round: 1,
+      error_type: "Error",
+    });
+  });
+
+  test("a second request with no answer fails the round, no third", async () => {
+    const chat = await chatApp();
+    chat.scripted.drop(5);
+    const res = await chat.member.call("POST", "/api/sessions", {
+      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
+    });
+    const { send } = await res.json();
+    await tick();
+    await tick();
+    expect(chat.scripted.chats()).toBe(2);
+    expect(chat.app.sessions.send(send.id)!).toMatchObject({
+      status: "failed",
+      cause: "failure",
+      error: "local failed: the connection was reset",
+    });
+  });
+
+  test("a refused request is never asked again", async () => {
+    const chat = await chatApp();
+    chat.scripted.refuse(500, "down");
+    const res = await chat.member.call("POST", "/api/sessions", {
+      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
+    });
+    const { send } = await res.json();
+    await tick();
+    await tick();
+    expect(chat.scripted.chats()).toBe(1);
+    expect(chat.app.sessions.send(send.id)!.status).toBe("failed");
   });
 
   test("a stop that races a finish ends the send once", async () => {

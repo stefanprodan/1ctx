@@ -209,6 +209,12 @@ export type LiveSend = {
     }
 );
 
+export type SessionAuthor = {
+  id: string;
+  username: string;
+  fullName: string;
+};
+
 export type SessionDetail = {
   session: SessionSummary;
   forkedFrom: {
@@ -220,4 +226,5 @@ export type SessionDetail = {
   // the send in flight, or the last one; null before the first
   send: SendSummary | null;
   live: LiveSend | null;
+  authors: SessionAuthor[];
 };

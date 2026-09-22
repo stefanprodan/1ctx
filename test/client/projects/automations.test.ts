@@ -54,7 +54,7 @@ const automation = (
   id: "au1",
   projectId: "p1",
   ownerId: "u1",
-  ownerName: "oana",
+  ownerName: "casey",
   agentId: "a1",
   name: "nightly",
   instructions: "Check the clusters",
@@ -646,8 +646,8 @@ describe("the entity over the socket", () => {
   test.serial("frames of the project on screen move its rows", async () => {
     me.value = {
       id: "u1",
-      username: "oana",
-      fullName: "Oana",
+      username: "casey",
+      fullName: "Casey",
       role: "member",
       mustChangePassword: false,
     };

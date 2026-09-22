@@ -119,6 +119,7 @@ function detail(
     messages: [],
     send: null,
     live: null,
+    authors: [],
     ...changes,
   };
 }
@@ -190,8 +191,8 @@ beforeEach(() => {
   user++;
   me.value = {
     id: `u${user}`,
-    username: "caelea",
-    fullName: "Oana",
+    username: "casey",
+    fullName: "Casey",
     role: "member",
     mustChangePassword: false,
   };

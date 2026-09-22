@@ -26,8 +26,8 @@ type FakeConn = Conn & {
 const userBody = (username: string) => ({
   username,
   fullName:
-    username === "caelea"
-      ? "Oana Mangiurea"
+    username === "casey"
+      ? "Casey Doe"
       : `${username[0].toUpperCase()}${username.slice(1)}`,
   email: `${username}@example.com`,
   role: "member" as const,
@@ -107,17 +107,17 @@ describe("admin users", () => {
     const client = await admin(app);
     const response = await client.call("POST", "/api/users", {
       body: {
-        ...userBody("caelea"),
-        email: "CAELEA@EXAMPLE.COM",
+        ...userBody("casey"),
+        email: "CASEY@EXAMPLE.COM",
       },
     });
     expect(response.status).toBe(201);
     const { user } = await response.json();
-    expect(user.email).toBe("caelea@example.com");
+    expect(user.email).toBe("casey@example.com");
     expect(user.disabled).toBe(false);
     expect(user.mustChangePassword).toBe(true);
     expect(app.users.byId(user.id)).toMatchObject({
-      email: "caelea@example.com",
+      email: "casey@example.com",
       about: "",
       disabled: false,
       mustChangePassword: true,
@@ -251,11 +251,11 @@ describe("admin users", () => {
   test("a user is made in the zone the admin picked, and the admin moves it", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const missing = { ...userBody("caelea"), tz: undefined };
+    const missing = { ...userBody("casey"), tz: undefined };
     expect(
       (await client.call("POST", "/api/users", { body: missing })).status,
     ).toBe(400);
-    const user = await create(client, "caelea");
+    const user = await create(client, "casey");
     expect(app.users.byId(user.id)?.tz).toBe("Europe/Bucharest");
     const moved = await client.call("PATCH", `/api/users/${user.id}`, {
       body: { tz: "Asia/Tokyo" },
@@ -303,12 +303,12 @@ describe("admin users", () => {
   test("taken identity fields answer field-specific conflicts", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const first = await create(client, "caelea");
+    const first = await create(client, "casey");
     const second = await create(client, "elena");
 
     await expectConflict(
       await client.call("POST", "/api/users", {
-        body: { ...userBody("caelea"), email: "other@example.com" },
+        body: { ...userBody("casey"), email: "other@example.com" },
       }),
       "username",
     );
@@ -358,11 +358,11 @@ describe("admin users", () => {
   test("rename leaves the personal project and keeps every login", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "caelea");
+    const user = await create(client, "casey");
     const first = app.client();
     const second = app.client();
-    await first.login("caelea", "longenough");
-    await second.login("caelea", "longenough");
+    await first.login("casey", "longenough");
+    await second.login("casey", "longenough");
     const before = app.db
       .query<{ n: number }, [string]>(
         "select count(*) as n from logins where user_id = ?",
@@ -388,21 +388,21 @@ describe("admin users", () => {
   test("same identity values are accepted and a full name keeps about", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "caelea");
-    app.users.setDetails(user.id, { fullName: "Oana", about: "Actor." });
+    const user = await create(client, "casey");
+    app.users.setDetails(user.id, { fullName: "Casey", about: "Actor." });
 
     const response = await client.call("PATCH", `/api/users/${user.id}`, {
       body: {
         username: user.username,
-        fullName: "Oana Mangiurea",
+        fullName: "Casey Doe",
         email: user.email,
       },
     });
     expect(response.status).toBe(200);
     expect(app.users.byId(user.id)).toMatchObject({
-      username: "caelea",
-      fullName: "Oana Mangiurea",
-      email: "caelea@example.com",
+      username: "casey",
+      fullName: "Casey Doe",
+      email: "casey@example.com",
       about: "Actor.",
     });
   });
@@ -481,7 +481,7 @@ describe("admin users", () => {
       "role",
     );
 
-    const caller = await create(client, "caelea");
+    const caller = await create(client, "casey");
     const route = userRoute(app, "PATCH", "/api/users/:id");
     const request = new Request(`${ORIGIN}/api/users/${adminUser.id}`, {
       method: "PATCH",
@@ -492,7 +492,7 @@ describe("admin users", () => {
         principal: {
           userId: caller.id,
           username: caller.username,
-          fullName: "Oana",
+          fullName: "Casey",
           role: "admin",
           mustChangePassword: false,
           loginId: "stale",
@@ -509,10 +509,10 @@ describe("admin users", () => {
     async () => {
       const app = await testApp();
       const client = await admin(app);
-      const user = await create(client, "caelea");
+      const user = await create(client, "casey");
       app.users.setMustChangePassword(user.id, false);
       const member = app.client();
-      await member.login("caelea", "longenough");
+      await member.login("casey", "longenough");
       const owner = app.users.byUsername("admin")!;
       app.db
         .query(
@@ -588,11 +588,11 @@ describe("admin users", () => {
   test("reset revokes every login and closes the user's socket", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "caelea");
+    const user = await create(client, "casey");
     const first = app.client();
     const second = app.client();
-    await first.login("caelea", "longenough");
-    await second.login("caelea", "longenough");
+    await first.login("casey", "longenough");
+    await second.login("casey", "longenough");
     const conn = await connection(app, first);
     app.socket.open(conn);
 
@@ -612,7 +612,7 @@ describe("admin users", () => {
     expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
     expect((await first.call("GET", "/api/profile")).status).toBe(401);
     expect((await second.call("GET", "/api/profile")).status).toBe(401);
-    expect((await app.client().login("caelea", "new-password")).status).toBe(
+    expect((await app.client().login("casey", "new-password")).status).toBe(
       200,
     );
   });
@@ -633,14 +633,14 @@ describe("admin users", () => {
     const app = await testApp();
     const client = await admin(app);
     const created = await client.call("POST", "/api/users", {
-      body: userBody("caelea"),
+      body: userBody("casey"),
     });
     const user = (await created.clone().json()).user;
     const responses = [
       created,
       await client.call("GET", "/api/users"),
       await client.call("PATCH", `/api/users/${user.id}`, {
-        body: { fullName: "Oana Mangiurea" },
+        body: { fullName: "Casey Doe" },
       }),
       await client.call("GET", "/api/profile"),
     ];
@@ -685,18 +685,18 @@ describe("user email projections", () => {
   test("a project member summary carries no email", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "caelea");
+    const user = await create(client, "casey");
     app.users.setMustChangePassword(user.id, false);
     const member = app.client();
-    await member.login("caelea", "longenough");
+    await member.login("casey", "longenough");
     const project = app.projects.personal(user.id)!;
     const response = await member.call("GET", `/api/projects/${project.id}`);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.project.members[0]).toEqual({
       id: user.id,
-      username: "caelea",
-      fullName: "Oana Mangiurea",
+      username: "casey",
+      fullName: "Casey Doe",
       role: "member",
     });
     expect(body.project.members[0]).not.toHaveProperty("email");
@@ -707,11 +707,11 @@ describe("disabled accounts", () => {
   test("disabling revokes open access and enabling restores sign-in", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "caelea");
+    const user = await create(client, "casey");
     const first = app.client();
     const second = app.client();
-    expect((await first.login("caelea", "longenough")).status).toBe(200);
-    expect((await second.login("caelea", "longenough")).status).toBe(200);
+    expect((await first.login("casey", "longenough")).status).toBe(200);
+    expect((await second.login("casey", "longenough")).status).toBe(200);
     const conn = await connection(app, first);
     app.socket.open(conn);
 
@@ -730,7 +730,7 @@ describe("disabled accounts", () => {
     ).toEqual({ n: 0 });
     expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
     expect((await first.call("GET", "/api/profile")).status).toBe(401);
-    const refused = await app.client().login("caelea", "longenough");
+    const refused = await app.client().login("casey", "longenough");
     expect(refused.status).toBe(401);
     expect(await refused.json()).toEqual({
       error: "wrong username or password",
@@ -746,7 +746,7 @@ describe("disabled accounts", () => {
     });
     expect(enabled.status).toBe(200);
     expect((await enabled.json()).user.disabled).toBe(false);
-    expect((await app.client().login("caelea", "longenough")).status).toBe(200);
+    expect((await app.client().login("casey", "longenough")).status).toBe(200);
   });
 
   test("the caller and last enabled admin guards preserve an administrator", async () => {
@@ -791,7 +791,7 @@ describe("disabled accounts", () => {
       "last admin",
     );
 
-    const second = await create(client, "caelea");
+    const second = await create(client, "casey");
     expect(
       (
         await client.call("PATCH", `/api/users/${second.id}`, {
@@ -812,11 +812,11 @@ describe("required password changes", () => {
   test("admin-set passwords restrict the account until profile change", async () => {
     const app = await testApp();
     const client = await admin(app);
-    const user = await create(client, "caelea");
+    const user = await create(client, "casey");
     expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
 
     const member = app.client();
-    const login = await member.login("caelea", "longenough");
+    const login = await member.login("casey", "longenough");
     expect(login.status).toBe(200);
     expect((await login.json()).user.mustChangePassword).toBe(true);
     const forbidden = await member.call("GET", "/api/projects");
@@ -829,7 +829,7 @@ describe("required password changes", () => {
     expect((await profile.json()).user.mustChangePassword).toBe(true);
     expect((await member.call("POST", "/api/logout")).status).toBe(200);
 
-    expect((await member.login("caelea", "longenough")).status).toBe(200);
+    expect((await member.login("casey", "longenough")).status).toBe(200);
     const changed = await member.call("POST", "/api/profile/password", {
       body: { current: "longenough", next: "changed-password" },
     });
@@ -844,7 +844,7 @@ describe("required password changes", () => {
     });
     expect(reset.status).toBe(204);
     expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
-    const afterReset = await app.client().login("caelea", "reset-password");
+    const afterReset = await app.client().login("casey", "reset-password");
     expect(afterReset.status).toBe(200);
     expect((await afterReset.json()).user.mustChangePassword).toBe(true);
   });

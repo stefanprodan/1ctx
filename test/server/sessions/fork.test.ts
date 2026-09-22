@@ -401,7 +401,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
         { role: "user", content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue` },
-        { role: "user", content: "the new question", name: "caelea" },
+        { role: "user", content: "the new question", name: "casey" },
       ]);
       await finish(chat, copied.session.id, next);
       expect(chat.app.sessions.send(copied.send!.id)?.tokens).toBe(0);
@@ -571,7 +571,7 @@ describe("POST /api/sessions/:id/fork", () => {
       const next = await waitScript(chat.scripted, 2);
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
-        { role: "user", content: "edited draft", name: "caelea" },
+        { role: "user", content: "edited draft", name: "casey" },
       ]);
       await finish(chat, copied.session.id, next);
     } finally {
@@ -817,7 +817,7 @@ describe("POST /api/sessions/:id/fork", () => {
         },
         { role: "tool", content: tool.content, tool_call_id: timeCall.id },
         { role: "assistant", content: "the original answer" },
-        { role: "user", content: "member follow-up", name: "caelea" },
+        { role: "user", content: "member follow-up", name: "casey" },
       ]);
       await finish(chat, copied.session.id, next);
       const continued = await detail(chat.member, copied.session.id);

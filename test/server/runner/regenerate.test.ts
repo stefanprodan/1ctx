@@ -72,7 +72,7 @@ describe("POST /api/sessions/:id/regenerate", () => {
         (event) =>
           event.msg === "send start" && event.fields.op === "regenerate",
       )?.fields,
-    ).toMatchObject({ chat: started.sessionId, user: "caelea" });
+    ).toMatchObject({ chat: started.sessionId, user: "casey" });
 
     expect(detail.session.status).toBe("running");
     expect(detail.messages).toHaveLength(2);

@@ -90,7 +90,7 @@ for (const output of outputs) {
         row({
           kind: "user",
           slot: null,
-          author: "caelea",
+          author: "casey",
           content: "\n**Read** these files.  \n",
           uploads,
         }),
@@ -98,7 +98,7 @@ for (const output of outputs) {
       ];
       const before = structuredClone(rows);
       expect(output.render(rows)).toBe(
-        `# \\*Chat\\*\n\n## @caelea 2026-09-19 10:00\n\n**Read** these files.  \n\n${attached}\n\n## @coder 2026-09-19 10:00\n\nAnswer.\n`,
+        `# \\*Chat\\*\n\n## @casey 2026-09-19 10:00\n\n**Read** these files.  \n\n${attached}\n\n## @coder 2026-09-19 10:00\n\nAnswer.\n`,
       );
       expect(rows).toEqual(before);
     });
@@ -108,7 +108,7 @@ for (const output of outputs) {
         row({
           kind: "user",
           slot: null,
-          author: "caelea",
+          author: "casey",
           content: "First question.",
           uploads,
         }),
@@ -126,7 +126,7 @@ for (const output of outputs) {
           sendId: "next",
           kind: "user",
           slot: null,
-          author: "caelea",
+          author: "casey",
           content: "Next question.",
           uploads: [{ ...uploads[0]!, name: "one.zip", files: 1 }],
         }),
@@ -138,7 +138,7 @@ for (const output of outputs) {
         }),
       ];
       expect(output.render(rows)).toBe(
-        `# \\*Chat\\*\n\n## @caelea 2026-09-19 10:00\n\nFirst question.\n\n${attached}\n\n## @coder 2026-09-19 10:00\n\nAnswer.\n\n_stopped_\n\n## @caelea 2026-09-19 10:00\n\nNext question.\n\nAttached: one.zip (1 file)\n`,
+        `# \\*Chat\\*\n\n## @casey 2026-09-19 10:00\n\nFirst question.\n\n${attached}\n\n## @coder 2026-09-19 10:00\n\nAnswer.\n\n_stopped_\n\n## @casey 2026-09-19 10:00\n\nNext question.\n\nAttached: one.zip (1 file)\n`,
       );
     });
 
@@ -148,13 +148,13 @@ for (const output of outputs) {
           row({
             kind: "user",
             slot: null,
-            author: "caelea",
+            author: "casey",
             content: "Plain question.",
           }),
           row({}),
         ]),
       ).toBe(
-        "# \\*Chat\\*\n\n## @caelea 2026-09-19 10:00\n\nPlain question.\n\n## @coder 2026-09-19 10:00\n\nAnswer.\n",
+        "# \\*Chat\\*\n\n## @casey 2026-09-19 10:00\n\nPlain question.\n\n## @coder 2026-09-19 10:00\n\nAnswer.\n",
       );
     });
   });

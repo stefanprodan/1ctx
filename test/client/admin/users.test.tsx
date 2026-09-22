@@ -53,12 +53,12 @@ const root: UserAccount = {
   disabled: false,
   mustChangePassword: false,
 };
-const caelea: UserAccount = {
+const casey: UserAccount = {
   id: "u2",
-  username: "caelea",
-  fullName: "Oana Mangiurea",
+  username: "casey",
+  fullName: "Casey Doe",
   role: "member",
-  email: "caelea@example.com",
+  email: "casey@example.com",
   tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
@@ -82,13 +82,13 @@ afterEach(() => {
 
 describe("the words", () => {
   test("the handle with the email, and since when", () => {
-    expect(metaLine(caelea)).toBe("@caelea · caelea@example.com");
-    expect(sinceLine(caelea)).toBe("since 13 September 2026");
+    expect(metaLine(casey)).toBe("@casey · casey@example.com");
+    expect(sinceLine(casey)).toBe("since 13 September 2026");
     expect(stateLine(root)).toBe("admin · since 12 September 2026");
-    expect(stateLine(caelea)).toBe(
+    expect(stateLine(casey)).toBe(
       "member · password to change · since 13 September 2026",
     );
-    expect(stateLine({ ...caelea, disabled: true })).toBe(
+    expect(stateLine({ ...casey, disabled: true })).toBe(
       "member · disabled · since 13 September 2026",
     );
   });
@@ -97,9 +97,9 @@ describe("the words", () => {
     expect(disableLock(root, "u1", 1)).toContain("yourself");
     expect(disableLock(root, "u2", 1)).toContain("last admin");
     expect(disableLock(root, "u2", 2)).toBeNull();
-    expect(disableLock(caelea, "u1", 1)).toBeNull();
+    expect(disableLock(casey, "u1", 1)).toBeNull();
     expect(
-      adminCount([root, { ...caelea, role: "admin", disabled: true }]),
+      adminCount([root, { ...casey, role: "admin", disabled: true }]),
     ).toBe(1);
     expect(roleLock({ ...root, disabled: true }, "u2", 0)).toBeNull();
   });
@@ -108,32 +108,32 @@ describe("the words", () => {
     expect(roleLock(root, "u1", 1)).toContain("own role");
     expect(roleLock(root, "u2", 1)).toContain("last admin");
     expect(roleLock(root, "u2", 2)).toBeNull();
-    expect(roleLock(caelea, "u1", 1)).toBeNull();
-    expect(adminCount([root, caelea])).toBe(1);
+    expect(roleLock(casey, "u1", 1)).toBeNull();
+    expect(adminCount([root, casey])).toBe(1);
   });
 
   test("the reset is for everyone but the admin's own row", () => {
-    expect(canReset(caelea, "u1")).toBe(true);
+    expect(canReset(casey, "u1")).toBe(true);
     expect(canReset(root, "u1")).toBe(false);
   });
 });
 
 describe("the checks", () => {
   test("leaves the username rule to the server and catches an empty one", () => {
-    expect(usernameProblem("caelea")).toBeNull();
+    expect(usernameProblem("casey")).toBeNull();
     expect(usernameProblem("ab")).toBeNull();
-    expect(usernameProblem("-caelea")).toBeNull();
+    expect(usernameProblem("-casey")).toBeNull();
     expect(usernameProblem("")).toBe("Enter a username");
     expect(usernameProblem("  ")).toBe("Enter a username");
   });
 
   test("the email rule", () => {
-    expect(emailProblem("caelea@example.com")).toBeNull();
-    expect(emailProblem(" Caelea@Example.com ")).toBeNull();
+    expect(emailProblem("casey@example.com")).toBeNull();
+    expect(emailProblem(" Casey@Example.com ")).toBeNull();
     expect(emailProblem("")).toBe("Enter an email");
-    expect(emailProblem("caelea")).toBe("Not an email address");
-    expect(emailProblem("caelea@example")).toBe("Not an email address");
-    expect(emailProblem("caelea@.com")).toBe("Not an email address");
+    expect(emailProblem("casey")).toBe("Not an email address");
+    expect(emailProblem("casey@example")).toBe("Not an email address");
+    expect(emailProblem("casey@.com")).toBe("Not an email address");
     expect(emailProblem("o ana@example.com")).toBe("Not an email address");
     expect(emailProblem(`${"a".repeat(250)}@b.co`)).toContain("under 254");
   });
@@ -151,32 +151,32 @@ describe("the checks", () => {
 
   test("the patch carries only what changed, lowercased", () => {
     expect(
-      patchOf(caelea, {
-        username: "caelea",
-        fullName: "Oana Mangiurea",
-        email: "caelea@example.com",
+      patchOf(casey, {
+        username: "casey",
+        fullName: "Casey Doe",
+        email: "casey@example.com",
         role: "member",
         tz: "Europe/Bucharest",
       }),
     ).toBeNull();
     expect(
-      patchOf(caelea, {
-        username: " oana2 ",
-        fullName: "Oana Mangiurea",
-        email: "Caelea@Example.com",
+      patchOf(casey, {
+        username: " casey2 ",
+        fullName: "Casey Doe",
+        email: "Casey@Example.com",
         role: "admin",
         tz: "Europe/Bucharest",
       }),
-    ).toEqual({ username: "oana2", role: "admin" });
+    ).toEqual({ username: "casey2", role: "admin" });
     expect(
-      patchOf(caelea, {
-        username: "caelea",
-        fullName: "Oana",
+      patchOf(casey, {
+        username: "casey",
+        fullName: "Casey",
         email: "o@example.com",
         role: "member",
         tz: "Asia/Tokyo",
       }),
-    ).toEqual({ fullName: "Oana", email: "o@example.com", tz: "Asia/Tokyo" });
+    ).toEqual({ fullName: "Casey", email: "o@example.com", tz: "Asia/Tokyo" });
   });
 });
 
@@ -212,40 +212,40 @@ describe("the refusals", () => {
 
 describe("the entity", () => {
   test("loads for the signed-in user and drops with them", async () => {
-    answer = () => Response.json({ users: [root, caelea] });
+    answer = () => Response.json({ users: [root, casey] });
     await loadUsers();
-    expect(users.value).toEqual([root, caelea]);
+    expect(users.value).toEqual([root, casey]);
     me.value = null;
     expect(users.value).toBeNull();
   });
 
   test("a write puts the server's row in the list, by username", async () => {
     users.value = [root];
-    answer = () => Response.json({ user: caelea });
+    answer = () => Response.json({ user: casey });
     await createUser({
-      username: "caelea",
-      fullName: "Oana Mangiurea",
-      email: "caelea@example.com",
+      username: "casey",
+      fullName: "Casey Doe",
+      email: "casey@example.com",
       role: "member",
       tz: "Europe/Bucharest",
       password: "longenough",
     });
-    expect(users.value).toEqual([root, caelea]);
-    const renamed = { ...caelea, username: "a-caelea" };
+    expect(users.value).toEqual([root, casey]);
+    const renamed = { ...casey, username: "a-casey" };
     answer = () => Response.json({ user: renamed });
-    await updateUser("u2", { username: "a-caelea" });
+    await updateUser("u2", { username: "a-casey" });
     expect(users.value).toEqual([renamed, root]);
   });
 
   test("a reset sends the password and reads the list again", async () => {
-    users.value = [root, { ...caelea, mustChangePassword: false }];
+    users.value = [root, { ...casey, mustChangePassword: false }];
     let sent: { url: string; body: unknown } | null = null as {
       url: string;
       body: unknown;
     } | null;
     answer = (url, init) => {
       if (init?.method !== "POST")
-        return Response.json({ users: [root, caelea] });
+        return Response.json({ users: [root, casey] });
       sent = { url, body: JSON.parse(String(init?.body)) };
       return new Response(null, { status: 204 });
     };
@@ -254,7 +254,7 @@ describe("the entity", () => {
       url: "/api/users/u2/password",
       body: { password: "longenough" },
     });
-    expect(users.value).toEqual([root, caelea]);
+    expect(users.value).toEqual([root, casey]);
   });
 
   test("a refusal is the error shown", async () => {
@@ -273,15 +273,15 @@ describe("the page", () => {
   });
 
   test("renders every user with the handle, the email and the role", () => {
-    users.value = [root, caelea];
+    users.value = [root, casey];
     const html = render(<Users />);
     expect(html).toContain("Stefan Prodan");
     expect(html).toContain("@admin · admin@1ctx.dev");
-    expect(html).toContain("@caelea · caelea@example.com");
+    expect(html).toContain("@casey · casey@example.com");
     expect(html).toContain(
       "member · password to change · since 13 September 2026",
     );
-    users.value = [root, { ...caelea, disabled: true }];
+    users.value = [root, { ...casey, disabled: true }];
     expect(render(<Users />)).toContain("rows-item-off");
     expect(html).toContain(">you<");
     expect(html).toContain("New user");

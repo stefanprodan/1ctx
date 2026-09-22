@@ -252,7 +252,7 @@ describe("GET /api/sessions", () => {
     });
     expect(rows.get(failed.id)).toMatchObject({
       send: { id: failedSend.id },
-      last: { seq: failedUser.seq, author: "caelea", text: "User line" },
+      last: { seq: failedUser.seq, author: "casey", text: "User line" },
     });
     chat.app.socket.dispose();
   });
@@ -816,7 +816,7 @@ describe("message limits and admission", () => {
       { body: { message: "again" } },
     );
     expect(second.status).toBe(409);
-    expect(await second.json()).toEqual({ error: "Oana Mangiurea is sending" });
+    expect(await second.json()).toEqual({ error: "Casey Doe is sending" });
     await finish(started.script);
     chat.app.socket.dispose();
   });
@@ -1420,7 +1420,7 @@ describe("GET /api/sessions/:id/markdown", () => {
     const running = await chat.member.call("GET", path(started.sessionId));
     expect(running.status).toBe(200);
     expect(await running.text()).toBe(
-      "# Plan the release, v2!\n\n## @caelea 1970-01-01 09:16\n\nPlan the release, v2!\n",
+      "# Plan the release, v2!\n\n## @casey 1970-01-01 09:16\n\nPlan the release, v2!\n",
     );
     chat.app.now.value += 60_000;
     await finish(started.script, "Ship it.");
@@ -1433,7 +1433,7 @@ describe("GET /api/sessions/:id/markdown", () => {
       'attachment; filename="plan-the-release-v2.md"',
     );
     expect(await res.text()).toBe(
-      "# Plan the release, v2!\n\n## @caelea 1970-01-01 09:16\n\nPlan the release, v2!\n\n## @coder 1970-01-01 09:17\n\nShip it.\n",
+      "# Plan the release, v2!\n\n## @casey 1970-01-01 09:16\n\nPlan the release, v2!\n\n## @coder 1970-01-01 09:17\n\nShip it.\n",
     );
     for (const query of ["", "?tz=Mars%2FOlympus", "?tz=UTC&x=1"]) {
       expect(

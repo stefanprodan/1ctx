@@ -96,7 +96,7 @@ export function userFieldOf(message: string): UserField | undefined {
   return undefined;
 }
 
-// "@oana · oana@example.com"
+// "@casey · casey@example.com"
 export function metaLine(user: UserAccount): string {
   return `@${user.username} · ${user.email}`;
 }

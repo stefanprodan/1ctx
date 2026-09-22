@@ -62,7 +62,7 @@ describe("automation scheduler", () => {
           fields: {
             automation: automation.id,
             source,
-            user: "caelea",
+            user: "casey",
           },
         });
         const send = chat.app.runner.registry.get(first.detail.session.id)!;
@@ -146,7 +146,7 @@ describe("automation scheduler", () => {
         fields: {
           automation: automation.id,
           source: "schedule",
-          user: "caelea",
+          user: "casey",
         },
       },
       {
@@ -158,7 +158,7 @@ describe("automation scheduler", () => {
       logs.events.find(
         (event) => event.msg === "send start" && event.fields.op === "run",
       )?.fields,
-    ).toMatchObject({ user: "caelea", provider: "local" });
+    ).toMatchObject({ user: "casey", provider: "local" });
 
     script.reply("done");
     await settle(chat, first.lastRunSessionId!);

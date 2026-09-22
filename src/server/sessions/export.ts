@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SessionAuthor } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import type { ExportRow } from "./markdown.ts";
 import { messageUploads } from "./rows.ts";
@@ -39,4 +40,16 @@ export function exportRows(db: Db, sessionId: string): ExportRow[] {
       toolCalls: row.toolCalls === null ? null : JSON.parse(row.toolCalls),
       uploads: row.kind === "user" ? messageUploads(row.uploads) : null,
     }));
+}
+
+export function authors(db: Db, sessionId: string): SessionAuthor[] {
+  return db
+    .query<SessionAuthor, [string, string]>(
+      `select id, username, full_name as fullName from users
+        where id in (select owner_id from sessions where id = ?
+                     union select user_id from messages
+                      where session_id = ? and user_id is not null)
+        order by username`,
+    )
+    .all(sessionId, sessionId);
 }

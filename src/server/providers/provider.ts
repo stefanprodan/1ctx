@@ -19,6 +19,7 @@ import {
   buildChatBody as buildOpenAiChatBody,
   chatEvents,
   streamChat,
+  Unanswered,
 } from "./openai.ts";
 import {
   buildChatBody as buildOpenRouterChatBody,
@@ -105,6 +106,7 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
           message: scrub(
             `${row.name} failed: ${err instanceof Error ? err.message : String(err)}`,
           ),
+          ...(err instanceof Unanswered ? { unanswered: true } : {}),
         };
       }
     },

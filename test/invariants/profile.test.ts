@@ -41,20 +41,20 @@ describe("PATCH /api/profile", () => {
     await client.login("admin", "hunter2-test");
     const res = await client.call("PATCH", "/api/profile", {
       body: {
-        fullName: "Oana Mangiurea",
+        fullName: "Casey Doe",
         about: "Actor.",
         tz: "Europe/Bucharest",
       },
     });
     expect(res.status).toBe(200);
     const { user } = await res.json();
-    expect(user.fullName).toBe("Oana Mangiurea");
+    expect(user.fullName).toBe("Casey Doe");
     expect(user.about).toBe("Actor.");
     expect(app.users.byUsername("admin")?.about).toBe("Actor.");
     expect(user.tz).toBe("Europe/Bucharest");
     expect(app.users.byUsername("admin")?.tz).toBe("Europe/Bucharest");
     const me = await (await client.call("GET", "/api/me")).json();
-    expect(me.user.fullName).toBe("Oana Mangiurea");
+    expect(me.user.fullName).toBe("Casey Doe");
     expect(me.user.about).toBeUndefined();
     expect(me.user.username).toBe("admin");
   });

@@ -212,14 +212,14 @@ describe("the note card", () => {
           run: null,
           updatedBy: {
             id: "u1",
-            username: "oana",
+            username: "casey",
             fullName: "",
             role: "member",
           },
         }),
         now,
       ),
-    ).toMatchObject({ kind: "user", username: "oana" });
+    ).toMatchObject({ kind: "user", username: "casey" });
     expect(writerOf(memory({ updatedAt: null }), now)).toEqual({
       kind: "none",
     });

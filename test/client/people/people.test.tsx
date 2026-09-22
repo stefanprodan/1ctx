@@ -32,10 +32,10 @@ import type {
 } from "../../../src/shared/api/directory.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 
-const caelea: Me = {
+const casey: Me = {
   id: "u1",
-  username: "caelea",
-  fullName: "Oana Mangiurea",
+  username: "casey",
+  fullName: "Casey Doe",
   role: "member",
   mustChangePassword: false,
 };
@@ -85,7 +85,7 @@ const agent: DirectoryAgentResponse = {
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
-  me.value = caelea;
+  me.value = casey;
   person.value = null;
   personError.value = null;
   agentPage.value = null;
@@ -191,7 +191,7 @@ describe("the directory entity", () => {
     async () => {
       const gates = gated((name) => Response.json(personOf(name)));
       const pending = loadPerson("bogdan");
-      me.value = { ...caelea, id: "u9", username: "someone" };
+      me.value = { ...casey, id: "u9", username: "someone" };
       gates[0]();
       await pending;
       expect(person.value).toBeNull();
@@ -231,7 +231,7 @@ describe("the directory entity", () => {
 
 describe("People.model", () => {
   test("the addresses of both pages", () => {
-    expect(userHref("caelea")).toBe("/users/caelea");
+    expect(userHref("casey")).toBe("/users/casey");
     expect(agentHref("sre_bot")).toBe("/agents/sre_bot");
   });
 
@@ -321,10 +321,10 @@ describe("the pages", () => {
     person.value = {
       user: {
         id: "u1",
-        username: "caelea",
-        fullName: "Oana Mangiurea",
+        username: "casey",
+        fullName: "Casey Doe",
         role: "member",
-        email: "caelea@example.com",
+        email: "casey@example.com",
         tz: "UTC",
         about: "",
         createdAt: 0,
@@ -332,7 +332,7 @@ describe("the pages", () => {
       },
       projects: [],
     };
-    const html = render(<User params={{ username: "caelea" }} />);
+    const html = render(<User params={{ username: "casey" }} />);
     expect(html).toContain(">Your team projects<");
     expect(html).toContain("No team projects yet.");
     expect(html).toContain("Nothing written yet.");

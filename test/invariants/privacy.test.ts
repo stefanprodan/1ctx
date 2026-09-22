@@ -15,8 +15,8 @@ function conn(chat: Awaited<ReturnType<typeof chatApp>>, admin: boolean) {
     data: {
       principal: {
         userId: admin ? chat.adminId : chat.memberId,
-        username: admin ? "admin" : "caelea",
-        fullName: admin ? "Stefan Prodan" : "Oana Mangiurea",
+        username: admin ? "admin" : "casey",
+        fullName: admin ? "Stefan Prodan" : "Casey Doe",
         role: admin ? "admin" : "member",
         mustChangePassword: false,
         loginId: admin ? "la" : "lm",

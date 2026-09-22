@@ -108,7 +108,7 @@ describe("compaction", () => {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue`,
       },
-      { role: "user", content: "the new question", name: "caelea" },
+      { role: "user", content: "the new question", name: "casey" },
     ]);
     expect(JSON.stringify(messages)).not.toContain("the old question");
     expect(JSON.stringify(messages)).not.toContain("the answer");
@@ -293,7 +293,7 @@ describe("compaction", () => {
       )?.fields,
     ).toMatchObject({
       chat: started.sessionId,
-      user: "caelea",
+      user: "casey",
       agent: "coder",
       provider: "local",
     });
@@ -330,7 +330,7 @@ describe("compaction", () => {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- First`,
       },
-      { role: "user", content: "next", name: "caelea" },
+      { role: "user", content: "next", name: "casey" },
       { role: "assistant", content: "next answer" },
     ]);
     finish(second.script, "## Goal\n\n- Second");

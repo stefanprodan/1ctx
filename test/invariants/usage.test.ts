@@ -95,7 +95,7 @@ describe("GET /api/usage/days", () => {
   test("returns the fixed window with zero-filled visible projects", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T12:00:00Z");
-    expect((await chat.member.login("caelea", "pw")).status).toBe(200);
+    expect((await chat.member.login("casey", "pw")).status).toBe(200);
     expect((await chat.admin.login("admin", "hunter2-test")).status).toBe(200);
     const visible = chat.app.projects.createTeam({
       ownerId: chat.adminId,
@@ -163,7 +163,7 @@ describe("GET /api/usage/days", () => {
   test("places a round that crosses midnight on the later day", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-15T23:59:30Z");
-    expect((await chat.member.login("caelea", "pw")).status).toBe(200);
+    expect((await chat.member.login("casey", "pw")).status).toBe(200);
     const started = await startChat(chat, "cross midnight");
     chat.app.now.value = Date.parse("2026-09-16T00:00:30Z");
     await finish(chat, started.script, 11, 5);

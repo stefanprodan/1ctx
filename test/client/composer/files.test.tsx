@@ -97,7 +97,7 @@ describe("a message's files", () => {
         { name: "notes.md", archive: false, files: 1, bytes: 2048, saved: [] },
       ],
     } as unknown as Message;
-    const author = { name: "Oana", username: "caelea" };
+    const author = { name: "Casey", username: "casey" };
     const html = render(<UserRow message={message} author={author} />);
     const card = html.slice(html.indexOf("transcript-card"));
     expect(card).toContain("look at these");

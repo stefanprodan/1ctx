@@ -48,8 +48,8 @@ beforeEach(() => {
   user++;
   me.value = {
     id: `uploads-u${user}`,
-    username: "caelea",
-    fullName: "Oana",
+    username: "casey",
+    fullName: "Casey",
     role: "member",
     mustChangePassword: false,
   };

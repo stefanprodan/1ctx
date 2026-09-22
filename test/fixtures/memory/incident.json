@@ -10,7 +10,7 @@
   "rows": [
     {
       "kind": "user",
-      "author": "caelea",
+      "author": "casey",
       "content": "Checkout returns 503. Investigate and fix it."
     },
     {
