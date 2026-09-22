@@ -22,6 +22,7 @@ import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ToolCall, wireTokens } from "../providers/index.ts";
 import type { MemorySnapshot } from "../sessions/index.ts";
+import { withCommandHints } from "./bash-hint.ts";
 import { makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
@@ -352,10 +353,20 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         return runMemory(memory, memorySessions, call, ctx);
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
+      const catalog =
+        offered.mcpCatalog === ""
+          ? []
+          : offered.mcp.flatMap((server) =>
+              server.tools.map((tool) => tool.wireName),
+            );
       const base = [
-        ...toolsFor(offered.search, [], offered.web, offered.visuals).filter(
-          (tool) => allowed.has(tool.name),
-        ),
+        ...toolsFor(offered.search, [], offered.web, offered.visuals)
+          .filter((tool) => allowed.has(tool.name))
+          .map((tool) =>
+            tool.name === "bash"
+              ? withCommandHints(tool, [...allowed], catalog)
+              : tool,
+          ),
         ...makeSkillTools(offered.skills.skills, skillStore).filter((tool) =>
           allowed.has(tool.name),
         ),

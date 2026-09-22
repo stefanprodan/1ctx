@@ -800,6 +800,9 @@ violation, and every rule has a rejected fixture under
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
   the defaults; `tools/` never imports `runner/`. `maxBashCalls` refuses
   excess bash calls before queue or slot admission without ending the loop.
+  A bash `command not found` for a name the send offers as a tool gains
+  one line saying to call it as a tool, through `mcp_call` for a catalog
+  MCP name (`tools/bash-hint.ts`).
   Main rounds spend prompt plus completion tokens, cached tokens included,
   or a request estimate without usage. The tool-work threshold and the
   window threshold are checked before calls, forcing one answer round.
