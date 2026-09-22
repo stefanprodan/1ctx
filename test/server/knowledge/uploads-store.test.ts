@@ -18,6 +18,7 @@ import {
   NotFound,
 } from "../../../src/server/lib/errors.ts";
 import { newId } from "../../../src/server/lib/ids.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { ProjectStore } from "../../../src/server/projects/index.ts";
 import { createUser, UserStore } from "../../../src/server/users/index.ts";
 import type { KnowledgeUploadResult } from "../../../src/shared/contracts/knowledge.ts";
@@ -690,7 +691,7 @@ describe("upload store", () => {
     () => {
       const ctx = fixture();
       const events: string[] = [];
-      const unsubscribe = subscribe((event) => events.push(event.type));
+      const unsubscribe = subscribe((event) => events.push(event.type), silent);
       try {
         ctx.claim([ctx.stage([file("a", "before")]).id!]);
         const item = ctx.stage([file("a", "after"), file("b", "new")]);

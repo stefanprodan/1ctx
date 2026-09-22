@@ -96,26 +96,33 @@ export function verifyPassword(
 // When the users table is empty and user-admin.key holds a password, create
 // the admin with its hash and drop the plain value. A non-empty table
 // ignores the file, so it bootstraps and never resets.
+// nobody can sign in until this file is right, so every line names it
+const ADMIN_FILE = `${ADMIN_SECRET}.key`;
+
 export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
   if (deps.store.count() > 0) return null;
   const password = deps.secret(ADMIN_SECRET);
   if (password === null) {
-    deps.log(`no users and no ${ADMIN_SECRET}.key; nobody can sign in`);
+    deps.log.warn("admin not created", { file: ADMIN_FILE, reason: "missing" });
     return null;
   }
   // the same cap the login parser applies, or the admin could never sign
   // in; the same floor a new password has, or the first admin would be
   // the one account allowed what the profile page refuses
   if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES) {
-    deps.log(
-      `${ADMIN_SECRET}.key is over ${MAX_PASSWORD_BYTES} bytes; nobody can sign in`,
-    );
+    deps.log.warn("admin not created", {
+      file: ADMIN_FILE,
+      reason: "too long",
+      limit: MAX_PASSWORD_BYTES,
+    });
     return null;
   }
   if (password.length < MIN_PASSWORD) {
-    deps.log(
-      `${ADMIN_SECRET}.key is under ${MIN_PASSWORD} characters; nobody can sign in`,
-    );
+    deps.log.warn("admin not created", {
+      file: ADMIN_FILE,
+      reason: "too short",
+      limit: MIN_PASSWORD,
+    });
     return null;
   }
   const user = createUser(deps, {
@@ -127,7 +134,7 @@ export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
     mustChangePassword: false,
     now: deps.clock(),
   });
-  deps.log(`created ${ADMIN_USERNAME} from ${ADMIN_SECRET}.key`);
+  deps.log.info("admin created", { user: ADMIN_USERNAME, file: ADMIN_FILE });
   return user;
 }
 

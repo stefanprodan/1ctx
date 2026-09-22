@@ -614,9 +614,11 @@ violation, and every rule has a rejected fixture under
   summary gains `UPLOADS_SUMMARY_LINE` only from earlier user records.
   Runs have no uploads; regenerate and compaction keep the tree.
   The reply in flight is checkpointed every 250 ms or 2 KB
-  without a revision. A send ends for one cause (finish, stop,
-  failure, shutdown, deadline) through one compare-and-set in the
-  runner, and
+  without a revision. The active send keeps its operation, start time
+  and separate prompt and completion token counts. Its start and end are
+  one log event each; a failed round or tool is a warning without
+  arguments or results. A send ends for one cause (finish, stop, failure,
+  shutdown, deadline) through one compare-and-set in the runner, and
   `finalizeSend` runs exactly once; the lock is held until the stream
   has let go. A stream quiet for two minutes after its first event
   (the wait for the first is bounded only by the deadline, since a
@@ -629,7 +631,8 @@ violation, and every rule has a rejected fixture under
   restart. At start `sessions.repair()` ends whatever a crash left
   running with cause `restart`. Shutdown terminates every send, waits
   for the streams, closes the sockets with 1012, then stops the
-  listener. An agent a session references is a 409 to delete.
+  listener; runner and app shutdown return the ended count and whether
+  the drain timed out. An agent a session references is a 409 to delete.
   Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
   reuses the last user message: inside `startSend`'s transaction the
   rows after it, their send and its usage go, and the envelope names
@@ -877,7 +880,9 @@ violation, and every rule has a rejected fixture under
   `me`; `login.revoked` removes the login's connections from delivery
   before closing them, and the expiry sweep publishes it too. Backpressure
   closes a slow connection; a dropped frame closes with 1013; the
-  client reloads on every open. The upgrade is `GET /api/socket` with
+  client reloads on every open. Socket opens and closes are logged by
+  user; a close carries Bun's code and only a cause the server recorded,
+  never the browser's reason text. The upgrade is `GET /api/socket` with
   `upgrade: true` on the descriptor: the router applies the same-origin
   check as for a write and hands the handler `ctx.upgrade()`; without
   an upgrade the route answers 426. The protocol is `shared/socket.ts`.
@@ -1180,13 +1185,28 @@ violation, and every rule has a rejected fixture under
   `.clamp`, `.cut`, `.meter`, `.notice-failed`, `.btn-text`,
   `.btn-icon`, `.status-*`); an owner adds only position, size and
   what is its own.
-- **A log line is the UTC time, the area, then the words,** one line per
-  event on stderr through `logger(area)` in `lib/log.ts`, which
-  `compose.ts` hands each area; nothing calls `console` for it, and a
-  test passes `silent`. Ids, names and counts only: never a secret, a
-  message, a prompt or a query string. The router logs a handler's throw
-  that is not an `HttpError` with the method, the path and the user,
-  then throws it on, so the listener answers 500.
+- **A log line is slog text,** one event on stderr through the `Log`
+  methods `info`, `warn` and `error` from `logger(area)` in `lib/log.ts`.
+  Its fields are flat and ordered after UTC `time`, `level`, `msg` and
+  `area`; `duration` is whole milliseconds. Messages are fixed lowercase
+  phrases. Fields hold only ids, usernames, configured names and models,
+  route patterns, counts, statuses, closed words, durations, client
+  addresses, error fields, and startup paths. Never a secret, message,
+  prompt, description, tool input or output, query string, raw request
+  path, a knowledge or upload file's name or text, email, attempted
+  login name, body or socket reason. `errorFields()` keeps the first
+  line, which `format()` cuts at 200 characters after `compose.ts` has
+  scrubbed the current provider, search and MCP keys from it, and the
+  source frames as `stack`; the build passes `--sourcemap` so a binary's
+  frames name source files. The router logs a `request` for a signed-in
+  user's writes and 4xx answers and for any 5xx, never an anonymous 4xx
+  or health, and answers an unexpected throw with a renewed JSON 500.
+  `login limited` is logged once when an address's window closes, not
+  per refusal. Startup is one event with paths, migrations, flags,
+  inventory and repair counts; shutdown reports ended sends and drain
+  timing. Catalog and MCP refreshes and hourly sweeps log only work done
+  or a failure. `subscribe()` on the bus takes the subscriber's `Log`; a
+  test collects events with `testApp({logFactory})`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

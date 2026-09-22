@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import { json, type RouteDescriptor } from "../../../src/server/lib/http.ts";
-import { format, silent } from "../../../src/server/lib/log.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import {
   conflicts,
   type Router,
@@ -15,6 +15,7 @@ import {
   sameOrigin,
 } from "../../../src/server/web/router.ts";
 import { clientAddress } from "../../../src/server/web/serve.ts";
+import { collectLogs } from "../../helpers/app.ts";
 
 const echo: RouteDescriptor = {
   method: "GET",
@@ -219,6 +220,13 @@ describe("router", () => {
               throw new BadRequest("no");
             },
           },
+          {
+            ...echo,
+            path: "/api/fatal",
+            handle: () => {
+              throw new TypeError("boom");
+            },
+          },
         ],
         resolve: () => ({
           principal: {
@@ -241,6 +249,10 @@ describe("router", () => {
     const failed = await renew(new Request("http://x/api/boom"), "a");
     expect(failed.status).toBe(400);
     expect(failed.headers.get("set-cookie")).toBe("login=t; Max-Age=9");
+    const fatal = await renew(new Request("http://x/api/fatal"), "a");
+    expect(fatal.status).toBe(500);
+    expect(await fatal.json()).toEqual({ error: "internal error" });
+    expect(fatal.headers.get("set-cookie")).toBe("login=t; Max-Age=9");
   });
 });
 
@@ -262,26 +274,45 @@ describe("a handler that throws", () => {
     mustChangePassword: false,
   };
 
-  test("is logged with where and who, then thrown on", async () => {
-    const lines: string[] = [];
-    const handle = router({
-      routes: [boom],
-      resolve: () => ({ principal, setCookie: null }),
-      trustProxy: false,
-      log: (line) => lines.push(line),
+  test("is one error request and a JSON 500", async () => {
+    const collected = collectLogs();
+    const handle = answered(
+      router({
+        routes: [boom],
+        resolve: () => ({ principal, setCookie: null }),
+        trustProxy: false,
+        log: collected.logFactory("router"),
+      }),
+    );
+
+    const res = await handle(
+      new Request("http://x/api/boom?q=secret"),
+      "100.64.0.7",
+    );
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "internal error" });
+    expect(collected.events).toHaveLength(1);
+    expect(collected.events[0]).toMatchObject({
+      level: "error",
+      area: "router",
+      msg: "request",
+      fields: {
+        method: "GET",
+        route: "/api/boom",
+        status: 500,
+        user: "maria",
+        addr: "100.64.0.7",
+        error: "rows is undefined",
+        error_type: "TypeError",
+      },
     });
-
-    await expect(
-      handle(new Request("http://x/api/boom?q=secret"), "a"),
-    ).rejects.toThrow("rows is undefined");
-
-    expect(lines).toEqual([
-      "GET /api/boom as maria failed: TypeError: rows is undefined",
-    ]);
+    expect(collected.events[0]!.fields.duration).toBeNumber();
+    expect(JSON.stringify(collected.events)).not.toContain("secret");
   });
 
-  test("an HttpError is an answer, not a log line", async () => {
-    const lines: string[] = [];
+  test("an HttpError is an answer without error fields", async () => {
+    const collected = collectLogs();
     const handle = answered(
       router({
         routes: [
@@ -293,27 +324,65 @@ describe("a handler that throws", () => {
             },
           },
         ],
-        resolve: nobody,
+        resolve: () => ({ principal, setCookie: null }),
         trustProxy: false,
-        log: (line) => lines.push(line),
+        log: collected.logFactory("router"),
       }),
     );
 
-    const res = await handle(new Request("http://x/api/bad"), "a");
+    const res = await handle(new Request("http://x/api/bad"), "not-an-ip");
 
     expect(res.status).toBe(400);
-    expect(lines).toEqual([]);
+    expect(collected.events).toHaveLength(1);
+    expect(collected.events[0]).toMatchObject({
+      level: "info",
+      area: "router",
+      msg: "request",
+      fields: {
+        method: "GET",
+        route: "/api/bad",
+        status: 400,
+        user: "maria",
+        addr: "invalid",
+      },
+    });
+    expect(collected.events[0]!.fields).not.toHaveProperty("error");
   });
-});
 
-describe("log format", () => {
-  test("is the UTC time, the area, then the line", () => {
+  test("an anonymous 4xx is not logged, a 5xx is", async () => {
+    const collected = collectLogs();
+    const handle = answered(
+      router({
+        routes: [
+          {
+            ...echo,
+            path: "/api/bad",
+            handle: () => {
+              throw new BadRequest("no");
+            },
+          },
+          { ...boom, policy: "public" },
+        ],
+        resolve: nobody,
+        trustProxy: false,
+        log: collected.logFactory("router"),
+      }),
+    );
+
     expect(
-      format(
-        new Date("2026-09-22T01:39:12.345Z"),
-        "runner",
-        "chat ab12 finish",
-      ),
-    ).toBe("2026-09-22T01:39:12.345Z runner: chat ab12 finish");
+      (await handle(new Request("http://x/api/bad"), "1.2.3.4")).status,
+    ).toBe(400);
+    expect(
+      (await handle(new Request("http://x/wp-login.php"), "1.2.3.4")).status,
+    ).toBe(404);
+    expect(collected.events).toHaveLength(0);
+    expect(
+      (await handle(new Request("http://x/api/boom"), "1.2.3.4")).status,
+    ).toBe(500);
+    expect(collected.events).toHaveLength(1);
+    expect(collected.events[0]).toMatchObject({
+      level: "error",
+      fields: { route: "/api/boom", status: 500, user: "nobody" },
+    });
   });
 });

@@ -22,7 +22,8 @@ export const CLOSE_RESTART = 1012;
 export type SocketHandlers = {
   open(conn: Conn): void;
   message(conn: Conn, raw: string): void;
-  close(conn: Conn): void;
+  drain(conn: Conn): void;
+  close(conn: Conn, code?: number): void;
   closeAll(code: number, reason: string): void;
 };
 
@@ -84,8 +85,11 @@ export function serve(options: ServeOptions) {
       message(ws: ServerWebSocket<ConnData>, message) {
         options.socket.message(ws, String(message));
       },
-      close(ws: ServerWebSocket<ConnData>) {
-        options.socket.close(ws);
+      drain(ws: ServerWebSocket<ConnData>) {
+        options.socket.drain(ws);
+      },
+      close(ws: ServerWebSocket<ConnData>, code) {
+        options.socket.close(ws, code);
       },
     },
   });

@@ -4,11 +4,13 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { newId } from "../../../src/server/lib/ids.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { Registry } from "../../../src/server/runner/index.ts";
 import { startSend } from "../../../src/server/runner/start.ts";
 import { MAX_REGENERATE_BODY } from "../../../src/server/sessions/index.ts";
 import { WEB_OFF_LINE } from "../../../src/shared/capabilities.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import { createAutomation, startRun } from "../../helpers/automations.ts";
 import {
   type ChatApp,
@@ -111,7 +113,7 @@ describe("a send's disabled capabilities", () => {
         ) {
           events.push(event);
         }
-      });
+      }, silent);
       try {
         const detail = await create(chat, { disable: ["web"] });
         const script = await waitScript(chat.scripted, 1);
@@ -320,7 +322,8 @@ describe("a send's disabled capabilities", () => {
   });
 
   test("a failed start rolls back the changed set as well as its rows", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     try {
       const started = await startChat(chat);
       started.script.reply("first");
@@ -333,15 +336,25 @@ describe("a send's disabled capabilities", () => {
         throw new Error("failed reply write");
       };
       try {
-        await expect(
-          chat.member.call(
-            "POST",
-            `/api/sessions/${started.sessionId}/messages`,
-            {
-              body: { message: "again", capabilities: { disable: ["web"] } },
-            },
-          ),
-        ).rejects.toThrow("failed reply write");
+        const response = await chat.member.call(
+          "POST",
+          `/api/sessions/${started.sessionId}/messages`,
+          {
+            body: { message: "again", capabilities: { disable: ["web"] } },
+          },
+        );
+        expect(response.status).toBe(500);
+        expect(
+          logs.events.findLast((event) => event.level === "error"),
+        ).toMatchObject({
+          area: "router",
+          msg: "request",
+          fields: {
+            route: "/api/sessions/:id/messages",
+            status: 500,
+            error: "failed reply write",
+          },
+        });
       } finally {
         store.addReply = addReply;
       }

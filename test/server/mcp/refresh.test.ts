@@ -3,12 +3,14 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Clock } from "../../../src/server/lib/clock.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import type { DiscoveryResult } from "../../../src/server/mcp/discover.ts";
 import { mcpArea } from "../../../src/server/mcp/index.ts";
 import { RefreshCoordinator } from "../../../src/server/mcp/refresh.ts";
 import { routes } from "../../../src/server/mcp/routes.ts";
 import { McpServerStore } from "../../../src/server/mcp/store.ts";
 import type { CreateMcpRequest } from "../../../src/shared/api/mcp.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { fixture, mcpFetch } from "./fake.ts";
 
@@ -74,6 +76,7 @@ const settle = () => Bun.sleep(10);
 describe("MCP refresh coordinator", () => {
   test("coalesces drift refreshes and honors the five minute hold", async () => {
     const db = memoryDb();
+    const logs = collectLogs();
     const time = fakeClock();
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
@@ -85,7 +88,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: logs.logFactory("mcp"),
       version: "test",
       render: (text) => text,
     });
@@ -108,6 +111,22 @@ describe("MCP refresh coordinator", () => {
     expect(
       fake.requests.filter((request) => request.method === "server/discover"),
     ).toHaveLength(2);
+    expect(
+      logs.events.filter((event) => event.msg === "server refreshed"),
+    ).toEqual([
+      {
+        level: "info",
+        area: "mcp",
+        msg: "server refreshed",
+        fields: { server: "cluster", tools: expect.any(Number) },
+      },
+      {
+        level: "info",
+        area: "mcp",
+        msg: "server refreshed",
+        fields: { server: "cluster", tools: expect.any(Number) },
+      },
+    ]);
     await area.close();
     db.close();
   });
@@ -125,7 +144,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -150,7 +169,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -181,7 +200,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -234,7 +253,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -288,7 +307,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -331,7 +350,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -363,7 +382,7 @@ describe("MCP refresh coordinator", () => {
     const coordinator = new RefreshCoordinator({
       store,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       discover,
     });
     const route = routes({
@@ -372,7 +391,7 @@ describe("MCP refresh coordinator", () => {
       capabilities: { forget: () => {} },
       coordinator,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       hasSecret: () => false,
       keys: () => [],
       callTimeoutMs: () => 20_000,
@@ -414,7 +433,7 @@ describe("MCP refresh coordinator", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -462,7 +481,7 @@ describe("MCP refresh coordinator", () => {
         keys: () => [],
         callTimeoutMs: () => 20_000,
         clock: time.clock,
-        log: () => {},
+        log: silent,
         version: "test",
         render: (text) => text,
       });
@@ -521,7 +540,7 @@ describe("MCP refresh routes", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -570,7 +589,7 @@ describe("MCP refresh routes", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -624,7 +643,7 @@ describe("MCP refresh routes", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -680,7 +699,7 @@ describe("MCP refresh routes", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -729,7 +748,7 @@ describe("MCP refresh routes", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });
@@ -771,7 +790,7 @@ describe("MCP refresh routes", () => {
       keys: () => [],
       callTimeoutMs: () => 20_000,
       clock: time.clock,
-      log: () => {},
+      log: silent,
       version: "test",
       render: (text) => text,
     });

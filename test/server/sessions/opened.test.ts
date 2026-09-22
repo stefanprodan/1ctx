@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import type { OpenedRecord } from "../../../src/server/knowledge/index.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { openedFileResponse } from "../../../src/server/sessions/opened.ts";
 import type {
   ForkSessionResponse,
@@ -112,7 +113,7 @@ describe("opened file storage and routes", () => {
     async () => {
       const chat = await chatApp();
       const events: BusEvent[] = [];
-      const off = subscribe((event) => events.push(event));
+      const off = subscribe((event) => events.push(event), silent);
       try {
         const started = await startChat(chat, "show the files");
         started.script.toolRound([

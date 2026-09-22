@@ -71,7 +71,7 @@ export type Automations = {
   ): UnreadChats;
   mark(automationId: string, marks: readonly MemoryMark[]): number;
   usesAgent(agentId: string): boolean;
-  start(): void;
+  start(): number;
   stop(): void;
   dispose(): void;
   routes: RouteDescriptor[];

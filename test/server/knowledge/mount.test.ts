@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { KNOWLEDGE_COMMANDS } from "../../../src/server/knowledge/limits.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { callCaps, freshSignal, run, type Setup, setup } from "./helpers.ts";
 
 const create = (s: Setup, name: string, text: string) =>
@@ -106,7 +107,7 @@ describe("knowledge command mounts", () => {
           event.data.projectId === s.projectId
         )
           events.push(event);
-      });
+      }, silent);
       try {
         expect(
           await run(s, "echo same > x; mkdir empty; rmdir empty; mkdir stays"),

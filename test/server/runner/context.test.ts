@@ -70,6 +70,7 @@ const policy: SendPolicy = {
   agentId: "a",
   agentName: "coder",
   providerId: "pr",
+  providerName: "local",
   wire: "openai-compatible",
   model: "org/model",
   contextLength: 1000,

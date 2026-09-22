@@ -57,6 +57,7 @@ export function compactSend(
     sessionId: session.id,
     projectId: policy.projectId,
     kind: "compact",
+    op: "compact",
     summarizing: true,
     // The last counted round is the size the history has now.
     used:
@@ -82,7 +83,14 @@ export function compactSend(
     deps.registry.free(send);
     throw err;
   }
-  deps.log(`chat ${session.id} compacted on ${policy.model}`);
+  deps.log.info("send start", {
+    chat: session.id,
+    user: policy.username,
+    agent: policy.agentName,
+    provider: policy.providerName,
+    model: policy.model,
+    op: "compact",
+  });
   void deps.run(send);
   return sessionDetail(deps.sessions, started.session, live(send));
 }

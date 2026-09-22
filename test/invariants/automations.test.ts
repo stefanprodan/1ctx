@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { nextFire, nextFires } from "../../src/server/automations/index.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import type { StreamRow } from "../../src/shared/api/sessions.ts";
 import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
@@ -175,7 +176,7 @@ describe("automations", () => {
       const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
       const off = subscribe((event) => {
         if (event.type === "session.changed") seen.push(event.data);
-      });
+      }, silent);
       try {
         chat.app.now.value = automation.nextAt!;
         const scheduledPending = chat.scripted.next();

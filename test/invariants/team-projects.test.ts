@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ProjectDetail } from "../../src/shared/contracts/project.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
@@ -355,7 +356,7 @@ describe("team project administration", () => {
       chat.app.socket.open(conn);
       conn.frames = [];
       const events: BusEvent[] = [];
-      const off = subscribe((event) => events.push(event));
+      const off = subscribe((event) => events.push(event), silent);
       const added = await addMember(chat, project.id, chat.memberId);
       expect(added.members.map((user) => user.id)).toEqual([chat.memberId]);
       expect(events).toEqual([
@@ -410,7 +411,7 @@ describe("team project administration", () => {
     chat.app.socket.open(conn);
     conn.frames = [];
     const events: BusEvent[] = [];
-    const off = subscribe((event) => events.push(event));
+    const off = subscribe((event) => events.push(event), silent);
     await addMember(chat, project.id, second.user.id);
     expect(events).toEqual([
       {

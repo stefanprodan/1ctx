@@ -5,6 +5,7 @@
 // wrong username and a wrong password the same way, after the same hash
 // work, so neither leaks which one was wrong.
 
+import { isIP } from "node:net";
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -45,6 +46,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "public",
       async handle(req, ctx) {
         if (!limit.hit(ctx.address, deps.clock())) {
+          if (limit.closed(ctx.address)) {
+            deps.log.warn("login limited", {
+              addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
+            });
+          }
           throw new TooManyRequests("too many sign-in attempts. Wait a minute");
         }
         const { username, password } = parseLogin(await jsonBody(req));
@@ -54,7 +60,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           user?.passwordHash ?? (await deps.users.nobodyHash()),
         );
         const wrong = new Unauthorized("wrong username or password");
-        if (!ok || user === null || user.disabled) throw wrong;
+        const logFailure = () =>
+          deps.log.warn("login failed", {
+            addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
+          });
+        if (!ok || user === null || user.disabled) {
+          logFailure();
+          throw wrong;
+        }
         const opened = transact(deps.db, () => {
           // Password verification yields. Re-read under the write transaction so
           // a disable, reset or rename that won meanwhile cannot open a login.
@@ -65,12 +78,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             current.passwordHash !== user.passwordHash ||
             current.disabled
           ) {
+            logFailure();
             throw wrong;
           }
           const { setCookie } = deps.auth.open(current);
           return { result: { user: current, setCookie } };
         });
-        deps.log(`${opened.user.username} signed in`);
+        deps.log.info("login opened", { user: opened.user.username });
         const body: LoginResponse = { user: meOf(opened.user) };
         return json(body, 200, { "set-cookie": opened.setCookie });
       },
@@ -91,7 +105,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             },
           ],
         }));
-        deps.log(`${principal.username} signed out`);
+        deps.log.info("login closed", { user: principal.username });
         return json({ ok: true }, 200, { "set-cookie": cleared });
       },
     },

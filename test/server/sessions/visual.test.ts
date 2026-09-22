@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { envelope } from "../../../src/server/runner/envelope.ts";
 import { parseVisualParams } from "../../../src/server/sessions/parse.ts";
 import { offWire } from "../../../src/server/sessions/rows.ts";
@@ -355,7 +356,7 @@ describe("visual call delivery", () => {
     async () => {
       const chat = await chatApp();
       const events: BusEvent[] = [];
-      const off = subscribe((event) => events.push(event));
+      const off = subscribe((event) => events.push(event), silent);
       try {
         const started = await startChat(chat, "Draw a diagram");
         started.script.toolRound([call]);

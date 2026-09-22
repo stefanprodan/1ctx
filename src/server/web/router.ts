@@ -5,11 +5,12 @@
 // descriptor, checked for same origin when it is not a GET (an upgrade
 // counts as a write: a browser sends Origin on the handshake), given a
 // principal, checked against the descriptor's policy, and only then
-// handed to the handler. An HttpError becomes a JSON body; anything
-// else propagates as the bug it is. A cookie the resolver renewed rides
-// back on the response unless the handler set its own, and on an
-// upgrade it rides in the handshake headers.
+// handed to the handler. An HttpError and an unexpected throw become
+// JSON bodies. A cookie the resolver renewed rides back on every
+// response unless the handler set its own, and on an upgrade it rides
+// in the handshake headers.
 
+import { isIP } from "node:net";
 import { BadRequest, HttpError } from "../lib/errors.ts";
 import {
   json,
@@ -18,7 +19,7 @@ import {
   type RouteDescriptor,
   type RouteOutcome,
 } from "../lib/http.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 
 type Compiled = RouteDescriptor & { pattern: RegExp; names: string[] };
 
@@ -112,9 +113,8 @@ export function sameOrigin(req: Request, url: URL, trustProxy: boolean) {
   return parsed.protocol === scheme || parsed.protocol === "https:";
 }
 
-// the policy, the parameters and the handler; every outcome is a
-// Response, an HttpError included. Anything else is a bug: it is logged
-// with where it happened and thrown on, which the listener answers 500.
+// the policy, the parameters and the handler; every expected outcome is
+// a Response. Anything else reaches the request boundary as a bug.
 async function dispatch(
   route: Compiled,
   match: RegExpExecArray,
@@ -125,7 +125,6 @@ async function dispatch(
     address: string;
     upgrade?: (data: unknown) => boolean;
   },
-  log: Log,
 ): Promise<RouteOutcome> {
   if (route.policy === "authenticated" || route.policy === "admin") {
     if (principal === null) return json({ error: "sign in" }, 401);
@@ -156,15 +155,67 @@ async function dispatch(
     if (err instanceof HttpError) {
       return json({ error: err.message }, err.status);
     }
-    const who = principal === null ? "nobody" : principal.username;
-    // the name and the message on one line, never the stack: a stack is
-    // many lines and an error's text may quote what it was given
-    const what = (
-      err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-    ).split("\n")[0];
-    log(`${ctx.req.method} ${ctx.url.pathname} as ${who} failed: ${what}`);
     throw err;
   }
+}
+
+function requestFields(
+  method: string,
+  route: string,
+  status: number,
+  started: number,
+  address: string,
+  principal: Principal | null | undefined,
+  error?: unknown,
+): LogFields {
+  const details = error === undefined ? {} : errorFields(error);
+  const { status: _errorStatus, ...withoutErrorStatus } = details;
+  return {
+    method,
+    route,
+    status,
+    duration: performance.now() - started,
+    user:
+      principal === undefined
+        ? undefined
+        : principal === null
+          ? "nobody"
+          : principal.username,
+    addr: isIP(address) === 0 ? "invalid" : address,
+    ...withoutErrorStatus,
+  };
+}
+
+function recordRequest(
+  log: Log,
+  method: string,
+  route: string,
+  health: boolean,
+  status: number,
+  started: number,
+  address: string,
+  principal: Principal | null | undefined,
+  error?: unknown,
+): void {
+  if (health) return;
+  // a 5xx is our bug whoever asked; below that only a signed-in user's
+  // requests say anything, since our client never calls a missing route
+  // or writes cross-origin, and a scanner's 4xx would fill the disk
+  if (status < 500) {
+    if (principal === null || principal === undefined) return;
+    if (method === "GET" && status < 400) return;
+  }
+  const fields = requestFields(
+    method,
+    route,
+    status,
+    started,
+    address,
+    principal,
+    error,
+  );
+  if (error === undefined) log.info("request", fields);
+  else log.error("request", fields);
 }
 
 export function router(deps: RouterDeps): Router {
@@ -172,6 +223,7 @@ export function router(deps: RouterDeps): Router {
   if (clashes.length > 0) throw new Error(`routes: ${clashes.join("; ")}`);
   const compiled = deps.routes.map(compile);
   return async (req, address, upgrader) => {
+    const started = performance.now();
     const url = new URL(req.url);
     const method = req.method as Method;
     let pathMatched = false;
@@ -184,12 +236,40 @@ export function router(deps: RouterDeps): Router {
         (method !== "GET" || route.upgrade) &&
         !sameOrigin(req, url, deps.trustProxy)
       ) {
-        return json({ error: "cross-origin request" }, 403);
+        const res = json({ error: "cross-origin request" }, 403);
+        recordRequest(
+          deps.log,
+          method,
+          route.path,
+          url.pathname === "/api/health",
+          res.status,
+          started,
+          address,
+          undefined,
+        );
+        return res;
       }
-      const resolution =
-        route.policy === "webhook"
-          ? { principal: null, setCookie: null }
-          : deps.resolve(req);
+      const resolved = route.policy !== "webhook";
+      let resolution: ReturnType<Resolver>;
+      try {
+        resolution = resolved
+          ? deps.resolve(req)
+          : { principal: null, setCookie: null };
+      } catch (error) {
+        const res = json({ error: "internal error" }, 500);
+        recordRequest(
+          deps.log,
+          method,
+          route.path,
+          url.pathname === "/api/health",
+          res.status,
+          started,
+          address,
+          undefined,
+          error,
+        );
+        return res;
+      }
       const upgrade =
         route.upgrade && upgrader
           ? (data: unknown) =>
@@ -200,24 +280,52 @@ export function router(deps: RouterDeps): Router {
                   : { "set-cookie": resolution.setCookie },
               )
           : undefined;
-      const res = await dispatch(
-        route,
-        match,
-        resolution.principal,
-        { req, url, address, upgrade },
-        deps.log,
-      );
+      let res: RouteOutcome;
+      let unexpected: unknown;
+      try {
+        res = await dispatch(route, match, resolution.principal, {
+          req,
+          url,
+          address,
+          upgrade,
+        });
+      } catch (error) {
+        unexpected = error;
+        res = json({ error: "internal error" }, 500);
+      }
       if (res === undefined) return undefined;
       // the row already moved, so the browser's copy must move with it
       // whatever the answer was, unless the handler replaced the cookie
       if (resolution.setCookie !== null && !res.headers.has("set-cookie")) {
         res.headers.set("set-cookie", resolution.setCookie);
       }
+      recordRequest(
+        deps.log,
+        method,
+        route.path,
+        url.pathname === "/api/health",
+        res.status,
+        started,
+        address,
+        resolved ? resolution.principal : undefined,
+        unexpected,
+      );
       return res;
     }
-    return json(
+    const res = json(
       { error: pathMatched ? "method not allowed" : "not found" },
       pathMatched ? 405 : 404,
     );
+    recordRequest(
+      deps.log,
+      method,
+      "unmatched",
+      url.pathname === "/api/health",
+      res.status,
+      started,
+      address,
+      undefined,
+    );
+    return res;
   };
 }

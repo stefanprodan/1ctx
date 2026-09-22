@@ -9,7 +9,7 @@ import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
 import type { SessionStore, UsagePort } from "../sessions/index.ts";
@@ -37,7 +37,7 @@ type Deps = {
 };
 
 export type Scheduler = {
-  start(): void;
+  start(): number;
   stop(): void;
   wake(): void;
   pass(): Promise<void>;
@@ -137,8 +137,14 @@ export function scheduler(deps: Deps): Scheduler {
     actor: UserRow | null,
   ): { detail: SessionDetail; launch: () => void } | null => {
     const holder: { value: PreparedRun | null } = { value: null };
+    const recorded: {
+      value:
+        | { msg: "fire"; user: string }
+        | { msg: "skip"; reason: string }
+        | null;
+    } = { value: null };
     try {
-      return transact(deps.db, () => {
+      const result = transact(deps.db, () => {
         const row = deps.store.byId(id);
         if (row === null) {
           if (source === "manual") throw new Conflict("no such automation");
@@ -183,6 +189,7 @@ export function scheduler(deps: Deps): Scheduler {
             nextAt,
             runSessionId: prepared.detail.session.id,
           })!;
+          recorded.value = { msg: "fire", user: resolved.user.username };
           return {
             result: { detail: prepared.detail, launch: prepared.launch },
             events: [changed(updated)],
@@ -199,9 +206,23 @@ export function scheduler(deps: Deps): Scheduler {
             reason: err.message,
             nextAt,
           })!;
+          recorded.value = { msg: "skip", reason: err.message };
           return { result: null, events: [changed(updated)] };
         }
       });
+      if (recorded.value?.msg === "fire") {
+        deps.log.info("fire", {
+          automation: id,
+          source,
+          user: recorded.value.user,
+        });
+      } else if (recorded.value?.msg === "skip") {
+        deps.log.info("skip", {
+          automation: id,
+          reason: recorded.value.reason,
+        });
+      }
+      return result;
     } catch (err) {
       holder.value?.abandon();
       throw err;
@@ -227,9 +248,10 @@ export function scheduler(deps: Deps): Scheduler {
         return { result: undefined, events: [changed(updated)] };
       });
     } catch (writeError) {
-      deps.log(
-        `automation ${id} could not record a skipped event: ${String(writeError)}`,
-      );
+      deps.log.error("skip record failed", {
+        automation: id,
+        ...errorFields(writeError),
+      });
     }
   };
 
@@ -240,7 +262,10 @@ export function scheduler(deps: Deps): Scheduler {
       return result?.detail ?? null;
     } catch (err) {
       recordUnexpected(id, err);
-      deps.log(`automation ${id} failed to fire: ${String(err)}`);
+      deps.log.error("fire failed", {
+        automation: id,
+        ...errorFields(err),
+      });
       return null;
     }
   };
@@ -268,11 +293,13 @@ export function scheduler(deps: Deps): Scheduler {
           };
         });
       } catch (err) {
-        deps.log(
-          `automation run ${session.id} could not be swept: ${String(err)}`,
-        );
+        deps.log.warn("retention delete failed", {
+          chat: session.id,
+          ...errorFields(err, false),
+        });
       }
     }
+    if (count > 0) deps.log.info("retention", { removed: count });
     return count;
   };
 
@@ -315,9 +342,10 @@ export function scheduler(deps: Deps): Scheduler {
         };
       });
     } catch (err) {
-      deps.log(
-        `automation ${session.automationId} could not record its run: ${String(err)}`,
-      );
+      deps.log.error("run record failed", {
+        automation: session.automationId,
+        ...errorFields(err),
+      });
     }
   };
 
@@ -333,7 +361,7 @@ export function scheduler(deps: Deps): Scheduler {
         sweep();
         lastSweep = now;
       } catch (err) {
-        deps.log(`automation retention sweep failed: ${String(err)}`);
+        deps.log.warn("retention failed", errorFields(err, false));
       }
     }
   };
@@ -362,11 +390,14 @@ export function scheduler(deps: Deps): Scheduler {
 
   return {
     start() {
-      if (running) return;
+      if (running) return 0;
       running = true;
-      reconcile();
-      unsubscribe ??= subscribe(onSession);
-      void loop().catch((err) => deps.log(`scheduler stopped: ${String(err)}`));
+      const reconciled = reconcile();
+      unsubscribe ??= subscribe(onSession, deps.log);
+      void loop().catch((err) =>
+        deps.log.error("scheduler stopped", errorFields(err)),
+      );
+      return reconciled;
     },
     stop() {
       running = false;

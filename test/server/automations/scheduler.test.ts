@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { type Event, Registry } from "../../../src/server/runner/index.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import { automationBody, createAutomation } from "../../helpers/automations.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
 
@@ -21,7 +22,8 @@ describe("automation scheduler", () => {
   test.each(["schedule", "manual"] as const)(
     "%s runs snapshot guidance before later edits",
     async (source) => {
-      const chat = await chatApp();
+      const logs = collectLogs();
+      const chat = await chatApp({ logFactory: logs.logFactory });
       chat.app.automationScheduler.stop();
       const events: Event[] = [];
       const start = chat.app.runner.startRun;
@@ -53,6 +55,16 @@ describe("automation scheduler", () => {
           return { detail: await response.json(), script: await pending };
         };
         const first = await launch();
+        expect(logs.events.findLast((event) => event.msg === "fire")).toEqual({
+          level: "info",
+          area: "automations",
+          msg: "fire",
+          fields: {
+            automation: automation.id,
+            source,
+            user: "caelea",
+          },
+        });
         const send = chat.app.runner.registry.get(first.detail.session.id)!;
         const policy = send.policy;
         expect(policy.automation).toMatchObject({
@@ -99,7 +111,8 @@ describe("automation scheduler", () => {
   );
 
   test("fires a due row once and skips a second fire while it runs", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     chat.app.automationScheduler.stop();
     const automation = await createAutomation(chat);
     chat.app.db
@@ -123,6 +136,29 @@ describe("automation scheduler", () => {
     expect(skipped.lastEventReason).toBe("still running");
     expect(skipped.lastRunSessionId).toBe(first.lastRunSessionId);
     expect(chat.scripted.scripts).toHaveLength(1);
+    expect(
+      logs.events
+        .filter((event) => event.msg === "fire" || event.msg === "skip")
+        .map((event) => ({ msg: event.msg, fields: event.fields })),
+    ).toEqual([
+      {
+        msg: "fire",
+        fields: {
+          automation: automation.id,
+          source: "schedule",
+          user: "caelea",
+        },
+      },
+      {
+        msg: "skip",
+        fields: { automation: automation.id, reason: "still running" },
+      },
+    ]);
+    expect(
+      logs.events.find(
+        (event) => event.msg === "send start" && event.fields.op === "run",
+      )?.fields,
+    ).toMatchObject({ user: "caelea", provider: "local" });
 
     script.reply("done");
     await settle(chat, first.lastRunSessionId!);
@@ -332,7 +368,8 @@ describe("automation scheduler", () => {
   });
 
   test("reconciles an ended run and sweeps expired run usage", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     chat.app.automationScheduler.stop();
     const automation = await createAutomation(chat, { retentionDays: 1 });
     const pending = chat.scripted.next();
@@ -359,6 +396,12 @@ describe("automation scheduler", () => {
       n: 1,
     });
     expect(chat.app.automationScheduler.sweep()).toBe(1);
+    expect(logs.events.findLast((event) => event.msg === "retention")).toEqual({
+      level: "info",
+      area: "automations",
+      msg: "retention",
+      fields: { removed: 1 },
+    });
     expect(chat.app.sessions.byId(detail.session.id)).toBeNull();
     expect(chat.app.db.query("select count(*) as n from usage").get()).toEqual({
       n: 0,

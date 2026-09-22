@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { transact } from "../../../src/server/db/index.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 const revoked = (id: string): BusEvent => ({
@@ -18,7 +19,7 @@ function capture() {
   const seen: string[] = [];
   const stop = subscribe((e) => {
     if (e.type === "login.revoked") seen.push(e.data.userId);
-  });
+  }, silent);
   return { seen, stop };
 }
 

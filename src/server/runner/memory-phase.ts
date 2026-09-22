@@ -8,6 +8,7 @@ import type {
 import type { SendCause } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ChatRequest, ToolCall } from "../providers/index.ts";
@@ -230,6 +231,7 @@ async function runCalls(
   let writeError: unknown = null;
   let clean = true;
   const settled = calls.map(async (call) => {
+    const callStarted = deps.clock();
     const ctx: ToolContext = {
       actor: {
         projectId: send.projectId,
@@ -252,7 +254,19 @@ async function runCalls(
       result = {
         content: error instanceof Error ? error.message : String(error),
         error: true,
+        failure: error,
       };
+    }
+    if (result.error) {
+      const tool = deps.tools.toolName?.(offered, call) ?? call.name;
+      deps.log.warn("tool failed", {
+        chat: send.sessionId,
+        tool,
+        duration: deps.clock() - callStarted,
+        ...(result.timedOut
+          ? { cause: "timeout" }
+          : errorFields(result.failure, false)),
+      });
     }
     if (signal.aborted) return;
     if (result.error || call.name !== "memory_edit") clean = false;
@@ -310,6 +324,7 @@ export type MemoryPhaseDeps = PhaseRowsDeps & {
     ): Promise<ToolResult>;
     toolName?(offered: Offered, call: ToolCall): string;
   };
+  log: Log;
   historyOf(send: ActiveSend): Message[];
   pause(ms: number): Promise<void>;
 };
@@ -355,6 +370,11 @@ export async function memoryPhase(
         });
       } catch (error) {
         if (controller.signal.aborted) return;
+        deps.log.warn("round failed", {
+          chat: send.sessionId,
+          round: send.roundNo,
+          ...errorFields(error, false),
+        });
         throw error;
       }
       if (controller.signal.aborted) return;

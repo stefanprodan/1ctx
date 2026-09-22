@@ -14,9 +14,7 @@ import type {
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
-import { logger } from "./log.ts";
-
-const log = logger("bus");
+import { errorFields, type Log } from "./log.ts";
 
 // the event map: one entry per event, payload by name
 export type BusEvents = {
@@ -61,22 +59,24 @@ export type BusEvent = {
 }[keyof BusEvents];
 
 type Listener = (event: BusEvent) => void;
+type Subscription = { listener: Listener; log: Log };
 
-const listeners = new Set<Listener>();
+const listeners = new Set<Subscription>();
 
-export function subscribe(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export function subscribe(listener: Listener, log: Log): () => void {
+  const subscription = { listener, log };
+  listeners.add(subscription);
+  return () => listeners.delete(subscription);
 }
 
 // a listener that throws is a bug in the listener, not in the publisher;
 // it is reported and the others still run
 export function publish(event: BusEvent): void {
-  for (const listener of listeners) {
+  for (const { listener, log } of listeners) {
     try {
       listener(event);
     } catch (err) {
-      log(`listener failed on ${event.type}: ${String(err)}`);
+      log.error("listener failed", { event: event.type, ...errorFields(err) });
     }
   }
 }

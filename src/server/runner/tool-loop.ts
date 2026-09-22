@@ -13,6 +13,7 @@ import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { isMemoryTool } from "../tools/index.ts";
@@ -31,6 +32,7 @@ export type LoopDeps = {
   writer: Writer;
   tools: ToolsPort;
   clock: Clock;
+  log: Log;
   historyOf(send: ActiveSend): Message[];
   fail(send: ActiveSend, error: string): void;
 };
@@ -76,7 +78,18 @@ export async function toolLoop(
   const limits = send.policy.limits;
   while (true) {
     if (send.cause !== null) return endFor(send.cause);
-    await runRound(deps.round, send, deps.historyOf(send));
+    try {
+      await runRound(deps.round, send, deps.historyOf(send));
+    } catch (error) {
+      if (!send.controller.signal.aborted) {
+        deps.log.warn("round failed", {
+          chat: send.sessionId,
+          round: send.roundNo,
+          ...errorFields(error, false),
+        });
+      }
+      throw error;
+    }
     if (send.cause !== null) return endFor(send.cause);
     const round = send.round;
     if (round === null) return finish();
@@ -228,6 +241,7 @@ async function runCalls(
     deps.writer.finishTool(send, call, result);
   };
   const settled = calls.map(async (call) => {
+    const callStarted = deps.clock();
     const ctx: ToolContext = {
       actor: {
         projectId: send.projectId,
@@ -251,7 +265,20 @@ async function runCalls(
       result = {
         content: err instanceof Error ? err.message : String(err),
         error: true,
+        failure: err,
       };
+    }
+    if (result.error) {
+      const tool =
+        deps.tools.toolName?.(send.policy.offered, call) ?? call.name;
+      deps.log.warn("tool failed", {
+        chat: send.sessionId,
+        tool,
+        duration: deps.clock() - callStarted,
+        ...(result.timedOut
+          ? { cause: "timeout" }
+          : errorFields(result.failure, false)),
+      });
     }
     let stored = result;
     try {

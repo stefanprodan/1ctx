@@ -10,16 +10,22 @@ import { join } from "node:path";
 import { type Db, open } from "../../src/server/db/index.ts";
 
 export function memoryDb(): Db {
-  return open(":memory:");
+  return open(":memory:").db;
 }
 
-export function fileDb(): { db: Db; path: string; cleanup: () => void } {
+export function fileDb(): {
+  db: Db;
+  path: string;
+  migrations: string[];
+  cleanup: () => void;
+} {
   const dir = mkdtempSync(join(tmpdir(), "1ctx-test-"));
   const path = join(dir, "test.sqlite");
-  const db = open(path);
+  const { db, migrations } = open(path);
   return {
     db,
     path,
+    migrations,
     cleanup() {
       db.close();
       rmSync(dir, { recursive: true, force: true });

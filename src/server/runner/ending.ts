@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import {
   type MemoryPhaseDeps,
   memoryPhase,
@@ -9,6 +9,7 @@ import {
 } from "./memory-phase.ts";
 import type { ActiveSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
+import { statusOf } from "./writer.ts";
 
 export const FINALIZE_ATTEMPTS = 3;
 export const FINALIZE_RETRY_MS = 100;
@@ -39,9 +40,10 @@ async function finalize(deps: EndingDeps, send: ActiveSend): Promise<boolean> {
       await deps.pause(FINALIZE_RETRY_MS);
     }
   }
-  deps.log(
-    `chat ${send.sessionId} could not be finalized: ${String(lastError)}`,
-  );
+  deps.log.error("chat finalize failed", {
+    chat: send.sessionId,
+    ...errorFields(lastError),
+  });
   return false;
 }
 
@@ -79,11 +81,19 @@ export async function endSend(
     }
   }
   const finalized = await finalize(deps, send);
-  deps.log(
-    `chat ${send.sessionId} ${send.cause}${
-      send.error === null ? "" : `: ${send.error}`
-    }`,
-  );
+  const log = send.cause === "failure" ? deps.log.error : deps.log.info;
+  log("send end", {
+    chat: send.sessionId,
+    op: send.op,
+    cause: send.cause,
+    status: statusOf(send.cause),
+    rounds: send.roundNo,
+    tools: send.budget.calls,
+    prompt_tokens: send.promptTokens,
+    completion_tokens: send.completionTokens,
+    duration: deps.phase.clock() - send.startedAt,
+    ...(send.error === null ? {} : errorFields(send.error, false)),
+  });
   send.end(finalized);
   return finalized;
 }

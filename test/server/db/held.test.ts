@@ -24,7 +24,7 @@ describe("heldByAnother", () => {
   test("a closed database is not held", () => {
     const path = temp("closed");
     try {
-      open(path).close();
+      open(path).db.close();
       expect(heldByAnother(path)).toBeFalse();
     } finally {
       rmSync(path, { force: true });
@@ -35,7 +35,7 @@ describe("heldByAnother", () => {
 
   test("a database another connection holds open is held", () => {
     const path = temp("open");
-    const held = open(path);
+    const held = open(path).db;
     try {
       expect(heldByAnother(path)).toBeTrue();
     } finally {
@@ -49,7 +49,7 @@ describe("heldByAnother", () => {
   test("the check leaves the database usable and unlocked", () => {
     const path = temp("after");
     try {
-      open(path).close();
+      open(path).db.close();
       expect(heldByAnother(path)).toBeFalse();
       const db = new Database(path, { strict: true });
       try {

@@ -16,7 +16,7 @@ import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import { withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
-import type { Log } from "./lib/log.ts";
+import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import {
@@ -34,7 +34,12 @@ import {
 } from "./providers/index.ts";
 import { type Provision, provisionArea } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
-import { type Registry, type Runner, runnerArea } from "./runner/index.ts";
+import {
+  type Registry,
+  type Runner,
+  runnerArea,
+  type ShutdownResult,
+} from "./runner/index.ts";
 import {
   type SessionStore,
   type Sessions,
@@ -63,7 +68,7 @@ export type ComposeOptions = {
   clock: Clock;
   // what reaches a provider; a test passes a fake
   fetcher?: Fetcher;
-  log: (area: string) => Log;
+  log: LogFactory;
   version: string;
   secureCookie: boolean;
   trustProxy: boolean;
@@ -99,17 +104,34 @@ export type App = {
   routes: RouteDescriptor[];
   handle: Router;
   provision: Provision;
+  repaired: number;
+  reconciled: number;
   // drop expired logins; called at start and every hour
   sweep(): number;
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
   mcpStart(): void;
   // terminate every send and close every socket, in that order
-  shutdown(): Promise<void>;
+  shutdown(): Promise<ShutdownResult>;
 };
+
+const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-"];
+
+function scrubbedLogs(options: ComposeOptions): LogFactory {
+  return (area) =>
+    scrubErrors(options.log(area), () =>
+      SCRUB_KINDS.flatMap((kind) =>
+        (options.secretNames?.(kind) ?? []).flatMap((name) => {
+          const value = options.secret(kind, name);
+          return value === null ? [] : [value];
+        }),
+      ),
+    );
+}
 
 export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock, secret } = options;
+  const log = scrubbedLogs(options);
   // Ports that point down the list, at an area built after the one that
   // holds them, are closures called once the list is complete: a user
   // is made with its personal project, project routes read sessions and
@@ -125,7 +147,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     db,
     secret: (name) => secret("user-", name),
     clock,
-    log: options.log("users"),
+    log: log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
   });
@@ -137,6 +159,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret: (name) => secret("provider-", name),
     keys: () => options.secretNames?.("provider-") ?? [],
     fetcher,
+    log: log("providers"),
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
   });
   // a deleted server or skill leaves no key behind in a chat or a task
@@ -153,7 +176,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     keys: () => options.secretNames?.(MCP_KEY_PREFIX) ?? [],
     callTimeoutMs: () => limits.current().callTimeoutMs,
     fetcher,
-    log: options.log("mcp"),
+    log: log("mcp"),
     version: options.version,
     render: renderMarkdown,
     capabilities,
@@ -161,7 +184,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const skills: Skills = skillsArea({
     db,
     clock,
-    log: options.log("skills"),
+    log: log("skills"),
     fetcher,
     capabilities,
     agents: {
@@ -189,7 +212,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const access: Access = accessArea({
     db,
     clock,
-    log: options.log("access"),
+    log: log("access"),
     secureCookie: options.secureCookie,
     users,
     projects,
@@ -229,7 +252,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   sessions = sessionsArea({
     db,
     clock,
-    log: options.log("sessions"),
+    log: log("sessions"),
     access,
     agents: { byId: (id) => agents.byId(id) },
     live: (sessionId) => runner.live(sessionId),
@@ -245,7 +268,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     fetcher,
     secret: (name) => secret("search-", name),
     clock,
-    log: options.log("tools"),
+    log: log("tools"),
     version: options.version,
     render: renderMarkdown,
     skills,
@@ -264,6 +287,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
     version: options.version,
+    log: log("socket"),
     refresh: (principal) => access.refresh(principal),
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
@@ -272,7 +296,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const runner = runnerArea({
     db,
     clock,
-    log: options.log("runner"),
+    log: log("runner"),
     sessions: sessions.store,
     access,
     visible: (principal, id) => sessions.visible(principal, id),
@@ -303,7 +327,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   automations = automationsArea({
     db,
     clock,
-    log: options.log("automations"),
+    log: log("automations"),
     access,
     users,
     projects,
@@ -314,10 +338,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     runner,
   });
+  let repaired = 0;
+  let reconciled = 0;
   if (options.activate !== false) {
     await users.bootstrap();
-    sessions.repair();
-    automations.start();
+    repaired = sessions.repair();
+    reconciled = automations.start();
   }
   const routes: RouteDescriptor[] = [
     ...users.routes,
@@ -342,7 +368,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     resolve: (req) => access.resolve(req),
     trustProxy: options.trustProxy,
-    log: options.log("web"),
+    log: log("router"),
   });
   const provision = provisionArea({
     handle,
@@ -364,6 +390,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       };
     },
   });
+  const sweepLog = log("sweep");
   return {
     users: users.store,
     projects: projects.store,
@@ -385,18 +412,39 @@ export async function compose(options: ComposeOptions): Promise<App> {
     routes,
     handle,
     provision,
-    sweep: () =>
-      access.sweep() + knowledge.sweep(clock()) + sessions.store.sweepDigests(),
+    repaired,
+    reconciled,
+    sweep: () => {
+      try {
+        const logins = access.sweep();
+        const knowledgeRows = knowledge.sweep(clock());
+        const digests = sessions.store.sweepDigests();
+        const removed = logins + knowledgeRows + digests;
+        if (removed > 0) {
+          sweepLog.info("sweep", {
+            logins,
+            knowledge: knowledgeRows,
+            digests,
+            removed,
+          });
+        }
+        return removed;
+      } catch (error) {
+        sweepLog.warn("sweep failed", errorFields(error, false));
+        throw error;
+      }
+    },
     mcpStart: () => mcp.start(),
     // the runner first, whose ending calls may still ask for a refresh
     // that the MCP close then refuses; nothing touches the db after
     async shutdown() {
       skills.close();
       automations.stop();
-      await runner.shutdown();
+      const result = await runner.shutdown();
       await mcp.close();
       automations.dispose();
       socket.dispose();
+      return result;
     },
   };
 }

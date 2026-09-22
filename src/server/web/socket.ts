@@ -17,6 +17,7 @@ import {
 } from "../../shared/socket.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import type { Log } from "../lib/log.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
 export const CLOSE_DROPPED = 1013;
@@ -24,11 +25,19 @@ export const CLOSE_DROPPED = 1013;
 export const CLOSE_REVOKED = 4001;
 export const CLOSE_BAD_COMMAND = 4002;
 
+export type SocketCloseCause =
+  | "backpressure"
+  | "dropped"
+  | "revoked"
+  | "shutdown"
+  | "protocol";
+
 export type ConnData = {
   principal: Principal;
   projects: Set<string>;
   watching: string | null;
   revoked: boolean;
+  closeCause?: SocketCloseCause;
 };
 
 type ConnState = Omit<ConnData, "revoked"> & { revoked?: boolean };
@@ -44,6 +53,7 @@ export type SocketDeps = {
   // the build, told to every connection so a tab left open over a
   // deploy reloads
   version: string;
+  log: Log;
   // the current principal, or null for a user that is gone
   refresh(principal: Principal): Principal | null;
   // every project the user may see now, or null for a user that is gone
@@ -58,7 +68,8 @@ export type Socket = {
   route: RouteDescriptor;
   open(conn: Conn): void;
   message(conn: Conn, raw: string): void;
-  close(conn: Conn): void;
+  drain(conn: Conn): void;
+  close(conn: Conn, code?: number): void;
   // a stream frame to the watchers of the session
   stream(sessionId: string, frame: SocketEvent): void;
   closeAll(code: number, reason: string): void;
@@ -73,11 +84,24 @@ export function socketArea(deps: SocketDeps): Socket {
   const watchers = new Map<string, Set<Conn>>();
   const pending = new Set<ConnData>();
 
+  const serverClose = (
+    conn: Conn,
+    code: number,
+    reason: string,
+    cause: SocketCloseCause,
+  ): void => {
+    conn.data.closeCause = cause;
+    conn.close(code, reason);
+  };
+
   const deliver = (conn: Conn, event: SocketEvent): void => {
     // 0 is a drop on a dead or overfull connection; -1 is backpressure
     // that Bun caps and closes past the limit
-    if (conn.send(JSON.stringify(event)) === 0) {
-      conn.close(CLOSE_DROPPED, "dropped a frame");
+    const sent = conn.send(JSON.stringify(event));
+    if (sent === 0) {
+      serverClose(conn, CLOSE_DROPPED, "dropped a frame", "dropped");
+    } else if (sent < 0) {
+      conn.data.closeCause = "backpressure";
     }
   };
 
@@ -108,7 +132,7 @@ export function socketArea(deps: SocketDeps): Socket {
   const recompute = (conn: Conn): void => {
     const principal = deps.refresh(conn.data.principal);
     if (principal === null) {
-      conn.close(CLOSE_REVOKED, "signed out");
+      serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
       return;
     }
     const roleChanged = principal.role !== conn.data.principal.role;
@@ -118,7 +142,7 @@ export function socketArea(deps: SocketDeps): Socket {
     if (roleChanged) deliver(conn, { type: "role", role: principal.role });
     const ids = deps.visibleProjectIds(principal.userId);
     if (ids === null) {
-      conn.close(CLOSE_REVOKED, "signed out");
+      serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
       return;
     }
     const next = new Set(ids);
@@ -234,7 +258,7 @@ export function socketArea(deps: SocketDeps): Socket {
           ) {
             // A close callback can lag behind the next committed write.
             forget(conn);
-            conn.close(CLOSE_REVOKED, "signed out");
+            serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
           }
         });
         for (const data of pending) {
@@ -249,7 +273,7 @@ export function socketArea(deps: SocketDeps): Socket {
         break;
     }
   };
-  const unsubscribe = subscribe(onBus);
+  const unsubscribe = subscribe(onBus, deps.log);
 
   return {
     route: {
@@ -276,8 +300,11 @@ export function socketArea(deps: SocketDeps): Socket {
     },
     open(conn) {
       pending.delete(conn.data as ConnData);
+      deps.log.info("socket open", {
+        user: conn.data.principal.username,
+      });
       if (conn.data.revoked === true) {
-        conn.close(CLOSE_REVOKED, "signed out");
+        serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
         return;
       }
       let set = byUser.get(conn.data.principal.userId);
@@ -300,12 +327,12 @@ export function socketArea(deps: SocketDeps): Socket {
         parsed = null;
       }
       if (!isSocketCommand(parsed)) {
-        conn.close(CLOSE_BAD_COMMAND, "bad command");
+        serverClose(conn, CLOSE_BAD_COMMAND, "bad command", "protocol");
         return;
       }
       const principal = deps.refresh(conn.data.principal);
       if (principal === null) {
-        conn.close(CLOSE_REVOKED, "signed out");
+        serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
         return;
       }
       conn.data.principal = principal;
@@ -334,8 +361,18 @@ export function socketArea(deps: SocketDeps): Socket {
         live: deps.live(parsed.sessionId),
       });
     },
-    close(conn) {
+    drain(conn) {
+      if (conn.data.closeCause === "backpressure") {
+        conn.data.closeCause = undefined;
+      }
+    },
+    close(conn, code = 1000) {
       forget(conn);
+      deps.log.info("socket close", {
+        user: conn.data.principal.username,
+        code,
+        cause: conn.data.closeCause,
+      });
     },
     stream(sessionId, frame) {
       const set = watchers.get(sessionId);
@@ -343,7 +380,7 @@ export function socketArea(deps: SocketDeps): Socket {
       for (const conn of [...set]) deliver(conn, frame);
     },
     closeAll(code, reason) {
-      each((conn) => conn.close(code, reason));
+      each((conn) => serverClose(conn, code, reason, "shutdown"));
     },
     size() {
       let n = 0;

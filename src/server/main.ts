@@ -5,6 +5,7 @@
 // wiring itself is in compose.ts so a test can run the same.
 
 import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname } from "node:path";
 import pkg from "../../package.json";
 import page from "../client/index.html";
@@ -13,7 +14,7 @@ import { type ComposeOptions, compose } from "./compose.ts";
 import { heldByAnother, inspect, open } from "./db/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { wallClock } from "./lib/clock.ts";
-import { logger, silent } from "./lib/log.ts";
+import { logger, scrubErrors, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { parse, readSources } from "./provision/index.ts";
 import { defaultDir, secrets } from "./secrets/index.ts";
@@ -22,6 +23,12 @@ import { serve } from "./web/serve.ts";
 
 const buildVersion = process.env.ONECTX_BUILD_VERSION;
 export const VERSION = buildVersion || `v${pkg.version}`;
+
+function displayPath(path: string): string {
+  const home = homedir();
+  if (path === home) return "~";
+  return path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+}
 
 function fail(message: string): never {
   console.error(`error: ${message}\n\n${HELP}`);
@@ -85,7 +92,7 @@ if (cli.kind === "provision") {
       snapshot.close();
     }
     if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
-    const db = open(dbPath);
+    const db = open(dbPath).db;
     try {
       const app = await compose({ ...options, db });
       try {
@@ -108,14 +115,20 @@ if (cli.kind === "provision") {
 const { hostname, port, dbPath, secretsDir, secretsMode } = cli.options;
 const { secureCookie, trustProxy } = cli.options;
 
-const log = logger("1ctx");
 if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
-const db = open(dbPath);
+const { db, migrations } = open(dbPath);
 const store = secrets(
   secretsDir ?? defaultDir(Bun.main, process.execPath),
   secretsMode,
 );
-log(`secrets: ${store.dir} (${store.mode})`);
+const log = scrubErrors(logger("1ctx"), () =>
+  (["provider-", "search-", "mcp-"] as const).flatMap((kind) =>
+    store.list(kind).flatMap((name) => {
+      const value = store.read(kind, name);
+      return value === null ? [] : [value];
+    }),
+  ),
+);
 
 const app = await compose({
   db,
@@ -140,7 +153,25 @@ const { server, stop } = serve({
   trustProxy,
   development: process.env.ONECTX_DEV === "1",
 });
-log(`${VERSION} listening on http://${server.hostname}:${server.port}`);
+const flags = [
+  ...(secureCookie ? ["secure-cookie"] : []),
+  ...(trustProxy ? ["trust-proxy"] : []),
+].join(",");
+log.info("startup", {
+  version: VERSION,
+  listen: `http://${server.hostname}:${server.port}`,
+  db: displayPath(dbPath),
+  secrets: displayPath(store.dir),
+  mode: store.mode,
+  migrations: migrations.length > 0 ? migrations.join(",") : "current",
+  flags: flags || "none",
+  providers: app.providers.list().length,
+  agents: app.agents.list().length,
+  mcp_servers: app.mcp.list().length,
+  automations: app.automations.all().length,
+  repaired: app.repaired,
+  reconciled: app.reconciled,
+});
 
 // in order: no more sends, every send ended and its rows written, the
 // sockets closed with the restart code, the listener stopped without
@@ -149,10 +180,16 @@ let stopping = false;
 const shutdown = async (signal: string) => {
   if (stopping) return;
   stopping = true;
-  log(`${signal}: shutting down`);
-  await app.shutdown();
+  const started = performance.now();
+  const result = await app.shutdown();
   await stop();
   db.close();
+  log.info("shutdown", {
+    signal,
+    ended: result.ended,
+    duration: performance.now() - started,
+    timed_out: result.timedOut || undefined,
+  });
   process.exit(0);
 };
 const onSignal = (signal: string) => {

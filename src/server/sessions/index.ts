@@ -152,7 +152,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         };
       });
       if (touched.length > 0) {
-        deps.log(`ended ${touched.length} chats left running by a restart`);
+        deps.log.info("chats repaired", { chats: touched.length });
       }
       return touched.length;
     },

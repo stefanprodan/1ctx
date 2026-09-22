@@ -10,6 +10,7 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadGateway, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
+import type { Log } from "../lib/log.ts";
 import { CatalogError, Catalogs, type Fetcher } from "./catalog.ts";
 import { providerFor } from "./provider.ts";
 import { type AgentsPort, routes } from "./routes.ts";
@@ -55,6 +56,7 @@ export type ProvidersDeps = {
   keys: () => string[];
   // what reaches a provider; a test passes a fake
   fetcher: Fetcher;
+  log: Log;
   agents: AgentsPort;
 };
 
@@ -83,6 +85,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
     fetcher: deps.fetcher,
     clock: deps.clock,
     secret: deps.secret,
+    log: deps.log,
   });
   return {
     store,

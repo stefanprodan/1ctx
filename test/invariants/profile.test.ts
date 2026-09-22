@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { PASSWORD_LIMIT } from "../../src/server/access/profile.ts";
 import { subscribe } from "../../src/server/lib/bus.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import { testApp } from "../helpers/app.ts";
 
 describe("GET /api/profile", () => {
@@ -99,7 +100,7 @@ describe("POST /api/profile/password", () => {
       await here.login("admin", "hunter2-test");
       await elsewhere.login("admin", "hunter2-test");
       const events: unknown[] = [];
-      const off = subscribe((e) => events.push(e));
+      const off = subscribe((e) => events.push(e), silent);
       const res = await here.call("POST", "/api/profile/password", {
         body: { current: "hunter2-test", next: "longenough" },
       });
@@ -158,7 +159,7 @@ describe("POST /api/profile/password", () => {
     const client = app.client();
     await client.login("admin", "hunter2-test");
     const events: unknown[] = [];
-    const off = subscribe((e) => events.push(e));
+    const off = subscribe((e) => events.push(e), silent);
     await client.call("POST", "/api/profile/password", {
       body: { current: "hunter2-test", next: "longenough" },
     });

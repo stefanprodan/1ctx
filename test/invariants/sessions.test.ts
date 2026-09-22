@@ -303,7 +303,7 @@ describe("GET /api/sessions/:id", () => {
         [];
       const unsubscribe = subscribe((event) => {
         if (event.type === "session.changed") changed.push(event.data);
-      });
+      }, silent);
       const started = await startChat(chat, "use a tool");
       started.script.toolRound([timeCall]);
       started.script.end();
@@ -542,7 +542,7 @@ describe("PATCH /api/sessions/:id", () => {
       );
       const before = chat.app.sessions.byId(started.sessionId)!.revision;
       const events: BusEvent[] = [];
-      const off = subscribe((event) => events.push(event));
+      const off = subscribe((event) => events.push(event), silent);
       const renamed = await chat.member.call(
         "PATCH",
         `/api/sessions/${started.sessionId}`,
@@ -729,7 +729,7 @@ describe("boot repair", () => {
       const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
       const stop = subscribe((event) => {
         if (event.type === "session.changed") seen.push(event.data);
-      });
+      }, silent);
       chat.app.socket.dispose();
       const fake = fakeFetch();
       const repaired = await compose({
@@ -745,6 +745,8 @@ describe("boot repair", () => {
       });
       stop();
 
+      expect(repaired.repaired).toBe(1);
+      expect(repaired.reconciled).toBe(0);
       expect(repaired.sessions.byId(session.id)).toMatchObject({
         status: "failed",
         revision: before.revision + 1,

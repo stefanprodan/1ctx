@@ -14,7 +14,12 @@ import {
   type ConnData,
 } from "../../src/server/web/socket.ts";
 import { PROTOCOL, type SocketEvent } from "../../src/shared/socket.ts";
-import { ORIGIN, type TestClient, VERSION } from "../helpers/app.ts";
+import {
+  collectLogs,
+  ORIGIN,
+  type TestClient,
+  VERSION,
+} from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import {
   type ChatApp,
@@ -103,13 +108,29 @@ function addTeam(chat: ChatApp, id: string) {
 
 describe("the socket", () => {
   test("open sends hello with the current protocol and the build", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
     expect(conn.frames).toEqual([
       { type: "hello", protocol: PROTOCOL, version: VERSION },
     ]);
-    close(chat, conn);
+    chat.app.socket.close(conn, 1001);
+    chat.app.socket.dispose();
+    expect(logs.events.filter((event) => event.area === "socket")).toEqual([
+      {
+        level: "info",
+        area: "socket",
+        msg: "socket open",
+        fields: { user: "caelea" },
+      },
+      {
+        level: "info",
+        area: "socket",
+        msg: "socket close",
+        fields: { user: "caelea", code: 1001, cause: undefined },
+      },
+    ]);
   });
 
   test("a session envelope reaches its project's connections only", async () => {
@@ -416,14 +437,28 @@ describe("the socket", () => {
   });
 
   test("a bad command closes the connection with 4002", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
     chat.app.socket.message(conn, JSON.stringify({ type: "watch" }));
     expect(conn.closed).toEqual([
       { code: CLOSE_BAD_COMMAND, reason: "bad command" },
     ]);
-    close(chat, conn);
+    chat.app.socket.close(conn, CLOSE_BAD_COMMAND);
+    chat.app.socket.dispose();
+    expect(
+      logs.events.findLast((event) => event.msg === "socket close"),
+    ).toEqual({
+      level: "info",
+      area: "socket",
+      msg: "socket close",
+      fields: {
+        user: "caelea",
+        code: CLOSE_BAD_COMMAND,
+        cause: "protocol",
+      },
+    });
   });
 
   test("a revocation before open closes without registering", async () => {
@@ -522,14 +557,28 @@ describe("the socket", () => {
   });
 
   test("a dropped send closes only that connection with 1013", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const conn = await connection(chat, chat.member);
     conn.sendResult = 0;
     chat.app.socket.open(conn);
     expect(conn.closed).toEqual([
       { code: CLOSE_DROPPED, reason: "dropped a frame" },
     ]);
-    close(chat, conn);
+    chat.app.socket.close(conn, CLOSE_DROPPED);
+    const slow = await connection(chat, chat.member);
+    slow.sendResult = -1;
+    chat.app.socket.open(slow);
+    chat.app.socket.close(slow, 1006);
+    chat.app.socket.dispose();
+    expect(
+      logs.events
+        .filter((event) => event.msg === "socket close")
+        .map((event) => event.fields),
+    ).toEqual([
+      { user: "caelea", code: CLOSE_DROPPED, cause: "dropped" },
+      { user: "caelea", code: 1006, cause: "backpressure" },
+    ]);
   });
 
   test("session deletion reaches the project and clears its watch", async () => {
@@ -549,7 +598,8 @@ describe("the socket", () => {
   });
 
   test("closeAll closes every connection with the given code", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const member = await connection(chat, chat.member);
     const admin = await connection(chat, chat.admin);
     chat.app.socket.open(member);
@@ -557,7 +607,17 @@ describe("the socket", () => {
     chat.app.socket.closeAll(1012, "restart");
     expect(member.closed).toEqual([{ code: 1012, reason: "restart" }]);
     expect(admin.closed).toEqual([{ code: 1012, reason: "restart" }]);
-    close(chat, member, admin);
+    chat.app.socket.close(member, 1012);
+    chat.app.socket.close(admin, 1012);
+    chat.app.socket.dispose();
+    expect(
+      logs.events
+        .filter((event) => event.msg === "socket close")
+        .map((event) => event.fields),
+    ).toEqual([
+      { user: "caelea", code: 1012, cause: "shutdown" },
+      { user: "admin", code: 1012, cause: "shutdown" },
+    ]);
   });
 
   test("a work round's reply streams to the watcher and its slot moves to work", async () => {

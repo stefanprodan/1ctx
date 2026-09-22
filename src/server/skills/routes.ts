@@ -13,7 +13,7 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound, ServiceUnavailable } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { MAX_REFRESH_ERROR } from "./limits.ts";
 import { changeOf, discover, loadSkill } from "./load.ts";
 import { parseAdd, parseDiscover, parseFile } from "./parse.ts";
@@ -161,7 +161,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             [...words].slice(0, MAX_REFRESH_ERROR).join(""),
             deps.clock(),
           );
-          deps.log(`skill ${before.name} refresh failed: ${words}`);
+          deps.log.warn("skill refresh failed", {
+            skill: before.name,
+            ...errorFields(error, false),
+          });
           throw error;
         } finally {
           deps.refreshing.delete(before.id);

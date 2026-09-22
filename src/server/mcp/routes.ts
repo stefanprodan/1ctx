@@ -18,6 +18,7 @@ import {
   ServiceUnavailable,
 } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
 import type { RefreshCoordinator, RefreshKind } from "./refresh.ts";
@@ -29,7 +30,7 @@ export type RoutesDeps = {
   capabilities: { forget(key: string): void };
   coordinator: RefreshCoordinator;
   clock: Clock;
-  log: (line: string) => void;
+  log: Log;
   hasSecret: (name: string) => boolean;
   keys: () => string[];
   callTimeoutMs: () => number;
@@ -160,7 +161,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               const words =
                 error instanceof Error ? error.message : String(error);
               deps.store.recordFailure(before.id, words, deps.clock());
-              deps.log(`server ${before.name} refresh failed: ${words}`);
+              deps.log.warn("server refresh failed", {
+                server: before.name,
+                ...errorFields(error, false),
+              });
             }
             throw gateway(error);
           }

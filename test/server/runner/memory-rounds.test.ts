@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import type {
   MemoryCommit,
   MemoryRow,
@@ -246,7 +247,7 @@ describe("pending memory read marks", () => {
         ) {
           seen.push(event);
         }
-      });
+      }, silent);
       const commit = store.commit.bind(store);
       const finish = chat.app.sessions.finishSend.bind(chat.app.sessions);
       store.commit = (...args) => {

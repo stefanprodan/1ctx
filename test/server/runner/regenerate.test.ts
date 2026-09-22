@@ -5,6 +5,7 @@
 // replacement send's durable rows.
 
 import { describe, expect, test } from "bun:test";
+import { collectLogs } from "../../helpers/app.ts";
 import type { ChatApp, Script } from "../../helpers/chat.ts";
 import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
 
@@ -34,7 +35,8 @@ async function finish(
 
 describe("POST /api/sessions/:id/regenerate", () => {
   test("keeps the user row and replaces a finished tool send", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const started = await startChat(chat, "what time is it");
     started.script.reasoning("checking");
     started.script.toolRound([timeCall]);
@@ -65,6 +67,12 @@ describe("POST /api/sessions/:id/regenerate", () => {
     expect(response.status).toBe(201);
     const detail = await response.json();
     const replacement = await pending;
+    expect(
+      logs.events.findLast(
+        (event) =>
+          event.msg === "send start" && event.fields.op === "regenerate",
+      )?.fields,
+    ).toMatchObject({ chat: started.sessionId, user: "caelea" });
 
     expect(detail.session.status).toBe("running");
     expect(detail.messages).toHaveLength(2);
