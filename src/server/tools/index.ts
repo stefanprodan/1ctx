@@ -8,7 +8,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import { skillKey, WEB } from "../../shared/capabilities.ts";
+import { skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
@@ -194,6 +194,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     search: SearchProvider | null,
     hosts: readonly string[],
     web: WebSnapshot | null,
+    visuals: boolean,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.version, fetchDeps, web)]),
@@ -208,7 +209,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           ),
         ]),
     makeVisualizeTool(hosts),
-    makeBashTool(deps.knowledge, web),
+    makeBashTool(deps.knowledge, web, visuals),
   ];
 
   const mcpTools = (servers: OfferedServer[], ctx: ToolContext): Tool[] =>
@@ -297,7 +298,12 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const area: ToolsArea = {
     store,
     webAccess,
-    capabilities: () => (webAccess().mode === "off" ? [] : [WEB]),
+    capabilities: () => [
+      ...(webAccess().mode === "off" ? [] : [WEB]),
+      ...(store.rows().find((row) => row.name === "visualize")!.enabled
+        ? [VISUALIZE]
+        : []),
+    ],
     serverNames: (links) =>
       mcpService.switchable(links).map((server) => server.name),
     skillsOff: (agentId, disabledCapabilities) =>
@@ -347,8 +353,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const base = [
-        ...toolsFor(offered.search, [], offered.web).filter((tool) =>
-          allowed.has(tool.name),
+        ...toolsFor(offered.search, [], offered.web, offered.visuals).filter(
+          (tool) => allowed.has(tool.name),
         ),
         ...makeSkillTools(offered.skills.skills, skillStore).filter((tool) =>
           allowed.has(tool.name),

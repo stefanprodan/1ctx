@@ -8,10 +8,11 @@ import {
   panelessOf,
   serversItem,
   skillsItem,
+  visualsItem,
   webItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
-import { WEB } from "../../../src/shared/capabilities.ts";
+import { VISUALIZE, WEB } from "../../../src/shared/capabilities.ts";
 
 describe("the Web access item", () => {
   test("is live and on when the instance allows it and the chat left it", () => {
@@ -51,6 +52,31 @@ describe("the Web access item", () => {
 
   test("waits without a reason until the project's agents answered", () => {
     expect(webItem({ tools: true, switchable: null, off: false })).toEqual({
+      live: false,
+      on: false,
+      reason: null,
+    });
+  });
+});
+
+describe("the Visuals item", () => {
+  test("follows its own key, apart from web access", () => {
+    expect(
+      visualsItem({ tools: true, switchable: [WEB, VISUALIZE], off: false }),
+    ).toEqual({ live: true, on: true, reason: null });
+    expect(
+      visualsItem({ tools: true, switchable: [WEB, VISUALIZE], off: true }),
+    ).toEqual({ live: true, on: false, reason: null });
+    expect(visualsItem({ tools: true, switchable: [WEB], off: false })).toEqual(
+      { live: false, on: false, reason: "Turned off by an admin" },
+    );
+    expect(
+      webItem({ tools: true, switchable: [VISUALIZE], off: false }),
+    ).toEqual({ live: false, on: false, reason: "Turned off by an admin" });
+    expect(
+      visualsItem({ tools: false, switchable: [VISUALIZE], off: false }).reason,
+    ).toBe("Agent cannot use tools");
+    expect(visualsItem({ tools: true, switchable: null, off: false })).toEqual({
       live: false,
       on: false,
       reason: null,

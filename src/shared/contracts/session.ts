@@ -59,6 +59,28 @@ export type RoundUsage = {
   contextLength: number | null;
 };
 
+// how an opened file is drawn: HTML and SVG in the visual frame while
+// the admin's Visuals row is on, Markdown rendered, anything else as code
+export type OpenedKind = "visual" | "markdown" | "code";
+
+// a file a bash command put on the page with open, as the tool row
+// carries it: the stored copy's text stays behind and the file route
+// answers it
+export type OpenedFile = {
+  // the absolute path in the mount, as it was resolved
+  path: string;
+  kind: OpenedKind;
+  // the highlighter's language for code; null for plain text and for
+  // the other kinds
+  language: string | null;
+  // the UTF-8 size and the line count of the stored copy
+  bytes: number;
+  lines: number;
+  // a visual's title, from the page's title element or the file's name;
+  // null for the other kinds
+  title: string | null;
+};
+
 export type Message = {
   id: string;
   sessionId: string;
@@ -83,6 +105,10 @@ export type Message = {
   // the files a user message carried, as they were at the send; null on
   // every other row and on a message without files
   uploads: MessageUpload[] | null;
+  // the files a bash command opened onto the page with open, in open
+  // order, without their text; null on every other row and on a bash
+  // row that opened nothing
+  files: OpenedFile[] | null;
   // the UTF-8 byte length of stored tool content on the wire; null on
   // every non-tool row
   resultBytes: number | null;

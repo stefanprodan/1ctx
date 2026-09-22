@@ -68,6 +68,7 @@ export class Registry {
         const start = Math.max(0, result.content.length - result.tail);
         const tail = clean(result.content.slice(start), ctx.caps.resultCut);
         return {
+          ...result,
           content:
             content.slice(
               0,
@@ -81,6 +82,7 @@ export class Registry {
         };
       }
       return {
+        ...(typeof result === "string" ? {} : result),
         content: clean(
           typeof result === "string" ? result : result.content,
           ctx.caps.resultCut,

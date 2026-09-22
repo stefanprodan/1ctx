@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The plus at the start of the composer's row and its menu, placed as
-// the agent list is. Add files opens the file picker. Web access is a
-// switch, drawn as the rail's theme switch is, and flipping it leaves
-// the menu open. MCP servers and Skills each swap the menu's rows for a
-// switch per server or skill, and Escape or the pane's first row swaps
-// them back. An item that cannot be used is off and says why on a line
+// the agent list is. Add files opens the file picker. Web access and
+// Visuals are switches, drawn as the rail's theme switch is, and
+// flipping one leaves the menu open. MCP servers and Skills each swap
+// the menu's rows for a switch per server or skill, and Escape or the
+// pane's first row swaps them back. An item that cannot be used is off and says why on a line
 // of its own.
 
 import { useSignal } from "@preact/signals";
@@ -22,6 +22,41 @@ const PANES: Record<Pane, { title: string; icon: IconName }> = {
   servers: { title: "MCP servers", icon: "mcp" },
   skills: { title: "Skills", icon: "skill" },
 };
+
+// the menu's row that is a switch for a kind alone
+function SwitchItem({
+  name,
+  icon,
+  item,
+  onFlip,
+}: {
+  name: string;
+  icon: IconName;
+  item: WebItem;
+  onFlip: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={item.on}
+      class="menu-item composer-add-item"
+      disabled={!item.live}
+      onClick={onFlip}
+    >
+      <Icon name={icon} size={14} class="composer-add-icon" />
+      <span class="composer-add-words">
+        <span>{name}</span>
+        {item.reason !== null && (
+          <span class="composer-add-block">{item.reason}</span>
+        )}
+      </span>
+      <span class={`composer-add-switch switch${item.on ? " switch-on" : ""}`}>
+        <span class="switch-knob" />
+      </span>
+    </button>
+  );
+}
 
 // the menu's row that leads to a pane
 function PaneLink({
@@ -70,6 +105,8 @@ export function Add({
   onFiles,
   web,
   onWeb,
+  visuals,
+  onVisuals,
   servers,
   skills,
   onFlip,
@@ -79,6 +116,8 @@ export function Add({
   onFiles: (files: File[]) => void;
   web: WebItem;
   onWeb: () => void;
+  visuals: WebItem;
+  onVisuals: () => void;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
@@ -173,27 +212,18 @@ export function Add({
               )}
             </span>
           </button>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={web.on}
-            class="menu-item composer-add-item"
-            disabled={!web.live}
-            onClick={onWeb}
-          >
-            <Icon name="globe" size={14} class="composer-add-icon" />
-            <span class="composer-add-words">
-              <span>Web access</span>
-              {web.reason !== null && (
-                <span class="composer-add-block">{web.reason}</span>
-              )}
-            </span>
-            <span
-              class={`composer-add-switch switch${web.on ? " switch-on" : ""}`}
-            >
-              <span class="switch-knob" />
-            </span>
-          </button>
+          <SwitchItem
+            name="Web access"
+            icon="globe"
+            item={web}
+            onFlip={onWeb}
+          />
+          <SwitchItem
+            name="Visuals"
+            icon="visual"
+            item={visuals}
+            onFlip={onVisuals}
+          />
           {(["servers", "skills"] as const).map((name) => {
             const item = items[name];
             return item === null ? null : (

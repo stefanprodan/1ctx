@@ -134,7 +134,11 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
   };
 }
 
-export const callCaps = { callTimeoutMs: 4000, resultCut: 1000 };
+export const callCaps = {
+  callTimeoutMs: 4000,
+  resultCut: 1000,
+  visuals: true,
+};
 export const freshSignal = () => new AbortController().signal;
 export type Setup = ReturnType<typeof setup>;
 

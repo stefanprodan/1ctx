@@ -1,6 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-
 import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
@@ -12,6 +11,7 @@ import type {
   SessionStatus,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import type { OpenedRecord } from "../knowledge/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 import {
@@ -39,6 +39,7 @@ import {
   memorySnapshot as readMemorySnapshot,
 } from "./memory.ts";
 import { addAgentMessage, finishReply } from "./messages.ts";
+import { readOpenedFile, writeOpenedFiles } from "./opened-store.ts";
 import { titleFrom } from "./parse.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -267,6 +268,10 @@ export class SessionStore {
     return raw ? message(raw) : null;
   }
 
+  openedFile(messageId: string, index: number) {
+    return readOpenedFile(this.db, messageId, index);
+  }
+
   reasoningDetails(
     id: string,
     providerId: string,
@@ -430,6 +435,7 @@ export class SessionStore {
       status: Exclude<MessageStatus, "streaming">;
       error: string | null;
       finishedAt: number;
+      opened?: OpenedRecord[] | null;
     },
   ): Message | null {
     const changed =
@@ -439,6 +445,9 @@ export class SessionStore {
         )
         .run(fields.content, fields.status, fields.error, fields.finishedAt, id)
         .changes > 0;
+    if (changed && fields.opened?.length) {
+      writeOpenedFiles(this.db, id, fields.opened);
+    }
     return changed ? this.message(id) : null;
   }
 

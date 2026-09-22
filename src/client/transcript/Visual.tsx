@@ -4,7 +4,8 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import {
-  cancelVisual,
+  cancelValue,
+  loadOpened,
   loadToolResult,
   loadVisual,
   toolResults,
@@ -25,11 +26,16 @@ export function Visual({ card }: { card: VisualCard }) {
   });
   const stored = toolVisuals.value.get(card.key);
   const result = card.result;
+  // an opened visual is stored bytes: the bash row's own end says
+  // nothing about it, so the card never draws the row's failure
+  const opened = card.source.kind === "file";
   const failed =
+    !opened &&
     result !== null &&
     result.status !== "done" &&
     result.status !== "streaming";
-  const failure = result ? toolResults.value.get(result.id) : undefined;
+  const failure =
+    !opened && result ? toolResults.value.get(result.id) : undefined;
   const error =
     card.preview?.error ??
     (failed
@@ -91,17 +97,23 @@ export function Visual({ card }: { card: VisualCard }) {
       media.removeEventListener("change", theme);
       window.removeEventListener("resize", theme);
       document.removeEventListener("load", theme, true);
-      cancelVisual(card.messageId, card.callIndex);
+      cancelValue(card.key);
     };
-  }, [card.messageId, card.callIndex, status]);
+  }, [card.key, status]);
 
   useEffect(() => {
-    if (result?.status === "done" && stored === undefined) {
-      void loadVisual(card.messageId, card.callIndex);
+    if (stored === undefined) {
+      // an exit 1 keeps its opens, so a failed row's files load too
+      if (opened) {
+        if (result?.status === "done" || result?.status === "failed")
+          void loadOpened(card.messageId, card.callIndex);
+      } else if (result?.status === "done") {
+        void loadVisual(card.messageId, card.callIndex);
+      }
     }
     if (failed && result && failure === undefined)
       void loadToolResult(result.id);
-  }, [result, stored, failed, failure, card.messageId, card.callIndex]);
+  }, [result, stored, failed, failure, opened, card.messageId, card.callIndex]);
 
   useLayoutEffect(() => {
     const model = player.current;

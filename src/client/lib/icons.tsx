@@ -128,6 +128,7 @@ const PATHS: Record<string, string> = {
   clip: "m14.29 7.37-6.13 6.13a4 4 0 0 1-5.66-5.66l5.71-5.71A2.67 2.67 0 1 1 12 5.89l-5.73 5.71a1.33 1.33 0 0 1-1.89-1.89l5.66-5.65",
   file: "M4 1.5h5l3 3V14a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 14zM9 1.5v3h3",
   archive: "M2 3h12v3H2zM3 6v7.5h10V6M6.5 9h3",
+  visual: "M2 2.5h12v11H2zM5 11V8M8 11V5.5M11 11V7",
 };
 
 export type IconName = keyof typeof PATHS;

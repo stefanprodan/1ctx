@@ -22,6 +22,12 @@ export function AccessLines({ row }: { row: AutomationSummary }) {
           <span class="split-strong">Off</span>
         </div>
       )}
+      {!access.visuals && (
+        <div class="split-line">
+          Visuals
+          <span class="split-strong">Off</span>
+        </div>
+      )}
       {access.mcpOff.length > 0 && (
         <div class="split-line">
           MCP off

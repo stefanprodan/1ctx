@@ -19,6 +19,7 @@ import {
   serverOf,
   skillKey,
   skillOf,
+  VISUALIZE,
   WEB,
 } from "../../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
@@ -260,6 +261,8 @@ export type Draft = {
   memoryGuidance: string;
   // its runs may reach the web, while the instance lets them
   web: boolean;
+  // its runs may call visualize, while the admin's Visuals row is on
+  visuals: boolean;
   // the keys of the MCP servers its runs go without
   mcpOff: string[];
   // the keys of the skills its runs go without
@@ -289,6 +292,7 @@ export function draftOf(
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
+      visuals: true,
       mcpOff: [],
       skillsOff: [],
     };
@@ -304,6 +308,7 @@ export function draftOf(
     memory: modeOf(a),
     memoryGuidance: a.memoryGuidance,
     web: !a.disabledCapabilities.includes(WEB),
+    visuals: !a.disabledCapabilities.includes(VISUALIZE),
     mcpOff: a.disabledCapabilities.filter((key) => serverOf(key) !== null),
     skillsOff: a.disabledCapabilities.filter((key) => skillOf(key) !== null),
   };
@@ -406,6 +411,7 @@ export function requestOf(
       memoryGuidance: d.memoryGuidance.trim(),
       disabledCapabilities: [
         ...(d.web ? [] : [WEB]),
+        ...(d.visuals ? [] : [VISUALIZE]),
         ...servers
           .map((server) => mcpKey(server.id))
           .filter((key) => d.mcpOff.includes(key)),
@@ -423,9 +429,10 @@ export function accessOf(
   a: Pick<AutomationSummary, "disabledCapabilities">,
   servers: readonly SwitchableServer[],
   skills: readonly SwitchableSkill[] = [],
-): { web: boolean; mcpOff: string[]; skillsOff: string[] } {
+): { web: boolean; visuals: boolean; mcpOff: string[]; skillsOff: string[] } {
   return {
     web: !a.disabledCapabilities.includes(WEB),
+    visuals: !a.disabledCapabilities.includes(VISUALIZE),
     mcpOff: servers
       .filter((server) => a.disabledCapabilities.includes(mcpKey(server.id)))
       .map((server) => server.name)

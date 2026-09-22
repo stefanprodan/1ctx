@@ -580,6 +580,11 @@ describe("visualize skill", () => {
     expect(prerequisite).toMatch(
       /\b(?:otherwise|else|not|unavailable)\b.*\btext\b/i,
     );
+    expect(words(loaded.body)).toContain(
+      words(
+        "With bash, you may also write the visual to a file under /tmp and run `open <file>` to show it. These rules hold for both routes.",
+      ),
+    );
   });
 
   test("keeps the complete upstream license and the theme's pinned revision", () => {

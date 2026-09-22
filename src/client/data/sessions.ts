@@ -41,8 +41,10 @@ import { applyEnvelope, dropRow, revokeRows } from "./stream.ts";
 import { loadUploads } from "./uploads.ts";
 
 export {
+  loadOpened,
   loadToolResult,
   loadVisual,
+  openedFiles,
   toolResults,
   toolVisuals,
 } from "./session-values.ts";

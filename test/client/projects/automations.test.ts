@@ -267,6 +267,7 @@ describe("the form", () => {
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
+      visuals: true,
       mcpOff: [],
       skillsOff: [],
     });
@@ -355,6 +356,20 @@ describe("the form", () => {
     expect(body(true)).toEqual([]);
   });
 
+  test("visuals are on for a new task, follow the row, and save as the key", () => {
+    expect(draftOf(null, "a1", "UTC", LIMIT).visuals).toBe(true);
+    const off = automation({ disabledCapabilities: ["visualize"] });
+    const shown = draftOf(off, "ignored", "ignored", LIMIT);
+    expect(shown.visuals).toBe(false);
+    expect(shown.web).toBe(true);
+    expect(dirtyOf(shown, off, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, visuals: true }, off, LIMIT)).toBe(true);
+    const request = requestOf(filled({ visuals: false, web: false }), LIMIT);
+    expect(
+      "body" in request ? request.body.disabledCapabilities : null,
+    ).toEqual(["visualize", "web"]);
+  });
+
   test("servers off follow the row and save only for the picked agent", () => {
     const row = automation({ disabledCapabilities: ["mcp:a1", "mcp:gone"] });
     const shown = draftOf(row, "ignored", "ignored", LIMIT);
@@ -408,6 +423,7 @@ describe("the form", () => {
     ];
     expect(accessOf(automation({}), servers, skills)).toEqual({
       web: true,
+      visuals: true,
       mcpOff: [],
       skillsOff: [],
     });
@@ -419,11 +435,13 @@ describe("the form", () => {
         "skill:gone",
         "skill:s1",
         "skill:s2",
+        "visualize",
         "web",
       ],
     });
     expect(accessOf(row, servers, skills)).toEqual({
       web: false,
+      visuals: false,
       mcpOff: ["flux", "github"],
       skillsOff: ["gitops", "visualize"],
     });

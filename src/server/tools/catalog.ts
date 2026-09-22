@@ -120,7 +120,7 @@ export function builtinCatalog(
   const own = fillYear(memoryTools("").map(schema), now);
   const tools = fillYear(
     [
-      makeBashTool(undefined, { mode: "all", domains: [] }),
+      makeBashTool(undefined, { mode: "all", domains: [] }, true),
       datetimeTool,
       makeWebfetchTool(""),
       makeWebsearchTool(() => null, "exa", ""),

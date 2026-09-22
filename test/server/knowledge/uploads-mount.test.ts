@@ -68,6 +68,7 @@ describe("uploaded files in command mounts", () => {
       expect(await run(s, "test -d /uploads; ls /uploads")).toEqual({
         content: "exit 0",
         error: false,
+        opened: [],
         tail: 6,
       });
       expect(s.area.uploads.read(s.session.id)).toEqual(before);
@@ -103,6 +104,7 @@ describe("uploaded files in command mounts", () => {
       expect(await run(s, "cp /uploads/docs/readme.md /tmp/copy")).toEqual({
         content: "exit 0",
         error: false,
+        opened: [],
         tail: 6,
       });
       expect(Buffer.from(scratchState(s).entries[0]!.data).toString()).toBe(
@@ -221,7 +223,12 @@ describe("uploaded files in command mounts", () => {
         s,
         "chmod 700 /uploads /uploads/docs; chmod 600 /uploads/docs/readme.md; touch /uploads /uploads/docs /uploads/docs/readme.md",
       );
-      expect(result).toEqual({ content: "exit 0", error: false, tail: 6 });
+      expect(result).toEqual({
+        content: "exit 0",
+        error: false,
+        opened: [],
+        tail: 6,
+      });
       expect(await run(s, "stat -c %a /uploads/docs/readme.md")).toEqual(mode);
       expect(s.area.uploads.read(s.session.id)).toEqual(before);
     } finally {
@@ -238,7 +245,7 @@ describe("uploaded files in command mounts", () => {
           s,
           "cp /uploads/docs/readme.md /tmp/copy; cat /tmp/copy > /uploads/docs/readme.md; mkdir /uploads/empty; rmdir /uploads/empty",
         ),
-      ).toEqual({ content: "exit 0", error: false, tail: 6 });
+      ).toEqual({ content: "exit 0", error: false, opened: [], tail: 6 });
     } finally {
       s.db.close();
     }
@@ -347,6 +354,7 @@ describe("upload mount budgets and isolation", () => {
       ).toEqual({
         content: "exit 0",
         error: false,
+        opened: [],
         tail: 6,
       });
       expect(Buffer.from(scratchState(s).entries[0]!.data).toString()).toBe(
@@ -426,7 +434,12 @@ describe("upload mount budgets and isolation", () => {
           ...callCaps,
           callTimeoutMs: 10_000,
         });
-        expect(result).toEqual({ content: "exit 0", error: false, tail: 6 });
+        expect(result).toEqual({
+          content: "exit 0",
+          error: false,
+          opened: [],
+          tail: 6,
+        });
       }
       const stored = new Map(
         scratchState(s).entries.map((file) => [
@@ -451,7 +464,7 @@ describe("upload mount budgets and isolation", () => {
       const other = s.makeSession();
       expect(
         await run(s, "ls /uploads", callCaps, freshSignal(), other.id),
-      ).toEqual({ content: "exit 0", error: false, tail: 6 });
+      ).toEqual({ content: "exit 0", error: false, opened: [], tail: 6 });
       seedUploads(s, { other: "separate" }, other.id);
       const result = await run(
         s,

@@ -8,6 +8,7 @@ import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
+import type { OpenedRecord } from "../knowledge/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type { MemoryWork } from "../memory/index.ts";
@@ -44,6 +45,7 @@ export type ToolResult = {
   content: string;
   error: boolean;
   tail?: number;
+  opened?: OpenedRecord[];
 };
 
 export type Tool<T extends string | ToolResult = string> = {
@@ -82,6 +84,7 @@ export type MemoryHandle = {
 
 export type Offered = {
   tools: ChatTool[];
+  visuals: boolean;
   web: WebSnapshot | null;
   search: SearchProvider | null;
   skills: { block: string; skills: OfferedSkill[] };

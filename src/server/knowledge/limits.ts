@@ -10,6 +10,7 @@ import { LIMIT_DEFINITIONS } from "../limits/index.ts";
 
 export const RECENT_FILES = 5;
 export const KNOWLEDGE_COMMANDS_IN_FLIGHT = 4;
+export const MAX_OPENS_PER_COMMAND = 10;
 export const MAX_KNOWLEDGE_BODY = 3 * LIMIT_DEFINITIONS.knowledgeFileBytes.max;
 export const MAX_ARCHIVE_UPLOAD = MAX_REQUEST_BYTES;
 export const MAX_ARCHIVE_EXPANDED = LIMIT_DEFINITIONS.knowledgeProjectBytes.max;

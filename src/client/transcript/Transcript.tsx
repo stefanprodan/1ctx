@@ -17,13 +17,14 @@ import { visualPreviews } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
 import { copyCode } from "./copy.ts";
+import { FileCard } from "./FileCard.tsx";
 import type { OnFork } from "./Fork.tsx";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
 import { UserRow } from "./UserRow.tsx";
 import { Visual } from "./Visual.tsx";
-import { visualCards } from "./visuals.ts";
+import { isFileCard, visualCards } from "./visuals.ts";
 import "./transcript.css";
 import "./md.css";
 import "./hljs.css";
@@ -155,9 +156,13 @@ export function Transcript({
                 )}
                 onRegenerate={last ? onRegenerate : undefined}
                 fork={fork}
-                visuals={visualCards(node, visualPreviews.value).map((card) => (
-                  <Visual key={card.key} card={card} />
-                ))}
+                visuals={visualCards(node, visualPreviews.value).map((card) =>
+                  isFileCard(card) ? (
+                    <FileCard key={card.key} card={card} />
+                  ) : (
+                    <Visual key={card.key} card={card} />
+                  ),
+                )}
               />
             );
           })}

@@ -10,6 +10,7 @@ import type { Db } from "../db/index.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import {
+  MESSAGE_COLUMNS,
   message,
   type RawMessage,
   type RawSend,
@@ -78,7 +79,7 @@ export function forkPoint(
 export function readForkPoint(db: Db, sessionId: string, messageId: string) {
   const rows = db
     .query<RawMessage, [string]>(
-      "select *, null as prompt_tokens from messages where session_id = ? order by seq",
+      `select ${MESSAGE_COLUMNS} from messages where session_id = ? order by seq`,
     )
     .all(sessionId)
     .map(message);
@@ -144,13 +145,16 @@ export function copyRows(
        tool_calls, tool_call_id, tool_name, model, ttft_ms, thinking_ms,
        created_at, finished_at, uploads from messages where id = ?`,
   );
+  const insertOpened = db.query(
+    `insert into opened_files
+       (message_id, position, path, kind, language, bytes, lines, title, text)
+     select ?, position, path, kind, language, bytes, lines, title, text
+     from opened_files where message_id = ? order by position`,
+  );
   for (const row of fields.rows) {
-    insertMessage.run(
-      ids.get(row.id)!,
-      fields.sessionId,
-      sendIds.get(row.sendId)!,
-      row.id,
-    );
+    const id = ids.get(row.id)!;
+    insertMessage.run(id, fields.sessionId, sendIds.get(row.sendId)!, row.id);
+    insertOpened.run(id, row.id);
   }
   return ids;
 }

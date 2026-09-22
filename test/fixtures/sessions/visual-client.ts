@@ -30,6 +30,7 @@ export function visualRow(fields: Partial<Message> = {}): Message {
     model: "test",
     resultBytes: null,
     uploads: null,
+    files: null,
     promptTokens: null,
     ttftMs: null,
     thinkingMs: null,

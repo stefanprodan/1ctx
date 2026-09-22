@@ -1,8 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { VISUAL_FRAME_BYTES } from "../../shared/words.ts";
+
 export const PAINT_MS = 150;
-export const VISUAL_BYTES = 512 * 1024;
+// the frame accepts what the painter checks, the one number the server
+// and the open command read too
+export const VISUAL_BYTES = VISUAL_FRAME_BYTES;
 export const THEME_TOKENS = [
   "--fg",
   "--dim",

@@ -15,7 +15,7 @@ import type { AutomationSummary } from "../../../shared/contracts/automation.ts"
 import { RETENTION_DAYS } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
-import { webItem } from "../../composer/Add.model.ts";
+import { visualsItem, webItem } from "../../composer/Add.model.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import {
   automationError,
@@ -144,6 +144,11 @@ function Editor({
     switchable: switchable.value,
     off: false,
   });
+  const visuals = visualsItem({
+    tools: takesTools,
+    switchable: switchable.value,
+    off: false,
+  });
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
@@ -241,6 +246,9 @@ function Editor({
         web={web}
         webOn={d.web}
         onWeb={() => set({ web: !d.web })}
+        visuals={visuals}
+        visualsOn={d.visuals}
+        onVisuals={() => set({ visuals: !d.visuals })}
         servers={takesTools ? serversOf() : []}
         mcpOff={d.mcpOff}
         onServer={(key) => set({ mcpOff: toggled(d.mcpOff, key) })}

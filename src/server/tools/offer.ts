@@ -5,7 +5,7 @@
 // apart from dispatch lets the agent page and the runner share the same
 // offered set without needing a live call context.
 
-import { mcpKey, skillKey, WEB } from "../../shared/capabilities.ts";
+import { mcpKey, skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import {
@@ -54,6 +54,7 @@ type OfferDeps = {
     search: SearchProvider | null,
     hosts: readonly string[],
     web: WebSnapshot | null,
+    visuals: boolean,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -121,6 +122,7 @@ export function offered(
       memory === null ? [] : makeMemoryTools(memory, deps.memorySessions);
     return {
       tools: fillYear(phaseTools.map(schema), now),
+      visuals: false,
       web: null,
       search: null,
       skills: { block: "", skills: [] },
@@ -132,6 +134,7 @@ export function offered(
   }
   const rows = new Map(deps.store.rows().map((row) => [row.name, row]));
   const searchRow = rows.get("websearch")!;
+  const visuals = rows.get("visualize")!.enabled;
   const access = rows.get("web")!;
   const web: WebSnapshot | null =
     access.mode === "off" || disabledCapabilities.includes(WEB)
@@ -146,7 +149,11 @@ export function offered(
     "bash",
     ...(web === null ? [] : ["webfetch"]),
     ...(search === null ? [] : ["websearch"]),
-    ...(rows.get("visualize")!.enabled ? ["visualize"] : []),
+    // the chat's own switch removes the tool and only the tool: open
+    // and the skill read the admin's row alone
+    ...(visuals && !disabledCapabilities.includes(VISUALIZE)
+      ? ["visualize"]
+      : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,
   // the skill tool's names and the file tool all come from what is left
@@ -166,7 +173,7 @@ export function offered(
   const baseTools = fillYear(
     [
       ...deps
-        .toolsFor(search, rows.get("visualize")!.hosts, web)
+        .toolsFor(search, rows.get("visualize")!.hosts, web, visuals)
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory, deps.memorySessions)),
@@ -204,6 +211,7 @@ export function offered(
   }
   return {
     tools: [...baseTools, ...mcpSchemas],
+    visuals,
     web,
     search,
     skills,

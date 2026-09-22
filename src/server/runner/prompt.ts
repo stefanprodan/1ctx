@@ -13,6 +13,8 @@
 import {
   mcpOffLine,
   skillsOffLine,
+  VISUALIZE,
+  VISUALIZE_OFF_LINE,
   WEB,
   WEB_OFF_LINE,
 } from "../../shared/capabilities.ts";
@@ -126,6 +128,12 @@ export function systemPrompt(
     policy.offered.tools.length > 0
   ) {
     parts.push(WEB_OFF_LINE);
+  }
+  if (
+    policy.disabledCapabilities.includes(VISUALIZE) &&
+    policy.offered.tools.length > 0
+  ) {
+    parts.push(VISUALIZE_OFF_LINE);
   }
   if (policy.mcpOff.length > 0) parts.push(mcpOffLine(policy.mcpOff));
   if (policy.skillsOff.length > 0) {

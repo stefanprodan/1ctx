@@ -31,6 +31,7 @@ function answer(changes: Partial<Message> = {}): Message {
     content: "done",
     resultBytes: null,
     uploads: null,
+    files: null,
     promptTokens: null,
     reasoning: "",
     html: '<p class="md-p">done</p>',

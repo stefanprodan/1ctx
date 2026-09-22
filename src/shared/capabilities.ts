@@ -5,11 +5,12 @@
 // what is off, since on is the default: a thing added to an agent later
 // is on everywhere without a write, and the empty set is every chat that
 // never touched a switch. A key is a kind, or a kind and a name after a
-// colon. Web access is a kind alone. An MCP server is `mcp:<server id>`:
-// the id, since the name is not what an agent's links hold. A skill is
-// `skill:<skill id>`, by the same rule.
+// colon. Web access is a kind alone, and so is the visualize tool. An
+// MCP server is `mcp:<server id>`: the id, since the name is not what an
+// agent's links hold. A skill is `skill:<skill id>`, by the same rule.
 
 export const WEB = "web";
+export const VISUALIZE = "visualize";
 export const MCP = "mcp";
 export const SKILL = "skill";
 
@@ -41,7 +42,10 @@ export function isCapabilityKey(value: unknown): value is string {
     // the shape alone: a key naming no server or skill, or one the agent
     // does not have, is kept and ignored, so a fork onto another agent
     // still sends
-    (value === WEB || serverOf(value) !== null || skillOf(value) !== null)
+    (value === WEB ||
+      value === VISUALIZE ||
+      serverOf(value) !== null ||
+      skillOf(value) !== null)
   );
 }
 
@@ -126,6 +130,12 @@ export const sameSet = (a: readonly string[], b: readonly string[]) =>
 // has web access off: constant, so every send after the flip shares it
 export const WEB_OFF_LINE =
   "The user turned web access off for this chat. Do not call webfetch or websearch or use curl. Say so if the web is needed.";
+
+// the line after it while a chat has the visualize tool off: a visual
+// drawn before the flip is in the history, and the model would call the
+// tool again and get an unknown tool
+export const VISUALIZE_OFF_LINE =
+  "The user turned the visualize tool off for this chat. Do not call visualize.";
 
 // the line after it while a chat has servers off that its agent would
 // otherwise be offered: names sorted, so it is constant between flips

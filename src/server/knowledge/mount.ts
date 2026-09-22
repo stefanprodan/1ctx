@@ -19,6 +19,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkFile, checkNames } from "./check.ts";
 import { type Change, commit, type ScratchCommit } from "./commit.ts";
 import { KNOWLEDGE_COMMANDS } from "./limits.ts";
+import { makeOpenCommand, type OpenedRecord, openedReceipt } from "./open.ts";
 import { failed, output } from "./output.ts";
 import { parseName } from "./parse.ts";
 import { acquire, acquireSession } from "./queue.ts";
@@ -27,7 +28,11 @@ import { type KnowledgeRow, type KnowledgeStore, summary } from "./store.ts";
 import { textFromBytes } from "./text.ts";
 import type { UploadStore, UploadTree } from "./uploads.ts";
 
-export type CommandCaps = { callTimeoutMs: number; resultCut: number } & (
+export type CommandCaps = {
+  callTimeoutMs: number;
+  resultCut: number;
+  visuals: boolean;
+} & (
   | { web?: null }
   | { web: WebSnapshot; fetchDeadlineMs: number; fetchBodyBytes: number }
 );
@@ -35,6 +40,7 @@ export type CommandResult = {
   content: string;
   error: boolean;
   tail?: number;
+  opened?: OpenedRecord[];
 };
 type MountDeps = {
   db: Db;
@@ -240,10 +246,20 @@ export async function run(
       storage.knowledgeFileBytes,
       ...uploads.entries.map((file) => file.bytes),
     );
+    const opened: OpenedRecord[] = [];
     const bash = new Bash({
       fs,
       cwd,
       commands: [...KNOWLEDGE_COMMANDS],
+      customCommands: [
+        makeOpenCommand(
+          {
+            knowledgeFileBytes: storage.knowledgeFileBytes,
+            visuals: caps.visuals,
+          },
+          opened,
+        ),
+      ],
       defenseInDepth: true,
       ...(caps.web
         ? {
@@ -325,6 +341,7 @@ export async function run(
       changes.knowledge,
       { sessionId, before: scratch, ...changes.scratch },
       { stdout, stderr: result.stderr, exitCode: result.exitCode },
+      opened.map(openedReceipt),
       caps.resultCut - notice.length,
       combined,
       deps.clock(),
@@ -333,6 +350,7 @@ export async function run(
       ...printed,
       content: notice + printed.content,
       error: result.exitCode !== 0,
+      opened,
     };
   } catch (error) {
     const result = failed(error, caps.resultCut - notice.length);
