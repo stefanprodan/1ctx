@@ -27,7 +27,8 @@ export type SessionsResponse = { rows: StreamRow[]; next: string | null };
 // who pressed Run now, whether or not they are in the project; null
 // for a chat and a scheduled run. agent is the session's agent by name,
 // credited on a line that says a send did not finish; null where the
-// row is built without it
+// row is built without it. runs is how many runs the automation keeps,
+// set only on its one line in All, which stands for them all
 export type StreamRow = {
   session: SessionSummary;
   agent: string | null;
@@ -35,6 +36,7 @@ export type StreamRow = {
   last: LastLine | null;
   automation: { id: string; name: string } | null;
   runBy: { id: string; username: string } | null;
+  runs: number | null;
 };
 
 // GET /api/sessions/:id, and the answer of POST /api/sessions

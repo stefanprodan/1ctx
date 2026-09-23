@@ -53,6 +53,15 @@
     color: var(--dim);
   }
 
+  /* how many runs an automation line stands for */
+  .stream-runs {
+    font-size: var(--text-label);
+    white-space: nowrap;
+  }
+  .stream-runs-icon {
+    vertical-align: -2px;
+  }
+
   .stream-author {
     color: var(--brand);
   }

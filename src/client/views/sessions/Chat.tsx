@@ -178,6 +178,7 @@ export function Chat({ params }: { params: Params }) {
                     last: null,
                     automation: null,
                     runBy: null,
+                    runs: null,
                   }}
                   onStop={() => stopSession(shown.session.id)}
                   fork={

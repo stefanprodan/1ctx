@@ -282,6 +282,7 @@ export async function runAutomation(id: string): Promise<SessionDetail> {
       automation: labelOf(id),
       // the one who pressed it is the one signed in
       runBy: me.value ? { id: me.value.id, username: me.value.username } : null,
+      runs: null,
     });
   }
   return detail;

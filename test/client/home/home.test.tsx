@@ -18,6 +18,7 @@ import {
 } from "../../../src/client/views/home/Home.model.ts";
 import { Home } from "../../../src/client/views/home/Home.tsx";
 import { Login } from "../../../src/client/views/home/Login.tsx";
+import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 
 describe("Home.model", () => {
   test("greets by the hour", () => {
@@ -31,6 +32,32 @@ describe("Home.model", () => {
   test("the date line is weekday, day and month", () => {
     expect(dateLine(new Date(2026, 8, 12))).toBe("Saturday 12 September");
   });
+});
+
+const chatRow = (): StreamRow => ({
+  session: {
+    id: "s1",
+    projectId: "p1",
+    ownerId: "u1",
+    agentId: "a1",
+    origin: "chat",
+    automationId: null,
+    runSource: null,
+    forkedFromId: null,
+    title: "Which pods restarted",
+    status: "done",
+    revision: 2,
+    createdAt: 0,
+    lastActivityAt: Date.now() - 120_000,
+    usage: null,
+    disabledCapabilities: [],
+  },
+  agent: "assistant",
+  send: null,
+  last: { seq: 2, author: "assistant", text: "nine pods" },
+  automation: null,
+  runBy: null,
+  runs: null,
 });
 
 describe("Home", () => {
@@ -117,32 +144,7 @@ describe("Home", () => {
     list.value = {
       next: null,
       more: { loading: false, error: null },
-      rows: [
-        {
-          session: {
-            id: "s1",
-            projectId: "p1",
-            ownerId: "u1",
-            agentId: "a1",
-            origin: "chat",
-            automationId: null,
-            runSource: null,
-            forkedFromId: null,
-            title: "Which pods restarted",
-            status: "done",
-            revision: 2,
-            createdAt: 0,
-            lastActivityAt: Date.now() - 120_000,
-            usage: null,
-            disabledCapabilities: [],
-          },
-          agent: "assistant",
-          send: null,
-          last: { seq: 2, author: "assistant", text: "nine pods" },
-          automation: null,
-          runBy: null,
-        },
-      ],
+      rows: [chatRow()],
     };
     const html = render(<Home />);
     expect(html).toContain('href="/chat/s1"');
@@ -153,6 +155,31 @@ describe("Home", () => {
       '<span class="stream-author">@assistant </span>nine pods',
     );
     expect(html).toContain("2m ago");
+  });
+
+  test("counts an automation's runs on its line in All", () => {
+    const base = chatRow();
+    list.value = {
+      next: null,
+      more: { loading: false, error: null },
+      rows: [
+        {
+          ...base,
+          session: {
+            ...base.session,
+            origin: "automation",
+            automationId: "au1",
+            title: "digest",
+          },
+          automation: { id: "au1", name: "digest" },
+          runs: 24,
+        },
+      ],
+    };
+    const html = render(<Home />);
+    expect(html).toMatch(
+      /#personal<\/span><span> · <\/span><span class="stream-runs">24 <svg.*?<\/svg><\/span><span> · <\/span><span class="stream-author">@assistant <\/span>nine pods/,
+    );
   });
 
   test("the search box carries the address's query and the empty line says so", () => {

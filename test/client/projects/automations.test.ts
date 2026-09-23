@@ -117,6 +117,7 @@ const run = (changes: Partial<SessionSummary> = {}): StreamRow => ({
   last: null,
   automation: { id: "au1", name: "nightly" },
   runBy: null,
+  runs: null,
 });
 
 describe("scheduleWords", () => {

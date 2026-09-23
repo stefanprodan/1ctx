@@ -1042,18 +1042,30 @@ violation, and every rule has a rejected fixture under
   its envelope brings it. The `session.changed` envelope carries `last`
   only when its transaction wrote such a row. `stream/Row.model.ts`
   composes the state line and the time from those and never reads a
-  transcript; `data/stream.ts` holds `{rows, next, more}` for one
-  filter, the query on the URL. A first page loads cold on a
-  navigation, the socket's open, a user change, `granted` and
-  `revoked`, dropping every row past it; warm on an envelope for a row
-  not held (under any covering filter, a search included) and a
-  delete, keeping the held rows past its last row and the held `next`
-  while any are kept. A warm load asked while a cold one is out is
-  cold. `loadMore()` merges a later page by id and revision, is dropped
-  by a cold load and not by a warm one, and a failure keeps the rows
-  and sets `more.error`. The pure reducers `mergeNextPage()` and
-  `refreshHead()` sit beside `ordered()` in `data/sessions-rows.ts`,
-  taking the order: `streamOrder` or the runs' `runOrder`.
+  transcript. All (`origin` null) lists an automation once, as its
+  newest run holding the query, with `runs` the count of its kept runs
+  (null on every other row), which the row draws as the number and the
+  bolt after the project; a run whose automation is gone is listed on
+  its own. Chats and Tasks list every row. `data/stream.ts` holds
+  `{rows, next, more}` for one filter, the query on the URL. A first
+  page loads cold on a navigation, the socket's open, a user change,
+  `granted` and `revoked`, dropping every row past it; warm on an
+  envelope for a row not held (under any covering filter, a search
+  included) and a delete, keeping the held rows past its last row and
+  the held `next` while any are kept. A warm load asked while a cold one
+  is out is cold. `loadMore()` merges a later page by id and revision,
+  is dropped by a cold load and not by a warm one, and a failure keeps
+  the rows and sets `more.error`. The pure reducers `mergeNextPage()`
+  and `refreshHead()` sit beside `ordered()` in `data/sessions-rows.ts`,
+  taking the order: `streamOrder` or the runs' `runOrder`; both keep one
+  line per automation (`oneLine()`). In All a run's envelope for an
+  automation with a line held goes through `swapRun()`: a newer run
+  takes the line and counts one more, an older run changes nothing, and
+  no load is asked; a swap is replayed over a first page asked before
+  it; a deleted automation's line stops counting and the first page
+  loads warm. An envelope for a row the filter would list, arriving
+  while a first page is out with none held, asks for one more page
+  once it lands.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
   reads signals and renders with the primitives under `ui/`. A route
   entry names its `load` in `app/routes.ts`, and `app/loading.ts`

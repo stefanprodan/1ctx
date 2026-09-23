@@ -43,6 +43,68 @@ export function ordered(
 const newest = (a: StreamRow, b: StreamRow | undefined) =>
   b !== undefined && b.session.revision > a.session.revision ? b : a;
 
+// in All an automation is one line: of two rows of one, the first in
+// the order stays, since it is the newer run, with the higher count,
+// since a count only moves up between loads
+export function oneLine(rows: StreamRow[]): StreamRow[] {
+  const lines = new Map<string, StreamRow>();
+  let dropped = false;
+  const out = rows.filter((row) => {
+    const id = row.session.automationId;
+    if (row.runs === null || id === null) return true;
+    const first = lines.get(id);
+    if (first === undefined) {
+      lines.set(id, row);
+      return true;
+    }
+    dropped = true;
+    if (row.runs > (first.runs ?? 0))
+      lines.set(id, { ...first, runs: row.runs });
+    return false;
+  });
+  if (!dropped) return rows;
+  return out.map((row) => {
+    const id = row.session.automationId;
+    return row.runs === null || id === null ? row : (lines.get(id) ?? row);
+  });
+}
+
+// a run's envelope over its automation's line in All: a newer run takes
+// the line and counts one more, the line's own run moves in place, an
+// older run changes nothing (null). undefined when no line is held
+export function swapRun(
+  rows: StreamRow[],
+  next: Pick<StreamRow, "session"> & Partial<Pick<StreamRow, "send" | "last">>,
+): StreamRow[] | null | undefined {
+  const id = next.session.automationId;
+  const line = rows.find(
+    (row) => row.runs !== null && row.session.automationId === id,
+  );
+  if (id === null || line === undefined) return undefined;
+  const same = line.session.id === next.session.id;
+  if (same && line.session.revision >= next.session.revision) return null;
+  if (!same && next.session.createdAt <= line.session.createdAt) return null;
+  const swapped: StreamRow = same
+    ? {
+        ...line,
+        session: next.session,
+        send: next.send ?? line.send,
+        last: next.last ?? line.last,
+      }
+    : {
+        session: next.session,
+        // the automation's agent may have changed since the line's run
+        agent:
+          next.session.agentId === line.session.agentId ? line.agent : null,
+        send: next.send ?? null,
+        last: next.last ?? null,
+        automation: line.automation,
+        runBy: null,
+        runs: (line.runs ?? 0) + 1,
+      };
+  return ordered([...rows.filter((row) => row !== line), swapped]);
+}
+
 // a later page into the held rows: the union by id, the higher revision
 // winning, in the order
 export function mergeNextPage(
@@ -54,7 +116,7 @@ export function mergeNextPage(
   for (const row of answer) {
     rows.set(row.session.id, newest(row, rows.get(row.session.id)));
   }
-  return ordered([...rows.values()], order);
+  return oneLine(ordered([...rows.values()], order));
 }
 
 // a first page over the held rows, on a connection that kept them
@@ -80,7 +142,7 @@ export function refreshHead(
             !inHead.has(row.session.id) && order(row.session, last.session) > 0,
         );
   return {
-    rows: ordered([...head, ...tail], order),
+    rows: oneLine(ordered([...head, ...tail], order)),
     next: tail.length > 0 ? next : answer.next,
   };
 }

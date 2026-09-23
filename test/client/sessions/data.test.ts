@@ -76,6 +76,7 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
     last: null,
     automation: null,
     runBy: null,
+    runs: null,
   };
 }
 
@@ -1891,5 +1892,198 @@ describe("the stream's pages", () => {
     await settle();
     expect(urls.at(-1)).toBe("/api/sessions?origin=chat");
     expect(ids(list.value)).toEqual(["a", "b"]);
+  });
+});
+
+describe("runs grouped in All", () => {
+  // the line of automation au in All, its run at a time, counting runs
+  const line = (
+    id: string,
+    at: number,
+    runs: number,
+    changes: Partial<SessionSummary> = {},
+  ): StreamRow => ({
+    ...row({
+      id,
+      origin: "automation",
+      automationId: "au",
+      title: "digest",
+      createdAt: at,
+      lastActivityAt: at,
+      ...changes,
+    }),
+    automation: { id: "au", name: "digest" },
+    runs,
+  });
+  const run = (id: string, at: number, changes: Partial<SessionSummary> = {}) =>
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: line(id, at, 0, changes).session,
+      messages: [],
+      send: null,
+    });
+
+  test.serial("a new run takes its line and counts up", async () => {
+    answer = () =>
+      Response.json({ rows: [row({ id: "c1" }), line("r1", 5, 3)] });
+    await loadList({ project: null, q: "" });
+    answer = (url) => {
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+    run("r2", 90, { status: "running" });
+    expect(ids(list.value)).toEqual(["r2", "c1"]);
+    expect(list.value?.rows[0]?.runs).toBe(4);
+    run("r2", 95, { revision: 2 });
+    expect(ids(list.value)).toEqual(["r2", "c1"]);
+    expect(list.value?.rows[0]?.runs).toBe(4);
+    expect(list.value?.rows[0]?.session.status).toBe("done");
+  });
+
+  test.serial("a run of an automation with no line loads again", async () => {
+    const urls: string[] = [];
+    answer = (url) => {
+      urls.push(url);
+      return Response.json({ rows: [row({ id: "c1" })] });
+    };
+    await loadList({ project: null, q: "" });
+    run("r1", 90);
+    await settle();
+    expect(urls).toEqual(["/api/sessions", "/api/sessions"]);
+  });
+
+  test.serial(
+    "under a search a run that misses it leaves the line",
+    async () => {
+      answer = () => Response.json({ rows: [line("r1", 5, 3)] });
+      await loadList({ project: null, q: "digest" });
+      answer = (url) => {
+        throw new Error(`unexpected fetch: ${url}`);
+      };
+      run("r2", 90, { title: "renamed" });
+      expect(ids(list.value)).toEqual(["r1"]);
+      expect(list.value?.rows[0]?.runs).toBe(3);
+    },
+  );
+
+  test.serial("Tasks lists every run on its own", async () => {
+    const urls: string[] = [];
+    answer = (url) => {
+      urls.push(url);
+      return Response.json({ rows: [{ ...line("r1", 5, 0), runs: null }] });
+    };
+    await loadList({ project: null, q: "", origin: "automation" });
+    run("r2", 90);
+    await settle();
+    expect(urls).toHaveLength(2);
+  });
+
+  test.serial(
+    "a deleted automation's line stops counting and loads again",
+    async () => {
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows:
+            urls.length === 1
+              ? [line("r2", 9, 2)]
+              : [
+                  { ...line("r2", 9, 0, { automationId: null }), runs: null },
+                  { ...line("r1", 5, 0, { automationId: null }), runs: null },
+                ],
+        });
+      };
+      await loadList({ project: null, q: "" });
+      applyAutomationFrame({
+        type: "automationDeleted",
+        projectId: "p1",
+        automationId: "au",
+      });
+      expect(list.value?.rows[0]?.runs).toBeNull();
+      await settle();
+      expect(urls).toHaveLength(2);
+      expect(ids(list.value)).toEqual(["r2", "r1"]);
+    },
+  );
+
+  test.serial("a first page asked before a swap keeps the swap", async () => {
+    let release: (r: Response) => void = () => {};
+    answer = () =>
+      new Promise((r) => {
+        release = r;
+      });
+    const loading = loadList({ project: null, q: "" });
+    await settle();
+    // no list held yet: the envelope asks again, so hold one first
+    release(Response.json({ rows: [line("r1", 5, 3), row({ id: "c1" })] }));
+    await loading;
+    answer = () =>
+      new Promise((r) => {
+        release = r;
+      });
+    const again = loadList({ project: null, q: "" });
+    await settle();
+    run("r2", 90, { status: "running" });
+    expect(ids(list.value)).toEqual(["r2", "c1"]);
+    release(Response.json({ rows: [line("r1", 5, 3), row({ id: "c1" })] }));
+    await again;
+    expect(ids(list.value)).toEqual(["r2", "c1"]);
+    expect(list.value?.rows[0]?.runs).toBe(4);
+  });
+
+  test.serial(
+    "a delete during the first load asks for the page again",
+    async () => {
+      const urls: string[] = [];
+      let release: (r: Response) => void = () => {};
+      answer = (url) => {
+        urls.push(url);
+        if (urls.length === 1) {
+          return new Promise((r) => {
+            release = r;
+          });
+        }
+        return Response.json({
+          rows: [{ ...line("r1", 5, 0, { automationId: null }), runs: null }],
+        });
+      };
+      const first = loadList({ project: null, q: "" });
+      await settle();
+      applyAutomationFrame({
+        type: "automationDeleted",
+        projectId: "p1",
+        automationId: "au",
+      });
+      release(Response.json({ rows: [line("r1", 5, 2)] }));
+      await first;
+      await settle();
+      expect(urls).toHaveLength(2);
+      expect(list.value?.rows[0]?.runs).toBeNull();
+    },
+  );
+
+  test.serial("a run moved during the first load asks once more", async () => {
+    const urls: string[] = [];
+    let release: (r: Response) => void = () => {};
+    answer = (url) => {
+      urls.push(url);
+      if (urls.length === 1) {
+        return new Promise((r) => {
+          release = r;
+        });
+      }
+      return Response.json({ rows: [line("r2", 90, 4)] });
+    };
+    const first = loadList({ project: null, q: "" });
+    await settle();
+    run("r2", 90, { status: "running" });
+    run("r2", 91, { revision: 2, status: "running" });
+    release(Response.json({ rows: [line("r1", 5, 3)] }));
+    await first;
+    await settle();
+    expect(urls).toHaveLength(2);
+    expect(ids(list.value)).toEqual(["r2"]);
+    expect(list.value?.rows[0]?.runs).toBe(4);
   });
 });
