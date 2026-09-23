@@ -491,6 +491,35 @@ export class UserRegex implements RegexLike {
   }
 
   /**
+   * (1ctx) The first match at or after `from`, as offsets into the input,
+   * for callers that walk a long text one match at a time.
+   */
+  scan(input: string, from = 0): { start: number; end: number } | null {
+    if (this.signal?.aborted) throw new Error("regular expression aborted");
+    const matcher = this.acquireMatcher(input);
+    if (!matcher.find(from)) return null;
+    return { start: matcher.start(0), end: matcher.end(0) };
+  }
+
+  /**
+   * (1ctx) The first match at or after `from` with every group's offsets,
+   * group 0 first; a group that did not take part is -1, -1.
+   */
+  groups(
+    input: string,
+    from = 0,
+  ): Array<{ start: number; end: number }> | null {
+    if (this.signal?.aborted) throw new Error("regular expression aborted");
+    const matcher = this.acquireMatcher(input);
+    if (!matcher.find(from)) return null;
+    const spans: Array<{ start: number; end: number }> = [];
+    for (let i = 0; i <= this._re2.groupCount(); i++) {
+      spans.push({ start: matcher.start(i), end: matcher.end(i) });
+    }
+    return spans;
+  }
+
+  /**
    * Get all matches using an iterator (for global regexes).
    */
   *matchAll(input: string): IterableIterator<RegExpMatchArray> {

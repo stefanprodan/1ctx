@@ -492,7 +492,8 @@ export class AwkParser {
     this.expect(TokenType.DO);
     this.skipNewlines();
     const body = this.parseStatement();
-    this.skipNewlines();
+    // (1ctx) `do stmt; while (c)`: a simple body ends at its semicolon
+    this.skipTerminators();
     this.expect(TokenType.WHILE);
     this.expect(TokenType.LPAREN);
     const condition = this.parseExpression();
@@ -692,8 +693,10 @@ export class AwkParser {
     return left;
   }
 
+  // (1ctx) awk binds concatenation tighter than the comparisons, which
+  // bind tighter than ~ and !~: `x "" == "0.3"` compares the concatenation
   private parseIn(): AwkExpr {
-    const left = this.parseConcatenation();
+    const left = this.parseMatch();
 
     if (this.check(TokenType.IN)) {
       this.advance();
@@ -705,12 +708,12 @@ export class AwkParser {
   }
 
   private parseConcatenation(): AwkExpr {
-    let left = this.parseMatch();
+    let left = this.parseAddSub();
 
     // Concatenation is implicit - consecutive expressions without operators
     // Match (~, !~) is handled by parseMatch, so we don't check for those here
     while (this.canStartExpression() && !this.isConcatTerminator()) {
-      const right = this.parseMatch();
+      const right = this.parseAddSub();
       left = { type: "binary", operator: " ", left, right };
     }
 
@@ -730,7 +733,7 @@ export class AwkParser {
   }
 
   private parseComparison(): AwkExpr {
-    let left = this.parseAddSub();
+    let left = this.parseConcatenation();
 
     while (
       this.match(
@@ -743,7 +746,7 @@ export class AwkParser {
       )
     ) {
       const opToken = this.advance();
-      const right = this.parseAddSub();
+      const right = this.parseConcatenation();
       const opMap = new Map<string, "<" | "<=" | ">" | ">=" | "==" | "!=">([
         ["<", "<"],
         ["<=", "<="],
@@ -912,11 +915,21 @@ export class AwkParser {
       // Exponent is right-associative, and binds tighter than unary
       // So 2^3^2 = 2^(3^2) = 2^9 = 512
       // But -2^2 = -(2^2) = -4 (unary handled in parseUnary)
-      const right = this.withDepth(() => this.parsePower());
+      const right = this.withDepth(() => this.parseExponent());
       left = { type: "binary", operator: "^", left, right };
     }
 
     return left;
+  }
+
+  // (1ctx) an exponent may carry its own sign: 2^-1
+  private parseExponent(): AwkExpr {
+    if (this.match(TokenType.MINUS, TokenType.PLUS, TokenType.NOT)) {
+      const op = this.advance().value as "!" | "-" | "+";
+      const operand = this.withDepth(() => this.parseExponent());
+      return { type: "unary", operator: op, operand };
+    }
+    return this.parsePower();
   }
 
   private parsePostfix(): AwkExpr {
@@ -1011,23 +1024,8 @@ export class AwkParser {
       return { type: "unary", operator: op, operand };
     }
 
-    // Power with non-postfix base
-    return this.parseFieldIndexPower();
-  }
-
-  /**
-   * Parse power expression for field index (no postfix on base)
-   */
-  private parseFieldIndexPower(): AwkExpr {
-    let left = this.parseFieldIndexPrimary();
-
-    if (this.check(TokenType.CARET)) {
-      this.advance();
-      const right = this.withDepth(() => this.parseFieldIndexPower());
-      left = { type: "binary", operator: "^", left, right };
-    }
-
-    return left;
+    // (1ctx) $ binds tighter than ^, so $2^2 is ($2)^2 as in gawk
+    return this.parseFieldIndexPrimary();
   }
 
   /**
@@ -1184,6 +1182,11 @@ export class AwkParser {
     // Identifier (variable or function call)
     if (this.check(TokenType.IDENT)) {
       const name = this.advance().value as string;
+
+      // (1ctx) `length` without parentheses is length($0)
+      if (name === "length" && !this.check(TokenType.LPAREN)) {
+        return { type: "call", name, args: [] };
+      }
 
       // Function call
       if (this.check(TokenType.LPAREN)) {

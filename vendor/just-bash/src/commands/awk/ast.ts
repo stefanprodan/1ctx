@@ -170,17 +170,23 @@ export interface AwkExpressionStmt {
   expression: AwkExpr;
 }
 
+// (1ctx) "|" sends the text to a command, run when the pipe is closed
+export interface AwkOutput {
+  redirect: ">" | ">>" | "|";
+  file: AwkExpr;
+}
+
 export interface AwkPrintStmt {
   type: "print";
   args: AwkExpr[];
-  output?: { redirect: ">" | ">>"; file: AwkExpr };
+  output?: AwkOutput;
 }
 
 export interface AwkPrintfStmt {
   type: "printf";
   format: AwkExpr;
   args: AwkExpr[];
-  output?: { redirect: ">" | ">>"; file: AwkExpr };
+  output?: AwkOutput;
 }
 
 export interface AwkIfStmt {

@@ -5,6 +5,7 @@
  */
 
 import { decodeBytesToUtf8, unsafeBytesFromLatin1 } from "../../../encoding.js";
+import { rethrowFatalExecutionError } from "../../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import { createUserRegex } from "../../../regex/index.js";
 import {
@@ -23,11 +24,13 @@ import type {
 import { awkBuiltins } from "../builtins.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { getField, setCurrentLine, setField } from "./fields.js";
+import { openStream, readRecord } from "./input.js";
+import { nullRedirection } from "./pipes.js";
 import {
   isTruthy,
   looksLikeNumber,
   matchRegex,
-  toAwkString,
+  toStr,
   toNumber,
 } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
@@ -35,6 +38,12 @@ import {
   getArrayElement,
   getVariable,
   hasArrayElement,
+  isArrayName,
+  isUninitElement,
+  isUninitVariable,
+  readArrayElement,
+  resolveArrayName,
+  deleteArray,
   setArrayElement,
   setVariable,
 } from "./variables.js";
@@ -166,12 +175,13 @@ async function evalArrayAccess(
   expr: AwkArrayAccess,
 ): Promise<AwkValue> {
   assertAwkDefenseContext(ctx, "array access evaluation");
-  const key = toAwkString(
+  const key = toStr(ctx,
     await withDefenseContext(ctx, "array key evaluation", () =>
       evalExpr(ctx, expr.key),
     ),
   );
-  return getArrayElement(ctx, expr.array, key);
+  // (1ctx) a reference creates the element, as in gawk
+  return readArrayElement(ctx, expr.array, key);
 }
 
 async function evalBinaryOp(
@@ -220,13 +230,13 @@ async function evalBinaryOp(
     const pattern =
       expr.right.type === "regex"
         ? expr.right.pattern
-        : toAwkString(
+        : toStr(ctx,
             await withDefenseContext(ctx, "regex right evaluation", () =>
               evalExpr(ctx, expr.right),
             ),
           );
     try {
-      return createUserRegex(pattern).test(toAwkString(left)) ? 1 : 0;
+      return createUserRegex(pattern).test(toStr(ctx, left)) ? 1 : 0;
     } catch {
       return 0;
     }
@@ -241,7 +251,7 @@ async function evalBinaryOp(
     const pattern =
       expr.right.type === "regex"
         ? expr.right.pattern
-        : toAwkString(
+        : toStr(ctx,
             await withDefenseContext(
               ctx,
               "negated-regex right evaluation",
@@ -249,10 +259,25 @@ async function evalBinaryOp(
             ),
           );
     try {
-      return createUserRegex(pattern).test(toAwkString(left)) ? 0 : 1;
+      return createUserRegex(pattern).test(toStr(ctx, left)) ? 0 : 1;
     } catch {
       return 1;
     }
+  }
+
+  // (1ctx) a comparison is numeric only when both sides are: a number, an
+  // uninitialized variable or element (both "" and 0, as gawk's), or a
+  // string that looks like one and is not a string constant, a
+  // concatenation or a string function's answer, which gawk compares as
+  // strings
+  if (isComparisonOp(op)) {
+    const l = await withDefenseContext(ctx, "binary left evaluation", () =>
+      evalOperand(ctx, expr.left),
+    );
+    const r = await withDefenseContext(ctx, "binary right evaluation", () =>
+      evalOperand(ctx, expr.right),
+    );
+    return evalComparison(ctx, l.value, r.value, op, l.numeric && r.numeric);
   }
 
   const left = await withDefenseContext(ctx, "binary left evaluation", () =>
@@ -264,7 +289,7 @@ async function evalBinaryOp(
 
   // String concatenation
   if (op === " ") {
-    const result = toAwkString(left) + toAwkString(right);
+    const result = toStr(ctx, left) + toStr(ctx, right);
     if (ctx.maxOutputSize > 0 && result.length > ctx.maxOutputSize) {
       throw new ExecutionLimitError(
         `awk: string concatenation size limit exceeded (${ctx.maxOutputSize} bytes)`,
@@ -275,26 +300,72 @@ async function evalBinaryOp(
     return result;
   }
 
-  // Comparison operators
-  if (isComparisonOp(op)) {
-    return evalComparison(left, right, op);
-  }
-
   // Arithmetic operators
   const leftNum = toNumber(left);
   const rightNum = toNumber(right);
+  // (1ctx) gawk's fatal error, where JavaScript would answer Infinity or NaN
+  if ((op === "/" || op === "%") && rightNum === 0) {
+    throw new Error("division by zero attempted");
+  }
   return applyNumericBinaryOp(leftNum, rightNum, op);
+}
+
+interface Operand {
+  value: AwkValue;
+  numeric: boolean;
+}
+
+// (1ctx) a comparison's side, and whether it takes part as a number
+async function evalOperand(
+  ctx: AwkRuntimeContext,
+  expr: AwkExpr,
+): Promise<Operand> {
+  if (expr.type === "variable") {
+    const value = getVariable(ctx, expr.name);
+    return {
+      value,
+      numeric: isUninitVariable(ctx, expr.name) || looksLikeNumber(value),
+    };
+  }
+  if (expr.type === "array_access") {
+    const key = toStr(ctx, await evalExpr(ctx, expr.key));
+    const uninit = isUninitElement(ctx, expr.array, key);
+    const value = readArrayElement(ctx, expr.array, key);
+    return { value, numeric: uninit || looksLikeNumber(value) };
+  }
+  // a field past NF is the null string, not uninitialized, in gawk
+  const value = await evalExpr(ctx, expr);
+  return { value, numeric: !isStringExpr(expr) && looksLikeNumber(value) };
 }
 
 function isComparisonOp(op: string): boolean {
   return ["<", "<=", ">", ">=", "==", "!="].includes(op);
 }
 
-function evalComparison(left: AwkValue, right: AwkValue, op: string): number {
-  const leftIsNum = looksLikeNumber(left);
-  const rightIsNum = looksLikeNumber(right);
+const STRING_FUNCTIONS = new Set([
+  "substr",
+  "tolower",
+  "toupper",
+  "sprintf",
+  "gensub",
+]);
 
-  if (leftIsNum && rightIsNum) {
+function isStringExpr(expr: AwkExpr): boolean {
+  return (
+    expr.type === "string" ||
+    (expr.type === "binary" && expr.operator === " ") ||
+    (expr.type === "call" && STRING_FUNCTIONS.has(expr.name))
+  );
+}
+
+function evalComparison(
+  ctx: AwkRuntimeContext,
+  left: AwkValue,
+  right: AwkValue,
+  op: string,
+  numeric: boolean,
+): number {
+  if (numeric) {
     const l = toNumber(left);
     const r = toNumber(right);
     switch (op) {
@@ -313,8 +384,8 @@ function evalComparison(left: AwkValue, right: AwkValue, op: string): number {
     }
   }
 
-  const l = toAwkString(left);
-  const r = toAwkString(right);
+  const l = toStr(ctx, left);
+  const r = toStr(ctx, right);
   switch (op) {
     case "<":
       return l < r ? 1 : 0;
@@ -371,7 +442,8 @@ async function evalFunctionCall(
     return callUserFunction(ctx, userFunc, args);
   }
 
-  return "";
+  // (1ctx) gawk's fatal error, when the call runs
+  throw new Error(`function '${name}' not defined`);
 }
 
 async function callUserFunction(
@@ -391,36 +463,51 @@ async function callUserFunction(
     );
   }
 
-  // Save only parameter variables (they are local in AWK)
-  // Use null-prototype to prevent prototype pollution via user-controlled param names
-  const savedParams: Record<string, AwkValue | undefined> = Object.create(null);
-  for (const param of func.params) {
-    savedParams[param] = ctx.vars[param];
+  // (1ctx) Arguments are evaluated in the caller's scope before any is
+  // bound. A variable is passed by reference, so an array stays shared and
+  // an untyped variable can become one; a parameter without an argument is
+  // untyped and may be a local array, which ends with the call.
+  const bound: Array<{ alias?: string; value?: AwkValue }> = [];
+  for (let i = 0; i < func.params.length; i++) {
+    if (i >= args.length) {
+      bound.push({});
+      continue;
+    }
+    const arg = args[i];
+    if (arg.type === "variable") {
+      bound.push({
+        alias: resolveArrayName(ctx, arg.name),
+        value: isArrayName(ctx, arg.name)
+          ? undefined
+          : getVariable(ctx, arg.name),
+      });
+    } else {
+      bound.push({
+        value: await withDefenseContext(
+          ctx,
+          "user function argument evaluation",
+          () => evalExpr(ctx, arg),
+        ),
+      });
+    }
   }
 
-  // Track array aliases we create (to clean up later)
-  const createdAliases: string[] = [];
-
-  // Set up parameters
+  const saved = func.params.map((param) => ({
+    value: ctx.vars[param],
+    array: ctx.arrays[param],
+    alias: ctx.arrayAliases.get(param),
+  }));
   for (let i = 0; i < func.params.length; i++) {
     const param = func.params[i];
-    if (i < args.length) {
-      const arg = args[i];
-      // If argument is a simple variable, set up an array alias
-      // This allows arrays to be passed by reference
-      if (arg.type === "variable") {
-        ctx.arrayAliases.set(param, arg.name);
-        createdAliases.push(param);
-      }
-      const value = await withDefenseContext(
-        ctx,
-        "user function argument evaluation",
-        () => evalExpr(ctx, arg),
-      );
-      ctx.vars[param] = value;
+    const { alias, value } = bound[i];
+    if (alias !== undefined && alias !== param) {
+      ctx.arrayAliases.set(param, alias);
     } else {
-      ctx.vars[param] = "";
+      ctx.arrayAliases.delete(param);
     }
+    if (value === undefined) delete ctx.vars[param];
+    else ctx.vars[param] = value;
+    if (alias === undefined) delete ctx.arrays[param];
   }
 
   // Execute function body
@@ -436,18 +523,15 @@ async function callUserFunction(
 
   const result = ctx.returnValue ?? "";
 
-  // Restore only parameter variables
-  for (const param of func.params) {
-    if (savedParams[param] !== undefined) {
-      ctx.vars[param] = savedParams[param];
-    } else {
-      delete ctx.vars[param];
-    }
-  }
-
-  // Clean up array aliases we created
-  for (const alias of createdAliases) {
-    ctx.arrayAliases.delete(alias);
+  for (let i = 0; i < func.params.length; i++) {
+    const param = func.params[i];
+    const before = saved[i];
+    if (bound[i].alias === undefined) deleteArray(ctx, param);
+    if (before.array !== undefined) ctx.arrays[param] = before.array;
+    if (before.value !== undefined) ctx.vars[param] = before.value;
+    else delete ctx.vars[param];
+    if (before.alias !== undefined) ctx.arrayAliases.set(param, before.alias);
+    else ctx.arrayAliases.delete(param);
   }
 
   ctx.hasReturn = false;
@@ -493,7 +577,7 @@ async function evalAssignment(
     } else if (target.type === "variable") {
       current = getVariable(ctx, target.name);
     } else {
-      const key = toAwkString(
+      const key = toStr(ctx,
         await withDefenseContext(ctx, "assignment array key", () =>
           evalExpr(ctx, target.key),
         ),
@@ -515,10 +599,13 @@ async function evalAssignment(
         finalValue = currentNum * valueNum;
         break;
       case "/=":
-        finalValue = valueNum !== 0 ? currentNum / valueNum : 0;
+        // (1ctx) gawk's fatal error
+        if (valueNum === 0) throw new Error("division by zero attempted");
+        finalValue = currentNum / valueNum;
         break;
       case "%=":
-        finalValue = valueNum !== 0 ? currentNum % valueNum : 0;
+        if (valueNum === 0) throw new Error("division by zero attempted");
+        finalValue = currentNum % valueNum;
         break;
       case "^=":
         finalValue = currentNum ** valueNum;
@@ -541,7 +628,7 @@ async function evalAssignment(
   } else if (target.type === "variable") {
     setVariable(ctx, target.name, finalValue);
   } else {
-    const key = toAwkString(
+    const key = toStr(ctx,
       await withDefenseContext(ctx, "assignment target array key", () =>
         evalExpr(ctx, target.key),
       ),
@@ -579,7 +666,7 @@ async function applyIncDec(
     oldVal = toNumber(getVariable(ctx, operand.name));
     setVariable(ctx, operand.name, oldVal + delta);
   } else {
-    const key = toAwkString(
+    const key = toStr(ctx,
       await withDefenseContext(ctx, "inc/dec array key", () =>
         evalExpr(ctx, operand.key),
       ),
@@ -632,7 +719,7 @@ async function evalInExpr(
     const parts: string[] = [];
     for (const e of key.elements) {
       parts.push(
-        toAwkString(
+        toStr(ctx,
           await withDefenseContext(ctx, "tuple key element evaluation", () =>
             evalExpr(ctx, e),
           ),
@@ -641,7 +728,7 @@ async function evalInExpr(
     }
     keyStr = parts.join(ctx.SUBSEP);
   } else {
-    keyStr = toAwkString(
+    keyStr = toStr(ctx,
       await withDefenseContext(ctx, "in-expression key evaluation", () =>
         evalExpr(ctx, key),
       ),
@@ -670,17 +757,14 @@ async function evalGetline(
     return evalGetlineFromFile(ctx, variable, file);
   }
 
-  // Plain getline - read from current input
-  if (!ctx.lines || ctx.lineIndex === undefined) {
+  // (1ctx) plain getline reads the main input walk, in BEGIN too
+  if (!ctx.mainInput) {
     return -1;
   }
-
-  const nextLineIndex = ctx.lineIndex + 1;
-  if (nextLineIndex >= ctx.lines.length) {
-    return 0; // No more lines
+  const nextLine = await ctx.mainInput.nextRecord();
+  if (nextLine === null) {
+    return 0;
   }
-
-  const nextLine = ctx.lines[nextLineIndex];
 
   if (variable) {
     setVariable(ctx, variable, nextLine);
@@ -689,14 +773,13 @@ async function evalGetline(
   }
 
   ctx.NR++;
-  ctx.lineIndex = nextLineIndex;
+  ctx.FNR++;
 
   return 1;
 }
 
 /**
- * Read a line from a command pipe: "cmd" | getline [var]
- * The command is executed and its output is read line by line.
+ * Read a record from a command pipe: "cmd" | getline [var]
  */
 async function evalGetlineFromCommand(
   ctx: AwkRuntimeContext,
@@ -710,59 +793,54 @@ async function evalGetlineFromCommand(
 
   assertAwkDefenseContext(ctx, "getline command source");
 
-  const cmd = toAwkString(
+  const cmd = toStr(ctx,
     await withDefenseContext(ctx, "getline command expression", () =>
       evalExpr(ctx, cmdExpr),
     ),
   );
 
+  // (1ctx) gawk's fatal error for an empty command
+  if (cmd === "") throw nullRedirection("|");
   let stream = ctx.getlineCommandStreams.get(cmd);
   if (!stream) {
-    // First time running this command
+    // First time running this command, or again after close()
+    let output: string;
     try {
       const result = await withDefenseContext(ctx, "getline command exec", () =>
         execFn(cmd),
       );
       // awk processes lines with regex / FS — decode bytes to UTF-8 so
       // `getline cmd |` from a piped command keeps multibyte fields whole.
-      const output = decodeBytesToUtf8(unsafeBytesFromLatin1(result.stdout));
-      const lines = output.split("\n");
-      // Remove trailing empty line if output ends with newline
-      if (lines.length > 0 && lines[lines.length - 1] === "") {
-        lines.pop();
-      }
-      stream = { lines, index: -1 };
-      ctx.getlineCommandStreams.set(cmd, stream);
+      output = decodeBytesToUtf8(unsafeBytesFromLatin1(result.stdout));
     } catch (e) {
       if (e instanceof SecurityViolationError) {
         throw e;
       }
+      rethrowFatalExecutionError(e);
       return -1; // Error running command
     }
+    // (1ctx) the output shares the command's input budget
+    stream = openStream(ctx, output);
+    ctx.getlineCommandStreams.set(cmd, stream);
   }
 
-  // Get next line
-  const nextIndex = stream.index + 1;
-  if (nextIndex >= stream.lines.length) {
+  // (1ctx) one record under the current RS; NR and FNR stay
+  const record = readRecord(ctx, stream);
+  if (record === null) {
     return 0; // EOF
   }
 
-  const line = stream.lines[nextIndex];
-  stream.index = nextIndex;
-
   if (variable) {
-    setVariable(ctx, variable, line);
+    setVariable(ctx, variable, record);
   } else {
-    setCurrentLine(ctx, line);
+    setCurrentLine(ctx, record);
   }
-
-  // Note: command pipe getline does NOT update NR
 
   return 1;
 }
 
 /**
- * Read a line from an external file.
+ * Read a record from an external file.
  */
 async function evalGetlineFromFile(
   ctx: AwkRuntimeContext,
@@ -775,7 +853,7 @@ async function evalGetlineFromFile(
   }
 
   assertAwkDefenseContext(ctx, "getline file source");
-  const filename = toAwkString(
+  const filename = toStr(ctx,
     await withDefenseContext(ctx, "getline filename evaluation", () =>
       evalExpr(ctx, fileExpr),
     ),
@@ -788,44 +866,43 @@ async function evalGetlineFromFile(
 
   const filePath = fs.resolvePath(ctx.cwd, filename);
 
+  if (filename === "") throw nullRedirection("<");
   let stream = ctx.getlineFileStreams.get(filePath);
+  if (!stream && (filename === "-" || filename === "/dev/stdin")) {
+    // (1ctx) standard input, as gawk names it
+    stream = openStream(ctx, ctx.readStdin?.() ?? "");
+    ctx.getlineFileStreams.set(filePath, stream);
+  }
   if (!stream) {
-    // First time reading this file
+    // First time reading this file, or again after close()
+    let content: string;
     try {
-      const content = await withDefenseContext(ctx, "getline file read", () =>
+      content = await withDefenseContext(ctx, "getline file read", () =>
         fs.readFile(filePath),
       );
-      const lines = content.split("\n");
-      // Remove trailing empty line if file ends with newline
-      if (lines.length > 0 && lines[lines.length - 1] === "") {
-        lines.pop();
-      }
-      stream = { lines, index: -1 };
-      ctx.getlineFileStreams.set(filePath, stream);
     } catch (e) {
       if (e instanceof SecurityViolationError) {
         throw e;
       }
+      rethrowFatalExecutionError(e);
       return -1; // Error reading file
     }
+    // (1ctx) the file shares the command's input budget
+    stream = openStream(ctx, content);
+    ctx.getlineFileStreams.set(filePath, stream);
   }
 
-  // Get next line
-  const nextIndex = stream.index + 1;
-  if (nextIndex >= stream.lines.length) {
+  // (1ctx) one record under the current RS; NR and FNR stay
+  const record = readRecord(ctx, stream);
+  if (record === null) {
     return 0; // EOF
   }
 
-  const line = stream.lines[nextIndex];
-  stream.index = nextIndex;
-
   if (variable) {
-    setVariable(ctx, variable, line);
+    setVariable(ctx, variable, record);
   } else {
-    setCurrentLine(ctx, line);
+    setCurrentLine(ctx, record);
   }
-
-  // Note: getline from file does NOT update NR
 
   return 1;
 }

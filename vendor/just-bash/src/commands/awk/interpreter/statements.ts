@@ -10,12 +10,23 @@ import {
   awaitWithDefenseContext,
 } from "../../../security/defense-context.js";
 import { utf8ByteLength } from "../../printf/escapes.js";
-import type { AwkArrayAccess, AwkExpr, AwkStmt, AwkVariable } from "../ast.js";
-import { formatPrintf } from "../builtins.js";
+import type {
+  AwkArrayAccess,
+  AwkExpr,
+  AwkOutput,
+  AwkStmt,
+  AwkVariable,
+} from "../ast.js";
+import { formatPrintf, numberToString } from "../format.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { evalExpr, setBlockExecutor } from "./expressions.js";
-import { isTruthy, toAwkString, toNumber } from "./type-coercion.js";
-import { deleteArray, deleteArrayElement } from "./variables.js";
+import { nullRedirection, writePipe } from "./pipes.js";
+import { isTruthy, toStr, toNumber } from "./type-coercion.js";
+import {
+  deleteArray,
+  deleteArrayElement,
+  resolveArrayName,
+} from "./variables.js";
 
 // Register the block executor with expressions module (for user function calls)
 setBlockExecutor(executeBlock);
@@ -25,7 +36,10 @@ setBlockExecutor(executeBlock);
  * Throws ExecutionLimitError if the limit is set and exceeded.
  */
 function checkAwkOutputSize(ctx: AwkRuntimeContext): void {
-  if (ctx.maxOutputSize > 0 && ctx.output.length > ctx.maxOutputSize) {
+  if (
+    ctx.maxOutputSize > 0 &&
+    ctx.output.length + ctx.errorOutput.length > ctx.maxOutputSize
+  ) {
     throw new ExecutionLimitError(
       `awk: output size limit exceeded (${ctx.maxOutputSize} bytes)`,
       "string_length",
@@ -159,16 +173,17 @@ async function executeStmt(
     case "exit":
       ctx.shouldExit = true;
       {
+        // (1ctx) a bare exit keeps the code an earlier exit set, as in gawk
         const codeExpr = stmt.code;
-        ctx.exitCode = codeExpr
-          ? Math.floor(
-              toNumber(
-                await withDefenseContext(ctx, "exit code expression", () =>
-                  evalExpr(ctx, codeExpr),
-                ),
+        if (codeExpr) {
+          ctx.exitCode = Math.floor(
+            toNumber(
+              await withDefenseContext(ctx, "exit code expression", () =>
+                evalExpr(ctx, codeExpr),
               ),
-            )
-          : 0;
+            ),
+          );
+        }
       }
       break;
 
@@ -199,7 +214,7 @@ async function executeStmt(
 async function executePrint(
   ctx: AwkRuntimeContext,
   args: AwkExpr[],
-  output?: { redirect: ">" | ">>"; file: AwkExpr },
+  output?: AwkOutput,
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "print execution");
   const values: string[] = [];
@@ -207,21 +222,8 @@ async function executePrint(
     const val = await withDefenseContext(ctx, "print argument evaluation", () =>
       evalExpr(ctx, arg),
     );
-    // Use OFMT for numeric values (POSIX AWK behavior)
-    // Exception: integers are printed directly without OFMT formatting
-    // This matches real AWK behavior where `print 2292437248` outputs
-    // the full integer, not scientific notation
-    if (typeof val === "number") {
-      if (Number.isInteger(val) && Math.abs(val) < Number.MAX_SAFE_INTEGER) {
-        values.push(String(val));
-      } else {
-        values.push(
-          formatPrintf(ctx.OFMT, [val], ctx.maxOutputSize || undefined),
-        );
-      }
-    } else {
-      values.push(toAwkString(val));
-    }
+    // (1ctx) a whole number prints exactly, any other through OFMT
+    values.push(typeof val === "number" ? numberToString(val, ctx.OFMT) : val);
   }
   const text = values.join(ctx.OFS) + ctx.ORS;
 
@@ -242,10 +244,10 @@ async function executePrintf(
   ctx: AwkRuntimeContext,
   format: AwkExpr,
   args: AwkExpr[],
-  output?: { redirect: ">" | ">>"; file: AwkExpr },
+  output?: AwkOutput,
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "printf execution");
-  const formatStr = toAwkString(
+  const formatStr = toStr(ctx,
     await withDefenseContext(ctx, "printf format evaluation", () =>
       evalExpr(ctx, format),
     ),
@@ -263,7 +265,7 @@ async function executePrintf(
     ctx.maxOutputSize > 0
       ? Math.max(0, ctx.maxOutputSize - utf8ByteLength(ctx.output))
       : undefined;
-  const text = formatPrintf(formatStr, values, remainingOutput);
+  const text = formatPrintf(formatStr, values, remainingOutput, ctx.CONVFMT);
 
   if (output) {
     await withDefenseContext(ctx, "printf redirection write", () =>
@@ -280,7 +282,7 @@ async function executePrintf(
  */
 async function writeToFile(
   ctx: AwkRuntimeContext,
-  redirect: ">" | ">>",
+  redirect: ">" | ">>" | "|",
   fileExpr: AwkExpr,
   text: string,
 ): Promise<void> {
@@ -293,11 +295,29 @@ async function writeToFile(
     return;
   }
 
-  const filename = toAwkString(
+  const filename = toStr(ctx,
     await withDefenseContext(ctx, "redirection filename evaluation", () =>
       evalExpr(ctx, fileExpr),
     ),
   );
+  // (1ctx) gawk's fatal error for an empty name, an unset variable's too
+  if (filename === "") throw nullRedirection(redirect);
+  // (1ctx) a pipe holds the text for its command
+  if (redirect === "|") {
+    writePipe(ctx, filename, text);
+    return;
+  }
+  // (1ctx) the standard streams, as gawk names them
+  if (filename === "/dev/stdout") {
+    ctx.output += text;
+    checkAwkOutputSize(ctx);
+    return;
+  }
+  if (filename === "/dev/stderr") {
+    ctx.errorOutput += text;
+    checkAwkOutputSize(ctx);
+    return;
+  }
   const filePath = fs.resolvePath(ctx.cwd, filename);
 
   if (redirect === ">") {
@@ -505,7 +525,8 @@ async function executeForIn(
   stmt: { variable: string; array: string; body: AwkStmt },
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "for-in execution");
-  const array = ctx.arrays[stmt.array];
+  // (1ctx) through an alias too, so a parameter holding an array iterates it
+  const array = ctx.arrays[resolveArrayName(ctx, stmt.array)];
   if (!array) return;
 
   for (const key of Object.keys(array)) {
@@ -535,7 +556,7 @@ async function executeDelete(
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "delete execution");
   if (target.type === "array_access") {
-    const key = toAwkString(
+    const key = toStr(ctx,
       await withDefenseContext(ctx, "delete key evaluation", () =>
         evalExpr(ctx, target.key),
       ),

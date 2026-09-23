@@ -5,6 +5,7 @@
  */
 
 import { ExecutionLimitError } from "../../interpreter/errors.js";
+import { AwkRefusal } from "./check.js";
 
 export enum TokenType {
   // Literals
@@ -90,7 +91,8 @@ export enum TokenType {
   EOF = "EOF",
 }
 
-const KEYWORDS = new Map<string, TokenType>([
+// (1ctx) exported: an operand or -v name that is a keyword is refused
+export const KEYWORDS = new Map<string, TokenType>([
   ["BEGIN", TokenType.BEGIN],
   ["END", TokenType.END],
   ["if", TokenType.IF],
@@ -792,6 +794,8 @@ export class AwkLexer {
             column: startColumn,
           };
         }
+        // (1ctx) a coprocess is refused, not read as a pipe and a name
+        if (next === "&") throw new AwkRefusal("|& is not supported", 2);
         return {
           type: TokenType.PIPE,
           value: "|",
@@ -896,6 +900,13 @@ export class AwkLexer {
         };
 
       default:
+        // (1ctx) gawk's directives are refused, not read as names
+        if (ch === "@") {
+          const word = /^[A-Za-z_]+/.exec(this.input.slice(this.pos))?.[0];
+          if (word === "include" || word === "load" || word === "namespace") {
+            throw new AwkRefusal(`@${word} is not supported`, 2);
+          }
+        }
         // Unknown character - return as identifier to allow graceful handling
         return {
           type: TokenType.IDENT,

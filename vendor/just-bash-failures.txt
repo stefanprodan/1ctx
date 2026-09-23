@@ -1,6 +1,8 @@
 (fail) AGENTS.npm.md Bash examples > should execute bash examples without errors
 (fail) AGENTS.npm.md Bash examples > should have bash code blocks
 (fail) AGENTS.npm.md validation > command list completeness > should list all registered commands
+(fail) AWK prospective allocation limits > rejects record arrays before splitting beyond maxArrayElements
+(fail) Additional Syntax Features - Prototype Pollution > AWK Output Redirection > should reject pipe output via variable (sandboxed)
 (fail) Code execution exploit regressions > blocks python worker escape vectors (js bridge, ctypes, subprocess)
 (fail) Code execution exploit regressions > blocks sqlite3 extension loading attempts
 (fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md
@@ -66,6 +68,21 @@
 (fail) WorkerDefenseInDepth > worker-specific behavior > blocks require and direct loader calls without consulting stack text
 (fail) WorkerDefenseInDepth > worker-specific behavior > should always block (no context tracking needed)
 (fail) WorkerDefenseInDepth > worker-specific behavior > should include 'worker context' in error messages
+(fail) awk built-in variables > FILENAME > should be empty for stdin
+(fail) awk command > error handling > should error on missing file
+(fail) awk command > printf formats > should format scientific with %e
+(fail) awk edge cases > numeric edge cases > should handle very large numbers
+(fail) awk error handling > division by zero > should handle floating point division by zero
+(fail) awk error handling > division by zero > should handle integer division by zero
+(fail) awk error handling > field access edge cases > should handle negative field index
+(fail) awk error handling > function argument errors > should handle split with missing arguments
+(fail) awk error handling > function argument errors > should handle sprintf with missing arguments
+(fail) awk error handling > function argument errors > should handle substr with missing arguments
+(fail) awk error handling > syntax errors > should handle undefined function call gracefully
+(fail) awk math functions > basic math functions > int() handles negative numbers
+(fail) awk operators > arithmetic operators > should handle division by zero
+(fail) awk parsing > error cases > should error on missing file
+(fail) awk printf formats > scientific %e > should format in scientific notation
 (fail) browser bundle safety > browser-excluded commands list > should have browser-excluded commands available in Node.js registry
 (fail) browser bundle safety > bundle contents > should not contain direct node: protocol imports in bundle code
 (fail) browser bundle safety > bundle contents > should not contain native module artifacts
