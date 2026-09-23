@@ -177,8 +177,17 @@ export const awkCommand2: RuntimeCommand = {
       runtimeCtx.ARGV[String(i + 1)] = options.operands[i];
     }
     Object.assign(runtimeCtx.ENVIRON, mapToRecord(ctx.env));
+    runtimeCtx.arrayElementCount +=
+      options.operands.length + 1 + Object.keys(runtimeCtx.ENVIRON).length;
 
     let stdinRead = false;
+    runtimeCtx.readStdin = () => {
+      if (stdinRead) return "";
+      stdinRead = true;
+      // awk parses fields with regex / FS — decode bytes to UTF-8 so
+      // non-ASCII data isn't split mid-codepoint.
+      return decodeBytesToUtf8(ctx.stdin);
+    };
     runtimeCtx.mainInput = new MainInput(runtimeCtx, {
       readFile: async (file) => {
         const filePath = ctx.fs.resolvePath(ctx.cwd, file);
@@ -208,13 +217,7 @@ export const awkCommand2: RuntimeCommand = {
           );
         }
       },
-      readStdin: () => {
-        if (stdinRead) return "";
-        stdinRead = true;
-        // awk parses fields with regex / FS — decode bytes to UTF-8 so
-        // non-ASCII data isn't split mid-codepoint.
-        return decodeBytesToUtf8(ctx.stdin);
-      },
+      readStdin: runtimeCtx.readStdin,
     });
 
     // Create interpreter
@@ -242,7 +245,7 @@ export const awkCommand2: RuntimeCommand = {
         );
         return {
           stdout: interp.getOutput(),
-          stderr: "",
+          stderr: runtimeCtx.errorOutput,
           exitCode: interp.getExitCode(),
         };
       }
@@ -253,7 +256,7 @@ export const awkCommand2: RuntimeCommand = {
         // Just run END blocks (none), no input processing needed
         return {
           stdout: interp.getOutput(),
-          stderr: "",
+          stderr: runtimeCtx.errorOutput,
           exitCode: interp.getExitCode(),
         };
       }
@@ -280,7 +283,7 @@ export const awkCommand2: RuntimeCommand = {
       // awk emits text; the pipeline handles encoding.
       return {
         stdout: interp.getOutput(),
-        stderr: "",
+        stderr: runtimeCtx.errorOutput,
         exitCode: interp.getExitCode(),
       };
     } catch (e) {
@@ -296,7 +299,7 @@ export const awkCommand2: RuntimeCommand = {
         e instanceof ExecutionLimitError ? ExecutionLimitError.EXIT_CODE : 2;
       return {
         stdout: interp.getOutput(),
-        stderr: `awk: ${msg}\n`,
+        stderr: `${runtimeCtx.errorOutput}awk: ${msg}\n`,
         exitCode,
       };
     }

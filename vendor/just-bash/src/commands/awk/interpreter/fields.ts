@@ -119,7 +119,9 @@ export function getField(ctx: AwkRuntimeContext, index: number): AwkValue {
   if (index === 0) {
     return ctx.line;
   }
-  if (index < 0 || index > ctx.fields.length) {
+  // (1ctx) gawk's fatal error
+  if (index < 0) throw new Error(`attempt to access field ${index}`);
+  if (index > ctx.fields.length) {
     return "";
   }
   return ctx.fields[index - 1] ?? "";

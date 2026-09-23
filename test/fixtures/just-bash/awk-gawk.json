@@ -3252,6 +3252,141 @@
       "stdout": "",
       "exit": 2,
       "stderr": true
+    },
+    {
+      "name": "fix: printf with too few arguments is fatal",
+      "args": [
+        "BEGIN {print \"before\"; printf \"%s %s|\\n\", \"a\"; print \"after\"}"
+      ],
+      "stdout": "before\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: printf %d with no argument is fatal",
+      "args": [
+        "BEGIN {printf \"%d\\n\"}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: printf %c with no argument is fatal",
+      "args": [
+        "BEGIN {printf \"%c|%s\\n\", 65}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: printf star width with no argument is fatal",
+      "args": [
+        "BEGIN {printf \"%*d\\n\", 5}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: printf with a spare argument",
+      "args": [
+        "BEGIN {printf \"%s\\n\", \"a\", \"b\"}"
+      ],
+      "stdout": "a\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a negative field is fatal",
+      "args": [
+        "{print \"before\"; print $(-1)}"
+      ],
+      "stdin": "a\n",
+      "stdout": "before\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: a bare exit in END keeps the code",
+      "args": [
+        "{exit 3} END {exit}"
+      ],
+      "stdin": "a\n",
+      "stdout": "",
+      "exit": 3,
+      "stderr": false
+    },
+    {
+      "name": "fix: a bare exit after none",
+      "args": [
+        "{exit} END {print \"end\"}"
+      ],
+      "stdin": "a\n",
+      "stdout": "end\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: exit in END overrides",
+      "args": [
+        "{exit 3} END {exit 4}"
+      ],
+      "stdin": "a\n",
+      "stdout": "",
+      "exit": 4,
+      "stderr": false
+    },
+    {
+      "name": "fix: print to /dev/stdout",
+      "args": [
+        "{print $1 > \"/dev/stdout\"; print $2}"
+      ],
+      "stdin": "alice 30 NY\nbob 25 LA\ncarol 35 NY\ndave 40 SF\n",
+      "stdout": "alice\n30\nbob\n25\ncarol\n35\ndave\n40\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: printf to /dev/stdout",
+      "args": [
+        "{printf \"%s|\", $1 > \"/dev/stdout\"} END {print \"\"}"
+      ],
+      "stdin": "alice 30 NY\nbob 25 LA\ncarol 35 NY\ndave 40 SF\n",
+      "stdout": "alice|bob|carol|dave|\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: getline from -",
+      "args": [
+        "BEGIN {while ((getline l < \"-\") > 0) n++; print n, l, NR}"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "2 b 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: getline from /dev/stdin",
+      "args": [
+        "BEGIN {while ((getline l < \"/dev/stdin\") > 0) n++; print n, l}"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "2 b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: getline from stdin then the main input",
+      "args": [
+        "BEGIN {getline l < \"/dev/stdin\"; print \"got\", l} {print NR, $0}"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "got a\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

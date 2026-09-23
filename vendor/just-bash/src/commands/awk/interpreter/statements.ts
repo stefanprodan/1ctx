@@ -29,7 +29,10 @@ setBlockExecutor(executeBlock);
  * Throws ExecutionLimitError if the limit is set and exceeded.
  */
 function checkAwkOutputSize(ctx: AwkRuntimeContext): void {
-  if (ctx.maxOutputSize > 0 && ctx.output.length > ctx.maxOutputSize) {
+  if (
+    ctx.maxOutputSize > 0 &&
+    ctx.output.length + ctx.errorOutput.length > ctx.maxOutputSize
+  ) {
     throw new ExecutionLimitError(
       `awk: output size limit exceeded (${ctx.maxOutputSize} bytes)`,
       "string_length",
@@ -163,16 +166,17 @@ async function executeStmt(
     case "exit":
       ctx.shouldExit = true;
       {
+        // (1ctx) a bare exit keeps the code an earlier exit set, as in gawk
         const codeExpr = stmt.code;
-        ctx.exitCode = codeExpr
-          ? Math.floor(
-              toNumber(
-                await withDefenseContext(ctx, "exit code expression", () =>
-                  evalExpr(ctx, codeExpr),
-                ),
+        if (codeExpr) {
+          ctx.exitCode = Math.floor(
+            toNumber(
+              await withDefenseContext(ctx, "exit code expression", () =>
+                evalExpr(ctx, codeExpr),
               ),
-            )
-          : 0;
+            ),
+          );
+        }
       }
       break;
 
@@ -289,6 +293,17 @@ async function writeToFile(
       evalExpr(ctx, fileExpr),
     ),
   );
+  // (1ctx) the standard streams, as gawk names them
+  if (filename === "/dev/stdout") {
+    ctx.output += text;
+    checkAwkOutputSize(ctx);
+    return;
+  }
+  if (filename === "/dev/stderr") {
+    ctx.errorOutput += text;
+    checkAwkOutputSize(ctx);
+    return;
+  }
   const filePath = fs.resolvePath(ctx.cwd, filename);
 
   if (redirect === ">") {

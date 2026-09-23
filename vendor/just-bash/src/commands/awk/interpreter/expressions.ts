@@ -864,6 +864,11 @@ async function evalGetlineFromFile(
   const filePath = fs.resolvePath(ctx.cwd, filename);
 
   let stream = ctx.getlineFileStreams.get(filePath);
+  if (!stream && (filename === "-" || filename === "/dev/stdin")) {
+    // (1ctx) standard input, as gawk names it
+    stream = openStream(ctx, ctx.readStdin?.() ?? "");
+    ctx.getlineFileStreams.set(filePath, stream);
+  }
   if (!stream) {
     // First time reading this file, or again after close()
     let content: string;

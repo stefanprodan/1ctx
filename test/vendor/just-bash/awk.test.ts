@@ -89,6 +89,16 @@ describe("awk limits and refusals", () => {
     expect(r.exitCode).not.toBe(0);
     expect(Date.now() - started).toBeLessThan(5_000);
   });
+
+  test("print to /dev/stderr reaches stderr", async () => {
+    const r = await new Bash().exec(
+      `awk '{ print "e" $0 > "/dev/stderr"; print "o" $0 }'`,
+      { stdin: "1\n2\n" },
+    );
+    expect(r.stdout).toBe("o1\no2\n");
+    expect(r.stderr).toBe("e1\ne2\n");
+    expect(r.exitCode).toBe(0);
+  });
 });
 
 describe("gawk features we do not have", () => {

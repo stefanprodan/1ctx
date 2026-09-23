@@ -57,6 +57,8 @@ export interface AwkRuntimeContext {
 
   // (1ctx) the main input walk, read by the main loop and plain getline
   mainInput?: { nextRecord(): Promise<string | null>; skipFile(): void };
+  // (1ctx) standard input, once; empty after the first read
+  readStdin?: () => string;
   // (1ctx) one input byte budget shared by every stream
   maxInputBytes: number;
   inputBytes: number;
@@ -87,6 +89,8 @@ export interface AwkRuntimeContext {
 
   // Output buffer (stdout)
   output: string;
+  // (1ctx) what the program printed to /dev/stderr
+  errorOutput: string;
 
   // Filesystem access for getline < file and print > file
   fs?: AwkFileSystem;
@@ -210,6 +214,7 @@ export function createRuntimeContext(
     inEndBlock: false,
 
     output: "",
+    errorOutput: "",
     openedFiles: new Set(),
 
     fs,

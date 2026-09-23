@@ -315,9 +315,17 @@ export function formatPrintf(
         flags += format[j++];
       }
 
+      // (1ctx) gawk's fatal error for a conversion with no argument left
+      const take = (index: number): AwkValue => {
+        if (index >= values.length) {
+          throw new Error("not enough arguments to satisfy format string");
+        }
+        return values[index];
+      };
+
       let width: number | undefined;
       if (format[j] === "*") {
-        const w = Math.trunc(toNumber(values[valueIdx++]));
+        const w = Math.trunc(toNumber(take(valueIdx++)));
         if (!Number.isSafeInteger(w)) throw tooWide("width");
         if (w < 0) flags += "-";
         width = Math.abs(w);
@@ -333,7 +341,7 @@ export function formatPrintf(
       if (format[j] === ".") {
         j++;
         if (format[j] === "*") {
-          const p = Math.trunc(toNumber(values[valueIdx++]));
+          const p = Math.trunc(toNumber(take(valueIdx++)));
           if (!Number.isSafeInteger(p)) throw tooWide("precision");
           precision = p < 0 ? undefined : p;
           j++;
@@ -356,27 +364,26 @@ export function formatPrintf(
       const spec: Spec = { flags, width, precision };
       const conv = format[j];
       const valIdx = positionalIdx ?? valueIdx;
-      const val = values[valIdx];
       let consumed = true;
 
       switch (conv) {
-        case "s":
+        case "s": {
+          const val = take(valIdx);
           append(
             formatString(
-              typeof val === "number"
-                ? numberToString(val, convfmt)
-                : (val ?? ""),
+              typeof val === "number" ? numberToString(val, convfmt) : val,
               spec,
             ),
           );
           break;
+        }
         case "d":
         case "i":
         case "u":
         case "x":
         case "X":
         case "o":
-          append(formatInteger(toNumber(val), spec, conv));
+          append(formatInteger(toNumber(take(valIdx)), spec, conv));
           break;
         case "f":
         case "F":
@@ -384,10 +391,10 @@ export function formatPrintf(
         case "E":
         case "g":
         case "G":
-          append(formatFloat(toNumber(val), spec, conv));
+          append(formatFloat(toNumber(take(valIdx)), spec, conv));
           break;
         case "c":
-          append(formatChar(val, spec));
+          append(formatChar(take(valIdx), spec));
           break;
         case "%":
           append("%");
