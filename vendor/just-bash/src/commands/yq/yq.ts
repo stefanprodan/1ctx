@@ -38,12 +38,13 @@ import {
   extractFrontMatter,
   type FormatOptions,
   formatOutput,
+  type InputFormat as InputFormatName,
   isValidInputFormat,
   isValidOutputFormat,
   parseAllYamlDocuments,
   parseInput,
 } from "./formats.js";
-import { evaluateDocument } from "./documents.js";
+import { evaluateAll, evaluateDocument, type Input } from "./documents.js";
 import { preservingText, spelledFor11 } from "./preserve.js";
 
 const yqHelp = {
@@ -115,7 +116,7 @@ EXAMPLES:
   yq '.items | group_by(.type)' data.yaml`,
   options: [
     "-p, --input-format=FMT   input format: yaml (default), xml, json, ini, csv, toml",
-    "-o, --output-format=FMT  output format: yaml (default), json, xml, ini, csv, toml",
+    "-o, --output-format=FMT  output format: yaml (default), json, xml, ini, csv, tsv, props, toml",
     "-i, --inplace            modify file in-place",
     "-r, --raw-output         output strings without quotes (json only)",
     "-c, --compact            compact output (json only)",
@@ -124,6 +125,8 @@ EXAMPLES:
     "-n, --null-input         don't read any input",
     "-j, --tojson             JSON output, the same as -o json",
     "-N, --no-doc             no --- between the results of different documents",
+    "-0, --nul-output         end each result with a NUL",
+    "    eval-all, ea         run the filter once over every document of every file",
     "-f, --front-matter       extract and process front-matter only",
     "-P, --prettyPrint        pretty print output",
     "-I, --indent=N           set indent level (default: 2)",
@@ -174,6 +177,8 @@ interface YqOptions extends FormatOptions {
   nulOutput: boolean;
   inplace: boolean;
   frontMatter: boolean;
+  /** ea: the filter runs once over every document (1ctx) */
+  evalAll: boolean;
 }
 
 interface ParsedArgs {
@@ -211,6 +216,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     nulOutput: false,
     inplace: false,
     frontMatter: false,
+    evalAll: false,
   };
   let inputFormatExplicit = false;
   let outputFormatExplicit = false;
@@ -376,12 +382,10 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       // mikefarah's `yq eval <filter> <file>` (1ctx)
       command = true;
     } else if (!filterSet && !command && (a === "eval-all" || a === "ea")) {
-      return {
-        stdout: "",
-        stderr:
-          "yq: eval-all is not supported: -s reads every document into one array\n",
-        exitCode: 1,
-      };
+      // mikefarah's eval-all: every document of every file as one list
+      // (1ctx)
+      command = true;
+      options.evalAll = true;
     } else if (!filterSet) {
       filter = a;
       filterSet = true;
@@ -437,6 +441,10 @@ export const yqCommand: RuntimeCommand = {
       inputFormatExplicit,
       outputFormatExplicit,
     } = parsed;
+
+    if (options.evalAll) {
+      return runEvalAll(parsed, ctx, withDefenseContext, warning);
+    }
 
     // mikefarah's yq reads every file in turn; this one read the first and
     // dropped the rest without a word (1ctx)
@@ -817,6 +825,190 @@ async function readLoads(
   return loads;
 }
 
+/**
+ * mikefarah's eval-all: every document of every file read first, the
+ * filter run once over the list, and -i writing each file its own
+ * documents' results. (1ctx)
+ */
+async function runEvalAll(
+  parsed: ParsedArgs,
+  ctx: RuntimeCommandContext,
+  withDefenseContext: <T>(phase: string, op: () => Promise<T>) => Promise<T>,
+  warning: string,
+): Promise<ExecResult> {
+  const { options, filter, files, inputFormatExplicit, outputFormatExplicit } =
+    parsed;
+  if (options.slurp || options.frontMatter) {
+    return {
+      stdout: "",
+      stderr: "yq: eval-all reads every document itself, without -s or -f\n",
+      exitCode: 1,
+    };
+  }
+  if (options.inplace && (files.length === 0 || files.includes("-"))) {
+    return {
+      stdout: "",
+      stderr: "yq: -i/--inplace requires a file argument\n",
+      exitCode: 1,
+    };
+  }
+  const first = files.find((name) => name !== "-");
+  if (
+    first !== undefined &&
+    !inputFormatExplicit &&
+    !outputFormatExplicit &&
+    detectFormatFromExtension(first) === "json"
+  ) {
+    options.outputFormat = "json";
+  }
+  const dataLimits = {
+    maxDepth: ctx.limits.maxQueryDepth,
+    maxElements: ctx.limits.maxQueryElements,
+  };
+  const inputs: Input[] = [];
+  // per file, for -i: its path, format, parsed documents and their values
+  const read: {
+    path: string;
+    format: InputFormatName;
+    documents: YAML.Document[];
+    values: QueryValue[];
+  }[] = [];
+  try {
+    const names = options.nullInput ? [] : files.length === 0 ? ["-"] : files;
+    if (options.nullInput) {
+      inputs.push({ value: null, document: 0, file: 0, filename: "" });
+    }
+    for (const [file, name] of names.entries()) {
+      let text: string;
+      let path = "";
+      if (name === "-") {
+        text = decodeBytesToUtf8(ctx.stdin);
+      } else {
+        path = ctx.fs.resolvePath(ctx.cwd, name);
+        try {
+          text = await withDefenseContext("file read", () =>
+            ctx.fs.readFile(path),
+          );
+        } catch (e) {
+          if (e instanceof SecurityViolationError) throw e;
+          return {
+            stdout: "",
+            stderr: `yq: ${name}: No such file or directory\n`,
+            exitCode: 2,
+          };
+        }
+      }
+      const format =
+        inputFormatExplicit || name === "-"
+          ? options.inputFormat
+          : (detectFormatFromExtension(name) ?? options.inputFormat);
+      const documents: YAML.Document[] = [];
+      const values =
+        format === "yaml"
+          ? parseAllYamlDocuments(text, dataLimits, documents)
+          : [parseInput(text, { ...options, inputFormat: format }, dataLimits)];
+      read.push({ path, format, documents, values });
+      const filename = files.length === 0 ? "-" : name === "-" ? "" : name;
+      for (const [document, value] of values.entries()) {
+        inputs.push({ value, document, file, filename });
+      }
+    }
+
+    const ast = parse(filter, {
+      maxDepth: ctx.limits.maxQueryDepth,
+      maxTokens: ctx.limits.maxQueryTokens,
+      maxSourceLength: ctx.limits.maxStringLength,
+    });
+    const loads = await readLoads(ast, ctx, withDefenseContext);
+    const evalOptions: EvaluateOptions = {
+      limits: {
+        maxIterations: ctx.limits.maxJqIterations,
+        maxStringLength: ctx.limits.maxStringLength,
+        maxOutputSize: ctx.limits.maxOutputSize,
+        maxArrayElements: ctx.limits.maxQueryElements,
+        maxDepth: ctx.limits.maxQueryDepth,
+      },
+      env: ctx.env,
+      coverage: ctx.coverage,
+      requireDefenseContext: ctx.requireDefenseContext,
+      budget: { operations: 0, callDepth: 0 },
+      dialect: "yq",
+    };
+    const records: Result[] = [];
+    for (const result of evaluateAll(inputs, ast, evalOptions, loads)) {
+      if (result.value === undefined) continue;
+      records.push({
+        value: result.value,
+        document: result.input.document,
+        computed: result.state === "computed",
+        index: result.index,
+        file: result.input.file,
+      });
+    }
+
+    if (!options.inplace) {
+      return {
+        stdout: printRecords(records, options, ctx, 0),
+        stderr: warning,
+        exitCode: options.exitStatus && missed(records) ? 1 : 0,
+      };
+    }
+
+    if (records.length === 0 || (options.exitStatus && missed(records))) {
+      return {
+        stdout: "",
+        stderr: "yq: no matches found, the file is left as it was\n",
+        exitCode: 1,
+      };
+    }
+    const maxBytes = Math.min(
+      ctx.limits.maxStringLength,
+      ctx.limits.maxOutputSize,
+    );
+    for (const [file, source] of read.entries()) {
+      const own = records.filter((record) => record.file === file);
+      if (own.length === 0) continue;
+      const written = outputFormatExplicit
+        ? options.outputFormat
+        : isValidOutputFormat(source.format)
+          ? source.format
+          : options.outputFormat;
+      const text =
+        written === "yaml" && source.format === "yaml"
+          ? inPlaceText(own, source.documents, source.values, {
+              format: (value) =>
+                formatOutput(value, { ...options, yaml11: true }, maxBytes),
+              maxDepth: ctx.limits.maxQueryDepth,
+            })
+          : printRecords(own, { ...options, outputFormat: written }, ctx, 0);
+      if (text === null) {
+        return {
+          stdout: "",
+          stderr:
+            "yq: the file is left as it was: this edit rewrites the whole document, which would change values a YAML 1.1 reader reads (like 0644 or yes); edit without reordering keys or going through an alias\n",
+          exitCode: 1,
+        };
+      }
+      if (text.length > maxBytes) {
+        throw new ExecutionLimitError(
+          `output size limit exceeded (${maxBytes} bytes)`,
+          "output_size",
+        );
+      }
+      await withDefenseContext("in-place write", () =>
+        ctx.fs.writeFile(source.path, text),
+      );
+    }
+    return {
+      stdout: "",
+      stderr: warning,
+      exitCode: options.exitStatus && missed(records) ? 1 : 0,
+    };
+  } catch (e) {
+    return failed(e);
+  }
+}
+
 /** The answer for an error the run stopped on. */
 function failed(e: unknown): ExecResult {
   if (e instanceof SecurityViolationError) {
@@ -855,6 +1047,8 @@ interface Result {
   computed: boolean;
   /** the document splitDoc gave it */
   index?: number;
+  /** the file it was read from, in an eval-all run */
+  file?: number;
 }
 
 /** The file and the document a result counts as read from. (1ctx) */
@@ -862,8 +1056,9 @@ type Key = [file: number, document: number];
 
 // both 0 for a computed value
 function keyOf(record: Result, file: number): Key {
-  if (record.index !== undefined) return [file, record.index];
-  return record.computed ? [0, 0] : [file, record.document];
+  const at = record.file ?? file;
+  if (record.index !== undefined) return [at, record.index];
+  return record.computed ? [0, 0] : [at, record.document];
 }
 
 // mikefarah prints --- where the document index changes, or a later file

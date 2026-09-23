@@ -815,6 +815,17 @@
         "exit": 0,
         "reason": "jq accepts mikefarah's yq names (upcase, downcase, env(NAME), strenv, to_json and the rest), which jq 1.8 does not define."
       }
+    },
+    {
+      "name": "ireduce is refused",
+      "args": [
+        "-c",
+        ".[] as $x ireduce (0; . + $x)"
+      ],
+      "stdin": "[1,2]\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true
     }
   ]
 }

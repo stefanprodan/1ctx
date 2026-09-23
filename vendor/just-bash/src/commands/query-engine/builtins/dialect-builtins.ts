@@ -775,6 +775,9 @@ export function evalDialectBuiltin(
     case "line":
     case "column":
       return [0];
+    case "ireduce":
+      if (!yq) throw new Error("ireduce is mikefarah's yq, not jq: use reduce");
+      return evaluate(value, args[0], ctx);
   }
   if (NODE_TEXT.has(name) && args.length === 0) return [""];
   if (SETTERS.has(name)) {

@@ -187,9 +187,8 @@ describe("yq over several documents", () => {
     expect(result.stdout).toBe("settings\n---\nbackend\n---\nbackend\n");
     const short = await yq("yq e -i '.a = 2' /m.yaml", "a: 1\n");
     expect(short.file).toBe("a: 2\n");
-    const all = await yq("yq ea '.' /m.yaml");
-    expect(all.exitCode).toBe(1);
-    expect(all.stderr).toContain("-s reads every document");
+    const all = await yq("yq ea '[.] | length' /m.yaml");
+    expect(all.stdout).toBe("3\n");
   });
 
   test("several files are read in turn, and -i writes each", async () => {

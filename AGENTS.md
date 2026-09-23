@@ -374,6 +374,10 @@ violation, and every rule has a rejected fixture under
   evaluate jq path expressions (`query-engine/path-expressions.ts`);
   yq runs the filter on each document of a YAML stream, as mikefarah's
   does, and `-i` keeps the file's comments (`yq/preserve.ts`).
+  yq answers as mikefarah's v4 does where it can: the `---` rule in
+  `yq/documents.ts`, the engine's `yq` dialect in
+  `query-engine/builtins/dialect-builtins.ts`, `eval-all`; the recorded
+  fixtures pin it, and a case with `accept` pins a kept difference.
   Python, js-exec and sqlite3 are removed. A fix to a command goes in
   the vendored source with a test, never around it.
   `knowledge/judge.ts` shares archive selection and judging between the

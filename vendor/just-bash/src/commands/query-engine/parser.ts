@@ -638,6 +638,26 @@ class Parser {
       // Parse pattern (can be $var, [$a, $b], {key: $a}, etc.)
       const pattern = this.parsePattern();
 
+      // mikefarah's `EXPR as $x ireduce (INIT; UPDATE)`, a reduce the
+      // evaluator runs in the yq dialect and refuses in jq's (1ctx)
+      if (this.peek().type === "IDENT" && this.peek().value === "ireduce") {
+        this.advance();
+        this.expect("LPAREN", "Expected '(' after ireduce");
+        const init = this.parseExpr();
+        this.expect("SEMICOLON", "Expected ';' after init expression");
+        const update = this.parseExpr();
+        this.expect("RPAREN", "Expected ')' after update expression");
+        const reduce: AstNode = {
+          type: "Reduce",
+          expr,
+          varName: pattern.type === "var" ? pattern.name : "",
+          init,
+          update,
+          pattern: pattern.type !== "var" ? pattern : undefined,
+        };
+        return { type: "Call", name: "ireduce", args: [reduce] };
+      }
+
       // Check for alternative patterns: ?// PATTERN ?// PATTERN ...
       const alternatives: DestructurePattern[] = [];
       while (this.check("QUESTION") && this.peekAhead(1)?.type === "ALT") {

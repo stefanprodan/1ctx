@@ -24,6 +24,7 @@ import {
   evalBinaryOp,
   evaluate,
   extractPathFromAst,
+  type QuerySource,
   type QueryValue,
 } from "../query-engine/index.js";
 import type { AstNode, DestructurePattern } from "../query-engine/parser.js";
@@ -73,6 +74,7 @@ const COMPUTED = new Set([
   "load",
   "load_str",
   "array_to_map",
+  "ireduce",
   "input",
   "inputs",
 ]);
@@ -378,4 +380,108 @@ export function evaluateDocument(
     { ...ctx, sourceNode: { value: document, path: [] } },
     new Map(),
   );
+}
+
+/** A document of an eval-all run: its value and where it was read. */
+export interface Input {
+  value: QueryValue;
+  document: number;
+  file: number;
+  filename: string;
+}
+
+/** A result of an eval-all run and the input it came from. */
+export interface InputResult extends Tagged {
+  input: Input;
+}
+
+/**
+ * mikefarah's eval-all: the filter runs once over the list of every
+ * document of every file. A pipe hands the whole list on, `[...]` at the
+ * top collects every result into one array and ireduce folds them; every
+ * other node, a comma included, runs per document, as in eval. A variable holds one document at a time, where mikefarah's
+ * holds the list.
+ */
+export function evaluateAll(
+  inputs: Input[],
+  ast: AstNode,
+  options: EvaluateOptions,
+  loads: QuerySource["loads"],
+): InputResult[] {
+  const optionsFor = (input: Input): EvaluateOptions => ({
+    ...options,
+    source: {
+      document: input.document,
+      file: input.file,
+      filename: input.filename,
+      loads,
+    },
+  });
+  const all = (node: AstNode, from: InputResult[]): InputResult[] => {
+    switch (node.type) {
+      case "Pipe":
+        return all(node.right, all(node.left, from));
+      case "Paren":
+        return all(node.expr, from);
+      case "Array": {
+        if (!node.elements || from.length === 0) break;
+        const items = all(node.elements, from).map((r) => r.value);
+        return [{ value: items, state: "computed", input: from[0].input }];
+      }
+      case "Call": {
+        const reduce = node.args[0];
+        if (node.name !== "ireduce" || reduce?.type !== "Reduce") break;
+        if (from.length === 0) return [];
+        // the fold over every result of its expression, from the first
+        // document on
+        const items = all(reduce.expr, from).map((r) => r.value);
+        const folded: AstNode = {
+          ...reduce,
+          expr: {
+            type: "Iterate",
+            base: { type: "Literal", value: items },
+          },
+        };
+        const first = from[0];
+        return evaluateDocument(first.value, folded, optionsFor(first.input)).map(
+          (result) => ({ ...result, state: "computed", input: first.input }),
+        );
+      }
+    }
+    return from.flatMap((item) =>
+      evaluateDocumentFrom(item, node, optionsFor(item.input)),
+    );
+  };
+  const start = inputs.map(
+    (input): InputResult => ({
+      value: input.value,
+      state: "document",
+      path: [],
+      input,
+    }),
+  );
+  return all(ast, start);
+}
+
+// one node on one result so far, in the state that result is in
+function evaluateDocumentFrom(
+  item: InputResult,
+  ast: AstNode,
+  options: EvaluateOptions,
+): InputResult[] {
+  const ctx = {
+    ...createContext(options),
+    root: item.input.value,
+    currentPath: [],
+    sourceNode: item,
+  };
+  return walk(ast, item, ctx, new Map()).map((result) => ({
+    ...result,
+    index:
+      result.index ??
+      (item.index !== undefined && result.state !== "computed"
+        ? item.index
+        : undefined),
+    input: item.input,
+  }));
 }

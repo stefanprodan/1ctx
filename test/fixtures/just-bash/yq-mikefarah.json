@@ -4185,6 +4185,277 @@
         "exit": 0,
         "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
       }
+    },
+    {
+      "name": "eval-all: sort documents by name",
+      "args": [
+        "ea",
+        "[.] | sort_by(.metadata.name) | .[].metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb\nweb-1\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: join names",
+      "args": [
+        "ea",
+        "[.metadata.name] | join(\",\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0,web-1,web\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: count documents",
+      "args": [
+        "ea",
+        "[.] | length",
+        "pods.yaml"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: count documents of two files",
+      "args": [
+        "eval-all",
+        "[.] | length",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "6\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: select",
+      "args": [
+        "ea",
+        "select(.kind == \"HelmRelease\") | .metadata.name",
+        "flux.yaml"
+      ],
+      "stdout": "podinfo\n---\nredis\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: merge two files with ireduce",
+      "args": [
+        "ea",
+        ". as $item ireduce ({}; . * $item)",
+        "m1.yaml",
+        "m2.yaml"
+      ],
+      "files": {
+        "m1.yaml": "a: 1\nx:\n  p: 1\n",
+        "m2.yaml": "b: 2\nx:\n  q: 2\n"
+      },
+      "stdout": "a: 1\nx:\n  p: 1\n  q: 2\nb: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: merge with load",
+      "args": [
+        "ea",
+        ". * load(\"m2.yaml\")",
+        "m1.yaml"
+      ],
+      "files": {
+        "m1.yaml": "a: 1\nx:\n  p: 1\n",
+        "m2.yaml": "b: 2\nx:\n  q: 2\n"
+      },
+      "stdout": "a: 1\nx:\n  p: 1\n  q: 2\nb: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: a path per document",
+      "args": [
+        "ea",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: length per document",
+      "args": [
+        "ea",
+        "length",
+        "pods.yaml"
+      ],
+      "stdout": "5\n4\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: collect over two files",
+      "args": [
+        "ea",
+        "[.metadata.name]",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "- postgres-0\n- web-1\n- web\n- podinfo\n- infra\n- redis\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: -N",
+      "args": [
+        "ea",
+        "-N",
+        ".kind",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\nPod\nDeployment\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: one file",
+      "args": [
+        "ea",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: stdin",
+      "args": [
+        "ea",
+        "[.] | length"
+      ],
+      "stdin": "a: 1\n---\na: 2\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: stdin with a path",
+      "args": [
+        "ea",
+        ".a"
+      ],
+      "stdin": "a: 1\n---\na: 2\n",
+      "stdout": "1\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: di and fi collected",
+      "args": [
+        "ea",
+        "-o",
+        "json",
+        "-I0",
+        "[di, fi]",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "[0,0,1,0,2,0,0,1,1,1,2,1]\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: a map per document",
+      "args": [
+        "ea",
+        "{\"n\": .metadata.name}",
+        "pods.yaml"
+      ],
+      "stdout": "n: postgres-0\n---\nn: web-1\n---\nn: web\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: first document of a list",
+      "args": [
+        "ea",
+        "[.] | .[0].kind",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: -i",
+      "args": [
+        "ea",
+        "-i",
+        "select(.kind == \"Deployment\").spec.replicas = 5",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pods.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: postgres-0\n  labels:\n    app: postgres\nspec:\n  nodeName: node-a\n  containers:\n    - name: postgres\n      image: postgres:16.4\nstatus:\n  phase: Running\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-1\n  labels:\n    app: web\nspec:\n  containers:\n    - name: web\n      image: nginx:1.27\n    - name: proxy\n      image: envoyproxy/envoy:v1.31\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 5\n"
+      }
+    },
+    {
+      "name": "eval-all: -i over every document",
+      "args": [
+        "ea",
+        "-i",
+        ".metadata.labels.team = \"web\"",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\n  labels:\n    team: web\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\n  labels:\n    team: web\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n---\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\n  labels:\n    team: web\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n"
+      }
+    },
+    {
+      "name": "eval-all: a variable holds one document",
+      "args": [
+        "ea",
+        ".metadata.name as $n | [$n]",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres-0\n- postgres-0\n- postgres-0\n- web-1\n- web-1\n- web-1\n- web\n- web\n- web\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "- postgres-0\n- web-1\n- web\n",
+        "exit": 0,
+        "reason": "In eval-all a variable holds one document at a time, where mikefarah's holds the whole list."
+      }
+    },
+    {
+      "name": "eval-all: ireduce in eval",
+      "args": [
+        "e",
+        ".[] as $c ireduce ([]; . + [$c])",
+        "config.yaml"
+      ],
+      "stdout": "- app\n- 1.2.0\n- 8080\n- false\n- \"\"\n- \"0644\"\n- null\n- - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: ireduce on a list",
+      "args": [
+        ".tags[] as $t ireduce (\"\"; . + $t)",
+        "config.yaml"
+      ],
+      "stdout": "webapi\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: ireduce on an inside node",
+      "args": [
+        ".spec.containers[]? as $c ireduce ([]; . + [$c.name])",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres\n- web\n- proxy\n[]\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: ireduce keeps its accumulator's document",
+      "args": [
+        ".kind as $k ireduce (.metadata; .)",
+        "pods.yaml"
+      ],
+      "stdout": "name: postgres-0\nlabels:\n  app: postgres\n---\nname: web-1\nlabels:\n  app: web\n---\nname: web\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "name: postgres-0\nlabels:\n  app: postgres\nname: web-1\nlabels:\n  app: web\nname: web\n",
+        "exit": 0,
+        "reason": "ireduce counts as computed, where mikefarah keeps its accumulator's document: a known miss of the walker."
+      }
     }
   ]
 }
