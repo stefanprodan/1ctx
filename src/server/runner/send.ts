@@ -11,7 +11,7 @@
 import type { LiveSend, VisualDraft } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
-import type { SendPolicy, ToolBudget } from "./policy.ts";
+import type { KeepPort, SendPolicy, ToolBudget } from "./policy.ts";
 
 export type RoundState = {
   messageId: string;
@@ -77,6 +77,8 @@ export type ActiveSend = {
   // the counters the built-ins share across parallel
   // calls and rounds
   toolBudget: ToolBudget;
+  // set at the start of a send that offers bash
+  keep: KeepPort | null;
   // the last three rounds' call signatures, for the loop check
   signatures: string[];
   // the cap that forced the answer round, which asks for the answer in words
@@ -186,6 +188,7 @@ export function newSend(fields: {
       visuals: 0,
       bashCalls: 0,
     },
+    keep: null,
     signatures: [],
     answering: null,
     repeated: false,

@@ -26,6 +26,7 @@ import { upload } from "./archive.ts";
 export type { OpenedRecord } from "./open.ts";
 
 import { checkFile, checkNames, checkTotals } from "./check.ts";
+import { startKept } from "./kept.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
@@ -75,6 +76,13 @@ export type KnowledgeCapability = KnowledgePort & {
     signal: AbortSignal,
   ): Promise<CommandResult>;
   sweep(now: number): number;
+  // a send's start: the session's kept MCP files trimmed to the budget,
+  // and the number the next kept folder takes
+  startKept(sessionId: string): {
+    next: number;
+    used: number;
+    maxBytes: number;
+  };
 };
 export type KnowledgeArea = KnowledgeCapability & {
   store: KnowledgeStore;
@@ -294,6 +302,17 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       files: store.counts(projectId).files,
       recent: store.recent(projectId),
     }),
+    startKept: (sessionId) =>
+      transact(deps.db, () => {
+        const caps = deps.limits.current();
+        return {
+          result: {
+            ...startKept(deps.db, sessionId, caps),
+            maxBytes: caps.mcpKeptBytes,
+          },
+          events: [],
+        };
+      }),
     sweep(now) {
       const caps = deps.limits.current();
       return (
@@ -312,6 +331,12 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   };
 }
 
+export {
+  copyKeptFiles,
+  type KeptFile,
+  keptPath,
+  writeKeptFiles,
+} from "./kept.ts";
 export {
   type Scratch,
   type ScratchChanges,

@@ -34,6 +34,14 @@ function contentLine(part: McpContent): string | null {
   return null;
 }
 
+// what a call gives the tools area: the text the model gets today, and
+// the scrubbed parts it may keep as files
+export type McpCallOutput = {
+  text: string;
+  content: McpContent[];
+  structured: unknown;
+};
+
 export function resultText(result: McpResult): {
   text: string;
   isError: boolean;

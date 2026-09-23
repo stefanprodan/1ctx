@@ -67,6 +67,7 @@ export type RawSession = {
   revision: number;
   created_at: number;
   last_activity_at: number;
+  mcp_folders: number;
 };
 
 export type UsagePort = {

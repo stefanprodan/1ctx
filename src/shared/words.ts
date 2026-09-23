@@ -408,6 +408,8 @@ export const LIMIT_NAMES = [
   "scratchIdleDays",
   "uploadBytes",
   "uploadFiles",
+  "mcpKeptBytes",
+  "mcpKeptFiles",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {

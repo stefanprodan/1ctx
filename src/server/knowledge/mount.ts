@@ -18,6 +18,7 @@ import type { Clock } from "../lib/clock.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkFile, checkNames } from "./check.ts";
 import { type Change, commit, type ScratchCommit } from "./commit.ts";
+import { type KeptEntry, listKept, readKept } from "./kept.ts";
 import { KNOWLEDGE_COMMANDS } from "./limits.ts";
 import { makeOpenCommand, type OpenedRecord, openedReceipt } from "./open.ts";
 import { failed, output } from "./output.ts";
@@ -164,6 +165,25 @@ async function uploadsChanged(
   return expected.size !== 0;
 }
 
+// Names alone, from the tree's own list: a stat would load every lazy
+// file to size it. A changed file under /mcp goes unnoticed and is
+// discarded all the same.
+function keptChanged(fs: InMemoryFs, kept: readonly KeptEntry[]): boolean {
+  const expected = new Set<string>();
+  for (const entry of kept) {
+    const parts = entry.path.split("/").filter(Boolean);
+    for (let end = 1; end <= parts.length; end++)
+      expected.add(`/${parts.slice(0, end).join("/")}`);
+  }
+  let seen = 0;
+  for (const path of fs.getAllPaths()) {
+    if (path !== "/mcp" && !path.startsWith("/mcp/")) continue;
+    if (!expected.has(path)) return true;
+    seen++;
+  }
+  return seen !== expected.size;
+}
+
 async function savedCwd(
   fs: InMemoryFs,
   pwd: string | undefined,
@@ -180,9 +200,11 @@ async function savedCwd(
     path !== "/knowledge" &&
     path !== "/tmp" &&
     path !== "/uploads" &&
+    path !== "/mcp" &&
     !path.startsWith("/knowledge/") &&
     !path.startsWith("/tmp/") &&
-    !path.startsWith("/uploads/")
+    !path.startsWith("/uploads/") &&
+    !path.startsWith("/mcp/")
   )
     return "/knowledge";
   return (await directory(fs, path)) ? path : "/knowledge";
@@ -215,6 +237,8 @@ export async function run(
     const rows = deps.store.read(projectId);
     const scratch = deps.scratch.read(sessionId);
     const uploads = deps.uploads.read(sessionId);
+    const kept = listKept(deps.db, sessionId);
+    const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
     // A lowered cap still permits deleting or shrinking the mounted base.
     const projectBytes = Math.max(
       storage.knowledgeProjectBytes,
@@ -224,6 +248,8 @@ export async function run(
       projectBytes +
       Math.max(storage.scratchBytes, scratch.bytes) +
       Math.max(storage.uploadBytes, uploads.bytes) +
+      // lazy files count when a command reads them
+      keptBytes +
       2 * 1024 * 1024;
     const fs = new InMemoryFs({}, { maxTotalBytes: mountBytes });
     fs.mkdirSync("/knowledge", { recursive: true });
@@ -237,6 +263,12 @@ export async function run(
       });
     for (const file of uploads.entries)
       fs.writeFileSync(`/uploads/${file.name}`, file.text);
+    // MCP results past the cut, read from the database on first read
+    for (const entry of kept)
+      fs.writeFileLazy(
+        entry.path,
+        () => readKept(deps.db, entry.messageId, entry.position) ?? "",
+      );
     const cwd = await savedCwd(fs, scratch.cwd);
     if (cwd !== scratch.cwd)
       notice = `started in /knowledge: ${scratch.cwd} no longer exists\n`;
@@ -245,6 +277,8 @@ export async function run(
       storage.scratchBytes,
       storage.knowledgeFileBytes,
       ...uploads.entries.map((file) => file.bytes),
+      // the reads the path line teaches (yq, then rg, then sed) add up
+      ...kept.map((entry) => 4 * entry.bytes),
     );
     const opened: OpenedRecord[] = [];
     const bash = new Bash({
@@ -312,6 +346,11 @@ export async function run(
     });
     const stdout = decodeBytesToUtf8(stdoutAsBytes(result));
     combined.throwIfAborted();
+    if (keptChanged(fs, kept)) {
+      notice =
+        "changes under /mcp were discarded: copy a file to /tmp to change it\n" +
+        notice;
+    }
     if (await uploadsChanged(fs, uploads)) {
       notice =
         "changes under /uploads were discarded: copy a file to /tmp to change it\n" +

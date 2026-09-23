@@ -256,6 +256,7 @@ async function runCalls(
       budget: send.toolBudget,
       caps: send.policy.toolCaps,
       web: send.policy.web,
+      keep: send.keep,
     };
     let result: ToolResult;
     try {

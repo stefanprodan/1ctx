@@ -163,6 +163,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Chat files",
     text: "Files one chat may hold.",
   },
+  mcpKeptBytes: {
+    label: "Kept MCP results size",
+    text: "Bytes of MCP results kept for one chat past the result cut.",
+  },
+  mcpKeptFiles: {
+    label: "Kept MCP files",
+    text: "MCP results and resources kept for one chat.",
+  },
 };
 
 // when a send carries a built-in, over its description

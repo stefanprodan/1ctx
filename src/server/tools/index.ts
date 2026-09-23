@@ -42,6 +42,7 @@ import {
   type SearchDependencies,
 } from "./builtin/websearch.ts";
 import { builtinCatalog, fillYear, parametersHtml } from "./catalog.ts";
+import { shapeMcpResult } from "./kept.ts";
 import { offered, type SkillsPort } from "./offer.ts";
 import type { ToolName } from "./parse.ts";
 import { Registry } from "./registry.ts";
@@ -67,6 +68,7 @@ export {
 } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
 export type {
+  KeepPort,
   MemoryHandle,
   MemoryScope,
   Offered,
@@ -213,7 +215,10 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     makeBashTool(deps.knowledge, web, visuals),
   ];
 
-  const mcpTools = (servers: OfferedServer[], ctx: ToolContext): Tool[] =>
+  const mcpTools = (
+    servers: OfferedServer[],
+    ctx: ToolContext,
+  ): Tool<string | ToolResult>[] =>
     servers.flatMap((server) =>
       server.tools.map((tool: OfferedMcpTool) => {
         const timeoutMs = server.timeoutMs ?? ctx.caps.callTimeoutMs;
@@ -226,12 +231,17 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           // client's own timer is a backstop set past it, since two
           // timers of one length race and the client's words would win
           // now and then
-          run: (args: Record<string, unknown>, runCtx: ToolContext) =>
-            mcpService.call(server, tool, args, {
-              signal: runCtx.signal,
-              timeoutMs: timeoutMs + MCP_BACKSTOP_MS,
-              bodyBytes: runCtx.caps.fetchBodyBytes,
-            }),
+          run: async (args: Record<string, unknown>, runCtx: ToolContext) =>
+            shapeMcpResult(
+              await mcpService.call(server, tool, args, {
+                signal: runCtx.signal,
+                timeoutMs: timeoutMs + MCP_BACKSTOP_MS,
+                bodyBytes: runCtx.caps.fetchBodyBytes,
+              }),
+              tool.name,
+              runCtx.keep,
+              runCtx.caps.resultCut,
+            ),
         };
       }),
     );

@@ -7,6 +7,7 @@ import type {
   SessionDetail,
 } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
+import { copyKeptFiles } from "../knowledge/index.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import {
@@ -156,6 +157,8 @@ export function copyRows(
     insertMessage.run(id, fields.sessionId, sendIds.get(row.sendId)!, row.id);
     insertOpened.run(id, row.id);
   }
+  const source = fields.rows[0]?.sessionId;
+  if (source !== undefined) copyKeptFiles(db, source, fields.sessionId, ids);
   return ids;
 }
 

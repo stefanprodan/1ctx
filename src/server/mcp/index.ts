@@ -32,7 +32,7 @@ import {
   MAX_SERVER_VERSION,
 } from "./limits.ts";
 import { RefreshCoordinator } from "./refresh.ts";
-import { resultText } from "./result.ts";
+import { type McpCallOutput, resultText } from "./result.ts";
 import { routes } from "./routes.ts";
 import { type McpServerRow, McpServerStore } from "./store.ts";
 
@@ -123,7 +123,7 @@ export type Mcp = {
     tool: OfferedMcpTool,
     args: Record<string, unknown>,
     options: McpCallOptions,
-  ): Promise<string>;
+  ): Promise<McpCallOutput>;
 };
 
 function switchableOver(
@@ -313,17 +313,20 @@ export function mcpArea(deps: McpDeps): Mcp {
           description: tool.description,
           inputSchema: tool.inputSchema,
         };
-        const mapped = resultText(
-          scrub(
-            await client.callTool(tool.name, args, definition, {
-              signal: options.signal,
-              timeoutMs: options.timeoutMs,
-            }),
-            key,
-          ),
+        const result = scrub(
+          await client.callTool(tool.name, args, definition, {
+            signal: options.signal,
+            timeoutMs: options.timeoutMs,
+          }),
+          key,
         );
+        const mapped = resultText(result);
         if (mapped.isError) throw new Error(mapped.text);
-        return mapped.text;
+        return {
+          text: mapped.text,
+          content: Array.isArray(result.content) ? result.content : [],
+          structured: result.structuredContent,
+        };
       });
     },
   };
@@ -346,5 +349,9 @@ export function mcpArea(deps: McpDeps): Mcp {
 export { type DiscoveryResult, discover, fingerprint } from "./discover.ts";
 export { changeNote } from "./note.ts";
 export { RefreshCoordinator } from "./refresh.ts";
-export { resultText } from "./result.ts";
+export {
+  type McpCallOutput,
+  type McpContent,
+  resultText,
+} from "./result.ts";
 export { type McpServerRow, McpServerStore, summary } from "./store.ts";

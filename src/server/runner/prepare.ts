@@ -38,6 +38,11 @@ export function prepareSend(fields: {
   uploads?: readonly string[];
   capabilities?: CapabilityChange;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
+  startKept(sessionId: string): {
+    next: number;
+    used: number;
+    maxBytes: number;
+  };
   title: string;
   kind: SendKind;
   origin: SessionOrigin;
@@ -77,6 +82,17 @@ export function prepareSend(fields: {
   fields.registry.set(send);
   let started: ReturnType<Writer["startSend"]>;
   try {
+    // under the lock, before the send is written and any command mounts:
+    // the kept files trimmed to the budget stay put for the whole send
+    if (fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
+      const kept = fields.startKept(fields.sessionId);
+      let next = kept.next;
+      send.keep = {
+        take: () => next++,
+        maxBytes: kept.maxBytes,
+        used: kept.used,
+      };
+    }
     started = fields.writer.startSend({
       sendId,
       replyId,

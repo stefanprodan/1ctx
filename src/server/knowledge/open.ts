@@ -110,7 +110,7 @@ function visualTitle(text: string, path: string): string {
 }
 
 function mounted(path: string): boolean {
-  return ["/knowledge", "/tmp", "/uploads"].some(
+  return ["/knowledge", "/tmp", "/uploads", "/mcp"].some(
     (root) => path === root || path.startsWith(`${root}/`),
   );
 }
