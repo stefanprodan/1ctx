@@ -10,6 +10,7 @@ import { type KeptFile, keptPath } from "../knowledge/index.ts";
 import type { McpCallOutput, McpContent } from "../mcp/index.ts";
 import type { KeepPort, ToolResult } from "./types.ts";
 
+// files a call keeps: resources, and one slot for the whole result
 export const MAX_KEPT_PER_CALL = 50;
 
 // the extension a blob gets when its name has none
@@ -79,6 +80,11 @@ export function size(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function lines(text: string): string {
+  const count = lineCount(text);
+  return `${count.toLocaleString("en-US")} ${count === 1 ? "line" : "lines"}`;
+}
+
 function lineCount(text: string): number {
   let count = 1;
   for (let i = text.indexOf("\n"); i !== -1; i = text.indexOf("\n", i + 1)) {
@@ -93,7 +99,10 @@ function start(text: string, room: number): string {
   if (text.length <= room) return text;
   const cut = text.slice(0, room);
   const line = cut.lastIndexOf("\n");
-  return line >= room / 2 ? cut.slice(0, line) : cut;
+  if (line >= room / 2) return cut.slice(0, line);
+  // never half of a surrogate pair, which a strict JSON reader refuses
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
 }
 
 function isJson(text: string): boolean {
@@ -218,37 +227,44 @@ export function shapeMcpResult(
   });
   const text = pieces.join("\n");
 
-  const lines: string[] = [];
+  const tail: string[] = [];
   if (text.length > cut) {
     const json = isJson(text);
     const path = keepFile(json ? "result.json" : "result.txt", text, null);
-    lines.push(
-      `whole result: ${path}, ${lineCount(text).toLocaleString("en-US")} lines, ${size(Buffer.byteLength(text))}: query it with ${json ? "jq" : "yq, rg or sed"}`,
+    tail.push(
+      `whole result: ${path}, ${lines(text)}, ${size(Buffer.byteLength(text))}: query it with ${json ? "jq" : "yq, rg or sed"}`,
     );
   }
-  lines.push(...saved);
+  // saved lines past half the cut become one line naming the folder, so
+  // no later cut clips the tail
+  if (saved.join("\n").length > cut / 2) {
+    tail.push(
+      `saved: ${saved.length} files in /mcp/${dir}/: list them with ls`,
+    );
+  } else tail.push(...saved);
   if (skipped > 0) {
-    lines.push(
-      `${skipped} more resources not kept: at most ${MAX_KEPT_PER_CALL} files per call`,
+    tail.push(
+      `${skipped} more resources not kept: at most ${MAX_KEPT_PER_CALL - 1} per call`,
     );
   }
 
   const total = files.reduce((sum, file) => sum + file.bytes, 0);
-  if (total > keep.maxBytes) {
-    // too large for the chat's budget: the plain cut, saying so
-    const note = `not kept: ${size(total)} is over this chat's ${size(keep.maxBytes)} for MCP results`;
+  if (keep.used + total > keep.maxBytes) {
+    // past the chat's budget, this send's files counted: the plain cut
+    const note = `not kept: ${size(total)} more would pass this chat's ${size(keep.maxBytes)} for MCP results`;
     return {
       content: `${output.text}\n${note}`,
       error: false,
       tail: note.length,
     };
   }
-  const tail = lines.join("\n");
-  const body = text.length > cut ? start(text, cut - tail.length - 1) : text;
+  keep.used += total;
+  const ending = tail.join("\n");
+  const body = text.length > cut ? start(text, cut - ending.length - 1) : text;
   return {
-    content: `${body}\n${tail}`,
+    content: `${body}\n${ending}`,
     error: false,
-    tail: tail.length,
+    tail: ending.length,
     kept: files,
   };
 }

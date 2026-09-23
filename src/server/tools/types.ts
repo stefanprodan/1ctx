@@ -26,8 +26,9 @@ export type ToolBudget = {
 };
 
 // A send that offers bash keeps MCP results past the cut under /mcp:
-// take() hands out the next folder number, maxBytes is the chat's budget.
-export type KeepPort = { take(): number; maxBytes: number };
+// take() hands out the next folder number; used counts the chat's kept
+// bytes, this send's included, against maxBytes.
+export type KeepPort = { take(): number; maxBytes: number; used: number };
 
 export type ToolContext = {
   web: WebSnapshot | null;

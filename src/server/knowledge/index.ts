@@ -78,7 +78,11 @@ export type KnowledgeCapability = KnowledgePort & {
   sweep(now: number): number;
   // a send's start: the session's kept MCP files trimmed to the budget,
   // and the number the next kept folder takes
-  startKept(sessionId: string): { next: number; maxBytes: number };
+  startKept(sessionId: string): {
+    next: number;
+    used: number;
+    maxBytes: number;
+  };
 };
 export type KnowledgeArea = KnowledgeCapability & {
   store: KnowledgeStore;
@@ -303,7 +307,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         const caps = deps.limits.current();
         return {
           result: {
-            next: startKept(deps.db, sessionId, caps),
+            ...startKept(deps.db, sessionId, caps),
             maxBytes: caps.mcpKeptBytes,
           },
           events: [],

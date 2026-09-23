@@ -15,7 +15,7 @@ import type { ToolResult } from "../../../src/server/tools/types.ts";
 
 function keep(start = 12, maxBytes = 32 * 1024 * 1024) {
   let next = start;
-  return { take: () => next++, maxBytes };
+  return { take: () => next++, maxBytes, used: 0 };
 }
 
 const text = (value: string): McpCallOutput => ({
@@ -195,7 +195,7 @@ describe("MCP results kept under /mcp", () => {
     ) as ToolResult;
     expect(result.kept).toHaveLength(MAX_KEPT_PER_CALL - 1);
     expect(result.content).toContain(
-      `6 more resources not kept: at most ${MAX_KEPT_PER_CALL} files per call`,
+      `6 more resources not kept: at most ${MAX_KEPT_PER_CALL - 1} per call`,
     );
   });
 
@@ -209,7 +209,7 @@ describe("MCP results kept under /mcp", () => {
     expect(result.kept).toBeUndefined();
     expect(result.content.startsWith(yaml)).toBeTrue();
     expect(result.content.slice(-result.tail!)).toBe(
-      "not kept: 18 KB is over this chat's 1 KB for MCP results",
+      "not kept: 18 KB more would pass this chat's 1 KB for MCP results",
     );
   });
 
@@ -220,5 +220,45 @@ describe("MCP results kept under /mcp", () => {
     const second = shapeMcpResult(text(yaml), "c", port, 1000) as ToolResult;
     expect(first.kept![0]!.dir).toBe("0040-a");
     expect(second.kept![0]!.dir).toBe("0041-c");
+  });
+
+  test("a character cut never splits a surrogate pair", () => {
+    const json = JSON.stringify(Array.from({ length: 500 }, () => "😀"));
+    const result = shapeMcpResult(
+      text(json),
+      "emoji",
+      keep(),
+      1000,
+    ) as ToolResult;
+    const body = result.content.slice(0, -result.tail! - 1);
+    const last = body.charCodeAt(body.length - 1);
+    expect(last >= 0xd800 && last <= 0xdbff).toBeFalse();
+    expect(result.content.slice(-result.tail!)).toContain("1 line,");
+  });
+
+  test("the budget counts this send's files too", () => {
+    const port = { ...keep(1, 30 * 1024), used: 0 };
+    const first = shapeMcpResult(text(yaml), "a", port, 1000) as ToolResult;
+    expect(first.kept).toHaveLength(1);
+    const second = shapeMcpResult(text(yaml), "b", port, 1000) as ToolResult;
+    expect(second.kept).toBeUndefined();
+    expect(second.content).toContain("more would pass this chat's 30 KB");
+  });
+
+  test("many saved lines become one naming the folder", () => {
+    const content = Array.from({ length: 40 }, (_, i) => ({
+      type: "resource",
+      resource: { uri: `x://h/${"n".repeat(60)}${i}.txt`, text: "a" },
+    }));
+    const result = shapeMcpResult(
+      { text: "", content, structured: undefined },
+      "list",
+      keep(3),
+      1000,
+    ) as ToolResult;
+    expect(result.kept).toHaveLength(40);
+    expect(result.content.slice(-result.tail!)).toBe(
+      "saved: 40 files in /mcp/0003-list/: list them with ls",
+    );
   });
 });

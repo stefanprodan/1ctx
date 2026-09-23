@@ -106,13 +106,14 @@ export function readKept(
 
 /**
  * The oldest folders dropped until the session is inside its budget, then
- * the number its next folder takes. Called as a send starts.
+ * the number its next folder takes and the bytes still kept. Called as a
+ * send starts.
  */
 export function startKept(
   db: Db,
   sessionId: string,
   caps: { mcpKeptBytes: number; mcpKeptFiles: number },
-): number {
+): { next: number; used: number } {
   const folders = db
     .query<{ folder: number; bytes: number; files: number }, [string]>(
       `select folder, sum(bytes) as bytes, count(*) as files
@@ -139,7 +140,7 @@ export function startKept(
       "select mcp_folders from sessions where id = ?",
     )
     .get(sessionId);
-  return (row?.mcp_folders ?? 0) + 1;
+  return { next: (row?.mcp_folders ?? 0) + 1, used: bytes };
 }
 
 // fork: the kept files of the copied rows, under their new ids

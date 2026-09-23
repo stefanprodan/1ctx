@@ -277,7 +277,8 @@ export async function run(
       storage.scratchBytes,
       storage.knowledgeFileBytes,
       ...uploads.entries.map((file) => file.bytes),
-      ...kept.map((entry) => entry.bytes),
+      // the reads the path line teaches (yq, then rg, then sed) add up
+      ...kept.map((entry) => 4 * entry.bytes),
     );
     const opened: OpenedRecord[] = [];
     const bash = new Bash({
@@ -345,7 +346,7 @@ export async function run(
     });
     const stdout = decodeBytesToUtf8(stdoutAsBytes(result));
     combined.throwIfAborted();
-    if (kept.length > 0 && keptChanged(fs, kept)) {
+    if (keptChanged(fs, kept)) {
       notice =
         "changes under /mcp were discarded: copy a file to /tmp to change it\n" +
         notice;

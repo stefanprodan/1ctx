@@ -578,8 +578,10 @@ violation, and every rule has a rejected fixture under
   leaves nothing, `-2` for a repeat), inlined too while under the cut,
   with a `saved: <path>` line. The path lines are the result's `tail`,
   so the registry, `cutResult` and `fitResults` keep them. A call keeps
-  at most `MAX_KEPT_PER_CALL` files and nothing past the chat's
-  `mcpKeptBytes`, saying so. Files are rows of `mcp_kept_files`,
+  at most `MAX_KEPT_PER_CALL` files (one slot for the whole result) and
+  nothing past the chat's `mcpKeptBytes`, this send's files counted,
+  saying so; saved lines longer than half the cut become one line naming
+  the folder. Files are rows of `mcp_kept_files`,
   written by the writer's `finishTool` in the row's transaction,
   cascading with the message, copied by fork; each call's folder is
   `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`, never
@@ -587,10 +589,12 @@ violation, and every rule has a rejected fixture under
   `mcpKeptFiles` (knowledge scope) through `knowledge.startKept()`
   under the runner's lock, so no command loses a file while it reads.
   The mount adds each as a lazy file (`writeFileLazy`), sized into
-  `mountBytes` and `ioBytes`; `/mcp` is never committed, an added or
-  removed name there gives a discard notice found from `getAllPaths()`
-  alone (a `stat` would load every file), and `open` and the saved cwd
-  accept it. A kept name is server text and never reaches a log field.
+  `mountBytes` and `ioBytes` (four reads of the largest); `/mcp` is never
+  committed, an added or removed name under it gives a discard notice
+  found from `getAllPaths()` alone (a `stat` would load every file), a
+  changed file is dropped without one, and `open` and the saved cwd
+  accept it. `prepareSend` calls `startKept` before `startSend`. A kept
+  name is server text and never reaches a log field.
 - **The MCP page shows the loaded rows as a send would carry them.**
   `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
   by `shapeServerName()`, the key a `Select` of the `mcp-` files the
