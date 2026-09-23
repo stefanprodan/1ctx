@@ -55,20 +55,69 @@ export type ClientOptions = {
 
 const argumentValidator = new AjvJsonSchemaValidator();
 
+// Ajv's own text names neither an unknown nor a missing property, so
+// the top level is checked first; a schema Ajv cannot compile lets the
+// call through for the server to judge
 export function validateArguments(
   schema: Record<string, unknown>,
   input: Record<string, unknown>,
 ): string | null {
+  let result: { valid: boolean; errorMessage?: string };
   try {
-    const validate = argumentValidator.getValidator<Record<string, unknown>>(
+    result = argumentValidator.getValidator<Record<string, unknown>>(
       schema as JsonSchemaType,
-    );
-    const result = validate(input);
-    if (result.valid) return null;
-    return result.errorMessage.split(",")[0]?.trim() || "arguments are invalid";
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    )(input);
+  } catch {
+    return null;
   }
+  if (result.valid) return null;
+  const properties = isObject(schema.properties) ? schema.properties : {};
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((name) => typeof name === "string")
+    : [];
+  const unknown =
+    schema.additionalProperties === false
+      ? Object.keys(input).filter((name) => !Object.hasOwn(properties, name))
+      : [];
+  const missing = required.filter((name) => !Object.hasOwn(input, name));
+  const others = (result.errorMessage ?? "")
+    .split(/, (?=data\b)/)
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line !== "" &&
+        !(
+          unknown.length > 0 &&
+          line === "data must NOT have additional properties"
+        ) &&
+        !(
+          missing.length > 0 &&
+          line.startsWith("data must have required property")
+        ),
+    )
+    .map((line) => line.replace(/^data\b/, "arguments"));
+  const problems = [
+    ...unknown.map((name) => `unknown property '${name}'`),
+    ...missing.map((name) => `missing required property '${name}'`),
+    ...others,
+  ];
+  if (problems.length === 0) problems.push("arguments are invalid");
+  const names = Object.keys(properties).map((name) =>
+    required.includes(name) ? `${name} (required)` : name,
+  );
+  const list =
+    names.length > MAX_LISTED
+      ? `${names.slice(0, MAX_LISTED).join(", ")} and ${names.length - MAX_LISTED} more`
+      : names.join(", ");
+  return `${problems.join("; ")}. ${
+    names.length === 0 ? "It takes no parameters." : `Its parameters: ${list}.`
+  }`;
+}
+
+const MAX_LISTED = 40;
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function cut(text: string, max: number): string {

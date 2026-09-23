@@ -23,7 +23,7 @@ import { cutResult, fitResults, resultsFit } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
 import { type ActiveSend, type CapReason, newRound } from "./send.ts";
-import type { Writer } from "./writer.ts";
+import { notRun, type Writer } from "./writer.ts";
 
 // how many identical rounds in a row are the loop check
 export const LOOP_REPEATS = 3;
@@ -93,6 +93,8 @@ export async function toolLoop(
     if (send.cause !== null) return endFor(send.cause);
     const round = send.round;
     if (round === null) return finish();
+    round.calls =
+      deps.tools.normalize?.(send.policy.offered, round.calls) ?? round.calls;
     const calls = round.calls;
 
     if (send.summarizing) {
@@ -132,7 +134,12 @@ export async function toolLoop(
     // calls in the answer round: keep work, record them not run, ask
     // once more without schemas, then end
     if (send.answering) {
-      deps.writer.recordUnrun(send, send.answering, calls);
+      deps.writer.recordUnrun(
+        send,
+        send.answering,
+        calls,
+        notRun(send.answering),
+      );
       // a request without schemas is a new prompt to a local server,
       // minutes for a long chat, so the same request goes first there;
       // a hosted wire's cache is not one conversation's to keep
@@ -159,12 +166,11 @@ export async function toolLoop(
       return { cause: "finish", finishReason: reason, error: null };
     }
 
-    // the loop check: three equal signatures in a row
+    // the loop check: three equal signatures in a row ask for the answer
     send.signatures.push(signature(calls));
     if (looping(send.signatures)) {
-      deps.writer.recordUnrun(send, "tool_loop", calls);
-      send.round = null;
-      return { cause: "finish", finishReason: "tool_loop", error: null };
+      goToAnswer(deps, send, "tool_loop", { calls });
+      continue;
     }
 
     // the caps, weighed before the calls launch

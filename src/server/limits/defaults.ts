@@ -100,7 +100,7 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     scope: "send",
   },
   toolWorkTokens: {
-    default: 500_000,
+    default: 1_000_000,
     min: 10_000,
     max: 10_000_000,
     unit: "tokens",

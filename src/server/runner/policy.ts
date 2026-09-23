@@ -59,6 +59,7 @@ export type ToolsPort = {
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
+  normalize?(offered: Offered, calls: ToolCall[]): ToolCall[];
 };
 
 export type SendPolicy = {

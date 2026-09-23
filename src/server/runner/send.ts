@@ -50,7 +50,11 @@ export type Budget = {
   tokens: number;
 };
 
-export type CapReason = "tool_limit" | "token_limit" | "context_limit";
+export type CapReason =
+  | "tool_limit"
+  | "token_limit"
+  | "context_limit"
+  | "tool_loop";
 
 // the phase of a send: talking to the provider, running a round's
 // tools with no row streaming, or ended

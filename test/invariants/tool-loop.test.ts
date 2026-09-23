@@ -10,7 +10,9 @@
 // the round numbers, the tool rows, the counters and the terminal cause.
 
 import { describe, expect, test } from "bun:test";
+import { LOOP_LINE } from "../../src/server/runner/context.ts";
 import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
+import { NOT_RUN_LOOP } from "../../src/server/runner/writer.ts";
 import { settleRun } from "../helpers/automations.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 import {
@@ -375,21 +377,27 @@ describe("the tool loop", () => {
     const chat = await chatApp();
     const { detail, sessionId } = await startChat(chat, "loop");
     // three rounds asking for the very same call; the third trips the
-    // loop check, which records the calls not run and ends tool_loop
+    // loop check, which records the calls not run and asks for the answer
     for (let round = 1; round <= 3; round++) {
       const script = await waitScript(chat.scripted, round);
       script.toolRound([time("same")]);
       script.end();
       await settle(chat);
     }
+    const answer = await waitScript(chat.scripted, 4);
+    expect(asksAnswer(answer.body, LOOP_LINE)).toBe(true);
+    answer.reply("the answer after the loop");
     await settle(chat, 10);
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send.status).toBe("done");
-    const lastReply = chat.app.sessions
-      .messages(sessionId)
-      .filter((r) => r.kind === "reply")
-      .at(-1)!;
-    expect(lastReply.finishReason).toBe("tool_loop");
+    const rows = chat.app.sessions.messages(sessionId);
+    const replies = rows.filter((r) => r.kind === "reply");
+    expect(replies.at(-2)!.finishReason).toBe("tool_loop");
+    expect(replies.at(-1)!.content).toBe("the answer after the loop");
+    expect(rows.filter((r) => r.kind === "tool").at(-1)).toMatchObject({
+      status: "stopped",
+      content: NOT_RUN_LOOP,
+    });
     answerNodes(chat, sessionId);
     chat.app.socket.dispose();
   });

@@ -28,7 +28,7 @@ const budgetLimits = [
   },
   {
     name: "toolWorkTokens",
-    default: 500_000,
+    default: 1_000_000,
     min: 10_000,
     max: 10_000_000,
     unit: "tokens",
@@ -118,7 +118,7 @@ describe("limits area", () => {
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
-        toolWorkTokens: 500_000,
+        toolWorkTokens: 1_000_000,
       });
       expect(TOOL_CAPS.maxBashCalls).toBe(100);
     } finally {

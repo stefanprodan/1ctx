@@ -550,11 +550,16 @@ violation, and every rule has a rejected fixture under
   after the built-ins and the skill tools, so the `tools` array is
   byte-stable across a session. `mcpMode` `all` puts every offered
   schema on the wire; `catalog` puts `mcp_describe` and `mcp_call`
-  (`tools/builtin/mcp.ts`, the name an enum of the offered wire names,
-  the arguments checked against the stored schema with the SDK's
-  validator before anything goes out) and one line per tool in the
-  prompt; `auto`, the default, is `all` while the lean schemas count at
-  most `MCP_CATALOG_FROM_TOKENS` through `lib/tokens.ts`. A call runs
+  (`tools/builtin/mcp.ts`, the name an enum of the offered wire names)
+  and one line per tool in the prompt, and the loop rewrites a call of
+  an offered wire name to `mcp_call` before its row is written, so
+  history never names a function the `tools` array lacks; `auto`, the default, is `all` while the lean schemas count at
+  most `MCP_CATALOG_FROM_TOKENS` through `lib/tokens.ts`. In both modes
+  the arguments are checked against the stored schema before anything
+  goes out: `validateArguments` in `mcp/client.ts` names unknown and
+  missing top-level properties, keeps the SDK validator's other words
+  and lists the parameters, and a schema the validator cannot compile
+  lets the call through. A call runs
   through the registry under the wire name in both modes, under the
   server's `timeoutMs` or the limits' call timeout, one client per
   call over the snapshot's URL and key name; the row is a tool row
@@ -859,7 +864,9 @@ violation, and every rule has a rejected fixture under
   MCP name (`tools/bash-hint.ts`).
   Main rounds spend prompt plus completion tokens, cached tokens included,
   or a request estimate without usage. The tool-work threshold and the
-  window threshold are checked before calls, forcing one answer round.
+  window threshold are checked before calls, forcing one answer round,
+  and so do three equal call rounds in a row (`tool_loop`), whose
+  answer line and not-run text say so rather than a spent budget.
   The answer round sends the schemas unchanged and no `tool_choice`,
   which would miss a server's cached prefix; the exhausted line asks
   for the answer. A round that still calls is asked again: on
@@ -869,8 +876,8 @@ violation, and every rule has a rejected fixture under
   The crossing and answer rounds may pass the tool-work budget; summaries
   and memory have their own limits. Results that outgrow the remaining
   window are cut largest first before storage, keeping bash's exit and
-  receipts and a cut line. The work row carries `tool_limit`, `token_limit`
-  or `context_limit`; the answer keeps the provider's finish reason.
+  receipts and a cut line. The work row carries `tool_limit`, `token_limit`,
+  `context_limit` or `tool_loop`; the answer keeps the provider's finish reason.
   The offered set is decided once per send in `runner/policy.ts` from
   the `tools` rows:
   a model that accepts tools always gets `datetime` and `bash` over the

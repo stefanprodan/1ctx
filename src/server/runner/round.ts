@@ -120,7 +120,7 @@ export function buildRequest(
     send.sessionId,
     // the answer round appends the exhausted line to a request-local
     // copy, never the stored rows
-    send.answering ? withExhausted(messages) : messages,
+    send.answering ? withExhausted(messages, send.answering) : messages,
   );
   // The answer round keeps the schemas untouched and asks in words: a
   // tool_choice changes the prompt a server renders and misses its

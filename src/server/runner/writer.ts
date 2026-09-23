@@ -43,6 +43,11 @@ export type { SessionsPort } from "./writer-port.ts";
 
 // the text a call cut before it ran gets, as its content
 export const NOT_RUN = "not run: the tool budget was spent";
+export const NOT_RUN_LOOP = "not run: the same calls came three times in a row";
+
+export function notRun(reason: string): string {
+  return reason === "tool_loop" ? NOT_RUN_LOOP : NOT_RUN;
+}
 // the text a call still running when the send ended gets
 export const CUT_SHORT = "stopped before it finished";
 
@@ -344,7 +349,7 @@ export class Writer {
         for (const row of created) {
           changed.push(
             this.deps.sessions.finishTool(row.id, {
-              content: NOT_RUN,
+              content: notRun(transition.finishReason),
               status: "stopped",
               error: null,
               finishedAt: now,
