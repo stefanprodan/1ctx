@@ -5,7 +5,7 @@
 // abort, and where we refuse rather than copy gawk.
 
 import { describe, expect, test } from "bun:test";
-import { Bash } from "just-bash";
+import { Bash, defineCommand } from "just-bash";
 
 const LIMIT_EXIT = 126;
 
@@ -75,19 +75,23 @@ describe("awk limits and refusals", () => {
     expect(r.exitCode).toBe(2);
   });
 
-  test("an abort stops a long read under a regex RS", async () => {
-    const records = 300_000;
-    const bash = new Bash({ files: { "/w/big.txt": "ab--".repeat(records) } });
+  test("an abort stops the read under a regex RS at the next record", async () => {
     const controller = new AbortController();
-    const started = Date.now();
-    setTimeout(() => controller.abort(), 50);
+    // a command the program runs through getline aborts the shell
+    const trip = defineCommand("trip", async () => {
+      controller.abort();
+      return { stdout: "", stderr: "", exitCode: 0 };
+    });
+    const bash = new Bash({
+      files: { "/w/big.txt": "ab--".repeat(1000) },
+      customCommands: [trip],
+    });
     const r = await bash.exec(
-      `awk 'BEGIN { RS = "-+" } { n++ } END { print "done", n }' /w/big.txt`,
+      `awk 'BEGIN { RS = "-+" } NR == 3 { "trip" | getline } { n++ } END { print "done", n }' /w/big.txt`,
       { signal: controller.signal },
     );
     expect(r.stdout).not.toContain("done");
     expect(r.exitCode).not.toBe(0);
-    expect(Date.now() - started).toBeLessThan(5_000);
   });
 
   test("a field past the element cap is refused", async () => {
