@@ -70,6 +70,7 @@ without a file of their own.
 | `src/commands/awk/parser2.ts` | `$` binds tighter than `^`, and an exponent may carry a sign | `$2^2` read `$4` and `2^-1` was a parse error |
 | `src/commands/awk/format.ts`, `interpreter/statements.ts`, `fields.ts`, `expressions.ts`, `awk2.ts` | `printf` with fewer arguments than conversions is fatal, a negative field is fatal, a bare `exit` keeps the code an earlier `exit` set, `print > "/dev/stdout"` prints and `print > "/dev/stderr"` reaches stderr, and `getline < "-"` or `getline < "/dev/stdin"` reads standard input | a missing argument printed empty or `0`, `$(-1)` was empty, `print > "/dev/stdout"` wrote a file that name and getline from stdin answered -1 |
 | `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `input.ts`, `records.ts`, `context.ts`, `awk2.ts` | fields are capped like array elements, `ARGV` and `ENVIRON` elements count against the cap, a gap in `ARGV` is skipped whole, and the compiled record separators live with the command | `$100000000 = "x"` took gigabytes, `split(s, ARGV)` escaped the cap, `ARGC = 1e8` spun for ten seconds and a module-level cache kept each command's last input |
+| `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
 
 ### Where our jq still differs from jq
 
@@ -112,6 +113,8 @@ they part:
   `asort`, `asorti`, `strtonum`, `patsplit`, `isarray` and `typeof` are
   functions not defined; `systime`, `mktime` and `strftime` fail when
   called, and `system` is refused.
+- `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
+  line saying what this is, not gawk's copyright text.
 - A value is a string or a number, with no strnum: a variable holding a
   string constant or a string function's answer compares as a number
   when both sides look numeric, so `x = "10"; x > 9` is true where gawk

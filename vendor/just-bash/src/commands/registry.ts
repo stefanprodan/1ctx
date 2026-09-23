@@ -41,6 +41,7 @@ export type CommandName =
   | "rg"
   | "sed"
   | "awk"
+  | "gawk"
   | "sort"
   | "uniq"
   | "comm"
@@ -222,6 +223,11 @@ const commandLoaders: LazyCommandDef<CommandName>[] = [
   },
   {
     name: "awk",
+    load: async () => (await import("./awk/awk2.js")).awkCommand2,
+  },
+  // (1ctx) the name models write for the awk of a Linux box
+  {
+    name: "gawk",
     load: async () => (await import("./awk/awk2.js")).awkCommand2,
   },
   {

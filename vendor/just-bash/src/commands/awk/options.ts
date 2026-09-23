@@ -27,7 +27,9 @@ export interface AwkOptions {
 
 export type ParsedOptions =
   | { ok: true; options: AwkOptions }
-  | { ok: false; stderr: string; exitCode: number };
+  | { ok: false; stderr: string; exitCode: number }
+  // --version or -V among the options
+  | { ok: false; version: true };
 
 const AWK_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const OPERAND_ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)=/;
@@ -54,6 +56,7 @@ export function parseOptions(args: string[]): ParsedOptions {
       break;
     }
     if (arg === "-" || !arg.startsWith("-")) break;
+    if (arg === "--version" || arg === "-V") return { ok: false, version: true };
     if (arg.startsWith("--")) {
       return fail(`awk: unrecognized option '${arg}'\n`);
     }

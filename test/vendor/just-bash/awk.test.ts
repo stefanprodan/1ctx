@@ -126,6 +126,27 @@ describe("awk limits and refusals", () => {
     expect(r.exitCode).toBe(LIMIT_EXIT);
   });
 
+  test("gawk is a name of awk, and both say they are gawk", async () => {
+    const bash = new Bash();
+    const names = await bash.exec("command -v gawk; which gawk; type gawk");
+    expect(names.stdout).toBe(
+      "/usr/bin/gawk\n/usr/bin/gawk\ngawk is /usr/bin/gawk\n",
+    );
+    const run = await bash.exec(`printf 'a b\\n' | gawk '{ print $2 }'`);
+    expect(run.stdout).toBe("b\n");
+    for (const command of [
+      "awk --version",
+      "gawk -V",
+      "awk -v x=1 --version",
+    ]) {
+      const r = await bash.exec(command);
+      expect(r.stdout.split("\n")[0]).toBe(
+        "GNU Awk 5.4.1 (just-bash, compatible)",
+      );
+      expect(r.exitCode).toBe(0);
+    }
+  });
+
   test("print to /dev/stderr reaches stderr", async () => {
     const r = await new Bash().exec(
       `awk '{ print "e" $0 > "/dev/stderr"; print "o" $0 }'`,

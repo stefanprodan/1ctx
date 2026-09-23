@@ -33,6 +33,7 @@ export const KNOWLEDGE_COMMANDS = [
   "rg",
   "sed",
   "awk",
+  "gawk",
   "sort",
   "uniq",
   "cut",

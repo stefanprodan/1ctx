@@ -43,8 +43,13 @@ const awkHelp = {
     "-v VAR=VAL assign VAL to variable VAR",
     "-f FILE    read the program from FILE",
     "    --help display this help and exit",
+    "    --version print the version and exit",
   ],
 };
+
+const AWK_VERSION =
+  "GNU Awk 5.4.1 (just-bash, compatible)\n" +
+  "A sandboxed awk that answers as gawk 5.4.1 does; see awk --help.\n";
 
 export const awkCommand2: RuntimeCommand = {
   name: "awk",
@@ -68,6 +73,11 @@ export const awkCommand2: RuntimeCommand = {
     // setVariable once the context exists; -f and -- are read as gawk does
     const parsed = parseOptions(args);
     if (!parsed.ok) {
+      // the first line is what a script checking for gawk looks for; the
+      // second says what this is
+      if ("version" in parsed) {
+        return { stdout: AWK_VERSION, stderr: "", exitCode: 0 };
+      }
       return { stdout: "", stderr: parsed.stderr, exitCode: parsed.exitCode };
     }
     const options = parsed.options;
