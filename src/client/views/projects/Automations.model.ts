@@ -25,7 +25,7 @@ import {
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
-import { daysOf, fieldsOf, WEEK } from "./Schedule.model.ts";
+import { daysOf, fieldsOf, fireLabel, WEEK } from "./Schedule.model.ts";
 
 const whole = (field: string, max: number): number | null => {
   if (!/^\d{1,2}$/.test(field)) return null;
@@ -101,9 +101,32 @@ export function scheduleTitle(schedule: string): string {
     : `${words[0].toUpperCase()}${words.slice(1)}`;
 }
 
-// a list row's state at its right: running, suspended, or the next
-// fire, after a failed last run
-// the row's meta: the last failure, red on its own, then the next fire
+// A fire the server left due waits for a run slot: the row is not
+// suspended and its next run is past the page's clock.
+export function waitingSince(
+  a: Pick<AutomationSummary, "suspendedAt" | "nextAt">,
+  now: number,
+): number | null {
+  return a.suspendedAt === null && a.nextAt !== null && a.nextAt <= now
+    ? a.nextAt
+    : null;
+}
+
+// the brief's foot: "Waiting for a free slot since 09:00", the day
+// named when not today, or the next run and how far off it is
+export function nextLine(
+  a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz">,
+  now: number,
+): string {
+  if (a.nextAt === null) return "";
+  const at = fireLabel(a.nextAt, now, a.tz, true);
+  return waitingSince(a, now) === null
+    ? `Next run ${at}, ${until(a.nextAt, now)}`
+    : `Waiting for a free slot since ${at.replace(/^today /, "")}`;
+}
+
+// the row's meta: the last failure, red on its own, then running,
+// waiting for a slot, suspended or the next fire
 export function rowState(
   a: AutomationSummary,
   now: number,
@@ -116,9 +139,11 @@ export function rowState(
   const next =
     a.suspendedAt !== null
       ? "suspended"
-      : a.nextAt !== null
-        ? `next ${until(a.nextAt, now)}`
-        : null;
+      : waitingSince(a, now) !== null
+        ? "waiting for a slot"
+        : a.nextAt !== null
+          ? `next ${until(a.nextAt, now)}`
+          : null;
   return { bad: failed, text: next ?? "" };
 }
 

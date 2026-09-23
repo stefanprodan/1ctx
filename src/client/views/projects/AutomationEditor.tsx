@@ -374,6 +374,7 @@ function Editor({
 const RUN_FACTS = [
   "Each run starts a new session where the agent works on its own, without asking questions.",
   "A scheduled run is skipped if the previous one is still running.",
+  "When too many tasks are running, a scheduled run waits for a free slot until its next time comes.",
   "A run that exceeds the deadline is stopped.",
   "Runs are deleted after the retention period.",
 ];

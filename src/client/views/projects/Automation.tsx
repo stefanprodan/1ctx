@@ -49,6 +49,7 @@ import {
   canChange,
   deadlineText,
   eventNote,
+  nextLine,
   scheduleTitle,
   suspendedText,
 } from "./Automations.model.ts";
@@ -286,8 +287,7 @@ export function Automation({ params }: { params: Params }) {
                 ) : row.nextAt !== null ? (
                   <p class="automations-brief-next">
                     <Icon name="arrow-right" size={14} />
-                    Next run {fireLabel(row.nextAt, now.value, row.tz, true)},{" "}
-                    {until(row.nextAt, now.value)}
+                    {nextLine(row, now.value)}
                   </p>
                 ) : null
               }

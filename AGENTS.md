@@ -668,13 +668,14 @@ violation, and every rule has a rejected fixture under
   final release (a finalized send freed) calls the `slotFreed` port,
   never a rollback, an abandon or a failed finalize, and a limits write
   that moves a run cap calls `runCapsChanged`; `compose.ts` binds both
-  to the scheduler's `wake()`. The writer's three transactions: `startSend`
-  (the session when new, the user message, the streaming reply, the
-  send row, the running state), `finalizeRound` (the reply's end and
-  its usage row) and `finalizeSend` (the send's end and the session's
-  state, with the last round inside it). Each bumps the session's
-  revision once and publishes one `session.changed` envelope after
-  commit. Create and send accept up to ten distinct staged `uploads` ids.
+  to the scheduler's `wake()`. The writer's three transactions:
+  `startSend` (the session when new, the user message, the streaming
+  reply, the send row, the running state), `finalizeRound` (the
+  reply's end and its usage row) and `finalizeSend` (the send's end
+  and the session's state, with the last round inside it). Each bumps
+  the session's revision once and publishes one `session.changed`
+  envelope after commit. Create and send accept up to ten distinct
+  staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
   change with `disable` and `enable` keys: `web`, `mcp:<server id>` and
@@ -849,8 +850,8 @@ violation, and every rule has a rejected fixture under
   hourly, and sleeps until the earliest `next_at` or a minute, woken
   early by a store write, a freed run slot or a moved run cap. `wake()`
   is level-triggered: it bumps a generation the sleep compares, so a
-  wake with no sleeper is kept. A fire is one transaction that reads the row
-  again, checks the owner's access with the pure rule in
+  wake with no sleeper is kept. A fire is one transaction that reads
+  the row again, checks the owner's access with the pure rule in
   `projects/visible.ts`, skips when a run of it still runs, moves
   `next_at` past now (missed fires are dropped, never replayed),
   records the event and calls the runner's `startRun()`, which is
@@ -963,13 +964,14 @@ violation, and every rule has a rejected fixture under
   Per call, Knowledge, Scheduled tasks), each saving the full set with
   the other scopes' saved values. A change on the Tools page applies to
   the next send, a run cap to the next admission; a send in flight
-  keeps the caps and the set it started on. A round's calls run in parallel
-  under the call timeout and the send's signal. A tool row is a message
-  of kind `tool`, and each tool's end is one transaction, one revision,
-  one envelope; only the reply text streams. Every message carries its
-  `send_id` and `round`, and a reply row its `slot`, `work` or `answer`,
-  written by the server: at the first call delta, or when the round
-  ends. The client groups by send and slot and never infers placement
+  keeps the caps and the set it started on. A round's calls run in
+  parallel under the call timeout and the send's signal. A tool row is
+  a message of kind `tool`, and each tool's end is one transaction,
+  one revision, one envelope; only the reply text streams. Every
+  message carries its `send_id` and `round`, and a reply row its
+  `slot`, `work` or `answer`, written by the server: at the first call
+  delta, or when the round ends. The client groups by send and slot and
+  never infers placement
   from the call arrays, the finish reason or the live map. A tool row
   travels without its result; detail and envelopes carry `resultBytes`,
   and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
@@ -1176,7 +1178,11 @@ violation, and every rule has a rejected fixture under
   unknown), each leading to the automation's page, `/automations/:id`,
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
-  Show more), then Suspend or Resume, Edit and Run now over two tabs:
+  Show more, and at its foot the next run, or "Waiting for a free slot
+  since 09:00" while the row is not suspended and its `nextAt` is past
+  the page's clock, which the Automations tab's row says first as
+  waiting for a slot; no field carries it), then Suspend or Resume,
+  Edit and Run now over two tabs:
   Runs, a log of `RunRow.tsx` rows with the source as the icon (who pressed Run now its
   title) and the feed's line, length against the deadline and Stop,
   filtered by `?runs=` and counted by the tally, paged with Show more
