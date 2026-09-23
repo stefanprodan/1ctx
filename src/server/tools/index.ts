@@ -26,6 +26,8 @@ import { withCommandHints } from "./bash-hint.ts";
 import { makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
+  asMcpCall,
+  checkMcpArguments,
   makeMcpCatalogTools,
   mcpCallName,
   resolveMcpCall,
@@ -121,6 +123,7 @@ export type Tools = {
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
+  normalize?(offered: Offered, calls: ToolCall[]): ToolCall[];
   routes?: RouteDescriptor[];
 };
 
@@ -231,8 +234,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           // client's own timer is a backstop set past it, since two
           // timers of one length race and the client's words would win
           // now and then
-          run: async (args: Record<string, unknown>, runCtx: ToolContext) =>
-            shapeMcpResult(
+          run: async (args: Record<string, unknown>, runCtx: ToolContext) => {
+            checkMcpArguments(tool, args, mcpService.validateArguments);
+            return shapeMcpResult(
               await mcpService.call(server, tool, args, {
                 signal: runCtx.signal,
                 timeoutMs: timeoutMs + MCP_BACKSTOP_MS,
@@ -241,7 +245,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
               tool.name,
               runCtx.keep,
               runCtx.caps.resultCut,
-            ),
+            );
+          },
         };
       }),
     );
@@ -348,6 +353,14 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         scope,
         disabledCapabilities,
       );
+    },
+    normalize(offered, calls) {
+      if (
+        offered.mcpCatalog === "" ||
+        !offered.tools.some((tool) => tool.name === "mcp_call")
+      )
+        return calls;
+      return calls.map((call) => asMcpCall(offered.mcp, call));
     },
     toolName(offered, call) {
       return mcpCallName(offered.mcp, call) ?? call.name;

@@ -658,7 +658,9 @@ describe("MCP tools in a send", () => {
       toolName: "mcp__flux__search_flux_docs",
       status: "failed",
     });
-    expect(rows[2]?.content).toContain("additional properties");
+    expect(rows[2]?.content).toContain(
+      "unknown property 'extra'. Its parameters: query (required), path, limit.",
+    );
     expect(rows[3]).toMatchObject({
       toolName: "mcp__flux__search_flux_docs",
       status: "done",
@@ -1428,6 +1430,73 @@ describe("MCP catalog and lifecycle end to end", () => {
       };
     };
     expect(await run("catalog")).toEqual(await run("all"));
+  });
+
+  test("catalog mode runs a wire name called directly as mcp_call", async () => {
+    const { chat, flux } = await sendFixture({ mode: "catalog" });
+    const started = await startChat(chat);
+    started.script.toolRound([
+      {
+        id: "direct",
+        name: "mcp__flux__search_flux_docs",
+        arguments: JSON.stringify({ query: "HelmRelease" }),
+      },
+      { id: "outside", name: "mcp__flux__not_offered", arguments: "{}" },
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    expect(answer.body.tools).toEqual(started.script.body.tools);
+    const messages = answer.body.messages as {
+      tool_calls?: { function: { name: string; arguments: string } }[];
+    }[];
+    const sent = messages.flatMap((message) => message.tool_calls ?? []);
+    expect(sent.map((call) => call.function.name)).toEqual([
+      "mcp_call",
+      "mcp__flux__not_offered",
+    ]);
+    expect(JSON.parse(sent[0]!.function.arguments)).toEqual({
+      name: "mcp__flux__search_flux_docs",
+      arguments: { query: "HelmRelease" },
+    });
+    const rows = chat.app.sessions.messages(started.sessionId);
+    expect(rows.find((row) => row.toolCallId === "direct")).toMatchObject({
+      toolName: "mcp__flux__search_flux_docs",
+      status: "done",
+    });
+    expect(rows.find((row) => row.toolCallId === "outside")?.status).toBe(
+      "failed",
+    );
+    expect(
+      flux.requests.filter((request) => request.method === "tools/call"),
+    ).toHaveLength(1);
+    answer.reply("done");
+    await waitDone(chat.app, started.sessionId);
+  });
+
+  test("all mode refuses arguments the schema rejects before a call", async () => {
+    const { chat, flux } = await sendFixture({ mode: "all" });
+    const started = await startChat(chat);
+    started.script.toolRound([
+      {
+        id: "bad",
+        name: "mcp__flux__search_flux_docs",
+        arguments: JSON.stringify({ q: "HelmRelease" }),
+      },
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    const row = chat.app.sessions
+      .messages(started.sessionId)
+      .find((message) => message.toolCallId === "bad");
+    expect(row?.status).toBe("failed");
+    expect(row?.content).toContain(
+      "unknown property 'q'; missing required property 'query'",
+    );
+    expect(
+      flux.requests.filter((request) => request.method === "tools/call"),
+    ).toHaveLength(0);
+    answer.reply("done");
+    await waitDone(chat.app, started.sessionId);
   });
 
   test("shutdown aborts an MCP call and ends its send once", async () => {

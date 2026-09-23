@@ -93,6 +93,8 @@ export async function toolLoop(
     if (send.cause !== null) return endFor(send.cause);
     const round = send.round;
     if (round === null) return finish();
+    round.calls =
+      deps.tools.normalize?.(send.policy.offered, round.calls) ?? round.calls;
     const calls = round.calls;
 
     if (send.summarizing) {

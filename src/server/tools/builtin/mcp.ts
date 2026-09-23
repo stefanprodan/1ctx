@@ -47,6 +47,36 @@ export function mcpCallName(
   }
 }
 
+// a catalog tool called by its wire name, as in all mode, becomes the
+// mcp_call the prompt teaches, before its row is written, so history
+// never names a function the tools array lacks
+export function asMcpCall(servers: OfferedServer[], call: ToolCall): ToolCall {
+  if (!flat(servers).some((tool) => tool.wireName === call.name)) return call;
+  let args: unknown;
+  try {
+    args = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
+  } catch {
+    args = call.arguments;
+  }
+  return {
+    ...call,
+    name: "mcp_call",
+    arguments: JSON.stringify({ name: call.name, arguments: args }),
+  };
+}
+
+// both call paths refuse before anything goes out, in the same words
+export function checkMcpArguments(
+  tool: OfferedMcpTool,
+  input: Record<string, unknown>,
+  validate: Mcp["validateArguments"],
+): void {
+  const error = validate(tool.inputSchema, input);
+  if (error !== null) {
+    throw new Error(`arguments for ${tool.wireName} are invalid: ${error}`);
+  }
+}
+
 export function resolveMcpCall(
   servers: OfferedServer[],
   call: ToolCall,
@@ -55,10 +85,7 @@ export function resolveMcpCall(
   const args = outer(call);
   const tool = named(servers, args.name);
   const input = object(args.arguments);
-  const error = validate(tool.inputSchema, input);
-  if (error !== null) {
-    throw new Error(`arguments for ${tool.wireName} are invalid: ${error}`);
-  }
+  checkMcpArguments(tool, input, validate);
   return { ...call, name: tool.wireName, arguments: JSON.stringify(input) };
 }
 
