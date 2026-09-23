@@ -80,6 +80,11 @@ jq 1.8. Where they part:
   jq 1.8 refuses; `setpath` with several paths and values orders its
   outputs path first.
 - Numbers are JavaScript's: integers past 2^53 lose precision.
+- A `\uXXXX` escape in a filter's string is read as `uXXXX`; `\t` and
+  `\n` work.
+- A `break` in the right side of an assignment outputs nothing, where jq
+  outputs the results before it; the filter form of a `$x` parameter
+  yields only the bound value (`def f($x): x`).
 
 ### Where our yq still differs from mikefarah's
 
@@ -87,9 +92,14 @@ jq 1.8. Where they part:
 the podinfo manifests the `-i` writes compared were mikefarah's byte
 for byte, or the same data with safer quoting. Where they part:
 
-- Strings a YAML 1.1 reader takes for a boolean or a number (`y`,
-  `yes`, `on`, `1_000`, `0b101`) are written quoted, since Kubernetes
-  reads YAML 1.1; mikefarah writes some of them bare.
+- An `-i` edit keeps every scalar it did not change as written (`0644`,
+  `yes`, `.5`), reading the document again with the failsafe schema. A
+  string it writes that a YAML 1.1 reader would take for something else
+  (`y`, `yes`, `on`, `0644`, `1_000`) is quoted, since Kubernetes reads
+  YAML 1.1; mikefarah writes some of them bare. Printing to stdout
+  spells every value afresh.
+- On a stream, an edit through a path some documents lack leaves those
+  documents alone; mikefarah creates the missing parents in them.
 - Printing to stdout drops comments, since only `-i` goes through the
   parsed document. An `-i` edit that cannot be carried over faithfully
   (a tag that keeps the old type, a map key YAML typed, like `1:`) is

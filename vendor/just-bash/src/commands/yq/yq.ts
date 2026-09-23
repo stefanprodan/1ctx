@@ -401,7 +401,10 @@ export const yqCommand: RuntimeCommand = {
         const one = args.filter((_, i) => !fileAt.includes(i) || i === at);
         const result = await yqCommand.execute(one, ctx);
         stderr += result.stderr;
-        const miss = options.exitStatus && result.exitCode === 1;
+        // a file that matched nothing leaves it and the loop goes on
+        const miss =
+          result.exitCode === 1 &&
+          (options.exitStatus || result.stderr.includes("no matches found"));
         if (result.exitCode !== 0 && !miss) {
           return { stdout, stderr, exitCode: result.exitCode };
         }
@@ -567,7 +570,8 @@ export const yqCommand: RuntimeCommand = {
           ctx.limits.maxStringLength,
           ctx.limits.maxOutputSize,
         );
-        if (values.length === 0) {
+        // nothing, or with -e only null and false: no write (1ctx)
+        if (values.length === 0 || (options.exitStatus && missed(values))) {
           // mikefarah's answer, and no emptied file (1ctx)
           return {
             stdout: "",
@@ -668,7 +672,8 @@ export const yqCommand: RuntimeCommand = {
 
       // Handle inplace mode
       if (options.inplace && filePath) {
-        if (values.length === 0) {
+        // nothing, or with -e only null and false: no write (1ctx)
+        if (values.length === 0 || (options.exitStatus && missed(values))) {
           return {
             stdout: "",
             stderr: "yq: no matches found, the file is left as it was\n",

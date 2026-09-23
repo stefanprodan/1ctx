@@ -252,4 +252,36 @@ describe("yq over several documents", () => {
     expect(stdin.exitCode).toBe(1);
     expect(await fs.readFile("/b.yaml")).toBe("a: 2\n");
   });
+
+  test("-i keeps every scalar it did not change as written", async () => {
+    const source = [
+      "spec:",
+      "  enabled: yes",
+      "  port: 010",
+      "  volumes:",
+      "    - configMap:",
+      "        defaultMode: 0644 # rw-r--r--",
+      "  ratio: .5",
+      "null: n",
+      "1: one",
+      "",
+    ].join("\n");
+    const result = await yq(
+      `yq -i '.spec.replicas = 3 | .["1"] = "uno"' /m.yaml`,
+      source,
+    );
+    expect(result.file).toBe(
+      source
+        .replace("1: one", "1: uno")
+        .replace("  ratio: .5\n", "  ratio: .5\n  replicas: 3\n"),
+    );
+    const same = await yq("yq -i '.' /m.yaml", source);
+    expect(same.file).toBe(source);
+  });
+
+  test("-i -e with only null results leaves the file", async () => {
+    const result = await yq("yq -i -e '.spec.nothing' /m.yaml");
+    expect(result.exitCode).toBe(1);
+    expect(result.file).toBe(MANIFESTS);
+  });
 });

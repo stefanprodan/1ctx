@@ -264,9 +264,7 @@ export function parseAllYamlDocuments(
     if (lineEnd === -1) break;
     lineStart = lineEnd + 1;
   }
-  // yaml-1.1 compat: strings a YAML 1.1 reader (Kubernetes) would take for
-  // a bool or a number (yes, 1_000, 0b101) are written quoted (1ctx)
-  const docs = YAML.parseAllDocuments(input, { compat: "yaml-1.1" });
+  const docs = YAML.parseAllDocuments(input);
   if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
     throw new ExecutionLimitError(
@@ -276,8 +274,13 @@ export function parseAllYamlDocuments(
   }
   const elementBudget = { used: docs.length };
   const values: QueryValue[] = [];
+  if (parsed) {
+    // each document again as text alone, for a write that keeps every
+    // untouched scalar as written (1ctx)
+    const text = YAML.parseAllDocuments(input, { schema: "failsafe" });
+    if (Array.isArray(text)) parsed.push(...text);
+  }
   for (const [index, doc] of docs.entries()) {
-    parsed?.push(doc);
     // toJS keeps going past a syntax error; a broken document fails the
     // whole stream, so -i never writes a half-read file (1ctx)
     const problem = doc.errors[0];
@@ -372,7 +375,6 @@ export function formatOutput(
   switch (options.outputFormat) {
     case "yaml":
       serialized = YAML.stringify(value, {
-        compat: "yaml-1.1",
         indent: options.indent,
       }).trimEnd();
       break;
