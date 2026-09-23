@@ -27,7 +27,21 @@ export function isTruthy(v: QueryValue): boolean {
  * Deep equality check for query values.
  */
 export function deepEqual(a: QueryValue, b: QueryValue): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return canonical(a) === canonical(b);
+}
+
+/**
+ * One text per value, the same for two maps that differ only in key
+ * order, as jq compares them. (1ctx)
+ */
+export function canonical(value: QueryValue): string {
+  return JSON.stringify(value, (_key, v) => {
+    const map = asQueryRecord(v);
+    if (!map || Array.isArray(v)) return v;
+    const sorted: Record<string, unknown> = Object.create(null);
+    for (const k of Object.keys(map).sort()) sorted[k] = map[k];
+    return sorted;
+  }) ?? "null";
 }
 
 /**

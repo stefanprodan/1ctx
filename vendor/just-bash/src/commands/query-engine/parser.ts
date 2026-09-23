@@ -82,6 +82,18 @@ const KEYWORDS: Map<string, TokenType> = new Map([
 
 const KEYWORD_TOKEN_TYPES: Set<TokenType> = new Set(KEYWORDS.values());
 
+// the node setters of mikefarah's yq (1ctx)
+const YQ_SETTERS = new Set([
+  "style",
+  "tag",
+  "anchor",
+  "alias",
+  "line_comment",
+  "head_comment",
+  "foot_comment",
+  "comments",
+]);
+
 function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   let pos = 0;
@@ -440,6 +452,18 @@ class Parser {
     return false;
   }
 
+  // a setter of mikefarah's yq after a path: `style=`, `line_comment=` (1ctx)
+  private isSetterAhead(): boolean {
+    const at = this.check("DOT") ? 1 : 0;
+    const name = this.peek(at);
+    const op = this.peek(at + 1).type;
+    return (
+      name.type === "IDENT" &&
+      YQ_SETTERS.has(name.value as string) &&
+      (op === "ASSIGN" || op === "UPDATE_PIPE")
+    );
+  }
+
   private isIdentLike(): boolean {
     const t = this.peek().type;
     return t === "IDENT" || KEYWORD_TOKEN_TYPES.has(t);
@@ -613,6 +637,26 @@ class Parser {
     if (this.match("AS")) {
       // Parse pattern (can be $var, [$a, $b], {key: $a}, etc.)
       const pattern = this.parsePattern();
+
+      // mikefarah's `EXPR as $x ireduce (INIT; UPDATE)`, a reduce the
+      // evaluator runs in the yq dialect and refuses in jq's (1ctx)
+      if (this.peek().type === "IDENT" && this.peek().value === "ireduce") {
+        this.advance();
+        this.expect("LPAREN", "Expected '(' after ireduce");
+        const init = this.parseExpr();
+        this.expect("SEMICOLON", "Expected ';' after init expression");
+        const update = this.parseExpr();
+        this.expect("RPAREN", "Expected ')' after update expression");
+        const reduce: AstNode = {
+          type: "Reduce",
+          expr,
+          varName: pattern.type === "var" ? pattern.name : "",
+          init,
+          update,
+          pattern: pattern.type !== "var" ? pattern : undefined,
+        };
+        return { type: "Call", name: "ireduce", args: [reduce] };
+      }
 
       // Check for alternative patterns: ?// PATTERN ?// PATTERN ...
       const alternatives: DestructurePattern[] = [];
@@ -800,6 +844,21 @@ class Parser {
         const token = this.advance();
         const name = token.value as string;
         expr = { type: "Field", name, base: expr };
+      } else if (
+        this.check("DOT") &&
+        this.peek(1).type === "LBRACKET" &&
+        this.peek(1).pos === this.peek().pos + 1
+      ) {
+        // .a.[0] and .a.[], which jq 1.8 and mikefarah's yq read (1ctx)
+        this.advance();
+      } else if (this.isSetterAhead()) {
+        // mikefarah's `.a style="double"` and `... comments=""`, a call the
+        // evaluator answers in the yq dialect and refuses in jq's (1ctx)
+        if (this.check("DOT")) this.advance();
+        const name = this.advance().value as string;
+        this.advance();
+        const value = this.parsePostfix();
+        expr = { type: "Call", name: `${name}=`, args: [expr, value] };
       } else if (this.check("LBRACKET")) {
         this.advance();
         if (this.match("RBRACKET")) {

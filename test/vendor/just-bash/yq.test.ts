@@ -5,7 +5,17 @@
 // prints for the same stream: the filter runs on each document.
 
 import { describe, expect, test } from "bun:test";
-import { Bash, InMemoryFs } from "just-bash";
+import {
+  Bash,
+  classify,
+  type DocumentState,
+  evaluateDocument,
+  evaluateQuery,
+  InMemoryFs,
+  parseQuery,
+} from "just-bash";
+import YAML from "yaml";
+import { CASES } from "./jq-paths.cases.ts";
 
 const MANIFESTS = `---
 apiVersion: v1
@@ -177,9 +187,8 @@ describe("yq over several documents", () => {
     expect(result.stdout).toBe("settings\n---\nbackend\n---\nbackend\n");
     const short = await yq("yq e -i '.a = 2' /m.yaml", "a: 1\n");
     expect(short.file).toBe("a: 2\n");
-    const all = await yq("yq ea '.' /m.yaml");
-    expect(all.exitCode).toBe(1);
-    expect(all.stderr).toContain("-s reads every document");
+    const all = await yq("yq ea '[.] | length' /m.yaml");
+    expect(all.stdout).toBe("3\n");
   });
 
   test("several files are read in turn, and -i writes each", async () => {
@@ -214,7 +223,7 @@ describe("yq over several documents", () => {
   test("-i that matches nothing leaves the file and exits 1", async () => {
     for (const filter of [
       'select(.kind == "Nope")',
-      'select(type == "!!map") | .a = 1',
+      'select(type == "!!seq") | .a = 1',
     ]) {
       const result = await yq(`yq -i '${filter}' /m.yaml`);
       expect(result.exitCode).toBe(1);
@@ -307,5 +316,185 @@ describe("yq over several documents", () => {
     expect((await yq(reorder, merged)).file).toBe(merged);
     const written = await yq(reorder, "b: 2\na: 1 # c\n");
     expect(written.file).toBe("a: 1\nb: 2\n");
+  });
+});
+
+describe("load", () => {
+  test("reads a file outside the working directory through the mount", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/work/base.yaml", "image: nginx\n");
+    fs.writeFileSync("/work/app/web.yaml", "replicas: 2\n");
+    const bash = new Bash({ fs, cwd: "/work/app" });
+    const result = await bash.exec(
+      `yq -o json -I0 '. * load("../base.yaml")' web.yaml`,
+    );
+    expect(result.stdout).toBe('{"replicas":2,"image":"nginx"}\n');
+  });
+
+  test("a file over the string limit is an error", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/big.yaml", `a: ${"x".repeat(300)}\n`);
+    fs.writeFileSync("/m.yaml", "b: 1\n");
+    const bash = new Bash({ fs, executionLimits: { maxStringLength: 200 } });
+    const result = await bash.exec(`yq 'load("/big.yaml")' /m.yaml`);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("failed to load /big.yaml");
+  });
+
+  test("a computed file name is refused", async () => {
+    const result = await yq(`yq 'load(.name)' /m.yaml`, "name: /m.yaml\n");
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("load takes a file name as a string");
+  });
+});
+
+describe("the document walker", () => {
+  const state = (filter: string, input: DocumentState, value?: unknown) =>
+    classify(parseQuery(filter), input, value);
+
+  test("a path step goes inside a document and stays computed", () => {
+    for (const filter of [".a", ".[0]", ".[]", ".[1:]", ".a?", ".a.b[0]"]) {
+      expect(state(filter, "document")).toBe("inside");
+      expect(state(filter, "inside")).toBe("inside");
+      expect(state(filter, "computed")).toBe("computed");
+    }
+  });
+
+  test("the same node keeps its state", () => {
+    for (const filter of [
+      ".",
+      "select(.a)",
+      "del(.a)",
+      "map_values(.)",
+      ".a = 1",
+      ".a |= 1",
+      '{"a": .b}',
+    ]) {
+      for (const input of ["document", "inside", "computed"] as const) {
+        expect(state(filter, input)).toBe(input);
+      }
+    }
+  });
+
+  test("a replacement keeps inside and loses the document", () => {
+    for (const filter of [
+      "length",
+      'has("a")',
+      "not",
+      ". == 1",
+      ". and true",
+      "tostring",
+      'test("a")',
+      "@tsv",
+      "to_entries",
+      "sort_by(.a)",
+      "[.a]",
+      "type",
+      "unknown_function",
+    ]) {
+      expect(state(filter, "document")).toBe("computed");
+      expect(state(filter, "inside")).toBe("inside");
+      expect(state(filter, "computed")).toBe("computed");
+    }
+  });
+
+  test("a value built from nothing is computed", () => {
+    for (const filter of [
+      "1",
+      '"x"',
+      '"\\(.a)"',
+      "keys",
+      "with_entries(.)",
+      "{}",
+      "reduce .[] as $x (0; . + $x)",
+    ]) {
+      expect(state(filter, "inside")).toBe("computed");
+    }
+  });
+
+  test("map is computed on a list and a replacement on null", () => {
+    expect(state("map(.a)", "inside", [1])).toBe("computed");
+    expect(state("map(.a)", "inside", null)).toBe("inside");
+  });
+
+  test("combinators compose their sides", () => {
+    expect(state(".a | length", "document")).toBe("inside");
+    expect(state("length | .a", "document")).toBe("computed");
+    expect(state('.a // "x"', "document")).toBe("inside");
+    expect(state('"x" // .a', "document")).toBe("computed");
+    expect(state("(.a)", "document")).toBe("inside");
+  });
+
+  // splitting the filter must never change a value, only its tag
+  test("the walker answers what the engine answers", async () => {
+    const recorded = (await import(
+      "../../fixtures/just-bash/yq-mikefarah.json"
+    )) as unknown as {
+      files: Record<string, string>;
+      cases: { args: string[] }[];
+    };
+    const filters = new Set<string>();
+    for (const { args } of recorded.cases) {
+      const filter = args.find(
+        (a, i) =>
+          !a.startsWith("-") && !["-o", "-p", "-I"].includes(args[i - 1]),
+      );
+      if (filter && !["eval", "e", "eval-all", "ea"].includes(filter)) {
+        filters.add(filter);
+      }
+    }
+    for (const filter of [
+      "$__loc__",
+      "limit(2; .[]?)",
+      "first(.[]?)",
+      "label $f | .[]?, break $f",
+      "[path(..)]",
+      ".a as $x | .b as $y | [$x, $y, (.c // $x)]",
+      "(.a, .b) as [$x] | $x",
+      "if .a then .b else .c end | . // 1",
+      "input",
+      ".[]? | parent",
+    ]) {
+      filters.add(filter);
+    }
+    const own = await Bun.file(import.meta.path).text();
+    for (const match of own.matchAll(/yq (?:-\S+ )*'([^']+)'/g)) {
+      filters.add(match[1]);
+    }
+    const documents: unknown[] = [];
+    for (const [name, text] of Object.entries(recorded.files)) {
+      if (!name.endsWith(".yaml")) continue;
+      for (const doc of YAML.parseAllDocuments(text))
+        documents.push(doc.toJS());
+    }
+    const runs: [unknown, string][] = [];
+    for (const filter of filters) {
+      for (const document of documents) runs.push([document, filter]);
+    }
+    for (const [input, filter] of CASES) runs.push([input, filter]);
+    expect(runs.length).toBeGreaterThan(1000);
+    const answer = (run: () => unknown[]) => {
+      try {
+        return { values: run() };
+      } catch {
+        return { error: true };
+      }
+    };
+    for (const [input, filter] of runs) {
+      let ast: ReturnType<typeof parseQuery>;
+      try {
+        ast = parseQuery(filter);
+      } catch {
+        continue;
+      }
+      // key and path read the paths the walker follows, which is its point
+      if (/"name":"(key|path)","args":\[\]/.test(JSON.stringify(ast))) continue;
+      const engine = answer(() => evaluateQuery(structuredClone(input), ast));
+      const walker = answer(() =>
+        evaluateDocument(structuredClone(input), ast, {}).map((r) => r.value),
+      );
+      expect({ filter, ...walker }).toEqual({ filter, ...engine });
+    }
   });
 });

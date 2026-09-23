@@ -141,3 +141,13 @@ export type {
   IFileSystem,
   ResolvedCommandContext,
 } from "./types.js";
+// the query engine and yq's document walker, for our tests of them (1ctx)
+export {
+  evaluate as evaluateQuery,
+  parse as parseQuery,
+} from "./commands/query-engine/index.js";
+export {
+  classify,
+  evaluateDocument,
+  type State as DocumentState,
+} from "./commands/yq/documents.js";

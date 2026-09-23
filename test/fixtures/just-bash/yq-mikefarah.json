@@ -1,0 +1,6623 @@
+{
+  "recordedWith": "yq (https://github.com/mikefarah/yq/) version v4.53.3",
+  "files": {
+    "pods.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: postgres-0\n  labels:\n    app: postgres\nspec:\n  nodeName: node-a\n  containers:\n    - name: postgres\n      image: postgres:16.4\nstatus:\n  phase: Running\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-1\n  labels:\n    app: web\nspec:\n  containers:\n    - name: web\n      image: nginx:1.27\n    - name: proxy\n      image: envoyproxy/envoy:v1.31\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 3\n",
+    "flux.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n---\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n",
+    "list.yaml": "apiVersion: v1\nkind: List\nitems:\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: frontend\n    spec:\n      ports:\n        - port: 80\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: backend\n    spec:\n      ports:\n        - port: 8080\n        - port: 9090\n",
+    "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n",
+    "config.yaml": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+    "data.json": "{\"name\": \"app\", \"items\": [{\"id\": 1, \"tag\": \"a\"}, {\"id\": 2, \"tag\": \"b\"}], \"meta\": {\"count\": 2}}\n",
+    "strings.yaml": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
+    "docs.yaml": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
+    "nulls.yaml": "a: 1\nn: null\ns: x\nl:\n  - 1\nm:\n  k: 1\n",
+    "rows.yaml": "a: x\nn: 1\nl:\n  - 1\n  - a b\n  - true\n  - null\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
+    "notes.yaml": "# top\na: 1 # one\nb:\n  - x # item\n",
+    "commented.yaml": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+    "stream.yaml": "# head one\na: 1 # one\n--- # sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+    "flow.yaml": "meta: {z: 1, a: 2} # m\nlist: [b, a]\n"
+  },
+  "cases": [
+    {
+      "name": "raw string: .empty",
+      "args": [
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .empty",
+      "args": [
+        "-o",
+        "yaml",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .empty",
+      "args": [
+        "-r",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .empty",
+      "args": [
+        "-o",
+        "json",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .empty",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .spaces",
+      "args": [
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .spaces",
+      "args": [
+        "-o",
+        "yaml",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .spaces",
+      "args": [
+        "-r",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .spaces",
+      "args": [
+        "-o",
+        "json",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "\"   \"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .spaces",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .trailing",
+      "args": [
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .trailing",
+      "args": [
+        "-o",
+        "yaml",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .trailing",
+      "args": [
+        "-r",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .trailing",
+      "args": [
+        "-o",
+        "json",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "\"x \"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .trailing",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .multi",
+      "args": [
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .multi",
+      "args": [
+        "-o",
+        "yaml",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .multi",
+      "args": [
+        "-r",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .multi",
+      "args": [
+        "-o",
+        "json",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "\"first\\nsecond\\n\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .multi",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .number",
+      "args": [
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .number",
+      "args": [
+        "-o",
+        "yaml",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .number",
+      "args": [
+        "-r",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .number",
+      "args": [
+        "-o",
+        "json",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "\"123\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .number",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .colon",
+      "args": [
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .colon",
+      "args": [
+        "-o",
+        "yaml",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .colon",
+      "args": [
+        "-r",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .colon",
+      "args": [
+        "-o",
+        "json",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": "\": x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .colon",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .none",
+      "args": [
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .none",
+      "args": [
+        "-o",
+        "yaml",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .none",
+      "args": [
+        "-r",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .none",
+      "args": [
+        "-o",
+        "json",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .none",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .word",
+      "args": [
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .word",
+      "args": [
+        "-o",
+        "yaml",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .word",
+      "args": [
+        "-r",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .word",
+      "args": [
+        "-o",
+        "json",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "\"null\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .word",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .yes",
+      "args": [
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .yes",
+      "args": [
+        "-o",
+        "yaml",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .yes",
+      "args": [
+        "-r",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .yes",
+      "args": [
+        "-o",
+        "json",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "\"yes\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .yes",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .octal",
+      "args": [
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .octal",
+      "args": [
+        "-o",
+        "yaml",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .octal",
+      "args": [
+        "-r",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .octal",
+      "args": [
+        "-o",
+        "json",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "\"0644\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .octal",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .list",
+      "args": [
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .list",
+      "args": [
+        "-o",
+        "yaml",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .list",
+      "args": [
+        "-r",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .list",
+      "args": [
+        "-o",
+        "json",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "[\n  \"a b\",\n  \"c\"\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .list",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "[\n  \"a b\",\n  \"c\"\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: --unwrapScalar=false",
+      "args": [
+        "--unwrapScalar=false",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "\"x \"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: --unwrapScalar=false on a map",
+      "args": [
+        "--unwrapScalar=false",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: the whole file",
+      "args": [
+        ".",
+        "strings.yaml"
+      ],
+      "stdout": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: read from each document",
+      "args": [
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: @tsv over documents with -N",
+      "args": [
+        "-N",
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\tnode-a\nweb-1\t\nweb\t\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: a literal",
+      "args": [
+        "-n",
+        "\"a\\tb\""
+      ],
+      "stdout": "a\tb\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: an interpolation from stdin",
+      "args": [
+        "\"\\(.a)-x\""
+      ],
+      "stdin": "a: 1\n",
+      "stdout": "1-x\n",
+      "exit": 0
+    },
+    {
+      "name": "-N drops the document lines",
+      "args": [
+        "-N",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb-1\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "--no-doc drops the document lines",
+      "args": [
+        "--no-doc",
+        ".kind",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease\nKustomization\nHelmRelease\n",
+      "exit": 0
+    },
+    {
+      "name": "-N on whole documents",
+      "args": [
+        "-N",
+        ".",
+        "flux.yaml"
+      ],
+      "stdout": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n",
+      "exit": 0
+    },
+    {
+      "name": "-j prints json",
+      "args": [
+        "-j",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "\"postgres-0\"\n\"web-1\"\n\"web\"\n",
+      "exit": 0
+    },
+    {
+      "name": "--tojson prints json",
+      "args": [
+        "--tojson",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"app\",\n  \"version\": \"1.2.0\",\n  \"port\": 8080,\n  \"debug\": false,\n  \"empty\": \"\",\n  \"mode\": \"0644\",\n  \"nothing\": null,\n  \"tags\": [\n    \"web\",\n    \"api\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-j on a map",
+      "args": [
+        "-j",
+        ".metadata",
+        "flux.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"podinfo\",\n  \"namespace\": \"apps\"\n}\n{\n  \"name\": \"infra\",\n  \"namespace\": \"flux-system\"\n}\n{\n  \"name\": \"redis\",\n  \"namespace\": \"cache\"\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json input prints json",
+      "args": [
+        ".",
+        "data.json"
+      ],
+      "stdout": "{\n  \"name\": \"app\",\n  \"items\": [\n    {\n      \"id\": 1,\n      \"tag\": \"a\"\n    },\n    {\n      \"id\": 2,\n      \"tag\": \"b\"\n    }\n  ],\n  \"meta\": {\n    \"count\": 2\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json input, a path",
+      "args": [
+        ".meta",
+        "data.json"
+      ],
+      "stdout": "{\n  \"count\": 2\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json input, a string",
+      "args": [
+        ".name",
+        "data.json"
+      ],
+      "stdout": "\"app\"\n",
+      "exit": 0
+    },
+    {
+      "name": "json input, -o yaml",
+      "args": [
+        "-o",
+        "yaml",
+        ".",
+        "data.json"
+      ],
+      "stdout": "name: app\nitems:\n  - id: 1\n    tag: a\n  - id: 2\n    tag: b\nmeta:\n  count: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "-p json on stdin",
+      "args": [
+        "-p",
+        "json",
+        ".items[0]"
+      ],
+      "stdin": "{\"items\": [{\"id\": 1}]}\n",
+      "stdout": "id: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "-I0 in yaml output",
+      "args": [
+        "-I0",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n    - web\n    - api\n",
+      "exit": 0
+    },
+    {
+      "name": "-I0 on json input",
+      "args": [
+        "-I0",
+        ".",
+        "data.json"
+      ],
+      "stdout": "{\"name\":\"app\",\"items\":[{\"id\":1,\"tag\":\"a\"},{\"id\":2,\"tag\":\"b\"}],\"meta\":{\"count\":2}}\n",
+      "exit": 0
+    },
+    {
+      "name": "-o json -I0",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "{\"name\":\"app\",\"version\":\"1.2.0\",\"port\":8080,\"debug\":false,\"empty\":\"\",\"mode\":\"0644\",\"nothing\":null,\"tags\":[\"web\",\"api\"]}\n",
+      "exit": 0
+    },
+    {
+      "name": "-i on a bare string document",
+      "args": [
+        "-i",
+        ".",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "-i writes a bare yes",
+      "args": [
+        "-i",
+        ". = \"yes\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "yes\n"
+      }
+    },
+    {
+      "name": "-i writes a bare number string",
+      "args": [
+        "-i",
+        ". = \"123\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "123\n"
+      }
+    },
+    {
+      "name": "-i writes an empty string",
+      "args": [
+        "-i",
+        ". = \"\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "\n"
+      }
+    },
+    {
+      "name": "-i writes a multi-line string",
+      "args": [
+        "-i",
+        ". = \"a\\nb\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "a\nb\n"
+      }
+    },
+    {
+      "name": "-i on documents ending in an empty string",
+      "args": [
+        "-i",
+        ".",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "a: 1\n---\n\"\"\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 1\n---\n\n"
+      }
+    },
+    {
+      "name": "-i on documents ending in a --- string",
+      "args": [
+        "-i",
+        ".",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "a: 1\n---\n\"---\"\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 1\n---\n---\n"
+      }
+    },
+    {
+      "name": "-i on documents ending in a multi-line string",
+      "args": [
+        "-i",
+        ".",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "a: 1\n---\n|\n  x\n  y\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 1\n---\nx\ny\n\n"
+      }
+    },
+    {
+      "name": "-i keeps only the selected document, no leading ---",
+      "args": [
+        "-i",
+        "select(.kind == \"Deployment\") | .spec.replicas = 5",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pods.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 5\n"
+      }
+    },
+    {
+      "name": "-i with a leading --- in the file",
+      "args": [
+        "-i",
+        "select(.a == 2) | .b = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\na: 1\n---\na: 2\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 2\nb: 1\n"
+      }
+    },
+    {
+      "name": "-i sets a field in every document",
+      "args": [
+        "-i",
+        ".metadata.labels.team = \"web\"",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\n  labels:\n    team: web\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\n  labels:\n    team: web\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n---\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\n  labels:\n    team: web\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n"
+      }
+    },
+    {
+      "name": "-p json keeps yaml output",
+      "args": [
+        "-p",
+        "json",
+        ".meta",
+        "data.txt"
+      ],
+      "files": {
+        "data.txt": "{\"meta\": {\"count\": 2}}\n"
+      },
+      "stdout": "count: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "-p json on a json file keeps yaml output",
+      "args": [
+        "-p",
+        "json",
+        ".meta",
+        "data.json"
+      ],
+      "stdout": "count: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "-N over two files",
+      "args": [
+        "-N",
+        ".kind",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "Pod\nPod\nDeployment\nHelmRelease\nKustomization\nHelmRelease\n",
+      "exit": 0
+    },
+    {
+      "name": "two files apart by ---",
+      "args": [
+        ".metadata.name",
+        "list.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "null\n---\npodinfo\n---\ninfra\n---\nredis\n",
+      "exit": 0
+    },
+    {
+      "name": "-j over two files",
+      "args": [
+        "-j",
+        ".kind",
+        "list.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "\"List\"\n\"HelmRelease\"\n\"Kustomization\"\n\"HelmRelease\"\n",
+      "exit": 0
+    },
+    {
+      "name": "a yaml file then a json file",
+      "args": [
+        ".name",
+        "config.yaml",
+        "data.json"
+      ],
+      "stdout": "app\n---\napp\n",
+      "exit": 0
+    },
+    {
+      "name": "--unwrapScalar=false on a number",
+      "args": [
+        "--unwrapScalar=false",
+        ".port",
+        "config.yaml"
+      ],
+      "stdout": "8080\n",
+      "exit": 0
+    },
+    {
+      "name": "-e on an empty string",
+      "args": [
+        "-e",
+        ".empty",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "a string inside a map keeps its quotes",
+      "args": [
+        ".metadata",
+        "flux.yaml"
+      ],
+      "stdout": "name: podinfo\nnamespace: apps\n---\nname: infra\nnamespace: flux-system\n---\nname: redis\nnamespace: cache\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | length",
+      "args": [
+        ".name | length",
+        "docs.yaml"
+      ],
+      "stdout": "5\n---\n4\n---\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | test(\"a\")",
+      "args": [
+        ".name | test(\"a\")",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | split(\"a\")",
+      "args": [
+        ".name | split(\"a\")",
+        "docs.yaml"
+      ],
+      "stdout": "- \"\"\n- lph\n- \"\"\n---\n- bet\n- \"\"\n---\n- g\n- mm\n- \"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | tostring",
+      "args": [
+        ".name | tostring",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | @base64",
+      "args": [
+        ".name | @base64",
+        "docs.yaml"
+      ],
+      "stdout": "YWxwaGE=\n---\nYmV0YQ==\n---\nZ2FtbWE=\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | @uri",
+      "args": [
+        ".name | @uri",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | trim",
+      "args": [
+        ".name | trim",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . == \"beta\"",
+      "args": [
+        ".name | . == \"beta\"",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . != \"x\"",
+      "args": [
+        ".name | . != \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | [.]",
+      "args": [
+        ".name | [.]",
+        "docs.yaml"
+      ],
+      "stdout": "- alpha\n---\n- beta\n---\n- gamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | @json",
+      "args": [
+        ".name | @json",
+        "docs.yaml"
+      ],
+      "stdout": "\"alpha\"\n---\n\"beta\"\n---\n\"gamma\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | select(. != \"x\")",
+      "args": [
+        ".name | select(. != \"x\")",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . as $x | $x",
+      "args": [
+        ".name | . as $x | $x",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | \"\\(.)!\"",
+      "args": [
+        ".name | \"\\(.)!\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha!\nbeta!\ngamma!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | contains(\"et\")",
+      "args": [
+        ".name | contains(\"et\")",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . + \"!\"",
+      "args": [
+        ".name | . + \"!\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha!\n---\nbeta!\n---\ngamma!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | capture(\"(?P<first>.)\")",
+      "args": [
+        ".name | capture(\"(?P<first>.)\")",
+        "docs.yaml"
+      ],
+      "stdout": "first: a\n---\nfirst: b\n---\nfirst: g\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | length",
+      "args": [
+        ".meta | length",
+        "docs.yaml"
+      ],
+      "stdout": "2\n---\n2\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | has(\"z\")",
+      "args": [
+        ".meta | has(\"z\")",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | to_entries",
+      "args": [
+        ".meta | to_entries",
+        "docs.yaml"
+      ],
+      "stdout": "- key: z\n  value: 1\n- key: a\n  value: 2\n---\n- key: z\n  value: 3\n- key: a\n  value: 4\n---\n- key: z\n  value: 5\n- key: a\n  value: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | to_entries | .[0].key",
+      "args": [
+        ".meta | to_entries | .[0].key",
+        "docs.yaml"
+      ],
+      "stdout": "z\n---\nz\n---\nz\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | with_entries(.)",
+      "args": [
+        ".meta | with_entries(.)",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\nz: 3\na: 4\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | del(.z)",
+      "args": [
+        ".meta | del(.z)",
+        "docs.yaml"
+      ],
+      "stdout": "a: 2\n---\na: 4\n---\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | map_values(. + 1)",
+      "args": [
+        ".meta | map_values(. + 1)",
+        "docs.yaml"
+      ],
+      "stdout": "z: 2\na: 3\n---\nz: 4\na: 5\n---\nz: 6\na: 7\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . * {\"y\": 2}",
+      "args": [
+        ".meta | . * {\"y\": 2}",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\ny: 2\n---\nz: 3\na: 4\ny: 2\n---\nz: 5\na: 6\ny: 2\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "z: 1\na: 2\n\"y\": 2\n---\nz: 3\na: 4\n\"y\": 2\n---\nz: 5\na: 6\n\"y\": 2\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
+    },
+    {
+      "name": "documents: .meta | {\"y\": 2} * .",
+      "args": [
+        ".meta | {\"y\": 2} * .",
+        "docs.yaml"
+      ],
+      "stdout": "y: 2\nz: 1\na: 2\n---\ny: 2\nz: 3\na: 4\n---\ny: 2\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . + {\"y\": 2}",
+      "args": [
+        ".meta | . + {\"y\": 2}",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\ny: 2\n---\nz: 3\na: 4\ny: 2\n---\nz: 5\na: 6\ny: 2\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "z: 1\na: 2\n\"y\": 2\n---\nz: 3\na: 4\n\"y\": 2\n---\nz: 5\na: 6\n\"y\": 2\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
+    },
+    {
+      "name": "documents: .meta | [.]",
+      "args": [
+        ".meta | [.]",
+        "docs.yaml"
+      ],
+      "stdout": "- z: 1\n  a: 2\n---\n- z: 3\n  a: 4\n---\n- z: 5\n  a: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . == {}",
+      "args": [
+        ".meta | . == {}",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | select(.z)",
+      "args": [
+        ".meta | select(.z)",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n---\nz: 3\na: 4\n---\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z = 9",
+      "args": [
+        ".meta | .z = 9",
+        "docs.yaml"
+      ],
+      "stdout": "z: 9\na: 2\n---\nz: 9\na: 4\n---\nz: 9\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z |= . + 1",
+      "args": [
+        ".meta | .z |= . + 1",
+        "docs.yaml"
+      ],
+      "stdout": "z: 2\na: 2\n---\nz: 4\na: 4\n---\nz: 6\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | {\"n\": .z}",
+      "args": [
+        ".meta | {\"n\": .z}",
+        "docs.yaml"
+      ],
+      "stdout": "n: 1\n---\nn: 3\n---\nn: 5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . as $m | $m",
+      "args": [
+        ".meta | . as $m | $m",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n---\nz: 3\na: 4\n---\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z + .a",
+      "args": [
+        ".meta | .z + .a",
+        "docs.yaml"
+      ],
+      "stdout": "3\n---\n7\n---\n11\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z * 2",
+      "args": [
+        ".meta | .z * 2",
+        "docs.yaml"
+      ],
+      "stdout": "2\n---\n6\n---\n10\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z - 1",
+      "args": [
+        ".meta | .z - 1",
+        "docs.yaml"
+      ],
+      "stdout": "0\n---\n2\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z < 3",
+      "args": [
+        ".meta | .z < 3",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | not",
+      "args": [
+        ".meta | not",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | length",
+      "args": [
+        ".list | length",
+        "docs.yaml"
+      ],
+      "stdout": "2\n---\n2\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | sort",
+      "args": [
+        ".list | sort",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n- b\n---\n- c\n- d\n---\n- e\n- f\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | sort_by(.)",
+      "args": [
+        ".list | sort_by(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n- b\n---\n- c\n- d\n---\n- e\n- f\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | reverse",
+      "args": [
+        ".list | reverse",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n- b\n---\n- c\n- d\n---\n- e\n- f\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | unique",
+      "args": [
+        ".list | unique",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | flatten",
+      "args": [
+        ".list | flatten",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | map(. + \"!\")",
+      "args": [
+        ".list | map(. + \"!\")",
+        "docs.yaml"
+      ],
+      "stdout": "- b!\n- a!\n- d!\n- c!\n- f!\n- e!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[0]",
+      "args": [
+        ".list | .[0]",
+        "docs.yaml"
+      ],
+      "stdout": "b\n---\nd\n---\nf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[1:]",
+      "args": [
+        ".list | .[1:]",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n---\n- c\n---\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | join(\",\")",
+      "args": [
+        ".list | join(\",\")",
+        "docs.yaml"
+      ],
+      "stdout": "b,a\n---\nd,c\n---\nf,e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | @csv",
+      "args": [
+        ".list | @csv",
+        "docs.yaml"
+      ],
+      "stdout": "b,a\n---\nd,c\n---\nf,e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | @tsv",
+      "args": [
+        ".list | @tsv",
+        "docs.yaml"
+      ],
+      "stdout": "b\ta\n---\nd\tc\n---\nf\te\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | contains([\"a\"])",
+      "args": [
+        ".list | contains([\"a\"])",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | group_by(.)",
+      "args": [
+        ".list | group_by(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- - b\n- - a\n---\n- - d\n- - c\n---\n- - f\n- - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[]",
+      "args": [
+        ".list | .[]",
+        "docs.yaml"
+      ],
+      "stdout": "b\na\n---\nd\nc\n---\nf\ne\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | any",
+      "args": [
+        ".list | any",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | all",
+      "args": [
+        ".list | all",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[0] = \"x\"",
+      "args": [
+        ".list | .[0] = \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "- x\n- a\n---\n- x\n- c\n---\n- x\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | . + [\"y\"]",
+      "args": [
+        ".list | . + [\"y\"]",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n- y\n---\n- d\n- c\n- y\n---\n- f\n- e\n- y\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "- b\n- a\n- \"y\"\n---\n- d\n- c\n- \"y\"\n---\n- f\n- e\n- \"y\"\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
+    },
+    {
+      "name": "documents: .list | [.[] | select(. != \"a\")]",
+      "args": [
+        ".list | [.[] | select(. != \"a\")]",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: length",
+      "args": [
+        "length",
+        "docs.yaml"
+      ],
+      "stdout": "3\n3\n3\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: has(\"name\")",
+      "args": [
+        "has(\"name\")",
+        "docs.yaml"
+      ],
+      "stdout": "true\ntrue\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: to_entries | .[0].key",
+      "args": [
+        "to_entries | .[0].key",
+        "docs.yaml"
+      ],
+      "stdout": "name\nname\nname\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.name] | .[0]",
+      "args": [
+        "[.name] | .[0]",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nbeta\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: \"\\(.name)\"",
+      "args": [
+        "\"\\(.name)\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nbeta\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.name == \"beta\")",
+      "args": [
+        "select(.name == \"beta\")",
+        "docs.yaml"
+      ],
+      "stdout": "name: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: del(.meta)",
+      "args": [
+        "del(.meta)",
+        "docs.yaml"
+      ],
+      "stdout": "name: alpha\nlist:\n  - b\n  - a\n---\nname: beta\nlist:\n  - d\n  - c\n---\nname: gamma\nlist:\n  - f\n  - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name = \"x\"",
+      "args": [
+        ".name = \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "name: x\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: x\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: x\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: . * {\"extra\": 1}",
+      "args": [
+        ". * {\"extra\": 1}",
+        "docs.yaml"
+      ],
+      "stdout": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\nextra: 1\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\nextra: 1\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\nextra: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: {\"extra\": 1} * .",
+      "args": [
+        "{\"extra\": 1} * .",
+        "docs.yaml"
+      ],
+      "stdout": "extra: 1\nname: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nextra: 1\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nextra: 1\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: {\"n\": .name}",
+      "args": [
+        "{\"n\": .name}",
+        "docs.yaml"
+      ],
+      "stdout": "n: alpha\n---\nn: beta\n---\nn: gamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.name, .list[0]] | @tsv",
+      "args": [
+        "[.name, .list[0]] | @tsv",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\tb\nbeta\td\ngamma\tf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .nope // \"none\"",
+      "args": [
+        ".nope // \"none\"",
+        "docs.yaml"
+      ],
+      "stdout": "none\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name // \"none\"",
+      "args": [
+        ".name // \"none\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name, \"x\"",
+      "args": [
+        ".name, \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nx\n---\nbeta\n---\nx\n---\ngamma\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.name, .list[0])",
+      "args": [
+        "(.name, .list[0])",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nb\n---\nbeta\nd\n---\ngamma\nf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .. | select(. == \"a\")",
+      "args": [
+        ".. | select(. == \"a\")",
+        "docs.yaml"
+      ],
+      "stdout": "a\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: ..",
+      "args": [
+        "..",
+        "docs.yaml"
+      ],
+      "stdout": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\nalpha\nz: 1\na: 2\n1\n2\n- b\n- a\nb\na\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\nbeta\nz: 3\na: 4\n3\n4\n- d\n- c\nd\nc\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\ngamma\nz: 5\na: 6\n5\n6\n- f\n- e\nf\ne\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | map(.)",
+      "args": [
+        ".list | map(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n- d\n- c\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: . as $d | $d.name",
+      "args": [
+        ". as $d | $d.name",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name as $n | $n | length",
+      "args": [
+        ".name as $n | $n | length",
+        "docs.yaml"
+      ],
+      "stdout": "5\n---\n4\n---\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name as $n | $n",
+      "args": [
+        ".name as $n | $n",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (\"x\") as $n | $n",
+      "args": [
+        "(\"x\") as $n | $n",
+        "docs.yaml"
+      ],
+      "stdout": "x\nx\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . as $n | $n",
+      "args": [
+        ".name | . as $n | $n",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.list[] | . + \"x\"] | .[0]",
+      "args": [
+        "[.list[] | . + \"x\"] | .[0]",
+        "docs.yaml"
+      ],
+      "stdout": "bx\ndx\nfx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .nope + .name",
+      "args": [
+        ".nope + .name",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta.z + .nope",
+      "args": [
+        ".meta.z + .nope",
+        "docs.yaml"
+      ],
+      "stdout": "1\n---\n3\n---\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: 1",
+      "args": [
+        "1",
+        "docs.yaml"
+      ],
+      "stdout": "1\n1\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: true",
+      "args": [
+        "true",
+        "docs.yaml"
+      ],
+      "stdout": "true\ntrue\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: null",
+      "args": [
+        "null",
+        "docs.yaml"
+      ],
+      "stdout": "null\nnull\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: {}",
+      "args": [
+        "{}",
+        "docs.yaml"
+      ],
+      "stdout": "{}\n{}\n{}\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: []",
+      "args": [
+        "[]",
+        "docs.yaml"
+      ],
+      "stdout": "[]\n[]\n[]\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list[0] // .name",
+      "args": [
+        ".list[0] // .name",
+        "docs.yaml"
+      ],
+      "stdout": "b\n---\nd\n---\nf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z, \"k\"",
+      "args": [
+        ".meta | .z, \"k\"",
+        "docs.yaml"
+      ],
+      "stdout": "1\nk\n---\n3\n---\nk\n---\n5\n---\nk\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.name != \"alpha\") | .name",
+      "args": [
+        "select(.name != \"alpha\") | .name",
+        "docs.yaml"
+      ],
+      "stdout": "beta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: empty",
+      "args": [
+        "empty",
+        "docs.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true,
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "jq's forms mikefarah refuses work in yq: empty, if, reduce, first, last, min_by, ltrimstr, gsub and the rest."
+      }
+    },
+    {
+      "name": "documents: del(.list[0]) | .list",
+      "args": [
+        "del(.list[0]) | .list",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n---\n- c\n---\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta * .meta",
+      "args": [
+        ".meta * .meta",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n---\nz: 3\na: 4\n---\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.name on pods.yaml",
+      "args": [
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata | to_entries | .[0].key on pods.yaml",
+      "args": [
+        ".metadata | to_entries | .[0].key",
+        "pods.yaml"
+      ],
+      "stdout": "name\n---\nname\n---\nname\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: length on pods.yaml",
+      "args": [
+        "length",
+        "pods.yaml"
+      ],
+      "stdout": "5\n4\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: keys | length on pods.yaml",
+      "args": [
+        "keys | length",
+        "pods.yaml"
+      ],
+      "stdout": "5\n4\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: \"\\(.kind)/\\(.metadata.name)\" on pods.yaml",
+      "args": [
+        "\"\\(.kind)/\\(.metadata.name)\"",
+        "pods.yaml"
+      ],
+      "stdout": "Pod/postgres-0\nPod/web-1\nDeployment/web\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.kind, .metadata.name] | @tsv on pods.yaml",
+      "args": [
+        "[.kind, .metadata.name] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\tpostgres-0\nPod\tweb-1\nDeployment\tweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.metadata.name] | .[0] on pods.yaml",
+      "args": [
+        "[.metadata.name] | .[0]",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb-1\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: to_entries | .[0].key on pods.yaml",
+      "args": [
+        "to_entries | .[0].key",
+        "pods.yaml"
+      ],
+      "stdout": "apiVersion\napiVersion\napiVersion\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.nodeName // \"none\" on pods.yaml",
+      "args": [
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .status.phase // \"unknown\" on pods.yaml",
+      "args": [
+        ".status.phase // \"unknown\"",
+        "pods.yaml"
+      ],
+      "stdout": "Running\nunknown\nunknown\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.name, \"x\" on pods.yaml",
+      "args": [
+        ".metadata.name, \"x\"",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nx\n---\nweb-1\n---\nx\n---\nweb\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.kind, .apiVersion) on pods.yaml",
+      "args": [
+        "(.kind, .apiVersion)",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\nv1\n---\nPod\nv1\n---\nDeployment\napps/v1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas // 0 | . + 1 on pods.yaml",
+      "args": [
+        ".spec.replicas // 0 | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.name as $n | $n on pods.yaml",
+      "args": [
+        ".metadata.name as $n | $n",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.metadata.name, (.spec.nodeName // \"\")] | @tsv on pods.yaml",
+      "args": [
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\tnode-a\nweb-1\t\nweb\t\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.containers[] | select(.name == \"web\") | .image on pods.yaml",
+      "args": [
+        ".spec.containers[] | select(.name == \"web\") | .image",
+        "pods.yaml"
+      ],
+      "stdout": "nginx:1.27\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.labels.app // \"none\" on pods.yaml",
+      "args": [
+        ".metadata.labels.app // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nweb\n---\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.kind == \"Pod\") | .metadata.name on pods.yaml",
+      "args": [
+        "select(.kind == \"Pod\") | .metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .x + .metadata.name on pods.yaml",
+      "args": [
+        ".x + .metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.metadata.name // \"x\") + \"y\" on pods.yaml",
+      "args": [
+        "(.metadata.name // \"x\") + \"y\"",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0y\n---\nweb-1y\n---\nweby\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.metadata.name] on pods.yaml",
+      "args": [
+        "[.metadata.name]",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres-0\n- web-1\n- web\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.containers[]?.name on pods.yaml",
+      "args": [
+        ".spec.containers[]?.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nweb\nproxy\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N .metadata.name on pods.yaml",
+      "args": [
+        "-N",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb-1\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json .metadata.name on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "\"postgres-0\"\n\"web-1\"\n\"web\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N .spec.nodeName // \"none\" on pods.yaml",
+      "args": [
+        "-N",
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json .spec.nodeName // \"none\" on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "\"node-a\"\n\"none\"\n\"none\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N .spec.replicas // 0 | . + 1 on pods.yaml",
+      "args": [
+        "-N",
+        ".spec.replicas // 0 | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json .spec.replicas // 0 | . + 1 on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".spec.replicas // 0 | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N [.metadata.name, (.spec.nodeName // \"\")] | @tsv on pods.yaml",
+      "args": [
+        "-N",
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\tnode-a\nweb-1\t\nweb\t\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json [.metadata.name, (.spec.nodeName // \"\")] | @tsv on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "\"postgres-0\\tnode-a\"\n\"web-1\\t\"\n\"web\\t\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.kind == \"HelmRelease\") | .status.conditions[] | select(.type == \"Ready\") | .reason on flux.yaml",
+      "args": [
+        "select(.kind == \"HelmRelease\") | .status.conditions[] | select(.type == \"Ready\") | .reason",
+        "flux.yaml"
+      ],
+      "stdout": "InstallFailed\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .status.conditions[]? | select(.status == \"False\") | .reason on flux.yaml",
+      "args": [
+        ".status.conditions[]? | select(.status == \"False\") | .reason",
+        "flux.yaml"
+      ],
+      "stdout": "InstallFailed\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata | .namespace + \"/\" + .name on flux.yaml",
+      "args": [
+        ".metadata | .namespace + \"/\" + .name",
+        "flux.yaml"
+      ],
+      "stdout": "apps/podinfo\n---\nflux-system/infra\n---\ncache/redis\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.spec.chart) | .spec.chart.spec.version on flux.yaml",
+      "args": [
+        "select(.spec.chart) | .spec.chart.spec.version",
+        "flux.yaml"
+      ],
+      "stdout": "6.7.0\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .kind as $k | .metadata.name | $k + \":\" + . on flux.yaml",
+      "args": [
+        ".kind as $k | .metadata.name | $k + \":\" + .",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease:podinfo\n---\nKustomization:infra\n---\nHelmRelease:redis\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a computed value over two files",
+      "args": [
+        "\"x\"",
+        "docs.yaml",
+        "config.yaml"
+      ],
+      "stdout": "x\nx\nx\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a read value over two files",
+      "args": [
+        ".name",
+        "docs.yaml",
+        "config.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n---\napp\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: length over two files",
+      "args": [
+        "length",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "5\n4\n4\n4\n4\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over two files",
+      "args": [
+        ".spec.nodeName // \"none\"",
+        "flux.yaml",
+        "pods.yaml"
+      ],
+      "stdout": "none\nnone\nnone\n---\nnode-a\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -i with computed results",
+      "args": [
+        "-i",
+        "length",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "4\n4\n5\n"
+      }
+    },
+    {
+      "name": "documents: -i with values read from each document",
+      "args": [
+        "-i",
+        ".metadata.name",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "podinfo\n---\ninfra\n---\nredis\n"
+      }
+    },
+    {
+      "name": "documents: -i with a default",
+      "args": [
+        "-i",
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pods.yaml": "node-a\nnone\nnone\n"
+      }
+    },
+    {
+      "name": "documents: a default over a.yaml c.yaml",
+      "args": [
+        ".a // \"x\"",
+        "a.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "1\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over c.yaml a.yaml c.yaml",
+      "args": [
+        ".a // \"x\"",
+        "c.yaml",
+        "a.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "x\n---\n1\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over a.yaml a.yaml",
+      "args": [
+        ".a // \"x\"",
+        "a.yaml",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "1\n---\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over d.yaml c.yaml",
+      "args": [
+        ".a // \"x\"",
+        "d.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "2\nx\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over c.yaml d.yaml",
+      "args": [
+        ".a // \"x\"",
+        "c.yaml",
+        "d.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "x\n---\n2\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over c.yaml a.yaml a.yaml c.yaml c.yaml a.yaml",
+      "args": [
+        ".a // \"x\"",
+        "c.yaml",
+        "a.yaml",
+        "a.yaml",
+        "c.yaml",
+        "c.yaml",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "x\n---\n1\n---\n1\nx\nx\n---\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a literal and a read value over three files",
+      "args": [
+        ".a, \"x\"",
+        "a.yaml",
+        "a.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "1\nx\n---\n1\nx\n---\nnull\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: image to repository",
+      "args": [
+        ".spec.containers[].image | sub(\":.*$\", \"\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nnginx\nenvoyproxy/envoy\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: image to repository with ;",
+      "args": [
+        ".spec.containers[].image | sub(\":.*$\"; \"\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nnginx\nenvoyproxy/envoy\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a wildcard in ==",
+      "args": [
+        ".spec.containers[] | select(.image == \"nginx*\") | .name",
+        "pods.yaml"
+      ],
+      "stdout": "web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a leading wildcard",
+      "args": [
+        ".. | select(. == \"*gres\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\npostgres\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a wildcard in !=",
+      "args": [
+        ".spec.containers[]? | select(.name != \"p*\") | .name",
+        "pods.yaml"
+      ],
+      "stdout": "web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a wildcard on the left is literal",
+      "args": [
+        "select(\"web*\" == .metadata.name) | .kind",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: strings by type",
+      "args": [
+        ".. | select(type == \"!!str\")",
+        "config.yaml"
+      ],
+      "stdout": "app\n1.2.0\n\n0644\nweb\napi\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: count strings by type",
+      "args": [
+        "[.. | select(type == \"!!str\")] | length",
+        "config.yaml"
+      ],
+      "stdout": "6\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys of maps by type",
+      "args": [
+        "select(type == \"!!map\") | keys",
+        "config.yaml"
+      ],
+      "stdout": "- name\n- version\n- port\n- debug\n- empty\n- mode\n- nothing\n- tags\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: entries of a list",
+      "args": [
+        ".items | to_entries | .[] | \"\\(.key): \\(.value.metadata.name)\"",
+        "list.yaml"
+      ],
+      "stdout": "0: frontend\n1: backend\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: with_entries on a list",
+      "args": [
+        ".items | with_entries(.value = .value.metadata.name)",
+        "list.yaml"
+      ],
+      "stdout": "0: frontend\n1: backend\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"0\": frontend\n\"1\": backend\n",
+        "exit": 0,
+        "reason": "Map keys are strings here: a list's index keys print quoted, where mikefarah's map has integer keys."
+      }
+    },
+    {
+      "name": "dialect: with_entries on a list of scalars",
+      "args": [
+        ".tags | with_entries(.)",
+        "config.yaml"
+      ],
+      "stdout": "0: web\n1: api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"0\": web\n\"1\": api\n",
+        "exit": 0,
+        "reason": "Map keys are strings here: a list's index keys print quoted, where mikefarah's map has integer keys."
+      }
+    },
+    {
+      "name": "dialect: to_entries on a list of scalars",
+      "args": [
+        ".tags | to_entries",
+        "config.yaml"
+      ],
+      "stdout": "- key: 0\n  value: web\n- key: 1\n  value: api\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sort_by where a document has no list",
+      "args": [
+        ".spec.containers | sort_by(.name)",
+        "pods.yaml"
+      ],
+      "stdout": "- name: postgres\n  image: postgres:16.4\n---\n- name: proxy\n  image: envoyproxy/envoy:v1.31\n- name: web\n  image: nginx:1.27\n",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: map where a document has no list",
+      "args": [
+        ".spec.containers | map(.image)",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres:16.4\n- nginx:1.27\n- envoyproxy/envoy:v1.31\n---\n[]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: map and join where a document has no list",
+      "args": [
+        ".spec.containers | map(.image) | join(\" \")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres:16.4\nnginx:1.27 envoyproxy/envoy:v1.31\n---\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: multiply where a document has no replicas",
+      "args": [
+        ".spec.replicas * 2",
+        "pods.yaml"
+      ],
+      "stdout": "6\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: subtract where a document has no replicas",
+      "args": [
+        ".spec.replicas - 1",
+        "pods.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: add where a document has no replicas",
+      "args": [
+        ".spec.replicas + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: concatenate a name and a number",
+      "args": [
+        ".metadata.name + \"-\" + .spec.replicas",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0-\n---\nweb-1-\n---\nweb-3\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a string plus a number",
+      "args": [
+        ".name + 1",
+        "config.yaml"
+      ],
+      "stdout": "app1\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a number plus a string",
+      "args": [
+        "1 + .name",
+        "config.yaml"
+      ],
+      "stdout": "1app\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a string plus a boolean",
+      "args": [
+        ".name + .debug",
+        "config.yaml"
+      ],
+      "stdout": "appfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a map plus a number",
+      "args": [
+        ".items[0].metadata + 1",
+        "list.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: a step into a string in the first document",
+      "args": [
+        ".metadata.name.x",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into a number",
+      "args": [
+        ".port.x",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into a boolean",
+      "args": [
+        ".debug.x",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into null",
+      "args": [
+        ".nothing.x",
+        "config.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into a list item",
+      "args": [
+        ".tags[0].x",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: capture without a match",
+      "args": [
+        ".metadata.name | capture(\"(?P<n>z)\")",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: capture a named group",
+      "args": [
+        ".metadata.name | capture(\"(?P<app>[a-z]+)-(?P<n>[0-9])\")",
+        "pods.yaml"
+      ],
+      "stdout": "app: postgres\nn: \"0\"\n---\napp: web\nn: \"1\"\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: capture with a comma",
+      "args": [
+        ".metadata.name | capture(\"(?P<app>[a-z]+)\", \"g\")",
+        "pods.yaml"
+      ],
+      "stdout": "app: postgres\n---\napp: web\n---\napp: web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: an unbound variable",
+      "args": [
+        "$index",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An unbound variable is an error, as in jq, where mikefarah prints nothing."
+      }
+    },
+    {
+      "name": "dialect: an unbound variable in a pipe",
+      "args": [
+        ".metadata.name as $n | $m",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An unbound variable is an error, as in jq, where mikefarah prints nothing."
+      }
+    },
+    {
+      "name": "dialect: keys keep the document order",
+      "args": [
+        "keys",
+        "config.yaml"
+      ],
+      "stdout": "- name\n- version\n- port\n- debug\n- empty\n- mode\n- nothing\n- tags\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: the first key",
+      "args": [
+        "keys | .[0]",
+        "config.yaml"
+      ],
+      "stdout": "name\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys iterated",
+      "args": [
+        "keys | .[]",
+        "config.yaml"
+      ],
+      "stdout": "name\nversion\nport\ndebug\nempty\nmode\nnothing\ntags\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys as json",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        "keys",
+        "config.yaml"
+      ],
+      "stdout": "[\"name\",\"version\",\"port\",\"debug\",\"empty\",\"mode\",\"nothing\",\"tags\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys of a map in each document",
+      "args": [
+        ".meta | keys",
+        "docs.yaml"
+      ],
+      "stdout": "- z\n- a\n- z\n- a\n- z\n- a\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub replaces every match",
+      "args": [
+        ".name | sub(\"a\"; \"o\")",
+        "docs.yaml"
+      ],
+      "stdout": "olpho\n---\nbeto\n---\ngommo\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub with a comma",
+      "args": [
+        ".name | sub(\"a\", \"o\")",
+        "docs.yaml"
+      ],
+      "stdout": "olpho\n---\nbeto\n---\ngommo\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub with named groups",
+      "args": [
+        ".metadata.name | sub(\"(?P<p>[a-z]+)-(?P<n>[0-9])\", \"${n}-${p}\")",
+        "pods.yaml"
+      ],
+      "stdout": "0-postgres\n---\n1-web\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub with a numbered group",
+      "args": [
+        ".metadata.name | sub(\"([0-9])\", \"[$1]\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-[0]\n---\nweb-[1]\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test with a comma",
+      "args": [
+        ".metadata.name | test(\"web\", \"g\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test is case sensitive",
+      "args": [
+        ".metadata.name | test(\"WEB\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test with (?i)",
+      "args": [
+        ".metadata.name | test(\"(?i)WEB\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test with the i flag",
+      "args": [
+        ".metadata.name | test(\"WEB\", \"i\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "false\n---\ntrue\n---\ntrue\n",
+        "exit": 0,
+        "reason": "jq's regex flags (i, x and the rest) work, where mikefarah ignores all but g."
+      }
+    },
+    {
+      "name": "dialect: split with a comma",
+      "args": [
+        ".name | split(\"p\", \"g\")",
+        "config.yaml"
+      ],
+      "stdout": "- a\n- \"\"\n- \"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: match with a named group",
+      "args": [
+        ".metadata.name | match(\"(?P<n>[a-z]+)-([0-9])\")",
+        "pods.yaml"
+      ],
+      "stdout": "string: postgres-0\noffset: 0\nlength: 10\ncaptures:\n  - string: postgres\n    offset: 0\n    length: 8\n    name: n\n  - string: \"0\"\n    offset: 9\n    length: 1\n---\nstring: web-1\noffset: 0\nlength: 5\ncaptures:\n  - string: web\n    offset: 0\n    length: 3\n    name: n\n  - string: \"1\"\n    offset: 4\n    length: 1\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "offset: 0\nlength: 10\nstring: postgres-0\ncaptures:\n  - offset: 0\n    length: 8\n    string: postgres\n    name: n\n  - offset: 9\n    length: 1\n    string: \"0\"\n    name: null\n---\noffset: 0\nlength: 5\nstring: web-1\ncaptures:\n  - offset: 0\n    length: 3\n    string: web\n    name: n\n  - offset: 4\n    length: 1\n    string: \"1\"\n    name: null\n",
+        "exit": 0,
+        "reason": "match answers its fields in jq's order (offset, length, string, captures)."
+      }
+    },
+    {
+      "name": "dialect: unique keeps the first seen order",
+      "args": [
+        ".list | . + [\"b\"] | unique",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n- b\n---\n- f\n- e\n- b\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: unique_by keeps the first seen order",
+      "args": [
+        ".list | unique_by(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: group_by keeps the first seen order",
+      "args": [
+        "[.items[].spec.ports[].port] | group_by(. > 100)",
+        "list.yaml"
+      ],
+      "stdout": "- - 80\n- - 8080\n  - 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: tojson of a map",
+      "args": [
+        ".metadata | tojson",
+        "flux.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"podinfo\",\n  \"namespace\": \"apps\"\n}\n\n---\n{\n  \"name\": \"infra\",\n  \"namespace\": \"flux-system\"\n}\n\n---\n{\n  \"name\": \"redis\",\n  \"namespace\": \"cache\"\n}\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: to_json(0) of a map",
+      "args": [
+        ".metadata | to_json(0)",
+        "flux.yaml"
+      ],
+      "stdout": "{\"name\":\"podinfo\",\"namespace\":\"apps\"}\n---\n{\"name\":\"infra\",\"namespace\":\"flux-system\"}\n---\n{\"name\":\"redis\",\"namespace\":\"cache\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: @json of a map",
+      "args": [
+        ".metadata | @json",
+        "flux.yaml"
+      ],
+      "stdout": "{\"name\":\"podinfo\",\"namespace\":\"apps\"}\n---\n{\"name\":\"infra\",\"namespace\":\"flux-system\"}\n---\n{\"name\":\"redis\",\"namespace\":\"cache\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: tojson of a string",
+      "args": [
+        ".name | tojson",
+        "config.yaml"
+      ],
+      "stdout": "\"app\"\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: to_json of a list",
+      "args": [
+        ".tags | to_json",
+        "config.yaml"
+      ],
+      "stdout": "[\n  \"web\",\n  \"api\"\n]\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: upcase",
+      "args": [
+        ".metadata.name | upcase",
+        "pods.yaml"
+      ],
+      "stdout": "POSTGRES-0\n---\nWEB-1\n---\nWEB\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: downcase",
+      "args": [
+        ".kind | downcase",
+        "pods.yaml"
+      ],
+      "stdout": "pod\n---\npod\n---\ndeployment\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: upcase keeps the document line",
+      "args": [
+        ".metadata.name as $n | $n | upcase",
+        "pods.yaml"
+      ],
+      "stdout": "POSTGRES-0\n---\nWEB-1\n---\nWEB\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a dot before an index",
+      "args": [
+        ".tags.[0]",
+        "config.yaml"
+      ],
+      "stdout": "web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a dot before an iterator",
+      "args": [
+        ".tags.[]",
+        "config.yaml"
+      ],
+      "stdout": "web\napi\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a dot before an index on a missing key",
+      "args": [
+        ".spec.containers.[0].name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nweb\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: env parses YAML",
+      "args": [
+        "env(COUNT) + 1",
+        "config.yaml"
+      ],
+      "env": {
+        "COUNT": "3"
+      },
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: env of a map",
+      "args": [
+        "env(CONF) | .x",
+        "config.yaml"
+      ],
+      "env": {
+        "CONF": "x: 1"
+      },
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: env of an unset variable",
+      "args": [
+        "env(UNSET)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: strenv is a string",
+      "args": [
+        "strenv(COUNT) + \"!\"",
+        "config.yaml"
+      ],
+      "env": {
+        "COUNT": "3"
+      },
+      "stdout": "3!\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: strenv of an unset variable",
+      "args": [
+        "strenv(UNSET)",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: set a value from env",
+      "args": [
+        ".port = env(PORT)",
+        "config.yaml"
+      ],
+      "env": {
+        "PORT": "9090"
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: 9090\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into to_entries",
+      "args": [
+        ".nothing | to_entries",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into with_entries(.)",
+      "args": [
+        ".nothing | with_entries(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into map(.)",
+      "args": [
+        ".nothing | map(.)",
+        "config.yaml"
+      ],
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into map_values(.)",
+      "args": [
+        ".nothing | map_values(.)",
+        "config.yaml"
+      ],
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into min",
+      "args": [
+        ".nothing | min",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into max",
+      "args": [
+        ".nothing | max",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into split(\"a\")",
+      "args": [
+        ".nothing | split(\"a\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into keys",
+      "args": [
+        ".nothing | keys",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into join(\",\")",
+      "args": [
+        ".nothing | join(\",\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into sort",
+      "args": [
+        ".nothing | sort",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into sort_by(.)",
+      "args": [
+        ".nothing | sort_by(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into unique",
+      "args": [
+        ".nothing | unique",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into unique_by(.)",
+      "args": [
+        ".nothing | unique_by(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into group_by(.)",
+      "args": [
+        ".nothing | group_by(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into flatten",
+      "args": [
+        ".nothing | flatten",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into test(\"a\")",
+      "args": [
+        ".nothing | test(\"a\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into sub(\"a\"; \"b\")",
+      "args": [
+        ".nothing | sub(\"a\"; \"b\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into upcase",
+      "args": [
+        ".nothing | upcase",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into trim",
+      "args": [
+        ".nothing | trim",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into @base64",
+      "args": [
+        ".nothing | @base64",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into any",
+      "args": [
+        ".nothing | any",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into reverse",
+      "args": [
+        ".nothing | reverse",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: a null value times two",
+      "args": [
+        ".nothing * 2",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: $__loc__",
+      "args": [
+        "$__loc__",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An unbound variable is an error, as in jq, where mikefarah prints nothing."
+      }
+    },
+    {
+      "name": "dialect: and binds looser than a pipe",
+      "args": [
+        ".meta | .z and .a",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "true\n---\ntrue\n---\ntrue\n",
+        "exit": 0,
+        "reason": "jq's precedence: and and or bind tighter than a pipe, where mikefarah reads a | b and c as (a | b) and c."
+      }
+    },
+    {
+      "name": "dialect: type of each kind",
+      "args": [
+        "(.name, .port, .debug, .nothing, .tags, ., 1.5) | type",
+        "config.yaml"
+      ],
+      "stdout": "!!str\n!!int\n!!bool\n!!null\n!!seq\n!!map\n!!float\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: tag of each kind",
+      "args": [
+        "(.name, .port, .tags, .) | tag",
+        "config.yaml"
+      ],
+      "stdout": "!!str\n!!int\n!!seq\n!!map\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: kind of each kind",
+      "args": [
+        "(.name, .tags, .) | kind",
+        "config.yaml"
+      ],
+      "stdout": "scalar\nseq\nmap\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a comma binds looser than a pipe",
+      "args": [
+        ".name, .port | type",
+        "config.yaml"
+      ],
+      "stdout": "app\n!!int\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "!!str\n!!int\n",
+        "exit": 0,
+        "reason": "jq's precedence: a comma binds tighter than a pipe, where mikefarah reads a | b, c as (a | b), c."
+      }
+    },
+    {
+      "name": "mikefarah: -- before a file",
+      "args": [
+        ".a",
+        "--",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n"
+      },
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -- before the filter",
+      "args": [
+        "--",
+        ".a",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n"
+      },
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o csv of maps",
+      "args": [
+        "-o",
+        "csv",
+        ".items",
+        "data.json"
+      ],
+      "stdout": "id,tag\n1,a\n2,b\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o tsv of maps",
+      "args": [
+        "-o",
+        "tsv",
+        ".items",
+        "data.json"
+      ],
+      "stdout": "id\ttag\n1\ta\n2\tb\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o csv of scalars",
+      "args": [
+        "-o",
+        "csv",
+        ".tags",
+        "config.yaml"
+      ],
+      "stdout": "web,api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o props",
+      "args": [
+        "-o",
+        "props",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name = app\nversion = 1.2.0\nport = 8080\ndebug = false\nempty = \nmode = 0644\nnothing = null\ntags.0 = web\ntags.1 = api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o p",
+      "args": [
+        "-o",
+        "p",
+        ".",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion = v1\nkind = List\nitems.0.apiVersion = v1\nitems.0.kind = Service\nitems.0.metadata.name = frontend\nitems.0.spec.ports.0.port = 80\nitems.1.apiVersion = v1\nitems.1.kind = Service\nitems.1.metadata.name = backend\nitems.1.spec.ports.0.port = 8080\nitems.1.spec.ports.1.port = 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -op",
+      "args": [
+        "-op",
+        ".metadata",
+        "flux.yaml"
+      ],
+      "stdout": "name = podinfo\nnamespace = apps\nname = infra\nnamespace = flux-system\nname = redis\nnamespace = cache\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -M",
+      "args": [
+        "-M",
+        ".name",
+        "config.yaml"
+      ],
+      "stdout": "app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -C",
+      "args": [
+        "-C",
+        ".name",
+        "config.yaml"
+      ],
+      "stdout": "app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -0",
+      "args": [
+        "-0",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\u0000---\nweb-1\u0000---\nweb\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: --nul-output",
+      "args": [
+        "--nul-output",
+        ".kind",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease\u0000---\nKustomization\u0000---\nHelmRelease\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -0 on a map",
+      "args": [
+        "-0",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -0 with -N",
+      "args": [
+        "-0",
+        "-N",
+        ".kind",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease\u0000Kustomization\u0000HelmRelease\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: documentIndex",
+      "args": [
+        "documentIndex",
+        "pods.yaml"
+      ],
+      "stdout": "0\n1\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: di with fi and filename",
+      "args": [
+        "[di, fi, filename]",
+        "flux.yaml"
+      ],
+      "stdout": "- 0\n- 0\n- flux.yaml\n- 1\n- 0\n- flux.yaml\n- 2\n- 0\n- flux.yaml\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: fi over two files",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        "[fi, di, filename]",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "[0,0,\"pods.yaml\"]\n[0,1,\"pods.yaml\"]\n[0,2,\"pods.yaml\"]\n[1,0,\"flux.yaml\"]\n[1,1,\"flux.yaml\"]\n[1,2,\"flux.yaml\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: filename of stdin",
+      "args": [
+        "filename"
+      ],
+      "stdin": "a: 1\n",
+      "stdout": "-\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: di of null input",
+      "args": [
+        "-n",
+        "di"
+      ],
+      "stdout": "0\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_string",
+      "args": [
+        ".port | to_string",
+        "config.yaml"
+      ],
+      "stdout": "8080\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_number of a string",
+      "args": [
+        "\"12\" | to_number",
+        "config.yaml"
+      ],
+      "stdout": "12\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_number of a version",
+      "args": [
+        ".version | to_number",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "mikefarah: @yaml of a list",
+      "args": [
+        ".tags | @yaml",
+        "config.yaml"
+      ],
+      "stdout": "- web\n- api\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_yaml of each document",
+      "args": [
+        ". | to_yaml",
+        "flux.yaml"
+      ],
+      "stdout": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @yamld",
+      "args": [
+        "\"a: 1\" | @yamld",
+        "config.yaml"
+      ],
+      "stdout": "a: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: from_yaml",
+      "args": [
+        "\"a: [1, 2]\" | from_yaml | .a[1]",
+        "config.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: from_json",
+      "args": [
+        "\"{\\\"a\\\":1}\" | from_json | .a",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @jsond",
+      "args": [
+        "\"[1]\" | @jsond | .[0]",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @props of a list",
+      "args": [
+        ".tags | @props",
+        "config.yaml"
+      ],
+      "stdout": "0 = web\n1 = api\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @props of a document",
+      "args": [
+        "@props",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion = v1\nkind = List\nitems.0.apiVersion = v1\nitems.0.kind = Service\nitems.0.metadata.name = frontend\nitems.0.spec.ports.0.port = 80\nitems.1.apiVersion = v1\nitems.1.kind = Service\nitems.1.metadata.name = backend\nitems.1.spec.ports.0.port = 8080\nitems.1.spec.ports.1.port = 9090\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: sort_keys of the top",
+      "args": [
+        "sort_keys(.)",
+        "config.yaml"
+      ],
+      "stdout": "debug: false\nempty: \"\"\nmode: \"0644\"\nname: app\nnothing: null\nport: 8080\ntags:\n  - web\n  - api\nversion: 1.2.0\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: sort_keys everywhere",
+      "args": [
+        "sort_keys(..)",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion: v1\nitems:\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: frontend\n    spec:\n      ports:\n        - port: 80\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: backend\n    spec:\n      ports:\n        - port: 8080\n        - port: 9090\nkind: List\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: pick keys",
+      "args": [
+        "pick([\"port\", \"name\", \"zz\"])",
+        "config.yaml"
+      ],
+      "stdout": "port: 8080\nname: app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: omit keys",
+      "args": [
+        "omit([\"port\", \"tags\"])",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: pick an index",
+      "args": [
+        ".tags | pick([1])",
+        "config.yaml"
+      ],
+      "stdout": "- api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: filter a list",
+      "args": [
+        ".tags | filter(. != \"web\")",
+        "config.yaml"
+      ],
+      "stdout": "- api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: filter a map",
+      "args": [
+        "filter(. == \"app\")",
+        "config.yaml"
+      ],
+      "stdout": "- app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: any_c",
+      "args": [
+        ".tags | any_c(. == \"api\")",
+        "config.yaml"
+      ],
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: all_c",
+      "args": [
+        ".tags | all_c(. == \"api\")",
+        "config.yaml"
+      ],
+      "stdout": "false\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: key of list items",
+      "args": [
+        ".tags[] | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: key of a field",
+      "args": [
+        ".name | key",
+        "config.yaml"
+      ],
+      "stdout": "name\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: key of each container",
+      "args": [
+        ".spec.containers[] | key",
+        "pods.yaml"
+      ],
+      "stdout": "0\n---\n0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: path of a found value",
+      "args": [
+        ".. | select(. == \"api\") | path",
+        "config.yaml"
+      ],
+      "stdout": "- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: path of an item",
+      "args": [
+        ".tags[1] | path",
+        "config.yaml"
+      ],
+      "stdout": "- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: path of the root",
+      "args": [
+        "path",
+        "config.yaml"
+      ],
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: with",
+      "args": [
+        "with(.tags; .[0] = \"x\")",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - x\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: with a new path",
+      "args": [
+        "with(.a.b; . = 1)",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\na:\n  b: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: splitDoc of items",
+      "args": [
+        ".tags[] | splitDoc",
+        "config.yaml"
+      ],
+      "stdout": "web\n---\napi\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: split_doc then a path",
+      "args": [
+        ".items[] | split_doc | .metadata.name",
+        "list.yaml"
+      ],
+      "stdout": "frontend\n---\nbackend\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: splitDoc of one list",
+      "args": [
+        ".items | splitDoc",
+        "list.yaml"
+      ],
+      "stdout": "- apiVersion: v1\n  kind: Service\n  metadata:\n    name: frontend\n  spec:\n    ports:\n      - port: 80\n- apiVersion: v1\n  kind: Service\n  metadata:\n    name: backend\n  spec:\n    ports:\n      - port: 8080\n      - port: 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: splitDoc of built items",
+      "args": [
+        "[.tags[], \"x\"] | .[] | splitDoc",
+        "config.yaml"
+      ],
+      "stdout": "web\n---\napi\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load",
+      "args": [
+        "load(\"config.yaml\") | .name",
+        "list.yaml"
+      ],
+      "stdout": "app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load_str",
+      "args": [
+        "load_str(\"a.yaml\")",
+        "config.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n"
+      },
+      "stdout": "a: 1\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load a json file",
+      "args": [
+        "load(\"data.json\") | .meta.count",
+        "config.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load a missing file",
+      "args": [
+        "load(\"nope.yaml\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "mikefarah: merge a loaded file",
+      "args": [
+        ". * load(\"a.yaml\")",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n"
+      },
+      "stdout": "b: 1\na: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: explode",
+      "args": [
+        "explode(.) | .web",
+        "anchors.yaml"
+      ],
+      "stdout": "image: nginx\nreplicas: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: a merge key is merged",
+      "args": [
+        ".web.image",
+        "anchors.yaml"
+      ],
+      "stdout": "nginx\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: a merge key keeps the explicit value",
+      "args": [
+        ".web.replicas",
+        "anchors.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: a merged map as json",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        ".web",
+        "anchors.yaml"
+      ],
+      "stdout": "{\"image\":\"nginx\",\"replicas\":2}\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -i through a merge key keeps it",
+      "args": [
+        "-i",
+        ".web.replicas = 3",
+        "anchors.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  !!merge <<: *base\n  replicas: 3\ntags: [a, b]\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds.",
+        "written": {
+          "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  <<: *base\n  replicas: 3\ntags: [a, b]\n"
+        }
+      }
+    },
+    {
+      "name": "mikefarah: -i on an anchor keeps the file",
+      "args": [
+        "-i",
+        ".base.image = \"httpd\"",
+        "anchors.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "anchors.yaml": "# shared defaults\nbase: &base\n  image: httpd\n  replicas: 1 # one by default\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "An alias is a copy: an edit of an anchor's target that its aliases would read differently is refused, the file left as it was.",
+        "written": {}
+      }
+    },
+    {
+      "name": "mikefarah: anchor of a node without one",
+      "args": [
+        ".web | anchor",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: alias",
+      "args": [
+        ".web | alias",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: style of a plain scalar",
+      "args": [
+        ".name | style",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: line_comment of a node without one",
+      "args": [
+        ".name | line_comment",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: head_comment of a node without one",
+      "args": [
+        ".base | head_comment",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: foot_comment",
+      "args": [
+        ". | foot_comment",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: style setter",
+      "args": [
+        ".name style=\"double\"",
+        "config.yaml"
+      ],
+      "stdout": "name: \"app\"\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      }
+    },
+    {
+      "name": "mikefarah: line_comment setter",
+      "args": [
+        ".name line_comment=\"x\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app # x\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      }
+    },
+    {
+      "name": "mikefarah: comments cleared",
+      "args": [
+        "... comments=\"\"",
+        "anchors.yaml"
+      ],
+      "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n",
+        "exit": 0,
+        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds."
+      }
+    },
+    {
+      "name": "mikefarah: tag setter",
+      "args": [
+        ".port tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: \"8080\"\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_json(4)",
+      "args": [
+        ".tags | to_json(4)",
+        "config.yaml"
+      ],
+      "stdout": "[\n    \"web\",\n    \"api\"\n]\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: line",
+      "args": [
+        ".name | line",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "0\n",
+        "exit": 0,
+        "reason": "Line and column are not kept on our values and answer 0."
+      }
+    },
+    {
+      "name": "eval-all: sort documents by name",
+      "args": [
+        "ea",
+        "[.] | sort_by(.metadata.name) | .[].metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb\nweb-1\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: join names",
+      "args": [
+        "ea",
+        "[.metadata.name] | join(\",\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0,web-1,web\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: count documents",
+      "args": [
+        "ea",
+        "[.] | length",
+        "pods.yaml"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: count documents of two files",
+      "args": [
+        "eval-all",
+        "[.] | length",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "6\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: select",
+      "args": [
+        "ea",
+        "select(.kind == \"HelmRelease\") | .metadata.name",
+        "flux.yaml"
+      ],
+      "stdout": "podinfo\n---\nredis\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: merge two files with ireduce",
+      "args": [
+        "ea",
+        ". as $item ireduce ({}; . * $item)",
+        "m1.yaml",
+        "m2.yaml"
+      ],
+      "files": {
+        "m1.yaml": "a: 1\nx:\n  p: 1\n",
+        "m2.yaml": "b: 2\nx:\n  q: 2\n"
+      },
+      "stdout": "a: 1\nx:\n  p: 1\n  q: 2\nb: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: merge with load",
+      "args": [
+        "ea",
+        ". * load(\"m2.yaml\")",
+        "m1.yaml"
+      ],
+      "files": {
+        "m1.yaml": "a: 1\nx:\n  p: 1\n",
+        "m2.yaml": "b: 2\nx:\n  q: 2\n"
+      },
+      "stdout": "a: 1\nx:\n  p: 1\n  q: 2\nb: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: a path per document",
+      "args": [
+        "ea",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: length per document",
+      "args": [
+        "ea",
+        "length",
+        "pods.yaml"
+      ],
+      "stdout": "5\n4\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: collect over two files",
+      "args": [
+        "ea",
+        "[.metadata.name]",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "- postgres-0\n- web-1\n- web\n- podinfo\n- infra\n- redis\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: -N",
+      "args": [
+        "ea",
+        "-N",
+        ".kind",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\nPod\nDeployment\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: one file",
+      "args": [
+        "ea",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: stdin",
+      "args": [
+        "ea",
+        "[.] | length"
+      ],
+      "stdin": "a: 1\n---\na: 2\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: stdin with a path",
+      "args": [
+        "ea",
+        ".a"
+      ],
+      "stdin": "a: 1\n---\na: 2\n",
+      "stdout": "1\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: di and fi collected",
+      "args": [
+        "ea",
+        "-o",
+        "json",
+        "-I0",
+        "[di, fi]",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "[0,0,1,0,2,0,0,1,1,1,2,1]\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: a map per document",
+      "args": [
+        "ea",
+        "{\"n\": .metadata.name}",
+        "pods.yaml"
+      ],
+      "stdout": "n: postgres-0\n---\nn: web-1\n---\nn: web\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: first document of a list",
+      "args": [
+        "ea",
+        "[.] | .[0].kind",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: -i",
+      "args": [
+        "ea",
+        "-i",
+        "select(.kind == \"Deployment\").spec.replicas = 5",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pods.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: postgres-0\n  labels:\n    app: postgres\nspec:\n  nodeName: node-a\n  containers:\n    - name: postgres\n      image: postgres:16.4\nstatus:\n  phase: Running\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-1\n  labels:\n    app: web\nspec:\n  containers:\n    - name: web\n      image: nginx:1.27\n    - name: proxy\n      image: envoyproxy/envoy:v1.31\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 5\n"
+      }
+    },
+    {
+      "name": "eval-all: -i over every document",
+      "args": [
+        "ea",
+        "-i",
+        ".metadata.labels.team = \"web\"",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\n  labels:\n    team: web\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\n  labels:\n    team: web\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n---\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\n  labels:\n    team: web\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n"
+      }
+    },
+    {
+      "name": "eval-all: a variable holds one document",
+      "args": [
+        "ea",
+        ".metadata.name as $n | [$n]",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres-0\n- postgres-0\n- postgres-0\n- web-1\n- web-1\n- web-1\n- web\n- web\n- web\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "- postgres-0\n- web-1\n- web\n",
+        "exit": 0,
+        "reason": "In eval-all a variable holds one document at a time, where mikefarah's holds the whole list."
+      }
+    },
+    {
+      "name": "eval-all: ireduce in eval",
+      "args": [
+        "e",
+        ".[] as $c ireduce ([]; . + [$c])",
+        "config.yaml"
+      ],
+      "stdout": "- app\n- 1.2.0\n- 8080\n- false\n- \"\"\n- \"0644\"\n- null\n- - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: ireduce on a list",
+      "args": [
+        ".tags[] as $t ireduce (\"\"; . + $t)",
+        "config.yaml"
+      ],
+      "stdout": "webapi\n",
+      "exit": 0
+    },
+    {
+      "name": "eval-all: ireduce on an inside node",
+      "args": [
+        ".spec.containers[]? as $c ireduce ([]; . + [$c.name])",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres\n- web\n- proxy\n[]\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: ireduce keeps its accumulator's document",
+      "args": [
+        ".kind as $k ireduce (.metadata; .)",
+        "pods.yaml"
+      ],
+      "stdout": "name: postgres-0\nlabels:\n  app: postgres\n---\nname: web-1\nlabels:\n  app: web\n---\nname: web\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "name: postgres-0\nlabels:\n  app: postgres\nname: web-1\nlabels:\n  app: web\nname: web\n",
+        "exit": 0,
+        "reason": "ireduce counts as computed, where mikefarah keeps its accumulator's document: a known miss of the walker."
+      }
+    },
+    {
+      "name": "arithmetic: .z * 2",
+      "args": [
+        ".z * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n * 2",
+      "args": [
+        ".n * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .z | . * 2",
+      "args": [
+        ".z | . * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .n | . * 2",
+      "args": [
+        ".n | . * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .z - 1",
+      "args": [
+        ".z - 1",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n - 1",
+      "args": [
+        ".n - 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z | . - 1",
+      "args": [
+        ".z | . - 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: 2 * .n",
+      "args": [
+        "2 * .n",
+        "nulls.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: 1 + .n",
+      "args": [
+        "1 + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .s + .n",
+      "args": [
+        ".s + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .l + .n",
+      "args": [
+        ".l + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .m + .n",
+      "args": [
+        ".m + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .l[5] * 2",
+      "args": [
+        ".l[5] * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .z + 1",
+      "args": [
+        ".z + 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n + 1",
+      "args": [
+        ".n + 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z + .a",
+      "args": [
+        ".z + .a",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z + .z",
+      "args": [
+        ".z + .z",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n.q + 1",
+      "args": [
+        ".n.q + 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n.q * 2",
+      "args": [
+        ".n.q * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: (.z | .q) * 2",
+      "args": [
+        "(.z | .q) * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .a.q * 2",
+      "args": [
+        ".a.q * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .a? * 2",
+      "args": [
+        ".a? * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z? * 2",
+      "args": [
+        ".z? * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z / 2",
+      "args": [
+        ".z / 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n / 2",
+      "args": [
+        ".n / 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .n % 2",
+      "args": [
+        ".n % 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .n - .n",
+      "args": [
+        ".n - .n",
+        "nulls.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .a[0]",
+      "args": [
+        ".a[0]",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .s[0]",
+      "args": [
+        ".s[0]",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .s[0:1]",
+      "args": [
+        ".s[0:1]",
+        "nulls.yaml"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .l[0].q * 2",
+      "args": [
+        ".l[0].q * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: (.z // 1) * 2",
+      "args": [
+        "(.z // 1) * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas | . + 1 on pods.yaml",
+      "args": [
+        ".spec.replicas | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n---\n1\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas | . - 1 on pods.yaml",
+      "args": [
+        ".spec.replicas | . - 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n---\n1\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.nodeName | . + \"-x\" on pods.yaml",
+      "args": [
+        ".spec.nodeName | . + \"-x\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a-x\n---\n-x\n---\n-x\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas + 1 | . * 2 on pods.yaml",
+      "args": [
+        ".spec.replicas + 1 | . * 2",
+        "pods.yaml"
+      ],
+      "stdout": "2\n2\n---\n8\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.nodeName + \"-x\" on pods.yaml",
+      "args": [
+        ".spec.nodeName + \"-x\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a-x\n-x\n-x\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.spec.replicas | . + 1] on pods.yaml",
+      "args": [
+        "[.spec.replicas | . + 1]",
+        "pods.yaml"
+      ],
+      "stdout": "- 1\n- 1\n- 4\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: [.. | path | join(\".\")]",
+      "args": [
+        "[.. | path | join(\".\")]",
+        "config.yaml"
+      ],
+      "stdout": "- \"\"\n- name\n- version\n- port\n- debug\n- empty\n- mode\n- nothing\n- tags\n- tags.0\n- tags.1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: to_entries | .[] | key",
+      "args": [
+        "to_entries | .[] | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n1\n2\n3\n4\n5\n6\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .spec | to_entries | .[0] | path",
+      "args": [
+        ".spec | to_entries | .[0] | path",
+        "pods.yaml"
+      ],
+      "stdout": "- spec\n- 0\n---\n- spec\n- 0\n---\n- spec\n- 0\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .spec | keys | .[0] | path",
+      "args": [
+        ".spec | keys | .[0] | path",
+        "pods.yaml"
+      ],
+      "stdout": "- 0\n- 0\n- 0\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: [.items[] | select(.metadata.name == \"backend\") | key]",
+      "args": [
+        "[.items[] | select(.metadata.name == \"backend\") | key]",
+        "list.yaml"
+      ],
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: [.items[] | select(.metadata.name == \"backend\") | path | join(\".\")]",
+      "args": [
+        "[.items[] | select(.metadata.name == \"backend\") | path | join(\".\")]",
+        "list.yaml"
+      ],
+      "stdout": "- items.1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .items[] | .spec.ports[] | select(.port == 9090) | key",
+      "args": [
+        ".items[] | .spec.ports[] | select(.port == 9090) | key",
+        "list.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .. | select(. == \"api\") | key",
+      "args": [
+        ".. | select(. == \"api\") | key",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: (.tags[] | select(. == \"api\")) | path",
+      "args": [
+        "(.tags[] | select(. == \"api\")) | path",
+        "config.yaml"
+      ],
+      "stdout": "- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .tags | .[] | key",
+      "args": [
+        ".tags | .[] | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .tags[0] | length | key",
+      "args": [
+        ".tags[0] | length | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: key inside map is refused",
+      "args": [
+        ".tags | map(key)",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "- 0\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: path inside map is refused",
+      "args": [
+        ".items | map(path)",
+        "list.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "- - items\n  - 0\n- - items\n  - 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: key inside a select under map is refused",
+      "args": [
+        ".items | map(select(.metadata.name == \"backend\") | key)",
+        "list.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: key inside del is refused",
+      "args": [
+        "del(.[] | select(key == \"port\"))",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "name: app\nversion: 1.2.0\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .debug tag = \"!!str\"",
+      "args": [
+        ".debug tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: \"false\"\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .nothing tag = \"!!str\"",
+      "args": [
+        ".nothing tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: \"null\"\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .port tag = \"!!str\" | .port | type",
+      "args": [
+        ".port tag = \"!!str\" | .port | type",
+        "config.yaml"
+      ],
+      "stdout": "!!str\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .mode tag = \"!!int\" | .mode + 1",
+      "args": [
+        ".mode tag = \"!!int\" | .mode + 1",
+        "config.yaml"
+      ],
+      "stdout": "645\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .mode tag = \"!!int\"",
+      "args": [
+        ".mode tag = \"!!int\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: 644\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "A retyped scalar prints as its new type, where mikefarah keeps the quoting it had (mode: \"0644\" with an !!int tag)."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .name tag = \"!!int\" is refused",
+      "args": [
+        ".name tag = \"!!int\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A scalar is retyped by its value: a tag the value cannot take (a word as !!int, !!bool) is refused where mikefarah writes a tagged node."
+      },
+      "stdout": "name: !!int app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .port tag = \"!!bool\" is refused",
+      "args": [
+        ".port tag = \"!!bool\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A scalar is retyped by its value: a tag the value cannot take (a word as !!int, !!bool) is refused where mikefarah writes a tagged node."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: !!bool 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .port tag = \"!!float\"",
+      "args": [
+        ".port tag = \"!!float\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "A whole number is a float already here, where mikefarah tags it !!float."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: !!float 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .l[] |= (. tag = \"!!str\")",
+      "args": [
+        ".l[] |= (. tag = \"!!str\")",
+        "rows.yaml"
+      ],
+      "stdout": "a: x\nn: 1\nl:\n  - \"1\"\n  - a b\n  - \"true\"\n  - \"null\"\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: (.l[] | select(tag == \"!!int\")) tag = \"!!str\"",
+      "args": [
+        "(.l[] | select(tag == \"!!int\")) tag = \"!!str\"",
+        "rows.yaml"
+      ],
+      "stdout": "a: x\nn: 1\nl:\n  - \"1\"\n  - a b\n  - true\n  - null\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: -i .port tag = \"!!str\"",
+      "args": [
+        "-i",
+        ".port tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "config.yaml": "name: app\nversion: 1.2.0\nport: \"8080\"\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n"
+      }
+    },
+    {
+      "name": "tag: -i .mode tag = \"!!int\"",
+      "args": [
+        "-i",
+        ".mode tag = \"!!int\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "config.yaml": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: 644\nnothing: null\ntags:\n  - web\n  - api\n"
+        },
+        "reason": "A retyped scalar is written as its new type, where mikefarah keeps the quoting it had (mode: \"0644\" with an !!int tag) and leaves the file."
+      },
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "comments: ... comments=\"\" on notes.yaml",
+      "args": [
+        "... comments=\"\"",
+        "notes.yaml"
+      ],
+      "stdout": "a: 1\nb:\n  - x\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -i ... comments=\"\" on notes.yaml",
+      "args": [
+        "-i",
+        "... comments=\"\"",
+        "notes.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "a: 1\nb:\n  - x\n"
+      }
+    },
+    {
+      "name": "comments: -i . comments=\"\" on notes.yaml",
+      "args": [
+        "-i",
+        ". comments=\"\"",
+        "notes.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "a: 1 # one\nb:\n  - x # item\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {},
+        "reason": "A comment setter on . with an empty string changes nothing here, where mikefarah drops the comments of the root node alone; ... comments=\"\" strips them all in both."
+      }
+    },
+    {
+      "name": "comments: -i ... line_comment=\"\" on notes.yaml",
+      "args": [
+        "-i",
+        "... line_comment=\"\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "notes.yaml": "a: 1\nb:\n  - x\n"
+        },
+        "reason": "A comment setter with an empty string strips every comment of the file, head and foot comments included."
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "# top\na: 1\nb:\n  - x\n"
+      }
+    },
+    {
+      "name": "comments: -i .a line_comment=\"\" is refused",
+      "args": [
+        "-i",
+        ".a line_comment=\"\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A comment setter is taken only on . or .. with an empty string; on a path it is refused.",
+        "written": {}
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "# top\na: 1\nb:\n  - x # item\n"
+      }
+    },
+    {
+      "name": "comments: -i ... comments=\"\" on anchors.yaml",
+      "args": [
+        "-i",
+        "... comments=\"\"",
+        "anchors.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n"
+        },
+        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds."
+      }
+    },
+    {
+      "name": "comments: .a line_comment=\"x\" is refused",
+      "args": [
+        ".a line_comment=\"x\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      },
+      "stdout": "# top\na: 1 # x\nb:\n  - x # item\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a style=\"double\" is refused",
+      "args": [
+        ".a style=\"double\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      },
+      "stdout": "# top\na: \"1\" # one\nb:\n  - x # item\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a anchor=\"x\" is refused",
+      "args": [
+        ".a anchor=\"x\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      },
+      "stdout": "# top\na: &x 1 # one\nb:\n  - x # item\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: \"x\" | @csv",
+      "args": [
+        "\"x\" | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .n | @csv",
+      "args": [
+        ".n | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | @csv",
+      "args": [
+        ".l | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "1,a b,true,null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | @tsv",
+      "args": [
+        ".l | @tsv",
+        "rows.yaml"
+      ],
+      "stdout": "1\ta b\ttrue\tnull\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | @csv",
+      "args": [
+        ".r | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "k,j\n1,x\n2,\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | @tsv",
+      "args": [
+        ".r | @tsv",
+        "rows.yaml"
+      ],
+      "stdout": "k\tj\n1\tx\n2\t\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .q | @csv",
+      "args": [
+        ".q | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "\"a,b\",\"c\"\"d\",\" e\",\"f\ng\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .q | @tsv",
+      "args": [
+        ".q | @tsv",
+        "rows.yaml"
+      ],
+      "stdout": "a,b\t\"c\"\"d\"\t\" e\"\t\"f\ng\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | @csv",
+      "args": [
+        ".m | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: [.l, .l] | @csv",
+      "args": [
+        "[.l, .l] | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "1,a b,true,null\n1,a b,true,null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: [.m] | @csv",
+      "args": [
+        "[.m] | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "k\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: [] | @csv",
+      "args": [
+        "[] | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | @sh",
+      "args": [
+        ".l | @sh",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: .n | @sh",
+      "args": [
+        ".n | @sh",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: .m | @sh",
+      "args": [
+        ".m | @sh",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: .m | tostring",
+      "args": [
+        ".m | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "k: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | tostring",
+      "args": [
+        ".l | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "- 1\n- a b\n- true\n- null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | tostring",
+      "args": [
+        ".r | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "- k: 1\n  j: x\n- k: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .n | tostring",
+      "args": [
+        ".n | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | map(.)",
+      "args": [
+        ".m | map(.)",
+        "rows.yaml"
+      ],
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | map(. + 1)",
+      "args": [
+        ".m | map(. + 1)",
+        "rows.yaml"
+      ],
+      "stdout": "- 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | map_values(. + 1)",
+      "args": [
+        ".m | map_values(. + 1)",
+        "rows.yaml"
+      ],
+      "stdout": "k: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | map(.k)",
+      "args": [
+        ".r | map(.k)",
+        "rows.yaml"
+      ],
+      "stdout": "- 1\n- 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | map(type) | join(\",\")",
+      "args": [
+        ".r | map(type) | join(\",\")",
+        "rows.yaml"
+      ],
+      "stdout": "!!map,!!map\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .a | @sh",
+      "args": [
+        ".a | @sh",
+        "rows.yaml"
+      ],
+      "accept": {
+        "stdout": "'x'\n",
+        "exit": 0,
+        "reason": "@sh quotes every string, as jq does, where mikefarah quotes only what needs it."
+      },
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o csv .r",
+      "args": [
+        "-o",
+        "csv",
+        ".r",
+        "rows.yaml"
+      ],
+      "stdout": "k,j\n1,x\n2,\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o tsv .r",
+      "args": [
+        "-o",
+        "tsv",
+        ".r",
+        "rows.yaml"
+      ],
+      "stdout": "k\tj\n1\tx\n2\t\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o csv .l",
+      "args": [
+        "-o",
+        "csv",
+        ".l",
+        "rows.yaml"
+      ],
+      "stdout": "1,a b,true,null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o csv .q",
+      "args": [
+        "-o",
+        "csv",
+        ".q",
+        "rows.yaml"
+      ],
+      "stdout": "\"a,b\",\"c\"\"d\",\" e\",\"f\ng\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .spec | map(type) | join(\",\") on pods.yaml",
+      "args": [
+        ".spec | map(type) | join(\",\")",
+        "pods.yaml"
+      ],
+      "stdout": "!!str,!!seq\n!!seq\n!!int\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: [{\"b\": 1, \"a\": 2}, {\"a\": 2, \"b\": 1}] | unique",
+      "args": [
+        "[{\"b\": 1, \"a\": 2}, {\"a\": 2, \"b\": 1}] | unique",
+        "config.yaml"
+      ],
+      "stdout": "- b: 1\n  a: 2\n- a: 2\n  b: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: {\"b\": 1, \"a\": 2} == {\"a\": 2, \"b\": 1}",
+      "args": [
+        "{\"b\": 1, \"a\": 2} == {\"a\": 2, \"b\": 1}",
+        "config.yaml"
+      ],
+      "stdout": "false\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .spec.containers[] | [.name, .image] | @tsv on pods.yaml",
+      "args": [
+        ".spec.containers[] | [.name, .image] | @tsv",
+        "pods.yaml"
+      ],
+      "accept": {
+        "stdout": "postgres\tpostgres:16.4\n---\nweb\tnginx:1.27\nproxy\tenvoyproxy/envoy:v1.31\n",
+        "exit": 0,
+        "reason": "mikefarah's collect and literals answer once for a document whose pipe produced nothing, an empty line here; ours answer nothing."
+      },
+      "stdout": "postgres\tpostgres:16.4\n---\nweb\tnginx:1.27\nproxy\tenvoyproxy/envoy:v1.31\n---\n\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .metadata.labels | to_entries | .[] | \"\\(.key)=\\(.value)\" on pods.yaml",
+      "args": [
+        ".metadata.labels | to_entries | .[] | \"\\(.key)=\\(.value)\"",
+        "pods.yaml"
+      ],
+      "accept": {
+        "stdout": "app=postgres\napp=web\n",
+        "exit": 0,
+        "reason": "mikefarah's collect and literals answer once for a document whose pipe produced nothing, an empty line here; ours answer nothing."
+      },
+      "stdout": "app=postgres\napp=web\n=\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .tags[] | splitDoc | . + \"!\"",
+      "args": [
+        ".tags[] | splitDoc | . + \"!\"",
+        "config.yaml"
+      ],
+      "stdout": "web!\n---\napi!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.tags[] | splitDoc) | upcase",
+      "args": [
+        "(.tags[] | splitDoc) | upcase",
+        "config.yaml"
+      ],
+      "stdout": "WEB\nAPI\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .items[] | splitDoc | .metadata",
+      "args": [
+        ".items[] | splitDoc | .metadata",
+        "list.yaml"
+      ],
+      "stdout": "name: frontend\n---\nname: backend\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .items[] | splitDoc | select(.metadata.name == \"backend\")",
+      "args": [
+        ".items[] | splitDoc | select(.metadata.name == \"backend\")",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion: v1\nkind: Service\nmetadata:\n  name: backend\nspec:\n  ports:\n    - port: 8080\n    - port: 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .items[] | splitDoc | .metadata.name | length",
+      "args": [
+        ".items[] | splitDoc | .metadata.name | length",
+        "list.yaml"
+      ],
+      "stdout": "8\n---\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: .metadata.name[0] on pods.yaml",
+      "args": [
+        ".metadata.name[0]",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: .metadata.name[0:2] on pods.yaml",
+      "args": [
+        ".metadata.name[0:2]",
+        "pods.yaml"
+      ],
+      "stdout": "po\n---\nwe\n---\nwe\n",
+      "exit": 0
+    },
+    {
+      "name": "errors: a broken filter exits 1",
+      "args": [
+        ".a |",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "errors: an unknown function exits 1",
+      "args": [
+        "nosuchfn",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "errors: an unknown function in the second of two files",
+      "args": [
+        ".name",
+        "config.yaml",
+        "nope.yaml"
+      ],
+      "files": {
+        "nope.yaml": "name: x\n"
+      },
+      "stdout": "app\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .",
+      "args": [
+        ".",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas = 5",
+      "args": [
+        ".spec.replicas = 5",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 5 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas |= . + 1",
+      "args": [
+        ".spec.replicas |= . + 1",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 4 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas += 1",
+      "args": [
+        ".spec.replicas += 1",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 4 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: del(.spec.template)",
+      "args": [
+        "del(.spec.template)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels",
+      "args": [
+        ".metadata.labels",
+        "commented.yaml"
+      ],
+      "stdout": "{app: web, tier: \"frontend\"} # flow labels\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec",
+      "args": [
+        ".spec",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0]",
+      "args": [
+        ".spec.template.spec.containers[0]",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nimage: \"nginx:1.27\"\nargs: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags",
+      "args": [
+        ".tags",
+        "commented.yaml"
+      ],
+      "stdout": "- x # first\n- \"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags[]",
+      "args": [
+        ".tags[]",
+        "commented.yaml"
+      ],
+      "stdout": "x\ny\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args",
+      "args": [
+        ".spec.template.spec.containers[0].args",
+        "commented.yaml"
+      ],
+      "stdout": "[a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: with_entries(select(.key != \"tags\"))",
+      "args": [
+        "with_entries(select(.key != \"tags\"))",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\n# foot\n",
+        "exit": 0,
+        "reason": "A foot comment belongs to the document here and stays when the last key goes; mikefarah's goes with the key."
+      }
+    },
+    {
+      "name": "comments: .metadata.labels |= with_entries(.value |= upcase)",
+      "args": [
+        ".metadata.labels |= with_entries(.value |= upcase)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: WEB, tier: \"FRONTEND\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: sort_keys(.)",
+      "args": [
+        "sort_keys(.)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec | sort_keys(.)",
+      "args": [
+        ".spec | sort_keys(.)",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].image |= sub(\"nginx\", \"httpd\")",
+      "args": [
+        ".spec.template.spec.containers[0].image |= sub(\"nginx\", \"httpd\")",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"httpd:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels.env = \"prod\"",
+      "args": [
+        ".metadata.labels.env = \"prod\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\", env: prod} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels.tier = \"back\"",
+      "args": [
+        ".metadata.labels.tier = \"back\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"back\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags += [\"z\"]",
+      "args": [
+        ".tags += [\"z\"]",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n  - z\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags | map(. + \"!\")",
+      "args": [
+        ".tags | map(. + \"!\")",
+        "commented.yaml"
+      ],
+      "stdout": "- x! # first\n- \"y!\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags | reverse",
+      "args": [
+        ".tags | reverse",
+        "commented.yaml"
+      ],
+      "stdout": "- \"y\"\n- x # first\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags | sort",
+      "args": [
+        ".tags | sort",
+        "commented.yaml"
+      ],
+      "stdout": "- x # first\n- \"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata | to_entries | from_entries",
+      "args": [
+        ".metadata | to_entries | from_entries",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nlabels: {app: web, tier: \"frontend\"} # flow labels\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: select(.kind == \"Deployment\")",
+      "args": [
+        "select(.kind == \"Deployment\")",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec * {\"paused\": true}",
+      "args": [
+        ".spec * {\"paused\": true}",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\npaused: true\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: . * {\"spec\": {\"replicas\": 9}}",
+      "args": [
+        ". * {\"spec\": {\"replicas\": 9}}",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 9 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels | keys",
+      "args": [
+        ".metadata.labels | keys",
+        "commented.yaml"
+      ],
+      "stdout": "- app\n- tier\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: (.. | select(tag == \"!!str\")) |= upcase",
+      "args": [
+        "(.. | select(tag == \"!!str\")) |= upcase",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: APPS/V1\nkind: DEPLOYMENT # the kind\nmetadata:\n  name: WEB\n  labels: {app: WEB, tier: \"FRONTEND\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: WEB\n          image: \"NGINX:1.27\"\n          args: [A, \"B\"]\ntags:\n  - X # first\n  - \"Y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ... comments=\"\"",
+      "args": [
+        "... comments=\"\"",
+        "commented.yaml"
+      ],
+      "stdout": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"}\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x\n  - \"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec | ... comments=\"\"",
+      "args": [
+        ".spec | ... comments=\"\"",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: pick([\"kind\", \"tags\"])",
+      "args": [
+        "pick([\"kind\", \"tags\"])",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\nkind: Deployment # the kind\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: omit([\"spec\"])",
+      "args": [
+        "omit([\"spec\"])",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers |= map(.image |= sub(\":.*\", \":2\"))",
+      "args": [
+        ".spec.template.spec.containers |= map(.image |= sub(\":.*\", \":2\"))",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:2\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: (.spec.template.spec.containers[] | select(.name == \"web\") | .image) = \"x\"",
+      "args": [
+        "(.spec.template.spec.containers[] | select(.name == \"web\") | .image) = \"x\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"x\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels = {\"a\": 1}",
+      "args": [
+        ".metadata.labels = {\"a\": 1}",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {a: 1} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas = \"3\"",
+      "args": [
+        ".spec.replicas = \"3\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: \"3\" # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas tag = \"!!str\"",
+      "args": [
+        ".spec.replicas tag = \"!!str\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: \"3\" # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[] | select(.name == \"web\")",
+      "args": [
+        ".spec.template.spec.containers[] | select(.name == \"web\")",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nimage: \"nginx:1.27\"\nargs: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers | .[0] | .image |= sub(\"nginx\", \"httpd\")",
+      "args": [
+        ".spec.template.spec.containers | .[0] | .image |= sub(\"nginx\", \"httpd\")",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nimage: \"httpd:1.27\"\nargs: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: explode(.)",
+      "args": [
+        "explode(.)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: map_values(.)",
+      "args": [
+        "map_values(.)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers | sort_by(.name)",
+      "args": [
+        ".spec.template.spec.containers | sort_by(.name)",
+        "commented.yaml"
+      ],
+      "stdout": "- name: web\n  image: \"nginx:1.27\"\n  args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers | map(select(.name == \"web\"))",
+      "args": [
+        ".spec.template.spec.containers | map(select(.name == \"web\"))",
+        "commented.yaml"
+      ],
+      "stdout": "- name: web\n  image: \"nginx:1.27\"\n  args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: del(.. | select(tag == \"!!str\" and test(\"^n\")))",
+      "args": [
+        "del(.. | select(tag == \"!!str\" and test(\"^n\")))",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels | with_entries(.key |= \"x-\" + .)",
+      "args": [
+        ".metadata.labels | with_entries(.key |= \"x-\" + .)",
+        "commented.yaml"
+      ],
+      "stdout": "x-app: web\nx-tier: \"frontend\"\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "{x-app: web, x-tier: frontend} # flow labels\n",
+        "exit": 0,
+        "reason": "with_entries edits the map in place, so a renamed map keeps its flow style and comment; mikefarah builds a new block map, copying the values' quotes."
+      }
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args |= reverse",
+      "args": [
+        ".spec.template.spec.containers[0].args |= reverse",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [\"b\", a]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args += [\"c\"]",
+      "args": [
+        ".spec.template.spec.containers[0].args += [\"c\"]",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\", c]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args | .[0] = \"z\"",
+      "args": [
+        ".spec.template.spec.containers[0].args | .[0] = \"z\"",
+        "commented.yaml"
+      ],
+      "stdout": "[z, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args | map(upcase)",
+      "args": [
+        ".spec.template.spec.containers[0].args | map(upcase)",
+        "commented.yaml"
+      ],
+      "stdout": "[A, \"B\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags |= map(upcase)",
+      "args": [
+        ".tags |= map(upcase)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - X\n  - \"Y\"\n# foot\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - X # first\n  - \"Y\"\n# foot\n",
+        "exit": 0,
+        "reason": "An item map wrote keeps its comment here; mikefarah's map makes new nodes under |=, though .[] |= keeps them."
+      }
+    },
+    {
+      "name": "comments: .tags | .[] |= upcase",
+      "args": [
+        ".tags | .[] |= upcase",
+        "commented.yaml"
+      ],
+      "stdout": "- X # first\n- \"Y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: {\"n\": .kind}",
+      "args": [
+        "{\"n\": .kind}",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "n: Deployment\n",
+        "exit": 0,
+        "reason": "Comments and style are kept for a result made from a node of the document; a map or list the filter builds ({...}, [...]) prints afresh, where mikefarah copies the nodes' comments into it."
+      },
+      "stdout": "n: Deployment # the kind\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: [.spec.replicas]",
+      "args": [
+        "[.spec.replicas]",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "- 3\n",
+        "exit": 0,
+        "reason": "Comments and style are kept for a result made from a node of the document; a map or list the filter builds ({...}, [...]) prints afresh, where mikefarah copies the nodes' comments into it."
+      },
+      "stdout": "- 3 # scaled\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels | to_entries",
+      "args": [
+        ".metadata.labels | to_entries",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "- key: app\n  value: web\n- key: tier\n  value: frontend\n",
+        "exit": 0,
+        "reason": "Comments and style are kept for a result made from a node of the document; a map or list the filter builds ({...}, [...]) prints afresh, where mikefarah copies the nodes' comments into it."
+      },
+      "stdout": "- key: app\n  value: web\n- key: tier\n  value: \"frontend\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -o json .",
+      "args": [
+        "-o",
+        "json",
+        ".",
+        "commented.yaml"
+      ],
+      "stdout": "{\n  \"apiVersion\": \"apps/v1\",\n  \"kind\": \"Deployment\",\n  \"metadata\": {\n    \"name\": \"web\",\n    \"labels\": {\n      \"app\": \"web\",\n      \"tier\": \"frontend\"\n    }\n  },\n  \"spec\": {\n    \"replicas\": 3,\n    \"template\": {\n      \"spec\": {\n        \"containers\": [\n          {\n            \"name\": \"web\",\n            \"image\": \"nginx:1.27\",\n            \"args\": [\n              \"a\",\n              \"b\"\n            ]\n          }\n        ]\n      }\n    }\n  },\n  \"tags\": [\n    \"x\",\n    \"y\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -o json .metadata",
+      "args": [
+        "-o",
+        "json",
+        ".metadata",
+        "commented.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"web\",\n  \"labels\": {\n    \"app\": \"web\",\n    \"tier\": \"frontend\"\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -I 4 .",
+      "args": [
+        "-I",
+        "4",
+        ".",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n    name: web\n    labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n    replicas: 3 # scaled\n    # the template\n    template:\n        spec:\n            containers:\n                - name: web\n                  image: \"nginx:1.27\"\n                  args: [a, \"b\"]\ntags:\n    - x # first\n    - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -I 4 .spec",
+      "args": [
+        "-I",
+        "4",
+        ".spec",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n    spec:\n        containers:\n            - name: web\n              image: \"nginx:1.27\"\n              args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -P .spec",
+      "args": [
+        "-P",
+        ".spec",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: nginx:1.27\n        args:\n          - a\n          - b\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -P .",
+      "args": [
+        "-P",
+        ".",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels:\n    app: web\n    tier: frontend\n    # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27\n          args:\n            - a\n            - b\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+        "exit": 0,
+        "reason": "The line comment of a flow map opened by -P ends up under it here and on the next key in mikefarah's."
+      },
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels:\n    app: web\n    tier: frontend\nspec: # flow labels\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27\n          args:\n            - a\n            - b\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -N .",
+      "args": [
+        "-N",
+        ".",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\n# sep\n# head two\nb: [1, 2]\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -i .spec.replicas = 5",
+      "args": [
+        "-i",
+        ".spec.replicas = 5",
+        "commented.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "commented.yaml": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 5 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n"
+      }
+    },
+    {
+      "name": "comments: -i del(.spec.template)",
+      "args": [
+        "-i",
+        "del(.spec.template)",
+        "commented.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "commented.yaml": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\ntags:\n  - x # first\n  - \"y\"\n# foot\n"
+      }
+    },
+    {
+      "name": "comments: -i ... comments=\"\"",
+      "args": [
+        "-i",
+        "... comments=\"\"",
+        "commented.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "commented.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"}\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x\n  - \"y\"\n"
+      }
+    },
+    {
+      "name": "comments: . on stream.yaml",
+      "args": [
+        ".",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\n---\n# sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a on stream.yaml",
+      "args": [
+        ".a",
+        "stream.yaml"
+      ],
+      "stdout": "1\n---\nnull\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .b on stream.yaml",
+      "args": [
+        ".b",
+        "stream.yaml"
+      ],
+      "stdout": "null\n---\n[1, 2]\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a = 2 on stream.yaml",
+      "args": [
+        ".a = 2",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 2 # one\n---\n# sep\n# head two\nb: [1, 2]\na: 2\n---\nc: \"x\"\na: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: select(.a) on stream.yaml",
+      "args": [
+        "select(.a)",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: select(.b) on stream.yaml",
+      "args": [
+        "select(.b)",
+        "stream.yaml"
+      ],
+      "stdout": "# sep\n# head two\nb: [1, 2]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: del(.a) on stream.yaml",
+      "args": [
+        "del(.a)",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\n{}\n---\n# sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .b[0] on stream.yaml",
+      "args": [
+        ".b[0]",
+        "stream.yaml"
+      ],
+      "stdout": "null\n---\n1\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .b += [3] on stream.yaml",
+      "args": [
+        ".b += [3]",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\nb:\n  - 3\n---\n# sep\n# head two\nb: [1, 2, 3]\n---\nc: \"x\"\nb:\n  - 3\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .c |= upcase on stream.yaml",
+      "args": [
+        ".c |= upcase",
+        "stream.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "comments: .meta | . * {\"y\": 2} on flow.yaml",
+      "args": [
+        ".meta | . * {\"y\": 2}",
+        "flow.yaml"
+      ],
+      "stdout": "{z: 1, a: 2, y: 2} # m\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "{z: 1, a: 2, \"y\": 2} # m\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
+    },
+    {
+      "name": "comments: .meta * {\"z\": 9} on flow.yaml",
+      "args": [
+        ".meta * {\"z\": 9}",
+        "flow.yaml"
+      ],
+      "stdout": "{z: 9, a: 2} # m\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list + [\"c\"] on flow.yaml",
+      "args": [
+        ".list + [\"c\"]",
+        "flow.yaml"
+      ],
+      "stdout": "[b, a, c]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list | . + [\"c\"] on flow.yaml",
+      "args": [
+        ".list | . + [\"c\"]",
+        "flow.yaml"
+      ],
+      "stdout": "[b, a, c]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list | sort on flow.yaml",
+      "args": [
+        ".list | sort",
+        "flow.yaml"
+      ],
+      "stdout": "[a, b]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list | reverse on flow.yaml",
+      "args": [
+        ".list | reverse",
+        "flow.yaml"
+      ],
+      "stdout": "[a, b]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta | keys on flow.yaml",
+      "args": [
+        ".meta | keys",
+        "flow.yaml"
+      ],
+      "stdout": "- z\n- a\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta | to_entries | .[0] on flow.yaml",
+      "args": [
+        ".meta | to_entries | .[0]",
+        "flow.yaml"
+      ],
+      "stdout": "key: z\nvalue: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: . * {\"meta\": {\"z\": 9}} on flow.yaml",
+      "args": [
+        ". * {\"meta\": {\"z\": 9}}",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 9, a: 2} # m\nlist: [b, a]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta | del(.z) on flow.yaml",
+      "args": [
+        ".meta | del(.z)",
+        "flow.yaml"
+      ],
+      "stdout": "{a: 2} # m\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta.z = 5 on flow.yaml",
+      "args": [
+        ".meta.z = 5",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 5, a: 2} # m\nlist: [b, a]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list[0] = \"z\" on flow.yaml",
+      "args": [
+        ".list[0] = \"z\"",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 1, a: 2} # m\nlist: [z, a]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list |= map(upcase) on flow.yaml",
+      "args": [
+        ".list |= map(upcase)",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 1, a: 2} # m\nlist: [B, A]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -P . on flow.yaml",
+      "args": [
+        "-P",
+        ".",
+        "flow.yaml"
+      ],
+      "stdout": "meta:\n  z: 1\n  a: 2\nlist: # m\n  - b\n  - a\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "meta:\n  z: 1\n  a: 2\n  # m\nlist:\n  - b\n  - a\n",
+        "exit": 0,
+        "reason": "The line comment of a flow map opened by -P ends up under it here and on the next key in mikefarah's."
+      }
+    },
+    {
+      "name": "comments: -P .meta on flow.yaml",
+      "args": [
+        "-P",
+        ".meta",
+        "flow.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "z: 1\na: 2\n# m\n",
+        "exit": 0,
+        "reason": "The line comment of a flow map opened by -P ends up under it here and on the next key in mikefarah's."
+      }
+    },
+    {
+      "name": "comments: -o json .meta on flow.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".meta",
+        "flow.yaml"
+      ],
+      "stdout": "{\n  \"z\": 1,\n  \"a\": 2\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea ireduce merge",
+      "args": [
+        "ea",
+        ". as $item ireduce ({}; . * $item)",
+        "config.yaml",
+        "anchors.yaml"
+      ],
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - a\n  - b\nbase:\n  image: nginx\n  replicas: 1\nweb:\n  image: nginx\n  replicas: 2\n",
+        "exit": 0,
+        "reason": "A fold builds its value from nothing and prints afresh; mikefarah's merge keeps the nodes' comments and styles."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags: [a, b]\n# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  \"<<\": *base\n  replicas: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea . on two files",
+      "args": [
+        "ea",
+        ".",
+        "commented.yaml",
+        "stream.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n---\n# head one\na: 1 # one\n---\n# sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea select on two files",
+      "args": [
+        "ea",
+        "select(.kind == \"Deployment\") | .spec",
+        "commented.yaml",
+        "stream.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea .a = 2 on two files",
+      "args": [
+        "ea",
+        ".a = 2",
+        "stream.yaml",
+        "flow.yaml"
+      ],
+      "stdout": "# head one\na: 2 # one\n---\n# sep\n# head two\nb: [1, 2]\na: 2\n---\nc: \"x\"\na: 2\n---\nmeta: {z: 1, a: 2} # m\nlist: [b, a]\na: 2\n",
+      "exit": 0
+    }
+  ]
+}

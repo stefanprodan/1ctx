@@ -96,6 +96,7 @@
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when xan is used but not available
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when yq is used but not available
 (fail) browser bundle safety > sqlite3 in Node.js > sqlite3 should be available by default in Node.js
+(fail) jq > JSON stream parsing (concatenated JSON) > should handle concatenated pretty-printed JSON objects with -s
 (fail) js-exec exploit regressions > blocks breakout chains and command-injection attempts
 (fail) js-exec exploit regressions > keeps queued execution bounded after a concurrent timeout
 (fail) js-exec host runtime breakout probes > blocks nested js-exec when invoked through Symbol.for('jb:exec') bridge
@@ -151,6 +152,15 @@
 (fail) worker protocol runtime desync probes > python3 stdout shaped like worker control payload is treated as plain output
 (fail) worker protocol runtime desync probes > sqlite3 output shaped like worker control payload is treated as query data
 (fail) worker protocol runtime desync probes > sqlite3 timed-out worker query does not execute later and mutate database
+(fail) yq > combined short options > should handle -cej for compact exit-status join
+(fail) yq > error handling > should handle invalid YAML
+(fail) yq > format auto-detection > should auto-detect JSON from .json extension
+(fail) yq > join-output mode > should not print newlines with -j
+(fail) yq format strings > edge cases > @base64 on array returns null
+(fail) yq format strings > edge cases > @base64 on non-string returns null
+(fail) yq format strings > edge cases > @csv on non-array returns null
+(fail) yq format strings > edge cases > @csv with null values
+(fail) yq format strings > edge cases > @sh on non-string returns null
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'

@@ -13,6 +13,7 @@ import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type { QueryValue } from "../query-engine/index.js";
+import { propsText } from "../query-engine/builtins/dialect-builtins.js";
 import { formatJsonValue } from "../query-engine/json-output.js";
 import {
   type SanitizeParsedDataLimits,
@@ -20,7 +21,16 @@ import {
 } from "../query-engine/safe-object.js";
 
 export type InputFormat = "yaml" | "xml" | "json" | "ini" | "csv" | "toml";
-export type OutputFormat = "yaml" | "json" | "xml" | "ini" | "csv" | "toml";
+// tsv and props are mikefarah's (1ctx)
+export type OutputFormat =
+  | "yaml"
+  | "json"
+  | "xml"
+  | "ini"
+  | "csv"
+  | "tsv"
+  | "props"
+  | "toml";
 
 const validInputFormats = [
   "yaml",
@@ -36,6 +46,8 @@ const validOutputFormats = [
   "xml",
   "ini",
   "csv",
+  "tsv",
+  "props",
   "toml",
 ] as const;
 
@@ -74,6 +86,8 @@ export interface FormatOptions {
   indent: number;
   /** quote strings a YAML 1.1 reader would retype, for an in-place write (1ctx) */
   yaml11?: boolean;
+  /** a top-level string printed as YAML without quotes, as mikefarah's --unwrapScalar (1ctx) */
+  unwrapScalar?: boolean;
   /** XML attribute prefix (default: +@) */
   xmlAttributePrefix: string;
   /** XML text content name (default: +content) */
@@ -91,6 +105,7 @@ export const defaultFormatOptions: FormatOptions = {
   compact: false,
   prettyPrint: false,
   indent: 2,
+  unwrapScalar: true,
   xmlAttributePrefix: "+@",
   xmlContentName: "+content",
   csvDelimiter: "",
@@ -161,8 +176,25 @@ function formatCsv(value: unknown, delimiter: string): string {
   if (!Array.isArray(value)) {
     value = [value];
   }
+  // a list of scalars is one row, as mikefarah writes it; Papa refused it,
+  // and a null is written as null, not an empty cell (1ctx)
+  const named = (cell: unknown) => (cell === null ? "null" : cell);
+  const rows = (value as unknown[]).map((row) =>
+    Array.isArray(row)
+      ? row.map(named)
+      : row !== null && typeof row === "object"
+        ? Object.fromEntries(
+            Object.entries(row as Record<string, unknown>).map(([k, v]) => [k, named(v)]),
+          )
+        : named(row),
+  );
+  value = rows.every((row) => row === null || typeof row !== "object") ? [rows] : rows;
   // Use comma as default for output (empty means auto-detect for input only)
-  return Papa.unparse(value as unknown[], { delimiter: delimiter || "," });
+  return Papa.unparse(value as unknown[], {
+    delimiter: delimiter || ",",
+    // mikefarah ends a row with a newline, not CRLF (1ctx)
+    newline: "\n",
+  });
 }
 
 /**
@@ -183,7 +215,7 @@ export function parseInput(
       // SECURITY: maxAliasCount limits YAML alias expansion (billion-laughs defense).
       // Default schema is 'core' which does NOT resolve !!js/function or other
       // code-execution tags (those are only in 'yaml-1.1' schema).
-      return sanitize(YAML.parse(trimmed, { maxAliasCount: 100 }));
+      return sanitize(YAML.parse(trimmed, { maxAliasCount: 100, merge: true }));
 
     case "json":
       // SECURITY: JSON.parse returns plain objects — sanitizeParsedData converts
@@ -266,7 +298,9 @@ export function parseAllYamlDocuments(
     if (lineEnd === -1) break;
     lineStart = lineEnd + 1;
   }
-  const docs = YAML.parseAllDocuments(input);
+  // merge keys (<<: *base) are merged on read, as mikefarah reads them
+  // (1ctx)
+  const docs = YAML.parseAllDocuments(input, { merge: true });
   if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
     throw new ExecutionLimitError(
@@ -302,6 +336,17 @@ export function parseAllYamlDocuments(
 }
 
 /**
+ * The documents of a YAML stream parsed with the failsafe schema, every
+ * scalar its source text, for a write or a print that keeps every
+ * untouched node as written. Parsed only when a result needs it, since
+ * the values were read already. (1ctx)
+ */
+export function parseFailsafeDocuments(input: string): YAML.Document[] {
+  const docs = YAML.parseAllDocuments(input, { schema: "failsafe" });
+  return Array.isArray(docs) ? docs : [];
+}
+
+/**
  * Extract front-matter from content
  * Front-matter is YAML/TOML/JSON at the start of a file between --- or +++ delimiters
  * Returns { frontMatter: parsed data, content: remaining content } or null if no front-matter
@@ -320,7 +365,7 @@ export function extractFrontMatter(
       const remaining = trimmed.slice(endMatch.index + 3 + endMatch[0].length);
       return {
         frontMatter: sanitizeParsedData(
-          YAML.parse(yamlContent, { maxAliasCount: 100 }),
+          YAML.parse(yamlContent, { maxAliasCount: 100, merge: true }),
           limits,
         ),
         content: remaining,
@@ -370,6 +415,26 @@ export function formatOutput(
 ): string {
   if (value === undefined) return "";
 
+  // the string itself, its spaces and newlines kept, as mikefarah prints a
+  // top-level scalar (1ctx)
+  if (
+    options.outputFormat === "yaml" &&
+    typeof value === "string" &&
+    options.unwrapScalar !== false
+  ) {
+    return new BoundedStringBuilder(
+      maxBytes,
+      "yq output",
+      () =>
+        new ExecutionLimitError(
+          `output size limit exceeded (${maxBytes} bytes)`,
+          "output_size",
+        ),
+    )
+      .append(value)
+      .build();
+  }
+
   if (options.outputFormat !== "json") {
     assertExternalSerializationFits(value, options, maxBytes);
   }
@@ -378,7 +443,8 @@ export function formatOutput(
     case "yaml":
       serialized = YAML.stringify(value, {
         ...(options.yaml11 ? { compat: "yaml-1.1" as const } : {}),
-        indent: options.indent,
+        // mikefarah's -I0 and -I1 print with 4 and 2 (1ctx)
+        indent: options.indent === 0 ? 4 : Math.max(options.indent, 2),
       }).trimEnd();
       break;
 
@@ -414,6 +480,14 @@ export function formatOutput(
 
     case "csv":
       serialized = formatCsv(value, options.csvDelimiter);
+      break;
+
+    case "tsv":
+      serialized = formatCsv(value, "\t");
+      break;
+
+    case "props":
+      serialized = propsText(value).trimEnd();
       break;
 
     case "toml": {

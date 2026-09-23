@@ -88,6 +88,10 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 gawk-record.ts, run by hand, records what gawk answers
                 into test/fixtures/just-bash/awk-gawk.json, which the
                 suite compares our awk with; the suite never runs gawk.
+                yq-record.ts, run by hand, rewrites
+                test/fixtures/just-bash/yq-mikefarah.json with what
+                mikefarah's yq v4 answers, jq-record.ts jq-1.8.json from
+                jq 1.8; the suite never runs either binary.
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
@@ -370,6 +374,10 @@ violation, and every rule has a rejected fixture under
   evaluate jq path expressions (`query-engine/path-expressions.ts`);
   yq runs the filter on each document of a YAML stream, as mikefarah's
   does, and `-i` keeps the file's comments (`yq/preserve.ts`).
+  yq answers as mikefarah's v4 does where it can: the `---` rule in
+  `yq/documents.ts`, the engine's `yq` dialect in
+  `query-engine/builtins/dialect-builtins.ts`, `eval-all`; the recorded
+  fixtures pin it, and a case with `accept` pins a kept difference.
   Python, js-exec and sqlite3 are removed. A fix to a command goes in
   the vendored source with a test, never around it.
   `knowledge/judge.ts` shares archive selection and judging between the

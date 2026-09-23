@@ -25,6 +25,13 @@ import {
   evalStringBuiltin,
   evalTypeBuiltin,
 } from "./builtins/index.js";
+import {
+  equalOperands,
+  evalDialectBuiltin,
+  missingPath,
+  mixedOperands,
+  unsupported,
+} from "./builtins/dialect-builtins.js";
 import type { AstNode, DestructurePattern } from "./parser.js";
 import { applyAssignment } from "./path-expressions.js";
 import {
@@ -142,7 +149,25 @@ export interface EvalContext {
   coverage?: FeatureCoverageWriter;
   /** Shared across every recursive evaluation and builtin invocation. */
   budget: QueryEvaluationBudget;
+  /** jq's rules, or mikefarah's yq where the two part (1ctx) */
+  dialect?: Dialect;
+  /** the document and file a yq run reads, for di, fi, filename, load (1ctx) */
+  source?: QuerySource;
+  /** a value the yq walker handed on, and its path from the root (1ctx) */
+  sourceNode?: { value: QueryValue; path?: (string | number)[] };
 }
+
+/** Where a yq run's input comes from. (1ctx) */
+export interface QuerySource {
+  document: number;
+  file: number;
+  filename: string;
+  /** the files load() names, read before the run: text, or why not */
+  loads: Map<string, { text: string } | { error: string }>;
+}
+
+/** Whose rules a builtin follows where jq and mikefarah's yq part. (1ctx) */
+export type Dialect = "jq" | "yq";
 
 export interface QueryEvaluationBudget {
   operations: number;
@@ -213,7 +238,8 @@ function boundedFlatMap(
   return results;
 }
 
-function createContext(options?: EvaluateOptions): EvalContext {
+// exported for the yq walker in yq/documents.ts (1ctx)
+export function createContext(options?: EvaluateOptions): EvalContext {
   const vars = new Map<string, QueryValue>();
   if (options?.namedArgs) {
     // Seed $NAME variables; jq stores variable references with the $ prefix.
@@ -240,6 +266,8 @@ function createContext(options?: EvaluateOptions): EvalContext {
     requireDefenseContext: options?.requireDefenseContext,
     defenseContextChecked: false,
     budget: options?.budget ?? { operations: 0, callDepth: 0 },
+    dialect: options?.dialect,
+    source: options?.source,
   };
 }
 
@@ -264,6 +292,9 @@ function withVar(
     labels: ctx.labels,
     coverage: ctx.coverage,
     budget: ctx.budget,
+    dialect: ctx.dialect,
+    source: ctx.source,
+    sourceNode: ctx.sourceNode,
   };
 }
 
@@ -356,7 +387,10 @@ function getValueAtPath(
  * Returns null if the AST is not a simple path expression.
  * Handles Pipe nodes with parent/root to track path adjustments.
  */
-function extractPathFromAst(ast: AstNode): (string | number)[] | null {
+// exported for the yq walker in yq/documents.ts (1ctx)
+export function extractPathFromAst(
+  ast: AstNode,
+): (string | number)[] | null {
   if (ast.type === "Identity") return [];
   if (ast.type === "Field") {
     const basePath = ast.base ? extractPathFromAst(ast.base) : [];
@@ -467,6 +501,9 @@ export interface EvaluateOptions {
   requireDefenseContext?: boolean;
   /** Reuse across multiple input documents to enforce one command budget. */
   budget?: QueryEvaluationBudget;
+  /** mikefarah's yq rules where they part from jq's (1ctx) */
+  dialect?: Dialect;
+  source?: QuerySource;
 }
 
 /**
@@ -579,6 +616,9 @@ function evaluateNode(
         if (v === null) {
           return [null];
         }
+        // mikefarah's yq answers nothing for a step into a scalar, so the
+        // other documents still print (1ctx)
+        if (ctx.dialect === "yq" && !Array.isArray(v)) return [];
         // jq throws an error when accessing a field on non-objects (arrays, numbers, strings, booleans)
         // This allows Try (.foo?) to catch it and return empty
         const typeName = Array.isArray(v) ? "array" : typeof v;
@@ -591,6 +631,14 @@ function evaluateNode(
       return boundedFlatMap(ctx, bases, (v) => {
         const indices = evaluate(v, ast.index, ctx);
         return boundedFlatMap(ctx, indices, (idx) => {
+          // an index into a scalar: nothing in mikefarah's yq, jq's error
+          // (1ctx)
+          if (v !== null && typeof v !== "object") {
+            if (ctx.dialect === "yq") return [];
+            throw new Error(
+              `Cannot index ${typeof v} with ${typeof idx === "string" ? "string" : "number"}`,
+            );
+          }
           if (typeof idx === "number" && Array.isArray(v)) {
             // Handle NaN - return null for NaN index
             if (Number.isNaN(idx)) {
@@ -886,7 +934,15 @@ function evaluateNode(
         return [argsObj];
       }
       const v = ctx.vars.get(ast.name);
-      return v !== undefined ? [v] : [null];
+      if (v !== undefined) return [v];
+      // an unbound variable is jq's error, where a quiet null misled (1ctx)
+      if (ast.name === "$__loc__" && ctx.dialect !== "yq") {
+        const loc: Record<string, QueryValue> = Object.create(null);
+        loc.file = "<top-level>";
+        loc.line = 1;
+        return [loc];
+      }
+      throw new Error(`${ast.name} is not defined`);
     }
 
     case "Recurse": {
@@ -1074,6 +1130,8 @@ function normalizeIndex(idx: number, len: number): number {
   return Math.min(idx, len);
 }
 
+const ARITHMETIC = new Set(["+", "-", "*", "/", "%"]);
+
 export function evalBinaryOp(
   value: QueryValue,
   op: string,
@@ -1109,6 +1167,18 @@ export function evalBinaryOp(
     return evaluate(value, right, ctx);
   }
 
+  // mikefarah's yq reads an operand's path without creating what is
+  // missing: a missing key drops the result, or in + leaves the other
+  // side (1ctx)
+  if (ctx.dialect === "yq" && ARITHMETIC.has(op)) {
+    const leftMissing = missingPath(value, left);
+    const rightMissing = missingPath(value, right);
+    if (leftMissing || rightMissing) {
+      if (op !== "+" || (leftMissing && rightMissing)) return [];
+      return evaluate(value, leftMissing ? right : left, ctx);
+    }
+  }
+
   const leftVals = evaluate(value, left, ctx);
   const rightVals = evaluate(value, right, ctx);
 
@@ -1117,7 +1187,11 @@ export function evalBinaryOp(
   chargeQueryWork(ctx, resultCount);
 
   return leftVals.flatMap((l) =>
-    rightVals.map((r) => {
+    rightVals.flatMap((r): QueryValue[] => {
+      // mikefarah's concatenation and null rules, jq's errors (1ctx)
+      const mixed = mixedOperands(op, l, r, ctx.dialect);
+      if (mixed !== undefined) return mixed;
+      return [(() => {
       switch (op) {
         case "+":
           // jq: null + x = x, x + null = x
@@ -1149,7 +1223,7 @@ export function evalBinaryOp(
           ) {
             return nullPrototypeMerge(l, r);
           }
-          return null;
+          return unsupported(op, l, r);
         case "-":
           if (typeof l === "number" && typeof r === "number") return l - r;
           if (Array.isArray(l) && Array.isArray(r)) {
@@ -1165,7 +1239,7 @@ export function evalBinaryOp(
               `string (${formatStr(l)}) and string (${formatStr(r)}) cannot be subtracted`,
             );
           }
-          return null;
+          return unsupported(op, l, r);
         case "*":
           if (typeof l === "number" && typeof r === "number") return l * r;
           if (typeof l === "string" && typeof r === "number") {
@@ -1197,7 +1271,7 @@ export function evalBinaryOp(
               });
             }
           }
-          return null;
+          return unsupported(op, l, r);
         case "/":
           if (typeof l === "number" && typeof r === "number") {
             if (r === 0) {
@@ -1208,7 +1282,7 @@ export function evalBinaryOp(
             return l / r;
           }
           if (typeof l === "string" && typeof r === "string") return l.split(r);
-          return null;
+          return unsupported(op, l, r);
         case "%":
           if (typeof l === "number" && typeof r === "number") {
             if (r === 0) {
@@ -1227,11 +1301,11 @@ export function evalBinaryOp(
             }
             return l % r;
           }
-          return null;
+          return unsupported(op, l, r);
         case "==":
-          return deepEqual(l, r);
+          return equalOperands(l, r, ctx.dialect);
         case "!=":
-          return !deepEqual(l, r);
+          return !equalOperands(l, r, ctx.dialect);
         case "<":
           return compare(l, r) < 0;
         case "<=":
@@ -1243,6 +1317,7 @@ export function evalBinaryOp(
         default:
           return null;
       }
+      })()];
     }),
   );
 }
@@ -1257,6 +1332,10 @@ function evalBuiltin(
   args: AstNode[],
   ctx: EvalContext,
 ): QueryValue[] {
+  // where jq and mikefarah's yq part, and jq 1.8's errors (1ctx)
+  const dialectResult = evalDialectBuiltin(value, name, args, ctx, evaluate);
+  if (dialectResult !== null) return dialectResult;
+
   // Handle simple single-argument math functions via lookup table
   const simpleMathFn = SIMPLE_MATH_FUNCTIONS.get(name);
   if (simpleMathFn) {
