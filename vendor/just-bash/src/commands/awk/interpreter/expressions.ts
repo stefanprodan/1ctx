@@ -37,6 +37,10 @@ import {
   getArrayElement,
   getVariable,
   hasArrayElement,
+  isArrayName,
+  readArrayElement,
+  resolveArrayName,
+  deleteArray,
   setArrayElement,
   setVariable,
 } from "./variables.js";
@@ -168,12 +172,13 @@ async function evalArrayAccess(
   expr: AwkArrayAccess,
 ): Promise<AwkValue> {
   assertAwkDefenseContext(ctx, "array access evaluation");
-  const key = toStr(ctx, 
+  const key = toStr(ctx,
     await withDefenseContext(ctx, "array key evaluation", () =>
       evalExpr(ctx, expr.key),
     ),
   );
-  return getArrayElement(ctx, expr.array, key);
+  // (1ctx) a reference creates the element, as in gawk
+  return readArrayElement(ctx, expr.array, key);
 }
 
 async function evalBinaryOp(
@@ -222,7 +227,7 @@ async function evalBinaryOp(
     const pattern =
       expr.right.type === "regex"
         ? expr.right.pattern
-        : toStr(ctx, 
+        : toStr(ctx,
             await withDefenseContext(ctx, "regex right evaluation", () =>
               evalExpr(ctx, expr.right),
             ),
@@ -243,7 +248,7 @@ async function evalBinaryOp(
     const pattern =
       expr.right.type === "regex"
         ? expr.right.pattern
-        : toStr(ctx, 
+        : toStr(ctx,
             await withDefenseContext(
               ctx,
               "negated-regex right evaluation",
@@ -408,36 +413,51 @@ async function callUserFunction(
     );
   }
 
-  // Save only parameter variables (they are local in AWK)
-  // Use null-prototype to prevent prototype pollution via user-controlled param names
-  const savedParams: Record<string, AwkValue | undefined> = Object.create(null);
-  for (const param of func.params) {
-    savedParams[param] = ctx.vars[param];
+  // (1ctx) Arguments are evaluated in the caller's scope before any is
+  // bound. A variable is passed by reference, so an array stays shared and
+  // an untyped variable can become one; a parameter without an argument is
+  // untyped and may be a local array, which ends with the call.
+  const bound: Array<{ alias?: string; value?: AwkValue }> = [];
+  for (let i = 0; i < func.params.length; i++) {
+    if (i >= args.length) {
+      bound.push({});
+      continue;
+    }
+    const arg = args[i];
+    if (arg.type === "variable") {
+      bound.push({
+        alias: resolveArrayName(ctx, arg.name),
+        value: isArrayName(ctx, arg.name)
+          ? undefined
+          : getVariable(ctx, arg.name),
+      });
+    } else {
+      bound.push({
+        value: await withDefenseContext(
+          ctx,
+          "user function argument evaluation",
+          () => evalExpr(ctx, arg),
+        ),
+      });
+    }
   }
 
-  // Track array aliases we create (to clean up later)
-  const createdAliases: string[] = [];
-
-  // Set up parameters
+  const saved = func.params.map((param) => ({
+    value: ctx.vars[param],
+    array: ctx.arrays[param],
+    alias: ctx.arrayAliases.get(param),
+  }));
   for (let i = 0; i < func.params.length; i++) {
     const param = func.params[i];
-    if (i < args.length) {
-      const arg = args[i];
-      // If argument is a simple variable, set up an array alias
-      // This allows arrays to be passed by reference
-      if (arg.type === "variable") {
-        ctx.arrayAliases.set(param, arg.name);
-        createdAliases.push(param);
-      }
-      const value = await withDefenseContext(
-        ctx,
-        "user function argument evaluation",
-        () => evalExpr(ctx, arg),
-      );
-      ctx.vars[param] = value;
+    const { alias, value } = bound[i];
+    if (alias !== undefined && alias !== param) {
+      ctx.arrayAliases.set(param, alias);
     } else {
-      ctx.vars[param] = "";
+      ctx.arrayAliases.delete(param);
     }
+    if (value === undefined) delete ctx.vars[param];
+    else ctx.vars[param] = value;
+    if (alias === undefined) delete ctx.arrays[param];
   }
 
   // Execute function body
@@ -453,18 +473,15 @@ async function callUserFunction(
 
   const result = ctx.returnValue ?? "";
 
-  // Restore only parameter variables
-  for (const param of func.params) {
-    if (savedParams[param] !== undefined) {
-      ctx.vars[param] = savedParams[param];
-    } else {
-      delete ctx.vars[param];
-    }
-  }
-
-  // Clean up array aliases we created
-  for (const alias of createdAliases) {
-    ctx.arrayAliases.delete(alias);
+  for (let i = 0; i < func.params.length; i++) {
+    const param = func.params[i];
+    const before = saved[i];
+    if (bound[i].alias === undefined) deleteArray(ctx, param);
+    if (before.array !== undefined) ctx.arrays[param] = before.array;
+    if (before.value !== undefined) ctx.vars[param] = before.value;
+    else delete ctx.vars[param];
+    if (before.alias !== undefined) ctx.arrayAliases.set(param, before.alias);
+    else ctx.arrayAliases.delete(param);
   }
 
   ctx.hasReturn = false;
@@ -510,7 +527,7 @@ async function evalAssignment(
     } else if (target.type === "variable") {
       current = getVariable(ctx, target.name);
     } else {
-      const key = toStr(ctx, 
+      const key = toStr(ctx,
         await withDefenseContext(ctx, "assignment array key", () =>
           evalExpr(ctx, target.key),
         ),
@@ -558,7 +575,7 @@ async function evalAssignment(
   } else if (target.type === "variable") {
     setVariable(ctx, target.name, finalValue);
   } else {
-    const key = toStr(ctx, 
+    const key = toStr(ctx,
       await withDefenseContext(ctx, "assignment target array key", () =>
         evalExpr(ctx, target.key),
       ),
@@ -596,7 +613,7 @@ async function applyIncDec(
     oldVal = toNumber(getVariable(ctx, operand.name));
     setVariable(ctx, operand.name, oldVal + delta);
   } else {
-    const key = toStr(ctx, 
+    const key = toStr(ctx,
       await withDefenseContext(ctx, "inc/dec array key", () =>
         evalExpr(ctx, operand.key),
       ),
@@ -649,7 +666,7 @@ async function evalInExpr(
     const parts: string[] = [];
     for (const e of key.elements) {
       parts.push(
-        toStr(ctx, 
+        toStr(ctx,
           await withDefenseContext(ctx, "tuple key element evaluation", () =>
             evalExpr(ctx, e),
           ),
@@ -658,7 +675,7 @@ async function evalInExpr(
     }
     keyStr = parts.join(ctx.SUBSEP);
   } else {
-    keyStr = toStr(ctx, 
+    keyStr = toStr(ctx,
       await withDefenseContext(ctx, "in-expression key evaluation", () =>
         evalExpr(ctx, key),
       ),
@@ -723,7 +740,7 @@ async function evalGetlineFromCommand(
 
   assertAwkDefenseContext(ctx, "getline command source");
 
-  const cmd = toStr(ctx, 
+  const cmd = toStr(ctx,
     await withDefenseContext(ctx, "getline command expression", () =>
       evalExpr(ctx, cmdExpr),
     ),
@@ -781,7 +798,7 @@ async function evalGetlineFromFile(
   }
 
   assertAwkDefenseContext(ctx, "getline file source");
-  const filename = toStr(ctx, 
+  const filename = toStr(ctx,
     await withDefenseContext(ctx, "getline filename evaluation", () =>
       evalExpr(ctx, fileExpr),
     ),

@@ -13,8 +13,19 @@ import type { AwkExpr } from "./ast.js";
 import { chars, charLength, charSlice, charsBefore } from "./chars.js";
 import { DEFAULT_AWK_STRING_LIMIT, formatPrintf } from "./format.js";
 import type { AwkRuntimeContext } from "./interpreter/context.js";
-import { splitRecord } from "./interpreter/fields.js";
+import {
+  compileSeparator,
+  type FieldSeparator,
+  splitRecord,
+  splitText,
+} from "./interpreter/fields.js";
 import { toAwkString, toNumber } from "./interpreter/type-coercion.js";
+import {
+  deleteArray,
+  isArrayName,
+  resolveArrayName,
+  setArrayElement,
+} from "./interpreter/variables.js";
 import type { AwkValue } from "./interpreter/types.js";
 
 /**
@@ -159,7 +170,12 @@ async function awkLength(
   if (args.length === 0) {
     return charLength(ctx.line);
   }
-  const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
+  // (1ctx) the number of elements of an array, a parameter holding one too
+  const arg = args[0];
+  if (arg.type === "variable" && isArrayName(ctx, arg.name)) {
+    return Object.keys(ctx.arrays[resolveArrayName(ctx, arg.name)]).length;
+  }
+  const str = toAwkString(await evaluator.evalExpr(arg), ctx.CONVFMT);
   // (1ctx) characters, not UTF-16 units
   return charLength(str);
 }
@@ -197,59 +213,79 @@ async function awkIndex(
   return idx === -1 ? 0 : charsBefore(str, idx) + 1;
 }
 
+/**
+ * (1ctx) The resolved name of an array argument, or gawk's fatal error
+ * when the argument is not a variable or holds a scalar.
+ */
+function arrayArgument(
+  ctx: AwkRuntimeContext,
+  arg: AwkExpr,
+  fn: string,
+  position: string,
+): string {
+  if (arg.type === "variable") {
+    const resolved = resolveArrayName(ctx, arg.name);
+    if (ctx.vars[resolved] === undefined) return resolved;
+  }
+  throw new Error(`${fn}: ${position} argument is not an array`);
+}
+
+// (1ctx) split as gawk does: both arrays cleared first, the separator read
+// as FS is (" ", one character, "" or a regex), and seps filled when given.
 async function awkSplit(
   args: AwkExpr[],
   ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length < 2) return 0;
+  const arrayName = arrayArgument(ctx, args[1], "split", "second");
+  const sepsName =
+    args.length >= 4
+      ? arrayArgument(ctx, args[3], "split", "fourth")
+      : undefined;
+  if (sepsName === arrayName) {
+    throw new Error(
+      "split: cannot use the same array for second and fourth args",
+    );
+  }
   const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
 
-  const arrayExpr = args[1];
-  if (arrayExpr.type !== "variable") {
-    return 0;
-  }
-  const arrayName = arrayExpr.name;
-
-  let sep: string | UserRegex = ctx.FS;
+  let sep: FieldSeparator = ctx.fieldSep;
   if (args.length >= 3) {
     const sepExpr = args[2];
-    // Check if the separator is a regex literal
-    if (sepExpr.type === "regex") {
-      sep = createUserRegex(sepExpr.pattern);
-    } else {
-      const sepVal = toAwkString(await evaluator.evalExpr(sepExpr), ctx.CONVFMT);
-      sep = sepVal === " " ? createUserRegex("\\s+") : sepVal;
-    }
-  } else if (ctx.FS === " ") {
-    sep = createUserRegex("\\s+");
+    sep =
+      sepExpr.type === "regex"
+        ? { kind: "regex", regex: createUserRegex(sepExpr.pattern) }
+        : compileSeparator(
+            toAwkString(await evaluator.evalExpr(sepExpr), ctx.CONVFMT),
+          );
   }
+  const { fields, seps } = splitText(str, sep);
 
-  const previousCount = Object.keys(ctx.arrays[arrayName] ?? {}).length;
-  const available =
-    ctx.maxArrayElements - ctx.arrayElementCount + previousCount;
-  const parts =
-    typeof sep !== "string"
-      ? sep.split(str, available + 1)
-      : sep === ""
-        ? // (1ctx) an empty separator splits characters, not UTF-16 units
-          chars(str).slice(0, available + 1)
-        : str.split(sep, available + 1);
-  if (parts.length > available) {
+  const previous =
+    Object.keys(ctx.arrays[arrayName] ?? {}).length +
+    (sepsName ? Object.keys(ctx.arrays[sepsName] ?? {}).length : 0);
+  const wanted = fields.length + (sepsName ? seps.size : 0);
+  if (wanted > ctx.maxArrayElements - ctx.arrayElementCount + previous) {
     throw new ExecutionLimitError(
       `array element limit exceeded (${ctx.maxArrayElements})`,
       "array_elements",
     );
   }
 
-  // Use null-prototype to prevent prototype pollution with user-controlled keys
-  ctx.arrays[arrayName] = Object.create(null);
-  for (let i = 0; i < parts.length; i++) {
-    ctx.arrays[arrayName][String(i + 1)] = parts[i];
+  deleteArray(ctx, arrayName);
+  ctx.arrays[arrayName] ??= Object.create(null);
+  for (let i = 0; i < fields.length; i++) {
+    setArrayElement(ctx, arrayName, String(i + 1), fields[i]);
   }
-  ctx.arrayElementCount += parts.length - previousCount;
-
-  return parts.length;
+  if (sepsName) {
+    deleteArray(ctx, sepsName);
+    ctx.arrays[sepsName] ??= Object.create(null);
+    for (const [i, text] of seps) {
+      setArrayElement(ctx, sepsName, String(i), text);
+    }
+  }
+  return fields.length;
 }
 
 async function awkSub(
@@ -354,25 +390,59 @@ async function awkMatch(
     return 0;
   }
 
+  // (1ctx) gawk's third argument, checked before anything is matched
+  const arrayName =
+    args.length >= 3
+      ? arrayArgument(ctx, args[2], "match", "third")
+      : undefined;
+
   const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   const pattern = await extractPatternArg(args[1], evaluator);
 
+  // Only a pattern that does not compile is a failed match; a limit or an
+  // array error is not
+  let regex: UserRegex | undefined;
   try {
-    const regex = createUserRegex(pattern);
-    const match = regex.exec(str);
-    if (match) {
-      // (1ctx) character positions, not UTF-16 offsets
-      ctx.RSTART = charsBefore(str, match.index) + 1;
-      ctx.RLENGTH = charLength(match[0]);
-      return ctx.RSTART;
-    }
-  } catch {
-    // Invalid regex
+    regex = createUserRegex(pattern);
+  } catch (e) {
+    if (!(e instanceof SyntaxError)) throw e;
+  }
+  const spans = regex?.groups(str) ?? null;
+
+  if (arrayName !== undefined) {
+    deleteArray(ctx, arrayName);
+    ctx.arrays[arrayName] ??= Object.create(null);
+  }
+  if (!spans) {
+    ctx.RSTART = 0;
+    ctx.RLENGTH = -1;
+    return 0;
   }
 
-  ctx.RSTART = 0;
-  ctx.RLENGTH = -1;
-  return 0;
+  // (1ctx) character positions, not UTF-16 offsets
+  ctx.RSTART = charsBefore(str, spans[0].start) + 1;
+  ctx.RLENGTH = charLength(str.slice(spans[0].start, spans[0].end));
+  if (arrayName !== undefined) {
+    for (let n = 0; n < spans.length; n++) {
+      const { start, end } = spans[n];
+      if (start < 0) continue;
+      const text = str.slice(start, end);
+      setArrayElement(ctx, arrayName, String(n), text);
+      setArrayElement(
+        ctx,
+        arrayName,
+        `${n}${ctx.SUBSEP}start`,
+        charsBefore(str, start) + 1,
+      );
+      setArrayElement(
+        ctx,
+        arrayName,
+        `${n}${ctx.SUBSEP}length`,
+        charLength(text),
+      );
+    }
+  }
+  return ctx.RSTART;
 }
 
 async function awkGensub(

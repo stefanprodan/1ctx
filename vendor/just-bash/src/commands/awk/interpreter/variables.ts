@@ -47,6 +47,8 @@ export function getVariable(ctx: AwkRuntimeContext, name: string): AwkValue {
       return ctx.RT;
   }
 
+  // (1ctx) an array is never a scalar
+  assertScalar(ctx, name);
   return ctx.vars[name] ?? "";
 }
 
@@ -119,13 +121,17 @@ export function setVariable(
       return;
   }
 
+  assertScalar(ctx, name);
   ctx.vars[name] = value;
 }
 
 /**
  * Resolve array name through aliases (for function parameter passing).
  */
-function resolveArrayName(ctx: AwkRuntimeContext, array: string): string {
+export function resolveArrayName(
+  ctx: AwkRuntimeContext,
+  array: string,
+): string {
   // Follow alias chain to get the real array name
   let resolved = array;
   const seen = new Set<string>();
@@ -152,6 +158,40 @@ export function getArrayElement(
 }
 
 /**
+ * (1ctx) Read an array element as an expression does, creating it with the
+ * empty value when it is missing, as gawk does.
+ */
+export function readArrayElement(
+  ctx: AwkRuntimeContext,
+  array: string,
+  key: string,
+): AwkValue {
+  const resolvedArray = resolveArrayName(ctx, array);
+  const value = ctx.arrays[resolvedArray]?.[key];
+  if (value !== undefined) return value;
+  setArrayElement(ctx, array, key, "");
+  return "";
+}
+
+/** (1ctx) True when the name, through any alias, is an array. */
+export function isArrayName(ctx: AwkRuntimeContext, name: string): boolean {
+  return ctx.arrays[resolveArrayName(ctx, name)] !== undefined;
+}
+
+/** (1ctx) gawk's fatal error for a scalar used as an array. */
+export function assertArray(ctx: AwkRuntimeContext, resolved: string): void {
+  if (ctx.vars[resolved] !== undefined) {
+    throw new Error(`attempt to use scalar '${resolved}' as an array`);
+  }
+}
+
+function assertScalar(ctx: AwkRuntimeContext, name: string): void {
+  if (isArrayName(ctx, name)) {
+    throw new Error(`attempt to use array '${name}' in a scalar context`);
+  }
+}
+
+/**
  * Set an array element value.
  */
 export function setArrayElement(
@@ -162,6 +202,7 @@ export function setArrayElement(
 ): void {
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
+  assertArray(ctx, resolvedArray);
   if (!ctx.arrays[resolvedArray]) {
     // Use null-prototype to prevent prototype pollution with user-controlled keys
     ctx.arrays[resolvedArray] = Object.create(null);

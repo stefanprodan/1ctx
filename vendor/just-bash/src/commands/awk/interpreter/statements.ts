@@ -15,7 +15,11 @@ import { formatPrintf, numberToString } from "../format.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { evalExpr, setBlockExecutor } from "./expressions.js";
 import { isTruthy, toStr, toNumber } from "./type-coercion.js";
-import { deleteArray, deleteArrayElement } from "./variables.js";
+import {
+  deleteArray,
+  deleteArrayElement,
+  resolveArrayName,
+} from "./variables.js";
 
 // Register the block executor with expressions module (for user function calls)
 setBlockExecutor(executeBlock);
@@ -232,7 +236,7 @@ async function executePrintf(
   output?: { redirect: ">" | ">>"; file: AwkExpr },
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "printf execution");
-  const formatStr = toStr(ctx, 
+  const formatStr = toStr(ctx,
     await withDefenseContext(ctx, "printf format evaluation", () =>
       evalExpr(ctx, format),
     ),
@@ -280,7 +284,7 @@ async function writeToFile(
     return;
   }
 
-  const filename = toStr(ctx, 
+  const filename = toStr(ctx,
     await withDefenseContext(ctx, "redirection filename evaluation", () =>
       evalExpr(ctx, fileExpr),
     ),
@@ -492,7 +496,8 @@ async function executeForIn(
   stmt: { variable: string; array: string; body: AwkStmt },
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "for-in execution");
-  const array = ctx.arrays[stmt.array];
+  // (1ctx) through an alias too, so a parameter holding an array iterates it
+  const array = ctx.arrays[resolveArrayName(ctx, stmt.array)];
   if (!array) return;
 
   for (const key of Object.keys(array)) {
@@ -522,7 +527,7 @@ async function executeDelete(
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "delete execution");
   if (target.type === "array_access") {
-    const key = toStr(ctx, 
+    const key = toStr(ctx,
       await withDefenseContext(ctx, "delete key evaluation", () =>
         evalExpr(ctx, target.key),
       ),

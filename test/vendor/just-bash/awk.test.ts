@@ -56,6 +56,16 @@ describe("awk limits and refusals", () => {
     expect(r.exitCode).toBe(LIMIT_EXIT);
   });
 
+  test("match raises the element cap error rather than failing the match", async () => {
+    const bash = new Bash({ executionLimits: { maxArrayElements: 5 } });
+    const r = await bash.exec(
+      `awk 'BEGIN { print match("abc", /(a)(b)(c)/, m) }'`,
+    );
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe("awk: array element limit exceeded (5)\n");
+    expect(r.exitCode).toBe(LIMIT_EXIT);
+  });
+
   test("an RS that matches the empty string is refused", async () => {
     const r = await new Bash().exec(
       `printf 'XaX' | awk 'BEGIN { RS = "X*"; print "begin" } { print "[" $0 "]" }'`,

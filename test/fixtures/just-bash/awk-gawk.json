@@ -2036,6 +2036,65 @@
       "stderr": false
     },
     {
+      "name": "split: seps without leading or trailing space",
+      "args": [
+        "BEGIN {n = split(\"a b\", a, \" \", s); print n, (0 in s), (2 in s), \"[\" s[1] \"]\"; n = split(\"   \", a, \" \", s); print n, (0 in s), \"[\" s[0] \"]\"}"
+      ],
+      "stdout": "2 0 0 [ ]\n0 1 [   ]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a trailing separator makes an empty field",
+      "args": [
+        "BEGIN {n = split(\"a,b,\", a, \",\", s); print n, \"[\" a[3] \"]\", s[2], (3 in s)}"
+      ],
+      "stdout": "3 [] , 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: an array inside a function",
+      "args": [
+        "function f(arr) {return split(\"x y z\", arr)} BEGIN {n = f(a); print n, a[3]}"
+      ],
+      "stdout": "3 z\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: the default FS is space, tab and newline only",
+      "args": [
+        "{printf \"%d\", NF; for (i = 1; i <= NF; i++) printf \" [%s]\", $i; print \"\"}"
+      ],
+      "stdin": "a\rb c\r\nd\u000be\ff g\n",
+      "stdout": "2 [a\rb] [c\r]\n2 [d\u000be\ff] [g]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: a regex FS with an empty first field",
+      "args": [
+        "-F:+",
+        "{print NF, \"[\" $1 \"]\", $2}"
+      ],
+      "stdin": "::a:b\n",
+      "stdout": "3 [] a\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: a tab FS keeps empty fields",
+      "args": [
+        "-F\\t",
+        "{print NF, \"[\" $2 \"]\", $3}"
+      ],
+      "stdin": "a\t\tb\n",
+      "stdout": "3 [] b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
       "name": "counts: length above",
       "args": [
         "BEGIN {print \"x\"; length(1, 2)}"
