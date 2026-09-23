@@ -42,9 +42,9 @@ The trim keeps what the mount can run. Removed, with their tests:
 ## What we changed
 
 Every change in the source carries `(1ctx)` in a comment, so
-`grep -rn "(1ctx)" vendor/just-bash/src` lists them. The tests are in
-`test/server/knowledge/just-bash-fixes.test.ts`, beside upstream's
-own.
+`grep -rn "(1ctx)" vendor/just-bash/src` lists them. Our tests of them
+are in `test/vendor/just-bash/`, `fixes.test.ts` for the rows below
+without a file of their own.
 
 | File | Change | Why |
 |---|---|---|
@@ -54,6 +54,7 @@ own.
 | `src/commands/tar/archive.ts` | gzip through the platform's `CompressionStream` and `DecompressionStream` | modern-tar 0.8, the version we pin, dropped `createGzipEncoder` and `createGzipDecoder`, thin wrappers over the same streams |
 | `src/commands/query-engine/builtins/object-builtins.ts` | `key` typed as `QueryValue` | TypeScript 7 cannot infer it (TS7022) |
 | `src/commands/registry.ts`, `src/commands/fuzz-flags.ts` | the removed commands' entries | the trim |
+| `src/interpreter/builtin-dispatch.ts` | a name that does not resolve is `bash: <name>: command not found`, 127, the removed `python`, `python3` and `sqlite3` included; `browser-excluded.ts` stays for upstream's bundle test, whose four "helpful error" tests pinning the old words are expected failures | upstream answered those with its browser bundle's words, "not available in browser environments ... use the Node.js bundle", and models went looking for `node` |
 | `src/commands/query-engine/path-expressions.ts` (new), `evaluator.ts`, `builtins/path-builtins.ts` | jq and yq assignments (`=`, `\|=`, `+=` and the rest), `path`, `del`, `delpaths`, `setpath`, `getpath` and `pick` evaluate the left side as jq's path expression, then set or delete each path it yields; `path-operations.ts` and the old setter are gone | upstream guessed paths from the shape of the query: `select(.kind == "Deployment").spec.replicas = 3` set every document, a pipe or `,` on the left replaced the whole input, `del` with `select` deleted nothing, and each exited 0 |
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | a YAML input of several documents runs the filter on each, results of different documents printed apart by `---`, and `-i` writes them all back; a document that does not parse fails the whole input | upstream refused a stream unless `-s` was given, and mikefarah's yq, the one models know, runs per document: every Kubernetes manifest and Flux list is several |
 | `src/commands/yq/yq.ts` | the leading `eval` or `e` of mikefarah's `yq eval <filter> <file>` is taken as his, `eval-all` is refused with a pointer to `-s`, `--version` answers, several files are read in turn with `-i` writing each, a value joined to `-o`, `-p` or `-I` (`-ojson`, `-I0`) is read, and JSON at `-I0` is one line | models write mikefarah's forms: `yq eval` failed on a file named after the filter, the files after the first were dropped without a word |
@@ -61,7 +62,7 @@ own.
 
 ### Where our jq still differs from jq
 
-`test/server/knowledge/jq-paths.test.ts` pins path expressions against
+`test/vendor/just-bash/jq-paths.test.ts` pins path expressions against
 jq 1.8. Where they part:
 
 - Iterating null yields nothing, in path mode too, as in mikefarah's
@@ -88,7 +89,7 @@ jq 1.8. Where they part:
 
 ### Where our yq still differs from mikefarah's
 
-`test/server/knowledge/yq.test.ts` pins streams and in-place edits; on
+`test/vendor/just-bash/yq.test.ts` pins streams and in-place edits; on
 the podinfo manifests the `-i` writes compared were mikefarah's byte
 for byte, or the same data with safer quoting. Where they part:
 

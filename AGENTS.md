@@ -70,7 +70,8 @@ src/client/     the Preact app, bundled by Bun from client/index.html.
                 views/<area>/, style/ (tokens.css, base.css only).
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/ and client/<area>/ for unit
-                tests, helpers/ (app.ts wires the server over a test db
+                tests, vendor/just-bash/ for our tests of the vendored
+                shell, helpers/ (app.ts wires the server over a test db
                 with a fake clock, the least argon2id cost (its
                 `hashPassword` hashes a test's users at it), a
                 cookie jar and a fake fetch that

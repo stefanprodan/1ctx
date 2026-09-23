@@ -4,7 +4,8 @@
 // What our changes to the vendored just-bash hold, against a loopback
 // server the test starts: curl never follows a redirect off http, since Bun's fetch reads
 // file: URLs from the host's disk, and a response refused for its length
-// lets go of its body. The suite reaches no network.
+// lets go of its body. The suite reaches no network. A command we removed
+// is not found like any other.
 
 import { describe, expect, test } from "bun:test";
 import { Bash } from "just-bash";
@@ -90,4 +91,12 @@ describe("the vendored just-bash", () => {
       s.stop();
     }
   });
+
+  for (const name of ["python", "python3", "sqlite3", "node"]) {
+    test(`${name} is not found like any other command`, async () => {
+      const result = await new Bash().exec(`${name} -c 1`);
+      expect(result.exitCode).toBe(127);
+      expect(result.stderr).toBe(`bash: ${name}: command not found\n`);
+    });
+  }
 });
