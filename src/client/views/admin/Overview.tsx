@@ -23,19 +23,15 @@ import {
   overview,
   overviewError,
   overviewLoading,
+  overviewRange,
   rangeOf,
 } from "../../data/overview.ts";
 import { count } from "../../lib/format.ts";
 import { BarsGhost, Bone } from "../../ui/Bones.tsx";
-import {
-  Bars,
-  ChartPanel,
-  DayBars,
-  type DaySeries,
-  Spark,
-} from "../../ui/Chart.tsx";
+import { Bars, ChartPanel } from "../../ui/Chart.tsx";
 import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { DayBars, type DaySeries, Spark } from "../../ui/Plot.tsx";
 import { RowsFilters } from "../../ui/Rows.tsx";
 import {
   Tile,
@@ -153,6 +149,7 @@ function TokensPanel({ answer }: { answer: OverviewResponse }) {
       hint={at ? dayLine(at) : rangeLine(totals)}
     >
       <DayBars
+        label="Tokens per day"
         days={starts}
         series={series}
         words={(v) => (v === 0 ? "0" : count(v))}
@@ -295,10 +292,12 @@ function BoardGhost() {
 }
 
 export function Overview() {
-  const answer = overview.value;
+  const days = rangeOf(new URLSearchParams(query.value));
+  // another range's answer is never drawn under this range's filter:
+  // a range change draws the bones until its own answer lands
+  const answer = overviewRange.value === days ? overview.value : null;
   const error = overviewError.value;
   const busy = overviewLoading.value;
-  const days = rangeOf(new URLSearchParams(query.value));
   const ranges = OVERVIEW_RANGES.map((r) => ({
     label: `${r} days`,
     on: r === days,

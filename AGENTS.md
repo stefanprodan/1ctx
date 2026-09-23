@@ -9,9 +9,10 @@ One continuous context for agents. Domain: 1ctx.dev.
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
   change: `docs/just-bash.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
-  and `modern-tar`, and `src/client/ui/Chart.tsx` alone imports `uplot`; the vendored tar command uses modern-tar too. The
-  modern-tar patch retains the raw header `typeflag` to distinguish GNU
-  sparse and unknown types from regular files.
+  and `modern-tar`, and `src/client/ui/Plot.tsx` alone imports `uplot`;
+  the vendored tar command uses modern-tar too. The modern-tar patch
+  retains the raw header `typeflag` to distinguish GNU sparse and
+  unknown types from regular files.
 - **Status:** alpha. No backwards compatibility and no shims for the API
   and the socket, which may change freely. Stored data is kept: every
   schema change is an appended migration and no database is wiped.
@@ -1391,8 +1392,9 @@ violation, and every rule has a rejected fixture under
   `ui/Tiles.tsx` (stat tiles, the figure at `--text-figure`) over
   `ui/Chart.tsx` panels in a grid: `ChartPanel` wears the Rows card
   head, `Bars` rank from one baseline in CSS, `Stack` splits a whole,
-  and uPlot draws what runs over days, `Spark` in a tile and `DayBars`
-  stacked with a key; a plot is made on mount, fed by a second effect,
+  and `ui/Plot.tsx` has uPlot draw what runs over days, `Spark` in a
+  tile and `DayBars` stacked with a key and a table for a screen
+  reader; a plot is made on mount, fed by a second effect,
   its colours tokens read at every draw, and tiles share their cursor
   by sync key. The head is `ui/Loaded.tsx` (when the answer was read,
   Refresh). A first load draws the board in `ui/Bones.tsx` bones at

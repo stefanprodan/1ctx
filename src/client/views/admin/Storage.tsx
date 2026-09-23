@@ -25,12 +25,12 @@ import {
   ChartFoot,
   ChartPanel,
   Meter,
-  Spark,
   Stack,
   Swatch,
 } from "../../ui/Chart.tsx";
 import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { Spark } from "../../ui/Plot.tsx";
 import { RowsFilters } from "../../ui/Rows.tsx";
 import {
   Tile,

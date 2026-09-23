@@ -141,6 +141,7 @@
   }
   /* a stack of parts over days, its key above it */
   .chart-days {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
@@ -171,6 +172,15 @@
   .chart-plot {
     position: relative;
     height: 200px;
+  }
+  /* the numbers of a plot for a screen reader, drawn for no one */
+  .chart-table {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .chart-meter-fill {
     background: var(--heat-3);
