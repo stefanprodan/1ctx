@@ -171,6 +171,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Kept MCP files",
     text: "MCP results and resources kept for one chat.",
   },
+  runsPerUser: {
+    label: "Runs per user",
+    text: "Runs one person may have going at once. A scheduled run waits for a free slot.",
+  },
+  runsRunning: {
+    label: "Runs at once",
+    text: "Runs the server may have going at once, every user counted.",
+  },
 };
 
 // when a send carries a built-in, over its description

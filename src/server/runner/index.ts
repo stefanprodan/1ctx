@@ -45,7 +45,7 @@ import { commitMemory } from "./memory-phase.ts";
 import { buildPolicy, type ToolsPort } from "./policy.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { regenerateUser } from "./regenerate.ts";
-import { Registry } from "./registry.ts";
+import { CHAT_POOL, Registry, runPool } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
@@ -55,7 +55,7 @@ import { Writer, type WriterDeps } from "./writer.ts";
 
 export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
-export { MAX_RUNNING, MAX_RUNNING_PER_USER, Registry } from "./registry.ts";
+export { Registry, RunCapacity } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
 export type { ShutdownResult } from "./shutdown.ts";
 export {
@@ -104,6 +104,8 @@ export type RunnerDeps = {
   render: WriterDeps["render"];
   stream: WriterDeps["stream"];
   registry?: Registry;
+  // a run's slot let go for good, so a waiting fire may start
+  slotFreed(): void;
 };
 
 export type Runner = {
@@ -221,7 +223,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
     } finally {
       if (send.tools !== null) await send.tools.catch(() => {});
       send.letGo();
-      if (finalized) registry.free(send);
+      if (finalized && registry.free(send) && send.kind === "run") {
+        deps.slotFreed();
+      }
     }
   };
 
@@ -304,15 +308,17 @@ export function runnerArea(deps: RunnerDeps): Runner {
     if (!changed.ok) throw new BadRequest(changed.error);
     const op: SendOp =
       event !== null ? "run" : existingUser !== null ? "regenerate" : "message";
+    const policy = policyFor(project, user, agent, event, true, changed.set);
     return prepareSend({
       registry,
+      pool: event === null ? CHAT_POOL : runPool(deps.limits.current()),
       writer,
       sessions: deps.sessions,
       log: deps.log,
       run: (send) => void run(send),
       sessionId,
       session,
-      policy: policyFor(project, user, agent, event, true, changed.set),
+      policy,
       op,
       text,
       title,
@@ -407,8 +413,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.origin === "automation") {
         throw new Conflict("a run cannot regenerate");
       }
-      const active = registry.get(session.id);
-      if (active !== null) registry.admit(session.id, principal.userId);
+      if (registry.get(session.id) !== null) {
+        registry.admit(session.id, principal.userId, CHAT_POOL);
+      }
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }
@@ -434,8 +441,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.origin === "automation") {
         throw new Conflict("a run cannot compact");
       }
-      const active = registry.get(session.id);
-      if (active !== null) registry.admit(session.id, principal.userId);
+      if (registry.get(session.id) !== null) {
+        registry.admit(session.id, principal.userId, CHAT_POOL);
+      }
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }

@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The one table of the limits: the loop caps of a send and the caps a
-// single tool call runs under, each with its default, the floor and
-// the ceiling the parser holds an admin to, its unit and its scope.
+// The one table of the limits: the loop caps of a send, the caps a
+// single tool call runs under and the caps on running runs, each with
+// its default, the floor and the ceiling the parser holds an admin to,
+// its unit and its scope.
 // The code owns the defaults; a row in the limits table is an override
 // alone, so a default that changes in code changes for every server
 // that never overrode it. runner/limits.ts and tools/limits.ts re-export
@@ -57,9 +58,16 @@ export type KnowledgeCaps = {
   mcpKeptFiles: number;
 };
 
+// the runs the process holds at once, read at each admission
+export type RunCaps = {
+  runsPerUser: number;
+  runsRunning: number;
+};
+
 export type Limits = LoopLimits &
   ToolCaps &
-  KnowledgeCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  KnowledgeCaps &
+  RunCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -323,6 +331,8 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     unit: "count",
     scope: "knowledge",
   },
+  runsPerUser: { default: 4, min: 1, max: 32, unit: "count", scope: "runs" },
+  runsRunning: { default: 32, min: 1, max: 64, unit: "count", scope: "runs" },
 };
 
 export const DEFAULT_LIMITS = Object.fromEntries(

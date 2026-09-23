@@ -342,7 +342,7 @@ describe("automation scheduler", () => {
     await chat.app.shutdown();
   });
 
-  test("records a cap refusal without starting a run", async () => {
+  test("a user's chats at their cap leave the run pool free", async () => {
     const chat = await chatApp({
       registry: new Registry({ running: 4, perUser: 1 }),
     });
@@ -353,17 +353,21 @@ describe("automation scheduler", () => {
       .query("update automations set next_at = ? where id = ?")
       .run(chat.app.now.value, automation.id);
 
+    const pending = chat.scripted.next();
     await chat.app.automationScheduler.pass();
+    const run = await pending;
 
     expect(chat.app.automations.byId(automation.id)).toMatchObject({
-      lastEventOutcome: "skipped",
-      lastEventReason: "1 of your chats are running; wait for one",
-      lastRunSessionId: null,
-      lastRunStatus: null,
+      lastEventOutcome: "run",
+      lastRunStatus: "running",
     });
-    expect(chat.scripted.scripts).toHaveLength(1);
     active.script.reply("done");
+    run.reply("done");
     await settle(chat, active.sessionId);
+    await settle(
+      chat,
+      chat.app.automations.byId(automation.id)!.lastRunSessionId!,
+    );
     await chat.app.shutdown();
   });
 

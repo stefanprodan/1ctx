@@ -110,7 +110,7 @@ describe("send budget fields", () => {
       toolsError.value = null;
       const html = render(<Tools />);
       const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
-      expect(forms).toHaveLength(3);
+      expect(forms).toHaveLength(4);
       const send = forms[0]!;
       const call = forms[1]!;
       expect(send).toContain("Tool-work tokens");

@@ -1,13 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Admission: one send per session, a cap on sends in the process and a
-// cap per user, decided before anything is written, with the refusal
-// naming who holds the lock.
+// Admission: one send per session, and chats and runs in two pools each
+// capped in the process and per user, decided before anything is
+// written, with the refusal naming who holds the lock.
 
 import { describe, expect, test } from "bun:test";
 import { Registry } from "../../src/server/runner/index.ts";
-import { chatApp, startChat, tick } from "../helpers/chat.ts";
+import {
+  createAutomation,
+  settleRun,
+  startRun,
+} from "../helpers/automations.ts";
+import { chatApp, setLimits, startChat, tick } from "../helpers/chat.ts";
 
 describe("admission", () => {
   test("a second send into a running chat is refused with who is sending", async () => {
@@ -66,6 +71,53 @@ describe("admission", () => {
     mine.script.reply("a");
     theirs.script.reply("b");
     await tick();
+  });
+
+  test("chats and runs are separate pools, the run caps read from the limits", async () => {
+    const chat = await chatApp({
+      registry: new Registry({ running: 10, perUser: 1 }),
+    });
+    chat.app.automationScheduler.stop();
+    const runs = [];
+    for (const name of ["one", "two", "three", "four"]) {
+      const automation = await createAutomation(chat, { name });
+      runs.push(await startRun(chat, automation.id));
+    }
+    // four runs of the user hold no chat slot
+    const talk = await startChat(chat, "still room for a chat");
+    const second = await chat.member.call("POST", "/api/sessions", {
+      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
+    });
+    expect(await second.json()).toEqual({
+      error: "1 of your chats are running; wait for one",
+    });
+    const fifth = await createAutomation(chat, { name: "five" });
+    const refused = await chat.member.call(
+      "POST",
+      `/api/automations/${fifth.id}/run`,
+    );
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({
+      error: "4 of your tasks are running; wait for one",
+    });
+
+    // a lowered cap stops no run and refuses the next
+    await setLimits(chat, { runsPerUser: 2, runsRunning: 3 });
+    expect(chat.app.runner.registry.size).toBe(5);
+    runs[0]!.main.reply("done");
+    await settleRun(chat, runs[0]!.sessionId);
+    const process = await chat.member.call(
+      "POST",
+      `/api/automations/${fifth.id}/run`,
+    );
+    expect(process.status).toBe(429);
+    expect(await process.json()).toEqual({
+      error: "too many tasks running; try again in a moment",
+    });
+    for (const run of runs.slice(1)) run.main.reply("done");
+    talk.script.reply("done");
+    await tick();
+    await chat.app.shutdown();
   });
 
   test("an agent that is not there, or a project the caller may not see, is refused before the lock", async () => {
