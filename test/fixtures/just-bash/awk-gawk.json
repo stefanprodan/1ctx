@@ -2986,6 +2986,121 @@
       "stdout": "1.0 1 1\n0x10 0 0\n+5 5 0\n.5e1 5 0\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "fix: gsub on an array element",
+      "args": [
+        "{a[NR] = $1} END {for (i = 1; i <= NR; i++) {gsub(/a/, \"A\", a[i]); print a[i]}}"
+      ],
+      "stdin": "alice 30 NY\nbob 25 LA\ncarol 35 NY\ndave 40 SF\n",
+      "stdout": "Alice\nbob\ncArol\ndAve\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: sub on an array element counts",
+      "args": [
+        "BEGIN {a[\"x\"] = \"banana\"; n = sub(/an/, \"AN\", a[\"x\"]); print n, a[\"x\"]}"
+      ],
+      "stdout": "1 bANana\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: sub on a missing element creates it",
+      "args": [
+        "BEGIN {n = sub(/an/, \"AN\", a[\"x\"]); print n, length(a), (\"x\" in a)}"
+      ],
+      "stdout": "0 1 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub on a multi-key element",
+      "args": [
+        "BEGIN {a[1, 2] = \"aaa\"; gsub(/a/, \"b\", a[1, 2]); print a[1, 2]}"
+      ],
+      "stdout": "bbb\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub on an array element through a parameter",
+      "args": [
+        "function f(arr, k) {gsub(/a/, \"A\", arr[k])} {a[1] = $1; f(a, 1); print a[1]}"
+      ],
+      "stdin": "banana x\n",
+      "stdout": "bAnAnA\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub on a built-in variable",
+      "args": [
+        "BEGIN {OFS = \"a-b\"; gsub(/-/, \"+\", OFS); print \"x\", \"y\"}"
+      ],
+      "stdout": "xa+by\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub on a string constant counts and changes nothing",
+      "args": [
+        "{n = gsub(/a/, \"x\", \"aaa\"); print n, $0}"
+      ],
+      "stdin": "abc\n",
+      "stdout": "3 abc\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub on a concatenation is refused",
+      "args": [
+        "{n = gsub(/a/, \"x\", $1 \"a\"); print n}"
+      ],
+      "stdin": "abc\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "fix: gsub without a match leaves $0 as it is",
+      "args": [
+        "{$1 = $1; OFS = \"-\"; gsub(/zzz/, \"\"); print; gsub(/a/, \"a\"); print}"
+      ],
+      "stdin": "a b\n",
+      "stdout": "a b\na b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub names a field past NF",
+      "args": [
+        "{n = gsub(/x/, \"y\", $5); print n, NF, $0}"
+      ],
+      "stdin": "a b\n",
+      "stdout": "0 5 a b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: backslashes before & in a replacement",
+      "args": [
+        "BEGIN {b = sprintf(\"%c\", 92); for (n = 1; n <= 5; n++) {r = \"\"; for (i = 0; i < n; i++) r = r b; s = \"abc\"; sub(/b/, r \"&\", s); t = \"abc\"; sub(/b/, r \"q\", t); u = \"abc\"; sub(/b/, r, u); v = \"abc\"; sub(/b/, r \"&\" r, v); print n \": \" s \" | \" t \" | \" u \" | \" v}}"
+      ],
+      "stdout": "1: a&c | a\\qc | a\\c | a&\\c\n2: a\\bc | a\\\\qc | a\\\\c | a\\b\\\\c\n3: a\\&c | a\\\\\\qc | a\\\\\\c | a\\&\\\\\\c\n4: a\\\\bc | a\\\\qc | a\\\\c | a\\\\b\\\\c\n5: a\\\\&c | a\\\\\\qc | a\\\\\\c | a\\\\&\\\\\\c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: gsub with escaped backslashes",
+      "args": [
+        "{s = $0; sub(/b/, \"[\\\\&]\", s); t = $0; sub(/b/, \"[\\\\\\\\&]\", t); u = $0; sub(/b/, \"[\\\\q]\", u); w = $0; sub(/b/, \"[\\\\\\\\]\", w); print s; print t; print u; print w}"
+      ],
+      "stdin": "abc\n",
+      "stdout": "a[&]c\na[\\b]c\na[\\q]c\na[\\\\]c\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

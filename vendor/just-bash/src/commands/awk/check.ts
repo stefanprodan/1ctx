@@ -51,6 +51,14 @@ const ARGUMENT_COUNTS: ReadonlyMap<string, readonly [number, number]> =
     ["strftime", [0, 3]],
   ]);
 
+const CHANGEABLE = new Set([
+  "variable",
+  "field",
+  "array_access",
+  "string",
+  "number",
+]);
+
 /** The builtins a program may call, and so may not define. */
 export function isBuiltinFunction(name: string): boolean {
   return ARGUMENT_COUNTS.has(name);
@@ -91,6 +99,17 @@ export function checkProgram(program: AwkProgram): void {
         if (bounds && (count < bounds[0] || count > bounds[1])) {
           throw new AwkRefusal(
             `${count} is invalid as number of arguments for ${node.name}`,
+            1,
+          );
+        }
+        // gawk takes a variable, a field, an element or a constant here
+        if (
+          (node.name === "sub" || node.name === "gsub") &&
+          count === 3 &&
+          !CHANGEABLE.has((node.args as Node[])[2].type)
+        ) {
+          throw new AwkRefusal(
+            `${node.name} third parameter is not a changeable object`,
             1,
           );
         }

@@ -16,15 +16,18 @@ import type { AwkRuntimeContext } from "./interpreter/context.js";
 import {
   compileSeparator,
   type FieldSeparator,
-  splitRecord,
   splitText,
 } from "./interpreter/fields.js";
-import { toAwkString, toNumber } from "./interpreter/type-coercion.js";
+import { getField, setField } from "./interpreter/fields.js";
+import { toAwkString, toNumber, toStr } from "./interpreter/type-coercion.js";
 import {
   deleteArray,
+  getVariable,
   isArrayName,
+  readArrayElement,
   resolveArrayName,
   setArrayElement,
+  setVariable,
 } from "./interpreter/variables.js";
 import type { AwkValue } from "./interpreter/types.js";
 
@@ -102,61 +105,83 @@ async function extractPatternArg(
   return pattern;
 }
 
-/**
- * Resolve a target variable name from a sub/gsub third argument.
- * Returns the variable name (e.g., "myvar", "$0", "$1").
- */
-async function resolveTargetName(
+// (1ctx) The target of sub and gsub: $0 or a field, a variable (a built-in
+// included), an array element, or any other expression, which gawk counts
+// the replacements in and leaves alone.
+type SubTarget =
+  | { kind: "field"; index: number }
+  | { kind: "variable"; name: string }
+  | { kind: "element"; array: string; key: string }
+  | { kind: "value"; value: string };
+
+async function resolveTarget(
   targetExpr: AwkExpr | undefined,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
-): Promise<string> {
-  if (!targetExpr) return "$0";
+): Promise<SubTarget> {
+  if (!targetExpr) return { kind: "field", index: 0 };
   if (targetExpr.type === "variable") {
-    return targetExpr.name;
+    return { kind: "variable", name: targetExpr.name };
   }
   if (targetExpr.type === "field") {
-    const idx = Math.floor(
+    const index = Math.floor(
       toNumber(await evaluator.evalExpr(targetExpr.index)),
     );
-    return `$${idx}`;
+    return { kind: "field", index };
   }
-  return "$0";
+  if (targetExpr.type === "array_access") {
+    const key = toStr(ctx, await evaluator.evalExpr(targetExpr.key));
+    return { kind: "element", array: targetExpr.array, key };
+  }
+  const value = toStr(ctx, await evaluator.evalExpr(targetExpr));
+  return { kind: "value", value };
 }
 
-/**
- * Get the current value of a target variable.
- */
-function getTargetValue(targetName: string, ctx: AwkRuntimeContext): string {
-  if (targetName === "$0") {
-    return ctx.line;
+function getTargetValue(target: SubTarget, ctx: AwkRuntimeContext): string {
+  switch (target.kind) {
+    case "field":
+      return toStr(ctx, getField(ctx, target.index));
+    case "variable":
+      return toStr(ctx, getVariable(ctx, target.name));
+    case "element":
+      return toStr(ctx, readArrayElement(ctx, target.array, target.key));
+    case "value":
+      return target.value;
   }
-  if (targetName.startsWith("$")) {
-    const idx = parseInt(targetName.slice(1), 10) - 1;
-    return ctx.fields[idx] || "";
-  }
-  return toAwkString(ctx.vars[targetName] ?? "", ctx.CONVFMT);
 }
 
-/**
- * Apply a new value to a target variable, updating $0 and fields as needed.
- */
+// gawk assigns nothing when nothing matched, though a field past NF is
+// made by being named, without rebuilding $0
+function changes(
+  target: SubTarget,
+  replacements: number,
+  ctx: AwkRuntimeContext,
+): boolean {
+  if (replacements > 0) return true;
+  if (target.kind === "field" && target.index > ctx.NF) {
+    while (ctx.fields.length < target.index) ctx.fields.push("");
+    ctx.NF = ctx.fields.length;
+  }
+  return false;
+}
+
 function applyTargetValue(
-  targetName: string,
+  target: SubTarget,
   newValue: string,
   ctx: AwkRuntimeContext,
 ): void {
-  if (targetName === "$0") {
-    ctx.line = newValue;
-    ctx.fields = splitRecord(ctx, newValue);
-    ctx.NF = ctx.fields.length;
-  } else if (targetName.startsWith("$")) {
-    const idx = parseInt(targetName.slice(1), 10) - 1;
-    while (ctx.fields.length <= idx) ctx.fields.push("");
-    ctx.fields[idx] = newValue;
-    ctx.NF = ctx.fields.length;
-    ctx.line = ctx.fields.join(ctx.OFS);
-  } else {
-    ctx.vars[targetName] = newValue;
+  switch (target.kind) {
+    case "field":
+      setField(ctx, target.index, newValue);
+      return;
+    case "variable":
+      setVariable(ctx, target.name, newValue);
+      return;
+    case "element":
+      setArrayElement(ctx, target.array, target.key, newValue);
+      return;
+    case "value":
+      return;
   }
 }
 
@@ -297,20 +322,22 @@ async function awkSub(
 
   const pattern = await extractPatternArg(args[0], evaluator);
   const replacement = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
-  const targetName = await resolveTargetName(args[2], evaluator);
-  const target = getTargetValue(targetName, ctx);
+  const target = await resolveTarget(args[2], ctx, evaluator);
+  const text = getTargetValue(target, ctx);
 
   try {
     const regex = createUserRegex(pattern, "g");
     const replaced = boundedRegexReplace(
-      target,
+      text,
       regex,
       (matchNumber) => matchNumber === 1,
       (match) =>
         createSubReplacement(replacement, match[0], awkStringLimit(ctx)),
       awkStringLimit(ctx),
     );
-    applyTargetValue(targetName, replaced.value, ctx);
+    if (changes(target, replaced.replacements, ctx)) {
+      applyTargetValue(target, replaced.value, ctx);
+    }
     return replaced.replacements;
   } catch (error) {
     rethrowFatalExecutionError(error);
@@ -327,20 +354,22 @@ async function awkGsub(
 
   const pattern = await extractPatternArg(args[0], evaluator);
   const replacement = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
-  const targetName = await resolveTargetName(args[2], evaluator);
-  const target = getTargetValue(targetName, ctx);
+  const target = await resolveTarget(args[2], ctx, evaluator);
+  const text = getTargetValue(target, ctx);
 
   try {
     const regex = createUserRegex(pattern, "g");
     const replaced = boundedRegexReplace(
-      target,
+      text,
       regex,
       () => true,
       (match) =>
         createSubReplacement(replacement, match[0], awkStringLimit(ctx)),
       awkStringLimit(ctx),
     );
-    applyTargetValue(targetName, replaced.value, ctx);
+    if (changes(target, replaced.replacements, ctx)) {
+      applyTargetValue(target, replaced.value, ctx);
+    }
     return replaced.replacements;
   } catch (error) {
     rethrowFatalExecutionError(error);
@@ -348,6 +377,9 @@ async function awkGsub(
   }
 }
 
+// (1ctx) gawk's own rules for the replacement of sub and gsub: \\\& gives
+// \&, \\\\ gives \\, \\& gives a backslash and the match, \& gives &, and
+// any other backslash is kept as it is.
 function createSubReplacement(
   replacement: string,
   match: string,
@@ -356,23 +388,30 @@ function createSubReplacement(
   const result = createAwkStringBuilder(maxBytes);
   let i = 0;
   while (i < replacement.length) {
-    if (replacement[i] === "\\" && i + 1 < replacement.length) {
-      const next = replacement[i + 1];
-      if (next === "&") {
-        result.append("&");
-        i += 2;
-      } else if (next === "\\") {
-        result.append("\\");
-        i += 2;
-      } else {
-        result.append(replacement[i + 1]);
-        i += 2;
-      }
-    } else if (replacement[i] === "&") {
+    const ch = replacement[i];
+    if (ch === "&") {
       result.append(match);
       i++;
+      continue;
+    }
+    if (ch !== "\\") {
+      result.append(ch);
+      i++;
+      continue;
+    }
+    const four = replacement.slice(i, i + 4);
+    if (four === "\\\\\\&" || four === "\\\\\\\\") {
+      result.append(four.slice(2));
+      i += 4;
+    } else if (four.startsWith("\\\\&")) {
+      result.append("\\");
+      result.append(match);
+      i += 3;
+    } else if (four.startsWith("\\&")) {
+      result.append("&");
+      i += 2;
     } else {
-      result.append(replacement[i]);
+      result.append("\\");
       i++;
     }
   }
