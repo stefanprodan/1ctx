@@ -150,6 +150,31 @@ describe("work summaries", () => {
     expect(summary.text).toBe("Worked for 51 s · 1 tool");
   });
 
+  test("a run's fold counts its own calls, not its memory phase's", () => {
+    const work = message({
+      toolCalls: [
+        { id: "call-1", name: "get_flux_instance", arguments: "{}" },
+        { id: "call-2", name: "get_latest_release", arguments: "{}" },
+      ],
+    });
+    const tool = (id: string, seq: number) =>
+      message({
+        id,
+        seq,
+        kind: "tool",
+        slot: null,
+        toolCalls: null,
+        toolCallId: id,
+        toolName: "tool",
+        finishReason: null,
+      });
+    const rows = [work, tool("call-1", 3), tool("call-2", 4)];
+    const ran = send({ kind: "run", toolCalls: 5, memoryRound: 3 });
+    const summary = workSummary(node({ rows, send: ran }), false);
+    expect(summary.toolCalls).toBe(2);
+    expect(summary.text).toBe("Worked for 51 s · 2 tools");
+  });
+
   test("a send without tools worked until its answer began", () => {
     const answer = message({
       id: "answer-1",
