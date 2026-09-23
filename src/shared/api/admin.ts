@@ -115,3 +115,102 @@ export type StorageResponse = {
     cleaned: { key: RetentionCleaned; bytes: number; days: number | null }[];
   };
 };
+
+// The ranges the Overview reads, in days of the zone
+export const OVERVIEW_RANGES = [7, 30, 90] as const;
+export type OverviewRange = (typeof OVERVIEW_RANGES)[number];
+
+// A day of the range: the sends started in it and how many of them
+// failed, and the tokens of the rounds in it. start is its local
+// midnight
+export type OverviewDay = {
+  day: string;
+  start: number;
+  sends: number;
+  failed: number;
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+};
+
+// What a range adds up to. cost sums the rounds that carry one and
+// pricedRounds counts them; cost is null when no round did
+export type OverviewTotals = {
+  sends: number;
+  failed: number;
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+  rounds: number;
+  pricedRounds: number;
+  cost: number | null;
+};
+
+export const USAGE_BY = [
+  "users",
+  "agents",
+  "models",
+  "projects",
+  "tasks",
+] as const;
+export type UsageBy = (typeof USAGE_BY)[number];
+
+// A row of a breakdown, by prompt plus completion tokens. name is the
+// username, the agent's name, the model, the team project's or the
+// task's name; a project or a task in a personal project has id and
+// name null and owner set. sub is a model's provider or a task's team
+// project. cost is null when none of the row's rounds carried one
+export type UsageRow = {
+  id: string | null;
+  name: string | null;
+  owner: string | null;
+  sub: string | null;
+  tokens: number;
+  sends: number;
+  failed: number;
+  cost: number | null;
+};
+
+// A provider's model over the range: its sends and failed sends, and
+// the median and slowest length and median rounds of the ended ones
+export type ModelHealth = {
+  provider: string;
+  model: string;
+  sends: number;
+  failed: number;
+  medianMs: number | null;
+  slowestMs: number | null;
+  medianRounds: number | null;
+};
+
+// GET /api/admin/overview?tz=&days=7|30|90: the range's days, today
+// last, its totals and the same over the range before it, the sends
+// running now against their caps and the users with an open socket,
+// the ten largest rows of each breakdown, the ten models with the most
+// sends, and the instance's counts, as of readAt. The range is read at
+// most once a minute per zone and range; now is read every time
+export type OverviewResponse = {
+  readAt: number;
+  days: OverviewDay[];
+  totals: OverviewTotals;
+  before: OverviewTotals;
+  now: {
+    chats: number;
+    chatsCap: number;
+    runs: number;
+    runsCap: number;
+    online: number;
+  };
+  by: Record<UsageBy, UsageRow[]>;
+  models: ModelHealth[];
+  instance: {
+    version: string;
+    startedAt: number;
+    users: number;
+    projects: number;
+    agents: number;
+    tasks: number;
+    servers: number;
+    databaseBytes: number;
+  };
+};
