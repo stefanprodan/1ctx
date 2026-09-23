@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   automationCount,
   automations,
+  loadAutomationPage,
   loadAutomations,
   matchesFilter,
   onAutomationsSocket,
@@ -721,6 +722,39 @@ describe("the entity over the socket", () => {
     me.value = null;
   });
 
+  test.serial("a row read before its delete never joins again", async () => {
+    me.value = {
+      id: "u1",
+      username: "casey",
+      fullName: "Casey",
+      role: "member",
+      mustChangePassword: false,
+    };
+    let release: (response: Response) => void = () => {};
+    globalThis.fetch = (async (url: string) => {
+      if (url === "/api/automations/au7") {
+        return new Promise<Response>((resolve) => {
+          release = resolve;
+        });
+      }
+      if (url === "/api/projects/p1/automations") {
+        return Response.json({ automations: [], runDeadlineMs: LIMIT });
+      }
+      return Response.json({ error: "no" }, { status: 404 });
+    }) as unknown as typeof fetch;
+    const page = loadAutomationPage("au7", undefined);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    onAutomationsSocket({
+      type: "automationDeleted",
+      projectId: "p1",
+      automationId: "au7",
+      runs: true,
+    });
+    release(Response.json({ automation: automation({ id: "au7" }) }));
+    await page;
+    expect(automations.value?.map((a) => a.id)).toEqual([]);
+  });
+
   test.serial("frames of the project on screen move its rows", async () => {
     me.value = {
       id: "u1",
@@ -773,6 +807,7 @@ describe("the entity over the socket", () => {
       type: "automationDeleted",
       projectId: "p1",
       automationId: "au2",
+      runs: false,
     });
     release(
       Response.json({
@@ -939,6 +974,7 @@ describe("the entity over the socket", () => {
       type: "automationDeleted",
       projectId: "p1",
       automationId: "au1",
+      runs: false,
     });
     expect(automations.value).toEqual([]);
     expect(runs.value).toBeNull();

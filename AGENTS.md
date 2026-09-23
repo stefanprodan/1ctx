@@ -881,7 +881,14 @@ violation, and every rule has a rejected fixture under
   `session.changed` and by `reconcile()` at start). The scheduler
   starts after `sessions.repair()` and stops first at shutdown.
   Deleting an automation is a 409 while a run runs and leaves its
-  runs, with `automation_id` set null.
+  runs, with `automation_id` set null; with `?runs=delete` it deletes
+  them and their usage in the same transaction. That is one
+  `automation.deleted` with `runs: true`, never a `session.deleted`
+  per run: the socket unwatches a run that is gone, and the client
+  drops their stream rows and held chats and leaves a run on screen
+  or loading. The usage rows go 500 sessions a statement.
+  The automation page and the editor confirm with Keep, Delete and
+  Delete with runs, and hide every other button while they ask.
 - **The tool loop is bounded, and the server places every row.** The
   loop caps (rounds, calls per round and per send, tool time, result
   bytes, `toolWorkTokens`) and the per-tool caps have their defaults,

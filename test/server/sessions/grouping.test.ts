@@ -15,6 +15,7 @@ const noUsage: UsagePort = {
   latest: () => null,
   latestFor: () => new Map(),
   deleteSession: () => 0,
+  deleteSessions: () => 0,
 };
 
 function seeded() {

@@ -79,6 +79,8 @@ const kept = new Held<{
 }>();
 let listTurn = 0;
 let pageTurn = 0;
+// deleted automations: a row read before its delete never joins again
+const gone = new Set<string>();
 let previewTurn = 0;
 
 effect(() => {
@@ -186,6 +188,7 @@ export async function loadAutomationPage(
     pageTurn === turn &&
     projectFor === row.projectId &&
     automations.value !== null &&
+    !gone.has(row.id) &&
     !automations.value.some((a) => a.id === row.id)
   ) {
     automations.value = upsertAutomation(automations.value, row);
@@ -288,9 +291,15 @@ export async function runAutomation(id: string): Promise<SessionDetail> {
   return detail;
 }
 
-export async function deleteAutomation(id: string): Promise<void> {
+// withRuns deletes its runs with it; else they stay, their automation
+// gone
+export async function deleteAutomation(
+  id: string,
+  withRuns = false,
+): Promise<void> {
   const forUser = owner;
-  await api(path(id), "DELETE");
+  await api(`${path(id)}${withRuns ? "?runs=delete" : ""}`, "DELETE");
+  gone.add(id);
   if (owner !== forUser) return;
   listTurn++;
   if (automations.value !== null) {
@@ -327,6 +336,7 @@ export function onAutomationsSocket(ev: SocketEvent): void {
       break;
     }
     case "automationDeleted":
+      gone.add(ev.automationId);
       applyAutomationFrame(ev);
       if (ev.projectId === projectFor) {
         listTurn++;

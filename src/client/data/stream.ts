@@ -301,6 +301,18 @@ export function dropRow(sessionId: string, projectId: string): void {
   if (covers(projectId)) void refresh();
 }
 
+// an automation's runs went with it: its rows go, and the first page is
+// loaded again as for a deleted row
+function dropRuns(automationId: string, projectId: string): void {
+  const keep = (row: StreamRow) =>
+    (row.automation?.id ?? row.session.automationId) !== automationId;
+  if (covers(projectId)) pages++;
+  kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
+  const held = list.value;
+  if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
+  if (held !== null && covers(projectId)) void refresh();
+}
+
 // the project may no longer be seen: its rows go, the whole list when
 // it was the project's own, and an answer in flight goes with them
 // since it may still hold rows of that project. What is left loads
@@ -354,6 +366,10 @@ export function applyAutomationFrame(
   // counting, but only a page asked after the delete lists its runs
   if (label === null && list.value === null && loading) {
     if (covers(ev.projectId)) void loadList(listFor);
+    return;
+  }
+  if (ev.type === "automationDeleted" && ev.runs) {
+    dropRuns(id, ev.projectId);
     return;
   }
   const held = list.value;

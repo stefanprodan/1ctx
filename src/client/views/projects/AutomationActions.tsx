@@ -28,11 +28,11 @@ export function AutomationActions({
   editable: boolean;
   onFailure: (text: string | null) => void;
 }) {
-  const busy = useSignal<"run" | "suspend" | "delete" | null>(null);
+  const busy = useSignal<"run" | "suspend" | "delete" | "purge" | null>(null);
   // Delete asks once, in place: the button turns into the confirmation
   const asking = useSignal(false);
   const act = async (
-    which: "run" | "suspend" | "delete",
+    which: "run" | "suspend" | "delete" | "purge",
     call: () => Promise<unknown>,
   ) => {
     if (busy.value !== null) return;
@@ -48,80 +48,97 @@ export function AutomationActions({
   const suspended = automation.suspendedAt !== null;
   const running = automation.lastRunStatus === "running";
   const off = busy.value !== null;
+  // while Delete asks, the confirmation is the only thing to press
+  const ask = editable && asking.value;
   return (
     <div class="automations-actions">
-      <button
-        type="button"
-        class="btn btn-small btn-primary"
-        disabled={off || running}
-        title={running ? "A run is on its way" : undefined}
-        onClick={() => void act("run", () => runAutomation(automation.id))}
-      >
-        <Icon name="bolt" size={12} />
-        {busy.value === "run" ? "Starting" : "Run now"}
-      </button>
-      <div class="automations-actions-end">
+      {!ask && (
         <button
           type="button"
-          class="btn btn-small"
-          disabled={off}
-          onClick={() =>
-            void act("suspend", () =>
-              suspendAutomation(automation.id, !suspended),
-            )
-          }
+          class="btn btn-small btn-primary"
+          disabled={off || running}
+          title={running ? "A run is on its way" : undefined}
+          onClick={() => void act("run", () => runAutomation(automation.id))}
         >
-          <Icon name={suspended ? "play" : "pause"} size={12} />
-          {suspended ? "Resume" : "Suspend"}
+          <Icon name="bolt" size={12} />
+          {busy.value === "run" ? "Starting" : "Run now"}
         </button>
-        {editable && (
-          <a class="btn btn-small" href={`/automations/${automation.id}/edit`}>
-            <Icon name="pencil" size={12} />
-            Edit
-          </a>
-        )}
-        {editable &&
-          (asking.value ? (
-            <>
-              <button
-                type="button"
-                class="btn btn-small"
-                disabled={off}
-                onClick={() => {
-                  asking.value = false;
-                }}
-              >
-                Keep
-              </button>
-              <button
-                type="button"
-                class="btn btn-small btn-danger"
-                disabled={off || running}
-                title={running ? "Stop the run first" : undefined}
-                onClick={() =>
-                  void act("delete", async () => {
-                    await deleteAutomation(automation.id);
-                    navigate(`/projects/${automation.projectId}/automations`);
-                  })
-                }
-              >
-                <Icon name="trash" size={12} />
-                {busy.value === "delete" ? "Deleting" : "Delete, runs stay"}
-              </button>
-            </>
-          ) : (
+      )}
+      <div class="automations-actions-end">
+        {ask ? (
+          <>
             <button
               type="button"
               class="btn btn-small"
               disabled={off}
               onClick={() => {
-                asking.value = true;
+                asking.value = false;
               }}
             >
-              <Icon name="trash" size={12} />
-              Delete
+              Keep
             </button>
-          ))}
+            {(["delete", "purge"] as const).map((which) => (
+              <button
+                key={which}
+                type="button"
+                class="btn btn-small btn-danger"
+                disabled={off || running}
+                title={running ? "Stop the run first" : undefined}
+                onClick={() =>
+                  void act(which, async () => {
+                    await deleteAutomation(automation.id, which === "purge");
+                    navigate(`/projects/${automation.projectId}/automations`);
+                  })
+                }
+              >
+                <Icon name="trash" size={12} />
+                {busy.value === which
+                  ? "Deleting"
+                  : which === "purge"
+                    ? "Delete with runs"
+                    : "Delete"}
+              </button>
+            ))}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              class="btn btn-small"
+              disabled={off}
+              onClick={() =>
+                void act("suspend", () =>
+                  suspendAutomation(automation.id, !suspended),
+                )
+              }
+            >
+              <Icon name={suspended ? "play" : "pause"} size={12} />
+              {suspended ? "Resume" : "Suspend"}
+            </button>
+            {editable && (
+              <a
+                class="btn btn-small"
+                href={`/automations/${automation.id}/edit`}
+              >
+                <Icon name="pencil" size={12} />
+                Edit
+              </a>
+            )}
+            {editable && (
+              <button
+                type="button"
+                class="btn btn-small"
+                disabled={off}
+                onClick={() => {
+                  asking.value = true;
+                }}
+              >
+                <Icon name="trash" size={12} />
+                Delete
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

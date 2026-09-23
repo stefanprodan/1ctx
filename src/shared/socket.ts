@@ -58,7 +58,13 @@ export type SocketEvent =
   | { type: "deleted"; projectId: string; sessionId: string }
   // an automation's row after a write, by the same revision rule
   | { type: "automation"; projectId: string; automation: AutomationSummary }
-  | { type: "automationDeleted"; projectId: string; automationId: string }
+  // runs: its runs were deleted with it, every one gone at once
+  | {
+      type: "automationDeleted";
+      projectId: string;
+      automationId: string;
+      runs: boolean;
+    }
   // a note was written: the client refetches it when the revision is
   // above the one held
   | {

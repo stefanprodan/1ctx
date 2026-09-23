@@ -25,7 +25,6 @@ import {
   deleteSession,
   leaveSession,
   live,
-  markdownHref,
   projectAgents,
   regenerateSession,
   renameSession,
@@ -35,6 +34,7 @@ import {
   sessionError,
   stopSession,
 } from "../../data/sessions.ts";
+import { markdownHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";

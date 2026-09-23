@@ -389,6 +389,7 @@ describe("the sessions entity", () => {
       type: "automationDeleted",
       projectId: "p1",
       automationId: "au1",
+      runs: false,
     });
     expect(list.value?.rows[0]?.automation).toBeNull();
   });
@@ -1999,11 +2000,47 @@ describe("runs grouped in All", () => {
         type: "automationDeleted",
         projectId: "p1",
         automationId: "au",
+        runs: false,
       });
       expect(list.value?.rows[0]?.runs).toBeNull();
       await settle();
       expect(urls).toHaveLength(2);
       expect(ids(list.value)).toEqual(["r2", "r1"]);
+    },
+  );
+
+  test.serial(
+    "a delete with its runs drops them and leaves a run on screen",
+    async () => {
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows:
+            urls.length === 1
+              ? [row({ id: "c1" }), line("r2", 9, 2)]
+              : [row({ id: "c1" })],
+        });
+      };
+      await loadList({ project: null, q: "" });
+      session.value = detail("r2", {
+        session: line("r2", 9, 2).session,
+      });
+      path.value = "/chat/r2";
+      const ev = {
+        type: "automationDeleted" as const,
+        projectId: "p1",
+        automationId: "au",
+        runs: true,
+      };
+      onSocket(ev);
+      applyAutomationFrame(ev);
+      expect(ids(list.value)).toEqual(["c1"]);
+      expect(session.value).toBeNull();
+      expect(pushed).toEqual(["/projects/p1"]);
+      await settle();
+      expect(urls).toHaveLength(2);
+      expect(ids(list.value)).toEqual(["c1"]);
     },
   );
 
@@ -2054,12 +2091,38 @@ describe("runs grouped in All", () => {
         type: "automationDeleted",
         projectId: "p1",
         automationId: "au",
+        runs: false,
       });
       release(Response.json({ rows: [line("r1", 5, 2)] }));
       await first;
       await settle();
       expect(urls).toHaveLength(2);
       expect(list.value?.rows[0]?.runs).toBeNull();
+    },
+  );
+
+  test.serial(
+    "a run read before its runs went is left for its project",
+    async () => {
+      let release: (r: Response) => void = () => {};
+      answer = () =>
+        new Promise((r) => {
+          release = r;
+        });
+      const loading = loadSession("r9");
+      await settle();
+      onSocket({
+        type: "automationDeleted",
+        projectId: "p1",
+        automationId: "au",
+        runs: true,
+      });
+      release(
+        Response.json(detail("r9", { session: line("r9", 5, 0).session })),
+      );
+      await loading;
+      expect(session.value).toBeNull();
+      expect(pushed).toEqual(["/projects/p1"]);
     },
   );
 

@@ -211,6 +211,20 @@ export class SessionStore {
     return automationRunning(this.db, automationId);
   }
 
+  // every run of the automation with its usage, in the caller's
+  // transaction, in a few statements however many runs it kept
+  deleteRuns(automationId: string): number {
+    const ids = this.db
+      .query<{ id: string }, [string]>(
+        "select id from sessions where automation_id = ?",
+      )
+      .all(automationId);
+    this.usage.deleteSessions(ids.map((row) => row.id));
+    return this.db
+      .query("delete from sessions where automation_id = ?")
+      .run(automationId).changes;
+  }
+
   expiredRuns(now: number): SessionRow[] {
     return expiredAutomationRuns(this.db, this.usage, now);
   }

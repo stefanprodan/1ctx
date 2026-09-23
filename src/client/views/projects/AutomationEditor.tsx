@@ -118,10 +118,11 @@ function Editor({
     draft.value = { ...draft.value, ...patch };
     save.touch();
   };
-  const remove = async () => {
+  const remove = async (runs: boolean) => {
     if (automation === null) return;
     const id = automation.id;
-    if (await save.act("delete", () => deleteAutomation(id))) {
+    const action = runs ? "purge" : "delete";
+    if (await save.act(action, () => deleteAutomation(id, runs))) {
       navigate(`/projects/${projectId}/automations`);
     }
   };
@@ -322,14 +323,6 @@ function Editor({
                 <>
                   <button
                     type="button"
-                    class="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void remove()}
-                  >
-                    {save.pending.value === "delete" ? "Deleting" : "Delete"}
-                  </button>
-                  <button
-                    type="button"
                     class="btn"
                     disabled={busy}
                     onClick={() => {
@@ -339,7 +332,24 @@ function Editor({
                   >
                     Keep
                   </button>
-                  <span class="automations-note">Its runs stay</span>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    disabled={busy}
+                    onClick={() => void remove(false)}
+                  >
+                    {save.pending.value === "delete" ? "Deleting" : "Delete"}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    disabled={busy}
+                    onClick={() => void remove(true)}
+                  >
+                    {save.pending.value === "purge"
+                      ? "Deleting"
+                      : "Delete with runs"}
+                  </button>
                 </>
               ) : (
                 <button
@@ -355,11 +365,16 @@ function Editor({
               )
             }
             before={
-              <a class="btn" href={back}>
-                Cancel
-              </a>
+              !asking.value && (
+                <a class="btn" href={back}>
+                  Cancel
+                </a>
+              )
             }
-          />
+          >
+            {/* while Delete asks, its buttons are the only ones */}
+            {asking.value ? <span /> : undefined}
+          </Foot>
         ) : (
           <a class="btn" href={back}>
             Back

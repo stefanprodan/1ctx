@@ -186,6 +186,17 @@ export function parseRunsQuery(url: URL): {
   };
 }
 
+// ?runs=delete deletes the automation's runs with it; without it they
+// stay, their automation gone
+export function parseDeleteAutomation(url: URL): { runs: boolean } {
+  queryKeys(url, ["runs"]);
+  const runs = url.searchParams.get("runs");
+  if (runs !== null && runs !== "delete") {
+    throw new BadRequest("runs must be delete");
+  }
+  return { runs: runs !== null };
+}
+
 export function parseSchedulePreview(url: URL): {
   schedule: string;
   tz: string;
