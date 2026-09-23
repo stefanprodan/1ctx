@@ -357,21 +357,28 @@ export function summaryRequest(
 // prefix holds; this line is what asks for the answer.
 export const EXHAUSTED_LINE =
   "The tool budget is spent. Answer now with what the results gave you.";
+// a loop is no spent budget, and saying so would teach nothing
+export const LOOP_LINE =
+  "You made the same calls three times in a row. Answer now with what the results gave you.";
 
 // append the exhausted line to a copy of the messages, on the last tool
 // message when there is one, else as a final user message
-export function withExhausted(messages: ChatMessageIn[]): ChatMessageIn[] {
+export function withExhausted(
+  messages: ChatMessageIn[],
+  reason: string,
+): ChatMessageIn[] {
+  const line = reason === "tool_loop" ? LOOP_LINE : EXHAUSTED_LINE;
   const copy = messages.slice();
   for (let i = copy.length - 1; i >= 0; i--) {
     const message = copy[i]!;
     if (message.role === "tool") {
       copy[i] = {
         ...message,
-        content: `${message.content}\n\n${EXHAUSTED_LINE}`,
+        content: `${message.content}\n\n${line}`,
       };
       return copy;
     }
   }
-  copy.push({ role: "user", content: EXHAUSTED_LINE });
+  copy.push({ role: "user", content: line });
   return copy;
 }

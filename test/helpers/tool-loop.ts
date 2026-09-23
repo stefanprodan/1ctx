@@ -59,12 +59,15 @@ export const time = (id: string, tz = "UTC") => ({
 
 // the answer round asks in words, on the last message, and keeps the
 // schemas as they were with no tool_choice, so the cached prefix holds
-export function asksAnswer(body: Record<string, unknown>): boolean {
+export function asksAnswer(
+  body: Record<string, unknown>,
+  line = EXHAUSTED_LINE,
+): boolean {
   const messages = body.messages as { content?: unknown }[];
   const last = messages.at(-1)?.content;
   return (
     typeof last === "string" &&
-    last.includes(EXHAUSTED_LINE) &&
+    last.includes(line) &&
     body.tool_choice === undefined &&
     Array.isArray(body.tools) &&
     body.tools.length > 0

@@ -864,7 +864,9 @@ violation, and every rule has a rejected fixture under
   MCP name (`tools/bash-hint.ts`).
   Main rounds spend prompt plus completion tokens, cached tokens included,
   or a request estimate without usage. The tool-work threshold and the
-  window threshold are checked before calls, forcing one answer round.
+  window threshold are checked before calls, forcing one answer round,
+  and so do three equal call rounds in a row (`tool_loop`), whose
+  answer line and not-run text say so rather than a spent budget.
   The answer round sends the schemas unchanged and no `tool_choice`,
   which would miss a server's cached prefix; the exhausted line asks
   for the answer. A round that still calls is asked again: on
@@ -874,8 +876,8 @@ violation, and every rule has a rejected fixture under
   The crossing and answer rounds may pass the tool-work budget; summaries
   and memory have their own limits. Results that outgrow the remaining
   window are cut largest first before storage, keeping bash's exit and
-  receipts and a cut line. The work row carries `tool_limit`, `token_limit`
-  or `context_limit`; the answer keeps the provider's finish reason.
+  receipts and a cut line. The work row carries `tool_limit`, `token_limit`,
+  `context_limit` or `tool_loop`; the answer keeps the provider's finish reason.
   The offered set is decided once per send in `runner/policy.ts` from
   the `tools` rows:
   a model that accepts tools always gets `datetime` and `bash` over the

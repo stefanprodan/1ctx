@@ -159,13 +159,15 @@ describe("socket fixtures for caps", () => {
       toolRound(script, [call("same")]);
       await settle(chat, 6);
     }
+    const answer = await waitScript(chat.scripted, 4);
+    answer.reply("answered after the loop");
     await settle(chat, 10);
     record("loop-check", detail, conn);
-    const lastReply = chat.app.sessions
+    const replies = chat.app.sessions
       .messages(sessionId)
-      .filter((r) => r.kind === "reply")
-      .at(-1)!;
-    expect(lastReply.finishReason).toBe("tool_loop");
+      .filter((r) => r.kind === "reply");
+    expect(replies.at(-2)!.finishReason).toBe("tool_loop");
+    expect(replies.at(-1)!.content).toBe("answered after the loop");
     chat.app.socket.dispose();
   });
 

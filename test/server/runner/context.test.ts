@@ -10,6 +10,7 @@ import {
   type ContextLookups,
   EXHAUSTED_LINE,
   history,
+  LOOP_LINE,
   request,
   SKILLS_LEAD,
   SUMMARIZE,
@@ -1001,7 +1002,7 @@ describe("withExhausted", () => {
       { role: "user", content: "hi" },
       { role: "tool", toolCallId: "c1", content: "a result" },
     ];
-    const out = withExhausted(messages);
+    const out = withExhausted(messages, "tool_limit");
     expect(out[2]).toEqual({
       role: "tool",
       toolCallId: "c1",
@@ -1020,12 +1021,20 @@ describe("withExhausted", () => {
       { role: "system", content: "sys" },
       { role: "user", content: "hi" },
     ];
-    const out = withExhausted(messages);
+    const out = withExhausted(messages, "tool_limit");
     expect(out[out.length - 1]).toEqual({
       role: "user",
       content: EXHAUSTED_LINE,
     });
     expect(messages).toHaveLength(2);
+  });
+
+  test("asks a loop for the answer without calling it a spent budget", () => {
+    const out = withExhausted(
+      [{ role: "tool", toolCallId: "c1", content: "a result" }],
+      "tool_loop",
+    );
+    expect(out[0]).toMatchObject({ content: `a result\n\n${LOOP_LINE}` });
   });
 });
 
