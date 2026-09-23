@@ -106,21 +106,28 @@ export function readKept(
 
 /**
  * The oldest folders dropped until the session is inside its budget, then
- * the number its next folder takes and the bytes still kept. Called as a
- * send starts.
+ * the number its next folder takes and the bytes and files still kept.
+ * Called as a send starts; the files of rows past afterSeq, which a
+ * regenerate is about to delete, count for nothing.
  */
 export function startKept(
   db: Db,
   sessionId: string,
   caps: { mcpKeptBytes: number; mcpKeptFiles: number },
-): { next: number; used: number } {
+  afterSeq: number | null = null,
+): { next: number; used: number; files: number } {
   const folders = db
-    .query<{ folder: number; bytes: number; files: number }, [string]>(
+    .query<
+      { folder: number; bytes: number; files: number },
+      [string, string, number]
+    >(
       `select folder, sum(bytes) as bytes, count(*) as files
        from mcp_kept_files where session_id = ?
+       and message_id not in
+         (select id from messages where session_id = ? and seq > ?)
        group by folder order by folder`,
     )
-    .all(sessionId);
+    .all(sessionId, sessionId, afterSeq ?? Number.MAX_SAFE_INTEGER);
   let bytes = folders.reduce((sum, f) => sum + f.bytes, 0);
   let files = folders.reduce((sum, f) => sum + f.files, 0);
   const drop: number[] = [];
@@ -140,7 +147,7 @@ export function startKept(
       "select mcp_folders from sessions where id = ?",
     )
     .get(sessionId);
-  return { next: (row?.mcp_folders ?? 0) + 1, used: bytes };
+  return { next: (row?.mcp_folders ?? 0) + 1, used: bytes, files };
 }
 
 // fork: the kept files of the copied rows, under their new ids

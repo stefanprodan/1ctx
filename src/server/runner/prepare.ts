@@ -38,10 +38,15 @@ export function prepareSend(fields: {
   uploads?: readonly string[];
   capabilities?: CapabilityChange;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
-  startKept(sessionId: string): {
+  startKept(
+    sessionId: string,
+    afterSeq: number | null,
+  ): {
     next: number;
     used: number;
+    files: number;
     maxBytes: number;
+    maxFiles: number;
   };
   title: string;
   kind: SendKind;
@@ -85,12 +90,18 @@ export function prepareSend(fields: {
     // under the lock, before the send is written and any command mounts:
     // the kept files trimmed to the budget stay put for the whole send
     if (fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
-      const kept = fields.startKept(fields.sessionId);
+      // a regenerate's kept files go with the rows it replaces
+      const kept = fields.startKept(
+        fields.sessionId,
+        fields.existingUser?.seq ?? null,
+      );
       let next = kept.next;
       send.keep = {
         take: () => next++,
         maxBytes: kept.maxBytes,
         used: kept.used,
+        maxFiles: kept.maxFiles,
+        files: kept.files,
       };
     }
     started = fields.writer.startSend({
