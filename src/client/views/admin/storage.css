@@ -1,0 +1,160 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .storage,
+  .storage-ghost {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .storage {
+    padding-bottom: var(--space-5);
+  }
+  .storage-ghost {
+    pointer-events: none;
+  }
+  .storage-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  /* the page head's words: when the answer was read */
+  .storage-loaded {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .storage-loaded-failed {
+    color: var(--failed);
+  }
+  .storage-spin {
+    animation: spin 0.9s linear infinite;
+  }
+
+  .storage-none {
+    margin: 0;
+    padding: var(--space-5) var(--space-4);
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+
+  .storage-tops {
+    display: flex;
+    flex-direction: column;
+  }
+  .storage-top {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) 132px;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .storage-top:last-child {
+    border-bottom: 0;
+  }
+  .storage-top-go:hover {
+    background: var(--hover);
+  }
+  .storage-top-icon {
+    color: var(--faint);
+  }
+  .storage-top-words {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  /* a long title wraps rather than hiding its end */
+  .storage-top-name,
+  .storage-top-sub {
+    overflow-wrap: break-word;
+  }
+  .storage-top-name {
+    font-size: var(--text-ui);
+  }
+  .storage-top-sub {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .storage-top-size {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .storage-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+    padding: 0 var(--space-4) var(--space-4);
+  }
+  .storage-col-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  .storage-col-share {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .storage-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: 7px 0;
+    border-top: 1px solid var(--line);
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+  .storage-item-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  .storage-facts {
+    margin: 0;
+    padding: 0 2px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 899px) {
+    .storage-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 719px) {
+    .storage-top {
+      grid-template-columns: 14px minmax(0, 1fr) 84px;
+    }
+  }
+
+  /* a load under way keeps the last answer on screen, faded, with no
+     jump in the layout */
+  .storage-stale {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+}

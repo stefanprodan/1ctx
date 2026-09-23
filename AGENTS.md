@@ -9,7 +9,7 @@ One continuous context for agents. Domain: 1ctx.dev.
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
   change: `docs/just-bash.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
-  and `modern-tar`; the vendored tar command uses modern-tar too. The
+  and `modern-tar`, and `src/client/ui/Chart.tsx` alone imports `uplot`; the vendored tar command uses modern-tar too. The
   modern-tar patch retains the raw header `typeflag` to distinguish GNU
   sparse and unknown types from regular files.
 - **Status:** alpha. No backwards compatibility and no shims for the API
@@ -115,6 +115,35 @@ a closure called only after the list is complete. An edge the layer
 order forbids is a port, never an import. A test that needs one area
 builds it with its factory and fakes for its ports.
 
+`overview/` is the area after `automations/` and before `provision/`:
+what an admin reads about the instance. `GET /api/admin/storage?tz=`
+(`admin` policy, `parse.ts` a 400 on anything but one valid `tz`)
+answers `StorageResponse` in `shared/api/admin.ts`: the file by stat
+and pragmas, every table on disk from `dbstat` grouped by
+`STORAGE_TABLES` in `storage.ts` (each table the migrations create in
+exactly one area, `sqlite_schema` and `migrations` under config; a
+test checks the map against the schema both ways), the indexes of an
+area together and never named, the stored bytes added a day over the
+zone's last 30 days and the 30 before, the ten largest projects, chats
+and tasks, and the retention lists. Stored is a table's `bytes`, or
+`octet_length` of the text columns of `messages` (`MESSAGE_BYTES`);
+usage, logins and the rest are their table's pages, and a living
+task's runs take their kept MCP files and the usage pages by their
+share of the rows. A personal project
+is counted and never named: `id`, `name` and `project` null, `owner`
+its owner. `scan.ts` is the queries, pure over a `Db` inside one read
+transaction; it sums what
+was added by quarter hour of UTC, which every zone's midnight falls
+on, so one scan serves any zone. `bun:sqlite` is synchronous, so the
+scan runs in `scan.worker.ts`, a `Worker` per scan over its own
+read-only connection to the file, ended when it answers, after
+`SCAN_DEADLINE_MS` or at shutdown; a memory database runs it inline. The worker is the second
+entry point of `bun build --compile`, where a relative URL resolves
+against the compile root, `src/server`, so `compose.ts` builds the URL
+and passes it in. `cache.ts` keeps one scan in flight and its answer a
+minute on the clock port; a failed scan keeps nothing, is a warning
+`storage scan failed` and the router's 500.
+
 `provision/` is the CLI-only area after `automations/` and before
 `web/`. `1ctx provision -f <file|dir|->` combines YAML inputs, validates
 offline against a database snapshot, then applies through the composed
@@ -184,7 +213,11 @@ violation, and every rule has a rejected fixture under
   family, font size, the `font` shorthand and radius come from
   `tokens.css` and appear nowhere else, CSS or TSX, a `var()` fallback
   included; `index.html` and `favicon.svg` are the two files in
-  `LITERAL_EXEMPTIONS`.
+  `LITERAL_EXEMPTIONS`. Every rule sits inside a layer (a font face
+  is not a rule and may sit outside), except in a sheet listed in
+  `UNLAYERED` with its reason: `ui/chart.css`, whose
+  overrides of uPlot's unlayered sheet must be unlayered to win, and
+  whose unlayered rules may name uPlot's classes inside its own.
 - Routes do not overlap: two patterns of one method that could match
   one path fail the router at start and the route table test.
 - No test names a real provider host; the suite never reaches a network.
@@ -1333,6 +1366,17 @@ violation, and every rule has a rejected fixture under
   `lib/format.ts` for a page's error signal and `status` on a form's
   problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
   words, and left out when the server did not answer.
+- **A dashboard is a board, not rows.** The admin's Storage page
+  (`/admin/storage`, the Admin group's first entry) is `ui/Tiles.tsx`
+  (stat tiles, the figure at `--text-figure`) over `ui/Chart.tsx`
+  panels in a grid: `ChartPanel` wears the Rows card head, `Bars` rank
+  from one baseline in CSS, `Stack` splits a whole, and `Spark` is a
+  uPlot sparkline over days, made on mount, fed by a second effect,
+  its colours tokens read at every draw, sharing its cursor by sync
+  key. Its first load draws the board in `Bone`s at the loaded sizes,
+  never a Loading line; Refresh keeps the last answer faded until the
+  next lands. `data/overview.ts` loads it on arrival and on Refresh,
+  never polled.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

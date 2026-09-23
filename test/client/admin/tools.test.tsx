@@ -438,6 +438,7 @@ describe("the page", () => {
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
     expect(labels).toEqual([
+      "Storage",
       "Projects",
       "Users",
       "Agents",

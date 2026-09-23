@@ -33,6 +33,7 @@ export const LAYERS = [
   "tools",
   "runner",
   "automations",
+  "overview",
   "provision",
   "service",
   "web",
@@ -41,13 +42,23 @@ export const LAYERS = [
 export const MAX_LINES = 500;
 
 // production files allowed past MAX_LINES, with the reason
-export const LINE_EXEMPTIONS: Record<string, string> = {};
+export const LINE_EXEMPTIONS: Record<string, string> = {
+  "client/app/routes.ts":
+    "the one route table: every view is one entry, and the rail reads it",
+};
 
 // files allowed a colour literal, with the reason: neither can read a
 // custom property
 export const LITERAL_EXEMPTIONS: Record<string, string> = {
   "client/index.html": "the theme-color meta is read before any stylesheet",
   "client/favicon.svg": "a favicon is loaded on its own, without the page",
+};
+
+// stylesheets allowed rules outside every layer, with the reason: an
+// unlayered rule beats every layered one
+export const UNLAYERED: Record<string, string> = {
+  "client/ui/chart.css":
+    "uPlot's own sheet is unlayered, so its overrides have to be too",
 };
 
 // hosts no test may name: the suite never reaches a network
@@ -407,6 +418,13 @@ function cssCheck(root: string, files: string[]): Violation[] {
         detail: "must open with @layer tokens, base, owners;",
       });
     }
+    if (unlayered(css) !== "" && !(rel in UNLAYERED)) {
+      out.push({
+        file: rel,
+        rule: "layers",
+        detail: "a rule outside every @layer",
+      });
+    }
     if (!isTokens) {
       for (const { property, value, line } of declarationsOf(css)) {
         const literal = tokenLiteral(property, value);
@@ -440,6 +458,11 @@ function cssCheck(root: string, files: string[]): Violation[] {
       continue;
     }
     names.set(name, rel);
+    // an unlayered sheet overrides a package's own sheet, so its
+    // unlayered rules may name the package's classes inside its own
+    const overrides = new Set(
+      rel in UNLAYERED ? selectorsOf(unlayered(css)) : [],
+    );
     for (const selector of selectorsOf(css)) {
       const global = globalCompound(selector);
       if (global) {
@@ -459,6 +482,7 @@ function cssCheck(root: string, files: string[]): Violation[] {
         if (owns(c)) continue;
         // a primitive inside the owner's own selector is composition
         if (inOwner && primitives.has(c)) continue;
+        if (inOwner && overrides.has(selector)) continue;
         out.push({
           file: rel,
           rule: "owner",
@@ -468,6 +492,27 @@ function cssCheck(root: string, files: string[]): Violation[] {
     }
   }
   return out;
+}
+
+// what is left of a sheet without its comments, its layer statement,
+// its layer blocks and its font faces, which no layer orders
+export function unlayered(css: string): string {
+  let rest = css
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/@layer[^{;]*;/g, "")
+    .replace(/@font-face\s*\{[^}]*\}/g, "");
+  for (;;) {
+    const start = rest.search(/@layer\s+[\w-]+\s*\{/);
+    if (start < 0) break;
+    let depth = 0;
+    let end = rest.indexOf("{", start);
+    for (; end < rest.length; end++) {
+      if (rest[end] === "{") depth++;
+      else if (rest[end] === "}" && --depth === 0) break;
+    }
+    rest = rest.slice(0, start) + rest.slice(end + 1);
+  }
+  return rest.trim();
 }
 
 // the first compound of a selector that is not a class, a pseudo, or

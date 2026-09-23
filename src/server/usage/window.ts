@@ -137,3 +137,13 @@ export function usageWindow(
 export function weekWindow(now: number, timeZone: string): UsageWindow {
   return calendarWindow(now, timeZone, () => 7);
 }
+
+// the last `count` calendar days, today included, for another area's
+// daily series in the caller's zone
+export function daysWindow(
+  now: number,
+  timeZone: string,
+  count: number,
+): UsageWindow {
+  return calendarWindow(now, timeZone, () => count);
+}
