@@ -842,19 +842,33 @@ violation, and every rule has a rejected fixture under
   answers the next `PREVIEW_FIRES` fires, or the 400 a save would get.
   The scheduler (`automations/scheduler.ts`)
   is a loop of passes on the clock port, never `Bun.cron(handler)`: a
-  pass fires every active row with `next_at <= now`, sweeps retention
+  pass first replaces each due row whose following occurrence has passed
+  too (one skipped event, reason `still waiting`, and `next_at` set to
+  the newest past occurrence; `automations/waits.ts`), then fires the
+  active rows with `next_at <= now` oldest first, sweeps retention
   hourly, and sleeps until the earliest `next_at` or a minute, woken
-  early by a store write. A fire is one transaction that reads the row
+  early by a store write, a freed run slot or a moved run cap. `wake()`
+  is level-triggered: it bumps a generation the sleep compares, so a
+  wake with no sleeper is kept. A fire is one transaction that reads the row
   again, checks the owner's access with the pure rule in
   `projects/visible.ts`, skips when a run of it still runs, moves
   `next_at` past now (missed fires are dropped, never replayed),
   records the event and calls the runner's `startRun()`, which is
   `prepare()` alone; `launch()` runs after the commit and `abandon()`
-  frees the reservation on a throw. A refusal is a skipped event with
-  its reason, never a queue. A scheduled run acts as the owner, a
-  manual run as whoever pressed Run now (409 while one runs, the run
-  pool's 429 when it is full); both count against the run pool, never
-  the chat pool. A run is a session with
+  frees the reservation on a throw. A full run pool (`RunCapacity`)
+  writes nothing: the row stays due on its missed time, `wait` is logged
+  once per occurrence, and the owner, or the process, is marked full in
+  memory until a wake. A pass skips a full owner's rows without calling
+  the runner and a full process ends its fires; while any is marked the
+  sleep counts only rows due after the pass (`earliest(after)`). Every
+  other refusal is a skipped event with its reason that moves
+  `next_at`. A scheduled run acts as the owner, a manual run as whoever
+  pressed Run now (409 while one runs, the run pool's 429 when it is
+  full, which leaves a wait as it is); a manual start moves a waiting
+  row's `next_at` past now, so it takes that fire. Both count against
+  the run pool, never the chat pool. A PATCH that changes the schedule
+  or the zone recomputes `next_at` from now and so ends a wait, other
+  fields leave it, and suspend nulls it. A run is a session with
   origin `automation`, its `automationId`, the automation's name as
   title and a send of kind `run`; the runner refuses `send`,
   `regenerate` and `compact` on it with 409, and arms its deadline
