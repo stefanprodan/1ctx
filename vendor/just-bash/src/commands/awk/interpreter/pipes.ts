@@ -20,6 +20,11 @@ import type { AwkRuntimeContext } from "./context.js";
 
 export const MAX_OUTPUT_PIPES = 16;
 
+/** gawk's fatal error for a redirection whose name is the empty string. */
+export function nullRedirection(op: string): Error {
+  return new Error(`expression for \`${op}' redirection has null string value`);
+}
+
 /** Marks everything printed so far as written, as gawk's fflush does. */
 export function flushOutput(ctx: AwkRuntimeContext): void {
   ctx.flushedAt = ctx.output.length;

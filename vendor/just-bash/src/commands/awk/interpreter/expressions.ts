@@ -25,6 +25,7 @@ import { awkBuiltins } from "../builtins.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { getField, setCurrentLine, setField } from "./fields.js";
 import { openStream, readRecord } from "./input.js";
+import { nullRedirection } from "./pipes.js";
 import {
   isTruthy,
   looksLikeNumber,
@@ -798,6 +799,8 @@ async function evalGetlineFromCommand(
     ),
   );
 
+  // (1ctx) gawk's fatal error for an empty command
+  if (cmd === "") throw nullRedirection("|");
   let stream = ctx.getlineCommandStreams.get(cmd);
   if (!stream) {
     // First time running this command, or again after close()
@@ -863,6 +866,7 @@ async function evalGetlineFromFile(
 
   const filePath = fs.resolvePath(ctx.cwd, filename);
 
+  if (filename === "") throw nullRedirection("<");
   let stream = ctx.getlineFileStreams.get(filePath);
   if (!stream && (filename === "-" || filename === "/dev/stdin")) {
     // (1ctx) standard input, as gawk names it

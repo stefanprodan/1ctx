@@ -3881,6 +3881,91 @@
       "stdout": "a b\na b\n1 1\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "fix: a pipe to an unset variable is fatal",
+      "args": [
+        "{print $0 | constructor}"
+      ],
+      "stdin": "hi\n",
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: a file redirection to an unset variable is fatal",
+      "args": [
+        "{print $0 > x}"
+      ],
+      "stdin": "hi\n",
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: an append redirection to an unset variable is fatal",
+      "args": [
+        "{print \"before\"; print $0 >> x}"
+      ],
+      "stdin": "hi\n",
+      "stdout": "before\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: printf to an empty command is fatal",
+      "args": [
+        "{printf \"%s\\n\", $0 | \"\"}"
+      ],
+      "stdin": "hi\n",
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: getline from an empty file name is fatal",
+      "args": [
+        "BEGIN {r = (getline line < \"\"); print r}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: getline from an empty command is fatal",
+      "args": [
+        "BEGIN {r = (\"\" | getline); print r}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: getline from an unset variable is fatal",
+      "args": [
+        "BEGIN {print \"before\"; r = (getline < x); print r}"
+      ],
+      "stdout": "before\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: getline var from an unset command is fatal",
+      "args": [
+        "BEGIN {r = (x | getline y); print r}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: close of an empty name",
+      "args": [
+        "BEGIN {print close(\"\")}"
+      ],
+      "stdout": "-1\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

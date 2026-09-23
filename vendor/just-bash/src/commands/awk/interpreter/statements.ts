@@ -20,7 +20,7 @@ import type {
 import { formatPrintf, numberToString } from "../format.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { evalExpr, setBlockExecutor } from "./expressions.js";
-import { writePipe } from "./pipes.js";
+import { nullRedirection, writePipe } from "./pipes.js";
 import { isTruthy, toStr, toNumber } from "./type-coercion.js";
 import {
   deleteArray,
@@ -300,6 +300,8 @@ async function writeToFile(
       evalExpr(ctx, fileExpr),
     ),
   );
+  // (1ctx) gawk's fatal error for an empty name, an unset variable's too
+  if (filename === "") throw nullRedirection(redirect);
   // (1ctx) a pipe holds the text for its command
   if (redirect === "|") {
     writePipe(ctx, filename, text);
