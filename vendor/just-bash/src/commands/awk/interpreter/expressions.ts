@@ -29,7 +29,7 @@ import {
   isTruthy,
   looksLikeNumber,
   matchRegex,
-  toAwkString,
+  toStr,
   toNumber,
 } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
@@ -168,7 +168,7 @@ async function evalArrayAccess(
   expr: AwkArrayAccess,
 ): Promise<AwkValue> {
   assertAwkDefenseContext(ctx, "array access evaluation");
-  const key = toAwkString(
+  const key = toStr(ctx, 
     await withDefenseContext(ctx, "array key evaluation", () =>
       evalExpr(ctx, expr.key),
     ),
@@ -222,13 +222,13 @@ async function evalBinaryOp(
     const pattern =
       expr.right.type === "regex"
         ? expr.right.pattern
-        : toAwkString(
+        : toStr(ctx, 
             await withDefenseContext(ctx, "regex right evaluation", () =>
               evalExpr(ctx, expr.right),
             ),
           );
     try {
-      return createUserRegex(pattern).test(toAwkString(left)) ? 1 : 0;
+      return createUserRegex(pattern).test(toStr(ctx, left)) ? 1 : 0;
     } catch {
       return 0;
     }
@@ -243,7 +243,7 @@ async function evalBinaryOp(
     const pattern =
       expr.right.type === "regex"
         ? expr.right.pattern
-        : toAwkString(
+        : toStr(ctx, 
             await withDefenseContext(
               ctx,
               "negated-regex right evaluation",
@@ -251,7 +251,7 @@ async function evalBinaryOp(
             ),
           );
     try {
-      return createUserRegex(pattern).test(toAwkString(left)) ? 0 : 1;
+      return createUserRegex(pattern).test(toStr(ctx, left)) ? 0 : 1;
     } catch {
       return 1;
     }
@@ -266,7 +266,7 @@ async function evalBinaryOp(
 
   // String concatenation
   if (op === " ") {
-    const result = toAwkString(left) + toAwkString(right);
+    const result = toStr(ctx, left) + toStr(ctx, right);
     if (ctx.maxOutputSize > 0 && result.length > ctx.maxOutputSize) {
       throw new ExecutionLimitError(
         `awk: string concatenation size limit exceeded (${ctx.maxOutputSize} bytes)`,
@@ -279,7 +279,10 @@ async function evalBinaryOp(
 
   // Comparison operators
   if (isComparisonOp(op)) {
-    return evalComparison(left, right, op);
+    // (1ctx) a string constant or a concatenation is a string, never a
+    // number, so the comparison is of strings as in gawk
+    const asStrings = isStringExpr(expr.left) || isStringExpr(expr.right);
+    return evalComparison(ctx, left, right, op, asStrings);
   }
 
   // Arithmetic operators
@@ -292,11 +295,23 @@ function isComparisonOp(op: string): boolean {
   return ["<", "<=", ">", ">=", "==", "!="].includes(op);
 }
 
-function evalComparison(left: AwkValue, right: AwkValue, op: string): number {
+function isStringExpr(expr: AwkExpr): boolean {
+  return (
+    expr.type === "string" || (expr.type === "binary" && expr.operator === " ")
+  );
+}
+
+function evalComparison(
+  ctx: AwkRuntimeContext,
+  left: AwkValue,
+  right: AwkValue,
+  op: string,
+  asStrings: boolean,
+): number {
   const leftIsNum = looksLikeNumber(left);
   const rightIsNum = looksLikeNumber(right);
 
-  if (leftIsNum && rightIsNum) {
+  if (!asStrings && leftIsNum && rightIsNum) {
     const l = toNumber(left);
     const r = toNumber(right);
     switch (op) {
@@ -315,8 +330,8 @@ function evalComparison(left: AwkValue, right: AwkValue, op: string): number {
     }
   }
 
-  const l = toAwkString(left);
-  const r = toAwkString(right);
+  const l = toStr(ctx, left);
+  const r = toStr(ctx, right);
   switch (op) {
     case "<":
       return l < r ? 1 : 0;
@@ -495,7 +510,7 @@ async function evalAssignment(
     } else if (target.type === "variable") {
       current = getVariable(ctx, target.name);
     } else {
-      const key = toAwkString(
+      const key = toStr(ctx, 
         await withDefenseContext(ctx, "assignment array key", () =>
           evalExpr(ctx, target.key),
         ),
@@ -543,7 +558,7 @@ async function evalAssignment(
   } else if (target.type === "variable") {
     setVariable(ctx, target.name, finalValue);
   } else {
-    const key = toAwkString(
+    const key = toStr(ctx, 
       await withDefenseContext(ctx, "assignment target array key", () =>
         evalExpr(ctx, target.key),
       ),
@@ -581,7 +596,7 @@ async function applyIncDec(
     oldVal = toNumber(getVariable(ctx, operand.name));
     setVariable(ctx, operand.name, oldVal + delta);
   } else {
-    const key = toAwkString(
+    const key = toStr(ctx, 
       await withDefenseContext(ctx, "inc/dec array key", () =>
         evalExpr(ctx, operand.key),
       ),
@@ -634,7 +649,7 @@ async function evalInExpr(
     const parts: string[] = [];
     for (const e of key.elements) {
       parts.push(
-        toAwkString(
+        toStr(ctx, 
           await withDefenseContext(ctx, "tuple key element evaluation", () =>
             evalExpr(ctx, e),
           ),
@@ -643,7 +658,7 @@ async function evalInExpr(
     }
     keyStr = parts.join(ctx.SUBSEP);
   } else {
-    keyStr = toAwkString(
+    keyStr = toStr(ctx, 
       await withDefenseContext(ctx, "in-expression key evaluation", () =>
         evalExpr(ctx, key),
       ),
@@ -708,7 +723,7 @@ async function evalGetlineFromCommand(
 
   assertAwkDefenseContext(ctx, "getline command source");
 
-  const cmd = toAwkString(
+  const cmd = toStr(ctx, 
     await withDefenseContext(ctx, "getline command expression", () =>
       evalExpr(ctx, cmdExpr),
     ),
@@ -766,7 +781,7 @@ async function evalGetlineFromFile(
   }
 
   assertAwkDefenseContext(ctx, "getline file source");
-  const filename = toAwkString(
+  const filename = toStr(ctx, 
     await withDefenseContext(ctx, "getline filename evaluation", () =>
       evalExpr(ctx, fileExpr),
     ),

@@ -5,8 +5,9 @@
  */
 
 import { ConstantRegex, createUserRegex } from "../../../regex/index.js";
+import { chars } from "../chars.js";
 import type { AwkRuntimeContext } from "./context.js";
-import { toAwkString } from "./type-coercion.js";
+import { toStr } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
 
 /**
@@ -18,6 +19,10 @@ export function splitRecord(ctx: AwkRuntimeContext, line: string): string[] {
   // Empty line always has 0 fields in AWK
   if (line === "") {
     return [];
+  }
+  // (1ctx) an empty FS makes each character a field
+  if (ctx.FS === "") {
+    return chars(line);
   }
   if (ctx.FS === " ") {
     // Default FS: split on runs of whitespace, skip leading/trailing
@@ -54,7 +59,7 @@ export function setField(
 ): void {
   if (index === 0) {
     // Setting $0 re-splits the line
-    ctx.line = toAwkString(value);
+    ctx.line = toStr(ctx, value);
     ctx.fields = splitRecord(ctx, ctx.line);
     ctx.NF = ctx.fields.length;
   } else if (index > 0) {
@@ -62,7 +67,7 @@ export function setField(
     while (ctx.fields.length < index) {
       ctx.fields.push("");
     }
-    ctx.fields[index - 1] = toAwkString(value);
+    ctx.fields[index - 1] = toStr(ctx, value);
     ctx.NF = ctx.fields.length;
     // Rebuild $0 from fields
     ctx.line = ctx.fields.join(ctx.OFS);

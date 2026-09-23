@@ -69,7 +69,11 @@
 (fail) WorkerDefenseInDepth > worker-specific behavior > should include 'worker context' in error messages
 (fail) awk built-in variables > FILENAME > should be empty for stdin
 (fail) awk command > error handling > should error on missing file
+(fail) awk command > printf formats > should format scientific with %e
+(fail) awk edge cases > numeric edge cases > should handle very large numbers
+(fail) awk math functions > basic math functions > int() handles negative numbers
 (fail) awk parsing > error cases > should error on missing file
+(fail) awk printf formats > scientific %e > should format in scientific notation
 (fail) browser bundle safety > browser-excluded commands list > should have browser-excluded commands available in Node.js registry
 (fail) browser bundle safety > bundle contents > should not contain direct node: protocol imports in bundle code
 (fail) browser bundle safety > bundle contents > should not contain native module artifacts

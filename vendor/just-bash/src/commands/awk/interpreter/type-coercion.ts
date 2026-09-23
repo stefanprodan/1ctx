@@ -5,6 +5,7 @@
  */
 
 import { createUserRegex } from "../../../regex/index.js";
+import { numberToString } from "../format.js";
 import type { AwkValue } from "./types.js";
 
 /**
@@ -43,12 +44,17 @@ export function toNumber(val: AwkValue): number {
 
 /**
  * Convert an AWK value to a string.
- * Numbers are formatted without trailing zeros.
+ * (1ctx) A whole number is its exact integer, any other number goes
+ * through CONVFMT, as gawk converts them.
  */
-export function toAwkString(val: AwkValue): string {
+export function toAwkString(val: AwkValue, convfmt = "%.6g"): string {
   if (typeof val === "string") return val;
-  if (Number.isInteger(val)) return String(val);
-  return String(val);
+  return numberToString(val, convfmt);
+}
+
+/** (1ctx) toAwkString under the running program's CONVFMT. */
+export function toStr(ctx: { CONVFMT: string }, val: AwkValue): string {
+  return typeof val === "string" ? val : numberToString(val, ctx.CONVFMT);
 }
 
 /**

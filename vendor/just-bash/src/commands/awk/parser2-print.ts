@@ -258,8 +258,10 @@ function parsePrintAnd(p: PrintParserContext): AwkExpr {
   return left;
 }
 
+// (1ctx) awk binds concatenation tighter than the comparisons, which bind
+// tighter than ~ and !~: `x "" == "0.3"` compares the concatenation
 function parsePrintIn(p: PrintParserContext): AwkExpr {
-  const left = parsePrintConcatenation(p);
+  const left = parsePrintMatch(p);
 
   if (p.check(TokenTypes.IN as TokenType)) {
     p.advance();
@@ -271,12 +273,12 @@ function parsePrintIn(p: PrintParserContext): AwkExpr {
 }
 
 function parsePrintConcatenation(p: PrintParserContext): AwkExpr {
-  let left = parsePrintMatch(p);
+  let left = p.parseAddSub();
 
   // Concatenation is implicit - consecutive expressions without operators
   // For print context, also stop at > and >> (redirection)
   while (canStartExpression(p) && !isPrintConcatTerminator(p)) {
-    const right = parsePrintMatch(p);
+    const right = p.parseAddSub();
     left = { type: "binary", operator: " ", left, right };
   }
 
@@ -302,7 +304,7 @@ function parsePrintMatch(p: PrintParserContext): AwkExpr {
  * Like parseComparison but doesn't consume > and >> (for print redirection)
  */
 function parsePrintComparison(p: PrintParserContext): AwkExpr {
-  let left = p.parseAddSub();
+  let left = parsePrintConcatenation(p);
 
   // Only handle <, <=, >=, ==, != - NOT > or >> (those are redirection)
   while (
@@ -315,7 +317,7 @@ function parsePrintComparison(p: PrintParserContext): AwkExpr {
     )
   ) {
     const opToken = p.advance();
-    const right = p.parseAddSub();
+    const right = parsePrintConcatenation(p);
     const opMap = new Map<string, "<" | "<=" | ">=" | "==" | "!=">([
       ["<", "<"],
       ["<=", "<="],

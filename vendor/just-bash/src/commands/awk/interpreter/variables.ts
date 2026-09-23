@@ -7,7 +7,7 @@
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { setFieldSeparator } from "./fields.js";
-import { toAwkString, toNumber } from "./type-coercion.js";
+import { toStr, toNumber } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
 
 /**
@@ -23,6 +23,8 @@ export function getVariable(ctx: AwkRuntimeContext, name: string): AwkValue {
       return ctx.ORS;
     case "OFMT":
       return ctx.OFMT;
+    case "CONVFMT":
+      return ctx.CONVFMT;
     case "NR":
       return ctx.NR;
     case "NF":
@@ -58,16 +60,19 @@ export function setVariable(
 ): void {
   switch (name) {
     case "FS":
-      setFieldSeparator(ctx, toAwkString(value));
+      setFieldSeparator(ctx, toStr(ctx, value));
       return;
     case "OFS":
-      ctx.OFS = toAwkString(value);
+      ctx.OFS = toStr(ctx, value);
       return;
     case "ORS":
-      ctx.ORS = toAwkString(value);
+      ctx.ORS = toStr(ctx, value);
       return;
     case "OFMT":
-      ctx.OFMT = toAwkString(value);
+      ctx.OFMT = toStr(ctx, value);
+      return;
+    case "CONVFMT":
+      ctx.CONVFMT = toStr(ctx, value);
       return;
     case "NR":
       ctx.NR = Math.floor(toNumber(value));
@@ -90,7 +95,7 @@ export function setVariable(
       ctx.FNR = Math.floor(toNumber(value));
       return;
     case "FILENAME":
-      ctx.FILENAME = toAwkString(value);
+      ctx.FILENAME = toStr(ctx, value);
       return;
     case "RSTART":
       ctx.RSTART = Math.floor(toNumber(value));
@@ -99,7 +104,7 @@ export function setVariable(
       ctx.RLENGTH = Math.floor(toNumber(value));
       return;
     case "SUBSEP":
-      ctx.SUBSEP = toAwkString(value);
+      ctx.SUBSEP = toStr(ctx, value);
       return;
     case "ARGC":
       // (1ctx) the input walk reads ARGC as it stands
@@ -107,10 +112,10 @@ export function setVariable(
       return;
     case "RS":
       // (1ctx) read by the record reader at each record
-      ctx.RS = toAwkString(value);
+      ctx.RS = toStr(ctx, value);
       return;
     case "RT":
-      ctx.RT = toAwkString(value);
+      ctx.RT = toStr(ctx, value);
       return;
   }
 

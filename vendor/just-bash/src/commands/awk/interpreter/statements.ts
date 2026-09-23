@@ -11,10 +11,10 @@ import {
 } from "../../../security/defense-context.js";
 import { utf8ByteLength } from "../../printf/escapes.js";
 import type { AwkArrayAccess, AwkExpr, AwkStmt, AwkVariable } from "../ast.js";
-import { formatPrintf } from "../builtins.js";
+import { formatPrintf, numberToString } from "../format.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { evalExpr, setBlockExecutor } from "./expressions.js";
-import { isTruthy, toAwkString, toNumber } from "./type-coercion.js";
+import { isTruthy, toStr, toNumber } from "./type-coercion.js";
 import { deleteArray, deleteArrayElement } from "./variables.js";
 
 // Register the block executor with expressions module (for user function calls)
@@ -207,21 +207,8 @@ async function executePrint(
     const val = await withDefenseContext(ctx, "print argument evaluation", () =>
       evalExpr(ctx, arg),
     );
-    // Use OFMT for numeric values (POSIX AWK behavior)
-    // Exception: integers are printed directly without OFMT formatting
-    // This matches real AWK behavior where `print 2292437248` outputs
-    // the full integer, not scientific notation
-    if (typeof val === "number") {
-      if (Number.isInteger(val) && Math.abs(val) < Number.MAX_SAFE_INTEGER) {
-        values.push(String(val));
-      } else {
-        values.push(
-          formatPrintf(ctx.OFMT, [val], ctx.maxOutputSize || undefined),
-        );
-      }
-    } else {
-      values.push(toAwkString(val));
-    }
+    // (1ctx) a whole number prints exactly, any other through OFMT
+    values.push(typeof val === "number" ? numberToString(val, ctx.OFMT) : val);
   }
   const text = values.join(ctx.OFS) + ctx.ORS;
 
@@ -245,7 +232,7 @@ async function executePrintf(
   output?: { redirect: ">" | ">>"; file: AwkExpr },
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "printf execution");
-  const formatStr = toAwkString(
+  const formatStr = toStr(ctx, 
     await withDefenseContext(ctx, "printf format evaluation", () =>
       evalExpr(ctx, format),
     ),
@@ -263,7 +250,7 @@ async function executePrintf(
     ctx.maxOutputSize > 0
       ? Math.max(0, ctx.maxOutputSize - utf8ByteLength(ctx.output))
       : undefined;
-  const text = formatPrintf(formatStr, values, remainingOutput);
+  const text = formatPrintf(formatStr, values, remainingOutput, ctx.CONVFMT);
 
   if (output) {
     await withDefenseContext(ctx, "printf redirection write", () =>
@@ -293,7 +280,7 @@ async function writeToFile(
     return;
   }
 
-  const filename = toAwkString(
+  const filename = toStr(ctx, 
     await withDefenseContext(ctx, "redirection filename evaluation", () =>
       evalExpr(ctx, fileExpr),
     ),
@@ -535,7 +522,7 @@ async function executeDelete(
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "delete execution");
   if (target.type === "array_access") {
-    const key = toAwkString(
+    const key = toStr(ctx, 
       await withDefenseContext(ctx, "delete key evaluation", () =>
         evalExpr(ctx, target.key),
       ),

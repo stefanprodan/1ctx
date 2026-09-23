@@ -22,6 +22,8 @@ export interface AwkRuntimeContext {
   OFS: string;
   ORS: string;
   OFMT: string;
+  // (1ctx) the format of a number converted to a string
+  CONVFMT: string;
   NR: number;
   NF: number;
   FNR: number;
@@ -159,6 +161,7 @@ export function createRuntimeContext(
     OFS: " ",
     ORS: "\n",
     OFMT: "%.6g",
+    CONVFMT: "%.6g",
     NR: 0,
     NF: 0,
     FNR: 0,

@@ -692,8 +692,10 @@ export class AwkParser {
     return left;
   }
 
+  // (1ctx) awk binds concatenation tighter than the comparisons, which
+  // bind tighter than ~ and !~: `x "" == "0.3"` compares the concatenation
   private parseIn(): AwkExpr {
-    const left = this.parseConcatenation();
+    const left = this.parseMatch();
 
     if (this.check(TokenType.IN)) {
       this.advance();
@@ -705,12 +707,12 @@ export class AwkParser {
   }
 
   private parseConcatenation(): AwkExpr {
-    let left = this.parseMatch();
+    let left = this.parseAddSub();
 
     // Concatenation is implicit - consecutive expressions without operators
     // Match (~, !~) is handled by parseMatch, so we don't check for those here
     while (this.canStartExpression() && !this.isConcatTerminator()) {
-      const right = this.parseMatch();
+      const right = this.parseAddSub();
       left = { type: "binary", operator: " ", left, right };
     }
 
@@ -730,7 +732,7 @@ export class AwkParser {
   }
 
   private parseComparison(): AwkExpr {
-    let left = this.parseAddSub();
+    let left = this.parseConcatenation();
 
     while (
       this.match(
@@ -743,7 +745,7 @@ export class AwkParser {
       )
     ) {
       const opToken = this.advance();
-      const right = this.parseAddSub();
+      const right = this.parseConcatenation();
       const opMap = new Map<string, "<" | "<=" | ">" | ">=" | "==" | "!=">([
         ["<", "<"],
         ["<=", "<="],

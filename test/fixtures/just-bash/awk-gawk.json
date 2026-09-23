@@ -2863,6 +2863,70 @@
       "stdout": "+inf -inf +inf\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "numbers: printf rounds half to even",
+      "args": [
+        "BEGIN {printf \"%.0f %.0f %.0f %.1f %.2f %.1e %.2g %.0e\\n\", 0.5, 1.5, 2.5, 0.25, 1.005, 2.25, 0.125, 25}"
+      ],
+      "stdout": "0 2 2 0.2 1.00 2.2e+00 0.12 2e+01\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "numbers: printf flags",
+      "args": [
+        "BEGIN {printf \"[%+.2f][% d][%08.3f][%-8.2e][%#x][%#o][%#.0f][%+5s]\\n\", 3.14159, 7, -2.5, 12345.678, 255, 8, 3, \"ab\"}"
+      ],
+      "stdout": "[+3.14][ 7][-002.500][1.23e+04][0xff][010][3.][   ab]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "numbers: %c of a code point",
+      "args": [
+        "BEGIN {printf \"[%c][%c][%c]\\n\", 65, 128077, 233}"
+      ],
+      "stdout": "[A][👍][é]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "numbers: large values through printf",
+      "args": [
+        "BEGIN {printf \"%x %o %d %.0f %e\\n\", 2^60, 2^40, -2^62, 1e22, 1e300}"
+      ],
+      "stdout": "1000000000000000 20000000000000 -4611686018427387904 10000000000000000000000 1.000000e+300\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "numbers: small values",
+      "args": [
+        "BEGIN {print 1e-300, 0.000001, 0.0000001; printf \"%g %f %.10g\\n\", 5e-324, 1e-7, 1/7}"
+      ],
+      "stdout": "1e-300 1e-06 1e-07\n4.94066e-324 0.000000 0.1428571429\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "numbers: a float that is whole prints as an integer",
+      "args": [
+        "BEGIN {x = 0.1 * 30; print x, (x == 3); a[x] = 1; for (k in a) print k; print 1e15 + 0.5, 3.0 * 2}"
+      ],
+      "stdout": "3 1\n3\n1e+15 6\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "numbers: numeric strings keep their text",
+      "args": [
+        "{print $1, $1 + 0, ($1 == 1)}"
+      ],
+      "stdin": "1.0\n0x10\n+5\n.5e1\n",
+      "stdout": "1.0 1 1\n0x10 0 0\n+5 5 0\n.5e1 5 0\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

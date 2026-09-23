@@ -10,8 +10,11 @@ import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import { createUserRegex, type UserRegex } from "../../regex/index.js";
 import type { AwkExpr } from "./ast.js";
+import { chars, charLength, charSlice, charsBefore } from "./chars.js";
+import { DEFAULT_AWK_STRING_LIMIT, formatPrintf } from "./format.js";
 import type { AwkRuntimeContext } from "./interpreter/context.js";
 import { splitRecord } from "./interpreter/fields.js";
+import { toAwkString, toNumber } from "./interpreter/type-coercion.js";
 import type { AwkValue } from "./interpreter/types.js";
 
 /**
@@ -26,21 +29,6 @@ export type AwkBuiltinFn = (
   ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ) => AwkValue | Promise<AwkValue>;
-
-// Helper functions for type conversion
-function toNumber(val: AwkValue): number {
-  if (typeof val === "number") return val;
-  const n = parseFloat(val);
-  return Number.isNaN(n) ? 0 : n;
-}
-
-function toAwkString(val: AwkValue): string {
-  if (typeof val === "string") return val;
-  if (Number.isInteger(val)) return String(val);
-  return String(val);
-}
-
-const DEFAULT_AWK_STRING_LIMIT = 10 * 1024 * 1024;
 
 function createAwkStringBuilder(maxBytes: number): BoundedStringBuilder {
   return new BoundedStringBuilder(
@@ -135,7 +123,7 @@ function getTargetValue(targetName: string, ctx: AwkRuntimeContext): string {
     const idx = parseInt(targetName.slice(1), 10) - 1;
     return ctx.fields[idx] || "";
   }
-  return toAwkString(ctx.vars[targetName] ?? "");
+  return toAwkString(ctx.vars[targetName] ?? "", ctx.CONVFMT);
 }
 
 /**
@@ -169,38 +157,44 @@ async function awkLength(
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) {
-    return ctx.line.length;
+    return charLength(ctx.line);
   }
-  const str = toAwkString(await evaluator.evalExpr(args[0]));
-  return str.length;
+  const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
+  // (1ctx) characters, not UTF-16 units
+  return charLength(str);
 }
 
 async function awkSubstr(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<string> {
   if (args.length < 2) return "";
-  const str = toAwkString(await evaluator.evalExpr(args[0]));
-  const start = Math.floor(toNumber(await evaluator.evalExpr(args[1]))) - 1;
+  const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
+  const start = Math.max(
+    0,
+    Math.floor(toNumber(await evaluator.evalExpr(args[1]))) - 1,
+  );
 
+  // (1ctx) positions and lengths count characters, as gawk does
   if (args.length >= 3) {
     const len = Math.floor(toNumber(await evaluator.evalExpr(args[2])));
-    return str.substr(Math.max(0, start), len);
+    return len > 0 ? charSlice(str, start, start + len) : "";
   }
-  return str.substr(Math.max(0, start));
+  return charSlice(str, start);
 }
 
 async function awkIndex(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length < 2) return 0;
-  const str = toAwkString(await evaluator.evalExpr(args[0]));
-  const target = toAwkString(await evaluator.evalExpr(args[1]));
+  const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
+  const target = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
   const idx = str.indexOf(target);
-  return idx === -1 ? 0 : idx + 1;
+  // (1ctx) a character position
+  return idx === -1 ? 0 : charsBefore(str, idx) + 1;
 }
 
 async function awkSplit(
@@ -209,7 +203,7 @@ async function awkSplit(
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length < 2) return 0;
-  const str = toAwkString(await evaluator.evalExpr(args[0]));
+  const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
 
   const arrayExpr = args[1];
   if (arrayExpr.type !== "variable") {
@@ -224,7 +218,7 @@ async function awkSplit(
     if (sepExpr.type === "regex") {
       sep = createUserRegex(sepExpr.pattern);
     } else {
-      const sepVal = toAwkString(await evaluator.evalExpr(sepExpr));
+      const sepVal = toAwkString(await evaluator.evalExpr(sepExpr), ctx.CONVFMT);
       sep = sepVal === " " ? createUserRegex("\\s+") : sepVal;
     }
   } else if (ctx.FS === " ") {
@@ -235,9 +229,12 @@ async function awkSplit(
   const available =
     ctx.maxArrayElements - ctx.arrayElementCount + previousCount;
   const parts =
-    typeof sep === "string"
-      ? str.split(sep, available + 1)
-      : sep.split(str, available + 1);
+    typeof sep !== "string"
+      ? sep.split(str, available + 1)
+      : sep === ""
+        ? // (1ctx) an empty separator splits characters, not UTF-16 units
+          chars(str).slice(0, available + 1)
+        : str.split(sep, available + 1);
   if (parts.length > available) {
     throw new ExecutionLimitError(
       `array element limit exceeded (${ctx.maxArrayElements})`,
@@ -263,7 +260,7 @@ async function awkSub(
   if (args.length < 2) return 0;
 
   const pattern = await extractPatternArg(args[0], evaluator);
-  const replacement = toAwkString(await evaluator.evalExpr(args[1]));
+  const replacement = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
   const targetName = await resolveTargetName(args[2], evaluator);
   const target = getTargetValue(targetName, ctx);
 
@@ -293,7 +290,7 @@ async function awkGsub(
   if (args.length < 2) return 0;
 
   const pattern = await extractPatternArg(args[0], evaluator);
-  const replacement = toAwkString(await evaluator.evalExpr(args[1]));
+  const replacement = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
   const targetName = await resolveTargetName(args[2], evaluator);
   const target = getTargetValue(targetName, ctx);
 
@@ -357,15 +354,16 @@ async function awkMatch(
     return 0;
   }
 
-  const str = toAwkString(await evaluator.evalExpr(args[0]));
+  const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   const pattern = await extractPatternArg(args[1], evaluator);
 
   try {
     const regex = createUserRegex(pattern);
     const match = regex.exec(str);
     if (match) {
-      ctx.RSTART = match.index + 1;
-      ctx.RLENGTH = match[0].length;
+      // (1ctx) character positions, not UTF-16 offsets
+      ctx.RSTART = charsBefore(str, match.index) + 1;
+      ctx.RLENGTH = charLength(match[0]);
       return ctx.RSTART;
     }
   } catch {
@@ -385,11 +383,11 @@ async function awkGensub(
   if (args.length < 3) return "";
 
   const pattern = await extractPatternArg(args[0], evaluator);
-  const replacement = toAwkString(await evaluator.evalExpr(args[1]));
-  const how = toAwkString(await evaluator.evalExpr(args[2]));
+  const replacement = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
+  const how = toAwkString(await evaluator.evalExpr(args[2]), ctx.CONVFMT);
   const target =
     args.length >= 4
-      ? toAwkString(await evaluator.evalExpr(args[3]))
+      ? toAwkString(await evaluator.evalExpr(args[3]), ctx.CONVFMT)
       : ctx.line;
 
   try {
@@ -477,20 +475,20 @@ function processGensub(
 
 async function awkTolower(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<string> {
   if (args.length === 0) return "";
-  return toAwkString(await evaluator.evalExpr(args[0])).toLowerCase();
+  return toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT).toLowerCase();
 }
 
 async function awkToupper(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<string> {
   if (args.length === 0) return "";
-  return toAwkString(await evaluator.evalExpr(args[0])).toUpperCase();
+  return toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT).toUpperCase();
 }
 
 async function awkSprintf(
@@ -499,28 +497,29 @@ async function awkSprintf(
   evaluator: AwkEvaluator,
 ): Promise<string> {
   if (args.length === 0) return "";
-  const format = toAwkString(await evaluator.evalExpr(args[0]));
+  const format = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   const values: AwkValue[] = [];
   for (let i = 1; i < args.length; i++) {
     values.push(await evaluator.evalExpr(args[i]));
   }
-  return formatPrintf(format, values, awkStringLimit(ctx));
+  return formatPrintf(format, values, awkStringLimit(ctx), ctx.CONVFMT);
 }
 
 // ─── Math Functions ─────────────────────────────────────────────
 
 async function awkInt(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 0;
-  return Math.floor(toNumber(await evaluator.evalExpr(args[0])));
+  // (1ctx) toward zero, as gawk truncates
+  return Math.trunc(toNumber(await evaluator.evalExpr(args[0])));
 }
 
 async function awkSqrt(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 0;
@@ -529,7 +528,7 @@ async function awkSqrt(
 
 async function awkSin(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 0;
@@ -538,7 +537,7 @@ async function awkSin(
 
 async function awkCos(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 0;
@@ -547,7 +546,7 @@ async function awkCos(
 
 async function awkAtan2(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   const y = args.length > 0 ? toNumber(await evaluator.evalExpr(args[0])) : 0;
@@ -557,7 +556,7 @@ async function awkAtan2(
 
 async function awkLog(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 0;
@@ -566,7 +565,7 @@ async function awkLog(
 
 async function awkExp(
   args: AwkExpr[],
-  _ctx: AwkRuntimeContext,
+  ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 1;
@@ -601,7 +600,7 @@ async function awkClose(
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return -1;
-  const name = toAwkString(await evaluator.evalExpr(args[0]));
+  const name = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   let closed = ctx.getlineCommandStreams.delete(name);
   if (ctx.fs && ctx.cwd) {
     const path = ctx.fs.resolvePath(ctx.cwd, name);
@@ -623,402 +622,6 @@ function unimplemented(name: string): AwkBuiltinFn {
   return () => {
     throw new Error(`function '${name}()' is not implemented`);
   };
-}
-
-// ─── Printf Formatting ──────────────────────────────────────────
-
-const MAX_PRINTF_WIDTH = 10000;
-
-export function formatPrintf(
-  format: string,
-  values: AwkValue[],
-  maxBytes: number = DEFAULT_AWK_STRING_LIMIT,
-): string {
-  let valueIdx = 0;
-  let result = "";
-  let resultBytes = 0;
-  let i = 0;
-  const maxFieldWidth = Math.min(MAX_PRINTF_WIDTH, maxBytes);
-  const append = (value: string): void => {
-    const bytes = utf8ByteLength(value);
-    if (bytes > maxBytes - resultBytes) {
-      throw new ExecutionLimitError(
-        `formatted string size limit exceeded (${maxBytes} bytes)`,
-        "string_length",
-      );
-    }
-    result += value;
-    resultBytes += bytes;
-  };
-
-  while (i < format.length) {
-    if (format[i] === "%" && i + 1 < format.length) {
-      let j = i + 1;
-      let flags = "";
-      let width = "";
-      let precision = "";
-      let positionalIdx: number | undefined;
-
-      // Check for positional argument: %n$ where n is a number
-      const posStart = j;
-      while (j < format.length && /\d/.test(format[j])) {
-        j++;
-      }
-      if (j > posStart && format[j] === "$") {
-        // Found positional argument like %2$
-        positionalIdx = parseInt(format.substring(posStart, j), 10) - 1; // Convert to 0-based
-        j++; // Skip the $
-      } else {
-        // Not positional, reset j
-        j = posStart;
-      }
-
-      // Skip length modifiers (l, ll, z, j, h, hh) - they're ignored in AWK but shouldn't break parsing
-      const skipLengthMods = () => {
-        if (j < format.length) {
-          // Check for hh or ll first (2-char modifiers)
-          if (
-            j + 1 < format.length &&
-            ((format[j] === "h" && format[j + 1] === "h") ||
-              (format[j] === "l" && format[j + 1] === "l"))
-          ) {
-            j += 2;
-            return;
-          }
-          // Check for single-char modifiers
-          if (/[lzjh]/.test(format[j])) {
-            j++;
-          }
-        }
-      };
-
-      while (j < format.length && /[-+ #0]/.test(format[j])) {
-        flags += format[j++];
-      }
-
-      // Handle * for width
-      if (format[j] === "*") {
-        const widthVal = values[valueIdx++];
-        const w = widthVal !== undefined ? Math.floor(Number(widthVal)) : 0;
-        if (!Number.isFinite(w) || !Number.isSafeInteger(w)) {
-          throw new ExecutionLimitError(
-            `printf width limit exceeded (${maxFieldWidth} bytes)`,
-            "string_length",
-          );
-        }
-        if (w < 0) {
-          flags += "-";
-          width = String(-w);
-        } else {
-          width = String(w);
-        }
-        j++;
-      } else {
-        while (j < format.length && /\d/.test(format[j])) {
-          width += format[j++];
-        }
-      }
-      if (width && parseInt(width, 10) > maxFieldWidth) {
-        throw new ExecutionLimitError(
-          `printf width limit exceeded (${maxFieldWidth} bytes)`,
-          "string_length",
-        );
-      }
-
-      if (format[j] === ".") {
-        j++;
-        // Handle * for precision
-        if (format[j] === "*") {
-          const precVal = values[valueIdx++];
-          const parsedPrecision =
-            precVal !== undefined ? Math.floor(Number(precVal)) : 0;
-          if (
-            !Number.isFinite(parsedPrecision) ||
-            !Number.isSafeInteger(parsedPrecision)
-          ) {
-            throw new ExecutionLimitError(
-              `printf precision limit exceeded (${maxFieldWidth} bytes)`,
-              "string_length",
-            );
-          }
-          precision = parsedPrecision < 0 ? "" : String(parsedPrecision);
-          j++;
-        } else {
-          while (j < format.length && /\d/.test(format[j])) {
-            precision += format[j++];
-          }
-        }
-        if (precision && parseInt(precision, 10) > maxFieldWidth) {
-          throw new ExecutionLimitError(
-            `printf precision limit exceeded (${maxFieldWidth} bytes)`,
-            "string_length",
-          );
-        }
-      }
-
-      // Skip length modifiers before the specifier
-      skipLengthMods();
-
-      const spec = format[j];
-      // Use positional index if specified, otherwise use sequential index
-      const valIdx = positionalIdx !== undefined ? positionalIdx : valueIdx;
-      const val = values[valIdx];
-
-      switch (spec) {
-        case "s": {
-          let str = val !== undefined ? String(val) : "";
-          if (precision) {
-            str = str.substring(0, parseInt(precision, 10));
-          }
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "d":
-        case "i": {
-          let num = val !== undefined ? Math.floor(Number(val)) : 0;
-          if (Number.isNaN(num)) num = 0;
-          const isNegative = num < 0;
-          let digits = Math.abs(num).toString();
-
-          // Precision for integers means minimum number of digits (zero-padded)
-          if (precision) {
-            const prec = parseInt(precision, 10);
-            digits = digits.padStart(prec, "0");
-          }
-
-          // Add sign
-          let sign = "";
-          if (isNegative) {
-            sign = "-";
-          } else if (flags.includes("+")) {
-            sign = "+";
-          } else if (flags.includes(" ")) {
-            sign = " ";
-          }
-
-          let str = sign + digits;
-
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else if (flags.includes("0") && !precision) {
-              // Zero-padding only applies when no precision is specified
-              str = sign + digits.padStart(w - sign.length, "0");
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "f": {
-          let num = val !== undefined ? Number(val) : 0;
-          if (Number.isNaN(num)) num = 0;
-          const prec = precision ? parseInt(precision, 10) : 6;
-          if (prec > 100) {
-            throw new ExecutionLimitError(
-              "printf floating-point precision limit exceeded (100 digits)",
-              "string_length",
-            );
-          }
-          let str = num.toFixed(prec);
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "e":
-        case "E": {
-          let num = val !== undefined ? Number(val) : 0;
-          if (Number.isNaN(num)) num = 0;
-          const prec = precision ? parseInt(precision, 10) : 6;
-          if (prec > 100) {
-            throw new ExecutionLimitError(
-              "printf floating-point precision limit exceeded (100 digits)",
-              "string_length",
-            );
-          }
-          let str = num.toExponential(prec);
-          if (spec === "E") str = str.toUpperCase();
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "g":
-        case "G": {
-          let num = val !== undefined ? Number(val) : 0;
-          if (Number.isNaN(num)) num = 0;
-          const prec = precision ? parseInt(precision, 10) : 6;
-          if (prec > 100) {
-            throw new ExecutionLimitError(
-              "printf floating-point precision limit exceeded (100 digits)",
-              "string_length",
-            );
-          }
-          const exp = num !== 0 ? Math.floor(Math.log10(Math.abs(num))) : 0;
-          let str: string;
-          if (num === 0) {
-            str = "0";
-          } else if (exp < -4 || exp >= prec) {
-            str = num.toExponential(prec - 1);
-            if (spec === "G") str = str.toUpperCase();
-          } else {
-            str = num.toPrecision(prec);
-          }
-          // Remove trailing zeros after decimal point, but keep at least one digit
-          // Must not match standalone "0" (which has no decimal point)
-          if (str.includes(".")) {
-            str = str.replace(/\.?0+$/, "").replace(/\.?0+e/, "e");
-          }
-          if (str.includes("e")) {
-            str = str.replace(/\.?0+e/, "e");
-          }
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "x":
-        case "X": {
-          let num = val !== undefined ? Math.floor(Number(val)) : 0;
-          if (Number.isNaN(num)) num = 0;
-          let digits = Math.abs(num).toString(16);
-          if (spec === "X") digits = digits.toUpperCase();
-
-          // Precision for hex means minimum number of digits (zero-padded)
-          if (precision) {
-            const prec = parseInt(precision, 10);
-            digits = digits.padStart(prec, "0");
-          }
-
-          const sign = num < 0 ? "-" : "";
-          let str = sign + digits;
-
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else if (flags.includes("0") && !precision) {
-              str = sign + digits.padStart(w - sign.length, "0");
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "o": {
-          let num = val !== undefined ? Math.floor(Number(val)) : 0;
-          if (Number.isNaN(num)) num = 0;
-          let digits = Math.abs(num).toString(8);
-
-          // Precision for octal means minimum number of digits (zero-padded)
-          if (precision) {
-            const prec = parseInt(precision, 10);
-            digits = digits.padStart(prec, "0");
-          }
-
-          const sign = num < 0 ? "-" : "";
-          let str = sign + digits;
-
-          if (width) {
-            const w = parseInt(width, 10);
-            if (flags.includes("-")) {
-              str = str.padEnd(w);
-            } else if (flags.includes("0") && !precision) {
-              str = sign + digits.padStart(w - sign.length, "0");
-            } else {
-              str = str.padStart(w);
-            }
-          }
-          append(str);
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "c": {
-          if (typeof val === "number") {
-            append(String.fromCharCode(val));
-          } else {
-            append(String(val ?? "").charAt(0) || "");
-          }
-          if (positionalIdx === undefined) valueIdx++;
-          break;
-        }
-
-        case "%":
-          append("%");
-          break;
-
-        default:
-          append(format.substring(i, j + 1));
-      }
-      i = j + 1;
-    } else if (format[i] === "\\" && i + 1 < format.length) {
-      const esc = format[i + 1];
-      switch (esc) {
-        case "n":
-          append("\n");
-          break;
-        case "t":
-          append("\t");
-          break;
-        case "r":
-          append("\r");
-          break;
-        case "\\":
-          append("\\");
-          break;
-        default:
-          append(esc);
-      }
-      i += 2;
-    } else {
-      append(format[i++]);
-    }
-  }
-
-  return result;
 }
 
 // ─── Built-in Function Registry ─────────────────────────────────
