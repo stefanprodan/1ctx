@@ -176,12 +176,19 @@ function formatCsv(value: unknown, delimiter: string): string {
   if (!Array.isArray(value)) {
     value = [value];
   }
-  // a list of scalars is one row, as mikefarah writes it; Papa refused it
-  // (1ctx)
-  const rows = value as unknown[];
-  if (rows.length > 0 && rows.every((row) => row === null || typeof row !== "object")) {
-    value = [rows];
-  }
+  // a list of scalars is one row, as mikefarah writes it; Papa refused it,
+  // and a null is written as null, not an empty cell (1ctx)
+  const named = (cell: unknown) => (cell === null ? "null" : cell);
+  const rows = (value as unknown[]).map((row) =>
+    Array.isArray(row)
+      ? row.map(named)
+      : row !== null && typeof row === "object"
+        ? Object.fromEntries(
+            Object.entries(row as Record<string, unknown>).map(([k, v]) => [k, named(v)]),
+          )
+        : named(row),
+  );
+  value = rows.every((row) => row === null || typeof row !== "object") ? [rows] : rows;
   // Use comma as default for output (empty means auto-detect for input only)
   return Papa.unparse(value as unknown[], {
     delimiter: delimiter || ",",

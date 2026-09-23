@@ -8,7 +8,10 @@
     "config.yaml": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
     "data.json": "{\"name\": \"app\", \"items\": [{\"id\": 1, \"tag\": \"a\"}, {\"id\": 2, \"tag\": \"b\"}], \"meta\": {\"count\": 2}}\n",
     "strings.yaml": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
-    "docs.yaml": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n"
+    "docs.yaml": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
+    "nulls.yaml": "a: 1\nn: null\ns: x\nl:\n  - 1\nm:\n  k: 1\n",
+    "rows.yaml": "a: x\nn: 1\nl:\n  - 1\n  - a b\n  - true\n  - null\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
+    "notes.yaml": "# top\na: 1 # one\nb:\n  - x # item\n"
   },
   "cases": [
     {
@@ -3355,12 +3358,7 @@
       ],
       "stdout": "",
       "exit": 1,
-      "error": true,
-      "accept": {
-        "stdout": "",
-        "exit": 0,
-        "reason": "A null in -, *, / or % drops the result, as a missing key does; mikefarah errors on an explicit null."
-      }
+      "error": true
     },
     {
       "name": "dialect: $__loc__",
@@ -4116,9 +4114,9 @@
       "stdout": "name: \"app\"\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
       "exit": 0,
       "accept": {
-        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
-        "exit": 0,
-        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
       }
     },
     {
@@ -4130,9 +4128,9 @@
       "stdout": "name: app # x\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
       "exit": 0,
       "accept": {
-        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
-        "exit": 0,
-        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
       }
     },
     {
@@ -4146,7 +4144,7 @@
       "accept": {
         "stdout": "base:\n  image: nginx\n  replicas: 1\nweb:\n  image: nginx\n  replicas: 2\ntags:\n  - a\n  - b\n",
         "exit": 0,
-        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
       }
     },
     {
@@ -4156,12 +4154,7 @@
         "config.yaml"
       ],
       "stdout": "name: app\nversion: 1.2.0\nport: \"8080\"\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
-      "exit": 0,
-      "accept": {
-        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
-        "exit": 0,
-        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
-      }
+      "exit": 0
     },
     {
       "name": "mikefarah: to_json(4)",
@@ -4183,7 +4176,7 @@
       "accept": {
         "stdout": "0\n",
         "exit": 0,
-        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+        "reason": "Line and column are not kept on our values and answer 0."
       }
     },
     {
@@ -4456,6 +4449,1223 @@
         "exit": 0,
         "reason": "ireduce counts as computed, where mikefarah keeps its accumulator's document: a known miss of the walker."
       }
+    },
+    {
+      "name": "arithmetic: .z * 2",
+      "args": [
+        ".z * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n * 2",
+      "args": [
+        ".n * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .z | . * 2",
+      "args": [
+        ".z | . * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .n | . * 2",
+      "args": [
+        ".n | . * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .z - 1",
+      "args": [
+        ".z - 1",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n - 1",
+      "args": [
+        ".n - 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z | . - 1",
+      "args": [
+        ".z | . - 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: 2 * .n",
+      "args": [
+        "2 * .n",
+        "nulls.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: 1 + .n",
+      "args": [
+        "1 + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .s + .n",
+      "args": [
+        ".s + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .l + .n",
+      "args": [
+        ".l + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .m + .n",
+      "args": [
+        ".m + .n",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .l[5] * 2",
+      "args": [
+        ".l[5] * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .z + 1",
+      "args": [
+        ".z + 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n + 1",
+      "args": [
+        ".n + 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z + .a",
+      "args": [
+        ".z + .a",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z + .z",
+      "args": [
+        ".z + .z",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n.q + 1",
+      "args": [
+        ".n.q + 1",
+        "nulls.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n.q * 2",
+      "args": [
+        ".n.q * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: (.z | .q) * 2",
+      "args": [
+        "(.z | .q) * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .a.q * 2",
+      "args": [
+        ".a.q * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .a? * 2",
+      "args": [
+        ".a? * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z? * 2",
+      "args": [
+        ".z? * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .z / 2",
+      "args": [
+        ".z / 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .n / 2",
+      "args": [
+        ".n / 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .n % 2",
+      "args": [
+        ".n % 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "arithmetic: .n - .n",
+      "args": [
+        ".n - .n",
+        "nulls.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .a[0]",
+      "args": [
+        ".a[0]",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .s[0]",
+      "args": [
+        ".s[0]",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .s[0:1]",
+      "args": [
+        ".s[0:1]",
+        "nulls.yaml"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: .l[0].q * 2",
+      "args": [
+        ".l[0].q * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "arithmetic: (.z // 1) * 2",
+      "args": [
+        "(.z // 1) * 2",
+        "nulls.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas | . + 1 on pods.yaml",
+      "args": [
+        ".spec.replicas | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n---\n1\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas | . - 1 on pods.yaml",
+      "args": [
+        ".spec.replicas | . - 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n---\n1\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.nodeName | . + \"-x\" on pods.yaml",
+      "args": [
+        ".spec.nodeName | . + \"-x\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a-x\n---\n-x\n---\n-x\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas + 1 | . * 2 on pods.yaml",
+      "args": [
+        ".spec.replicas + 1 | . * 2",
+        "pods.yaml"
+      ],
+      "stdout": "2\n2\n---\n8\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.nodeName + \"-x\" on pods.yaml",
+      "args": [
+        ".spec.nodeName + \"-x\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a-x\n-x\n-x\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.spec.replicas | . + 1] on pods.yaml",
+      "args": [
+        "[.spec.replicas | . + 1]",
+        "pods.yaml"
+      ],
+      "stdout": "- 1\n- 1\n- 4\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: [.. | path | join(\".\")]",
+      "args": [
+        "[.. | path | join(\".\")]",
+        "config.yaml"
+      ],
+      "stdout": "- \"\"\n- name\n- version\n- port\n- debug\n- empty\n- mode\n- nothing\n- tags\n- tags.0\n- tags.1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: to_entries | .[] | key",
+      "args": [
+        "to_entries | .[] | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n1\n2\n3\n4\n5\n6\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .spec | to_entries | .[0] | path",
+      "args": [
+        ".spec | to_entries | .[0] | path",
+        "pods.yaml"
+      ],
+      "stdout": "- spec\n- 0\n---\n- spec\n- 0\n---\n- spec\n- 0\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .spec | keys | .[0] | path",
+      "args": [
+        ".spec | keys | .[0] | path",
+        "pods.yaml"
+      ],
+      "stdout": "- 0\n- 0\n- 0\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: [.items[] | select(.metadata.name == \"backend\") | key]",
+      "args": [
+        "[.items[] | select(.metadata.name == \"backend\") | key]",
+        "list.yaml"
+      ],
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: [.items[] | select(.metadata.name == \"backend\") | path | join(\".\")]",
+      "args": [
+        "[.items[] | select(.metadata.name == \"backend\") | path | join(\".\")]",
+        "list.yaml"
+      ],
+      "stdout": "- items.1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .items[] | .spec.ports[] | select(.port == 9090) | key",
+      "args": [
+        ".items[] | .spec.ports[] | select(.port == 9090) | key",
+        "list.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .. | select(. == \"api\") | key",
+      "args": [
+        ".. | select(. == \"api\") | key",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: (.tags[] | select(. == \"api\")) | path",
+      "args": [
+        "(.tags[] | select(. == \"api\")) | path",
+        "config.yaml"
+      ],
+      "stdout": "- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .tags | .[] | key",
+      "args": [
+        ".tags | .[] | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: .tags[0] | length | key",
+      "args": [
+        ".tags[0] | length | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: key inside map is refused",
+      "args": [
+        ".tags | map(key)",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "- 0\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: path inside map is refused",
+      "args": [
+        ".items | map(path)",
+        "list.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "- - items\n  - 0\n- - items\n  - 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: key inside a select under map is refused",
+      "args": [
+        ".items | map(select(.metadata.name == \"backend\") | key)",
+        "list.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "paths: key inside del is refused",
+      "args": [
+        "del(.[] | select(key == \"port\"))",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "key and path are known only where the walker follows the path, at the top of the filter; inside map, with_entries or del they are refused rather than answered wrong."
+      },
+      "stdout": "name: app\nversion: 1.2.0\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .debug tag = \"!!str\"",
+      "args": [
+        ".debug tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: \"false\"\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .nothing tag = \"!!str\"",
+      "args": [
+        ".nothing tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: \"null\"\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .port tag = \"!!str\" | .port | type",
+      "args": [
+        ".port tag = \"!!str\" | .port | type",
+        "config.yaml"
+      ],
+      "stdout": "!!str\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .mode tag = \"!!int\" | .mode + 1",
+      "args": [
+        ".mode tag = \"!!int\" | .mode + 1",
+        "config.yaml"
+      ],
+      "stdout": "645\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .mode tag = \"!!int\"",
+      "args": [
+        ".mode tag = \"!!int\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: 644\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "A retyped scalar prints as its new type, where mikefarah keeps the quoting it had (mode: \"0644\" with an !!int tag)."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .name tag = \"!!int\" is refused",
+      "args": [
+        ".name tag = \"!!int\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A scalar is retyped by its value: a tag the value cannot take (a word as !!int, !!bool) is refused where mikefarah writes a tagged node."
+      },
+      "stdout": "name: !!int app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .port tag = \"!!bool\" is refused",
+      "args": [
+        ".port tag = \"!!bool\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A scalar is retyped by its value: a tag the value cannot take (a word as !!int, !!bool) is refused where mikefarah writes a tagged node."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: !!bool 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .port tag = \"!!float\"",
+      "args": [
+        ".port tag = \"!!float\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "A whole number is a float already here, where mikefarah tags it !!float."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: !!float 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: .l[] |= (. tag = \"!!str\")",
+      "args": [
+        ".l[] |= (. tag = \"!!str\")",
+        "rows.yaml"
+      ],
+      "stdout": "a: x\nn: 1\nl:\n  - \"1\"\n  - a b\n  - \"true\"\n  - \"null\"\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: (.l[] | select(tag == \"!!int\")) tag = \"!!str\"",
+      "args": [
+        "(.l[] | select(tag == \"!!int\")) tag = \"!!str\"",
+        "rows.yaml"
+      ],
+      "stdout": "a: x\nn: 1\nl:\n  - \"1\"\n  - a b\n  - true\n  - null\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
+      "exit": 0
+    },
+    {
+      "name": "tag: -i .port tag = \"!!str\"",
+      "args": [
+        "-i",
+        ".port tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "config.yaml": "name: app\nversion: 1.2.0\nport: \"8080\"\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n"
+      }
+    },
+    {
+      "name": "tag: -i .mode tag = \"!!int\"",
+      "args": [
+        "-i",
+        ".mode tag = \"!!int\"",
+        "config.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "config.yaml": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: 644\nnothing: null\ntags:\n  - web\n  - api\n"
+        },
+        "reason": "A retyped scalar is written as its new type, where mikefarah keeps the quoting it had (mode: \"0644\" with an !!int tag) and leaves the file."
+      },
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "comments: ... comments=\"\" on notes.yaml",
+      "args": [
+        "... comments=\"\"",
+        "notes.yaml"
+      ],
+      "stdout": "a: 1\nb:\n  - x\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -i ... comments=\"\" on notes.yaml",
+      "args": [
+        "-i",
+        "... comments=\"\"",
+        "notes.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "a: 1\nb:\n  - x\n"
+      }
+    },
+    {
+      "name": "comments: -i . comments=\"\" on notes.yaml",
+      "args": [
+        "-i",
+        ". comments=\"\"",
+        "notes.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "a: 1 # one\nb:\n  - x # item\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {},
+        "reason": "A comment setter on . with an empty string changes nothing here, where mikefarah drops the comments of the root node alone; ... comments=\"\" strips them all in both."
+      }
+    },
+    {
+      "name": "comments: -i ... line_comment=\"\" on notes.yaml",
+      "args": [
+        "-i",
+        "... line_comment=\"\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "notes.yaml": "a: 1\nb:\n  - x\n"
+        },
+        "reason": "A comment setter with an empty string strips every comment of the file, head and foot comments included."
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "# top\na: 1\nb:\n  - x\n"
+      }
+    },
+    {
+      "name": "comments: -i .a line_comment=\"\" is refused",
+      "args": [
+        "-i",
+        ".a line_comment=\"\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A comment setter is taken only on . or .. with an empty string; on a path it is refused.",
+        "written": {}
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "notes.yaml": "# top\na: 1\nb:\n  - x # item\n"
+      }
+    },
+    {
+      "name": "comments: -i ... comments=\"\" on anchors.yaml is refused",
+      "args": [
+        "-i",
+        "... comments=\"\"",
+        "anchors.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A fresh write of a document with an alias would expand it, so the edit is refused.",
+        "written": {}
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
+      }
+    },
+    {
+      "name": "comments: .a line_comment=\"x\" is refused",
+      "args": [
+        ".a line_comment=\"x\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      },
+      "stdout": "# top\na: 1 # x\nb:\n  - x # item\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a style=\"double\" is refused",
+      "args": [
+        ".a style=\"double\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      },
+      "stdout": "# top\na: \"1\" # one\nb:\n  - x # item\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a anchor=\"x\" is refused",
+      "args": [
+        ".a anchor=\"x\"",
+        "notes.yaml"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+      },
+      "stdout": "# top\na: &x 1 # one\nb:\n  - x # item\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: \"x\" | @csv",
+      "args": [
+        "\"x\" | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .n | @csv",
+      "args": [
+        ".n | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | @csv",
+      "args": [
+        ".l | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "1,a b,true,null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | @tsv",
+      "args": [
+        ".l | @tsv",
+        "rows.yaml"
+      ],
+      "stdout": "1\ta b\ttrue\tnull\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | @csv",
+      "args": [
+        ".r | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "k,j\n1,x\n2,\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | @tsv",
+      "args": [
+        ".r | @tsv",
+        "rows.yaml"
+      ],
+      "stdout": "k\tj\n1\tx\n2\t\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .q | @csv",
+      "args": [
+        ".q | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "\"a,b\",\"c\"\"d\",\" e\",\"f\ng\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .q | @tsv",
+      "args": [
+        ".q | @tsv",
+        "rows.yaml"
+      ],
+      "stdout": "a,b\t\"c\"\"d\"\t\" e\"\t\"f\ng\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | @csv",
+      "args": [
+        ".m | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: [.l, .l] | @csv",
+      "args": [
+        "[.l, .l] | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "1,a b,true,null\n1,a b,true,null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: [.m] | @csv",
+      "args": [
+        "[.m] | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "k\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: [] | @csv",
+      "args": [
+        "[] | @csv",
+        "rows.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | @sh",
+      "args": [
+        ".l | @sh",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: .n | @sh",
+      "args": [
+        ".n | @sh",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: .m | @sh",
+      "args": [
+        ".m | @sh",
+        "rows.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "formats: .m | tostring",
+      "args": [
+        ".m | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "k: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .l | tostring",
+      "args": [
+        ".l | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "- 1\n- a b\n- true\n- null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | tostring",
+      "args": [
+        ".r | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "- k: 1\n  j: x\n- k: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .n | tostring",
+      "args": [
+        ".n | tostring",
+        "rows.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | map(.)",
+      "args": [
+        ".m | map(.)",
+        "rows.yaml"
+      ],
+      "stdout": "- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | map(. + 1)",
+      "args": [
+        ".m | map(. + 1)",
+        "rows.yaml"
+      ],
+      "stdout": "- 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .m | map_values(. + 1)",
+      "args": [
+        ".m | map_values(. + 1)",
+        "rows.yaml"
+      ],
+      "stdout": "k: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | map(.k)",
+      "args": [
+        ".r | map(.k)",
+        "rows.yaml"
+      ],
+      "stdout": "- 1\n- 2\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .r | map(type) | join(\",\")",
+      "args": [
+        ".r | map(type) | join(\",\")",
+        "rows.yaml"
+      ],
+      "stdout": "!!map,!!map\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .a | @sh",
+      "args": [
+        ".a | @sh",
+        "rows.yaml"
+      ],
+      "accept": {
+        "stdout": "'x'\n",
+        "exit": 0,
+        "reason": "@sh quotes every string, as jq does, where mikefarah quotes only what needs it."
+      },
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o csv .r",
+      "args": [
+        "-o",
+        "csv",
+        ".r",
+        "rows.yaml"
+      ],
+      "stdout": "k,j\n1,x\n2,\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o tsv .r",
+      "args": [
+        "-o",
+        "tsv",
+        ".r",
+        "rows.yaml"
+      ],
+      "stdout": "k\tj\n1\tx\n2\t\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o csv .l",
+      "args": [
+        "-o",
+        "csv",
+        ".l",
+        "rows.yaml"
+      ],
+      "stdout": "1,a b,true,null\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: -o csv .q",
+      "args": [
+        "-o",
+        "csv",
+        ".q",
+        "rows.yaml"
+      ],
+      "stdout": "\"a,b\",\"c\"\"d\",\" e\",\"f\ng\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .spec | map(type) | join(\",\") on pods.yaml",
+      "args": [
+        ".spec | map(type) | join(\",\")",
+        "pods.yaml"
+      ],
+      "stdout": "!!str,!!seq\n!!seq\n!!int\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: [{\"b\": 1, \"a\": 2}, {\"a\": 2, \"b\": 1}] | unique",
+      "args": [
+        "[{\"b\": 1, \"a\": 2}, {\"a\": 2, \"b\": 1}] | unique",
+        "config.yaml"
+      ],
+      "stdout": "- b: 1\n  a: 2\n- a: 2\n  b: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: {\"b\": 1, \"a\": 2} == {\"a\": 2, \"b\": 1}",
+      "args": [
+        "{\"b\": 1, \"a\": 2} == {\"a\": 2, \"b\": 1}",
+        "config.yaml"
+      ],
+      "stdout": "false\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .spec.containers[] | [.name, .image] | @tsv on pods.yaml",
+      "args": [
+        ".spec.containers[] | [.name, .image] | @tsv",
+        "pods.yaml"
+      ],
+      "accept": {
+        "stdout": "postgres\tpostgres:16.4\n---\nweb\tnginx:1.27\nproxy\tenvoyproxy/envoy:v1.31\n",
+        "exit": 0,
+        "reason": "mikefarah's collect and literals answer once for a document whose pipe produced nothing, an empty line here; ours answer nothing."
+      },
+      "stdout": "postgres\tpostgres:16.4\n---\nweb\tnginx:1.27\nproxy\tenvoyproxy/envoy:v1.31\n---\n\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: .metadata.labels | to_entries | .[] | \"\\(.key)=\\(.value)\" on pods.yaml",
+      "args": [
+        ".metadata.labels | to_entries | .[] | \"\\(.key)=\\(.value)\"",
+        "pods.yaml"
+      ],
+      "accept": {
+        "stdout": "app=postgres\napp=web\n",
+        "exit": 0,
+        "reason": "mikefarah's collect and literals answer once for a document whose pipe produced nothing, an empty line here; ours answer nothing."
+      },
+      "stdout": "app=postgres\napp=web\n=\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .tags[] | splitDoc | . + \"!\"",
+      "args": [
+        ".tags[] | splitDoc | . + \"!\"",
+        "config.yaml"
+      ],
+      "stdout": "web!\n---\napi!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.tags[] | splitDoc) | upcase",
+      "args": [
+        "(.tags[] | splitDoc) | upcase",
+        "config.yaml"
+      ],
+      "stdout": "WEB\nAPI\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .items[] | splitDoc | .metadata",
+      "args": [
+        ".items[] | splitDoc | .metadata",
+        "list.yaml"
+      ],
+      "stdout": "name: frontend\n---\nname: backend\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .items[] | splitDoc | select(.metadata.name == \"backend\")",
+      "args": [
+        ".items[] | splitDoc | select(.metadata.name == \"backend\")",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion: v1\nkind: Service\nmetadata:\n  name: backend\nspec:\n  ports:\n    - port: 8080\n    - port: 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .items[] | splitDoc | .metadata.name | length",
+      "args": [
+        ".items[] | splitDoc | .metadata.name | length",
+        "list.yaml"
+      ],
+      "stdout": "8\n---\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: .metadata.name[0] on pods.yaml",
+      "args": [
+        ".metadata.name[0]",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: .metadata.name[0:2] on pods.yaml",
+      "args": [
+        ".metadata.name[0:2]",
+        "pods.yaml"
+      ],
+      "stdout": "po\n---\nwe\n---\nwe\n",
+      "exit": 0
+    },
+    {
+      "name": "errors: a broken filter exits 1",
+      "args": [
+        ".a |",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "errors: an unknown function exits 1",
+      "args": [
+        "nosuchfn",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "errors: an unknown function in the second of two files",
+      "args": [
+        ".name",
+        "config.yaml",
+        "nope.yaml"
+      ],
+      "files": {
+        "nope.yaml": "name: x\n"
+      },
+      "stdout": "app\n---\nx\n",
+      "exit": 0
     }
   ]
 }

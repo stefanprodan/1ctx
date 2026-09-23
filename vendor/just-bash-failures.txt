@@ -157,6 +157,9 @@
 (fail) yq > join-output mode > should not print newlines with -j
 (fail) yq format strings > edge cases > @base64 on array returns null
 (fail) yq format strings > edge cases > @base64 on non-string returns null
+(fail) yq format strings > edge cases > @csv on non-array returns null
+(fail) yq format strings > edge cases > @csv with null values
+(fail) yq format strings > edge cases > @sh on non-string returns null
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'

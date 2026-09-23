@@ -27,6 +27,7 @@ import {
   type QuerySource,
   type QueryValue,
 } from "../query-engine/index.js";
+import { missingPath } from "../query-engine/builtins/dialect-builtins.js";
 import type { AstNode, DestructurePattern } from "../query-engine/parser.js";
 import { asQueryRecord } from "../query-engine/safe-object.js";
 import { isTruthy } from "../query-engine/value-operations.js";
@@ -42,6 +43,8 @@ export interface Tagged {
   state: State;
   /** the document splitDoc gave it, apart from the one it was read from */
   index?: number;
+  /** the very node splitDoc made a document, not one inside it */
+  splitRoot?: boolean;
   /** its path from the root, where known, for key and path */
   path?: (string | number)[];
 }
@@ -188,10 +191,10 @@ function isMap(value: QueryValue): boolean {
   return asQueryRecord(value) !== null;
 }
 
-// scalar arithmetic replaces its left side; null + x is x; a merge of two
-// maps keeps the side that was read
+// scalar arithmetic replaces its left side, a null left side included,
+// whose replacement mikefarah makes in its place; a merge of two maps
+// keeps the side that was read
 function arithmetic(op: string, left: Tagged, right: Tagged): State {
-  if (op === "+" && left.value === null) return right.state;
   if ((op === "+" || op === "*") && isMap(left.value) && isMap(right.value)) {
     return left.state === "computed" ? right.state : left.state;
   }
@@ -209,7 +212,7 @@ function walk(
       const lefts = walk(ast.left, input, ctx, vars);
       // splitDoc makes each result so far a document of its own
       if (isSplitDoc(ast.right)) {
-        return lefts.map((left, index) => ({ ...left, index }));
+        return lefts.map((left, index) => ({ ...left, index, splitRoot: true }));
       }
       // the context the engine's own pipe gives its right side, which
       // parent reads
@@ -218,15 +221,32 @@ function walk(
         leftPath === null
           ? ctx
           : { ...ctx, currentPath: [...(ctx.currentPath ?? []), ...leftPath] };
+      // a node inside a split document stays in it, as mikefarah's parent
+      // chain has it; a function's replacement of a node inside keeps it
+      // and one of the split node itself loses it, arithmetic the other
+      // way round, since his add copies the node's own index
+      const keeps = keepsSplit(ast.right);
+      const sameNode = keepsSplit(ast.right) && !isPathOnly(ast.right);
       return lefts.flatMap((left) =>
         walk(ast.right, left, { ...right, sourceNode: left }, vars).map(
-          // a node inside a split document stays in it
-          (result) =>
-            left.index !== undefined &&
-            result.index === undefined &&
-            result.state !== "computed"
-              ? { ...result, index: left.index }
-              : result,
+          (result) => {
+            if (left.index === undefined || result.index !== undefined) {
+              return result;
+            }
+            const arithmetic =
+              ast.right.type === "BinaryOp" && ARITHMETIC.has(ast.right.op);
+            const kept = keeps
+              ? true
+              : arithmetic
+                ? left.splitRoot === true
+                : !left.splitRoot && result.state === "inside";
+            if (!kept) return result;
+            return {
+              ...result,
+              index: left.index,
+              splitRoot: sameNode ? left.splitRoot : false,
+            };
+          },
         ),
       );
     }
@@ -237,6 +257,14 @@ function walk(
       ];
     case "Paren":
       return walk(ast.expr, input, ctx, vars);
+    case "Array": {
+      // walked, so key and path inside [...] see the paths
+      if (!ast.elements) break;
+      const items = walk(ast.elements, input, ctx, vars).map((r) => r.value);
+      const state = replaced(input.state);
+      const path = state === "computed" ? [] : (input.path ?? []);
+      return [{ value: items, state, path }];
+    }
     case "BinaryOp": {
       if (ast.op === "//") {
         const found = walk(ast.left, input, ctx, vars).filter(
@@ -245,6 +273,15 @@ function walk(
         return found.length > 0 ? found : walk(ast.right, input, ctx, vars);
       }
       if (!ARITHMETIC.has(ast.op)) break;
+      // a missing key read as an operand drops the result, or in + leaves
+      // the other side, as the engine's own rule
+      const yq = ctx.dialect === "yq";
+      const leftMissing = yq && missingPath(input.value, ast.left);
+      const rightMissing = yq && missingPath(input.value, ast.right);
+      if (leftMissing || rightMissing) {
+        if (ast.op !== "+" || (leftMissing && rightMissing)) return [];
+        return walk(leftMissing ? ast.right : ast.left, input, ctx, vars);
+      }
       const lefts = walk(ast.left, input, ctx, vars);
       const rights = walk(ast.right, input, ctx, vars);
       const results: Tagged[] = [];
@@ -294,7 +331,7 @@ function walk(
     case "Recurse": {
       // .. answers the input itself first, then the nodes inside it
       const values = evaluate(input.value, ast, ctx);
-      const paths = pathsOf(input, ast, ctx, values.length);
+      const paths = pathsOf(input, ast, ctx, values.length, step(input.state));
       return values.map((value, index) => ({
         value,
         state: index === 0 ? input.state : step(input.state),
@@ -304,12 +341,29 @@ function walk(
   }
   const state = classify(ast, input.state, input.value, vars);
   const values = evaluate(input.value, ast, ctx);
-  const paths = pathsOf(input, ast, ctx, values.length);
+  const paths = pathsOf(input, ast, ctx, values.length, state);
   return values.map((value, index) => ({
     value,
     state,
     path: paths?.[index],
   }));
+}
+
+// a path step or a function returning its input keeps a split document's
+// index, as mikefarah's parent chain does
+function keepsSplit(ast: AstNode): boolean {
+  switch (ast.type) {
+    case "Pipe":
+      return keepsSplit(ast.left) && keepsSplit(ast.right);
+    case "Paren":
+      return keepsSplit(ast.expr);
+    case "Call":
+      return SAME_NODE.has(ast.name);
+    case "UpdateOp":
+      return true;
+    default:
+      return isPathOnly(ast);
+  }
 }
 
 function isSplitDoc(ast: AstNode): boolean {
@@ -338,19 +392,22 @@ function isPathOnly(ast: AstNode): boolean {
   }
 }
 
-// the paths of a node's results from the root: path() of a path step, the
-// input's own for a function that returns its input, else unknown
+// the paths of a node's results from the root, as mikefarah's parent
+// chain gives them: path() of a path step under the input's, the input's
+// own for a replacement or a function that returns its input, and a fresh
+// root for a value computed from nothing
 function pathsOf(
   input: Tagged,
   ast: AstNode,
   ctx: EvalContext,
   count: number,
+  state: State,
 ): ((string | number)[] | undefined)[] | undefined {
-  if (input.path === undefined) return undefined;
-  if (ast.type === "Call" && SAME_NODE.has(ast.name)) {
-    return Array.from({ length: count }, () => input.path);
+  const base = input.path ?? [];
+  if (!isPathOnly(ast)) {
+    const own = state === "computed" ? [] : base;
+    return Array.from({ length: count }, () => own);
   }
-  if (!isPathOnly(ast)) return undefined;
   try {
     const paths = evaluate(
       input.value,
@@ -358,7 +415,7 @@ function pathsOf(
       ctx,
     );
     if (paths.length !== count) return undefined;
-    return paths.map((p) => [...(input.path ?? []), ...(p as (string | number)[])]);
+    return paths.map((p) => [...base, ...(p as (string | number)[])]);
   } catch {
     return undefined;
   }

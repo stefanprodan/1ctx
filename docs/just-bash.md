@@ -81,7 +81,9 @@ without a file of their own.
 | `src/commands/yq/documents.ts` (new), `yq.ts`, `query-engine/evaluator.ts`, `src/index.ts` | a walker runs the top of a yq filter (`\|`, `,`, `//`, parentheses, `as`, `if`, arithmetic) and tags each result as the document, a node inside it, or computed from nothing, classifying every other node by what it is; `---` prints where the document index moves or a later file starts, a computed value counting as document 0, in stdout and in `-i`; the evaluator exports `createContext()` and `extractPathFromAst()` and the package exports the walker and the engine for our tests | mikefarah prints `---` only between values read from different documents: `length`, `keys` and `"\(.kind)"` print none, `.a // "none"` one where the index moves |
 | `src/commands/query-engine/builtins/dialect-builtins.ts` (new), `evaluator.ts`, `parser.ts`, `yq/yq.ts` | `dialect` on the options and the context, `yq` from the yq command; the builtins, arithmetic, `==` and field steps that part follow it, and jq 1.8's errors and answers where both tools agree and upstream answered null (see "The jq and yq dialects"); an unbound variable is an error; `.a.[0]` parses | where the tools part, a model got exit 0 with the wrong answer: `sub("-", "_")` and `select(.image == "nginx*")` answered null or nothing, `type` never matched `!!str`, `keys` sorted, `to_entries` of a list was null, and `.a * 2` printed null for every document without `a` |
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `--` ends the flags; `-o csv` writes a list of scalars as one row and every row with a newline, `-o tsv`, `-o props` and `-o p` are mikefarah's formats (`tags.0 = a`); `-M`, `-C` and `--colors` are accepted and ignored; `-0` and `--nul-output` end each result with a NUL, keeping `---`, and fail on a result holding one | mikefarah's flags failed as unknown options |
-| `src/commands/query-engine/builtins/dialect-builtins.ts`, `parser.ts`, `yq/yq.ts`, `yq/documents.ts` | mikefarah's functions: `documentIndex` and `di`, `fileIndex`, `fi` and `filename`, `to_number`, `to_string`, `@yaml`, `to_yaml`, `@yamld`, `from_yaml`, `@jsond`, `from_json`, `@props`, `sort_keys(f)`, `pick` and `omit` of a list of keys, `filter(f)`, `any_c`, `all_c`, `key` and bare `path` (from the paths the walker follows), `with(p; f)`, `splitDoc` and `split_doc` (each result its own document), `load` and `load_str` of a file named as a string (read before the run through the mount, under the string limit), `explode`; `anchor`, `alias`, `style` and the comment getters answer `""`, `line` and `column` 0, and the setters (`.a style="double"`, `... comments=""`, `tag=`) parse and change nothing; jq refuses the setters | models write them from mikefarah's docs, and each failed as an unknown function or a parse error |
+| `src/commands/query-engine/builtins/dialect-builtins.ts`, `parser.ts`, `yq/yq.ts`, `yq/documents.ts` | mikefarah's functions: `documentIndex` and `di`, `fileIndex`, `fi` and `filename`, `to_number`, `to_string`, `@yaml`, `to_yaml`, `@yamld`, `from_yaml`, `@jsond`, `from_json`, `@props`, `sort_keys(f)`, `pick` and `omit` of a list of keys, `filter(f)`, `any_c`, `all_c`, `key` and bare `path` (from the paths the walker follows), `with(p; f)`, `splitDoc` and `split_doc` (each result its own document), `load` and `load_str` of a file named as a string (read before the run through the mount, under the string limit), `explode`; `anchor`, `alias`, `style` and the comment getters answer `""`, `line` and `column` 0; `tag = "!!str"` and the other four YAML tags retype a scalar whose value can take the tag, `... comments=""` strips the comments (under `-i` the documents are written afresh, refused over an alias or a YAML 1.1 scalar), and `style=`, `anchor=`, `alias=` and a comment set to text are refused, since our values carry none; jq refuses every setter | models write them from mikefarah's docs, and each failed as an unknown function or a parse error, then changed nothing |
+| `src/commands/query-engine/builtins/dialect-builtins.ts`, `evaluator.ts`, `yq/documents.ts` | in the yq dialect an arithmetic operand that is a path of steps is read as mikefarah reads it, without creating a missing key: `.n * 2` on a document without `n` answers nothing and `.n + 1` the other side, where `.n \| . * 2` fails on the null the pipe made, `null - x` and `null + x` are `x` in the node's place, `x * null` is `x`; a `key` or bare `path` the walker cannot follow (inside `map`, `with_entries` or `del`) is refused, and a replacement's path is its input's, so `to_entries \| .[] \| key` counts; `.a[0]` on a string answers nothing (jq's error) | `.spec.replicas \| . + 1` lost its `---`, `.n - 1` printed nothing where mikefarah prints 1, and `key` answered null inside a function |
+| `src/commands/query-engine/builtins/dialect-builtins.ts`, `yq/formats.ts`, `value-operations.ts` | `@csv` and `@tsv` in the yq dialect are mikefarah's (a scalar as it is, a list one row, a list of lists rows, a list of maps under a header, `null` written out, Go's quoting) and `-o csv` writes `null` too; `@sh` and `@uri` fail on anything but a string; `tostring` of a map or list is YAML; `map` over a map is `[.[] \| f]` in both dialects; `unique`, `unique_by` and `group_by` key a map by its text in linear time, and jq's `==`, `unique` and `group_by` treat two maps that differ only in key order as one, mikefarah's not; jq's `@csv` quotes every string, its `@tsv` escapes with backslashes and its `@sh` joins a list | `@sh` and `@uri` answered null for a list, `tostring` of a list was JSON, `map` over a map was null, `unique` compared every pair, and jq's `@csv` left strings bare |
 | `src/commands/yq/formats.ts`, `src/commands/yq/preserve.ts` | merge keys (`<<: *base`) merge on read, the explicit keys winning; `-i` keeps the key as written | `.web.image` through a merge key answered null and `-o json` showed a `<<` key |
 | `src/commands/yq/yq.ts`, `src/commands/yq/documents.ts`, `query-engine/parser.ts` | `ea` and `eval-all` read every document of every file (or stdin) first and run the filter once over the list: a pipe hands the whole list on, `[...]` at the top collects every result into one array, `EXPR as $x ireduce (INIT; UPDATE)` folds them, and every other node runs per document; `-i` writes each file its own documents' results; `ireduce` parses in both dialects and jq refuses it | the idioms that sort or count documents across a stream, or merge files, were refused with a pointer to `-s` |
 
@@ -112,9 +114,10 @@ variable is an error, `.a.[0]` and `.a.[]` parse, and `keys`,
 `join`, `sort`, `unique`, `group_by`, `flatten`, `test`, `sub`,
 `trim`, `upcase` and `any` fail on null instead of answering null.
 jq keeps its own for `@base64` of a non-string (the text encoded) and
-`reverse` of null (`[]`), sorts `unique` and `group_by`, and fails
-arithmetic on operands it does not take (null included) where upstream
-answered null. Both accept mikefarah's `upcase`, `downcase`,
+`reverse` of null (`[]`), sorts `unique` and `group_by`, compares maps
+by key, quotes every string in `@csv`, escapes `@tsv` cells with
+backslashes, joins a list with `@sh`, and fails arithmetic on operands
+it does not take (null included) where upstream answered null. Both accept mikefarah's `upcase`, `downcase`,
 `env(NAME)` (the variable read as YAML, an unset one an error),
 `strenv(NAME)` (a string, an unset one empty), `to_json`, `tag` and
 `kind`, which jq 1.8 does not define.
@@ -231,8 +234,7 @@ for one of the reasons below. Where they part:
   mikefarah empties it.
 - Our values carry no style, comments, tags or anchors: `style`,
   `anchor`, `line_comment` and the like answer `""`, `line` and
-  `column` 0, and the setters (`style=`, `tag=`, `comments=`) change
-  nothing, `tag = "!!str"` included.
+  `column` 0.
 - `load` takes its file name as a string literal, read before the run;
   a loaded JSON file prints in block style, where mikefarah keeps its
   flow style.
@@ -241,17 +243,34 @@ for one of the reasons below. Where they part:
   `keys_unsorted`, `ascii_upcase`, `gsub`, `splits`, `add`, `index`,
   bare object keys (`{name: .a}`), `env.NAME` and `$ENV.NAME`, and jq's
   regex flags (`i`, `x`), where mikefarah takes only `g`.
-- jq's precedence: `a | b, c` is `a | (b, c)` and `a | b and c` is
-  `a | (b and c)`; mikefarah binds the pipe tighter. An unbound
-  variable (`$index`, `$__loc__`) is an error; mikefarah prints nothing.
-- A null in `-`, `*`, `/` or `%` drops the result, as a missing key
-  does in mikefarah's; he errors on an explicit null (`z: null`, then
-  `.z * 2`), and our values cannot tell the two apart.
+- jq's precedence: `a | b, c` is `a | (b, c)`, `a | b and c` is
+  `a | (b and c)` and `.a // "" != "x"` is `.a // ("" != "x")`;
+  mikefarah binds the pipe tighter and `//` looser than `!=`. An
+  unbound variable (`$index`, `$__loc__`) is an error; mikefarah prints
+  nothing.
+- A document whose pipe produced nothing prints nothing: mikefarah's
+  literals, `"\(.a)"`, `[...]` and `{...}` still answer once there, so
+  `select(.kind == "Nope") | "x"` prints `x` per document and
+  `.spec.containers[] | [.name, .image] | @tsv` an empty line for a
+  document without containers.
+- `key` and bare `path` are answered where the walker follows the path
+  (`.[] | select(...) | key`, `[.. | path]`) and refused inside `map`,
+  `with_entries` and `del`, where mikefarah answers them; `parent` is
+  upstream's and answers nothing after `..` or `select`.
+- `-I 4` indents a map inside a sequence item by 4; mikefarah's by 2.
+- A setter of style, comments or anchors is refused, `tag =` retypes
+  the value (`mode: 644` where mikefarah keeps `"0644"` with an `!!int`
+  tag) and refuses a value the tag does not fit, where mikefarah
+  writes a tagged node (`!!int app`).
+- `sub("(w)eb", "$1x")` reads `$1x` as group 1 and `x`; Go reads a
+  group named `1x`, empty.
 - Map keys are strings: `with_entries` on a list prints `"0": a`, where
   mikefarah's map has the integer key `0`.
 - `match` answers its fields in jq's order; `sub(re; repl; "g")`
   replaces every match, as the other forms do; `@sh` quotes every
-  string; `length` of a number is its absolute value, not its digits.
+  string; `length` of a number is its absolute value, not its digits;
+  a string printed afresh is double-quoted where mikefarah single-quotes
+  (`'!!str'`).
 - `-s` is slurp, not mikefarah's split into files; a missing file exits
   2; `--version` names just-bash and the syntax.
 

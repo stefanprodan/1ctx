@@ -181,6 +181,18 @@ export function spelledFor11(doc: YAML.Document): boolean {
   return found;
 }
 
+/** Whether the document holds an alias, which a fresh spelling expands. */
+export function hasAlias(doc: YAML.Document): boolean {
+  let found = false;
+  YAML.visit(doc, {
+    Alias() {
+      found = true;
+      return YAML.visit.BREAK;
+    },
+  });
+  return found;
+}
+
 /**
  * The document's text with `after` in place of `before`, its comments and
  * every untouched scalar kept as written, or null when the edit cannot be

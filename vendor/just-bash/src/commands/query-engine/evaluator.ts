@@ -28,6 +28,7 @@ import {
 import {
   equalOperands,
   evalDialectBuiltin,
+  missingPath,
   mixedOperands,
   unsupported,
 } from "./builtins/dialect-builtins.js";
@@ -630,6 +631,14 @@ function evaluateNode(
       return boundedFlatMap(ctx, bases, (v) => {
         const indices = evaluate(v, ast.index, ctx);
         return boundedFlatMap(ctx, indices, (idx) => {
+          // an index into a scalar: nothing in mikefarah's yq, jq's error
+          // (1ctx)
+          if (v !== null && typeof v !== "object") {
+            if (ctx.dialect === "yq") return [];
+            throw new Error(
+              `Cannot index ${typeof v} with ${typeof idx === "string" ? "string" : "number"}`,
+            );
+          }
           if (typeof idx === "number" && Array.isArray(v)) {
             // Handle NaN - return null for NaN index
             if (Number.isNaN(idx)) {
@@ -1121,6 +1130,8 @@ function normalizeIndex(idx: number, len: number): number {
   return Math.min(idx, len);
 }
 
+const ARITHMETIC = new Set(["+", "-", "*", "/", "%"]);
+
 export function evalBinaryOp(
   value: QueryValue,
   op: string,
@@ -1154,6 +1165,18 @@ export function evalBinaryOp(
     );
     if (nonNull.length > 0) return nonNull;
     return evaluate(value, right, ctx);
+  }
+
+  // mikefarah's yq reads an operand's path without creating what is
+  // missing: a missing key drops the result, or in + leaves the other
+  // side (1ctx)
+  if (ctx.dialect === "yq" && ARITHMETIC.has(op)) {
+    const leftMissing = missingPath(value, left);
+    const rightMissing = missingPath(value, right);
+    if (leftMissing || rightMissing) {
+      if (op !== "+" || (leftMissing && rightMissing)) return [];
+      return evaluate(value, leftMissing ? right : left, ctx);
+    }
   }
 
   const leftVals = evaluate(value, left, ctx);

@@ -826,6 +826,173 @@
       "stdout": "",
       "exit": 3,
       "error": true
+    },
+    {
+      "name": "unique of maps differing in key order",
+      "args": [
+        "-c",
+        "unique"
+      ],
+      "stdin": "[{\"b\":1,\"a\":2},{\"a\":2,\"b\":1}]\n",
+      "stdout": "[{\"b\":1,\"a\":2}]\n",
+      "exit": 0
+    },
+    {
+      "name": "group_by of maps differing in key order",
+      "args": [
+        "-c",
+        "group_by(.) | map(length)"
+      ],
+      "stdin": "[{\"b\":1,\"a\":2},{\"a\":2,\"b\":1}]\n",
+      "stdout": "[2]\n",
+      "exit": 0
+    },
+    {
+      "name": "maps differing in key order are equal",
+      "args": [
+        "-c",
+        ".[0] == .[1]"
+      ],
+      "stdin": "[{\"b\":1,\"a\":2},{\"a\":2,\"b\":1}]\n",
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "map over an object",
+      "args": [
+        "-c",
+        "map(type)"
+      ],
+      "stdin": "{\"a\":1,\"b\":\"x\"}\n",
+      "stdout": "[\"number\",\"string\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "@csv quotes every string",
+      "args": [
+        "-c",
+        "@csv"
+      ],
+      "stdin": "[\"a,b\",\"c\\\"d\",1,null,true,\" e\"]\n",
+      "stdout": "\"\\\"a,b\\\",\\\"c\\\"\\\"d\\\",1,,true,\\\" e\\\"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@tsv escapes a cell",
+      "args": [
+        "-c",
+        "@tsv"
+      ],
+      "stdin": "[\"a\\tb\",\"c\\\\d\",\"e\\nf\",null,1]\n",
+      "stdout": "\"a\\\\tb\\tc\\\\\\\\d\\te\\\\nf\\t\\t1\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@csv of a string fails",
+      "args": [
+        "-c",
+        "@csv"
+      ],
+      "stdin": "\"x\"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "@csv of a nested list fails",
+      "args": [
+        "-c",
+        "@csv"
+      ],
+      "stdin": "[[1]]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "@sh of a list",
+      "args": [
+        "-c",
+        "@sh"
+      ],
+      "stdin": "[1,\"a b\",null,true]\n",
+      "stdout": "\"1 'a b' null true\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@sh of a number",
+      "args": [
+        "-c",
+        "@sh"
+      ],
+      "stdin": "1\n",
+      "stdout": "\"1\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@sh of null",
+      "args": [
+        "-c",
+        "@sh"
+      ],
+      "stdin": "null\n",
+      "stdout": "\"null\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@sh of an object fails",
+      "args": [
+        "-c",
+        "@sh"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "@sh of a nested list fails",
+      "args": [
+        "-c",
+        "@sh"
+      ],
+      "stdin": "[[1]]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null times two fails",
+      "args": [
+        "-c",
+        ".a * 2"
+      ],
+      "stdin": "{\"a\":null}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "a missing key times two fails",
+      "args": [
+        "-c",
+        ".z * 2"
+      ],
+      "stdin": "{\"a\":null}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": ".a[0] on a string fails",
+      "args": [
+        "-c",
+        ".a[0]"
+      ],
+      "stdin": "{\"a\":\"x\"}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
     }
   ]
 }

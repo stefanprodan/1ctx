@@ -30,6 +30,7 @@ import {
   type QuerySource,
   type QueryValue,
 } from "../query-engine/index.js";
+import { stripsComments } from "../query-engine/builtins/dialect-builtins.js";
 import type { AstNode } from "../query-engine/parser.js";
 import { getValueDepth } from "../query-engine/value-operations.js";
 import {
@@ -45,7 +46,7 @@ import {
   parseInput,
 } from "./formats.js";
 import { evaluateAll, evaluateDocument, type Input } from "./documents.js";
-import { preservingText, spelledFor11 } from "./preserve.js";
+import { hasAlias, preservingText, spelledFor11 } from "./preserve.js";
 
 const yqHelp = {
   name: "yq",
@@ -488,11 +489,13 @@ export const yqCommand: RuntimeCommand = {
         if (!options.inplace && !outputFormatExplicit) one.unshift("-o", first);
         const result = await (yqCommand.execute as RunOne)(one, ctx, file);
         const [head, tail] = edges.get(result) ?? [null, null];
-        stderr += result.stderr.replaceAll(TOJSON_WARNING, "");
-        // a file that matched nothing leaves it and the loop goes on
+        const own = result.stderr.replaceAll(TOJSON_WARNING, "");
+        stderr += own;
+        // a file that matched nothing leaves it and the loop goes on; an
+        // error says so on stderr and ends it
         const miss =
           result.exitCode === 1 &&
-          (options.exitStatus || result.stderr.includes("no matches found"));
+          (own === "" || own.includes("no matches found"));
         if (miss) misses++;
         if (result.stdout !== "") {
           const yaml =
@@ -706,6 +709,8 @@ export const yqCommand: RuntimeCommand = {
           format: (value) =>
             formatOutput(value, { ...options, yaml11: true }, maxBytes),
           maxDepth: ctx.limits.maxQueryDepth,
+          // `... comments=""` writes the documents afresh, without them
+          plain: hasNode(ast, stripsComments),
         });
         if (text === null) {
           return {
@@ -773,6 +778,17 @@ export const yqCommand: RuntimeCommand = {
     }
   },
 };
+
+/** Whether a node of the filter satisfies `test`. (1ctx) */
+function hasNode(ast: AstNode, test: (node: AstNode) => boolean): boolean {
+  const visit = (node: unknown): boolean => {
+    if (Array.isArray(node)) return node.some(visit);
+    if (node === null || typeof node !== "object") return false;
+    if (test(node as AstNode)) return true;
+    return Object.values(node).some(visit);
+  };
+  return visit(ast);
+}
 
 /**
  * The files the filter's load() and load_str() name, read through the
@@ -979,6 +995,7 @@ async function runEvalAll(
               format: (value) =>
                 formatOutput(value, { ...options, yaml11: true }, maxBytes),
               maxDepth: ctx.limits.maxQueryDepth,
+              plain: hasNode(ast, stripsComments),
             })
           : printRecords(own, { ...options, outputFormat: written }, ctx, 0);
       if (text === null) {
@@ -1171,7 +1188,12 @@ function inPlaceText(
   records: Result[],
   documents: YAML.Document[],
   documentValues: QueryValue[],
-  opts: { format: (value: QueryValue) => string; maxDepth: number },
+  opts: {
+    format: (value: QueryValue) => string;
+    maxDepth: number;
+    /** written from the values, so the file's comments go */
+    plain?: boolean;
+  },
 ): string | null {
   const groups: Result[][] = documents.map(() => []);
   for (const record of records) {
@@ -1191,11 +1213,15 @@ function inPlaceText(
     // several results for one document: mikefarah writes the last
     const record = group[group.length - 1];
     const last = record.value;
-    let part = preservingText(documents[index], documentValues[index], last);
+    let part = opts.plain
+      ? null
+      : preservingText(documents[index], documentValues[index], last);
     if (part === null) {
       // written afresh from values: refused when that would change what a
-      // YAML 1.1 reader gets from an untouched scalar (0644, yes)
+      // YAML 1.1 reader gets from an untouched scalar (0644, yes), or
+      // expand an alias
       if (spelledFor11(documents[index])) return null;
+      if (opts.plain && hasAlias(documents[index])) return null;
       part = opts.format(last);
     }
     // the markers are written here, where the document moves

@@ -17,6 +17,7 @@ import type { Dialect, EvalContext } from "../evaluator.js";
 import { type AstNode, parse } from "../parser.js";
 import { asQueryRecord, safeSet, sanitizeParsedData } from "../safe-object.js";
 import {
+  canonical,
   compareJq,
   deepEqual,
   type QueryValue,
@@ -78,12 +79,66 @@ function isScalar(value: QueryValue): boolean {
   );
 }
 
+// the map keys and list indexes a path of steps names, null for any other
+// node
+function pathSteps(ast: AstNode): (string | number)[] | null {
+  switch (ast.type) {
+    case "Identity":
+      return [];
+    case "Paren":
+    case "Optional":
+      return pathSteps(ast.expr);
+    case "Pipe": {
+      const left = pathSteps(ast.left);
+      const right = left === null ? null : pathSteps(ast.right);
+      return left === null || right === null ? null : [...left, ...right];
+    }
+    case "Field": {
+      const base = ast.base ? pathSteps(ast.base) : [];
+      return base === null ? null : [...base, ast.name];
+    }
+    case "Index": {
+      const base = ast.base ? pathSteps(ast.base) : [];
+      if (base === null || ast.index.type !== "Literal") return null;
+      const index = ast.index.value;
+      if (typeof index !== "string" && typeof index !== "number") return null;
+      return [...base, index];
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Whether a path of steps names a map key that is not there, or steps
+ * into a scalar. mikefarah's arithmetic reads its operands without
+ * creating what is missing, so `.n * 2` on a document without `n` answers
+ * nothing where `.n | . * 2` fails on the null it made; a list index past
+ * the end still makes a null.
+ */
+export function missingPath(value: QueryValue, ast: AstNode): boolean {
+  const steps = pathSteps(ast);
+  if (steps === null) return false;
+  let at = value;
+  for (const step of steps) {
+    if (typeof step === "string") {
+      const map = asQueryRecord(at);
+      if (map === null) return !Array.isArray(at);
+      if (!Object.hasOwn(map, step)) return true;
+      at = map[step] as QueryValue;
+    } else {
+      if (isScalar(at)) return true;
+      at = Array.isArray(at) ? (at[step] ?? null) : null;
+    }
+  }
+  return false;
+}
+
 /**
  * mikefarah's answer for arithmetic his yq takes and jq does not: a string
- * and a number or boolean concatenate, a null in -, *, / or % drops the
- * result (a missing key does there; our values cannot tell it from a null
- * one), a map and a scalar fail. Undefined leaves the operands to jq's
- * rules.
+ * and a number or boolean concatenate, a null on the left of + or - gives
+ * the right side, a null on the right of * the left, a map and a scalar
+ * fail. Undefined leaves the operands to jq's rules.
  */
 export function mixedOperands(
   op: string,
@@ -99,10 +154,15 @@ export function mixedOperands(
     ) {
       return [`${l}${r}`];
     }
+    if (r === null && l !== null && !Array.isArray(l) && typeof l !== "string") {
+      unsupported(op, l, r);
+    }
     return undefined;
   }
-  if (op === "-" || op === "*" || op === "/" || op === "%") {
-    if (l === null || r === null) return [];
+  if (op === "-" && l === null) return [r];
+  if (op === "*") {
+    if (r === null) return [l];
+    if (l === null && (Array.isArray(r) || asQueryRecord(r))) return [r];
   }
   return undefined;
 }
@@ -131,21 +191,20 @@ function globMatch(text: string, pattern: string): boolean {
   return p === pattern.length;
 }
 
-/** ==: in mikefarah's yq a * in a right-hand string is a wildcard. */
+/**
+ * ==: in mikefarah's yq a * in a right-hand string is a wildcard, and two
+ * maps are equal only in the same key order; jq compares maps by key.
+ */
 export function equalOperands(
   l: QueryValue,
   r: QueryValue,
   dialect: Dialect | undefined,
 ): boolean {
-  if (
-    dialect === "yq" &&
-    typeof l === "string" &&
-    typeof r === "string" &&
-    r.includes("*")
-  ) {
+  if (dialect !== "yq") return deepEqual(l, r);
+  if (typeof l === "string" && typeof r === "string" && r.includes("*")) {
     return globMatch(l, r);
   }
-  return deepEqual(l, r);
+  return JSON.stringify(l) === JSON.stringify(r);
 }
 
 const REGEX_FUNCTIONS = new Set([
@@ -395,19 +454,22 @@ function entryKey(key: QueryValue, yq: boolean): string {
   throw new Error(`Cannot use ${described(key)} as object key`);
 }
 
-// first-seen order, as mikefarah's unique and group_by keep it
+// first-seen order, as mikefarah's unique and group_by keep it; his maps
+// are equal only in one key order, jq's by key
 function byKey(
   value: QueryValue[],
   key: (item: QueryValue) => QueryValue,
+  yq: boolean,
 ): QueryValue[][] {
-  const groups: { key: QueryValue; items: QueryValue[] }[] = [];
+  const groups = new Map<string, { key: QueryValue; items: QueryValue[] }>();
   for (const item of value) {
     const k = key(item);
-    const group = groups.find((g) => deepEqual(g.key, k));
+    const text = yq ? JSON.stringify(k) : canonical(k);
+    const group = groups.get(text);
     if (group) group.items.push(item);
-    else groups.push({ key: k, items: [item] });
+    else groups.set(text, { key: k, items: [item] });
   }
-  return groups.map((g) => g.items);
+  return [...groups.values()].map((g) => g.items);
 }
 
 function yamlValue(text: string): QueryValue {
@@ -445,6 +507,136 @@ export function propsText(value: QueryValue): string {
   return lines.map((line) => `${line}\n`).join("");
 }
 
+// a scalar as mikefarah's csv writes it
+function csvText(value: QueryValue): string {
+  return value === null || value === undefined ? "null" : String(value);
+}
+
+// Go's csv quoting: a field holding the separator, a quote, a newline or a
+// leading space
+function csvField(text: string, separator: string): string {
+  if (
+    text.includes(separator) ||
+    text.includes('"') ||
+    text.includes("\n") ||
+    text.includes("\r") ||
+    text.startsWith(" ")
+  ) {
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+  return text;
+}
+
+/**
+ * mikefarah's @csv and @tsv: a scalar as it is, a list of scalars as one
+ * row, a list of lists as rows, a list of maps under a header of the
+ * first map's keys, anything else an error.
+ */
+export function csvRows(value: QueryValue, separator: string): string {
+  const row = (cells: QueryValue[]): string => {
+    for (const cell of cells) {
+      if (cell !== null && typeof cell === "object") {
+        throw new Error(
+          `csv encoding only works for arrays of scalars (string/numbers/booleans), got ${yamlTag(cell)}`,
+        );
+      }
+    }
+    return cells.map((cell) => csvField(csvText(cell), separator)).join(separator);
+  };
+  if (!Array.isArray(value)) {
+    if (value !== null && typeof value === "object") {
+      throw new Error(`csv encoding only works for arrays, got: ${yamlTag(value)}`);
+    }
+    return csvText(value);
+  }
+  if (value.length === 0) return "";
+  if (Array.isArray(value[0])) {
+    return value
+      .map((item) => {
+        if (!Array.isArray(item)) {
+          throw new Error(
+            `csv encoding only works for arrays of scalars (string/numbers/booleans), got ${yamlTag(item)}`,
+          );
+        }
+        return row(item);
+      })
+      .join("\n");
+  }
+  const first = asQueryRecord(value[0]);
+  if (first) {
+    const headers = Object.keys(first);
+    const rows = value.map((item) => {
+      const map = asQueryRecord(item);
+      if (!map) {
+        throw new Error(
+          `csv object encoding only works for arrays of flat objects, got ${yamlTag(item)}`,
+        );
+      }
+      return row(headers.map((h) => (Object.hasOwn(map, h) ? (map[h] as QueryValue) : "")));
+    });
+    return [row(headers), ...rows].join("\n");
+  }
+  return row(value);
+}
+
+// jq's @sh: a string quoted, a number, boolean or null as its text, a list
+// of them joined by spaces, anything else an error
+function shellText(value: QueryValue, yq: boolean): string {
+  const one = (item: QueryValue): string => {
+    if (typeof item === "string") return `'${item.replaceAll("'", "'\\''")}'`;
+    if (item === null || item === undefined) return "null";
+    if (typeof item === "object") {
+      throw new Error(`${described(item)} can not be escaped for shell`);
+    }
+    return String(item);
+  };
+  if (yq && typeof value !== "string") {
+    throw new Error(
+      `cannot encode ${yamlTag(value)} as a shell word, can only operate on strings`,
+    );
+  }
+  if (Array.isArray(value)) return value.map(one).join(" ");
+  return one(value);
+}
+
+// a scalar retyped by mikefarah's `tag = "!!int"`, where the value can
+// take the tag; a tagged node that reads back differently is refused
+function retyped(value: QueryValue, tag: QueryValue): QueryValue {
+  if (typeof tag !== "string") throw new Error("tag takes a string like !!str");
+  const refuse = (): never => {
+    throw new Error(`${described(value)} cannot be given the tag ${tag}`);
+  };
+  if (value !== null && typeof value === "object") refuse();
+  const text = value === null || value === undefined ? "null" : String(value);
+  switch (tag) {
+    case "!!str":
+      return text;
+    case "!!int":
+      if (typeof value === "number" && Number.isInteger(value)) return value;
+      if (typeof value === "string" && /^[-+]?\d+$/.test(value.trim())) {
+        return Number(value);
+      }
+      return refuse();
+    case "!!float":
+      if (typeof value === "number") return value;
+      if (typeof value === "string" && /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(value.trim())) {
+        return Number(value);
+      }
+      return refuse();
+    case "!!bool":
+      if (typeof value === "boolean") return value;
+      if (text === "true" || text === "false") return text === "true";
+      return refuse();
+    case "!!null":
+      if (value === null || text === "null" || text === "~" || text === "") {
+        return null;
+      }
+      return refuse();
+    default:
+      return refuse();
+  }
+}
+
 // the functions mikefarah's yq answers from a node's comments, style and
 // anchors, which our values never carry: his answers for a node without
 const NODE_TEXT = new Set([
@@ -457,7 +649,10 @@ const NODE_TEXT = new Set([
 ]);
 
 // the setters mikefarah writes after a path (`.a style="double"`), parsed
-// as a call of the name and `=` (1ctx)
+// as a call of the name and `=`: tag= retypes a scalar, a comment setter
+// with an empty string on `.` or `..` strips what the output never has,
+// and the rest are refused, since our values carry no style, comments or
+// anchors (1ctx)
 const SETTERS = new Set([
   "style=",
   "tag=",
@@ -468,6 +663,27 @@ const SETTERS = new Set([
   "foot_comment=",
   "comments=",
 ]);
+
+// a comment setter with an empty string on `.` or `..`
+function clearsComments(ast: AstNode): boolean {
+  if (ast.type !== "Call" || ast.args.length !== 2) return false;
+  if (!ast.name.endsWith("comment=") && ast.name !== "comments=") return false;
+  const [path, text] = ast.args;
+  return (
+    (path.type === "Identity" || path.type === "Recurse") &&
+    text.type === "Literal" &&
+    text.value === ""
+  );
+}
+
+/** Whether a call strips every comment of the document: `... comments=""`. */
+export function stripsComments(ast: AstNode): boolean {
+  return (
+    ast.type === "Call" &&
+    clearsComments(ast) &&
+    ast.args[0].type === "Recurse"
+  );
+}
 
 let sortKeysAst: AstNode | null = null;
 
@@ -494,14 +710,18 @@ function loaded(ctx: EvalContext, name: string, raw: boolean): QueryValue {
 }
 
 // the path the yq walker knows for this very value; a value inside a
-// function it does not follow has none
+// function it does not follow has none, and a quiet null would mislead
 function sourcePath(
   value: QueryValue,
+  name: string,
   ctx: EvalContext,
 ): (string | number)[] | undefined {
   const node = ctx.sourceNode;
   if (node === undefined) return ctx.currentPath;
-  return Object.is(node.value, value) && node.path ? [...node.path] : undefined;
+  if (Object.is(node.value, value) && node.path) return [...node.path];
+  throw new Error(
+    `${name} is known after a path step or select at the top of the filter, as in .[] | select(...) | ${name}, not inside map, with_entries or del`,
+  );
 }
 
 function jsonText(value: QueryValue, indent: number): string {
@@ -560,13 +780,23 @@ export function evalDialectBuiltin(
       return [out];
     }
     case "map":
-    case "map_values":
+    case "map_values": {
       if (args.length === 0) return null;
       if (value === null && yq) return [[]];
-      if (value === null || !(Array.isArray(value) || asQueryRecord(value))) {
+      const map = asQueryRecord(value);
+      if (value === null || !(Array.isArray(value) || map)) {
         return cannotIterate(value);
       }
+      // map over a map is [.[] | f], which upstream answered null
+      if (name === "map" && map) {
+        return [
+          Object.values(map).flatMap((item) =>
+            evaluate(item as QueryValue, args[0], ctx),
+          ),
+        ];
+      }
       return null;
+    }
     case "min":
     case "max":
       if (value === null && yq) return [];
@@ -605,7 +835,7 @@ export function evalDialectBuiltin(
           ? (item: QueryValue) => item
           : (item: QueryValue) => evaluate(item, args[0], ctx)[0] ?? null;
       // mikefarah keeps the order things were first seen in, jq sorts by key
-      const groups = byKey(value, key);
+      const groups = byKey(value, key, yq);
       if (!yq) groups.sort((a, b) => compareJq(key(a[0]), key(b[0])));
       return name === "group_by" ? [groups] : [groups.map((g) => g[0])];
     }
@@ -619,6 +849,48 @@ export function evalDialectBuiltin(
       if (typeof value === "string") return null;
       if (yq) throw new Error(`${described(value)} cannot be base64 encoded`);
       return [Buffer.from(JSON.stringify(value), "utf-8").toString("base64")];
+    case "@csv":
+    case "@tsv": {
+      if (yq) return [csvRows(value, name === "@csv" ? "," : "\t")];
+      if (!Array.isArray(value)) {
+        throw new Error(
+          `${described(value)} cannot be ${name.slice(1)}-formatted, only array`,
+        );
+      }
+      // jq quotes every string in a csv row and escapes a tsv cell
+      const cell = (item: QueryValue): string => {
+        if (item === null || item === undefined) return "";
+        if (typeof item === "object") {
+          throw new Error(
+            `${described(item)} is not valid in a ${name.slice(1)} row`,
+          );
+        }
+        if (typeof item !== "string") return String(item);
+        return name === "@csv"
+          ? `"${item.replaceAll('"', '""')}"`
+          : item
+              .replaceAll("\\", "\\\\")
+              .replaceAll("\t", "\\t")
+              .replaceAll("\n", "\\n")
+              .replaceAll("\r", "\\r");
+      };
+      return [value.map(cell).join(name === "@csv" ? "," : "\t")];
+    }
+    case "@sh":
+      return [shellText(value, yq)];
+    case "@uri":
+      if (yq && typeof value !== "string") {
+        throw new Error(
+          `cannot encode ${yamlTag(value)} as URI, can only operate on strings`,
+        );
+      }
+      return null;
+    case "tostring":
+      // mikefarah spells a map or a list as YAML
+      if (yq && value !== null && typeof value === "object") {
+        return [YAML.stringify(value, { indent: 2 }).trimEnd()];
+      }
+      return null;
     case "type":
       return yq ? [yamlTag(value)] : null;
     case "tag":
@@ -743,12 +1015,12 @@ export function evalDialectBuiltin(
       return [name === "any_c" ? items.some(test) : items.every(test)];
     }
     case "key": {
-      const path = sourcePath(value, ctx);
+      const path = sourcePath(value, name, ctx);
       return [path && path.length > 0 ? path[path.length - 1] : null];
     }
     case "path":
       if (args.length > 0) return null;
-      return [sourcePath(value, ctx) ?? null];
+      return [sourcePath(value, name, ctx) ?? null];
     case "with":
       if (args.length !== 2) return null;
       return evaluate(
@@ -780,12 +1052,29 @@ export function evalDialectBuiltin(
       return evaluate(value, args[0], ctx);
   }
   if (NODE_TEXT.has(name) && args.length === 0) return [""];
+  if (name === "tag=" && args.length === 1) {
+    return [retyped(value, evaluate(value, args[0], ctx)[0] ?? null)];
+  }
   if (SETTERS.has(name)) {
     if (!yq) throw new Error(`${name} is mikefarah's yq, not jq`);
-    // the value is evaluated for its errors; the node keeps its style,
-    // comments and tags, which our values do not carry
-    evaluate(value, args[1], ctx);
-    return [value];
+    if (name === "tag=") {
+      const tags = evaluate(value, args[1], ctx);
+      return evaluate(
+        value,
+        {
+          type: "UpdateOp",
+          op: "|=",
+          path: args[0],
+          value: { type: "Call", name, args: [{ type: "Literal", value: tags[0] ?? null }] },
+        },
+        ctx,
+      );
+    }
+    if (clearsComments({ type: "Call", name, args })) return [value];
+    const what = name.slice(0, -1);
+    throw new Error(
+      `${what} cannot be set: values here carry no style, comments or anchors, and the output has none`,
+    );
   }
   return null;
 }
