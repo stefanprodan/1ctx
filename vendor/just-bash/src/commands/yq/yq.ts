@@ -43,6 +43,7 @@ import {
   isValidInputFormat,
   isValidOutputFormat,
   parseAllYamlDocuments,
+  parseFailsafeDocuments,
   parseInput,
 } from "./formats.js";
 import { evaluateAll, evaluateDocument, type Input } from "./documents.js";
@@ -585,7 +586,13 @@ export const yqCommand: RuntimeCommand = {
         maxTokens: ctx.limits.maxQueryTokens,
         maxSourceLength: ctx.limits.maxStringLength,
       });
-      const documents: YAML.Document[] = [];
+      // the documents as written, parsed once and only when a result
+      // prints through them or -i writes them (1ctx)
+      let parsed: YAML.Document[] | null = null;
+      const documentsOf = (): YAML.Document[] => {
+        parsed ??= parseFailsafeDocuments(input);
+        return parsed;
+      };
       let documentValues: QueryValue[] = [];
 
       const evalOptions: EvaluateOptions = {
@@ -666,7 +673,7 @@ export const yqCommand: RuntimeCommand = {
         // every YAML file is read this way, so a result that is a node of
         // it prints with its comments, and -i writes them back
         if (options.inputFormat === "yaml") {
-          documentValues = parseAllYamlDocuments(input, dataLimits, documents);
+          documentValues = parseAllYamlDocuments(input, dataLimits);
         }
         if (documentValues.length > 0) {
           for (const [index, document] of documentValues.entries()) {
@@ -687,8 +694,9 @@ export const yqCommand: RuntimeCommand = {
         options.inplace &&
         filePath &&
         options.outputFormat === "yaml" &&
-        documents.length > 0
+        documentValues.length > 0
       ) {
+        const documents = documentsOf();
         const maxBytes = Math.min(
           ctx.limits.maxStringLength,
           ctx.limits.maxOutputSize,
@@ -736,8 +744,11 @@ export const yqCommand: RuntimeCommand = {
       const finalOutput = printRecords(records, options, ctx, file, {
         plain: hasNode(ast, stripsComments),
         nodeOf: (record) =>
-          documents.length > 0
-            ? { document: documents[record.document], value: documentValues[record.document] }
+          documentValues.length > 0
+            ? {
+                document: documentsOf()[record.document],
+                value: documentValues[record.document],
+              }
             : undefined,
       });
 
@@ -885,11 +896,12 @@ async function runEvalAll(
     maxElements: ctx.limits.maxQueryElements,
   };
   const inputs: Input[] = [];
-  // per file, for -i: its path, format, parsed documents and their values
+  // per file: its path, format, values and, parsed when a result needs
+  // them, its documents as written
   const read: {
     path: string;
     format: InputFormatName;
-    documents: YAML.Document[];
+    documents: () => YAML.Document[];
     values: QueryValue[];
   }[] = [];
   try {
@@ -921,11 +933,15 @@ async function runEvalAll(
         inputFormatExplicit || name === "-"
           ? options.inputFormat
           : (detectFormatFromExtension(name) ?? options.inputFormat);
-      const documents: YAML.Document[] = [];
       const values =
         format === "yaml"
-          ? parseAllYamlDocuments(text, dataLimits, documents)
+          ? parseAllYamlDocuments(text, dataLimits)
           : [parseInput(text, { ...options, inputFormat: format }, dataLimits)];
+      let parsed: YAML.Document[] | null = null;
+      const documents = (): YAML.Document[] => {
+        parsed ??= parseFailsafeDocuments(text);
+        return parsed;
+      };
       read.push({ path, format, documents, values });
       const filename = files.length === 0 ? "-" : name === "-" ? "" : name;
       for (const [document, value] of values.entries()) {
@@ -975,7 +991,7 @@ async function runEvalAll(
             const source = read[record.file ?? 0];
             return source?.format === "yaml"
               ? {
-                  document: source.documents[record.document],
+                  document: source.documents()[record.document],
                   value: source.values[record.document],
                 }
               : undefined;
@@ -1007,7 +1023,7 @@ async function runEvalAll(
           : options.outputFormat;
       const text =
         written === "yaml" && source.format === "yaml"
-          ? inPlaceText(own, source.documents, source.values, {
+          ? inPlaceText(own, source.documents(), source.values, {
               format: (value) =>
                 formatOutput(value, { ...options, yaml11: true }, maxBytes),
               maxDepth: ctx.limits.maxQueryDepth,
@@ -1120,8 +1136,15 @@ function keptText(
   options: YqOptions,
   nodeOf: (record: Result) => Node | undefined,
   stripComments: boolean,
+  own: boolean,
 ): string | null {
-  if (record.source === undefined || options.outputFormat !== "yaml") {
+  const { value } = record;
+  if (
+    record.source === undefined ||
+    options.outputFormat !== "yaml" ||
+    value === null ||
+    typeof value !== "object"
+  ) {
     return null;
   }
   const node = nodeOf(record);
@@ -1135,6 +1158,7 @@ function keptText(
       indent: options.indent === 0 ? 4 : Math.max(options.indent, 2),
       pretty: options.prettyPrint,
       stripComments,
+      own,
     },
   );
 }
@@ -1188,6 +1212,14 @@ function printRecords(
   let lastKey: Key | null = null;
   const marker = options.outputFormat === "yaml" && !options.noDoc;
   const end = options.nulOutput ? "\0" : "\n";
+  // a document printed whole once is edited in place, not cloned
+  const wholes = new Map<string, number>();
+  for (const record of records) {
+    if (record.source?.length === 0) {
+      const key = `${record.file ?? file}:${record.document}`;
+      wholes.set(key, (wholes.get(key) ?? 0) + 1);
+    }
+  }
   for (const record of records) {
     const { value } = record;
     const key = keyOf(record, file);
@@ -1220,8 +1252,15 @@ function printRecords(
     let text: string;
     try {
       text =
-        (kept ? keptText(record, options, kept.nodeOf, kept.plain) : null) ??
-        formatOutput(value, options, serializationLimit);
+        (kept
+          ? keptText(
+              record,
+              options,
+              kept.nodeOf,
+              kept.plain,
+              wholes.get(`${record.file ?? file}:${record.document}`) === 1,
+            )
+          : null) ?? formatOutput(value, options, serializationLimit);
     } finally {
       serializationLease?.release();
     }
@@ -1301,6 +1340,7 @@ function inPlaceText(
     const last = record.value;
     let part = preservingText(documents[index], documentValues[index], last, [], {
       stripComments: opts.plain,
+      own: true,
     });
     if (part === null) {
       // written afresh from values: refused when that would change what a

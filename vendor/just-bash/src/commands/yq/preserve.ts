@@ -87,9 +87,21 @@ function build(value: QueryValue): YAML.Node {
   return scalar(value);
 }
 
+/** A node the edit wrote (whole) or a collection it took items from. */
+interface Touch {
+  path: Key[];
+  whole: boolean;
+}
+
 // an edited scalar keeps its node, and so its comment, and a quoted one
 // its quotes for a string, as mikefarah keeps the node's style
-function put(doc: YAML.Document, path: Key[], value: QueryValue): void {
+function put(
+  doc: YAML.Document,
+  path: Key[],
+  value: QueryValue,
+  touched: Touch[],
+): void {
+  touched.push({ path, whole: true });
   const current = doc.getIn(path, true);
   if (YAML.isScalar(current) && !isMap(value) && !Array.isArray(value)) {
     const next = scalar(value);
@@ -134,17 +146,21 @@ function reordered(
   return true;
 }
 
+// every node the edit wrote goes into touched, so only those are read
+// back to check them
 function applyChanges(
   doc: YAML.Document,
   path: Key[],
   before: QueryValue,
   after: QueryValue,
+  touched: Touch[],
 ): void {
   if (same(before, after)) return;
   const bothMaps = isMap(before) && isMap(after);
   const bothSeqs = Array.isArray(before) && Array.isArray(after);
   if (path.length === 0 && !bothMaps && !bothSeqs) {
     doc.contents = build(after) as typeof doc.contents;
+    touched.push({ path, whole: true });
     return;
   }
   if (bothMaps) {
@@ -155,7 +171,10 @@ function applyChanges(
     const head = YAML.isMap(parent) ? parent.items[0]?.key : undefined;
     const headComment = YAML.isNode(head) ? head.commentBefore : undefined;
     for (const key of Object.keys(was)) {
-      if (!Object.hasOwn(now, key)) doc.deleteIn([...path, key]);
+      if (!Object.hasOwn(now, key)) {
+        doc.deleteIn([...path, key]);
+        touched.push({ path, whole: false });
+      }
     }
     if (
       headComment &&
@@ -173,12 +192,19 @@ function applyChanges(
     }
     for (const key of Object.keys(now)) {
       if (Object.hasOwn(was, key)) {
-        applyChanges(doc, [...path, key], was[key], now[key]);
+        applyChanges(doc, [...path, key], was[key], now[key], touched);
       } else if (YAML.isMap(parent)) {
         parent.items.push(new YAML.Pair(scalar(key), build(now[key])));
+        touched.push({ path: [...path, key], whole: true });
       } else {
         throw new Error("not a map");
       }
+    }
+    // keys in another order are not carried over: the check says so
+    const kept = Object.keys(was).filter((key) => Object.hasOwn(now, key));
+    const added = Object.keys(now).filter((key) => !Object.hasOwn(was, key));
+    if (!same([...kept, ...added], Object.keys(now))) {
+      touched.push({ path, whole: false });
     }
     return;
   }
@@ -187,20 +213,77 @@ function applyChanges(
     const now = after as QueryValue[];
     // the same items in another order keep their nodes: sort, reverse
     const seq = path.length === 0 ? doc.contents : doc.getIn(path, true);
-    if (YAML.isSeq(seq) && reordered(seq, was, now)) return;
+    if (YAML.isSeq(seq) && reordered(seq, was, now)) {
+      touched.push({ path, whole: false });
+      return;
+    }
     const common = Math.min(was.length, now.length);
     for (let i = 0; i < common; i++) {
-      applyChanges(doc, [...path, i], was[i], now[i]);
+      applyChanges(doc, [...path, i], was[i], now[i], touched);
     }
     for (let i = was.length - 1; i >= now.length; i--) {
       doc.deleteIn([...path, i]);
+      touched.push({ path, whole: false });
     }
     for (let i = was.length; i < now.length; i++) {
       doc.addIn(path, build(now[i]));
+      touched.push({ path: [...path, i], whole: true });
     }
     return;
   }
-  put(doc, path, after);
+  put(doc, path, after, touched);
+}
+
+function valueAt(value: QueryValue, path: Key[]): QueryValue {
+  let at = value;
+  for (const step of path) {
+    if (Array.isArray(at)) at = at[step as number] ?? null;
+    else if (isMap(at)) at = at[step as string] ?? null;
+    else return null;
+  }
+  return at;
+}
+
+// the text of one node of a failsafe document
+function nodeText(node: YAML.Node): string {
+  const doc = new YAML.Document(undefined, { schema: "failsafe" });
+  doc.contents = node as typeof doc.contents;
+  return doc.toString({ flowCollectionPadding: false });
+}
+
+// whether every node the edit wrote reads back as the result, and every
+// collection it took items from has the result's keys or length, so a
+// large document costs its edit and not a second parse
+function readsBack(
+  doc: YAML.Document,
+  after: QueryValue,
+  touched: Touch[],
+): boolean {
+  for (const { path, whole } of touched) {
+    const node = doc.getIn(path, true);
+    const want = valueAt(after, path);
+    if (whole) {
+      if (!YAML.isNode(node)) return false;
+      const reread = YAML.parseDocument(nodeText(node), { merge: true });
+      if (reread.errors.length > 0) return false;
+      if (!same(reread.toJS({ maxAliasCount: 100 }) as QueryValue, want)) {
+        return false;
+      }
+    } else if (YAML.isMap(node)) {
+      if (!isMap(want)) return false;
+      const keys = node.items.map((pair) =>
+        YAML.isScalar(pair.key) ? String(pair.key.value) : "",
+      );
+      if (!same(keys, Object.keys(want))) return false;
+    } else if (YAML.isSeq(node)) {
+      if (!Array.isArray(want) || node.items.length !== want.length) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -243,6 +326,8 @@ export interface Spelling {
   pretty?: boolean;
   /** every comment dropped, the style kept */
   stripComments?: boolean;
+  /** the document is the caller's to change, so it is not cloned */
+  own?: boolean;
 }
 
 function stripComments(doc: YAML.Document): void {
@@ -306,7 +391,7 @@ export function preservingText(
   try {
     let copy: YAML.Document;
     if (path.length === 0) {
-      copy = doc.clone();
+      copy = spelling.own ? doc : doc.clone();
     } else {
       // the node alone, so a long stream costs each result its own size
       const node = doc.getIn(path, true);
@@ -314,7 +399,8 @@ export function preservingText(
       copy = new YAML.Document(undefined, { schema: "failsafe" });
       copy.contents = node.clone() as typeof copy.contents;
     }
-    applyChanges(copy, [], before, after);
+    const touched: Touch[] = [];
+    applyChanges(copy, [], before, after, touched);
     if (spelling.stripComments) stripComments(copy);
     if (spelling.pretty && copy.contents) prettify(copy.contents);
     const text = copy
@@ -329,8 +415,13 @@ export function preservingText(
       .replace(/^((?:#[^\n]*\n)+)\n/, "$1")
       // a foot comment follows the last line, as mikefarah writes it
       .replace(/\n\n(?=(#[^\n]*\n?)+$)/, "\n");
-    // what is written must read back as the result
-    // merge keys read merged, as the values were (1ctx)
+    // what is written must read back as the result: the nodes the edit
+    // wrote, or the whole text where an anchor or a merge key could
+    // reach past them (merge keys read merged, as the values were)
+    if (touched.length === 0) return text;
+    if (!/[&*]|<<:/.test(text)) {
+      return readsBack(copy, after, touched) ? text : null;
+    }
     const reread = YAML.parseDocument(text, { merge: true });
     if (reread.errors.length > 0) return null;
     if (!same(reread.toJS({ maxAliasCount: 100 }) as QueryValue, after)) {

@@ -336,6 +336,17 @@ export function parseAllYamlDocuments(
 }
 
 /**
+ * The documents of a YAML stream parsed with the failsafe schema, every
+ * scalar its source text, for a write or a print that keeps every
+ * untouched node as written. Parsed only when a result needs it, since
+ * the values were read already. (1ctx)
+ */
+export function parseFailsafeDocuments(input: string): YAML.Document[] {
+  const docs = YAML.parseAllDocuments(input, { schema: "failsafe" });
+  return Array.isArray(docs) ? docs : [];
+}
+
+/**
  * Extract front-matter from content
  * Front-matter is YAML/TOML/JSON at the start of a file between --- or +++ delimiters
  * Returns { frontMatter: parsed data, content: remaining content } or null if no front-matter
