@@ -79,22 +79,60 @@ without a file of their own.
 | `src/commands/yq/yq.ts` | `-i` groups the results by document, writes one `---` between documents and none before the first, and writes a document that is a string raw | a surviving second document started the file with `---`, and a bare string was written quoted |
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `-N` and `--no-doc` drop the `---` lines; `-j` and `--tojson` are `-o json` with mikefarah's deprecation line; a `.json` file prints JSON unless `-p` or `-o` was given, and several files print in the first one's format; YAML at `-I0` and `-I1` is indented 4 and 2 | mikefarah's meanings: `-j` joined the output here, and JSON input printed YAML |
 | `src/commands/yq/documents.ts` (new), `yq.ts`, `query-engine/evaluator.ts`, `src/index.ts` | a walker runs the top of a yq filter (`\|`, `,`, `//`, parentheses, `as`, `if`, arithmetic) and tags each result as the document, a node inside it, or computed from nothing, classifying every other node by what it is; `---` prints where the document index moves or a later file starts, a computed value counting as document 0, in stdout and in `-i`; the evaluator exports `createContext()` and `extractPathFromAst()` and the package exports the walker and the engine for our tests | mikefarah prints `---` only between values read from different documents: `length`, `keys` and `"\(.kind)"` print none, `.a // "none"` one where the index moves |
+| `src/commands/query-engine/builtins/dialect-builtins.ts` (new), `evaluator.ts`, `parser.ts`, `yq/yq.ts` | `dialect` on the options and the context, `yq` from the yq command; the builtins, arithmetic, `==` and field steps that part follow it, and jq 1.8's errors and answers where both tools agree and upstream answered null (see "The jq and yq dialects"); an unbound variable is an error; `.a.[0]` parses | where the tools part, a model got exit 0 with the wrong answer: `sub("-", "_")` and `select(.image == "nginx*")` answered null or nothing, `type` never matched `!!str`, `keys` sorted, `to_entries` of a list was null, and `.a * 2` printed null for every document without `a` |
+
+### The jq and yq dialects
+
+jq and yq run one engine. `dialect` on its options and context is
+`yq` for the yq command and jq's otherwise, and the builtins that part
+read it in `query-engine/builtins/dialect-builtins.ts`, which runs before
+the others. In the yq dialect: `keys` keeps the document's order,
+`type` and `tag` answer `!!str`, `!!map` and the rest and `kind`
+answers `scalar`, `map` or `seq`; `sub`, `test`, `match`,
+`capture`, `split`, `splits` and `scan` take their arguments apart by
+a comma, `sub` replaces every match with Go's `${name}` and `$1`;
+`==` and `!=` read a `*` in a right-hand string as a wildcard;
+`tojson` is indented JSON and a newline; `unique`, `unique_by` and
+`group_by` keep the order things were first seen in; `map` and
+`map_values` of null are `[]`, `to_entries`, `with_entries`, `min`,
+`max` and `split` of null answer nothing, and `with_entries` on a list
+keys the map by index; a string and a number or boolean concatenate
+with `+`, a null in `-`, `*`, `/` or `%` drops the result; a step
+into a string, number or boolean (`.name.x`) answers nothing.
+
+In both, toward jq 1.8: `to_entries` on a list numbers its entries,
+`capture` without a match answers nothing, `match` names its groups
+and gives their offsets, `sub` in jq takes the capture object
+(`"\(.name)"`) and each output of its replacement, an unbound
+variable is an error, `.a.[0]` and `.a.[]` parse, and `keys`,
+`join`, `sort`, `unique`, `group_by`, `flatten`, `test`, `sub`,
+`trim`, `upcase` and `any` fail on null instead of answering null.
+jq keeps its own for `@base64` of a non-string (the text encoded) and
+`reverse` of null (`[]`), sorts `unique` and `group_by`, and fails
+arithmetic on operands it does not take (null included) where upstream
+answered null. Both accept mikefarah's `upcase`, `downcase`,
+`env(NAME)` (the variable read as YAML, an unset one an error),
+`strenv(NAME)` (a string, an unset one empty), `to_json`, `tag` and
+`kind`, which jq 1.8 does not define.
 
 ### Where our jq still differs from jq
 
 `test/vendor/just-bash/jq-paths.test.ts` pins path expressions against
-jq 1.8. Where they part:
+jq 1.8, and `jq-1.8.test.ts` the cases `scripts/jq-record.ts` recorded
+from jq 1.8.2 for the dialect rules. Where they part:
 
 - Iterating null yields nothing, in path mode too, as in mikefarah's
   yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
   skips the documents without the key, where jq stops with an error.
   Iterating a number, a string or a boolean is still jq's error.
-- The value evaluator keeps upstream's leniencies where jq errors:
-  `-`, `*`, `/` and `%` with null give null (so `.a -= 1` on a missing
-  key writes null), `to_entries` on an array gives null (so
-  `with_entries` on one nulls it), `map_values(f)` keeps every output
-  of `f`, `walk` never reaches scalars, `$__loc__` is null, and `?`
-  covers the whole path before it (`.a.b?`) rather than its last step.
+- The value evaluator keeps some of upstream's leniencies:
+  `map_values(f)` keeps every output of `f`, `walk` never reaches
+  scalars, `?` covers the whole path before it (`.a.b?`) rather than
+  its last step, `$__loc__` is always on line 1, and an error inside
+  one input drops that input's earlier outputs.
+- The regular expressions are RE2's: no `x` flag, no lookaround, no
+  backreferences.
+- mikefarah's names above are accepted.
 - `//` in path mode drops an error on its left (`(error("x") // .z) = 1`
   writes `.z`); jq 1.8 raises it.
 - `last(f)`, `limit(n; f)` and `nth(n; f)` also work as paths, which
@@ -182,12 +220,27 @@ for one of the reasons below. Where they part:
   first. A file with a duplicate key does not parse here.
 - An alias is a copy: editing an anchor's target leaves the aliased
   places at the old value, and a plain write re-emits anchors.
-- mikefarah's own operators (`explode`, `style`, `tag`, `line_comment`,
-  `with`, `key`) and `eval-all` are not there, and `type` answers jq's
-  names (`object`), not `!!map`. An `-i` whose filter outputs nothing,
-  as `select(type == "!!map")` does, leaves the file and exits 1.
-- The jq leniencies above apply too: `map(f)` over a missing key gives
-  null where mikefarah gives `[]`.
+- mikefarah's own operators (`explode`, `style`, `line_comment`,
+  `with`, `key`) and `eval-all` are not there. An `-i` whose filter
+  outputs nothing leaves the file and exits 1; mikefarah empties it.
+- jq's forms mikefarah refuses work: `empty`, `if`, `reduce`, `first`,
+  `last`, `min_by`, `max_by`, `ltrimstr`, `paths`, `any(f)`, `all(f)`,
+  `keys_unsorted`, `ascii_upcase`, `gsub`, `splits`, `add`, `index`,
+  bare object keys (`{name: .a}`), `env.NAME` and `$ENV.NAME`, and jq's
+  regex flags (`i`, `x`), where mikefarah takes only `g`.
+- jq's precedence: `a | b, c` is `a | (b, c)` and `a | b and c` is
+  `a | (b and c)`; mikefarah binds the pipe tighter. An unbound
+  variable (`$index`, `$__loc__`) is an error; mikefarah prints nothing.
+- A null in `-`, `*`, `/` or `%` drops the result, as a missing key
+  does in mikefarah's; he errors on an explicit null (`z: null`, then
+  `.z * 2`), and our values cannot tell the two apart.
+- Map keys are strings: `with_entries` on a list prints `"0": a`, where
+  mikefarah's map has the integer key `0`.
+- `match` answers its fields in jq's order; `sub(re; repl; "g")`
+  replaces every match, as the other forms do; `@sh` quotes every
+  string; `length` of a number is its absolute value, not its digits.
+- `-s` is slurp, not mikefarah's split into files; a missing file exits
+  2; `--version` names just-bash and the syntax.
 
 ## Its tests
 

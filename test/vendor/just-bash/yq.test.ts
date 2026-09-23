@@ -224,7 +224,7 @@ describe("yq over several documents", () => {
   test("-i that matches nothing leaves the file and exits 1", async () => {
     for (const filter of [
       'select(.kind == "Nope")',
-      'select(type == "!!map") | .a = 1',
+      'select(type == "!!seq") | .a = 1',
     ]) {
       const result = await yq(`yq -i '${filter}' /m.yaml`);
       expect(result.exitCode).toBe(1);

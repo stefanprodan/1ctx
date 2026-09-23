@@ -800,6 +800,13 @@ class Parser {
         const token = this.advance();
         const name = token.value as string;
         expr = { type: "Field", name, base: expr };
+      } else if (
+        this.check("DOT") &&
+        this.peek(1).type === "LBRACKET" &&
+        this.peek(1).pos === this.peek().pos + 1
+      ) {
+        // .a.[0] and .a.[], which jq 1.8 and mikefarah's yq read (1ctx)
+        this.advance();
       } else if (this.check("LBRACKET")) {
         this.advance();
         if (this.match("RBRACKET")) {

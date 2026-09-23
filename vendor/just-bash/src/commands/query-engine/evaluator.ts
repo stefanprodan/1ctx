@@ -25,6 +25,12 @@ import {
   evalStringBuiltin,
   evalTypeBuiltin,
 } from "./builtins/index.js";
+import {
+  equalOperands,
+  evalDialectBuiltin,
+  mixedOperands,
+  unsupported,
+} from "./builtins/dialect-builtins.js";
 import type { AstNode, DestructurePattern } from "./parser.js";
 import { applyAssignment } from "./path-expressions.js";
 import {
@@ -142,7 +148,12 @@ export interface EvalContext {
   coverage?: FeatureCoverageWriter;
   /** Shared across every recursive evaluation and builtin invocation. */
   budget: QueryEvaluationBudget;
+  /** jq's rules, or mikefarah's yq where the two part (1ctx) */
+  dialect?: Dialect;
 }
+
+/** Whose rules a builtin follows where jq and mikefarah's yq part. (1ctx) */
+export type Dialect = "jq" | "yq";
 
 export interface QueryEvaluationBudget {
   operations: number;
@@ -241,6 +252,7 @@ export function createContext(options?: EvaluateOptions): EvalContext {
     requireDefenseContext: options?.requireDefenseContext,
     defenseContextChecked: false,
     budget: options?.budget ?? { operations: 0, callDepth: 0 },
+    dialect: options?.dialect,
   };
 }
 
@@ -265,6 +277,7 @@ function withVar(
     labels: ctx.labels,
     coverage: ctx.coverage,
     budget: ctx.budget,
+    dialect: ctx.dialect,
   };
 }
 
@@ -471,6 +484,8 @@ export interface EvaluateOptions {
   requireDefenseContext?: boolean;
   /** Reuse across multiple input documents to enforce one command budget. */
   budget?: QueryEvaluationBudget;
+  /** mikefarah's yq rules where they part from jq's (1ctx) */
+  dialect?: Dialect;
 }
 
 /**
@@ -583,6 +598,9 @@ function evaluateNode(
         if (v === null) {
           return [null];
         }
+        // mikefarah's yq answers nothing for a step into a scalar, so the
+        // other documents still print (1ctx)
+        if (ctx.dialect === "yq" && !Array.isArray(v)) return [];
         // jq throws an error when accessing a field on non-objects (arrays, numbers, strings, booleans)
         // This allows Try (.foo?) to catch it and return empty
         const typeName = Array.isArray(v) ? "array" : typeof v;
@@ -890,7 +908,15 @@ function evaluateNode(
         return [argsObj];
       }
       const v = ctx.vars.get(ast.name);
-      return v !== undefined ? [v] : [null];
+      if (v !== undefined) return [v];
+      // an unbound variable is jq's error, where a quiet null misled (1ctx)
+      if (ast.name === "$__loc__" && ctx.dialect !== "yq") {
+        const loc: Record<string, QueryValue> = Object.create(null);
+        loc.file = "<top-level>";
+        loc.line = 1;
+        return [loc];
+      }
+      throw new Error(`${ast.name} is not defined`);
     }
 
     case "Recurse": {
@@ -1121,7 +1147,11 @@ export function evalBinaryOp(
   chargeQueryWork(ctx, resultCount);
 
   return leftVals.flatMap((l) =>
-    rightVals.map((r) => {
+    rightVals.flatMap((r): QueryValue[] => {
+      // mikefarah's concatenation and null rules, jq's errors (1ctx)
+      const mixed = mixedOperands(op, l, r, ctx.dialect);
+      if (mixed !== undefined) return mixed;
+      return [(() => {
       switch (op) {
         case "+":
           // jq: null + x = x, x + null = x
@@ -1153,7 +1183,7 @@ export function evalBinaryOp(
           ) {
             return nullPrototypeMerge(l, r);
           }
-          return null;
+          return unsupported(op, l, r);
         case "-":
           if (typeof l === "number" && typeof r === "number") return l - r;
           if (Array.isArray(l) && Array.isArray(r)) {
@@ -1169,7 +1199,7 @@ export function evalBinaryOp(
               `string (${formatStr(l)}) and string (${formatStr(r)}) cannot be subtracted`,
             );
           }
-          return null;
+          return unsupported(op, l, r);
         case "*":
           if (typeof l === "number" && typeof r === "number") return l * r;
           if (typeof l === "string" && typeof r === "number") {
@@ -1201,7 +1231,7 @@ export function evalBinaryOp(
               });
             }
           }
-          return null;
+          return unsupported(op, l, r);
         case "/":
           if (typeof l === "number" && typeof r === "number") {
             if (r === 0) {
@@ -1212,7 +1242,7 @@ export function evalBinaryOp(
             return l / r;
           }
           if (typeof l === "string" && typeof r === "string") return l.split(r);
-          return null;
+          return unsupported(op, l, r);
         case "%":
           if (typeof l === "number" && typeof r === "number") {
             if (r === 0) {
@@ -1231,11 +1261,11 @@ export function evalBinaryOp(
             }
             return l % r;
           }
-          return null;
+          return unsupported(op, l, r);
         case "==":
-          return deepEqual(l, r);
+          return equalOperands(l, r, ctx.dialect);
         case "!=":
-          return !deepEqual(l, r);
+          return !equalOperands(l, r, ctx.dialect);
         case "<":
           return compare(l, r) < 0;
         case "<=":
@@ -1247,6 +1277,7 @@ export function evalBinaryOp(
         default:
           return null;
       }
+      })()];
     }),
   );
 }
@@ -1261,6 +1292,10 @@ function evalBuiltin(
   args: AstNode[],
   ctx: EvalContext,
 ): QueryValue[] {
+  // where jq and mikefarah's yq part, and jq 1.8's errors (1ctx)
+  const dialectResult = evalDialectBuiltin(value, name, args, ctx, evaluate);
+  if (dialectResult !== null) return dialectResult;
+
   // Handle simple single-argument math functions via lookup table
   const simpleMathFn = SIMPLE_MATH_FUNCTIONS.get(name);
   if (simpleMathFn) {

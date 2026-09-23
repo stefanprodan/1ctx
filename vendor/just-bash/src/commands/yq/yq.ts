@@ -557,6 +557,8 @@ export const yqCommand: RuntimeCommand = {
         coverage: ctx.coverage,
         requireDefenseContext: ctx.requireDefenseContext,
         budget: { operations: 0, callDepth: 0 },
+        // mikefarah's rules where they part from jq's (1ctx)
+        dialect: "yq",
       };
       const dataLimits = {
         maxDepth: ctx.limits.maxQueryDepth,

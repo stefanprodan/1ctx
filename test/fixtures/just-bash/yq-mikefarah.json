@@ -2464,6 +2464,972 @@
       },
       "stdout": "1\nx\n---\n1\nx\n---\nnull\nx\n",
       "exit": 0
+    },
+    {
+      "name": "dialect: image to repository",
+      "args": [
+        ".spec.containers[].image | sub(\":.*$\", \"\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nnginx\nenvoyproxy/envoy\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: image to repository with ;",
+      "args": [
+        ".spec.containers[].image | sub(\":.*$\"; \"\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nnginx\nenvoyproxy/envoy\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a wildcard in ==",
+      "args": [
+        ".spec.containers[] | select(.image == \"nginx*\") | .name",
+        "pods.yaml"
+      ],
+      "stdout": "web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a leading wildcard",
+      "args": [
+        ".. | select(. == \"*gres\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\npostgres\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a wildcard in !=",
+      "args": [
+        ".spec.containers[]? | select(.name != \"p*\") | .name",
+        "pods.yaml"
+      ],
+      "stdout": "web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a wildcard on the left is literal",
+      "args": [
+        "select(\"web*\" == .metadata.name) | .kind",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: strings by type",
+      "args": [
+        ".. | select(type == \"!!str\")",
+        "config.yaml"
+      ],
+      "stdout": "app\n1.2.0\n\n0644\nweb\napi\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: count strings by type",
+      "args": [
+        "[.. | select(type == \"!!str\")] | length",
+        "config.yaml"
+      ],
+      "stdout": "6\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys of maps by type",
+      "args": [
+        "select(type == \"!!map\") | keys",
+        "config.yaml"
+      ],
+      "stdout": "- name\n- version\n- port\n- debug\n- empty\n- mode\n- nothing\n- tags\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: entries of a list",
+      "args": [
+        ".items | to_entries | .[] | \"\\(.key): \\(.value.metadata.name)\"",
+        "list.yaml"
+      ],
+      "stdout": "0: frontend\n1: backend\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: with_entries on a list",
+      "args": [
+        ".items | with_entries(.value = .value.metadata.name)",
+        "list.yaml"
+      ],
+      "stdout": "0: frontend\n1: backend\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"0\": frontend\n\"1\": backend\n",
+        "exit": 0,
+        "reason": "Map keys are strings here: a list's index keys print quoted, where mikefarah's map has integer keys."
+      }
+    },
+    {
+      "name": "dialect: with_entries on a list of scalars",
+      "args": [
+        ".tags | with_entries(.)",
+        "config.yaml"
+      ],
+      "stdout": "0: web\n1: api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"0\": web\n\"1\": api\n",
+        "exit": 0,
+        "reason": "Map keys are strings here: a list's index keys print quoted, where mikefarah's map has integer keys."
+      }
+    },
+    {
+      "name": "dialect: to_entries on a list of scalars",
+      "args": [
+        ".tags | to_entries",
+        "config.yaml"
+      ],
+      "stdout": "- key: 0\n  value: web\n- key: 1\n  value: api\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sort_by where a document has no list",
+      "args": [
+        ".spec.containers | sort_by(.name)",
+        "pods.yaml"
+      ],
+      "stdout": "- name: postgres\n  image: postgres:16.4\n---\n- name: proxy\n  image: envoyproxy/envoy:v1.31\n- name: web\n  image: nginx:1.27\n",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: map where a document has no list",
+      "args": [
+        ".spec.containers | map(.image)",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres:16.4\n- nginx:1.27\n- envoyproxy/envoy:v1.31\n---\n[]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: map and join where a document has no list",
+      "args": [
+        ".spec.containers | map(.image) | join(\" \")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres:16.4\nnginx:1.27 envoyproxy/envoy:v1.31\n---\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: multiply where a document has no replicas",
+      "args": [
+        ".spec.replicas * 2",
+        "pods.yaml"
+      ],
+      "stdout": "6\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: subtract where a document has no replicas",
+      "args": [
+        ".spec.replicas - 1",
+        "pods.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: add where a document has no replicas",
+      "args": [
+        ".spec.replicas + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: concatenate a name and a number",
+      "args": [
+        ".metadata.name + \"-\" + .spec.replicas",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0-\n---\nweb-1-\n---\nweb-3\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a string plus a number",
+      "args": [
+        ".name + 1",
+        "config.yaml"
+      ],
+      "stdout": "app1\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a number plus a string",
+      "args": [
+        "1 + .name",
+        "config.yaml"
+      ],
+      "stdout": "1app\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a string plus a boolean",
+      "args": [
+        ".name + .debug",
+        "config.yaml"
+      ],
+      "stdout": "appfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a map plus a number",
+      "args": [
+        ".items[0].metadata + 1",
+        "list.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: a step into a string in the first document",
+      "args": [
+        ".metadata.name.x",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into a number",
+      "args": [
+        ".port.x",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into a boolean",
+      "args": [
+        ".debug.x",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into null",
+      "args": [
+        ".nothing.x",
+        "config.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a step into a list item",
+      "args": [
+        ".tags[0].x",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: capture without a match",
+      "args": [
+        ".metadata.name | capture(\"(?P<n>z)\")",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: capture a named group",
+      "args": [
+        ".metadata.name | capture(\"(?P<app>[a-z]+)-(?P<n>[0-9])\")",
+        "pods.yaml"
+      ],
+      "stdout": "app: postgres\nn: \"0\"\n---\napp: web\nn: \"1\"\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: capture with a comma",
+      "args": [
+        ".metadata.name | capture(\"(?P<app>[a-z]+)\", \"g\")",
+        "pods.yaml"
+      ],
+      "stdout": "app: postgres\n---\napp: web\n---\napp: web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: an unbound variable",
+      "args": [
+        "$index",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An unbound variable is an error, as in jq, where mikefarah prints nothing."
+      }
+    },
+    {
+      "name": "dialect: an unbound variable in a pipe",
+      "args": [
+        ".metadata.name as $n | $m",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An unbound variable is an error, as in jq, where mikefarah prints nothing."
+      }
+    },
+    {
+      "name": "dialect: keys keep the document order",
+      "args": [
+        "keys",
+        "config.yaml"
+      ],
+      "stdout": "- name\n- version\n- port\n- debug\n- empty\n- mode\n- nothing\n- tags\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: the first key",
+      "args": [
+        "keys | .[0]",
+        "config.yaml"
+      ],
+      "stdout": "name\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys iterated",
+      "args": [
+        "keys | .[]",
+        "config.yaml"
+      ],
+      "stdout": "name\nversion\nport\ndebug\nempty\nmode\nnothing\ntags\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys as json",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        "keys",
+        "config.yaml"
+      ],
+      "stdout": "[\"name\",\"version\",\"port\",\"debug\",\"empty\",\"mode\",\"nothing\",\"tags\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: keys of a map in each document",
+      "args": [
+        ".meta | keys",
+        "docs.yaml"
+      ],
+      "stdout": "- z\n- a\n- z\n- a\n- z\n- a\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub replaces every match",
+      "args": [
+        ".name | sub(\"a\"; \"o\")",
+        "docs.yaml"
+      ],
+      "stdout": "olpho\n---\nbeto\n---\ngommo\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub with a comma",
+      "args": [
+        ".name | sub(\"a\", \"o\")",
+        "docs.yaml"
+      ],
+      "stdout": "olpho\n---\nbeto\n---\ngommo\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub with named groups",
+      "args": [
+        ".metadata.name | sub(\"(?P<p>[a-z]+)-(?P<n>[0-9])\", \"${n}-${p}\")",
+        "pods.yaml"
+      ],
+      "stdout": "0-postgres\n---\n1-web\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: sub with a numbered group",
+      "args": [
+        ".metadata.name | sub(\"([0-9])\", \"[$1]\")",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-[0]\n---\nweb-[1]\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test with a comma",
+      "args": [
+        ".metadata.name | test(\"web\", \"g\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test is case sensitive",
+      "args": [
+        ".metadata.name | test(\"WEB\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test with (?i)",
+      "args": [
+        ".metadata.name | test(\"(?i)WEB\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: test with the i flag",
+      "args": [
+        ".metadata.name | test(\"WEB\", \"i\")",
+        "pods.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "false\n---\ntrue\n---\ntrue\n",
+        "exit": 0,
+        "reason": "jq's regex flags (i, x and the rest) work, where mikefarah ignores all but g."
+      }
+    },
+    {
+      "name": "dialect: split with a comma",
+      "args": [
+        ".name | split(\"p\", \"g\")",
+        "config.yaml"
+      ],
+      "stdout": "- a\n- \"\"\n- \"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: match with a named group",
+      "args": [
+        ".metadata.name | match(\"(?P<n>[a-z]+)-([0-9])\")",
+        "pods.yaml"
+      ],
+      "stdout": "string: postgres-0\noffset: 0\nlength: 10\ncaptures:\n  - string: postgres\n    offset: 0\n    length: 8\n    name: n\n  - string: \"0\"\n    offset: 9\n    length: 1\n---\nstring: web-1\noffset: 0\nlength: 5\ncaptures:\n  - string: web\n    offset: 0\n    length: 3\n    name: n\n  - string: \"1\"\n    offset: 4\n    length: 1\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "offset: 0\nlength: 10\nstring: postgres-0\ncaptures:\n  - offset: 0\n    length: 8\n    string: postgres\n    name: n\n  - offset: 9\n    length: 1\n    string: \"0\"\n    name: null\n---\noffset: 0\nlength: 5\nstring: web-1\ncaptures:\n  - offset: 0\n    length: 3\n    string: web\n    name: n\n  - offset: 4\n    length: 1\n    string: \"1\"\n    name: null\n",
+        "exit": 0,
+        "reason": "match answers its fields in jq's order (offset, length, string, captures)."
+      }
+    },
+    {
+      "name": "dialect: unique keeps the first seen order",
+      "args": [
+        ".list | . + [\"b\"] | unique",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n- b\n---\n- f\n- e\n- b\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: unique_by keeps the first seen order",
+      "args": [
+        ".list | unique_by(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: group_by keeps the first seen order",
+      "args": [
+        "[.items[].spec.ports[].port] | group_by(. > 100)",
+        "list.yaml"
+      ],
+      "stdout": "- - 80\n- - 8080\n  - 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: tojson of a map",
+      "args": [
+        ".metadata | tojson",
+        "flux.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"podinfo\",\n  \"namespace\": \"apps\"\n}\n\n---\n{\n  \"name\": \"infra\",\n  \"namespace\": \"flux-system\"\n}\n\n---\n{\n  \"name\": \"redis\",\n  \"namespace\": \"cache\"\n}\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: to_json(0) of a map",
+      "args": [
+        ".metadata | to_json(0)",
+        "flux.yaml"
+      ],
+      "stdout": "{\"name\":\"podinfo\",\"namespace\":\"apps\"}\n---\n{\"name\":\"infra\",\"namespace\":\"flux-system\"}\n---\n{\"name\":\"redis\",\"namespace\":\"cache\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: @json of a map",
+      "args": [
+        ".metadata | @json",
+        "flux.yaml"
+      ],
+      "stdout": "{\"name\":\"podinfo\",\"namespace\":\"apps\"}\n---\n{\"name\":\"infra\",\"namespace\":\"flux-system\"}\n---\n{\"name\":\"redis\",\"namespace\":\"cache\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: tojson of a string",
+      "args": [
+        ".name | tojson",
+        "config.yaml"
+      ],
+      "stdout": "\"app\"\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: to_json of a list",
+      "args": [
+        ".tags | to_json",
+        "config.yaml"
+      ],
+      "stdout": "[\n  \"web\",\n  \"api\"\n]\n\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: upcase",
+      "args": [
+        ".metadata.name | upcase",
+        "pods.yaml"
+      ],
+      "stdout": "POSTGRES-0\n---\nWEB-1\n---\nWEB\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: downcase",
+      "args": [
+        ".kind | downcase",
+        "pods.yaml"
+      ],
+      "stdout": "pod\n---\npod\n---\ndeployment\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: upcase keeps the document line",
+      "args": [
+        ".metadata.name as $n | $n | upcase",
+        "pods.yaml"
+      ],
+      "stdout": "POSTGRES-0\n---\nWEB-1\n---\nWEB\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a dot before an index",
+      "args": [
+        ".tags.[0]",
+        "config.yaml"
+      ],
+      "stdout": "web\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a dot before an iterator",
+      "args": [
+        ".tags.[]",
+        "config.yaml"
+      ],
+      "stdout": "web\napi\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a dot before an index on a missing key",
+      "args": [
+        ".spec.containers.[0].name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nweb\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: env parses YAML",
+      "args": [
+        "env(COUNT) + 1",
+        "config.yaml"
+      ],
+      "env": {
+        "COUNT": "3"
+      },
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: env of a map",
+      "args": [
+        "env(CONF) | .x",
+        "config.yaml"
+      ],
+      "env": {
+        "CONF": "x: 1"
+      },
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: env of an unset variable",
+      "args": [
+        "env(UNSET)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: strenv is a string",
+      "args": [
+        "strenv(COUNT) + \"!\"",
+        "config.yaml"
+      ],
+      "env": {
+        "COUNT": "3"
+      },
+      "stdout": "3!\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: strenv of an unset variable",
+      "args": [
+        "strenv(UNSET)",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: set a value from env",
+      "args": [
+        ".port = env(PORT)",
+        "config.yaml"
+      ],
+      "env": {
+        "PORT": "9090"
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: 9090\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into to_entries",
+      "args": [
+        ".nothing | to_entries",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into with_entries(.)",
+      "args": [
+        ".nothing | with_entries(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into map(.)",
+      "args": [
+        ".nothing | map(.)",
+        "config.yaml"
+      ],
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into map_values(.)",
+      "args": [
+        ".nothing | map_values(.)",
+        "config.yaml"
+      ],
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into min",
+      "args": [
+        ".nothing | min",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into max",
+      "args": [
+        ".nothing | max",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into split(\"a\")",
+      "args": [
+        ".nothing | split(\"a\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "dialect: null into keys",
+      "args": [
+        ".nothing | keys",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into join(\",\")",
+      "args": [
+        ".nothing | join(\",\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into sort",
+      "args": [
+        ".nothing | sort",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into sort_by(.)",
+      "args": [
+        ".nothing | sort_by(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into unique",
+      "args": [
+        ".nothing | unique",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into unique_by(.)",
+      "args": [
+        ".nothing | unique_by(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into group_by(.)",
+      "args": [
+        ".nothing | group_by(.)",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into flatten",
+      "args": [
+        ".nothing | flatten",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into test(\"a\")",
+      "args": [
+        ".nothing | test(\"a\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into sub(\"a\"; \"b\")",
+      "args": [
+        ".nothing | sub(\"a\"; \"b\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into upcase",
+      "args": [
+        ".nothing | upcase",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into trim",
+      "args": [
+        ".nothing | trim",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into @base64",
+      "args": [
+        ".nothing | @base64",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into any",
+      "args": [
+        ".nothing | any",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: null into reverse",
+      "args": [
+        ".nothing | reverse",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "dialect: a null value times two",
+      "args": [
+        ".nothing * 2",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true,
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "A null in -, *, / or % drops the result, as a missing key does; mikefarah errors on an explicit null."
+      }
+    },
+    {
+      "name": "dialect: $__loc__",
+      "args": [
+        "$__loc__",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An unbound variable is an error, as in jq, where mikefarah prints nothing."
+      }
+    },
+    {
+      "name": "dialect: and binds looser than a pipe",
+      "args": [
+        ".meta | .z and .a",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "true\n---\ntrue\n---\ntrue\n",
+        "exit": 0,
+        "reason": "jq's precedence: and and or bind tighter than a pipe, where mikefarah reads a | b and c as (a | b) and c."
+      }
+    },
+    {
+      "name": "dialect: type of each kind",
+      "args": [
+        "(.name, .port, .debug, .nothing, .tags, ., 1.5) | type",
+        "config.yaml"
+      ],
+      "stdout": "!!str\n!!int\n!!bool\n!!null\n!!seq\n!!map\n!!float\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: tag of each kind",
+      "args": [
+        "(.name, .port, .tags, .) | tag",
+        "config.yaml"
+      ],
+      "stdout": "!!str\n!!int\n!!seq\n!!map\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: kind of each kind",
+      "args": [
+        "(.name, .tags, .) | kind",
+        "config.yaml"
+      ],
+      "stdout": "scalar\nseq\nmap\n",
+      "exit": 0
+    },
+    {
+      "name": "dialect: a comma binds looser than a pipe",
+      "args": [
+        ".name, .port | type",
+        "config.yaml"
+      ],
+      "stdout": "app\n!!int\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "!!str\n!!int\n",
+        "exit": 0,
+        "reason": "jq's precedence: a comma binds tighter than a pipe, where mikefarah reads a | b, c as (a | b), c."
+      }
     }
   ]
 }

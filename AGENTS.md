@@ -90,7 +90,8 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 suite compares our awk with; the suite never runs gawk.
                 yq-record.ts, run by hand, rewrites
                 test/fixtures/just-bash/yq-mikefarah.json with what
-                mikefarah's yq v4 answers; the suite never runs yq.
+                mikefarah's yq v4 answers, jq-record.ts jq-1.8.json from
+                jq 1.8; the suite never runs either binary.
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched

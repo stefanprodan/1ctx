@@ -1,0 +1,777 @@
+{
+  "recordedWith": "jq-1.8.2",
+  "files": {},
+  "cases": [
+    {
+      "name": "null: keys",
+      "args": [
+        "-c",
+        "keys"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: to_entries",
+      "args": [
+        "-c",
+        "to_entries"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: with_entries(.)",
+      "args": [
+        "-c",
+        "with_entries(.)"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: map(.)",
+      "args": [
+        "-c",
+        "map(.)"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: map_values(.)",
+      "args": [
+        "-c",
+        "map_values(.)"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: min",
+      "args": [
+        "-c",
+        "min"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: max",
+      "args": [
+        "-c",
+        "max"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: split(\"a\")",
+      "args": [
+        "-c",
+        "split(\"a\")"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: join(\",\")",
+      "args": [
+        "-c",
+        "join(\",\")"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: sort",
+      "args": [
+        "-c",
+        "sort"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: sort_by(.)",
+      "args": [
+        "-c",
+        "sort_by(.)"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: unique",
+      "args": [
+        "-c",
+        "unique"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: unique_by(.)",
+      "args": [
+        "-c",
+        "unique_by(.)"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: group_by(.)",
+      "args": [
+        "-c",
+        "group_by(.)"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: flatten",
+      "args": [
+        "-c",
+        "flatten"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: test(\"a\")",
+      "args": [
+        "-c",
+        "test(\"a\")"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: sub(\"a\"; \"b\")",
+      "args": [
+        "-c",
+        "sub(\"a\"; \"b\")"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: ascii_upcase",
+      "args": [
+        "-c",
+        "ascii_upcase"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: trim",
+      "args": [
+        "-c",
+        "trim"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: any",
+      "args": [
+        "-c",
+        "any"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: all",
+      "args": [
+        "-c",
+        "all"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: @base64",
+      "args": [
+        "-c",
+        "@base64"
+      ],
+      "stdin": "null\n",
+      "stdout": "\"bnVsbA==\"\n",
+      "exit": 0
+    },
+    {
+      "name": "null: reverse",
+      "args": [
+        "-c",
+        "reverse"
+      ],
+      "stdin": "null\n",
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "null: . - 1",
+      "args": [
+        "-c",
+        ". - 1"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: . * 2",
+      "args": [
+        "-c",
+        ". * 2"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: . / 2",
+      "args": [
+        "-c",
+        ". / 2"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: . % 2",
+      "args": [
+        "-c",
+        ". % 2"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: 2 * .",
+      "args": [
+        "-c",
+        "2 * ."
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: . + 1",
+      "args": [
+        "-c",
+        ". + 1"
+      ],
+      "stdin": "null\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "null: 1 - .",
+      "args": [
+        "-c",
+        "1 - ."
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: capture(\"a\")",
+      "args": [
+        "-c",
+        "capture(\"a\")"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "null: match(\"a\")",
+      "args": [
+        "-c",
+        "match(\"a\")"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "keys of a number",
+      "args": [
+        "-c",
+        "keys"
+      ],
+      "stdin": "1\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "keys are sorted",
+      "args": [
+        "-c",
+        "keys"
+      ],
+      "stdin": "{\"b\":1,\"a\":2}\n",
+      "stdout": "[\"a\",\"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "to_entries on an array",
+      "args": [
+        "-c",
+        "to_entries"
+      ],
+      "stdin": "[\"x\",\"y\"]\n",
+      "stdout": "[{\"key\":0,\"value\":\"x\"},{\"key\":1,\"value\":\"y\"}]\n",
+      "exit": 0
+    },
+    {
+      "name": "with_entries on an array",
+      "args": [
+        "-c",
+        "with_entries(.)"
+      ],
+      "stdin": "[\"x\",\"y\"]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "with_entries on an array with string keys",
+      "args": [
+        "-c",
+        "with_entries(.key |= tostring)"
+      ],
+      "stdin": "[\"x\",\"y\"]\n",
+      "stdout": "{\"0\":\"x\",\"1\":\"y\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "@base64 of a number",
+      "args": [
+        "-c",
+        "@base64"
+      ],
+      "stdin": "1\n",
+      "stdout": "\"MQ==\"\n",
+      "exit": 0
+    },
+    {
+      "name": "a string plus a number",
+      "args": [
+        "-c",
+        "\"a\" + 1"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "a number plus a string",
+      "args": [
+        "-c",
+        "1 + \"a\""
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "a map minus a number",
+      "args": [
+        "-c",
+        "{} - 1"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "a string minus a string",
+      "args": [
+        "-c",
+        "\"a\" - \"b\""
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "sub with a named capture",
+      "args": [
+        "-c",
+        "sub(\"(?<x>l)\"; \"[\\(.x)]\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "\"a[l]pha\"\n",
+      "exit": 0
+    },
+    {
+      "name": "sub replaces the first match",
+      "args": [
+        "-c",
+        "sub(\"a\"; \"o\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "\"olpha\"\n",
+      "exit": 0
+    },
+    {
+      "name": "sub with the g flag",
+      "args": [
+        "-c",
+        "sub(\"a\"; \"o\"; \"g\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "\"olpho\"\n",
+      "exit": 0
+    },
+    {
+      "name": "gsub",
+      "args": [
+        "-c",
+        "gsub(\"(?<c>[ap])\"; \"<\\(.c)>\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "\"<a>l<p>h<a>\"\n",
+      "exit": 0
+    },
+    {
+      "name": "sub with several outputs",
+      "args": [
+        "-c",
+        "sub(\"b\"; \"x\", \"y\")"
+      ],
+      "stdin": "\"abc\"\n",
+      "stdout": "\"axc\"\n\"ayc\"\n",
+      "exit": 0
+    },
+    {
+      "name": "test with the i flag",
+      "args": [
+        "-c",
+        "test(\"A\"; \"i\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "test with the x flag",
+      "args": [
+        "-c",
+        "test(\"a l\"; \"x\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "true\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "false\n",
+        "exit": 0,
+        "reason": "The regular expressions are RE2's, which have no extended mode: the x flag is ignored."
+      }
+    },
+    {
+      "name": "capture without a match",
+      "args": [
+        "-c",
+        "capture(\"(?<n>z)\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "capture a named group",
+      "args": [
+        "-c",
+        "capture(\"(?<first>.)(?<rest>.*)\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "{\"first\":\"a\",\"rest\":\"lpha\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "match with named and plain groups",
+      "args": [
+        "-c",
+        "match(\"(?<n>l)(p)\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "{\"offset\":1,\"length\":2,\"string\":\"lp\",\"captures\":[{\"offset\":1,\"length\":1,\"string\":\"l\",\"name\":\"n\"},{\"offset\":2,\"length\":1,\"string\":\"p\",\"name\":null}]}\n",
+      "exit": 0
+    },
+    {
+      "name": "match every occurrence",
+      "args": [
+        "-c",
+        "[match(\"a\"; \"g\") | .offset]"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "[0,4]\n",
+      "exit": 0
+    },
+    {
+      "name": "match an optional group that did not take part",
+      "args": [
+        "-c",
+        "match(\"(x)?a\")"
+      ],
+      "stdin": "\"alpha\"\n",
+      "stdout": "{\"offset\":0,\"length\":1,\"string\":\"a\",\"captures\":[{\"offset\":-1,\"string\":null,\"length\":0,\"name\":null}]}\n",
+      "exit": 0
+    },
+    {
+      "name": "an unbound variable",
+      "args": [
+        "-c",
+        "$index"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "an unbound variable after a pipe",
+      "args": [
+        "-c",
+        ". as $x | $y"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "$__loc__",
+      "args": [
+        "-c",
+        "$__loc__"
+      ],
+      "stdin": "null\n",
+      "stdout": "{\"file\":\"<top-level>\",\"line\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "a step into a string",
+      "args": [
+        "-c",
+        ".name.x"
+      ],
+      "stdin": "{\"name\":\"web\"}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "a step into a number in a list",
+      "args": [
+        "-c",
+        ".tags[0].x"
+      ],
+      "stdin": "{\"tags\":[1]}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "a step after a step with a dot",
+      "args": [
+        "-c",
+        ".a.[0]"
+      ],
+      "stdin": "{\"a\":[1,2]}\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "iterating after a dot",
+      "args": [
+        "-c",
+        "[.a.[]]"
+      ],
+      "stdin": "{\"a\":[1,2]}\n",
+      "stdout": "[1,2]\n",
+      "exit": 0
+    },
+    {
+      "name": "a wildcard is a literal",
+      "args": [
+        "-c",
+        ". == \"web*\""
+      ],
+      "stdin": "\"web-1\"\n",
+      "stdout": "false\n",
+      "exit": 0
+    },
+    {
+      "name": "tojson is compact",
+      "args": [
+        "-c",
+        "tojson"
+      ],
+      "stdin": "{\"a\":[1,2]}\n",
+      "stdout": "\"{\\\"a\\\":[1,2]}\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@json is compact",
+      "args": [
+        "-c",
+        "@json"
+      ],
+      "stdin": "{\"a\":[1,2]}\n",
+      "stdout": "\"{\\\"a\\\":[1,2]}\"\n",
+      "exit": 0
+    },
+    {
+      "name": "unique sorts",
+      "args": [
+        "-c",
+        "unique"
+      ],
+      "stdin": "[\"b\",\"a\",\"b\"]\n",
+      "stdout": "[\"a\",\"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "group_by sorts",
+      "args": [
+        "-c",
+        "group_by(.)"
+      ],
+      "stdin": "[\"b\",\"a\",\"b\"]\n",
+      "stdout": "[[\"a\"],[\"b\",\"b\"]]\n",
+      "exit": 0
+    },
+    {
+      "name": "upcase is mikefarah's",
+      "args": [
+        "-c",
+        "upcase"
+      ],
+      "stdin": "\"web\"\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true,
+      "accept": {
+        "stdout": "\"WEB\"\n",
+        "exit": 0,
+        "reason": "jq accepts mikefarah's yq names (upcase, downcase, env(NAME), strenv, to_json and the rest), which jq 1.8 does not define."
+      }
+    },
+    {
+      "name": "strenv is mikefarah's",
+      "args": [
+        "-c",
+        "strenv(NAME)"
+      ],
+      "stdin": "null\n",
+      "env": {
+        "NAME": "web"
+      },
+      "stdout": "",
+      "exit": 3,
+      "error": true,
+      "accept": {
+        "stdout": "\"web\"\n",
+        "exit": 0,
+        "reason": "jq accepts mikefarah's yq names (upcase, downcase, env(NAME), strenv, to_json and the rest), which jq 1.8 does not define."
+      }
+    },
+    {
+      "name": "env with a name is mikefarah's",
+      "args": [
+        "-c",
+        "env(COUNT) + 1"
+      ],
+      "stdin": "null\n",
+      "env": {
+        "COUNT": "3"
+      },
+      "stdout": "",
+      "exit": 3,
+      "error": true,
+      "accept": {
+        "stdout": "4\n",
+        "exit": 0,
+        "reason": "jq accepts mikefarah's yq names (upcase, downcase, env(NAME), strenv, to_json and the rest), which jq 1.8 does not define."
+      }
+    },
+    {
+      "name": "the whole environment",
+      "args": [
+        "-c",
+        "env.NAME"
+      ],
+      "stdin": "null\n",
+      "env": {
+        "NAME": "web"
+      },
+      "stdout": "\"web\"\n",
+      "exit": 0
+    }
+  ]
+}
