@@ -1,0 +1,2784 @@
+{
+  "gawk": "GNU Awk 5.4.1, API 4.1, PMA Avon 8-g1, (GNU MPFR 4.2.2, GNU MP 6.3.0)",
+  "cases": [
+    {
+      "name": "idiom: print first field",
+      "args": [
+        "{print $1}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "alpha\nbeta\ngamma\nalpha\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: -F, second field",
+      "args": [
+        "-F,",
+        "{print $2}"
+      ],
+      "stdin": "a,b,c\nd,e,f\n",
+      "stdout": "b\ne\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: -F tab",
+      "args": [
+        "-F\\t",
+        "{print $2}"
+      ],
+      "stdin": "a\tb c\td\n",
+      "stdout": "b c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: -F colon passwd",
+      "args": [
+        "-F:",
+        "{print $1, $NF}"
+      ],
+      "stdin": "root:x:0:0:root:/root:/bin/bash\n",
+      "stdout": "root /bin/bash\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: sum a column",
+      "args": [
+        "{s += $2} END {print s}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "65\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: count by key",
+      "args": [
+        "{c[$1]++} END {print c[\"alpha\"], c[\"beta\"], c[\"none\"] + 0}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "2 1 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: NR==FNR join",
+      "args": [
+        "NR==FNR {m[$1]=$2; next} ($1 in m) {print $0, m[$1]}",
+        "k.txt",
+        "d.txt"
+      ],
+      "files": {
+        "k.txt": "a 1\nb 2\n",
+        "d.txt": "a x\nc y\nb z\n"
+      },
+      "stdout": "a x 1\nb z 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf formats",
+      "args": [
+        "BEGIN {printf \"%5.2f|%-6s|%05d|%x|%X|%o|%c|%%|%+d\\n\", 3.14159, \"ab\", 42, 255, 255, 8, 65, 7}"
+      ],
+      "stdout": " 3.14|ab    |00042|ff|FF|10|A|%|+7\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf string width",
+      "args": [
+        "{printf \"%-8s|%8s|\\n\", $1, $2}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "alpha   |      10|\nbeta    |      20|\ngamma   |      30|\nalpha   |       5|\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: gsub with ampersand",
+      "args": [
+        "{gsub(/a/, \"[&]\"); print}"
+      ],
+      "stdin": "banana\n",
+      "stdout": "b[a]n[a]n[a]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: gsub escaped ampersand",
+      "args": [
+        "{gsub(/a/, \"\\\\&\"); print}"
+      ],
+      "stdin": "banana\n",
+      "stdout": "b&n&n&\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: sub first only",
+      "args": [
+        "{n = sub(/a/, \"A\"); print n, $0}"
+      ],
+      "stdin": "banana\n",
+      "stdout": "1 bAnana\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: gsub count on a field",
+      "args": [
+        "{n = gsub(/o/, \"0\", $2); print n, $0}"
+      ],
+      "stdin": "foo boo zoo\n",
+      "stdout": "2 foo b00 zoo\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: range pattern",
+      "args": [
+        "/start/,/end/"
+      ],
+      "stdin": "a\nstart\nb\nend\nc\nstart\nd\n",
+      "stdout": "start\nb\nend\nstart\nd\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: $1=$1 with OFS",
+      "args": [
+        "BEGIN {OFS=\"-\"} {$1=$1; print}"
+      ],
+      "stdin": "a  b   c\n",
+      "stdout": "a-b-c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: split on a string",
+      "args": [
+        "{n = split($0, a, \":\"); print n, a[1], a[n]}"
+      ],
+      "stdin": "x:y:z\n",
+      "stdout": "3 x z\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: split default",
+      "args": [
+        "BEGIN {n = split(\"a b  c\", arr); print n, arr[3]}"
+      ],
+      "stdout": "3 c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: getline from a command",
+      "args": [
+        "BEGIN {\"echo hi there\" | getline x; print x}"
+      ],
+      "stdout": "hi there\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: getline loop from a command",
+      "args": [
+        "BEGIN {while ((\"printf 'a\\\\nb\\\\n'\" | getline line) > 0) print \"got\", line}"
+      ],
+      "stdout": "got a\ngot b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: dedupe with !seen",
+      "args": [
+        "!seen[$0]++"
+      ],
+      "stdin": "a\nb\na\nc\nb\n",
+      "stdout": "a\nb\nc\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: substr edges",
+      "args": [
+        "BEGIN {s = \"hello\"; print substr(s, 2, 3) \"|\" substr(s, 0) \"|\" substr(s, -1, 3) \"|\" substr(s, 4, 100) \"|\" substr(s, 9)}"
+      ],
+      "stdout": "ell|hello|hel|lo|\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: substr after index",
+      "args": [
+        "{print substr($0, index($0, \"=\") + 1)}"
+      ],
+      "stdin": "key=value=x\n",
+      "stdout": "value=x\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: number output",
+      "args": [
+        "BEGIN {print 0.1 + 0.2, 1/3, 100/3, 1e6, 1e-5, 123456789012, 2^31, 3.0}"
+      ],
+      "stdout": "0.3 0.333333 33.3333 1000000 1e-05 123456789012 2147483648 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: NF and $NF",
+      "args": [
+        "{print NF, $NF, $(NF-1)}"
+      ],
+      "stdin": "a b c d\n",
+      "stdout": "4 d c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: length of the line",
+      "args": [
+        "{print length, length($0)}"
+      ],
+      "stdin": "hello world\n",
+      "stdout": "11 11\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: toupper and tolower",
+      "args": [
+        "{print toupper($1), tolower($2)}"
+      ],
+      "stdin": "abc DEF\n",
+      "stdout": "ABC def\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: index",
+      "args": [
+        "BEGIN {print index(\"hello\", \"ll\"), index(\"hello\", \"z\")}"
+      ],
+      "stdout": "3 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: sprintf",
+      "args": [
+        "BEGIN {s = sprintf(\"%s-%03d\", \"id\", 7); print s}"
+      ],
+      "stdout": "id-007\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: -v numeric",
+      "args": [
+        "-v",
+        "n=3",
+        "{print $1 * n}"
+      ],
+      "stdin": "2\n5\n",
+      "stdout": "6\n15\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: regex on a field",
+      "args": [
+        "$2 ~ /^b/ {print $1}"
+      ],
+      "stdin": "x apple\ny banana\nz berry\n",
+      "stdout": "y\nz\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: next skips comments",
+      "args": [
+        "/^#/ {next} {print}"
+      ],
+      "stdin": "# c\na\n#d\nb\n",
+      "stdout": "a\nb\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: exit code",
+      "args": [
+        "{print; exit 3}"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "a\n",
+      "exit": 3,
+      "stderr": false
+    },
+    {
+      "name": "idiom: END sees NR",
+      "args": [
+        "END {print NR}"
+      ],
+      "stdin": "a\nb\nc\n",
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: while do for",
+      "args": [
+        "BEGIN {i = 0; while (i < 3) i++; do i--; while (i > 1); for (j = 0; j < 3; j++) s = s j; print i, s}"
+      ],
+      "stdout": "1 012\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: ternary",
+      "args": [
+        "{print ($1 > 5 ? \"big\" : \"small\")}"
+      ],
+      "stdin": "3\n10\n",
+      "stdout": "small\nbig\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: numeric field comparison",
+      "args": [
+        "$1 > 10"
+      ],
+      "stdin": "9\n10\n11\n100\n",
+      "stdout": "11\n100\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: uninitialized is zero and empty",
+      "args": [
+        "BEGIN {print x + 0, \"[\" x \"]\", length(x)}"
+      ],
+      "stdout": "0 [] 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: multi-dimensional array",
+      "args": [
+        "BEGIN {a[1,2] = 3; if ((1,2) in a) print \"yes\", a[1,2]; for (k in a) {split(k, p, SUBSEP); print p[1], p[2]}}"
+      ],
+      "stdout": "yes 3\n1 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: delete whole array",
+      "args": [
+        "BEGIN {a[1]; a[2]; delete a; n = 0; for (k in a) n++; print n}"
+      ],
+      "stdout": "0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf %d of a numeric prefix",
+      "args": [
+        "BEGIN {printf \"%d items\\n\", \"3abc\"}"
+      ],
+      "stdout": "3 items\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: concatenation precedence",
+      "args": [
+        "BEGIN {print 1 \" \" 2 + 3, 2 \" \" -1}"
+      ],
+      "stdout": "1 5 2-1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: ORS",
+      "args": [
+        "BEGIN {ORS=\";\"} {print}"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "a;b;",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: gensub with a group",
+      "args": [
+        "BEGIN {print gensub(/([a-z]+)-([0-9]+)/, \"\\\\2:\\\\1\", \"g\", \"ab-12 cd-34\")}"
+      ],
+      "stdout": "12:ab 34:cd\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: match and substr",
+      "args": [
+        "match($0, /[0-9]+/) {print substr($0, RSTART, RLENGTH), RSTART, RLENGTH}"
+      ],
+      "stdin": "abc123def\nnone\n",
+      "stdout": "123 4 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: dynamic regex from -v",
+      "args": [
+        "-v",
+        "pat=^b",
+        "$0 ~ pat"
+      ],
+      "stdin": "a\nb1\nb2\n",
+      "stdout": "b1\nb2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: trim leading spaces",
+      "args": [
+        "{sub(/^ +/, \"\"); print \"[\" $0 \"]\"}"
+      ],
+      "stdin": "   x y\n",
+      "stdout": "[x y]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: increment a field",
+      "args": [
+        "{$2++; print}"
+      ],
+      "stdin": "a 1 c\n",
+      "stdout": "a 2 c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: NF assignment truncates",
+      "args": [
+        "{NF = 2; print}"
+      ],
+      "stdin": "a b c d\n",
+      "stdout": "a b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: assign past NF extends",
+      "args": [
+        "BEGIN {OFS=\",\"} {$5 = \"x\"; print; print NF}"
+      ],
+      "stdin": "a b\n",
+      "stdout": "a,b,,,x\n5\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: int of a numeric string",
+      "args": [
+        "BEGIN {print int(\"3.9abc\"), int(7.99), int(\"x\")}"
+      ],
+      "stdout": "3 7 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: reverse fields",
+      "args": [
+        "{for (i = NF; i > 0; i--) printf \"%s%s\", $i, (i > 1 ? \" \" : \"\\n\")}"
+      ],
+      "stdin": "a b c\n",
+      "stdout": "c b a\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf with parentheses",
+      "args": [
+        "{printf(\"%s-%s\\n\", $1, $2)}"
+      ],
+      "stdin": "a b\n",
+      "stdout": "a-b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: write a file and read it back",
+      "args": [
+        "{print $1 > \"out.txt\"} END {close(\"out.txt\"); while ((getline l < \"out.txt\") > 0) print \"read\", l}"
+      ],
+      "stdin": "a 1\nb 2\n",
+      "stdout": "read a\nread b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: append to a file",
+      "args": [
+        "BEGIN {print \"one\" >> \"log.txt\"; print \"two\" >> \"log.txt\"; close(\"log.txt\"); while ((getline l < \"log.txt\") > 0) print l}"
+      ],
+      "files": {
+        "log.txt": "zero\n"
+      },
+      "stdout": "zero\none\ntwo\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: blank the third field",
+      "args": [
+        "{$3 = \"\"; print}"
+      ],
+      "stdin": "a b c d\n",
+      "stdout": "a b  d\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: FILENAME and FNR over two files",
+      "args": [
+        "{print FILENAME, FNR, NR, $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "a.txt 1 1 A1\na.txt 2 2 A2\nb.txt 1 3 B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: string comparison",
+      "args": [
+        "BEGIN {print (\"abc\" < \"abd\"), (\"b\" > \"a\"), (\"10\" == 10)}"
+      ],
+      "stdout": "1 1 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: regex alternation and anchors",
+      "args": [
+        "/^(foo|bar)$/"
+      ],
+      "stdin": "foo\nfoobar\nbar\n",
+      "stdout": "foo\nbar\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: bracket expression class",
+      "args": [
+        "/^[[:digit:]]+$/ {print \"num\", $0}"
+      ],
+      "stdin": "123\nabc\n4a\n",
+      "stdout": "num 123\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: modulo and power",
+      "args": [
+        "BEGIN {print 7 % 3, -7 % 3, 2 ^ 10, 2 ** 3}"
+      ],
+      "stdout": "1 -1 1024 8\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: increment and decrement",
+      "args": [
+        "BEGIN {x = 5; print x++, x, ++x, x--, --x}"
+      ],
+      "stdout": "5 6 7 7 5\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: logical operators",
+      "args": [
+        "BEGIN {print (1 && 0), (1 || 0), !0, !\"\", !\"a\"}"
+      ],
+      "stdout": "0 1 1 1 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: in operator",
+      "args": [
+        "BEGIN {a[\"k\"] = 1; print (\"k\" in a), (\"z\" in a)}"
+      ],
+      "stdout": "1 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: for in over one key",
+      "args": [
+        "BEGIN {a[\"only\"] = 1; for (k in a) print k, a[k]}"
+      ],
+      "stdout": "only 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf %s of a number",
+      "args": [
+        "BEGIN {printf \"%s %s %s\\n\", 3, 3.5, 1e6}"
+      ],
+      "stdout": "3 3.5 1000000\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: print with commas and OFS",
+      "args": [
+        "BEGIN {OFS = \":\"; print \"a\", \"b\", 1}"
+      ],
+      "stdout": "a:b:1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: sum per key then total",
+      "args": [
+        "{s[$1] += $2; t += $2} END {print s[\"alpha\"], s[\"gamma\"], t}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "15 30 65\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: average",
+      "args": [
+        "{s += $2} END {printf \"%.2f\\n\", s / NR}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "16.25\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: max of a column",
+      "args": [
+        "NR == 1 || $2 > max {max = $2} END {print max}"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "30\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: print lines longer than",
+      "args": [
+        "length($0) > 7"
+      ],
+      "stdin": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "stdout": "alpha 10 x\nbeta 20 y\ngamma 30 z\nalpha 5 w\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: line numbers",
+      "args": [
+        "{print NR \": \" $0}"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "1: a\n2: b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: last field of each line",
+      "args": [
+        "{print $NF}"
+      ],
+      "stdin": "a b\nc d e\n",
+      "stdout": "b\ne\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: exit in BEGIN runs END",
+      "args": [
+        "BEGIN {print \"b\"; exit 1} END {print \"e\"}"
+      ],
+      "stdout": "b\ne\n",
+      "exit": 1,
+      "stderr": false
+    },
+    {
+      "name": "idiom: getline var from a file",
+      "args": [
+        "BEGIN {while ((getline line < \"a.txt\") > 0) n++; print n, line}"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "2 A2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: unary minus string",
+      "args": [
+        "BEGIN {x = \"3\"; print -x, +\"4a\"}"
+      ],
+      "stdout": "-3 4\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf %i and %5.1f",
+      "args": [
+        "BEGIN {printf \"%i %5.1f\\n\", 42.9, 2.25}"
+      ],
+      "stdout": "42   2.2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: character class in split",
+      "args": [
+        "BEGIN {n = split(\"a1b2c\", p, /[0-9]/); print n, p[1], p[3]}"
+      ],
+      "stdout": "3 a c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: printf reuse of format",
+      "args": [
+        "{printf \"%s=%s;\", $1, $2} END {print \"\"}"
+      ],
+      "stdin": "a 1\nb 2\n",
+      "stdout": "a=1;b=2;\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: nextfile",
+      "args": [
+        "FNR == 2 {nextfile} {print FILENAME, $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "a.txt A1\nb.txt B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: subtract dates like numbers",
+      "args": [
+        "{print $2 - $1}"
+      ],
+      "stdin": "10 25\n3.5 1\n",
+      "stdout": "15\n-2.5\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "idiom: string repeat with a loop",
+      "args": [
+        "BEGIN {s = \"\"; for (i = 0; i < 3; i++) s = s \"ab\"; print s}"
+      ],
+      "stdout": "ababab\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -v RS before BEGIN",
+      "args": [
+        "-v",
+        "RS=;",
+        "BEGIN {printf \"[%s]\\n\", RS} {print NR \": \" $0}"
+      ],
+      "stdin": "a;b;c\n",
+      "stdout": "[;]\n1: a\n2: b\n3: c\n\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -v FS then -F",
+      "args": [
+        "-v",
+        "FS=:",
+        "-F,",
+        "BEGIN {print FS}"
+      ],
+      "stdout": ",\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -F then -v FS",
+      "args": [
+        "-F,",
+        "-v",
+        "FS=:",
+        "BEGIN {print FS}"
+      ],
+      "stdout": ":\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -v unknown escape",
+      "args": [
+        "-v",
+        "s=\\q",
+        "BEGIN {print s}"
+      ],
+      "stdout": "q\n",
+      "exit": 0,
+      "stderr": true
+    },
+    {
+      "name": "options: -v escaped backslash",
+      "args": [
+        "-v",
+        "s=a\\\\n",
+        "BEGIN {print s}"
+      ],
+      "stdout": "a\\n\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -v OFS tab",
+      "args": [
+        "-v",
+        "OFS=\\t",
+        "{$1 = $1; print}"
+      ],
+      "stdin": "a b c\n",
+      "stdout": "a\tb\tc\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -f one file",
+      "args": [
+        "-f",
+        "prog.awk"
+      ],
+      "stdin": "a b\n",
+      "files": {
+        "prog.awk": "{print $2}\n"
+      },
+      "stdout": "b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -f two files",
+      "args": [
+        "-f",
+        "lib.awk",
+        "-f",
+        "main.awk"
+      ],
+      "stdin": "4\n",
+      "files": {
+        "lib.awk": "function twice(x) {return x * 2}\n",
+        "main.awk": "{print twice($1)}\n"
+      },
+      "stdout": "8\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -f with an operand",
+      "args": [
+        "-f",
+        "prog.awk",
+        "a.txt"
+      ],
+      "files": {
+        "prog.awk": "{print FILENAME, $0}\n",
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "a.txt A1\na.txt A2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -- ends options",
+      "args": [
+        "--",
+        "BEGIN {print \"x\"}"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -- then a dash operand",
+      "args": [
+        "-F,",
+        "--",
+        "{print $2}",
+        "-"
+      ],
+      "stdin": "a,b\n",
+      "stdout": "b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: delete ARGV[1] in BEGIN",
+      "args": [
+        "BEGIN {delete ARGV[1]} {print FILENAME, $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "b.txt B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: ARGV[1] rewritten to an assignment",
+      "args": [
+        "BEGIN {ARGV[1] = \"x=changed\"} {print x, $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "changed B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: ARGC lowered in BEGIN",
+      "args": [
+        "BEGIN {ARGC = 1} {print \"in\", $0}",
+        "a.txt"
+      ],
+      "stdin": "S\n",
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "in S\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: ARGC lowered keeps the first file",
+      "args": [
+        "BEGIN {ARGC = 2} {print FILENAME, $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "a.txt A1\na.txt A2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: an empty ARGV entry is skipped",
+      "args": [
+        "BEGIN {ARGV[1] = \"\"} {print FILENAME, $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "b.txt B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: ARGV entry added in BEGIN",
+      "args": [
+        "BEGIN {ARGV[ARGC++] = \"b.txt\"} {print FILENAME, $0}",
+        "a.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "a.txt A1\na.txt A2\nb.txt B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: dash between two files",
+      "args": [
+        "{print FILENAME \":\" $0}",
+        "a.txt",
+        "-",
+        "b.txt"
+      ],
+      "stdin": "S\n",
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "a.txt:A1\na.txt:A2\n-:S\nb.txt:B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: 1x=1 is a file name",
+      "args": [
+        "{print FILENAME, $0}",
+        "1x=1"
+      ],
+      "files": {
+        "1x=1": "one\n"
+      },
+      "stdout": "1x=1 one\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: a.b=1 is a file name",
+      "args": [
+        "{print FILENAME, $0}",
+        "a.b=1"
+      ],
+      "files": {
+        "a.b=1": "dot\n"
+      },
+      "stdout": "a.b=1 dot\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: a-b=1 is a file name",
+      "args": [
+        "{print FILENAME, $0}",
+        "a-b=1"
+      ],
+      "files": {
+        "a-b=1": "dash\n"
+      },
+      "stdout": "a-b=1 dash\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: a keyword as a name is fatal",
+      "args": [
+        "BEGIN {print \"begin\"} {print}",
+        "print=1"
+      ],
+      "stdin": "S\n",
+      "stdout": "begin\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "operands: a builtin as a name is fatal",
+      "args": [
+        "BEGIN {print \"begin\"} {print}",
+        "length=1"
+      ],
+      "stdin": "S\n",
+      "stdout": "begin\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "operands: an array name is fatal",
+      "args": [
+        "BEGIN {print \"begin\"} {print}",
+        "ARGV=x"
+      ],
+      "stdin": "S\n",
+      "stdout": "begin\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "operands: assignments before, between and after files",
+      "args": [
+        "{print v, $0} END {print \"end\", v}",
+        "v=1",
+        "a.txt",
+        "v=2",
+        "b.txt",
+        "v=3"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "1 A1\n1 A2\n2 B1\nend 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: FS per file",
+      "args": [
+        "{print $2}",
+        "FS=,",
+        "c1.txt",
+        "FS=;",
+        "c2.txt"
+      ],
+      "files": {
+        "c1.txt": "a,b;c\n",
+        "c2.txt": "d,e;f\n"
+      },
+      "stdout": "b;c\nf\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: only an assignment reads stdin",
+      "args": [
+        "{print v, $0}",
+        "v=x"
+      ],
+      "stdin": "S\n",
+      "stdout": "x S\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: assignment escapes",
+      "args": [
+        "{print s $0}",
+        "s=a\\tb:"
+      ],
+      "stdin": "S\n",
+      "stdout": "a\tb:S\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: assignment not seen in BEGIN",
+      "args": [
+        "BEGIN {print \"[\" v \"]\"} {print v}",
+        "v=1",
+        "a.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "[]\n1\n1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: RS as an operand",
+      "args": [
+        "{print NR, $0}",
+        "RS=;",
+        "semi.txt"
+      ],
+      "files": {
+        "semi.txt": "a;b;c"
+      },
+      "stdout": "1 a\n2 b\n3 c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: missing file",
+      "args": [
+        "{print}",
+        "nope.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "operands: dash alone reads stdin",
+      "args": [
+        "{print FILENAME \"|\" $0}",
+        "-"
+      ],
+      "stdin": "S\n",
+      "stdout": "-|S\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: FILENAME of stdin",
+      "args": [
+        "{print \"[\" FILENAME \"]\"}"
+      ],
+      "stdin": "S\n",
+      "stdout": "[-]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "operands: a missing file stops the run",
+      "args": [
+        "{print} END {print \"end\"}",
+        "nope.txt",
+        "a.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "records: chat RS=--- table",
+      "args": [
+        "BEGIN {RS = \"---\"} NR > 1 {name = \"\"; ns = \"\"; phase = \"\"; n = split($0, l, \"\\n\"); for (i = 1; i <= n; i++) {if (l[i] ~ /^  name:/) {name = l[i]; sub(/^  name: /, \"\", name)} if (l[i] ~ /^  namespace:/) {ns = l[i]; sub(/^  namespace: /, \"\", ns)} if (l[i] ~ /^  phase:/) {phase = l[i]; sub(/^  phase: /, \"\", phase)}} printf \"%-20s %-8s %s\\n\", name, ns, phase}",
+        "pods.yaml"
+      ],
+      "files": {
+        "pods.yaml": "---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: cache-redis-0\n  namespace: cache\nstatus:\n  phase: Running\n  restarts: 2\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-frontend-7d9f\n  namespace: apps\nstatus:\n  phase: Pending\n  restarts: 0\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: batch-job-x2\n  namespace: jobs\nstatus:\n  phase: Failed\n  restarts: 5\n"
+      },
+      "stdout": "cache-redis-0        cache    Running\nweb-frontend-7d9f    apps     Pending\nbatch-job-x2         jobs     Failed\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: chat match array extraction",
+      "args": [
+        "/^  (name|namespace|phase):/ {if (match($0, /^  ([a-z]+): (.*)$/, m)) row[m[1]] = m[2]} /^  restarts:/ {print row[\"namespace\"] \"/\" row[\"name\"], row[\"phase\"]}",
+        "pods.yaml"
+      ],
+      "files": {
+        "pods.yaml": "---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: cache-redis-0\n  namespace: cache\nstatus:\n  phase: Running\n  restarts: 2\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-frontend-7d9f\n  namespace: apps\nstatus:\n  phase: Pending\n  restarts: 0\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: batch-job-x2\n  namespace: jobs\nstatus:\n  phase: Failed\n  restarts: 5\n"
+      },
+      "stdout": "cache/cache-redis-0 Running\napps/web-frontend-7d9f Pending\njobs/batch-job-x2 Failed\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS a single character",
+      "args": [
+        "BEGIN {RS = \";\"} {print NR \"[\" $0 \"]\" \"RT[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;;c;\n",
+      "stdout": "1[a]RT[;]\n2[b]RT[;]\n3[]RT[;]\n4[c]RT[;]\n5[\n]RT[]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS a single character with a leading separator",
+      "args": [
+        "BEGIN {RS = \";\"} {print NR \"[\" $0 \"]\"}"
+      ],
+      "stdin": ";a;b;",
+      "stdout": "1[]\n2[a]\n3[b]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS a regex metacharacter",
+      "args": [
+        "BEGIN {RS = \".\"} {print NR \"[\" $0 \"]\"}"
+      ],
+      "stdin": "a.b.c",
+      "stdout": "1[a]\n2[b]\n3[c]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: paragraph mode",
+      "args": [
+        "BEGIN {RS = \"\"} {printf \"%d[%s]RT[%s]\\n\", NR, $0, RT}"
+      ],
+      "stdin": "\n\npara one\nline two\n\n\n\npara two\n\n",
+      "stdout": "1[para one\nline two]RT[\n\n\n\n]\n2[para two]RT[\n\n]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: paragraph mode single trailing newline",
+      "args": [
+        "BEGIN {RS = \"\"} {printf \"%d[%s]RT[%s]\\n\", NR, $0, RT}"
+      ],
+      "stdin": "a\nb\n\nc\n",
+      "stdout": "1[a\nb]RT[\n\n]\n2[c]RT[\n]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: paragraph mode no trailing newline",
+      "args": [
+        "BEGIN {RS = \"\"} {printf \"%d[%s]RT[%s]\\n\", NR, $0, RT}"
+      ],
+      "stdin": "a\n\nb",
+      "stdout": "1[a]RT[\n\n]\n2[b]RT[]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: paragraph mode CRLF blank line is not blank",
+      "args": [
+        "BEGIN {RS = \"\"} {printf \"%d[%s]\\n\", NR, $0}"
+      ],
+      "stdin": "a\r\n\r\nb\r\n",
+      "stdout": "1[a\r\n\r\nb\r]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: paragraph mode fields split on newline",
+      "args": [
+        "BEGIN {RS = \"\"; FS = \":\"} {print NF; for (i = 1; i <= NF; i++) print i \"[\" $i \"]\"}"
+      ],
+      "stdin": "a:b\nc:d\n\ne\n",
+      "stdout": "4\n1[a]\n2[b]\n3[c]\n4[d]\n1\n1[e]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: paragraph mode default FS",
+      "args": [
+        "BEGIN {RS = \"\"} {print NF, $1, $NF}"
+      ],
+      "stdin": "a b\nc d\n\ne f\n",
+      "stdout": "4 a d\n2 e f\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS regex",
+      "args": [
+        "BEGIN {RS = \"[0-9]+\"} {print NR \"[\" $0 \"]RT[\" RT \"]\"}"
+      ],
+      "stdin": "12a3b44c",
+      "stdout": "1[]RT[12]\n2[a]RT[3]\n3[b]RT[44]\n4[c]RT[]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS regex CRLF",
+      "args": [
+        "BEGIN {RS = \"\\r?\\n\"} {print NR, length($0), \"[\" $0 \"]\"}"
+      ],
+      "stdin": "a\r\nb\nc\r\n",
+      "stdout": "1 1 [a]\n2 1 [b]\n3 1 [c]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: CRLF under the default RS keeps the CR",
+      "args": [
+        "{print length($0)}"
+      ],
+      "stdin": "ab\r\ncd\r\n",
+      "stdout": "3\n3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RT under the default RS",
+      "args": [
+        "{print \"[\" RT \"]\"}"
+      ],
+      "stdin": "a\nb",
+      "stdout": "[\n]\n[]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS changed in a rule",
+      "args": [
+        "NR == 1 {RS = \";\"} {print NR \": \" $0}"
+      ],
+      "stdin": "a\nb;c;d\n",
+      "stdout": "1: a\n2: b\n3: c\n4: d\n\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: RS changed in a rule carries to the next file",
+      "args": [
+        "FNR == 1 && NR == 1 {RS = \";\"} {print FILENAME, NR \": \" $0}",
+        "r1.txt",
+        "r2.txt"
+      ],
+      "files": {
+        "r1.txt": "a\nb;c",
+        "r2.txt": "d;e\nf;"
+      },
+      "stdout": "r1.txt 1: a\nr1.txt 2: b\nr1.txt 3: c\nr2.txt 4: d\nr2.txt 5: e\nf\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: plain getline moves NR, FNR and RT",
+      "args": [
+        "BEGIN {RS = \";\"} NR == 1 {r = getline; print r, $0, NR, FNR, \"[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;c;",
+      "stdout": "1 b 2 2 [;]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline var moves NR and FNR, not $0",
+      "args": [
+        "BEGIN {RS = \";\"} NR == 1 {r = getline v; print r, v, $0, NR, FNR, \"[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;c;",
+      "stdout": "1 b a 2 2 [;]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: plain getline at the end answers 0",
+      "args": [
+        "{r = getline; print r, $0, NR}"
+      ],
+      "stdin": "a\n",
+      "stdout": "0 a 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline from a file leaves NR",
+      "args": [
+        "BEGIN {RS = \";\"} NR == 1 {r = (getline < \"g.txt\"); print r, $0, NF, NR, FNR, \"[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;",
+      "files": {
+        "g.txt": "x y;z"
+      },
+      "stdout": "1 x y 2 1 1 [;]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline var from a file leaves NR",
+      "args": [
+        "BEGIN {RS = \";\"} NR == 1 {r = (getline v < \"g.txt\"); print r, v, $0, NR, FNR, \"[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;",
+      "files": {
+        "g.txt": "x y;z"
+      },
+      "stdout": "1 x y a 1 1 [;]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: command getline leaves NR",
+      "args": [
+        "BEGIN {RS = \";\"} NR == 1 {r = (\"printf 'p q;r'\" | getline); print r, $0, NF, NR, FNR, \"[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;",
+      "stdout": "1 p q 2 1 1 [;]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: command getline var leaves NR",
+      "args": [
+        "BEGIN {RS = \";\"} NR == 1 {r = (\"printf 'p q;r'\" | getline v); print r, v, $0, NR, FNR, \"[\" RT \"]\"}"
+      ],
+      "stdin": "a;b;",
+      "stdout": "1 p q a 1 1 [;]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline file reads to the end",
+      "args": [
+        "BEGIN {while ((r = (getline l < \"g.txt\")) > 0) print r, l; print r}"
+      ],
+      "files": {
+        "g.txt": "one\ntwo"
+      },
+      "stdout": "1 one\n1 two\n0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline from a missing file",
+      "args": [
+        "BEGIN {print (getline l < \"nope.txt\")}"
+      ],
+      "stdout": "-1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: close and reopen a file under another RS",
+      "args": [
+        "BEGIN {getline a < \"g.txt\"; close(\"g.txt\"); RS = \";\"; getline b < \"g.txt\"; print a \"|\" b}"
+      ],
+      "files": {
+        "g.txt": "x;y\nz\n"
+      },
+      "stdout": "x;y|x\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: close and rerun a command",
+      "args": [
+        "BEGIN {c = \"printf 'a;b'\"; c | getline x; close(c); RS = \";\"; c | getline y; print x \"|\" y}"
+      ],
+      "stdout": "a;b|a\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: a command read twice without close",
+      "args": [
+        "BEGIN {c = \"printf 'a\\\\nb\\\\n'\"; c | getline x; c | getline y; print x, y}"
+      ],
+      "stdout": "a b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: close truncates an output file on reopen",
+      "args": [
+        "BEGIN {f = \"o.txt\"; print \"one\" > f; close(f); print \"two\" > f; close(f); while ((getline l < f) > 0) print \"read\", l}"
+      ],
+      "stdout": "read two\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: close answers",
+      "args": [
+        "BEGIN {print close(\"nope\"); getline l < \"g.txt\"; print close(\"g.txt\"); print close(\"g.txt\")}"
+      ],
+      "files": {
+        "g.txt": "x\n"
+      },
+      "stdout": "-1\n0\n-1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline updates NF",
+      "args": [
+        "NR == 1 {getline; print NF, $2}"
+      ],
+      "stdin": "a\nb c d\n",
+      "stdout": "3 c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline in BEGIN reads the operands",
+      "args": [
+        "BEGIN {getline; print \"got\", $0, NR, FILENAME; getline; print \"got2\", $0, NR} {print \"main\", $0}",
+        "a.txt",
+        "b.txt"
+      ],
+      "files": {
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "got A1 1 a.txt\ngot2 A2 2\nmain B1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "records: getline var in BEGIN reads stdin",
+      "args": [
+        "BEGIN {r = getline v; print r, v, NR, \"[\" $0 \"]\"} {print \"main\", $0}"
+      ],
+      "stdin": "S\nT\n",
+      "stdout": "1 S 1 []\nmain T\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: paragraph fields after sub",
+      "args": [
+        "BEGIN {RS = \"\"} {sub(/x/, \"y\"); print NF, $2, $3}"
+      ],
+      "stdin": "x a\nb c\n",
+      "stdout": "4 a b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: paragraph fields after $0 assignment",
+      "args": [
+        "BEGIN {RS = \"\"} {$0 = \"a b\\nc\"; print NF, $3}"
+      ],
+      "stdin": "z\n",
+      "stdout": "3 c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: default FS trims and splits runs",
+      "args": [
+        "{print NF; n = split($0, a); print n, \"[\" a[1] \"]\", \"[\" a[3] \"]\"}"
+      ],
+      "stdin": "  a  b\tc \n",
+      "stdout": "3\n3 [a] [c]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fields: default FS includes newline in split",
+      "args": [
+        "BEGIN {n = split(\"a\\nb c\", p); print n, p[2]}"
+      ],
+      "stdout": "3 b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: length",
+      "args": [
+        "BEGIN {print length(\"a👍b👍c\")}"
+      ],
+      "stdout": "5\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: substr",
+      "args": [
+        "BEGIN {print substr(\"a👍b👍c\", 2, 3)}"
+      ],
+      "stdout": "👍b👍\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: index",
+      "args": [
+        "BEGIN {print index(\"a👍b👍c\", \"b\")}"
+      ],
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: RSTART and RLENGTH",
+      "args": [
+        "BEGIN {match(\"a👍b👍c\", /b👍/); print RSTART, RLENGTH}"
+      ],
+      "stdout": "3 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: length of a line",
+      "args": [
+        "{print length}"
+      ],
+      "stdin": "é👍x\n",
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: split on empty FS",
+      "args": [
+        "BEGIN {n = split(\"a👍b\", p, \"\"); print n, p[2]}"
+      ],
+      "stdout": "3 👍\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: printf width over an emoji",
+      "args": [
+        "BEGIN {printf \"[%5s][%-4s]\\n\", \"👍\", \"é\"}"
+      ],
+      "stdout": "[    👍][é   ]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: printf precision over an emoji",
+      "args": [
+        "BEGIN {printf \"[%.2s]\\n\", \"👍👍👍\"}"
+      ],
+      "stdout": "[👍👍]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: printf %c of a string",
+      "args": [
+        "BEGIN {printf \"[%c]\\n\", \"👍x\"}"
+      ],
+      "stdout": "[👍]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "chars: toupper keeps an emoji",
+      "args": [
+        "BEGIN {print toupper(\"a👍b\")}"
+      ],
+      "stdout": "A👍B\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: groups and positions",
+      "args": [
+        "BEGIN {r = match(\"xxabcx\", /(b)(c)/, m); print r, m[0], m[1], m[2], m[1, \"start\"], m[1, \"length\"], m[0, \"start\"], m[0, \"length\"]}"
+      ],
+      "stdout": "4 bc b c 4 1 4 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: a pre-filled array is cleared",
+      "args": [
+        "BEGIN {m[\"x\"] = 1; m[7] = 2; match(\"abc\", /b/, m); n = 0; for (k in m) n++; print n, (\"x\" in m), (7 in m), m[0]}"
+      ],
+      "stdout": "3 0 0 b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: no match leaves the array empty",
+      "args": [
+        "BEGIN {m[1] = 1; r = match(\"abc\", /z/, m); n = 0; for (k in m) n++; print r, RSTART, RLENGTH, n}"
+      ],
+      "stdout": "0 0 -1 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: an empty match",
+      "args": [
+        "BEGIN {r = match(\"abc\", /x*/, m); print r, RSTART, RLENGTH, \"[\" m[0] \"]\", m[0, \"start\"], m[0, \"length\"]}"
+      ],
+      "stdout": "1 1 0 [] 1 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: an optional group that did not take part",
+      "args": [
+        "BEGIN {match(\"ac\", /a(b)?c/, m); print (1 in m), ((1, \"start\") in m), m[0]; n = 0; for (k in m) n++; print n}"
+      ],
+      "stdout": "0 0 ac\n3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: a custom SUBSEP",
+      "args": [
+        "BEGIN {SUBSEP = \":\"; match(\"abc\", /(b)/, m); print m[\"1:start\"], m[\"1:length\"]}"
+      ],
+      "stdout": "2 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: nested groups",
+      "args": [
+        "BEGIN {match(\"zabc\", /((a)(b))c/, m); print m[1], m[2], m[3], m[1, \"start\"], m[2, \"start\"], m[3, \"start\"]}"
+      ],
+      "stdout": "ab a b 2 2 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: an emoji before the match",
+      "args": [
+        "BEGIN {match(\"👍👍abc\", /(b)c/, m); print RSTART, RLENGTH, m[1, \"start\"], m[0, \"length\"]}"
+      ],
+      "stdout": "4 2 4 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: an array passed into a function",
+      "args": [
+        "function f(arr) {return match(\"xyz\", /(y)/, arr)} BEGIN {r = f(a); print r, a[0], a[1], a[1, \"start\"]}"
+      ],
+      "stdout": "2 y y 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: a scalar third argument",
+      "args": [
+        "BEGIN {print \"x\"; s = 1; match(\"a\", /a/, s)}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "match: a repeated group keeps its last",
+      "args": [
+        "BEGIN {match(\"abab\", /(ab)+/, m); print m[0], m[1], m[1, \"start\"]}"
+      ],
+      "stdout": "abab ab 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "match: a dynamic regex string",
+      "args": [
+        "BEGIN {re = \"([0-9]+)-([0-9]+)\"; if (match(\"v 12-34\", re, m)) print m[1] + m[2]}"
+      ],
+      "stdout": "46\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: default with seps",
+      "args": [
+        "BEGIN {n = split(\"  a  b\\tc \", a, \" \", s); print n, a[1], a[2], a[3]; print \"[\" s[0] \"][\" s[1] \"][\" s[2] \"][\" s[3] \"]\"}"
+      ],
+      "stdout": "3 a b c\n[  ][  ][\t][ ]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a single character with seps",
+      "args": [
+        "BEGIN {n = split(\"a.b..c\", a, \".\", s); print n, a[1], a[3], a[4], \"[\" s[1] \"][\" s[2] \"][\" s[3] \"]\", (0 in s)}"
+      ],
+      "stdout": "4 a  c [.][.][.] 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a regex with seps",
+      "args": [
+        "BEGIN {n = split(\"a1b22c\", a, /[0-9]+/, s); print n, a[1], a[2], a[3], s[1], s[2], (3 in s)}"
+      ],
+      "stdout": "3 a b c 1 22 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: pre-filled arrays are cleared",
+      "args": [
+        "BEGIN {a[9] = 1; s[9] = 1; n = split(\"x,y\", a, \",\", s); print n, (9 in a), (9 in s), s[1]}"
+      ],
+      "stdout": "2 0 0 ,\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a scalar fourth argument",
+      "args": [
+        "BEGIN {print \"x\"; s = 1; split(\"a b\", a, \" \", s)}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "split: the same array twice",
+      "args": [
+        "BEGIN {print \"x\"; split(\"a b\", a, \" \", a)}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "split: an empty string",
+      "args": [
+        "BEGIN {a[1] = 1; n = split(\"\", a); print n, (1 in a)}"
+      ],
+      "stdout": "0 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a single space character is the default",
+      "args": [
+        "BEGIN {n = split(\" a b \", a, \" \"); print n, a[1]}"
+      ],
+      "stdout": "2 a\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a tab separator",
+      "args": [
+        "BEGIN {n = split(\"a\\t\\tb\", a, \"\\t\"); print n, \"[\" a[2] \"]\", a[3]}"
+      ],
+      "stdout": "3 [] b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "split: a pipe separator",
+      "args": [
+        "BEGIN {n = split(\"a|b|c\", a, \"|\"); print n, a[2]}"
+      ],
+      "stdout": "3 b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "counts: length above",
+      "args": [
+        "BEGIN {print \"x\"; length(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: substr below",
+      "args": [
+        "BEGIN {print \"x\"; substr(\"a\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: substr above",
+      "args": [
+        "BEGIN {print \"x\"; substr(\"a\", 1, 1, 1)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: index below",
+      "args": [
+        "BEGIN {print \"x\"; index(\"a\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: index above",
+      "args": [
+        "BEGIN {print \"x\"; index(\"a\", \"b\", \"c\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: split below",
+      "args": [
+        "BEGIN {print \"x\"; split(\"a\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: split above",
+      "args": [
+        "BEGIN {print \"x\"; split(\"a\", x, \",\", y, z)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sub below",
+      "args": [
+        "BEGIN {print \"x\"; sub(/a/)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sub above",
+      "args": [
+        "BEGIN {print \"x\"; sub(/a/, \"b\", x, y)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: gsub below",
+      "args": [
+        "BEGIN {print \"x\"; gsub(/a/)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: gsub above",
+      "args": [
+        "BEGIN {print \"x\"; gsub(/a/, \"b\", x, y)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: match below",
+      "args": [
+        "BEGIN {print \"x\"; match(\"a\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: match above",
+      "args": [
+        "BEGIN {print \"x\"; match(\"a\", /a/, m, n)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: gensub below",
+      "args": [
+        "BEGIN {print \"x\"; gensub(/a/, \"b\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: gensub above",
+      "args": [
+        "BEGIN {print \"x\"; gensub(/a/, \"b\", \"g\", x, y)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: tolower below",
+      "args": [
+        "BEGIN {print \"x\"; tolower()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: tolower above",
+      "args": [
+        "BEGIN {print \"x\"; tolower(\"a\", \"b\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: toupper below",
+      "args": [
+        "BEGIN {print \"x\"; toupper()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: toupper above",
+      "args": [
+        "BEGIN {print \"x\"; toupper(\"a\", \"b\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: int below",
+      "args": [
+        "BEGIN {print \"x\"; int()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: int above",
+      "args": [
+        "BEGIN {print \"x\"; int(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sqrt below",
+      "args": [
+        "BEGIN {print \"x\"; sqrt()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sqrt above",
+      "args": [
+        "BEGIN {print \"x\"; sqrt(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sin below",
+      "args": [
+        "BEGIN {print \"x\"; sin()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sin above",
+      "args": [
+        "BEGIN {print \"x\"; sin(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: cos below",
+      "args": [
+        "BEGIN {print \"x\"; cos()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: cos above",
+      "args": [
+        "BEGIN {print \"x\"; cos(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: log below",
+      "args": [
+        "BEGIN {print \"x\"; log()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: log above",
+      "args": [
+        "BEGIN {print \"x\"; log(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: exp below",
+      "args": [
+        "BEGIN {print \"x\"; exp()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: exp above",
+      "args": [
+        "BEGIN {print \"x\"; exp(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: atan2 below",
+      "args": [
+        "BEGIN {print \"x\"; atan2(1)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: atan2 above",
+      "args": [
+        "BEGIN {print \"x\"; atan2(1, 2, 3)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: rand above",
+      "args": [
+        "BEGIN {print \"x\"; rand(1)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: srand above",
+      "args": [
+        "BEGIN {print \"x\"; srand(1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: system below",
+      "args": [
+        "BEGIN {print \"x\"; system()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: system above",
+      "args": [
+        "BEGIN {print \"x\"; system(\"a\", \"b\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: close below",
+      "args": [
+        "BEGIN {print \"x\"; close()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: close above",
+      "args": [
+        "BEGIN {print \"x\"; close(\"a\", \"b\", \"c\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: fflush above",
+      "args": [
+        "BEGIN {print \"x\"; fflush(\"a\", \"b\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: systime above",
+      "args": [
+        "BEGIN {print \"x\"; systime(1)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: mktime below",
+      "args": [
+        "BEGIN {print \"x\"; mktime()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: mktime above",
+      "args": [
+        "BEGIN {print \"x\"; mktime(\"a\", 1, 2)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: strftime above",
+      "args": [
+        "BEGIN {print \"x\"; strftime(1, 2, 3, 4)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: a miscount in a rule that never runs",
+      "args": [
+        "BEGIN {print \"x\"} 0 {substr(\"a\")}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: a miscount in a function never called",
+      "args": [
+        "function f() {return index(\"a\")} BEGIN {print \"x\"}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: sprintf with no arguments",
+      "args": [
+        "BEGIN {print \"x\"; print sprintf()}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "counts: a function named after a builtin",
+      "args": [
+        "function length(x) {return 1} BEGIN {print \"x\"}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "counts: fewer arguments than parameters",
+      "args": [
+        "function f(a, b) {return a \"-\" b \"-\"} BEGIN {print f(1)}"
+      ],
+      "stdout": "1--\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "counts: a valid length with no parentheses",
+      "args": [
+        "{print length}"
+      ],
+      "stdin": "abc\n",
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: -F dot",
+      "args": [
+        "-F.",
+        "{print $2}"
+      ],
+      "stdin": "a.b.c\n",
+      "stdout": "b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: -F pipe",
+      "args": [
+        "-F|",
+        "{print $2}"
+      ],
+      "stdin": "a|b|c\n",
+      "stdout": "b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: -F star",
+      "args": [
+        "-F*",
+        "{print $2, NF}"
+      ],
+      "stdin": "a*b*c\n",
+      "stdout": "b 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: FS a single metacharacter",
+      "args": [
+        "BEGIN {FS = \"+\"} {print $3}"
+      ],
+      "stdin": "1+2+3\n",
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: FS two characters is a regex",
+      "args": [
+        "BEGIN {FS = \"[,;]\"} {print $2, $3}"
+      ],
+      "stdin": "a,b;c\n",
+      "stdout": "b c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: split on a dot",
+      "args": [
+        "BEGIN {n = split(\"1.2.3\", v, \".\"); print n, v[2]}"
+      ],
+      "stdout": "3 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: length of an array",
+      "args": [
+        "BEGIN {a[1]; a[2] = 5; print length(a)}"
+      ],
+      "stdout": "2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: length of an array through a function",
+      "args": [
+        "function n(arr) {return length(arr)} BEGIN {a[\"x\"] = 1; a[\"y\"] = 2; a[\"z\"] = 3; print n(a)}"
+      ],
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a reference statement creates the element",
+      "args": [
+        "BEGIN {a[\"k\"]; for (k in a) print \"key\", k; print length(a)}"
+      ],
+      "stdout": "key k\n1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a read creates the element",
+      "args": [
+        "BEGIN {x = a[\"k\"]; print (\"k\" in a)}"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: length of an element creates it",
+      "args": [
+        "BEGIN {n = length(a[\"k\"]); print n, (\"k\" in a)}"
+      ],
+      "stdout": "0 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: an element as a function argument creates it",
+      "args": [
+        "function f(v) {return v} BEGIN {f(a[\"k\"]); print (\"k\" in a)}"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: in does not create",
+      "args": [
+        "BEGIN {if (\"k\" in a) print \"yes\"; n = 0; for (k in a) n++; print n}"
+      ],
+      "stdout": "0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: delete does not create",
+      "args": [
+        "BEGIN {delete a[\"k\"]; n = 0; for (k in a) n++; print n}"
+      ],
+      "stdout": "0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: ARGV[99] creates",
+      "args": [
+        "BEGIN {x = ARGV[99]; print ARGC, (99 in ARGV)}"
+      ],
+      "stdout": "1 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: ENVIRON read creates",
+      "args": [
+        "BEGIN {x = ENVIRON[\"NO_SUCH_VAR_1CTX\"]; print (\"NO_SUCH_VAR_1CTX\" in ENVIRON)}"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a scalar used as an array",
+      "args": [
+        "BEGIN {print \"x\"; a = 1; a[1] = 2}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: an array used as a scalar",
+      "args": [
+        "BEGIN {print \"x\"; a[1] = 1; b = a + 1; print b}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: a subscript follows CONVFMT",
+      "args": [
+        "BEGIN {CONVFMT = \"%.4g\"; a[1/3] = 1; a[12] = 1; for (k in a) if (k != 12) print k; print (12 in a), ((0.1 + 0.2) \"\")}"
+      ],
+      "stdout": "0.3333\n1 0.3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a subscript of a fraction by default",
+      "args": [
+        "BEGIN {a[0.1 + 0.2] = 1; for (k in a) print k}"
+      ],
+      "stdout": "0.3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: log of a negative",
+      "args": [
+        "BEGIN {print log(-1)}"
+      ],
+      "stdout": "+nan\n",
+      "exit": 0,
+      "stderr": true
+    },
+    {
+      "name": "fix: minus log of zero",
+      "args": [
+        "BEGIN {print -log(0), log(0)}"
+      ],
+      "stdout": "+inf -inf\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: 2^1024",
+      "args": [
+        "BEGIN {print 2^1024, -2^1024}"
+      ],
+      "stdout": "+inf -inf\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: minus zero",
+      "args": [
+        "BEGIN {print -0, 0 * -1, -0 \"\"}"
+      ],
+      "stdout": "0 0 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: 1e30",
+      "args": [
+        "BEGIN {print 1e30; x = 1e30 \"\"; print x; printf \"%d\\n\", 1e30}"
+      ],
+      "stdout": "1000000000000000019884624838656\n1000000000000000019884624838656\n1000000000000000019884624838656\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: 2^53+1",
+      "args": [
+        "BEGIN {print 2^53 + 1, 2^53}"
+      ],
+      "stdout": "9007199254740992 9007199254740992\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: one third",
+      "args": [
+        "BEGIN {print 1/3; x = 1/3 \"\"; print x}"
+      ],
+      "stdout": "0.333333\n0.333333\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a big literal",
+      "args": [
+        "BEGIN {print 100000000000000000000}"
+      ],
+      "stdout": "100000000000000000000\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: int truncates toward zero",
+      "args": [
+        "BEGIN {print int(-3.5), int(3.5), int(-0.5)}"
+      ],
+      "stdout": "-3 3 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: %d truncates toward zero",
+      "args": [
+        "BEGIN {printf \"%d %d %i\\n\", -3.9, 3.9, -0.1}"
+      ],
+      "stdout": "-3 3 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: %e writes two exponent digits",
+      "args": [
+        "BEGIN {printf \"%e %.2e %E %e\\n\", 1234.5, 1234.5, 0.00012, 0}"
+      ],
+      "stdout": "1.234500e+03 1.23e+03 1.200000E-04 0.000000e+00\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: %g writes two exponent digits",
+      "args": [
+        "BEGIN {printf \"%g %G %g %g\\n\", 1e20, 1e-10, 123456789, 0.0001}"
+      ],
+      "stdout": "1e+20 1E-10 1.23457e+08 0.0001\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: OFMT on print",
+      "args": [
+        "BEGIN {OFMT = \"%.2f\"; x = 3.14159; print x; print 10; print x \"\"}"
+      ],
+      "stdout": "3.14\n10\n3.14159\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: CONVFMT on conversion",
+      "args": [
+        "BEGIN {CONVFMT = \"%.3f\"; x = 3.14159; y = x \"\"; print y; print 17 \"\"; print x}"
+      ],
+      "stdout": "3.142\n17\n3.14159\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: 0.1+0.2 as a string",
+      "args": [
+        "BEGIN {x = 0.1 + 0.2; print x \"\"; print (x \"\" == \"0.3\")}"
+      ],
+      "stdout": "0.3\n1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: printf %s of a fraction",
+      "args": [
+        "BEGIN {printf \"%s\\n\", 0.1 + 0.2}"
+      ],
+      "stdout": "0.3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a number assigned to a field",
+      "args": [
+        "{$2 = 0.1 + 0.2; $3 = 1e30; print}"
+      ],
+      "stdin": "a b c\n",
+      "stdout": "a 0.3 1000000000000000019884624838656\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: a number compared with a string",
+      "args": [
+        "BEGIN {x = 0.1 + 0.2; print (x == \"0.3\"), (1e30 == \"1000000000000000019884624838656\")}"
+      ],
+      "stdout": "1 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: an undefined function reached",
+      "args": [
+        "BEGIN {print \"x\"; nosuch(\"3\")}"
+      ],
+      "stdout": "x\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "fix: an undefined function not reached",
+      "args": [
+        "BEGIN {print \"x\"} 0 {nosuch()}"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: an infinity through printf",
+      "args": [
+        "BEGIN {printf \"%d %f %s\\n\", 2^1024, -2^1024, 2^1024}"
+      ],
+      "stdout": "+inf -inf +inf\n",
+      "exit": 0,
+      "stderr": false
+    }
+  ]
+}

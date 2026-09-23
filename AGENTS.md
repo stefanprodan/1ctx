@@ -85,6 +85,9 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 host in the gitignored scripts/staging.env), and brand.py
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and vendor-test.sh.
+                gawk-record.ts, run by hand, records what gawk answers
+                into test/fixtures/just-bash/awk-gawk.json, which the
+                suite compares our awk with; the suite never runs gawk.
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
