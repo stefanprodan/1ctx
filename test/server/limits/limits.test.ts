@@ -42,11 +42,27 @@ const budgetLimits = [
     unit: "count",
     scope: "call",
   },
+  {
+    name: "runsPerUser",
+    default: 4,
+    min: 1,
+    max: 32,
+    unit: "count",
+    scope: "runs",
+  },
+  {
+    name: "runsRunning",
+    default: 32,
+    min: 1,
+    max: 64,
+    unit: "count",
+    scope: "runs",
+  },
 ] as const;
 
 describe("limits area", () => {
   test.each([...budgetLimits])(
-    "defines and round-trips the send budget limit %p",
+    "defines and round-trips the limit %p",
     ({ name, ...definition }) => {
       const db = memoryDb();
       try {
@@ -111,11 +127,12 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
-      expect(rows).toHaveLength(37);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(37);
+      expect(rows).toHaveLength(39);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(39);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(11);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
+      expect(rows.filter((row) => row.scope === "runs")).toHaveLength(2);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 1_000_000,
@@ -123,6 +140,64 @@ describe("limits area", () => {
       expect(TOOL_CAPS.maxBashCalls).toBe(100);
     } finally {
       db.close();
+    }
+  });
+
+  test("a write that moves a run cap calls the port once, any other none", () => {
+    const db = memoryDb();
+    try {
+      let calls = 0;
+      const area = limitsArea({
+        db,
+        clock: () => 100,
+        runCapsChanged: () => calls++,
+      });
+      area.set({ ...DEFAULT_LIMITS, rounds: 20 }, 100);
+      expect(calls).toBe(0);
+      area.set({ ...DEFAULT_LIMITS, rounds: 20, runsPerUser: 6 }, 110);
+      expect(calls).toBe(1);
+      area.set({ ...DEFAULT_LIMITS, rounds: 30, runsPerUser: 6 }, 120);
+      expect(calls).toBe(1);
+      area.set({ ...DEFAULT_LIMITS, runsRunning: 40, runsPerUser: 6 }, 130);
+      expect(calls).toBe(2);
+      area.reset();
+      expect(calls).toBe(3);
+      area.reset();
+      expect(calls).toBe(3);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("the runs scope travels through the full-set PUT", async () => {
+    const app = await testApp();
+    try {
+      const admin = app.client();
+      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+      const saved = await admin.call("PUT", "/api/limits", {
+        body: { values: { ...DEFAULT_LIMITS, runsPerUser: 2, runsRunning: 8 } },
+      });
+      expect(saved.status).toBe(200);
+      const body: LimitsResponse = await saved.json();
+      expect(body.limits.filter((row) => row.scope === "runs")).toEqual([
+        expect.objectContaining({ name: "runsPerUser", value: 2 }),
+        expect.objectContaining({ name: "runsRunning", value: 8 }),
+      ]);
+      const missing: Record<string, number> = { ...DEFAULT_LIMITS };
+      delete missing.runsRunning;
+      const refused = await admin.call("PUT", "/api/limits", {
+        body: { values: missing },
+      });
+      expect(refused.status).toBe(400);
+      const over = await admin.call("PUT", "/api/limits", {
+        body: { values: { ...DEFAULT_LIMITS, runsRunning: 65 } },
+      });
+      expect(over.status).toBe(400);
+      expect(await over.json()).toEqual({
+        error: "runsRunning must be between 1 and 64",
+      });
+    } finally {
+      await app.shutdown();
     }
   });
 
@@ -143,7 +218,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(37);
+      expect(body.limits).toHaveLength(39);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

@@ -14,7 +14,7 @@ import {
   sessionDetail,
 } from "../sessions/index.ts";
 import type { SendPolicy } from "./policy.ts";
-import type { Registry } from "./registry.ts";
+import type { Pool, Registry } from "./registry.ts";
 import { live, newSend, type SendOp } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
@@ -26,6 +26,7 @@ export type PreparedRun = {
 
 export function prepareSend(fields: {
   registry: Registry;
+  pool: Pool;
   writer: Writer;
   sessions: SessionStore;
   log: Log;
@@ -69,7 +70,7 @@ export function prepareSend(fields: {
       throw new BadRequest("this agent cannot read files");
     }
   }
-  fields.registry.admit(fields.sessionId, fields.policy.userId);
+  fields.registry.admit(fields.sessionId, fields.policy.userId, fields.pool);
   const sendId = newId();
   const userId = fields.existingUser?.id ?? newId();
   const replyId = newId();

@@ -216,9 +216,11 @@ export async function testApp(
     // a runner registry with its own caps
     registry?: Registry;
     activate?: boolean;
+    // another app's database, for a restart over the same rows
+    db?: Db;
   } = {},
 ): Promise<TestApp> {
-  const db = memoryDb();
+  const db = options.db ?? memoryDb();
   let current = 1_000_000;
   const sleepers = new Set<{ at: number; resolve: () => void }>();
   const now = {

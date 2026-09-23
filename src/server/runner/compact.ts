@@ -12,7 +12,7 @@ import {
   sessionDetail,
 } from "../sessions/index.ts";
 import type { SendPolicy } from "./policy.ts";
-import type { Registry } from "./registry.ts";
+import { CHAT_POOL, type Registry } from "./registry.ts";
 import { type ActiveSend, live, newSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
@@ -49,7 +49,7 @@ export function compactSend(
   if (!hasAnswer || lastUser === null) {
     throw new BadRequest("nothing to compact");
   }
-  deps.registry.admit(session.id, policy.userId);
+  deps.registry.admit(session.id, policy.userId, CHAT_POOL);
   const sendId = newId();
   const summaryId = newId();
   const send = newSend({

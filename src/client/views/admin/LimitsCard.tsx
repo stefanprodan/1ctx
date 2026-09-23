@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Limits tab: a form per send and a form per call, each limit typed
-// in the page's unit with the default beside a changed one; Save and
-// Reset to defaults at each form's foot. A change applies to the next send.
+// The Limits tab: a form per scope, each limit typed in the page's unit
+// with the default beside a changed one; Save and Reset to defaults at
+// each form's foot. A change applies to the next send, a run cap to the
+// next admission.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";

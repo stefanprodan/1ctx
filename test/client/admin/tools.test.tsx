@@ -132,7 +132,25 @@ const reserve = row({
   unit: "tokens",
   scope: "send",
 });
-const rows = [rounds, toolMs, resultBytes, timeout, searchBody, cut, reserve];
+const runsPerUser = row({
+  name: "runsPerUser",
+  value: 4,
+  default: 4,
+  min: 1,
+  max: 32,
+  unit: "count",
+  scope: "runs",
+});
+const rows = [
+  rounds,
+  toolMs,
+  resultBytes,
+  timeout,
+  searchBody,
+  cut,
+  reserve,
+  runsPerUser,
+];
 
 const html =
   '<div class="md-block" data-lang="json"><div class="md-block-head">' +
@@ -250,6 +268,7 @@ describe("the limit words and units", () => {
         searchBodyBytes: 512 * 1024,
         resultCut: 50_000,
         contextReserve: 20_000,
+        runsPerUser: 4,
       },
     });
     const edited = { ...draft, rounds: "501" };
@@ -284,6 +303,11 @@ describe("the limit words and units", () => {
     expect(reset.callTimeoutMs).toBe(20_000);
     expect(reset.searchBodyBytes).toBe(1024 * 1024);
     expect(withSaved(rows, "send", { rounds: 3 }).callTimeoutMs).toBe(1500);
+    expect(withSaved(rows, "runs", { runsPerUser: 2 })).toMatchObject({
+      runsPerUser: 2,
+      rounds: 100,
+      callTimeoutMs: 1500,
+    });
     expect(totalTokens([{ tokens: 96 }, { tokens: 2716 }])).toBe(2812);
     // another form's save moves only the change times: no re-seed
     expect(seedOf([{ ...timeout, changedAt: 99 }])).toBe(seedOf([timeout]));
@@ -537,7 +561,9 @@ describe("the page", () => {
     expect(html).toContain("Per send");
     expect(html).toContain("Per call");
     expect(html).toContain("Knowledge");
-    expect(html.match(/<form/g)).toHaveLength(3);
+    expect(html).toContain("Scheduled tasks");
+    expect(html).toContain("Runs per user");
+    expect(html.match(/<form/g)).toHaveLength(4);
     expect(html).not.toContain(">Limits</span>");
     expect(html).toContain('type="number"');
     expect(html).toContain('step="any"');

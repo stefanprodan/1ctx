@@ -137,8 +137,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // is made with its personal project, project routes read sessions and
   // usage built later, a provider an agent runs on and an agent a chat
   // runs on cannot go, a project route asks access what the principal
-  // may see, and the session detail asks the runner for the reply in
-  // flight.
+  // may see, the session detail asks the runner for the reply in
+  // flight, and a freed run slot or a moved run cap wakes the scheduler.
   let usage!: Usage;
   let sessions!: Sessions;
   let automations!: Automations;
@@ -152,7 +152,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     passwordCost: options.passwordCost,
   });
   const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
-  const limits = limitsArea({ db, clock });
+  const limits = limitsArea({
+    db,
+    clock,
+    runCapsChanged: () => automations.scheduler.wake(),
+  });
   const providers = providersArea({
     db,
     clock,
@@ -323,6 +327,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     render: renderMarkdown,
     stream: (sessionId, frame) => socket.stream(sessionId, frame),
     registry: options.registry,
+    slotFreed: () => automations.scheduler.wake(),
   });
   automations = automationsArea({
     db,

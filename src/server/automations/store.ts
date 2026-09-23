@@ -147,12 +147,13 @@ export class AutomationStore {
       .map(row);
   }
 
-  earliest(): number | null {
+  // with after, only the fires due past it: a waiting row is not a wake
+  earliest(after: number | null = null): number | null {
     return this.db
-      .query<{ next_at: number | null }, []>(
-        "select min(next_at) as next_at from automations where suspended_at is null",
+      .query<{ next_at: number | null }, [number | null, number | null]>(
+        "select min(next_at) as next_at from automations where suspended_at is null and (? is null or next_at > ?)",
       )
-      .get()!.next_at;
+      .get(after, after)!.next_at;
   }
 
   count(projectId: string): number {

@@ -11,11 +11,12 @@ import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
-import type { Event, PreparedRun } from "../runner/index.ts";
+import { type Event, type PreparedRun, RunCapacity } from "../runner/index.ts";
 import type { SessionStore, UsagePort } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { nextFire } from "./schedule.ts";
 import type { AutomationStore } from "./store.ts";
+import { replaceMissed, type Waiting, Waits } from "./waits.ts";
 
 const PASS_MS = 60_000;
 const SWEEP_MS = 3_600_000;
@@ -53,8 +54,11 @@ export function scheduler(deps: Deps): Scheduler {
   let wakeWait: (() => void) | null = null;
   let unsubscribe: (() => void) | null = null;
   let lastSweep = deps.clock();
+  const waits = new Waits(deps.log);
+  let passAt = 0;
 
   const wake = () => {
+    waits.wake();
     const resolve = wakeWait;
     wakeWait = null;
     resolve?.();
@@ -135,7 +139,7 @@ export function scheduler(deps: Deps): Scheduler {
     id: string,
     source: EventSource,
     actor: UserRow | null,
-  ): { detail: SessionDetail; launch: () => void } | null => {
+  ): Started | null => {
     const holder: { value: PreparedRun | null } = { value: null };
     const recorded: {
       value:
@@ -144,7 +148,7 @@ export function scheduler(deps: Deps): Scheduler {
         | null;
     } = { value: null };
     try {
-      const result = transact(deps.db, () => {
+      const result = transact<Started | null>(deps.db, () => {
         const row = deps.store.byId(id);
         if (row === null) {
           if (source === "manual") throw new Conflict("no such automation");
@@ -158,8 +162,11 @@ export function scheduler(deps: Deps): Scheduler {
         ) {
           return { result: null };
         }
+        // a manual start takes a fire left waiting for a slot
+        const waiting =
+          row.suspendedAt === null && row.nextAt !== null && row.nextAt <= now;
         const nextAt =
-          source === "schedule"
+          source === "schedule" || waiting
             ? nextFire(row.schedule, row.tz, now)
             : undefined;
         try {
@@ -198,6 +205,12 @@ export function scheduler(deps: Deps): Scheduler {
           holder.value?.abandon();
           holder.value = null;
           if (source === "manual" || !(err instanceof HttpError)) throw err;
+          // a full run pool writes nothing: the row stays due
+          if (err instanceof RunCapacity) {
+            return {
+              result: { wait: err.pool, dueAt: dueAt!, ownerId: row.ownerId },
+            };
+          }
           const updated = deps.store.recordEvent(row.id, {
             at: now,
             dueAt: dueAt!,
@@ -256,10 +269,17 @@ export function scheduler(deps: Deps): Scheduler {
   };
 
   const fire = async (id: string): Promise<SessionDetail | null> => {
+    const seen = waits.generation;
     try {
       const result = start(id, "schedule", null);
-      result?.launch();
-      return result?.detail ?? null;
+      if (result === null) return null;
+      if ("wait" in result) {
+        waits.block(id, result, seen, deps.clock());
+        return null;
+      }
+      waits.started(id);
+      result.launch();
+      return result.detail;
     } catch (err) {
       recordUnexpected(id, err);
       deps.log.error("fire failed", {
@@ -351,8 +371,18 @@ export function scheduler(deps: Deps): Scheduler {
 
   const pass = async (keepGoing: () => boolean = () => true): Promise<void> => {
     const now = deps.clock();
-    for (const row of deps.store.due(now)) {
+    passAt = now;
+    const due = deps.store.due(now);
+    waits.prune(new Set(due.map((row) => row.id)));
+    for (const row of due) {
       if (!keepGoing()) return;
+      replaceMissed(deps, row.id, now);
+    }
+    // oldest first, due and waiting alike; a full pool for one owner
+    // passes over that owner's rows, for the process it ends the fires
+    for (const row of deps.store.due(now)) {
+      if (!keepGoing() || waits.processFull) break;
+      if (waits.ownerFull(row.ownerId)) continue;
       await fire(row.id);
     }
     if (!keepGoing()) return;
@@ -366,25 +396,29 @@ export function scheduler(deps: Deps): Scheduler {
     }
   };
 
-  const wait = async (): Promise<void> => {
+  const wait = async (seen: number): Promise<void> => {
+    if (waits.generation !== seen) return;
     const now = deps.clock();
-    const earliest = deps.store.earliest();
+    // while a pool is full the rows left due are waits, not wakes
+    const earliest = deps.store.earliest(waits.any ? passAt : null);
     const ms = earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - now);
     if (ms <= 0) return;
     const sleeper =
       deps.clock.sleep?.(ms) ??
       new Promise<void>((resolve) => setTimeout(resolve, ms));
-    const waking = new Promise<void>((resolve) => {
-      wakeWait = resolve;
+    const waking = new Promise<boolean>((resolve) => {
+      wakeWait = () => resolve(true);
     });
-    await Promise.race([sleeper, waking]);
+    const woken = await Promise.race([sleeper.then(() => false), waking]);
     wakeWait = null;
+    if (!woken) waits.expire(deps.clock(), PASS_MS);
   };
 
   const loop = async () => {
     while (running) {
+      const seen = waits.generation;
       await pass(() => running);
-      if (running) await wait();
+      if (running) await wait(seen);
     }
   };
 
@@ -408,7 +442,9 @@ export function scheduler(deps: Deps): Scheduler {
     fire,
     runNow(row, user) {
       const result = start(row.id, "manual", user);
-      if (result === null) throw new Conflict("no such automation");
+      if (result === null || "wait" in result) {
+        throw new Conflict("no such automation");
+      }
       result.launch();
       return result.detail;
     },
@@ -420,6 +456,8 @@ export function scheduler(deps: Deps): Scheduler {
     },
   };
 }
+
+type Started = { detail: SessionDetail; launch: () => void } | Waiting;
 
 function errText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

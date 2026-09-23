@@ -410,6 +410,8 @@ export const LIMIT_NAMES = [
   "uploadFiles",
   "mcpKeptBytes",
   "mcpKeptFiles",
+  "runsPerUser",
+  "runsRunning",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {
@@ -427,9 +429,10 @@ export const LIMIT_UNITS = [
 ] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
-// where a limit applies: over the whole send, to one tool call, or to
-// a project's knowledge base, a storage cap read at each write
-export const LIMIT_SCOPES = ["send", "call", "knowledge"] as const;
+// where a limit applies: over the whole send, to one tool call, to a
+// project's knowledge base, a storage cap read at each write, or to the
+// runs the process holds at once, read at each admission
+export const LIMIT_SCOPES = ["send", "call", "knowledge", "runs"] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 
 // a skill's name, the Agent Skills rule: lowercase ASCII letters, digits

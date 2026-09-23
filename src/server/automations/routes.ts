@@ -245,7 +245,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           }
           const now = deps.clock();
           checkSchedule(next.schedule, next.tz, now);
-          const scheduleChanged = "schedule" in patch || "tz" in patch;
+          // a new schedule or zone ends a wait; other fields leave it
+          const scheduleChanged =
+            next.schedule !== current.schedule || next.tz !== current.tz;
           const nextAt =
             current.suspendedAt !== null
               ? null

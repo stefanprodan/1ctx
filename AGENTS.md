@@ -659,14 +659,23 @@ violation, and every rule has a rejected fixture under
 - **A send is a row and ends once.** A chat is a session in a project
   with one agent for its life; a user message starts a send under the
   runner's lock, one per session, taken synchronously before anything
-  is written, with a cap on sends in the process and per user
-  (`runner/registry.ts`). The writer's three transactions: `startSend`
-  (the session when new, the user message, the streaming reply, the
-  send row, the running state), `finalizeRound` (the reply's end and
-  its usage row) and `finalizeSend` (the send's end and the session's
-  state, with the last round inside it). Each bumps the session's
-  revision once and publishes one `session.changed` envelope after
-  commit. Create and send accept up to ten distinct staged `uploads` ids.
+  is written, with chats and runs in separate pools, each capped in the
+  process and per user (`runner/registry.ts`): a chat send (a message,
+  regenerate or compact) at the constant caps, a run at `runsPerUser`
+  and `runsRunning`, limits in the `runs` scope that the runner reads
+  and passes to `admit()` in the same turn. A full run pool throws
+  `RunCapacity`, a 429 carrying `pool` (`user` or `process`). A run's
+  final release (a finalized send freed) calls the `slotFreed` port,
+  never a rollback, an abandon or a failed finalize, and a limits write
+  that moves a run cap calls `runCapsChanged`; `compose.ts` binds both
+  to the scheduler's `wake()`. The writer's three transactions:
+  `startSend` (the session when new, the user message, the streaming
+  reply, the send row, the running state), `finalizeRound` (the
+  reply's end and its usage row) and `finalizeSend` (the send's end
+  and the session's state, with the last round inside it). Each bumps
+  the session's revision once and publishes one `session.changed`
+  envelope after commit. Create and send accept up to ten distinct
+  staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
   change with `disable` and `enable` keys: `web`, `mcp:<server id>` and
@@ -834,18 +843,35 @@ violation, and every rule has a rejected fixture under
   answers the next `PREVIEW_FIRES` fires, or the 400 a save would get.
   The scheduler (`automations/scheduler.ts`)
   is a loop of passes on the clock port, never `Bun.cron(handler)`: a
-  pass fires every active row with `next_at <= now`, sweeps retention
+  pass first replaces each due row whose following occurrence has passed
+  too (one skipped event, reason `still waiting`, and `next_at` set to
+  the newest past occurrence; `automations/waits.ts`), then fires the
+  active rows with `next_at <= now` oldest first, sweeps retention
   hourly, and sleeps until the earliest `next_at` or a minute, woken
-  early by a store write. A fire is one transaction that reads the row
-  again, checks the owner's access with the pure rule in
+  early by a store write, a freed run slot or a moved run cap. `wake()`
+  is level-triggered: it bumps a generation the sleep compares, so a
+  wake with no sleeper is kept. A fire is one transaction that reads
+  the row again, checks the owner's access with the pure rule in
   `projects/visible.ts`, skips when a run of it still runs, moves
   `next_at` past now (missed fires are dropped, never replayed),
   records the event and calls the runner's `startRun()`, which is
   `prepare()` alone; `launch()` runs after the commit and `abandon()`
-  frees the reservation on a throw. A refusal is a skipped event with
-  its reason, never a queue. A scheduled run acts as the owner, a
-  manual run as whoever pressed Run now (409 while one runs, 429 at a
-  cap); both count against the runner's caps. A run is a session with
+  frees the reservation on a throw. A full run pool (`RunCapacity`)
+  writes nothing: the row stays due on its missed time, `wait` is logged
+  once per occurrence, and the owner, or the process, is marked full in
+  memory until a wake or, should a wake be lost, a pass interval. A
+  missed occurrence is found by a binary search, not a walk. A pass
+  skips a full owner's rows without calling the runner and a full
+  process ends its fires; while any is marked the
+  sleep counts only rows due after the pass (`earliest(after)`). Every
+  other refusal is a skipped event with its reason that moves
+  `next_at`. A scheduled run acts as the owner, a manual run as whoever
+  pressed Run now (409 while one runs, the run pool's 429 when it is
+  full, which leaves a wait as it is); a manual start moves a waiting
+  row's `next_at` past now, so it takes that fire. Both count against
+  the run pool, never the chat pool. A PATCH that changes the schedule
+  or the zone recomputes `next_at` from now and so ends a wait, other
+  fields leave it, and suspend nulls it. A run is a session with
   origin `automation`, its `automationId`, the automation's name as
   title and a send of kind `run`; the runner refuses `send`,
   `regenerate` and `compact` on it with 409, and arms its deadline
@@ -936,16 +962,18 @@ violation, and every rule has a rejected fixture under
   first. Visuals is the visualize row with its switch and its hosts with
   Add, Remove and Reset, apart from web access.
   The hosts field warns that loaded URLs can send the visual's data;
-  each card's head has its total. Limits is a form per scope, each
-  saving the full set with the other scope's saved values. A change on
-  the Tools page applies to the next send; a send in flight keeps the
-  caps and the set it started on. A round's calls run in parallel
-  under the call timeout and the send's signal. A tool row is a message
-  of kind `tool`, and each tool's end is one transaction, one revision,
-  one envelope; only the reply text streams. Every message carries its
-  `send_id` and `round`, and a reply row its `slot`, `work` or `answer`,
-  written by the server: at the first call delta, or when the round
-  ends. The client groups by send and slot and never infers placement
+  each card's head has its total. Limits is a form per scope (Per send,
+  Per call, Knowledge, Scheduled tasks), each saving the full set with
+  the other scopes' saved values. A change on the Tools page applies to
+  the next send, a run cap to the next admission; a send in flight
+  keeps the caps and the set it started on. A round's calls run in
+  parallel under the call timeout and the send's signal. A tool row is
+  a message of kind `tool`, and each tool's end is one transaction,
+  one revision, one envelope; only the reply text streams. Every
+  message carries its `send_id` and `round`, and a reply row its
+  `slot`, `work` or `answer`, written by the server: at the first call
+  delta, or when the round ends. The client groups by send and slot and
+  never infers placement
   from the call arrays, the finish reason or the live map. A tool row
   travels without its result; detail and envelopes carry `resultBytes`,
   and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
@@ -1152,7 +1180,11 @@ violation, and every rule has a rejected fixture under
   unknown), each leading to the automation's page, `/automations/:id`,
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
-  Show more), then Suspend or Resume, Edit and Run now over two tabs:
+  Show more, and at its foot the next run, or "Waiting for a free slot
+  since 09:00" while the row is not suspended and its `nextAt` is past
+  the page's clock by `WAIT_GRACE_MS`, which the Automations tab's row says first as
+  waiting for a slot; no field carries it), then Suspend or Resume,
+  Edit and Run now over two tabs:
   Runs, a log of `RunRow.tsx` rows with the source as the icon (who pressed Run now its
   title) and the feed's line, length against the deadline and Stop,
   filtered by `?runs=` and counted by the tally, paged with Show more

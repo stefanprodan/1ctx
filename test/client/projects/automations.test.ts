@@ -37,6 +37,7 @@ import {
   durationText,
   eventNote,
   followDeadlineLimit,
+  nextLine,
   OWN_MEMORY_GUIDANCE,
   PROJECT_MEMORY_TASK,
   pickMemory,
@@ -46,6 +47,7 @@ import {
   scheduleWords,
   sourceText,
   suspendedText,
+  waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
@@ -194,6 +196,47 @@ describe("the row's words", () => {
     });
     const done = automation({ ...failed, lastRunStatus: "done" });
     expect(rowState(done, now).text).toBe("next in 4h");
+  });
+
+  test("a next run past the page's clock is a wait, said first", () => {
+    const clock = Date.UTC(2026, 8, 14, 11, 20);
+    const nine = Date.UTC(2026, 8, 14, 9);
+    const waiting = automation({
+      tz: "UTC",
+      nextAt: nine,
+      lastEventAt: clock - 2 * HOUR,
+      lastEventOutcome: "run",
+      lastRunStatus: "failed",
+    });
+    expect(waitingSince(waiting, clock)).toBe(nine);
+    expect(rowState(waiting, clock)).toEqual({
+      bad: "failed 2h ago",
+      text: "waiting for a slot",
+    });
+    expect(nextLine(waiting, clock)).toBe(
+      "Waiting for a free slot since 09:00",
+    );
+    expect(nextLine({ ...waiting, nextAt: clock + 2 * HOUR }, clock)).toBe(
+      "Next run today 13:20, in 2h",
+    );
+    expect(nextLine({ ...waiting, nextAt: nine - 24 * HOUR }, clock)).toBe(
+      "Waiting for a free slot since Sun Sep 13 09:00",
+    );
+    // a fire the server is starting this moment, or a clock a few
+    // seconds ahead, is not a wait
+    expect(waitingSince({ ...waiting, nextAt: clock - 5_000 }, clock)).toBe(
+      null,
+    );
+    expect(waitingSince({ ...waiting, nextAt: clock - 11_000 }, clock)).toBe(
+      clock - 11_000,
+    );
+    const off = { ...waiting, suspendedAt: clock - HOUR };
+    expect(waitingSince(off, clock)).toBeNull();
+    expect(rowState(off, clock).text).toBe("suspended");
+    expect(rowState({ ...waiting, lastRunStatus: "running" }, clock)).toEqual({
+      bad: null,
+      text: "running",
+    });
   });
 
   test("a suspended row names who suspended it", () => {
