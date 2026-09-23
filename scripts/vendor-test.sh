@@ -38,6 +38,10 @@ if [[ ${1:-} == --update ]]; then
 fi
 
 if ! diff -u "$LIST" "$LOG.now"; then
+  # what bun said before each new failure, since the list keeps only names
+  comm -13 "$LIST" "$LOG.now" | while IFS= read -r line; do
+    grep -F -B 30 "$line" "$LOG" | grep -v '^(pass)' | tail -30 || true
+  done
   echo "vendor-test: failures differ from vendor/just-bash-failures.txt" >&2
   exit 1
 fi
