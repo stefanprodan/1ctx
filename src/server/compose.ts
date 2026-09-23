@@ -152,6 +152,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
   });
+  // the instance's start, as the overview reports it
+  const startedAt = clock();
   const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
   const limits = limitsArea({
     db,
@@ -349,6 +351,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: log("overview"),
     limits,
+    version: options.version,
+    startedAt,
+    pools: () => ({
+      ...runner.registry.running(),
+      chatsCap: runner.registry.chatsCap,
+    }),
+    online: () => socket.online(),
     // built here, at the compile root, so the binary finds its entry
     worker: new URL("./overview/scan.worker.ts", import.meta.url),
   });

@@ -12,7 +12,10 @@ import { pathToFileURL } from "node:url";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { overviewArea } from "../../../src/server/overview/index.ts";
 import { workerScanner } from "../../../src/server/overview/worker.ts";
-import type { StorageResponse } from "../../../src/shared/api/admin.ts";
+import type {
+  OverviewResponse,
+  StorageResponse,
+} from "../../../src/shared/api/admin.ts";
 import { collectLogs, testApp } from "../../helpers/app.ts";
 import { fileDb } from "../../helpers/db.ts";
 
@@ -45,6 +48,25 @@ describe("the scan worker", () => {
     }
   });
 
+  test("answers the overview's range from the same worker", async () => {
+    const file = fileDb();
+    try {
+      const app = await testApp({ db: file.db });
+      const admin = app.client();
+      await admin.login("admin", "hunter2-test");
+      const res = await admin.call("GET", "/api/admin/overview?tz=UTC&days=7");
+      expect(res.status).toBe(200);
+      const body: OverviewResponse = await res.json();
+      expect(body.days).toHaveLength(7);
+      expect(body.instance.users).toBe(1);
+      expect(body.instance.databaseBytes).toBeGreaterThan(0);
+      expect(body.now).toMatchObject({ chats: 0, runs: 0, online: 0 });
+      await app.shutdown();
+    } finally {
+      file.cleanup();
+    }
+  });
+
   test("a file that cannot be opened fails the scan without its path", async () => {
     const path = join(tmpdir(), "1ctx-missing", "none.sqlite");
     const scanner = workerScanner(path, WORKER);
@@ -62,9 +84,14 @@ describe("the scan worker", () => {
       clock: () => app.now.value,
       log: logFactory("overview"),
       limits: { current: () => DEFAULT_LIMITS },
+      version: "v0.0.0-test",
+      startedAt: 0,
+      pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
+      online: () => 0,
       worker: WORKER,
       scanner: {
         scan: () => Promise.reject(new Error("disk gone")),
+        range: () => Promise.reject(new Error("disk gone")),
         close() {},
       },
     });

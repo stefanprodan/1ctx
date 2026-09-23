@@ -1,44 +1,53 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One scan at a time, its answer kept a minute on the clock port: a
-// request while a scan runs waits for that scan, one inside the minute
-// gets the kept answer, and a failed scan keeps nothing.
+// One read at a time per key, its answer kept a minute on the clock
+// port: a request while a read runs waits for that read, one inside
+// the minute gets the kept answer, and a failed read keeps nothing.
+// The storage scan has one key; the overview a key per zone and range.
 
 import type { Clock } from "../lib/clock.ts";
 
 export const KEEP_MS = 60_000;
 
 export type Cache<T> = {
-  get(): Promise<T>;
+  get(key?: string): Promise<T>;
 };
 
 export function scanCache<T>(deps: {
   clock: Clock;
-  run: () => Promise<T>;
+  run: (key: string) => Promise<T>;
   keepMs?: number;
 }): Cache<T> {
   const keepMs = deps.keepMs ?? KEEP_MS;
-  let kept: { at: number; value: T } | null = null;
-  let inflight: Promise<T> | null = null;
+  const kept = new Map<string, { at: number; value: T }>();
+  const inflight = new Map<string, Promise<T>>();
   return {
-    get() {
+    get(key = "") {
       const now = deps.clock();
-      if (kept !== null && now - kept.at < keepMs) {
-        return Promise.resolve(kept.value);
+      const have = kept.get(key);
+      if (have !== undefined && now - have.at < keepMs) {
+        return Promise.resolve(have.value);
       }
-      if (inflight === null) {
-        inflight = deps
-          .run()
+      let pending = inflight.get(key);
+      if (pending === undefined) {
+        pending = deps
+          .run(key)
           .then((value) => {
-            kept = { at: deps.clock(), value };
+            const at = deps.clock();
+            // a zone asked once need not be kept past its minute
+            for (const [other, entry] of kept) {
+              if (at - entry.at >= keepMs) kept.delete(other);
+            }
+            kept.set(key, { at, value });
             return value;
           })
           .finally(() => {
-            inflight = null;
+            inflight.delete(key);
           });
+        inflight.set(key, pending);
       }
-      return inflight;
+      return pending;
     },
   };
 }

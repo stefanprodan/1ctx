@@ -57,6 +57,26 @@ describe("the scan cache", () => {
     expect(await again).toBe(2);
   });
 
+  test("keeps an answer per key and drops one past its minute", async () => {
+    const keys: string[] = [];
+    let now = 1_000;
+    const cache = scanCache<string>({
+      clock: () => now,
+      run: (key) => {
+        keys.push(key);
+        return Promise.resolve(`${key}!`);
+      },
+    });
+    expect(await cache.get("UTC\n7")).toBe("UTC\n7!");
+    expect(await cache.get("UTC\n7")).toBe("UTC\n7!");
+    expect(await cache.get("UTC\n30")).toBe("UTC\n30!");
+    expect(keys).toEqual(["UTC\n7", "UTC\n30"]);
+    now += KEEP_MS;
+    await cache.get("UTC\n30");
+    await cache.get("UTC\n7");
+    expect(keys).toEqual(["UTC\n7", "UTC\n30", "UTC\n30", "UTC\n7"]);
+  });
+
   test("keeps nothing from a failed scan", async () => {
     const c = controlled();
     const failed = c.cache.get();

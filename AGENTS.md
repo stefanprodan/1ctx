@@ -135,14 +135,33 @@ its owner. `scan.ts` is the queries, pure over a `Db` inside one read
 transaction; it sums what
 was added by quarter hour of UTC, which every zone's midnight falls
 on, so one scan serves any zone. `bun:sqlite` is synchronous, so the
-scan runs in `scan.worker.ts`, a `Worker` per scan over its own
+scan runs in `scan.worker.ts`, a `Worker` per job over its own
 read-only connection to the file, ended when it answers, after
 `SCAN_DEADLINE_MS` or at shutdown; a memory database runs it inline. The worker is the second
 entry point of `bun build --compile`, where a relative URL resolves
 against the compile root, `src/server`, so `compose.ts` builds the URL
-and passes it in. `cache.ts` keeps one scan in flight and its answer a
-minute on the clock port; a failed scan keeps nothing, is a warning
-`storage scan failed` and the router's 500.
+and passes it in. `cache.ts` keeps one read in flight per key and its
+answer a minute on the clock port; a failed read keeps nothing, is a
+warning (`storage scan failed`, `overview read failed`) and the
+router's 500.
+`GET /api/admin/overview?tz=&days=7|30|90` (`admin`, both parameters
+once, `days` one of `OVERVIEW_RANGES`) answers `OverviewResponse`: the
+range's days in the zone, today last, their totals and the same number
+of days before, the sends running now, the ten largest rows of each
+breakdown, the ten models with the most sends, and the instance.
+`range.ts` is the worker's second job, one read transaction over the
+same connection: sends by `started_at` and tokens, rounds and cost by
+`usage.created_at`, summed by quarter hour and laid on the zone's days
+in `overview.ts`; a breakdown sums tokens from `usage` and sends from
+`sends` apart and joins them by key, so a send of many rounds counts
+once; a model's median and slowest length and median rounds are over
+its ended sends. The range is kept a minute per zone and range. `now`
+(the pools from `runner.registry.running()` and `chatsCap`, `runsCap`
+the current `runsRunning`, `online` the users with a socket through a
+port to `web/`) and the version and start `compose.ts` passes are
+read at every request, never kept. A personal project and its tasks
+are counted and never named: `id` and `name` null, `owner` its
+owner.
 
 `provision/` is the CLI-only area after `automations/` and before
 `web/`. `1ctx provision -f <file|dir|->` combines YAML inputs, validates
