@@ -187,6 +187,11 @@ describe("the overview query", () => {
     expect(parse("?tz=UTC&days=90").days).toBe(90);
   });
 
+  test("gives the zone its canonical name", () => {
+    expect(parse("?tz=eUrOpE%2FbErLiN&days=7").timeZone).toBe("Europe/Berlin");
+    expect(parse("?tz=utc&days=7").timeZone).toBe("UTC");
+  });
+
   test("refuses anything else", () => {
     for (const query of [
       "",
@@ -583,6 +588,20 @@ describe("the overview models", () => {
     ]);
   });
 
+  test("read a send the clock stepped back on as zero long", async () => {
+    const chat = await fixture();
+    const sessionId = await settledChat(chat);
+    hide(chat);
+    addSend(chat, sessionId, { at: NOW, finishedAt: NOW - 5_000 });
+    addSend(chat, sessionId, { at: NOW, finishedAt: NOW + 400 });
+    const body = await overview(chat);
+    expect(body.models[0]).toMatchObject({
+      sends: 2,
+      medianMs: 200,
+      slowestMs: 400,
+    });
+  });
+
   test("say null for a model whose sends all run", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
@@ -697,6 +716,15 @@ describe("the overview now", () => {
     await built.overview("UTC", 30);
     expect(keys).toHaveLength(2);
     await built.overview("Europe/Berlin", 7);
+    expect(keys).toHaveLength(3);
+    // the parser gives every spelling the canonical name
+    const spelled = await built.routes[0]!.handle(
+      new Request("http://x/api/admin/overview?tz=eUrOpE%2FbErLiN&days=7"),
+      {
+        url: new URL("http://x/api/admin/overview?tz=eUrOpE%2FbErLiN&days=7"),
+      } as never,
+    );
+    expect(spelled?.status).toBe(200);
     expect(keys).toHaveLength(3);
     app.now.value += KEEP_MS;
     await built.overview("UTC", 7);

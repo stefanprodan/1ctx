@@ -23,10 +23,12 @@ function one(url: URL, name: string): string {
   return values[0]!;
 }
 
+// the canonical name, since Intl takes any case and the cache keys on it
 function zone(url: URL): string {
   const timeZone = one(url, "tz");
   if (!isTimeZone(timeZone)) throw new BadRequest("unknown tz");
-  return timeZone;
+  return new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions()
+    .timeZone;
 }
 
 export function parseStorageQuery(url: URL): string {

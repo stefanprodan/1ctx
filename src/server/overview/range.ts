@@ -317,7 +317,7 @@ function models(db: Db, bounds: Bounds): ModelRow[] {
       Bounds
     >(
       `select p.name as provider, s.model,
-              s.finished_at - s.started_at as ms, s.rounds
+              max(s.finished_at - s.started_at, 0) as ms, s.rounds
          from sends s join providers p on p.id = s.provider_id
          where s.started_at >= ? and s.started_at < ?
            and s.status != 'running' and s.finished_at is not null`,
