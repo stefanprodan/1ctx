@@ -26,10 +26,11 @@ import type YAML from "yaml";
 import { hasHelpFlag, showHelp, unknownOption } from "../help.js";
 import {
   type EvaluateOptions,
-  evaluate,
   parse,
+  type QuerySource,
   type QueryValue,
 } from "../query-engine/index.js";
+import type { AstNode } from "../query-engine/parser.js";
 import { getValueDepth } from "../query-engine/value-operations.js";
 import {
   defaultFormatOptions,
@@ -169,6 +170,8 @@ interface YqOptions extends FormatOptions {
   noDoc: boolean;
   /** -j, mikefarah's deprecated --tojson (1ctx) */
   tojson: boolean;
+  /** -0: a NUL after each result, mikefarah's --nul-output (1ctx) */
+  nulOutput: boolean;
   inplace: boolean;
   frontMatter: boolean;
 }
@@ -189,6 +192,8 @@ const SHORT_FORMATS: Record<string, string> = Object.assign(Object.create(null),
   j: "json",
   x: "xml",
   c: "csv",
+  t: "tsv",
+  p: "props",
 });
 
 function formatName(value: string | undefined): string | undefined {
@@ -203,6 +208,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     nullInput: false,
     noDoc: false,
     tojson: false,
+    nulOutput: false,
     inplace: false,
     frontMatter: false,
   };
@@ -214,9 +220,26 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
   let command = false;
   const files: string[] = [];
   const fileAt: number[] = [];
+  // after --, the filter and files only, as mikefarah reads them (1ctx)
+  let positional = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+
+    if (!positional && a === "--") {
+      positional = true;
+      continue;
+    }
+    if (positional) {
+      if (filterSet) {
+        files.push(a);
+        fileAt.push(i);
+      } else {
+        filter = a;
+        filterSet = true;
+      }
+      continue;
+    }
 
     // Long options with values
     if (a.startsWith("--input-format=")) {
@@ -292,6 +315,15 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       options.frontMatter = true;
     } else if (a === "-P" || a === "--prettyPrint") {
       options.prettyPrint = true;
+    } else if (a === "-0" || a === "--nul-output") {
+      options.nulOutput = true;
+    } else if (
+      a === "-M" ||
+      a === "-C" ||
+      a === "--no-colors" ||
+      a === "--colors"
+    ) {
+      // colours are for a terminal, and the mount has none (1ctx)
     } else if (a === "-") {
       files.push("-");
       fileAt.push(i);
@@ -336,6 +368,8 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
         else if (c === "i") options.inplace = true;
         else if (c === "f") options.frontMatter = true;
         else if (c === "P") options.prettyPrint = true;
+        else if (c === "0") options.nulOutput = true;
+        else if (c === "M" || c === "C") continue;
         else return unknownOption("yq", `-${c}`);
       }
     } else if (!filterSet && !command && (a === "eval" || a === "e")) {
@@ -564,14 +598,28 @@ export const yqCommand: RuntimeCommand = {
         maxDepth: ctx.limits.maxQueryDepth,
         maxElements: ctx.limits.maxQueryElements,
       };
+      // load() reads its files before the run, which cannot wait (1ctx)
+      const loads = await readLoads(ast, ctx, withDefenseContext);
+      // mikefarah names stdin "-" when no file was given, and "" for -
+      const filename = options.nullInput
+        ? ""
+        : files.length === 0
+          ? "-"
+          : files[0] === "-"
+            ? ""
+            : files[0];
       const run = (input: QueryValue, document: number): void => {
-        for (const { value, state } of evaluateDocument(
-          input,
-          ast,
-          evalOptions,
-        )) {
+        for (const { value, state, index } of evaluateDocument(input, ast, {
+          ...evalOptions,
+          source: { document, file, filename, loads },
+        })) {
           if (value !== undefined) {
-            records.push({ value, document, computed: state === "computed" });
+            records.push({
+              value,
+              document,
+              computed: state === "computed",
+              index,
+            });
           }
         }
       };
@@ -718,6 +766,57 @@ export const yqCommand: RuntimeCommand = {
   },
 };
 
+/**
+ * The files the filter's load() and load_str() name, read through the
+ * mount from the working directory under its string limit. (1ctx)
+ */
+async function readLoads(
+  ast: AstNode,
+  ctx: RuntimeCommandContext,
+  withDefenseContext: <T>(phase: string, op: () => Promise<T>) => Promise<T>,
+): Promise<QuerySource["loads"]> {
+  const names = new Set<string>();
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    if (node === null || typeof node !== "object") return;
+    const call = node as AstNode;
+    if (
+      call.type === "Call" &&
+      (call.name === "load" || call.name === "load_str") &&
+      call.args.length === 1 &&
+      call.args[0].type === "Literal" &&
+      typeof call.args[0].value === "string"
+    ) {
+      names.add(call.args[0].value);
+    }
+    for (const value of Object.values(node)) visit(value);
+  };
+  visit(ast);
+  const loads: QuerySource["loads"] = new Map();
+  for (const name of names) {
+    try {
+      const text = await withDefenseContext("load read", () =>
+        ctx.fs.readFile(ctx.fs.resolvePath(ctx.cwd, name)),
+      );
+      loads.set(
+        name,
+        text.length > ctx.limits.maxStringLength
+          ? { error: `failed to load ${name}: larger than the string limit` }
+          : { text },
+      );
+    } catch (e) {
+      if (e instanceof SecurityViolationError) throw e;
+      loads.set(name, {
+        error: `failed to load ${name}: no such file or directory`,
+      });
+    }
+  }
+  return loads;
+}
+
 /** The answer for an error the run stopped on. */
 function failed(e: unknown): ExecResult {
   if (e instanceof SecurityViolationError) {
@@ -754,6 +853,8 @@ interface Result {
   value: QueryValue;
   document: number;
   computed: boolean;
+  /** the document splitDoc gave it */
+  index?: number;
 }
 
 /** The file and the document a result counts as read from. (1ctx) */
@@ -761,6 +862,7 @@ type Key = [file: number, document: number];
 
 // both 0 for a computed value
 function keyOf(record: Result, file: number): Key {
+  if (record.index !== undefined) return [file, record.index];
   return record.computed ? [0, 0] : [file, record.document];
 }
 
@@ -772,8 +874,9 @@ function moved(last: Key | null, next: Key | null): boolean {
 }
 
 /**
- * The text of the results: one per line, --- where the document moves in
- * YAML output unless -N, a top-level string raw. (1ctx)
+ * The text of the results: one per line, or each ended by a NUL with -0,
+ * --- where the document moves in YAML output unless -N, a top-level
+ * string raw. (1ctx)
  */
 function printRecords(
   records: Result[],
@@ -794,10 +897,9 @@ function printRecords(
         "output_size",
       ),
   );
-  let printed = 0;
   let lastKey: Key | null = null;
-  const documentSeparator =
-    options.outputFormat === "yaml" && !options.noDoc ? "\n---\n" : "\n";
+  const marker = options.outputFormat === "yaml" && !options.noDoc;
+  const end = options.nulOutput ? "\0" : "\n";
   for (const record of records) {
     const { value } = record;
     const key = keyOf(record, file);
@@ -810,9 +912,8 @@ function printRecords(
         "recursion",
       );
     }
-    const between = moved(lastKey, key) ? documentSeparator : "\n";
-    const separatorBytes = printed > 0 ? between.length : 0;
-    const remainingBytes = output.remainingBytes - separatorBytes - 1;
+    const between = marker && moved(lastKey, key) ? "---\n" : "";
+    const remainingBytes = output.remainingBytes - between.length - 1;
     if (remainingBytes < 0) {
       throw new ExecutionLimitError(
         `output size limit exceeded (${maxOutputSize} bytes)`,
@@ -839,12 +940,14 @@ function printRecords(
     if (text === "" && typeof value !== "string") {
       continue;
     }
-    if (printed > 0) output.append(between);
+    if (options.nulOutput && text.includes("\0")) {
+      throw new Error("a result holds a NUL, which -0 cannot print");
+    }
+    output.append(between);
     output.append(text);
-    printed++;
+    output.append(end);
     lastKey = key;
   }
-  if (printed > 0) output.append("\n");
   return output.build();
 }
 

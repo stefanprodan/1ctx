@@ -150,6 +150,19 @@ export interface EvalContext {
   budget: QueryEvaluationBudget;
   /** jq's rules, or mikefarah's yq where the two part (1ctx) */
   dialect?: Dialect;
+  /** the document and file a yq run reads, for di, fi, filename, load (1ctx) */
+  source?: QuerySource;
+  /** a value the yq walker handed on, and its path from the root (1ctx) */
+  sourceNode?: { value: QueryValue; path?: (string | number)[] };
+}
+
+/** Where a yq run's input comes from. (1ctx) */
+export interface QuerySource {
+  document: number;
+  file: number;
+  filename: string;
+  /** the files load() names, read before the run: text, or why not */
+  loads: Map<string, { text: string } | { error: string }>;
 }
 
 /** Whose rules a builtin follows where jq and mikefarah's yq part. (1ctx) */
@@ -253,6 +266,7 @@ export function createContext(options?: EvaluateOptions): EvalContext {
     defenseContextChecked: false,
     budget: options?.budget ?? { operations: 0, callDepth: 0 },
     dialect: options?.dialect,
+    source: options?.source,
   };
 }
 
@@ -278,6 +292,8 @@ function withVar(
     coverage: ctx.coverage,
     budget: ctx.budget,
     dialect: ctx.dialect,
+    source: ctx.source,
+    sourceNode: ctx.sourceNode,
   };
 }
 
@@ -486,6 +502,7 @@ export interface EvaluateOptions {
   budget?: QueryEvaluationBudget;
   /** mikefarah's yq rules where they part from jq's (1ctx) */
   dialect?: Dialect;
+  source?: QuerySource;
 }
 
 /**

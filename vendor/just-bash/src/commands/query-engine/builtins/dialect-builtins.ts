@@ -14,7 +14,7 @@ import type { RE2JS } from "re2js";
 import YAML from "yaml";
 import { createUserRegex, type UserRegex } from "../../../regex/index.js";
 import type { Dialect, EvalContext } from "../evaluator.js";
-import type { AstNode } from "../parser.js";
+import { type AstNode, parse } from "../parser.js";
 import { asQueryRecord, safeSet, sanitizeParsedData } from "../safe-object.js";
 import {
   compareJq,
@@ -425,6 +425,85 @@ function variableName(
   return firstString(value, arg, ctx, evaluate, "");
 }
 
+/** mikefarah's properties text: `a.b.0 = value`, one line each. */
+export function propsText(value: QueryValue): string {
+  const lines: string[] = [];
+  const walk = (node: QueryValue, path: string): void => {
+    if (Array.isArray(node) || asQueryRecord(node)) {
+      const items = Array.isArray(node)
+        ? node.map((item, i) => [String(i), item] as const)
+        : Object.entries(node as Record<string, QueryValue>);
+      for (const [key, item] of items) {
+        walk(item, path === "" ? key : `${path}.${key}`);
+      }
+      return;
+    }
+    const text = node === null || node === undefined ? "null" : String(node);
+    lines.push(path === "" ? text : `${path} = ${text}`);
+  };
+  walk(value, "");
+  return lines.map((line) => `${line}\n`).join("");
+}
+
+// the functions mikefarah's yq answers from a node's comments, style and
+// anchors, which our values never carry: his answers for a node without
+const NODE_TEXT = new Set([
+  "anchor",
+  "alias",
+  "style",
+  "line_comment",
+  "head_comment",
+  "foot_comment",
+]);
+
+// the setters mikefarah writes after a path (`.a style="double"`), parsed
+// as a call of the name and `=` (1ctx)
+const SETTERS = new Set([
+  "style=",
+  "tag=",
+  "anchor=",
+  "alias=",
+  "line_comment=",
+  "head_comment=",
+  "foot_comment=",
+  "comments=",
+]);
+
+let sortKeysAst: AstNode | null = null;
+
+// sort_keys(f): f |= its keys sorted, where it is a map
+function sortKeysUpdate(path: AstNode): AstNode {
+  sortKeysAst ??= parse(
+    'if kind == "map" then to_entries | sort_by(.key) | from_entries else . end',
+  );
+  return { type: "UpdateOp", op: "|=", path, value: sortKeysAst };
+}
+
+function loaded(ctx: EvalContext, name: string, raw: boolean): QueryValue {
+  const file = ctx.source?.loads.get(name);
+  if (!file) {
+    throw new Error(`load takes a file name as a string: ${name}`);
+  }
+  if ("error" in file) throw new Error(file.error);
+  if (raw) return file.text;
+  return sanitizeParsedData(
+    name.toLowerCase().endsWith(".json")
+      ? JSON.parse(file.text)
+      : YAML.parse(file.text, { maxAliasCount: 100, merge: true }),
+  );
+}
+
+// the path the yq walker knows for this very value; a value inside a
+// function it does not follow has none
+function sourcePath(
+  value: QueryValue,
+  ctx: EvalContext,
+): (string | number)[] | undefined {
+  const node = ctx.sourceNode;
+  if (node === undefined) return ctx.currentPath;
+  return Object.is(node.value, value) && node.path ? [...node.path] : undefined;
+}
+
 function jsonText(value: QueryValue, indent: number): string {
   return indent === 0
     ? JSON.stringify(value)
@@ -580,6 +659,130 @@ export function evalDialectBuiltin(
         args.length > 0 ? Number(evaluate(value, args[0], ctx)[0]) : 2;
       return [jsonText(value, Number.isFinite(indent) ? indent : 2)];
     }
+    case "documentIndex":
+    case "di":
+      return [ctx.source?.document ?? 0];
+    case "fileIndex":
+    case "fi":
+      return [ctx.source?.file ?? 0];
+    case "filename":
+      return [ctx.source?.filename ?? null];
+    case "to_number":
+      if (typeof value === "number") return [value];
+      if (typeof value === "string" && /^\s*[-+]?(\d|\.\d)/.test(value)) {
+        const number = Number(value);
+        if (Number.isFinite(number)) return [number];
+      }
+      throw new Error(`${described(value)} cannot be parsed as a number`);
+    case "to_string":
+      return evaluate(value, { type: "Call", name: "tostring", args: [] }, ctx);
+    case "@yaml":
+    case "to_yaml":
+      return [YAML.stringify(value, { indent: 2 })];
+    case "@yamld":
+    case "from_yaml":
+      if (typeof value !== "string") notString(value);
+      return [yamlValue(value)];
+    case "@jsond":
+    case "from_json":
+      return evaluate(value, { type: "Call", name: "fromjson", args: [] }, ctx);
+    case "@props":
+      return [propsText(value)];
+    case "sort_keys":
+      if (args.length === 0) return null;
+      return evaluate(value, sortKeysUpdate(args[0]), ctx);
+    case "pick":
+    case "omit": {
+      // mikefarah's array of keys; jq's pick takes a path expression
+      if (!yq || args.length !== 1 || args[0].type !== "Array") {
+        return null;
+      }
+      const wanted = evaluate(value, args[0], ctx)[0] as QueryValue[];
+      if (Array.isArray(value)) {
+        const keep = (i: number) => wanted.includes(i) === (name === "pick");
+        return [
+          name === "pick"
+            ? wanted.filter((i) => typeof i === "number" && i < value.length)
+                .map((i) => value[i as number])
+            : value.filter((_, i) => keep(i)),
+        ];
+      }
+      const map = asQueryRecord(value);
+      if (!map) return name === "pick" ? [null] : [value];
+      const keys =
+        name === "pick"
+          ? wanted.filter(
+              (k): k is string => typeof k === "string" && Object.hasOwn(map, k),
+            )
+          : Object.keys(map).filter((k) => !wanted.includes(k));
+      return [record(keys.map((k) => [k, map[k]]))];
+    }
+    case "filter":
+      if (args.length === 0) return null;
+      return evaluate(
+        value,
+        {
+          type: "Array",
+          elements: {
+            type: "Pipe",
+            left: { type: "Iterate" },
+            right: { type: "Call", name: "select", args },
+          },
+        },
+        ctx,
+      );
+    case "any_c":
+    case "all_c": {
+      if (args.length === 0) return null;
+      if (!Array.isArray(value) && !asQueryRecord(value)) cannotIterate(value);
+      const items = Object.values(value as object) as QueryValue[];
+      const test = (item: QueryValue) =>
+        evaluate(item, args[0], ctx).some(
+          (v) => v !== null && v !== undefined && v !== false,
+        );
+      return [name === "any_c" ? items.some(test) : items.every(test)];
+    }
+    case "key": {
+      const path = sourcePath(value, ctx);
+      return [path && path.length > 0 ? path[path.length - 1] : null];
+    }
+    case "path":
+      if (args.length > 0) return null;
+      return [sourcePath(value, ctx) ?? null];
+    case "with":
+      if (args.length !== 2) return null;
+      return evaluate(
+        value,
+        { type: "UpdateOp", op: "|=", path: args[0], value: args[1] },
+        ctx,
+      );
+    case "splitDoc":
+    case "split_doc":
+      return [value];
+    case "load":
+    case "load_str": {
+      if (args.length !== 1) return null;
+      const file =
+        args[0].type === "Literal" && typeof args[0].value === "string"
+          ? args[0].value
+          : "";
+      return [loaded(ctx, file, name === "load_str")];
+    }
+    case "explode":
+      // mikefarah's explode(.): aliases are copies once read, so nothing is
+      // left to explode; jq's explode/0 splits a string into codepoints
+      return args.length === 1 ? [value] : null;
+    case "line":
+    case "column":
+      return [0];
+  }
+  if (NODE_TEXT.has(name) && args.length === 0) return [""];
+  if (SETTERS.has(name)) {
+    if (!yq) throw new Error(`${name} is mikefarah's yq, not jq`);
+    // the value is evaluated for its errors; the node keeps its style,
+    // comments and tags, which our values do not carry
+    evaluate(value, args[1], ctx);
+    return [value];
   }
   return null;
 }

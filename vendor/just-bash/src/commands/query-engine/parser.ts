@@ -82,6 +82,18 @@ const KEYWORDS: Map<string, TokenType> = new Map([
 
 const KEYWORD_TOKEN_TYPES: Set<TokenType> = new Set(KEYWORDS.values());
 
+// the node setters of mikefarah's yq (1ctx)
+const YQ_SETTERS = new Set([
+  "style",
+  "tag",
+  "anchor",
+  "alias",
+  "line_comment",
+  "head_comment",
+  "foot_comment",
+  "comments",
+]);
+
 function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   let pos = 0;
@@ -438,6 +450,18 @@ class Parser {
       return next.pos === dot.pos + 1;
     }
     return false;
+  }
+
+  // a setter of mikefarah's yq after a path: `style=`, `line_comment=` (1ctx)
+  private isSetterAhead(): boolean {
+    const at = this.check("DOT") ? 1 : 0;
+    const name = this.peek(at);
+    const op = this.peek(at + 1).type;
+    return (
+      name.type === "IDENT" &&
+      YQ_SETTERS.has(name.value as string) &&
+      (op === "ASSIGN" || op === "UPDATE_PIPE")
+    );
   }
 
   private isIdentLike(): boolean {
@@ -807,6 +831,14 @@ class Parser {
       ) {
         // .a.[0] and .a.[], which jq 1.8 and mikefarah's yq read (1ctx)
         this.advance();
+      } else if (this.isSetterAhead()) {
+        // mikefarah's `.a style="double"` and `... comments=""`, a call the
+        // evaluator answers in the yq dialect and refuses in jq's (1ctx)
+        if (this.check("DOT")) this.advance();
+        const name = this.advance().value as string;
+        this.advance();
+        const value = this.parsePostfix();
+        expr = { type: "Call", name: `${name}=`, args: [expr, value] };
       } else if (this.check("LBRACKET")) {
         this.advance();
         if (this.match("RBRACKET")) {

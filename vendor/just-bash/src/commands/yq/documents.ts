@@ -39,6 +39,10 @@ export type State = "document" | "inside" | "computed";
 export interface Tagged {
   value: QueryValue;
   state: State;
+  /** the document splitDoc gave it, apart from the one it was read from */
+  index?: number;
+  /** its path from the root, where known, for key and path */
+  path?: (string | number)[];
 }
 
 type Vars = ReadonlyMap<string, State>;
@@ -201,14 +205,28 @@ function walk(
   switch (ast.type) {
     case "Pipe": {
       const lefts = walk(ast.left, input, ctx, vars);
+      // splitDoc makes each result so far a document of its own
+      if (isSplitDoc(ast.right)) {
+        return lefts.map((left, index) => ({ ...left, index }));
+      }
       // the context the engine's own pipe gives its right side, which
-      // parent and path read
+      // parent reads
       const leftPath = extractPathFromAst(ast.left);
       const right =
         leftPath === null
           ? ctx
           : { ...ctx, currentPath: [...(ctx.currentPath ?? []), ...leftPath] };
-      return lefts.flatMap((left) => walk(ast.right, left, right, vars));
+      return lefts.flatMap((left) =>
+        walk(ast.right, left, { ...right, sourceNode: left }, vars).map(
+          // a node inside a split document stays in it
+          (result) =>
+            left.index !== undefined &&
+            result.index === undefined &&
+            result.state !== "computed"
+              ? { ...result, index: left.index }
+              : result,
+        ),
+      );
     }
     case "Comma":
       return [
@@ -256,7 +274,7 @@ function walk(
           patternNames(pattern, names);
           const states = new Map(vars);
           for (const name of names) states.set(name, bound.state);
-          return walk(ast.body, input, inner, states);
+          return walk(ast.body, input, { ...inner, sourceNode: input }, states);
         }
         return [];
       });
@@ -274,14 +292,74 @@ function walk(
     case "Recurse": {
       // .. answers the input itself first, then the nodes inside it
       const values = evaluate(input.value, ast, ctx);
+      const paths = pathsOf(input, ast, ctx, values.length);
       return values.map((value, index) => ({
         value,
         state: index === 0 ? input.state : step(input.state),
+        path: paths?.[index],
       }));
     }
   }
   const state = classify(ast, input.state, input.value, vars);
-  return evaluate(input.value, ast, ctx).map((value) => ({ value, state }));
+  const values = evaluate(input.value, ast, ctx);
+  const paths = pathsOf(input, ast, ctx, values.length);
+  return values.map((value, index) => ({
+    value,
+    state,
+    path: paths?.[index],
+  }));
+}
+
+function isSplitDoc(ast: AstNode): boolean {
+  return (
+    ast.type === "Call" &&
+    (ast.name === "splitDoc" || ast.name === "split_doc") &&
+    ast.args.length === 0
+  );
+}
+
+// a node made only of path steps, whose results path() can name
+function isPathOnly(ast: AstNode): boolean {
+  switch (ast.type) {
+    case "Identity":
+    case "Recurse":
+      return true;
+    case "Field":
+    case "Index":
+    case "Slice":
+    case "Iterate":
+      return ast.base === undefined || isPathOnly(ast.base);
+    case "Optional":
+      return isPathOnly(ast.expr);
+    default:
+      return false;
+  }
+}
+
+// the paths of a node's results from the root: path() of a path step, the
+// input's own for a function that returns its input, else unknown
+function pathsOf(
+  input: Tagged,
+  ast: AstNode,
+  ctx: EvalContext,
+  count: number,
+): ((string | number)[] | undefined)[] | undefined {
+  if (input.path === undefined) return undefined;
+  if (ast.type === "Call" && SAME_NODE.has(ast.name)) {
+    return Array.from({ length: count }, () => input.path);
+  }
+  if (!isPathOnly(ast)) return undefined;
+  try {
+    const paths = evaluate(
+      input.value,
+      { type: "Call", name: "path", args: [ast] },
+      ctx,
+    );
+    if (paths.length !== count) return undefined;
+    return paths.map((p) => [...(input.path ?? []), ...(p as (string | number)[])]);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -294,5 +372,10 @@ export function evaluateDocument(
   options: EvaluateOptions,
 ): Tagged[] {
   const ctx = { ...createContext(options), root: document, currentPath: [] };
-  return walk(ast, { value: document, state: "document" }, ctx, new Map());
+  return walk(
+    ast,
+    { value: document, state: "document", path: [] },
+    { ...ctx, sourceNode: { value: document, path: [] } },
+    new Map(),
+  );
 }

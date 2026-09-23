@@ -13,6 +13,7 @@ import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type { QueryValue } from "../query-engine/index.js";
+import { propsText } from "../query-engine/builtins/dialect-builtins.js";
 import { formatJsonValue } from "../query-engine/json-output.js";
 import {
   type SanitizeParsedDataLimits,
@@ -20,7 +21,16 @@ import {
 } from "../query-engine/safe-object.js";
 
 export type InputFormat = "yaml" | "xml" | "json" | "ini" | "csv" | "toml";
-export type OutputFormat = "yaml" | "json" | "xml" | "ini" | "csv" | "toml";
+// tsv and props are mikefarah's (1ctx)
+export type OutputFormat =
+  | "yaml"
+  | "json"
+  | "xml"
+  | "ini"
+  | "csv"
+  | "tsv"
+  | "props"
+  | "toml";
 
 const validInputFormats = [
   "yaml",
@@ -36,6 +46,8 @@ const validOutputFormats = [
   "xml",
   "ini",
   "csv",
+  "tsv",
+  "props",
   "toml",
 ] as const;
 
@@ -164,8 +176,18 @@ function formatCsv(value: unknown, delimiter: string): string {
   if (!Array.isArray(value)) {
     value = [value];
   }
+  // a list of scalars is one row, as mikefarah writes it; Papa refused it
+  // (1ctx)
+  const rows = value as unknown[];
+  if (rows.length > 0 && rows.every((row) => row === null || typeof row !== "object")) {
+    value = [rows];
+  }
   // Use comma as default for output (empty means auto-detect for input only)
-  return Papa.unparse(value as unknown[], { delimiter: delimiter || "," });
+  return Papa.unparse(value as unknown[], {
+    delimiter: delimiter || ",",
+    // mikefarah ends a row with a newline, not CRLF (1ctx)
+    newline: "\n",
+  });
 }
 
 /**
@@ -186,7 +208,7 @@ export function parseInput(
       // SECURITY: maxAliasCount limits YAML alias expansion (billion-laughs defense).
       // Default schema is 'core' which does NOT resolve !!js/function or other
       // code-execution tags (those are only in 'yaml-1.1' schema).
-      return sanitize(YAML.parse(trimmed, { maxAliasCount: 100 }));
+      return sanitize(YAML.parse(trimmed, { maxAliasCount: 100, merge: true }));
 
     case "json":
       // SECURITY: JSON.parse returns plain objects — sanitizeParsedData converts
@@ -269,7 +291,9 @@ export function parseAllYamlDocuments(
     if (lineEnd === -1) break;
     lineStart = lineEnd + 1;
   }
-  const docs = YAML.parseAllDocuments(input);
+  // merge keys (<<: *base) are merged on read, as mikefarah reads them
+  // (1ctx)
+  const docs = YAML.parseAllDocuments(input, { merge: true });
   if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
     throw new ExecutionLimitError(
@@ -323,7 +347,7 @@ export function extractFrontMatter(
       const remaining = trimmed.slice(endMatch.index + 3 + endMatch[0].length);
       return {
         frontMatter: sanitizeParsedData(
-          YAML.parse(yamlContent, { maxAliasCount: 100 }),
+          YAML.parse(yamlContent, { maxAliasCount: 100, merge: true }),
           limits,
         ),
         content: remaining,
@@ -438,6 +462,14 @@ export function formatOutput(
 
     case "csv":
       serialized = formatCsv(value, options.csvDelimiter);
+      break;
+
+    case "tsv":
+      serialized = formatCsv(value, "\t");
+      break;
+
+    case "props":
+      serialized = propsText(value).trimEnd();
       break;
 
     case "toml": {

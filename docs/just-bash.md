@@ -80,6 +80,9 @@ without a file of their own.
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `-N` and `--no-doc` drop the `---` lines; `-j` and `--tojson` are `-o json` with mikefarah's deprecation line; a `.json` file prints JSON unless `-p` or `-o` was given, and several files print in the first one's format; YAML at `-I0` and `-I1` is indented 4 and 2 | mikefarah's meanings: `-j` joined the output here, and JSON input printed YAML |
 | `src/commands/yq/documents.ts` (new), `yq.ts`, `query-engine/evaluator.ts`, `src/index.ts` | a walker runs the top of a yq filter (`\|`, `,`, `//`, parentheses, `as`, `if`, arithmetic) and tags each result as the document, a node inside it, or computed from nothing, classifying every other node by what it is; `---` prints where the document index moves or a later file starts, a computed value counting as document 0, in stdout and in `-i`; the evaluator exports `createContext()` and `extractPathFromAst()` and the package exports the walker and the engine for our tests | mikefarah prints `---` only between values read from different documents: `length`, `keys` and `"\(.kind)"` print none, `.a // "none"` one where the index moves |
 | `src/commands/query-engine/builtins/dialect-builtins.ts` (new), `evaluator.ts`, `parser.ts`, `yq/yq.ts` | `dialect` on the options and the context, `yq` from the yq command; the builtins, arithmetic, `==` and field steps that part follow it, and jq 1.8's errors and answers where both tools agree and upstream answered null (see "The jq and yq dialects"); an unbound variable is an error; `.a.[0]` parses | where the tools part, a model got exit 0 with the wrong answer: `sub("-", "_")` and `select(.image == "nginx*")` answered null or nothing, `type` never matched `!!str`, `keys` sorted, `to_entries` of a list was null, and `.a * 2` printed null for every document without `a` |
+| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `--` ends the flags; `-o csv` writes a list of scalars as one row and every row with a newline, `-o tsv`, `-o props` and `-o p` are mikefarah's formats (`tags.0 = a`); `-M`, `-C` and `--colors` are accepted and ignored; `-0` and `--nul-output` end each result with a NUL, keeping `---`, and fail on a result holding one | mikefarah's flags failed as unknown options |
+| `src/commands/query-engine/builtins/dialect-builtins.ts`, `parser.ts`, `yq/yq.ts`, `yq/documents.ts` | mikefarah's functions: `documentIndex` and `di`, `fileIndex`, `fi` and `filename`, `to_number`, `to_string`, `@yaml`, `to_yaml`, `@yamld`, `from_yaml`, `@jsond`, `from_json`, `@props`, `sort_keys(f)`, `pick` and `omit` of a list of keys, `filter(f)`, `any_c`, `all_c`, `key` and bare `path` (from the paths the walker follows), `with(p; f)`, `splitDoc` and `split_doc` (each result its own document), `load` and `load_str` of a file named as a string (read before the run through the mount, under the string limit), `explode`; `anchor`, `alias`, `style` and the comment getters answer `""`, `line` and `column` 0, and the setters (`.a style="double"`, `... comments=""`, `tag=`) parse and change nothing; jq refuses the setters | models write them from mikefarah's docs, and each failed as an unknown function or a parse error |
+| `src/commands/yq/formats.ts`, `src/commands/yq/preserve.ts` | merge keys (`<<: *base`) merge on read, the explicit keys winning; `-i` keeps the key as written | `.web.image` through a merge key answered null and `-o json` showed a `<<` key |
 
 ### The jq and yq dialects
 
@@ -213,16 +216,22 @@ for one of the reasons below. Where they part:
   the file left as it was, when a plain scalar of it reads differently
   for YAML 1.1 and 1.2 (`0644`, `yes`), since the fresh spelling would
   change what Kubernetes reads.
-- Merge keys (`<<: *base`) are not merged on read, and `!!binary` reads
-  as an object of bytes.
+- `!!binary` reads as an object of bytes. A merge key is written back
+  without the `!!merge` tag mikefarah adds.
 - `-i` over several files writes each as it goes, so a later file that
   does not parse leaves the earlier ones written; mikefarah reads all
   first. A file with a duplicate key does not parse here.
 - An alias is a copy: editing an anchor's target leaves the aliased
   places at the old value, and a plain write re-emits anchors.
-- mikefarah's own operators (`explode`, `style`, `line_comment`,
-  `with`, `key`) and `eval-all` are not there. An `-i` whose filter
-  outputs nothing leaves the file and exits 1; mikefarah empties it.
+- `eval-all` is not there. An `-i` whose filter outputs nothing leaves
+  the file and exits 1; mikefarah empties it.
+- Our values carry no style, comments, tags or anchors: `style`,
+  `anchor`, `line_comment` and the like answer `""`, `line` and
+  `column` 0, and the setters (`style=`, `tag=`, `comments=`) change
+  nothing, `tag = "!!str"` included.
+- `load` takes its file name as a string literal, read before the run;
+  a loaded JSON file prints in block style, where mikefarah keeps its
+  flow style.
 - jq's forms mikefarah refuses work: `empty`, `if`, `reduce`, `first`,
   `last`, `min_by`, `max_by`, `ltrimstr`, `paths`, `any(f)`, `all(f)`,
   `keys_unsorted`, `ascii_upcase`, `gsub`, `splits`, `add`, `index`,

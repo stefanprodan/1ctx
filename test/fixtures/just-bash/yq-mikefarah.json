@@ -3430,6 +3430,761 @@
         "exit": 0,
         "reason": "jq's precedence: a comma binds tighter than a pipe, where mikefarah reads a | b, c as (a | b), c."
       }
+    },
+    {
+      "name": "mikefarah: -- before a file",
+      "args": [
+        ".a",
+        "--",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n"
+      },
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -- before the filter",
+      "args": [
+        "--",
+        ".a",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n"
+      },
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o csv of maps",
+      "args": [
+        "-o",
+        "csv",
+        ".items",
+        "data.json"
+      ],
+      "stdout": "id,tag\n1,a\n2,b\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o tsv of maps",
+      "args": [
+        "-o",
+        "tsv",
+        ".items",
+        "data.json"
+      ],
+      "stdout": "id\ttag\n1\ta\n2\tb\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o csv of scalars",
+      "args": [
+        "-o",
+        "csv",
+        ".tags",
+        "config.yaml"
+      ],
+      "stdout": "web,api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o props",
+      "args": [
+        "-o",
+        "props",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name = app\nversion = 1.2.0\nport = 8080\ndebug = false\nempty = \nmode = 0644\nnothing = null\ntags.0 = web\ntags.1 = api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -o p",
+      "args": [
+        "-o",
+        "p",
+        ".",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion = v1\nkind = List\nitems.0.apiVersion = v1\nitems.0.kind = Service\nitems.0.metadata.name = frontend\nitems.0.spec.ports.0.port = 80\nitems.1.apiVersion = v1\nitems.1.kind = Service\nitems.1.metadata.name = backend\nitems.1.spec.ports.0.port = 8080\nitems.1.spec.ports.1.port = 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -op",
+      "args": [
+        "-op",
+        ".metadata",
+        "flux.yaml"
+      ],
+      "stdout": "name = podinfo\nnamespace = apps\nname = infra\nnamespace = flux-system\nname = redis\nnamespace = cache\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -M",
+      "args": [
+        "-M",
+        ".name",
+        "config.yaml"
+      ],
+      "stdout": "app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -C",
+      "args": [
+        "-C",
+        ".name",
+        "config.yaml"
+      ],
+      "stdout": "app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -0",
+      "args": [
+        "-0",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\u0000---\nweb-1\u0000---\nweb\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: --nul-output",
+      "args": [
+        "--nul-output",
+        ".kind",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease\u0000---\nKustomization\u0000---\nHelmRelease\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -0 on a map",
+      "args": [
+        "-0",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -0 with -N",
+      "args": [
+        "-0",
+        "-N",
+        ".kind",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease\u0000Kustomization\u0000HelmRelease\u0000",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: documentIndex",
+      "args": [
+        "documentIndex",
+        "pods.yaml"
+      ],
+      "stdout": "0\n1\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: di with fi and filename",
+      "args": [
+        "[di, fi, filename]",
+        "flux.yaml"
+      ],
+      "stdout": "- 0\n- 0\n- flux.yaml\n- 1\n- 0\n- flux.yaml\n- 2\n- 0\n- flux.yaml\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: fi over two files",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        "[fi, di, filename]",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "[0,0,\"pods.yaml\"]\n[0,1,\"pods.yaml\"]\n[0,2,\"pods.yaml\"]\n[1,0,\"flux.yaml\"]\n[1,1,\"flux.yaml\"]\n[1,2,\"flux.yaml\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: filename of stdin",
+      "args": [
+        "filename"
+      ],
+      "stdin": "a: 1\n",
+      "stdout": "-\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: di of null input",
+      "args": [
+        "-n",
+        "di"
+      ],
+      "stdout": "0\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_string",
+      "args": [
+        ".port | to_string",
+        "config.yaml"
+      ],
+      "stdout": "8080\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_number of a string",
+      "args": [
+        "\"12\" | to_number",
+        "config.yaml"
+      ],
+      "stdout": "12\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_number of a version",
+      "args": [
+        ".version | to_number",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "mikefarah: @yaml of a list",
+      "args": [
+        ".tags | @yaml",
+        "config.yaml"
+      ],
+      "stdout": "- web\n- api\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: to_yaml of each document",
+      "args": [
+        ". | to_yaml",
+        "flux.yaml"
+      ],
+      "stdout": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @yamld",
+      "args": [
+        "\"a: 1\" | @yamld",
+        "config.yaml"
+      ],
+      "stdout": "a: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: from_yaml",
+      "args": [
+        "\"a: [1, 2]\" | from_yaml | .a[1]",
+        "config.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: from_json",
+      "args": [
+        "\"{\\\"a\\\":1}\" | from_json | .a",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @jsond",
+      "args": [
+        "\"[1]\" | @jsond | .[0]",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @props of a list",
+      "args": [
+        ".tags | @props",
+        "config.yaml"
+      ],
+      "stdout": "0 = web\n1 = api\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: @props of a document",
+      "args": [
+        "@props",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion = v1\nkind = List\nitems.0.apiVersion = v1\nitems.0.kind = Service\nitems.0.metadata.name = frontend\nitems.0.spec.ports.0.port = 80\nitems.1.apiVersion = v1\nitems.1.kind = Service\nitems.1.metadata.name = backend\nitems.1.spec.ports.0.port = 8080\nitems.1.spec.ports.1.port = 9090\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: sort_keys of the top",
+      "args": [
+        "sort_keys(.)",
+        "config.yaml"
+      ],
+      "stdout": "debug: false\nempty: \"\"\nmode: \"0644\"\nname: app\nnothing: null\nport: 8080\ntags:\n  - web\n  - api\nversion: 1.2.0\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: sort_keys everywhere",
+      "args": [
+        "sort_keys(..)",
+        "list.yaml"
+      ],
+      "stdout": "apiVersion: v1\nitems:\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: frontend\n    spec:\n      ports:\n        - port: 80\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: backend\n    spec:\n      ports:\n        - port: 8080\n        - port: 9090\nkind: List\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: pick keys",
+      "args": [
+        "pick([\"port\", \"name\", \"zz\"])",
+        "config.yaml"
+      ],
+      "stdout": "port: 8080\nname: app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: omit keys",
+      "args": [
+        "omit([\"port\", \"tags\"])",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: pick an index",
+      "args": [
+        ".tags | pick([1])",
+        "config.yaml"
+      ],
+      "stdout": "- api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: filter a list",
+      "args": [
+        ".tags | filter(. != \"web\")",
+        "config.yaml"
+      ],
+      "stdout": "- api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: filter a map",
+      "args": [
+        "filter(. == \"app\")",
+        "config.yaml"
+      ],
+      "stdout": "- app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: any_c",
+      "args": [
+        ".tags | any_c(. == \"api\")",
+        "config.yaml"
+      ],
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: all_c",
+      "args": [
+        ".tags | all_c(. == \"api\")",
+        "config.yaml"
+      ],
+      "stdout": "false\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: key of list items",
+      "args": [
+        ".tags[] | key",
+        "config.yaml"
+      ],
+      "stdout": "0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: key of a field",
+      "args": [
+        ".name | key",
+        "config.yaml"
+      ],
+      "stdout": "name\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: key of each container",
+      "args": [
+        ".spec.containers[] | key",
+        "pods.yaml"
+      ],
+      "stdout": "0\n---\n0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: path of a found value",
+      "args": [
+        ".. | select(. == \"api\") | path",
+        "config.yaml"
+      ],
+      "stdout": "- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: path of an item",
+      "args": [
+        ".tags[1] | path",
+        "config.yaml"
+      ],
+      "stdout": "- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: path of the root",
+      "args": [
+        "path",
+        "config.yaml"
+      ],
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: with",
+      "args": [
+        "with(.tags; .[0] = \"x\")",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - x\n  - api\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: with a new path",
+      "args": [
+        "with(.a.b; . = 1)",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\na:\n  b: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: splitDoc of items",
+      "args": [
+        ".tags[] | splitDoc",
+        "config.yaml"
+      ],
+      "stdout": "web\n---\napi\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: split_doc then a path",
+      "args": [
+        ".items[] | split_doc | .metadata.name",
+        "list.yaml"
+      ],
+      "stdout": "frontend\n---\nbackend\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: splitDoc of one list",
+      "args": [
+        ".items | splitDoc",
+        "list.yaml"
+      ],
+      "stdout": "- apiVersion: v1\n  kind: Service\n  metadata:\n    name: frontend\n  spec:\n    ports:\n      - port: 80\n- apiVersion: v1\n  kind: Service\n  metadata:\n    name: backend\n  spec:\n    ports:\n      - port: 8080\n      - port: 9090\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: splitDoc of built items",
+      "args": [
+        "[.tags[], \"x\"] | .[] | splitDoc",
+        "config.yaml"
+      ],
+      "stdout": "web\n---\napi\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load",
+      "args": [
+        "load(\"config.yaml\") | .name",
+        "list.yaml"
+      ],
+      "stdout": "app\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load_str",
+      "args": [
+        "load_str(\"a.yaml\")",
+        "config.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n"
+      },
+      "stdout": "a: 1\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load a json file",
+      "args": [
+        "load(\"data.json\") | .meta.count",
+        "config.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: load a missing file",
+      "args": [
+        "load(\"nope.yaml\")",
+        "config.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "mikefarah: merge a loaded file",
+      "args": [
+        ". * load(\"a.yaml\")",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n"
+      },
+      "stdout": "b: 1\na: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: explode",
+      "args": [
+        "explode(.) | .web",
+        "anchors.yaml"
+      ],
+      "stdout": "image: nginx\nreplicas: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: a merge key is merged",
+      "args": [
+        ".web.image",
+        "anchors.yaml"
+      ],
+      "stdout": "nginx\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: a merge key keeps the explicit value",
+      "args": [
+        ".web.replicas",
+        "anchors.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: a merged map as json",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        ".web",
+        "anchors.yaml"
+      ],
+      "stdout": "{\"image\":\"nginx\",\"replicas\":2}\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: -i through a merge key keeps it",
+      "args": [
+        "-i",
+        ".web.replicas = 3",
+        "anchors.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  !!merge <<: *base\n  replicas: 3\ntags: [a, b]\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds.",
+        "written": {
+          "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  <<: *base\n  replicas: 3\ntags: [a, b]\n"
+        }
+      }
+    },
+    {
+      "name": "mikefarah: -i on an anchor keeps the file",
+      "args": [
+        "-i",
+        ".base.image = \"httpd\"",
+        "anchors.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "anchors.yaml": "# shared defaults\nbase: &base\n  image: httpd\n  replicas: 1 # one by default\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "An alias is a copy: an edit of an anchor's target that its aliases would read differently is refused, the file left as it was.",
+        "written": {}
+      }
+    },
+    {
+      "name": "mikefarah: anchor of a node without one",
+      "args": [
+        ".web | anchor",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: alias",
+      "args": [
+        ".web | alias",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: style of a plain scalar",
+      "args": [
+        ".name | style",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: line_comment of a node without one",
+      "args": [
+        ".name | line_comment",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: head_comment of a node without one",
+      "args": [
+        ".base | head_comment",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: foot_comment",
+      "args": [
+        ". | foot_comment",
+        "anchors.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: style setter",
+      "args": [
+        ".name style=\"double\"",
+        "config.yaml"
+      ],
+      "stdout": "name: \"app\"\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+      }
+    },
+    {
+      "name": "mikefarah: line_comment setter",
+      "args": [
+        ".name line_comment=\"x\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app # x\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+      }
+    },
+    {
+      "name": "mikefarah: comments cleared",
+      "args": [
+        "... comments=\"\"",
+        "anchors.yaml"
+      ],
+      "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "base:\n  image: nginx\n  replicas: 1\nweb:\n  image: nginx\n  replicas: 2\ntags:\n  - a\n  - b\n",
+        "exit": 0,
+        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+      }
+    },
+    {
+      "name": "mikefarah: tag setter",
+      "args": [
+        ".port tag = \"!!str\"",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: \"8080\"\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+        "exit": 0,
+        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+      }
+    },
+    {
+      "name": "mikefarah: to_json(4)",
+      "args": [
+        ".tags | to_json(4)",
+        "config.yaml"
+      ],
+      "stdout": "[\n    \"web\",\n    \"api\"\n]\n\n",
+      "exit": 0
+    },
+    {
+      "name": "mikefarah: line",
+      "args": [
+        ".name | line",
+        "config.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "0\n",
+        "exit": 0,
+        "reason": "Style, comments and tags are not kept on our values: the setters parse and change nothing, and line and column answer 0."
+      }
     }
   ]
 }

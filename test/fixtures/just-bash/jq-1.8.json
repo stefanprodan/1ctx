@@ -772,6 +772,49 @@
       },
       "stdout": "\"web\"\n",
       "exit": 0
+    },
+    {
+      "name": "a yq setter is refused",
+      "args": [
+        "-c",
+        ". style=\"double\""
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "to_number is mikefarah's",
+      "args": [
+        "-c",
+        "to_number + 1"
+      ],
+      "stdin": "\"12\"\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true,
+      "accept": {
+        "stdout": "13\n",
+        "exit": 0,
+        "reason": "jq accepts mikefarah's yq names (upcase, downcase, env(NAME), strenv, to_json and the rest), which jq 1.8 does not define."
+      }
+    },
+    {
+      "name": "@yaml is mikefarah's",
+      "args": [
+        "-r",
+        "@yaml"
+      ],
+      "stdin": "{\"a\":[1]}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true,
+      "accept": {
+        "stdout": "a:\n  - 1\n\n",
+        "exit": 0,
+        "reason": "jq accepts mikefarah's yq names (upcase, downcase, env(NAME), strenv, to_json and the rest), which jq 1.8 does not define."
+      }
     }
   ]
 }

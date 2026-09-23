@@ -199,7 +199,8 @@ export function preservingText(
       .toString({ flowCollectionPadding: false })
       .replace(/\n+$/, "");
     // what is written must read back as the result
-    const reread = YAML.parseDocument(text);
+    // merge keys read merged, as the values were (1ctx)
+    const reread = YAML.parseDocument(text, { merge: true });
     if (reread.errors.length > 0) return null;
     if (!same(reread.toJS({ maxAliasCount: 100 }) as QueryValue, after)) {
       return null;

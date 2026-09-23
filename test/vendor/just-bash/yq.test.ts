@@ -320,6 +320,36 @@ describe("yq over several documents", () => {
   });
 });
 
+describe("load", () => {
+  test("reads a file outside the working directory through the mount", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/work/base.yaml", "image: nginx\n");
+    fs.writeFileSync("/work/app/web.yaml", "replicas: 2\n");
+    const bash = new Bash({ fs, cwd: "/work/app" });
+    const result = await bash.exec(
+      `yq -o json -I0 '. * load("../base.yaml")' web.yaml`,
+    );
+    expect(result.stdout).toBe('{"replicas":2,"image":"nginx"}\n');
+  });
+
+  test("a file over the string limit is an error", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/big.yaml", `a: ${"x".repeat(300)}\n`);
+    fs.writeFileSync("/m.yaml", "b: 1\n");
+    const bash = new Bash({ fs, executionLimits: { maxStringLength: 200 } });
+    const result = await bash.exec(`yq 'load("/big.yaml")' /m.yaml`);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("failed to load /big.yaml");
+  });
+
+  test("a computed file name is refused", async () => {
+    const result = await yq(`yq 'load(.name)' /m.yaml`, "name: /m.yaml\n");
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("load takes a file name as a string");
+  });
+});
+
 describe("the document walker", () => {
   const state = (filter: string, input: DocumentState, value?: unknown) =>
     classify(parseQuery(filter), input, value);
@@ -459,6 +489,8 @@ describe("the document walker", () => {
       } catch {
         continue;
       }
+      // key and path read the paths the walker follows, which is its point
+      if (/"name":"(key|path)","args":\[\]/.test(JSON.stringify(ast))) continue;
       const engine = answer(() => evaluateQuery(structuredClone(input), ast));
       const walker = answer(() =>
         evaluateDocument(structuredClone(input), ast, {}).map((r) => r.value),
