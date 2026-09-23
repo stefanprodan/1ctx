@@ -66,6 +66,8 @@ without a file of their own.
 | `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `expressions.ts`, `statements.ts`, `context.ts`, `builtins.ts`, `src/regex/user-regex.ts` | `FS` and `split()` read their separator as gawk does: `" "` is runs of space, tab and newline, any other single character is that character, `""` each character, two or more a regex; one splitter serves records, `$0` assignment, `sub`/`gsub` and `split()`, whose fourth argument gets the separators; `length(arr)` counts elements; reading an element creates it; a scalar used as an array and the reverse are fatal; arguments are bound after all are evaluated, and a parameter without one is a local array; `match(s, re, arr)` fills `arr` with each group and its `start` and `length` in characters from the new `UserRegex.groups()`, and only a pattern that does not compile is a failed match | `-F.` split on every character and `-F'\|'` crashed, `length(arr)` was 0, `a["k"];` created nothing, `match(line, /re/, m)` left `m` empty, and a limit error inside `match` was swallowed |
 | `src/commands/awk/check.ts` (new), `awk2.ts`, `lexer.ts`, `parser2.ts`, `options.ts`, `interpreter/input.ts`, `interpreter/expressions.ts`, `builtins.ts` | a pass over the parsed program refuses a builtin called with a number of arguments outside gawk 5.4.1's bounds, and a function named after a builtin, exit 1, before `BEGIN`; `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`, `FIELDWIDTHS`, `@include`, `@load` and `@namespace` are refused the same way, exit 2, in the program, `-v` or an operand; a call to a function that does not exist and `sprintf()` are fatal when they run; `length` without parentheses is `length($0)`, and `do stmt; while (c)` parses | extra arguments were ignored (`match(s, re, m)` left `m` empty with exit 0), an unknown function answered the empty string, and `IGNORECASE=1` or `FIELDWIDTHS` changed nothing without a word |
 | `src/commands/awk/builtins.ts`, `check.ts` | `sub` and `gsub` change the array element, the built-in variable or the field their third argument names, assign nothing when nothing matched, count in a string constant without changing it, and refuse any other third argument before the program runs; the replacement follows gawk's backslash rules (`\\\&` gives `\&`, `\\\\` gives `\\`, `\\&` a backslash and the match, `\&` an ampersand, any other backslash stays) | `gsub(/a/, "b", arr[k])` and `gsub(/a/, "b", "aaa")` changed `$0` instead, and `\q` lost its backslash |
+| `src/commands/awk/interpreter/expressions.ts`, `variables.ts`, `context.ts` | a comparison is numeric when both sides are a number, an uninitialized variable or element (both `""` and `0`, an element made by a reference included) or a numeric-looking string that is not a constant, a concatenation or a string function's answer; division and modulo by zero are fatal | `x == 0` and `c[$1] == 0` were false for an unset `x` and `c[$1]`, `substr(s, 1, 2) > 5` compared numbers, and `1/0` printed `0` |
+| `src/commands/awk/parser2.ts` | `$` binds tighter than `^`, and an exponent may carry a sign | `$2^2` read `$4` and `2^-1` was a parse error |
 
 ### Where our jq still differs from jq
 
@@ -108,14 +110,27 @@ they part:
   `asort`, `asorti`, `strtonum`, `patsplit`, `isarray` and `typeof` are
   functions not defined; `systime`, `mktime` and `strftime` fail when
   called, and `system` is refused.
-- A value is a string or a number, with no strnum: a string compares as
-  a number when both sides look numeric, unless one side is a string
-  constant or a concatenation, so `x = "10"; x > 9` is true where gawk
-  compares strings.
+- A value is a string or a number, with no strnum: a variable holding a
+  string constant or a string function's answer compares as a number
+  when both sides look numeric, so `x = "10"; x > 9` is true where gawk
+  compares strings. Fields, `getline` variables, `split` elements,
+  `ARGV`, `ENVIRON`, `-v` values and uninitialized values compare as
+  gawk's do. `!"0"` is true, as for a field holding `0`, where gawk's
+  string constant is false. `+inf` and `+nan` in the input are 0.
+- A user function that returns without a value answers `""`, a string,
+  where gawk's answer is uninitialized.
+- `print | "cmd"` and `printf | "cmd"` are a parse error.
 - A local array parameter and a global array of the same name share
   storage during the call.
+- `for (k in a)` walks the elements in insertion order, gawk's order is
+  its own.
+- `srand(n)` answers `n`, not the previous seed, and `rand()` is not
+  gawk's sequence for a seed.
+- `0x1A` in a program is `0` followed by the variable `x1A`; gawk reads a
+  hexadecimal constant.
 - NaN prints as `+nan` whatever its sign.
-- Regular expressions are RE2's, without backreferences.
+- Regular expressions are RE2's, without backreferences and without
+  gawk's `\<`, `\>` and `\y` word boundaries.
 
 ### Where our yq still differs from mikefarah's
 

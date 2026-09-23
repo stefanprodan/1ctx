@@ -38,6 +38,8 @@ import {
   getVariable,
   hasArrayElement,
   isArrayName,
+  isUninitElement,
+  isUninitVariable,
   readArrayElement,
   resolveArrayName,
   deleteArray,
@@ -262,6 +264,21 @@ async function evalBinaryOp(
     }
   }
 
+  // (1ctx) a comparison is numeric only when both sides are: a number, an
+  // uninitialized variable or element (both "" and 0, as gawk's), or a
+  // string that looks like one and is not a string constant, a
+  // concatenation or a string function's answer, which gawk compares as
+  // strings
+  if (isComparisonOp(op)) {
+    const l = await withDefenseContext(ctx, "binary left evaluation", () =>
+      evalOperand(ctx, expr.left),
+    );
+    const r = await withDefenseContext(ctx, "binary right evaluation", () =>
+      evalOperand(ctx, expr.right),
+    );
+    return evalComparison(ctx, l.value, r.value, op, l.numeric && r.numeric);
+  }
+
   const left = await withDefenseContext(ctx, "binary left evaluation", () =>
     evalExpr(ctx, expr.left),
   );
@@ -282,27 +299,61 @@ async function evalBinaryOp(
     return result;
   }
 
-  // Comparison operators
-  if (isComparisonOp(op)) {
-    // (1ctx) a string constant or a concatenation is a string, never a
-    // number, so the comparison is of strings as in gawk
-    const asStrings = isStringExpr(expr.left) || isStringExpr(expr.right);
-    return evalComparison(ctx, left, right, op, asStrings);
-  }
-
   // Arithmetic operators
   const leftNum = toNumber(left);
   const rightNum = toNumber(right);
+  // (1ctx) gawk's fatal error, where JavaScript would answer Infinity or NaN
+  if ((op === "/" || op === "%") && rightNum === 0) {
+    throw new Error("division by zero attempted");
+  }
   return applyNumericBinaryOp(leftNum, rightNum, op);
+}
+
+interface Operand {
+  value: AwkValue;
+  numeric: boolean;
+}
+
+// (1ctx) a comparison's side, and whether it takes part as a number
+async function evalOperand(
+  ctx: AwkRuntimeContext,
+  expr: AwkExpr,
+): Promise<Operand> {
+  if (expr.type === "variable") {
+    const value = getVariable(ctx, expr.name);
+    return {
+      value,
+      numeric: isUninitVariable(ctx, expr.name) || looksLikeNumber(value),
+    };
+  }
+  if (expr.type === "array_access") {
+    const key = toStr(ctx, await evalExpr(ctx, expr.key));
+    const uninit = isUninitElement(ctx, expr.array, key);
+    const value = readArrayElement(ctx, expr.array, key);
+    return { value, numeric: uninit || looksLikeNumber(value) };
+  }
+  // a field past NF is the null string, not uninitialized, in gawk
+  const value = await evalExpr(ctx, expr);
+  return { value, numeric: !isStringExpr(expr) && looksLikeNumber(value) };
 }
 
 function isComparisonOp(op: string): boolean {
   return ["<", "<=", ">", ">=", "==", "!="].includes(op);
 }
 
+const STRING_FUNCTIONS = new Set([
+  "substr",
+  "tolower",
+  "toupper",
+  "sprintf",
+  "gensub",
+]);
+
 function isStringExpr(expr: AwkExpr): boolean {
   return (
-    expr.type === "string" || (expr.type === "binary" && expr.operator === " ")
+    expr.type === "string" ||
+    (expr.type === "binary" && expr.operator === " ") ||
+    (expr.type === "call" && STRING_FUNCTIONS.has(expr.name))
   );
 }
 
@@ -311,12 +362,9 @@ function evalComparison(
   left: AwkValue,
   right: AwkValue,
   op: string,
-  asStrings: boolean,
+  numeric: boolean,
 ): number {
-  const leftIsNum = looksLikeNumber(left);
-  const rightIsNum = looksLikeNumber(right);
-
-  if (!asStrings && leftIsNum && rightIsNum) {
+  if (numeric) {
     const l = toNumber(left);
     const r = toNumber(right);
     switch (op) {
@@ -550,10 +598,13 @@ async function evalAssignment(
         finalValue = currentNum * valueNum;
         break;
       case "/=":
-        finalValue = valueNum !== 0 ? currentNum / valueNum : 0;
+        // (1ctx) gawk's fatal error
+        if (valueNum === 0) throw new Error("division by zero attempted");
+        finalValue = currentNum / valueNum;
         break;
       case "%=":
-        finalValue = valueNum !== 0 ? currentNum % valueNum : 0;
+        if (valueNum === 0) throw new Error("division by zero attempted");
+        finalValue = currentNum % valueNum;
         break;
       case "^=":
         finalValue = currentNum ** valueNum;

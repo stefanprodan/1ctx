@@ -10,6 +10,33 @@ import { setFieldSeparator } from "./fields.js";
 import { toStr, toNumber } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
 
+// (1ctx) the names getVariable answers itself
+const BUILTIN_VARIABLES = new Set([
+  "FS",
+  "OFS",
+  "ORS",
+  "OFMT",
+  "CONVFMT",
+  "NR",
+  "NF",
+  "FNR",
+  "FILENAME",
+  "RSTART",
+  "RLENGTH",
+  "SUBSEP",
+  "ARGC",
+  "RS",
+  "RT",
+]);
+
+/** (1ctx) True for a scalar never assigned, which is both "" and 0. */
+export function isUninitVariable(
+  ctx: AwkRuntimeContext,
+  name: string,
+): boolean {
+  return !BUILTIN_VARIABLES.has(name) && ctx.vars[name] === undefined;
+}
+
 /**
  * Get a variable value. Handles built-in variables.
  */
@@ -166,11 +193,19 @@ export function readArrayElement(
   array: string,
   key: string,
 ): AwkValue {
-  const resolvedArray = resolveArrayName(ctx, array);
-  const value = ctx.arrays[resolvedArray]?.[key];
-  if (value !== undefined) return value;
-  setArrayElement(ctx, array, key, "");
+  const elements = ctx.arrays[resolveArrayName(ctx, array)];
+  if (elements && key in elements) return elements[key] ?? "";
+  setArrayElement(ctx, array, key, undefined);
   return "";
+}
+
+/** (1ctx) True for an element that is missing or was never assigned. */
+export function isUninitElement(
+  ctx: AwkRuntimeContext,
+  array: string,
+  key: string,
+): boolean {
+  return ctx.arrays[resolveArrayName(ctx, array)]?.[key] === undefined;
 }
 
 /** (1ctx) True when the name, through any alias, is an array. */
@@ -198,7 +233,7 @@ export function setArrayElement(
   ctx: AwkRuntimeContext,
   array: string,
   key: string,
-  value: AwkValue,
+  value: AwkValue | undefined,
 ): void {
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
@@ -229,7 +264,8 @@ export function hasArrayElement(
 ): boolean {
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
-  return ctx.arrays[resolvedArray]?.[key] !== undefined;
+  const elements = ctx.arrays[resolvedArray];
+  return elements !== undefined && key in elements;
 }
 
 /**

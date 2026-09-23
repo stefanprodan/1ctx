@@ -915,11 +915,21 @@ export class AwkParser {
       // Exponent is right-associative, and binds tighter than unary
       // So 2^3^2 = 2^(3^2) = 2^9 = 512
       // But -2^2 = -(2^2) = -4 (unary handled in parseUnary)
-      const right = this.withDepth(() => this.parsePower());
+      const right = this.withDepth(() => this.parseExponent());
       left = { type: "binary", operator: "^", left, right };
     }
 
     return left;
+  }
+
+  // (1ctx) an exponent may carry its own sign: 2^-1
+  private parseExponent(): AwkExpr {
+    if (this.match(TokenType.MINUS, TokenType.PLUS, TokenType.NOT)) {
+      const op = this.advance().value as "!" | "-" | "+";
+      const operand = this.withDepth(() => this.parseExponent());
+      return { type: "unary", operator: op, operand };
+    }
+    return this.parsePower();
   }
 
   private parsePostfix(): AwkExpr {
@@ -1014,23 +1024,8 @@ export class AwkParser {
       return { type: "unary", operator: op, operand };
     }
 
-    // Power with non-postfix base
-    return this.parseFieldIndexPower();
-  }
-
-  /**
-   * Parse power expression for field index (no postfix on base)
-   */
-  private parseFieldIndexPower(): AwkExpr {
-    let left = this.parseFieldIndexPrimary();
-
-    if (this.check(TokenType.CARET)) {
-      this.advance();
-      const right = this.withDepth(() => this.parseFieldIndexPower());
-      left = { type: "binary", operator: "^", left, right };
-    }
-
-    return left;
+    // (1ctx) $ binds tighter than ^, so $2^2 is ($2)^2 as in gawk
+    return this.parseFieldIndexPrimary();
   }
 
   /**

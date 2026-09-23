@@ -39,7 +39,9 @@ export interface AwkRuntimeContext {
 
   // User variables and arrays
   vars: Record<string, AwkValue>;
-  arrays: Record<string, Record<string, AwkValue>>;
+  // (1ctx) an element made by a reference holds undefined until it is
+  // assigned: it reads as "" and compares as gawk's uninitialized value
+  arrays: Record<string, Record<string, AwkValue | undefined>>;
   // Array aliases for function parameter passing (parameter name → original name)
   arrayAliases: Map<string, string>;
 
