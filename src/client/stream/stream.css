@@ -69,4 +69,51 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
+
+  /* the placeholder rows: bars at the text's size, so a ghost is as
+     tall as a row, pulsing slowly one after another */
+  .stream-ghost {
+    pointer-events: none;
+  }
+  .stream-bone {
+    display: inline-block;
+    height: 0.7em;
+    vertical-align: middle;
+    border-radius: var(--radius-cell);
+    background: var(--line);
+    animation: pulse 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--ghost) * 0.1s);
+  }
+  .stream-bone-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius);
+  }
+  .stream-bone-title {
+    width: 62%;
+  }
+  .stream-bone-line {
+    width: 44%;
+  }
+  .stream-bone-when {
+    width: 36px;
+  }
+  .stream-ghost-b .stream-bone-title {
+    width: 48%;
+  }
+  .stream-ghost-b .stream-bone-line {
+    width: 56%;
+  }
+  .stream-ghost-c .stream-bone-title {
+    width: 70%;
+  }
+  .stream-ghost-c .stream-bone-line {
+    width: 34%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stream-bone {
+      animation: none;
+    }
+  }
 }

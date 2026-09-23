@@ -34,6 +34,10 @@ export const projectError = signal<Failure | null>(null);
 
 let owner: string | null = null;
 let listTurn = 0;
+// the turn whose list is shown: an answer newer than it is kept even
+// when a later request is still out, so the shell's load and a route's
+// own, started together, draw the list at the first answer
+let listShown = 0;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 const kept = new Held<ProjectDetail>();
 
@@ -42,6 +46,7 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   listTurn++;
+  listShown = listTurn;
   wanted = { id: "", turn: wanted.turn + 1 };
   projects.value = null;
   projectsError.value = null;
@@ -56,7 +61,8 @@ export async function loadProjects(): Promise<void> {
   projectsError.value = null;
   try {
     const body = await api<ProjectsResponse>("/api/projects");
-    if (owner === forUser && listTurn === turn) {
+    if (owner === forUser && turn > listShown) {
+      listShown = turn;
       projects.value = body.projects;
     }
   } catch (err) {

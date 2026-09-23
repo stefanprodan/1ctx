@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
-import { projects } from "../../../src/client/data/projects.ts";
+import { projects, projectsError } from "../../../src/client/data/projects.ts";
 import {
   homeProjectId,
   list,
@@ -89,7 +89,7 @@ describe("Home", () => {
     expect(html).toContain('class="composer composer-tall card"');
     expect(html).toContain('rows="2"');
     expect(html).toContain('placeholder="Search sessions"');
-    expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Loading sessions"');
     // the aside: the agents, and the week once it answers
     expect(html).toContain(
       'class="split-name split-name-link" href="/agents/assistant">assistant<',
@@ -184,11 +184,23 @@ describe("Home", () => {
     },
   );
 
-  test("without the personal project the composer waits", () => {
+  test("the composer and the feed wait for the project list", () => {
     projects.value = null;
     const html = render(<Home />);
     expect(html).not.toContain('class="composer');
-    expect(html).toContain('placeholder="Search sessions"');
+    expect(html).not.toContain('placeholder="Search sessions"');
+  });
+
+  test("a failed project list still draws the feed", () => {
+    projects.value = null;
+    projectsError.value = { words: "down", status: 500 };
+    try {
+      const html = render(<Home />);
+      expect(html).not.toContain('class="composer');
+      expect(html).toContain('placeholder="Search sessions"');
+    } finally {
+      projectsError.value = null;
+    }
   });
 });
 

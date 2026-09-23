@@ -26,6 +26,9 @@ export const homeProjectId = signal<string | null>(null);
 
 let owner: string | null = null;
 let turn = 0;
+// the turn whose answer is shown: a newer one for the project on screen
+// is kept even while a later request is out
+let shownTurn = 0;
 let shownFor: string | null = null;
 const kept = new Held<ProjectAgentsResponse>();
 
@@ -34,6 +37,7 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   turn++;
+  shownTurn = turn;
   projectAgents.value = null;
   shownFor = null;
   kept.clear();
@@ -59,7 +63,10 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
     const body = await api<ProjectAgentsResponse>(
       `/api/projects/${encodeURIComponent(projectId)}/agents`,
     );
-    if (!current()) return;
+    if (owner !== forUser || shownFor !== projectId || mine <= shownTurn) {
+      return;
+    }
+    shownTurn = mine;
     kept.set(projectId, body);
     projectAgents.value = body.agents;
     answered(body);

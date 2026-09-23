@@ -72,7 +72,7 @@ export function Stream({
       }
     >
       {rows === null ? (
-        <RowsNote>Loading</RowsNote>
+        <Ghosts />
       ) : rows.length === 0 ? (
         <RowsNote>{empty}</RowsNote>
       ) : (
@@ -86,5 +86,37 @@ export function Stream({
         ))
       )}
     </RowsCard>
+  );
+}
+
+// placeholder rows in the shape of the real ones while the list loads,
+// so the rows land where the shapes were
+const GHOSTS = 6;
+
+function Ghosts() {
+  return (
+    <div class="stream-ghosts" role="status" aria-label="Loading sessions">
+      {Array.from({ length: GHOSTS }, (_, i) => (
+        <div
+          key={i}
+          class={`stream-row stream-ghost stream-ghost-${"abc"[i % 3]}`}
+          style={{ "--ghost": i }}
+          aria-hidden="true"
+        >
+          <span class="stream-bone stream-bone-icon" />
+          <span class="stream-text">
+            <span class="stream-title">
+              <span class="stream-bone stream-bone-title" />
+            </span>
+            <span class="stream-line">
+              <span class="stream-bone stream-bone-line" />
+            </span>
+          </span>
+          <span class="stream-when">
+            <span class="stream-bone stream-bone-when" />
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }

@@ -557,6 +557,13 @@
     }
   }
 
+  /* the slow fade a placeholder breathes with */
+  @keyframes pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+
   /* the one turn a spinner needs */
   @keyframes spin {
     to {

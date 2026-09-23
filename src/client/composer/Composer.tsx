@@ -410,7 +410,7 @@ export function Composer({
           />
         )}
         <AgentPicker
-          agents={list}
+          agents={agents}
           agentId={agent}
           onPick={
             fixed

@@ -1251,6 +1251,58 @@ describe("capability flips on a send", () => {
     },
   );
 
+  test.serial(
+    "an earlier answer for the project draws while a later one is out",
+    async () => {
+      const gates: ((name: string) => void)[] = [];
+      answer = () =>
+        new Promise<Response>((resolve) => {
+          gates.push((name) =>
+            resolve(
+              Response.json({
+                agents: [{ id: name, name }],
+                capabilities: [],
+              }),
+            ),
+          );
+        });
+      const first = loadProjectAgents("p1");
+      const second = loadProjectAgents("p1");
+      gates[0]("older");
+      await first;
+      expect(projectAgents.value?.map((a) => a.id)).toEqual(["older"]);
+      gates[1]("newer");
+      await second;
+      expect(projectAgents.value?.map((a) => a.id)).toEqual(["newer"]);
+    },
+  );
+
+  test.serial(
+    "an answer for a project no longer picked is dropped",
+    async () => {
+      const gates: (() => void)[] = [];
+      answer = (url) =>
+        new Promise<Response>((resolve) => {
+          gates.push(() =>
+            resolve(
+              Response.json({
+                agents: [{ id: url.includes("/p1/") ? "a1" : "a2" }],
+                capabilities: [],
+              }),
+            ),
+          );
+        });
+      const first = loadProjectAgents("p1");
+      const second = loadProjectAgents("p2");
+      gates[0]();
+      await first;
+      expect(projectAgents.value).toBeNull();
+      gates[1]();
+      await second;
+      expect(projectAgents.value?.map((a) => a.id)).toEqual(["a2"]);
+    },
+  );
+
   test.serial("the project's agents answer what can be switched", async () => {
     answer = () => Response.json({ agents: [], capabilities: [WEB] });
     await loadProjectAgents("p1");
