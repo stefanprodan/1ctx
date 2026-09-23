@@ -64,6 +64,7 @@ without a file of their own.
 | `src/commands/awk/interpreter/records.ts` (new), `input.ts`, `expressions.ts`, `fields.ts`, `builtins.ts`, `src/regex/user-regex.ts` | `RS` and `RT` are built-ins: a record is read one at a time under the `RS` in force, a single character literally, `""` as paragraph mode (a newline also separates fields), two or more characters as a regular expression found through the new `UserRegex.scan()`, one that can match the empty string refused; every `getline` form reads records the same way and sets `RT`, plain `getline` moves `NR` and `FNR`, and the main input, `getline` files and commands share one byte budget; `close()` ends a `getline` file or command and an output file, answering 0 or -1; the abort signal stops the reader | the input was always split on newlines, so `RS="---"` over a kept YAML list gave one record per line with exit 0, and `close()` did nothing |
 | `src/commands/awk/chars.ts` (new), `format.ts` (new), `builtins.ts`, `interpreter/type-coercion.ts`, `statements.ts`, `expressions.ts`, `fields.ts`, `variables.ts`, `context.ts`, `parser2.ts`, `parser2-print.ts` | `length`, `substr`, `index`, `RSTART`, `RLENGTH`, an empty-`FS` split and `printf` widths, precisions and `%c` count code points; `printf` moved to `format.ts` and formats from the exact binary value, rounding half to even, with two exponent digits; a whole number prints as its exact integer, any other through `OFMT` in `print` and through `CONVFMT` (a new built-in) wherever it becomes a string, subscripts included; `int()` and `%d` truncate toward zero; infinities and NaN print as `+inf`, `-inf` and `+nan`; a comparison with a string constant or a concatenation compares strings; concatenation binds tighter than the comparisons | an emoji counted as two characters, `1e30` printed as `1e+30`, `0.1+0.2` became `0.30000000000000004` as a string, `%e` wrote `e+3`, `int(-3.5)` was -4, `%.1f` of 2.25 gave 2.3, and `x "" == "0.3"` compared `"" == "0.3"` |
 | `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `expressions.ts`, `statements.ts`, `context.ts`, `builtins.ts`, `src/regex/user-regex.ts` | `FS` and `split()` read their separator as gawk does: `" "` is runs of space, tab and newline, any other single character is that character, `""` each character, two or more a regex; one splitter serves records, `$0` assignment, `sub`/`gsub` and `split()`, whose fourth argument gets the separators; `length(arr)` counts elements; reading an element creates it; a scalar used as an array and the reverse are fatal; arguments are bound after all are evaluated, and a parameter without one is a local array; `match(s, re, arr)` fills `arr` with each group and its `start` and `length` in characters from the new `UserRegex.groups()`, and only a pattern that does not compile is a failed match | `-F.` split on every character and `-F'\|'` crashed, `length(arr)` was 0, `a["k"];` created nothing, `match(line, /re/, m)` left `m` empty, and a limit error inside `match` was swallowed |
+| `src/commands/awk/check.ts` (new), `awk2.ts`, `lexer.ts`, `parser2.ts`, `options.ts`, `interpreter/input.ts`, `interpreter/expressions.ts`, `builtins.ts` | a pass over the parsed program refuses a builtin called with a number of arguments outside gawk 5.4.1's bounds, and a function named after a builtin, exit 1, before `BEGIN`; `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`, `FIELDWIDTHS`, `@include`, `@load` and `@namespace` are refused the same way, exit 2, in the program, `-v` or an operand; a call to a function that does not exist and `sprintf()` are fatal when they run; `length` without parentheses is `length($0)`, and `do stmt; while (c)` parses | extra arguments were ignored (`match(s, re, m)` left `m` empty with exit 0), an unknown function answered the empty string, and `IGNORECASE=1` or `FIELDWIDTHS` changed nothing without a word |
 
 ### Where our jq still differs from jq
 
@@ -91,6 +92,30 @@ jq 1.8. Where they part:
 - A `break` in the right side of an assignment outputs nothing, where jq
   outputs the results before it; the filter form of a `$x` parameter
   yields only the bound value (`def f($x): x`).
+
+### Where our awk still differs from gawk
+
+`test/fixtures/just-bash/awk-gawk.json` holds what gawk 5.4.1 answered,
+recorded by `scripts/gawk-record.ts`, and
+`test/vendor/just-bash/awk-gawk.test.ts` holds our awk to it. Where
+they part:
+
+- An `RS` that can match the empty string (`X*`) is refused; gawk's
+  records for one are erratic.
+- `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`,
+  `FIELDWIDTHS`, `@include`, `@load` and `@namespace` are refused;
+  `asort`, `asorti`, `strtonum`, `patsplit`, `isarray` and `typeof` are
+  functions not defined; `systime`, `mktime` and `strftime` fail when
+  called, and `system` is refused.
+- A value is a string or a number, with no strnum: a string compares as
+  a number when both sides look numeric, unless one side is a string
+  constant or a concatenation, so `x = "10"; x > 9` is true where gawk
+  compares strings.
+- `sub` and `gsub` with an array element as the target change nothing.
+- A local array parameter and a global array of the same name share
+  storage during the call.
+- NaN prints as `+nan` whatever its sign.
+- Regular expressions are RE2's, without backreferences.
 
 ### Where our yq still differs from mikefarah's
 

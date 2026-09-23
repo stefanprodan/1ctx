@@ -492,7 +492,8 @@ export class AwkParser {
     this.expect(TokenType.DO);
     this.skipNewlines();
     const body = this.parseStatement();
-    this.skipNewlines();
+    // (1ctx) `do stmt; while (c)`: a simple body ends at its semicolon
+    this.skipTerminators();
     this.expect(TokenType.WHILE);
     this.expect(TokenType.LPAREN);
     const condition = this.parseExpression();
@@ -1186,6 +1187,11 @@ export class AwkParser {
     // Identifier (variable or function call)
     if (this.check(TokenType.IDENT)) {
       const name = this.advance().value as string;
+
+      // (1ctx) `length` without parentheses is length($0)
+      if (name === "length" && !this.check(TokenType.LPAREN)) {
+        return { type: "call", name, args: [] };
+      }
 
       // Function call
       if (this.check(TokenType.LPAREN)) {

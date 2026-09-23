@@ -566,7 +566,8 @@ async function awkSprintf(
   ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<string> {
-  if (args.length === 0) return "";
+  // (1ctx) gawk's fatal error, when the call runs
+  if (args.length === 0) throw new Error("sprintf: no arguments");
   const format = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   const values: AwkValue[] = [];
   for (let i = 1; i < args.length; i++) {

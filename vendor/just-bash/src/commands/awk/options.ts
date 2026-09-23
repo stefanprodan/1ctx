@@ -7,6 +7,7 @@
  */
 
 import { awkBuiltins } from "./builtins.js";
+import { isUnsupportedName } from "./check.js";
 import { KEYWORDS } from "./lexer.js";
 
 export interface AwkAssignment {
@@ -84,6 +85,9 @@ export function parseOptions(args: string[]): ParsedOptions {
       }
       if (isReservedName(name)) {
         return fail(`awk: cannot use gawk builtin '${name}' as variable name\n`, 2);
+      }
+      if (isUnsupportedName(name)) {
+        return fail(`awk: ${name} is not supported\n`, 2);
       }
       assignments.push({ name, value: awkEscapes(value.slice(eq + 1)) });
     }

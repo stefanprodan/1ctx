@@ -90,3 +90,69 @@ describe("awk limits and refusals", () => {
     expect(Date.now() - started).toBeLessThan(5_000);
   });
 });
+
+describe("gawk features we do not have", () => {
+  const refused: [string, string][] = [
+    ["BEGINFILE", "BEGINFILE { print FILENAME }"],
+    ["ENDFILE", "ENDFILE { print FILENAME }"],
+    ["PROCINFO", 'BEGIN { PROCINFO["sorted_in"] = "@ind_str_asc" }'],
+    ["@include", '@include "lib.awk"'],
+    ["@load", '@load "ordchr"'],
+    ["@namespace", '@namespace "ns"'],
+    ["IGNORECASE", "{ IGNORECASE = 1 }"],
+    ["FPAT", 'BEGIN { FPAT = "[^,]+" }'],
+    ["FIELDWIDTHS", 'END { FIELDWIDTHS = "2 2" }'],
+  ];
+  for (const [name, construct] of refused) {
+    test(`${name} is refused before anything runs`, async () => {
+      const program = `BEGIN { print "ran" }\n${construct}`;
+      const r = await new Bash().exec(`awk '${program}'`, { stdin: "a\n" });
+      expect(r.stdout).toBe("");
+      expect(r.stderr).toBe(`awk: ${name} is not supported\n`);
+      expect(r.exitCode).toBe(2);
+    });
+  }
+
+  test("a refused variable given by -v is refused", async () => {
+    const r = await new Bash().exec(`awk -v IGNORECASE=1 '{ print }'`, {
+      stdin: "a\n",
+    });
+    expect(r.stderr).toBe("awk: IGNORECASE is not supported\n");
+    expect(r.exitCode).toBe(2);
+  });
+
+  for (const call of [
+    'strtonum("0x1A")',
+    "asort(a)",
+    "asorti(a)",
+    'patsplit("a b", a)',
+    "isarray(a)",
+    "typeof(a)",
+  ]) {
+    const name = call.slice(0, call.indexOf("("));
+    test(`${name} is a function not defined`, async () => {
+      const r = await new Bash().exec(
+        `awk 'BEGIN { print "before"; x = ${call} }'`,
+      );
+      expect(r.stdout).toBe("before\n");
+      expect(r.stderr).toBe(`awk: function '${name}' not defined\n`);
+      expect(r.exitCode).toBe(2);
+    });
+  }
+
+  for (const call of [
+    "systime()",
+    'mktime("2026 01 01 00 00 00")',
+    "strftime()",
+  ]) {
+    const name = call.slice(0, call.indexOf("("));
+    test(`a valid call to ${name} reaches its runtime error`, async () => {
+      const r = await new Bash().exec(
+        `awk 'BEGIN { print "before"; x = ${call} }'`,
+      );
+      expect(r.stdout).toBe("before\n");
+      expect(r.stderr).toBe(`awk: function '${name}()' is not implemented\n`);
+      expect(r.exitCode).toBe(2);
+    });
+  }
+});

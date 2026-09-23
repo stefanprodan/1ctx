@@ -5,6 +5,7 @@
  */
 
 import { ExecutionLimitError } from "../../interpreter/errors.js";
+import { AwkRefusal } from "./check.js";
 
 export enum TokenType {
   // Literals
@@ -897,6 +898,13 @@ export class AwkLexer {
         };
 
       default:
+        // (1ctx) gawk's directives are refused, not read as names
+        if (ch === "@") {
+          const word = /^[A-Za-z_]+/.exec(this.input.slice(this.pos))?.[0];
+          if (word === "include" || word === "load" || word === "namespace") {
+            throw new AwkRefusal(`@${word} is not supported`, 2);
+          }
+        }
         // Unknown character - return as identifier to allow graceful handling
         return {
           type: TokenType.IDENT,

@@ -23,6 +23,7 @@ import type {
 } from "../../types.js";
 import { hasHelpFlag, showHelp } from "../help.js";
 import type { AwkProgram } from "./ast.js";
+import { AwkRefusal, checkProgram } from "./check.js";
 import {
   type AwkFileSystem,
   AwkInterpreter,
@@ -105,10 +106,13 @@ export const awkCommand2: RuntimeCommand = {
     let ast: AwkProgram;
     try {
       ast = parser.parse(program);
+      // (1ctx) what gawk refuses before anything runs
+      checkProgram(ast);
     } catch (e) {
       rethrowFatalExecutionError(e);
       const msg = e instanceof Error ? e.message : String(e);
-      return { stdout: "", stderr: `awk: ${msg}\n`, exitCode: 1 };
+      const exitCode = e instanceof AwkRefusal ? e.exitCode : 1;
+      return { stdout: "", stderr: `awk: ${msg}\n`, exitCode };
     }
 
     // Create filesystem adapter with appendFile support

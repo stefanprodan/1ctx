@@ -393,7 +393,8 @@ async function evalFunctionCall(
     return callUserFunction(ctx, userFunc, args);
   }
 
-  return "";
+  // (1ctx) gawk's fatal error, when the call runs
+  throw new Error(`function '${name}' not defined`);
 }
 
 async function callUserFunction(

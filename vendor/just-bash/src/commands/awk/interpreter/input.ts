@@ -9,6 +9,7 @@
 
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import { utf8ByteLength } from "../../printf/escapes.js";
+import { isUnsupportedName, unsupported } from "../check.js";
 import { isReservedName, operandAssignment } from "../options.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { nextRecord } from "./records.js";
@@ -139,6 +140,7 @@ function assignOperand(
   if (isReservedName(name)) {
     throw new Error(`cannot use gawk builtin '${name}' as variable name`);
   }
+  if (isUnsupportedName(name)) throw unsupported(name);
   if (ctx.arrays[name] !== undefined) {
     throw new Error(`attempt to use array '${name}' in a scalar context`);
   }

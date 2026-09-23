@@ -71,6 +71,9 @@
 (fail) awk command > error handling > should error on missing file
 (fail) awk command > printf formats > should format scientific with %e
 (fail) awk edge cases > numeric edge cases > should handle very large numbers
+(fail) awk error handling > function argument errors > should handle split with missing arguments
+(fail) awk error handling > function argument errors > should handle substr with missing arguments
+(fail) awk error handling > syntax errors > should handle undefined function call gracefully
 (fail) awk math functions > basic math functions > int() handles negative numbers
 (fail) awk parsing > error cases > should error on missing file
 (fail) awk printf formats > scientific %e > should format in scientific notation
