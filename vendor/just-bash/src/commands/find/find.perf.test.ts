@@ -445,7 +445,8 @@ describe("find performance tracing", () => {
 
     // Verify both produce same results (correctness only, timing is informational)
     expect(fastPathMatches).toBe(regularPathMatches);
-  });
+    // (1ctx) 4.8M evaluations can pass Bun's 5 s default on a busy runner
+  }, 60_000);
 
   it("should skip stat calls for printf with simple directives", async () => {
     // Create a filesystem with many files

@@ -58,8 +58,13 @@ export function workSummary(
     (row) => row.status === "done" || row.status === "failed",
   ).length;
   const failed = tools.filter((row) => row.status === "failed").length;
-  // the calls the runner counts are the launched ones: a row each
-  const toolCalls = node.send?.toolCalls ?? tools.length;
+  // the calls the runner counts are the launched ones: a row each. A
+  // run's memory phase keeps counting on the send, and its rows are
+  // drawn apart, so this fold counts its own
+  const toolCalls =
+    node.send === null || node.send.memoryRound !== null
+      ? tools.length
+      : node.send.toolCalls;
 
   // a send without tools worked until its answer began: the first
   // token, or the end of its thinking
