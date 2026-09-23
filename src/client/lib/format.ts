@@ -41,6 +41,33 @@ export function stamp(ms: number): string {
   return `${day}, ${clock(ms)}`;
 }
 
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// "19 Sep", the same in every browser (Chrome's en-GB says "Sept")
+export function dayMonth(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+// "Sat 19 Sep"
+export function weekdayDayMonth(ms: number): string {
+  return `${WEEKDAYS[new Date(ms).getDay()]} ${dayMonth(ms)}`;
+}
+
 const DAY = 86_400_000;
 
 // a span in the compact units a feed uses, one letter and no space:

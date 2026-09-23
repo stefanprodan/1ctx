@@ -27,3 +27,18 @@ export function projectHere(
 export function onPage(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+// the one page of a group lit for a path: the longest that holds it, so
+// /admin/storage lights Storage and not the Overview at /admin too
+export function litPage(pathname: string, hrefs: string[]): string | null {
+  let best: string | null = null;
+  for (const href of hrefs) {
+    if (
+      onPage(pathname, href) &&
+      (best === null || href.length > best.length)
+    ) {
+      best = href;
+    }
+  }
+  return best;
+}

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { litPage } from "../../../src/client/app/Rail.model.ts";
 import { rangeOf } from "../../../src/client/data/overview.ts";
 import {
   cachedLine,
@@ -13,6 +14,7 @@ import {
   money,
   runningTile,
   sendsLine,
+  shortModel,
   usageBars,
 } from "../../../src/client/views/admin/Overview.model.ts";
 import type {
@@ -139,7 +141,15 @@ describe("overview words", () => {
       [row({ name: "gpt", sub: "openrouter", failed: 1, cost: 1.5 })],
       600,
     );
-    expect(bar.hint).toBe("gpt · openrouter · 3 sends · 1 failed · $1.50");
+    expect(bar.hint).toBe(
+      "gpt · openrouter · 600 tokens, 100% · 3 sends · 1 failed · $1.50",
+    );
+  });
+
+  test("a model loses its org unless a bare word is left", () => {
+    expect(shortModel("mlx-community/LFM2.5-8B")).toBe("LFM2.5-8B");
+    expect(shortModel("openrouter/free")).toBe("openrouter/free");
+    expect(shortModel("gemini-3.8-flash")).toBe("gemini-3.8-flash");
   });
 
   test("send lengths and the model bars", () => {
@@ -162,5 +172,15 @@ describe("overview words", () => {
     expect(bar.hint).toBe(
       "ornith · mlx-serve · 20 sends · 5% failed · slowest 12m · median 4 rounds",
     );
+  });
+});
+
+describe("the rail", () => {
+  test("lights Storage alone under /admin/storage", () => {
+    const hrefs = ["/admin", "/admin/storage", "/admin/tools"];
+    expect(litPage("/admin/storage", hrefs)).toBe("/admin/storage");
+    expect(litPage("/admin", hrefs)).toBe("/admin");
+    expect(litPage("/admin/tools/web", hrefs)).toBe("/admin/tools");
+    expect(litPage("/projects", hrefs)).toBeNull();
   });
 });

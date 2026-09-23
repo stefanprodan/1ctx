@@ -20,7 +20,7 @@ import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
-import { onPage, projectHere } from "./Rail.model.ts";
+import { litPage, onPage, projectHere } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { type Route, railRows } from "./routes.ts";
 import { theme, toggleTheme } from "./theme.ts";
@@ -77,7 +77,11 @@ function Group({
   here: string;
   follow?: () => void;
 }) {
-  const inside = routes.some((r) => onPage(here, r.path));
+  const lit = litPage(
+    here,
+    routes.map((r) => r.path),
+  );
+  const inside = lit !== null;
   const open = useSignal(inside);
   useEffect(() => {
     if (inside) open.value = true;
@@ -102,7 +106,13 @@ function Group({
       </button>
       {open.value &&
         routes.map((r) => (
-          <Sub key={r.path} href={r.path} here={here} follow={follow}>
+          <Sub
+            key={r.path}
+            href={r.path}
+            here={here}
+            on={r.path === lit}
+            follow={follow}
+          >
             {r.nav!.label}
           </Sub>
         ))}

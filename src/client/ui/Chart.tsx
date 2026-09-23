@@ -15,6 +15,7 @@ import { useId, useLayoutEffect, useRef } from "preact/hooks";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { theme } from "../app/theme.ts";
+import { dayMonth } from "../lib/format.ts";
 import "./chart.css";
 
 const token = (name: string) =>
@@ -226,15 +227,19 @@ export function DayBars({
             ...axis,
             font: font(),
             size: 24,
-            space: 70,
             grid: { show: false },
-            values: (_u, splits) =>
-              splits.map((t) =>
-                new Date(t * 1000).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                }),
-              ),
+            // a tick on a day, never between two, every few days when
+            // they would crowd
+            splits: (u) => {
+              const all = u.data[0] as number[];
+              const room = Math.max(
+                1,
+                Math.floor(u.bbox.width / devicePixelRatio / 64),
+              );
+              const step = Math.max(1, Math.ceil(all.length / room));
+              return all.filter((_, i) => (all.length - 1 - i) % step === 0);
+            },
+            values: (_u, splits) => splits.map((t) => dayMonth(t * 1000)),
           },
           {
             ...axis,

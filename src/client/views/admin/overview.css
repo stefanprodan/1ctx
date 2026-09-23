@@ -54,9 +54,24 @@
     color: var(--fg);
   }
 
+  .overview-range-head {
+    display: flex;
+  }
+  .overview-range-row {
+    display: none;
+  }
   @media (max-width: 899px) {
     .overview-grid {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 719px) {
+    .overview-range-head {
+      display: none;
+    }
+    .overview-range-row {
+      display: flex;
     }
   }
 

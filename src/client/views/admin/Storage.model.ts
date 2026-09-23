@@ -15,6 +15,7 @@ import type {
   StorageFile,
   StoredPart,
 } from "../../../shared/api/admin.ts";
+import { weekdayDayMonth } from "../../lib/format.ts";
 
 const KB = 1024;
 const MB = KB * 1024;
@@ -131,13 +132,7 @@ export const added = (days: StorageDay[]): number =>
   days.reduce((sum, d) => sum + d.bytes, 0);
 
 // "Tue 23 Sep"
-export function dayWord(start: number): string {
-  return new Date(start).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-}
+export const dayWord = weekdayDayMonth;
 
 // the average a day, as the growth tile's figure: "+4.1", "MB a day"
 export function perDay(bytes: number, days: number) {

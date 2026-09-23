@@ -110,13 +110,17 @@ export function rangeLine(totals: OverviewTotals): string {
 export function usageBars(kind: UsageBy, rows: UsageRow[], total: number) {
   return rows.map((row, i) => {
     const personal = row.owner !== null;
+    const named = row.name ?? "";
     const name = personal
       ? kind === "tasks"
         ? `a task of @${row.owner}`
         : `personal of @${row.owner}`
-      : (row.name ?? "");
+      : kind === "models"
+        ? shortModel(named)
+        : named;
     const hint = [
-      row.sub && !personal ? `${name} · ${row.sub}` : name,
+      row.sub && !personal ? `${named} · ${row.sub}` : name,
+      `${count(row.tokens)} tokens, ${share(row.tokens, total)}`,
       plural(row.sends, "send", "sends"),
       ...(row.failed > 0 ? [`${row.failed} failed`] : []),
       ...(row.cost !== null ? [money(row.cost)] : []),
@@ -145,6 +149,13 @@ export function lengthWord(ms: number): string {
   return `${Math.floor(s / 3600)}h${m ? ` ${m}m` : ""}`;
 }
 
+// A model without its org, as the agent rows show it, unless what is
+// left is a bare word ("openrouter/free"); the hint carries the whole.
+export function shortModel(model: string): string {
+  const rest = model.slice(model.lastIndexOf("/") + 1);
+  return /[\d-]/.test(rest) ? rest : model;
+}
+
 // the models by their median send, with what else they did in the hint
 export function modelBars(models: ModelHealth[]) {
   return models.map((m) => {
@@ -159,7 +170,7 @@ export function modelBars(models: ModelHealth[]) {
     ].join(" · ");
     return {
       key: `${m.provider}/${m.model}`,
-      name: m.model,
+      name: shortModel(m.model),
       value: m.medianMs ?? 0,
       label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
       hint,

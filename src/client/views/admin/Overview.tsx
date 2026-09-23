@@ -182,26 +182,22 @@ function UsagePanel({ answer }: { answer: OverviewResponse }) {
   }));
   return (
     <ChartPanel
-      label="Usage by"
-      hint={bars.find((b) => b.key === over.value)?.hint ?? "tokens"}
+      label="By"
+      hint={bars.find((b) => b.key === over.value)?.hint}
       action={<RowsFilters label="Usage by" filters={filters} />}
     >
       {bars.length === 0 ? (
         <p class="overview-none">Nothing in this range</p>
       ) : (
         <Bars
+          wide
           bars={bars.map((b) => ({
             key: b.key,
             name: b.name,
             value: b.value,
             hint: b.hint,
             mono: b.mono,
-            label: (
-              <>
-                {b.tokens}
-                <span class="chart-share">{b.share}</span>
-              </>
-            ),
+            label: b.tokens,
           }))}
           onHover={(key) => {
             over.value = key;
@@ -287,8 +283,8 @@ function BoardGhost() {
             </div>
           </ChartPanel>
         </div>
-        <ChartPanel label="Usage by">
-          <BarsGhost widths={BAR_WIDTHS} at={48} />
+        <ChartPanel label="By">
+          <BarsGhost widths={BAR_WIDTHS} at={48} wide />
         </ChartPanel>
         <ChartPanel label="Send length">
           <BarsGhost widths={MODEL_WIDTHS} at={66} wide />
@@ -314,7 +310,9 @@ export function Overview() {
       title="Overview"
       actions={
         <>
-          <RowsFilters label="Range" filters={ranges} />
+          <span class="overview-range-head">
+            <RowsFilters label="Range" filters={ranges} />
+          </span>
           <Loaded
             readAt={answer?.readAt ?? null}
             busy={busy}
@@ -329,6 +327,10 @@ export function Overview() {
         class={`overview${busy && answer ? " overview-stale" : ""}`}
         aria-busy={busy}
       >
+        {/* a phone's head has no room for the range: it leads the board */}
+        <div class="overview-range-row">
+          <RowsFilters label="Range" filters={ranges} />
+        </div>
         {answer ? <Board answer={answer} /> : <BoardGhost />}
       </div>
     </Page>
