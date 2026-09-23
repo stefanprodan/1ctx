@@ -174,6 +174,30 @@ describe("kept MCP files in the mount", () => {
     }
   });
 
+  test("a regenerate's replaced rows count for nothing at the start", () => {
+    const s = setup();
+    try {
+      const kept1 = toolRow(s);
+      writeKeptFiles(s.db, kept1, [kept(1, "result.txt", "old")]);
+      writeKeptFiles(s.db, toolRow(s), [kept(2, "result.txt", "replaced")]);
+      const { seq } = s.db
+        .query<{ seq: number }, [string]>(
+          "select seq from messages where id = ?",
+        )
+        .get(kept1)!;
+      const caps = { mcpKeptBytes: 1024, mcpKeptFiles: 1 };
+      // the second row goes with the regenerate, so the first fits
+      expect(startKept(s.db, s.session.id, caps, seq)).toEqual({
+        next: 3,
+        used: 3,
+        files: 1,
+      });
+      expect(listKept(s.db, s.session.id)).toHaveLength(2);
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("kept files go with their row and a fork copies them", () => {
     const s = setup();
     try {
@@ -187,7 +211,7 @@ describe("kept MCP files in the mount", () => {
       ]);
       expect(
         startKept(s.db, fork.id, { mcpKeptBytes: 1 << 20, mcpKeptFiles: 9 }),
-      ).toEqual({ next: 6, used: 1 });
+      ).toEqual({ next: 6, used: 1, files: 1 });
       s.db.query("delete from messages where id = ?").run(row);
       expect(listKept(s.db, s.session.id)).toEqual([]);
       expect(listKept(s.db, fork.id)).toHaveLength(1);

@@ -36,7 +36,11 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
         { type: "text", text: manifests },
         {
           type: "resource",
-          resource: { uri: "x://flux/notes.md", text: "# kept\n" },
+          resource: {
+            uri: "x://flux/notes.md",
+            mimeType: "text/markdown",
+            blob: Buffer.from("# kept\n").toString("base64"),
+          },
         },
       ],
     },
@@ -98,7 +102,7 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
   const full = chat.app.sessions.message(call.id)!;
   expect(call.status).toBe("done");
   expect(full.content).toMatch(
-    /\nwhole result: \/mcp\/0001-get_kubernetes_resources\/result\.txt, 16,002 lines, 186 KB: query it with yq, rg or sed\nsaved: \/mcp\/0001-get_kubernetes_resources\/notes\.md$/,
+    /\nwhole result: \/mcp\/0001-get_kubernetes_resources\/result\.txt, 16,000 lines, 186 KB: query it with yq, rg or sed\nsaved: \/mcp\/0001-get_kubernetes_resources\/notes\.md \(7 bytes\)$/,
   );
   expect(full.content.length).toBeLessThanOrEqual(50_000);
   // the model's next request carries the start and the path, not the whole
@@ -135,5 +139,5 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
   expect(
     chat.app.db.query("select count(*) as n from mcp_kept_files").get(),
   ).toEqual({ n: 0 });
-  expect(chat.app.knowledge.startKept(first.sessionId).next).toBe(2);
+  expect(chat.app.knowledge.startKept(first.sessionId, null).next).toBe(2);
 });

@@ -437,7 +437,10 @@ violation, and every rule has a rejected fixture under
   `test/fixtures/providers/` are what the tests and the fake fetch
   answer with. A `ToolCall` may carry `signature`, an opaque token the
   provider put on the call (Gemini 3 refuses a tool round without it),
-  stored with the call and sent back as received, never shown. An agent
+  stored with the call and sent back as received, never shown; on the
+  Gemini wire a step whose calls carry no signature of that model (another
+  model's, or older rows) gets Google's placeholder
+  `skip_thought_signature_validator` on its first call. An agent
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider an agent runs on is a 409 to
   delete. A catalog row with no window and none of
@@ -590,21 +593,23 @@ violation, and every rule has a rejected fixture under
   over `resultCut` is kept whole as `result.json` (an object or array)
   or `result.txt`, never YAML by guess, and the context gets its start,
   cut at a line, then `whole result: <path>, N lines, S: query it with
-  ...`; every embedded resource with text or a blob is a file named
+  ...`; an embedded resource that is text under the cut is inlined and
+  not kept, and every other one with text or a blob is a file named
   from its URI's last segment (made safe, `resource-<n>` when that
-  leaves nothing, `-2` for a repeat), inlined too while under the cut,
-  with a `saved: <path>` line. The path lines are the result's `tail`,
+  leaves nothing, `-2` for a repeat), with a `saved: <path>` line. The path lines are the result's `tail`,
   so the registry, `cutResult` and `fitResults` keep them. A call keeps
   at most `MAX_KEPT_PER_CALL` files (one slot for the whole result) and
-  nothing past the chat's `mcpKeptBytes`, this send's files counted,
-  saying so; saved lines longer than half the cut become one line naming
+  nothing past the chat's `mcpKeptBytes` or `mcpKeptFiles`, this send's
+  files counted, saying so; saved lines longer than half the cut become one line naming
   the folder. Files are rows of `mcp_kept_files`,
   written by the writer's `finishTool` in the row's transaction,
   cascading with the message, copied by fork; each call's folder is
   `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`, never
   reused. `prepareSend` trims the oldest folders to `mcpKeptBytes` and
   `mcpKeptFiles` (knowledge scope) through `knowledge.startKept()`
-  under the runner's lock, so no command loses a file while it reads.
+  under the runner's lock, so no command loses a file while it reads;
+  a regenerate's files, on the rows it is about to delete, count for
+  nothing.
   The mount adds each as a lazy file (`writeFileLazy`), sized into
   `mountBytes` and `ioBytes` (four reads of the largest); `/mcp` is never
   committed, an added or removed name under it gives a discard notice

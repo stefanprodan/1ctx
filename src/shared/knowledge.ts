@@ -184,9 +184,9 @@ export type RecentFile = {
 
 export const KNOWLEDGE_TAG = "knowledge";
 
-// "2026-09-18 14:05" in UTC, as the date line is
+// "2026-09-18 14:05 UTC": a bare time was read in the user's zone
 function stamp(at: number): string {
-  return new Date(at).toISOString().slice(0, 16).replace("T", " ");
+  return `${new Date(at).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 // a name cannot close the block: the rule allows no `<`, but the block

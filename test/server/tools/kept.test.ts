@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An MCP answer as the context gets it: whole when it fits, else its start
-// with the kept file's path as the tail; every resource kept as a file.
+// with the kept file's path as the tail; a resource inlined when it is
+// small text, kept as a file otherwise.
 
 import { describe, expect, test } from "bun:test";
 import type { McpCallOutput } from "../../../src/server/mcp/index.ts";
@@ -15,7 +16,7 @@ import type { ToolResult } from "../../../src/server/tools/types.ts";
 
 function keep(start = 12, maxBytes = 32 * 1024 * 1024) {
   let next = start;
-  return { take: () => next++, maxBytes, used: 0 };
+  return { take: () => next++, maxBytes, used: 0, maxFiles: 2000, files: 0 };
 }
 
 const text = (value: string): McpCallOutput => ({
@@ -101,7 +102,25 @@ describe("MCP results kept under /mcp", () => {
     expect(fitted.results[0]!.content).toContain(tail);
   });
 
-  test("a resource is kept, inlined while small, named from its URI", () => {
+  test("a small text resource is inlined and not kept", () => {
+    const output: McpCallOutput = {
+      text: "",
+      content: [
+        { type: "text", text: "downloaded" },
+        {
+          type: "resource",
+          resource: { uri: "repo://o/r/a.csv", text: "ticker,shares\n" },
+        },
+      ],
+      structured: undefined,
+    };
+    expect(shapeMcpResult(output, "get", keep(), 1000)).toBe(
+      "downloaded\nticker,shares\n",
+    );
+  });
+
+  test("a resource past the cut is kept, named from its URI", () => {
+    const csv = `ticker,shares\n${"ACME,10\n".repeat(30)}`;
     const output: McpCallOutput = {
       text: "",
       content: [
@@ -111,7 +130,7 @@ describe("MCP results kept under /mcp", () => {
           resource: {
             uri: "repo://o/r/sha/1/contents/data/portfolio_stock.csv",
             mimeType: "text/plain; charset=utf-8",
-            text: "ticker,shares\nACME,10\n",
+            text: csv,
           },
         },
       ],
@@ -121,19 +140,19 @@ describe("MCP results kept under /mcp", () => {
       output,
       "get_file_contents",
       keep(7),
-      1000,
+      200,
     ) as ToolResult;
     expect(result.content).toBe(
-      "successfully downloaded text file (SHA: abc)\nticker,shares\nACME,10\n\nsaved: /mcp/0007-get_file_contents/portfolio_stock.csv",
+      "successfully downloaded text file (SHA: abc)\nsaved: /mcp/0007-get_file_contents/portfolio_stock.csv",
     );
     expect(result.kept).toEqual([
       {
         folder: 7,
         dir: "0007-get_file_contents",
         name: "portfolio_stock.csv",
-        text: "ticker,shares\nACME,10\n",
+        text: csv,
         data: null,
-        bytes: 22,
+        bytes: 254,
       },
     ]);
   });
@@ -159,7 +178,7 @@ describe("MCP results kept under /mcp", () => {
     const result = shapeMcpResult(output, "read", keep(3), 1000) as ToolResult;
     expect(result.content).not.toContain(big);
     expect(result.content).toBe(
-      "y\nsaved: /mcp/0003-read/big.txt\nsaved: /mcp/0003-read/chart.png (3 bytes)\nsaved: /mcp/0003-read/big-2.txt",
+      "y\nsaved: /mcp/0003-read/big.txt\nsaved: /mcp/0003-read/chart.png (3 bytes)",
     );
     expect(result.kept![1]!.data).toEqual(new Uint8Array([1, 2, 3]));
   });
@@ -168,9 +187,9 @@ describe("MCP results kept under /mcp", () => {
     const output: McpCallOutput = {
       text: "",
       content: [
-        { type: "resource", resource: { uri: "x://h/../", text: "a" } },
-        { type: "resource", resource: { uri: "x://h/%2F..%2F", text: "b" } },
-        { type: "resource", resource: { uri: 7, text: "c" } },
+        { type: "resource", resource: { uri: "x://h/../", blob: "YQ==" } },
+        { type: "resource", resource: { uri: "x://h/%2F..%2F", blob: "Yg==" } },
+        { type: "resource", resource: { uri: 7, blob: "Yw==" } },
       ],
       structured: undefined,
     };
@@ -185,7 +204,7 @@ describe("MCP results kept under /mcp", () => {
   test("a call keeps at most its cap of files, the rest named as not kept", () => {
     const content = Array.from({ length: MAX_KEPT_PER_CALL + 5 }, (_, i) => ({
       type: "resource",
-      resource: { uri: `x://h/f${i}.txt`, text: `${i}` },
+      resource: { uri: `x://h/f${i}.txt`, blob: "YQ==" },
     }));
     const result = shapeMcpResult(
       { text: "", content, structured: undefined },
@@ -245,10 +264,34 @@ describe("MCP results kept under /mcp", () => {
     expect(second.content).toContain("more would pass this chat's 30 KB");
   });
 
+  test("a small text resource beside structured content is kept", () => {
+    const output: McpCallOutput = {
+      text: "",
+      content: [
+        { type: "resource", resource: { uri: "x://h/a.txt", text: "small" } },
+      ],
+      structured: { count: 1 },
+    };
+    const result = shapeMcpResult(output, "get", keep(5), 1000) as ToolResult;
+    expect(result.content).toBe('{"count":1}\nsaved: /mcp/0005-get/a.txt');
+    expect(result.kept?.map((file) => file.name)).toEqual(["a.txt"]);
+  });
+
+  test("the file cap counts this send's files too", () => {
+    const port = { ...keep(1), maxFiles: 1 };
+    const first = shapeMcpResult(text(yaml), "a", port, 1000) as ToolResult;
+    expect(first.kept).toHaveLength(1);
+    const second = shapeMcpResult(text(yaml), "b", port, 1000) as ToolResult;
+    expect(second.kept).toBeUndefined();
+    expect(second.content).toContain(
+      "not kept: 1 more file would pass this chat's 1 for MCP results",
+    );
+  });
+
   test("many saved lines become one naming the folder", () => {
     const content = Array.from({ length: 40 }, (_, i) => ({
       type: "resource",
-      resource: { uri: `x://h/${"n".repeat(60)}${i}.txt`, text: "a" },
+      resource: { uri: `x://h/${"n".repeat(60)}${i}.txt`, blob: "YQ==" },
     }));
     const result = shapeMcpResult(
       { text: "", content, structured: undefined },

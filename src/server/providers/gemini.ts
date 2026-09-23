@@ -84,6 +84,9 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
 
 const THINKING_BUDGETS = { low: 1024, medium: 8192, high: 24576 } as const;
 
+// https://ai.google.dev/gemini-api/docs/thought-signatures
+export const FOREIGN_SIGNATURE = "skip_thought_signature_validator";
+
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   const body = buildOpenAiChatBody(req, { includeThinkingFlag: false });
   delete body.prompt_cache_key;
@@ -94,15 +97,22 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
     delete message.reasoning_content;
     delete message.reasoning_details;
     const source = req.messages[index]!;
-    if (
-      source.role !== "assistant" ||
-      source.model !== req.model ||
-      !Array.isArray(message.tool_calls)
-    ) {
+    if (source.role !== "assistant" || !Array.isArray(message.tool_calls)) {
       return;
     }
+    const own = source.model === req.model;
+    const signatures: (string | undefined)[] = message.tool_calls.map(
+      (_call, at) => (own ? source.toolCalls?.[at]?.signature : undefined),
+    );
+    // Gemini 3 refuses a step whose first call has no signature, as
+    // another model's calls or older rows have; Google's placeholder for
+    // calls it did not make goes on that first call, and Gemini's own
+    // signatures stay as they came
+    if (!signatures.some((signature) => signature !== undefined)) {
+      signatures[0] = FOREIGN_SIGNATURE;
+    }
     message.tool_calls.forEach((call: Record<string, unknown>, at) => {
-      const signature = source.toolCalls?.[at]?.signature;
+      const signature = signatures[at];
       if (signature !== undefined) {
         call.extra_content = { google: { thought_signature: signature } };
       }

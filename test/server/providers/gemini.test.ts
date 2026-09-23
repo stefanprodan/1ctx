@@ -7,6 +7,7 @@ import {
   CatalogError,
   type ChatEvent,
   type ChatRequest,
+  FOREIGN_SIGNATURE,
   fetchCatalog,
   geminiError,
   geminiEvents,
@@ -341,7 +342,7 @@ describe("Gemini chat body", () => {
   });
 
   test.each(["gemini-2.5-flash", "org/other-model", undefined])(
-    "drops signatures from %s but keeps its calls and results",
+    "puts the placeholder on %s's calls in place of its signatures",
     (model) => {
       const history: ChatRequest = {
         ...request,
@@ -389,6 +390,9 @@ describe("Gemini chat body", () => {
               id: "old",
               type: "function",
               function: { name: "datetime", arguments: "{}" },
+              extra_content: {
+                google: { thought_signature: FOREIGN_SIGNATURE },
+              },
             },
           ],
         },
@@ -413,6 +417,56 @@ describe("Gemini chat body", () => {
       expect(history).toEqual(before);
     },
   );
+});
+
+describe("Gemini signatures on parallel calls", () => {
+  const step = (
+    model: string | undefined,
+    signatures: (string | undefined)[],
+  ): ChatRequest => ({
+    ...request,
+    messages: [
+      {
+        role: "assistant",
+        model,
+        content: null,
+        toolCalls: signatures.map((signature, i) => ({
+          id: `c${i}`,
+          name: "datetime",
+          arguments: "{}",
+          ...(signature === undefined ? {} : { signature }),
+        })),
+      },
+      { role: "tool", toolCallId: "c0", content: "a" },
+      { role: "tool", toolCallId: "c1", content: "b" },
+    ],
+  });
+  const sent = (req: ChatRequest) =>
+    (
+      (buildChatBody(req).messages as Record<string, unknown>[])[0]!
+        .tool_calls as Record<string, unknown>[]
+    ).map((call) => call.extra_content ?? null);
+
+  test("Gemini's own step keeps its one signature and adds none", () => {
+    expect(sent(step(request.model, ["first", undefined]))).toEqual([
+      { google: { thought_signature: "first" } },
+      null,
+    ]);
+  });
+
+  test("an unsigned step gets the placeholder on its first call only", () => {
+    const placeholder = { google: { thought_signature: FOREIGN_SIGNATURE } };
+    for (const model of [request.model, "org/other-model"]) {
+      expect(sent(step(model, [undefined, undefined]))).toEqual([
+        placeholder,
+        null,
+      ]);
+    }
+    expect(sent(step("org/other-model", ["theirs", "theirs"]))).toEqual([
+      placeholder,
+      null,
+    ]);
+  });
 });
 
 describe("Gemini stream", () => {

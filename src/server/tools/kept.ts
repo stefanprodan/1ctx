@@ -3,7 +3,8 @@
 //
 // An MCP result as the context and /mcp get it. What the context cannot
 // hold is kept whole under /mcp and the context gets its start and the
-// path; every embedded resource is a file, inlined too when it is small.
+// path; an embedded resource is inlined when it is small text and kept
+// as a file otherwise, never both.
 // The path lines are the result's tail, so every later cut keeps them.
 
 import { type KeptFile, keptPath } from "../knowledge/index.ts";
@@ -186,6 +187,16 @@ export function shapeMcpResult(
   if (structured) pieces.push(JSON.stringify(output.structured));
   output.content.forEach((part, index) => {
     const resource = resources[index];
+    // small text reads in the context; a file would keep it twice
+    if (
+      resource &&
+      !structured &&
+      resource.text !== undefined &&
+      resource.text.length <= cut
+    ) {
+      pieces.push(resource.text);
+      return;
+    }
     if (resource) {
       if (files.length >= MAX_KEPT_PER_CALL - 1) {
         skipped++;
@@ -203,13 +214,6 @@ export function shapeMcpResult(
           ? new Uint8Array(Buffer.from(resource.blob, "base64"))
           : null;
       const path = keepFile(name, resource.text ?? null, data);
-      if (
-        !structured &&
-        resource.text !== undefined &&
-        resource.text.length <= cut
-      ) {
-        pieces.push(resource.text);
-      }
       saved.push(
         `saved: ${path}${resource.text === undefined ? ` (${size(data!.byteLength)})` : ""}`,
       );
@@ -248,10 +252,18 @@ export function shapeMcpResult(
     );
   }
 
+  // every resource read inline and the text fits: nothing to keep
+  if (files.length === 0) return text;
   const total = files.reduce((sum, file) => sum + file.bytes, 0);
-  if (keep.used + total > keep.maxBytes) {
+  const over =
+    keep.used + total > keep.maxBytes
+      ? `${size(total)} more would pass this chat's ${size(keep.maxBytes)} for MCP results`
+      : keep.files + files.length > keep.maxFiles
+        ? `${files.length} more ${files.length === 1 ? "file" : "files"} would pass this chat's ${keep.maxFiles.toLocaleString("en-US")} for MCP results`
+        : null;
+  if (over !== null) {
     // past the chat's budget, this send's files counted: the plain cut
-    const note = `not kept: ${size(total)} more would pass this chat's ${size(keep.maxBytes)} for MCP results`;
+    const note = `not kept: ${over}`;
     return {
       content: `${output.text}\n${note}`,
       error: false,
@@ -259,6 +271,7 @@ export function shapeMcpResult(
     };
   }
   keep.used += total;
+  keep.files += files.length;
   const ending = tail.join("\n");
   const body = text.length > cut ? start(text, cut - ending.length - 1) : text;
   return {

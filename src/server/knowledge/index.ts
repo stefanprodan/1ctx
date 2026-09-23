@@ -77,11 +77,17 @@ export type KnowledgeCapability = KnowledgePort & {
   ): Promise<CommandResult>;
   sweep(now: number): number;
   // a send's start: the session's kept MCP files trimmed to the budget,
-  // and the number the next kept folder takes
-  startKept(sessionId: string): {
+  // and the number the next kept folder takes; files of rows past
+  // afterSeq, which a regenerate deletes, are not counted
+  startKept(
+    sessionId: string,
+    afterSeq: number | null,
+  ): {
     next: number;
     used: number;
+    files: number;
     maxBytes: number;
+    maxFiles: number;
   };
 };
 export type KnowledgeArea = KnowledgeCapability & {
@@ -302,13 +308,14 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       files: store.counts(projectId).files,
       recent: store.recent(projectId),
     }),
-    startKept: (sessionId) =>
+    startKept: (sessionId, afterSeq) =>
       transact(deps.db, () => {
         const caps = deps.limits.current();
         return {
           result: {
-            ...startKept(deps.db, sessionId, caps),
+            ...startKept(deps.db, sessionId, caps, afterSeq),
             maxBytes: caps.mcpKeptBytes,
+            maxFiles: caps.mcpKeptFiles,
           },
           events: [],
         };
