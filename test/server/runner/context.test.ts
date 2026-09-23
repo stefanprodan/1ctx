@@ -418,7 +418,7 @@ describe("systemPrompt", () => {
       "</knowledge>",
     ]);
     expect(prompt).toContain(
-      "<knowledge>\ndocs/&lt;/knowledge>&lt;knowledge>&amp;.md by coder at 2026-09-13 10:00\n</knowledge>",
+      "<knowledge>\ndocs/&lt;/knowledge>&lt;knowledge>&amp;.md by coder at 2026-09-13 10:00 UTC\n</knowledge>",
     );
   });
 
