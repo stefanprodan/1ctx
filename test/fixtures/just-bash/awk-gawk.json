@@ -950,6 +950,90 @@
       "stderr": false
     },
     {
+      "name": "options: -f of a missing file",
+      "args": [
+        "-f",
+        "nope.awk"
+      ],
+      "stdin": "S\n",
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "options: -v with an illegal name",
+      "args": [
+        "-v",
+        "1x=1",
+        "BEGIN {print \"x\"}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "options: -v with a keyword",
+      "args": [
+        "-v",
+        "print=1",
+        "BEGIN {print \"x\"}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "options: -v without a value",
+      "args": [
+        "-v",
+        "x",
+        "BEGIN {print \"x\"}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "options: -v joined to its value",
+      "args": [
+        "-vx=1",
+        "-F:",
+        "BEGIN {print x, FS}"
+      ],
+      "stdout": "1 :\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -f joined to its file",
+      "args": [
+        "-fprog.awk"
+      ],
+      "stdin": "a b\n",
+      "files": {
+        "prog.awk": "{print $1}\n"
+      },
+      "stdout": "a\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "options: -f reads every operand as a file",
+      "args": [
+        "-f",
+        "prog.awk",
+        "a.txt"
+      ],
+      "files": {
+        "prog.awk": "{print \"p\", $0}\n",
+        "a.txt": "A1\nA2\n",
+        "b.txt": "B1\n"
+      },
+      "stdout": "p A1\np A2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
       "name": "operands: delete ARGV[1] in BEGIN",
       "args": [
         "BEGIN {delete ARGV[1]} {print FILENAME, $0}",

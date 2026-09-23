@@ -49,9 +49,11 @@ export interface AwkRuntimeContext {
   // User-defined functions (from AST)
   functions: Map<string, AwkFunctionDef>;
 
-  // For getline support (current file)
-  lines?: string[];
-  lineIndex?: number;
+  // (1ctx) the main input walk, read by the main loop and plain getline
+  mainInput?: { nextRecord(): Promise<string | null>; skipFile(): void };
+  // (1ctx) one input byte budget shared by every stream
+  maxInputBytes: number;
+  inputBytes: number;
   /** Internal getline streams, isolated from the AWK variable namespace. */
   getlineCommandStreams: Map<string, { lines: string[]; index: number }>;
   getlineFileStreams: Map<string, { lines: string[]; index: number }>;
@@ -108,6 +110,7 @@ export interface CreateContextOptions {
   maxRecursionDepth?: number;
   maxOutputSize?: number;
   maxArrayElements?: number;
+  maxInputBytes?: number;
   fs?: AwkFileSystem;
   cwd?: string;
   exec?: (
@@ -126,12 +129,21 @@ export function createRuntimeContext(
     maxRecursionDepth = DEFAULT_MAX_RECURSION_DEPTH,
     maxOutputSize = 0,
     maxArrayElements = 100_000,
+    maxInputBytes = 10 * 1024 * 1024,
     fs,
     cwd,
     exec,
     coverage,
     requireDefenseContext,
   } = options;
+
+  // (1ctx) ARGV and ENVIRON are ordinary arrays, so delete, in and for-in
+  // reach them; their elements are not counted against the array cap.
+  const ARGV = Object.create(null) as Record<string, string>;
+  const ENVIRON = Object.create(null) as Record<string, string>;
+  const arrays = Object.create(null) as Record<string, Record<string, AwkValue>>;
+  arrays.ARGV = ARGV;
+  arrays.ENVIRON = ENVIRON;
 
   return {
     FS: " ",
@@ -152,12 +164,12 @@ export function createRuntimeContext(
     // Use null-prototype objects to prevent prototype pollution
     // when user-controlled keys like "__proto__" or "constructor" are used
     vars: Object.create(null) as Record<string, AwkValue>,
-    arrays: Object.create(null) as Record<string, Record<string, AwkValue>>,
+    arrays,
     arrayAliases: new Map(),
 
     ARGC: 0,
-    ARGV: Object.create(null) as Record<string, string>,
-    ENVIRON: Object.create(null) as Record<string, string>,
+    ARGV,
+    ENVIRON,
 
     functions: new Map(),
     getlineCommandStreams: new Map(),
@@ -168,6 +180,8 @@ export function createRuntimeContext(
     maxRecursionDepth,
     maxOutputSize,
     maxArrayElements,
+    maxInputBytes,
+    inputBytes: 0,
     arrayElementCount: 0,
     recordsProcessed: 0,
     currentRecursionDepth: 0,

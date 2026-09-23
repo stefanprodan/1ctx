@@ -97,6 +97,10 @@ export function setVariable(
     case "SUBSEP":
       ctx.SUBSEP = toAwkString(value);
       return;
+    case "ARGC":
+      // (1ctx) the input walk reads ARGC as it stands
+      ctx.ARGC = toNumber(value);
+      return;
   }
 
   ctx.vars[name] = value;
@@ -126,14 +130,6 @@ export function getArrayElement(
   array: string,
   key: string,
 ): AwkValue {
-  // Handle built-in ARGV array
-  if (array === "ARGV") {
-    return ctx.ARGV[key] ?? "";
-  }
-  // Handle built-in ENVIRON array
-  if (array === "ENVIRON") {
-    return ctx.ENVIRON[key] ?? "";
-  }
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
   return ctx.arrays[resolvedArray]?.[key] ?? "";
@@ -154,7 +150,7 @@ export function setArrayElement(
     // Use null-prototype to prevent prototype pollution with user-controlled keys
     ctx.arrays[resolvedArray] = Object.create(null);
   }
-  if (!(key in ctx.arrays[resolvedArray])) {
+  if (!(key in ctx.arrays[resolvedArray]) && !isUncounted(resolvedArray)) {
     if (ctx.arrayElementCount >= ctx.maxArrayElements) {
       throw new ExecutionLimitError(
         `array element limit exceeded (${ctx.maxArrayElements})`,
@@ -174,12 +170,6 @@ export function hasArrayElement(
   array: string,
   key: string,
 ): boolean {
-  if (array === "ARGV") {
-    return ctx.ARGV[key] !== undefined;
-  }
-  if (array === "ENVIRON") {
-    return ctx.ENVIRON[key] !== undefined;
-  }
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
   return ctx.arrays[resolvedArray]?.[key] !== undefined;
@@ -196,7 +186,9 @@ export function deleteArrayElement(
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
   if (ctx.arrays[resolvedArray]) {
-    if (key in ctx.arrays[resolvedArray]) ctx.arrayElementCount--;
+    if (key in ctx.arrays[resolvedArray] && !isUncounted(resolvedArray)) {
+      ctx.arrayElementCount--;
+    }
     delete ctx.arrays[resolvedArray][key];
   }
 }
@@ -207,6 +199,18 @@ export function deleteArrayElement(
 export function deleteArray(ctx: AwkRuntimeContext, array: string): void {
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
-  ctx.arrayElementCount -= Object.keys(ctx.arrays[resolvedArray] ?? {}).length;
+  const elements = ctx.arrays[resolvedArray];
+  if (!elements) return;
+  if (isUncounted(resolvedArray)) {
+    // (1ctx) ARGV and ENVIRON stay the same objects the context holds
+    for (const key of Object.keys(elements)) delete elements[key];
+    return;
+  }
+  ctx.arrayElementCount -= Object.keys(elements).length;
   delete ctx.arrays[resolvedArray];
+}
+
+// (1ctx) the arrays awk fills itself, outside the element cap
+function isUncounted(array: string): boolean {
+  return array === "ARGV" || array === "ENVIRON";
 }

@@ -90,7 +90,8 @@ export enum TokenType {
   EOF = "EOF",
 }
 
-const KEYWORDS = new Map<string, TokenType>([
+// (1ctx) exported: an operand or -v name that is a keyword is refused
+export const KEYWORDS = new Map<string, TokenType>([
   ["BEGIN", TokenType.BEGIN],
   ["END", TokenType.END],
   ["if", TokenType.IF],

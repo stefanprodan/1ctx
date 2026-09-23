@@ -670,17 +670,14 @@ async function evalGetline(
     return evalGetlineFromFile(ctx, variable, file);
   }
 
-  // Plain getline - read from current input
-  if (!ctx.lines || ctx.lineIndex === undefined) {
+  // (1ctx) plain getline reads the main input walk, in BEGIN too
+  if (!ctx.mainInput) {
     return -1;
   }
-
-  const nextLineIndex = ctx.lineIndex + 1;
-  if (nextLineIndex >= ctx.lines.length) {
-    return 0; // No more lines
+  const nextLine = await ctx.mainInput.nextRecord();
+  if (nextLine === null) {
+    return 0;
   }
-
-  const nextLine = ctx.lines[nextLineIndex];
 
   if (variable) {
     setVariable(ctx, variable, nextLine);
@@ -689,7 +686,6 @@ async function evalGetline(
   }
 
   ctx.NR++;
-  ctx.lineIndex = nextLineIndex;
 
   return 1;
 }
