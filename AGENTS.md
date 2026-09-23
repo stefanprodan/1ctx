@@ -859,8 +859,10 @@ violation, and every rule has a rejected fixture under
   frees the reservation on a throw. A full run pool (`RunCapacity`)
   writes nothing: the row stays due on its missed time, `wait` is logged
   once per occurrence, and the owner, or the process, is marked full in
-  memory until a wake. A pass skips a full owner's rows without calling
-  the runner and a full process ends its fires; while any is marked the
+  memory until a wake or, should a wake be lost, a pass interval. A
+  missed occurrence is found by a binary search, not a walk. A pass
+  skips a full owner's rows without calling the runner and a full
+  process ends its fires; while any is marked the
   sleep counts only rows due after the pass (`earliest(after)`). Every
   other refusal is a skipped event with its reason that moves
   `next_at`. A scheduled run acts as the owner, a manual run as whoever
@@ -1180,7 +1182,7 @@ violation, and every rule has a rejected fixture under
   brief (schedule, zone, agent, the instructions cut to four lines with
   Show more, and at its foot the next run, or "Waiting for a free slot
   since 09:00" while the row is not suspended and its `nextAt` is past
-  the page's clock, which the Automations tab's row says first as
+  the page's clock by `WAIT_GRACE_MS`, which the Automations tab's row says first as
   waiting for a slot; no field carries it), then Suspend or Resume,
   Edit and Run now over two tabs:
   Runs, a log of `RunRow.tsx` rows with the source as the icon (who pressed Run now its

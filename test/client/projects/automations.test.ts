@@ -222,6 +222,14 @@ describe("the row's words", () => {
     expect(nextLine({ ...waiting, nextAt: nine - 24 * HOUR }, clock)).toBe(
       "Waiting for a free slot since Sun Sep 13 09:00",
     );
+    // a fire the server is starting this moment, or a clock a few
+    // seconds ahead, is not a wait
+    expect(waitingSince({ ...waiting, nextAt: clock - 5_000 }, clock)).toBe(
+      null,
+    );
+    expect(waitingSince({ ...waiting, nextAt: clock - 11_000 }, clock)).toBe(
+      clock - 11_000,
+    );
     const off = { ...waiting, suspendedAt: clock - HOUR };
     expect(waitingSince(off, clock)).toBeNull();
     expect(rowState(off, clock).text).toBe("suspended");

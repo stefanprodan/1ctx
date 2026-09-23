@@ -101,13 +101,18 @@ export function scheduleTitle(schedule: string): string {
     : `${words[0].toUpperCase()}${words.slice(1)}`;
 }
 
-// A fire the server left due waits for a run slot: the row is not
-// suspended and its next run is past the page's clock.
+// a fire starts within milliseconds; the grace covers that and a clock
+// a little ahead
+export const WAIT_GRACE_MS = 10_000;
+
+// a fire the server left due waits for a run slot
 export function waitingSince(
   a: Pick<AutomationSummary, "suspendedAt" | "nextAt">,
   now: number,
 ): number | null {
-  return a.suspendedAt === null && a.nextAt !== null && a.nextAt <= now
+  return a.suspendedAt === null &&
+    a.nextAt !== null &&
+    a.nextAt <= now - WAIT_GRACE_MS
     ? a.nextAt
     : null;
 }

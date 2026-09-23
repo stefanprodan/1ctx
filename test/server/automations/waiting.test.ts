@@ -316,6 +316,32 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.shutdown();
   });
 
+  test("a block no wake clears is tried again after the pass interval", async () => {
+    const { chat } = await stopped();
+    const now = chat.app.now.value;
+    const waiting = await createAutomation(chat, { name: "waiting" });
+    setDue(chat, waiting.id, now);
+    let refusals = 1;
+    const start = fakeStart(chat, () => {
+      if (refusals === 0) return null;
+      refusals--;
+      return "user";
+    });
+    chat.app.automationScheduler.start();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(start.calls).toEqual([waiting.id]);
+    const pending = chat.scripted.next();
+    chat.app.now.value = now + 60_000;
+    const script = await pending;
+    expect(start.calls).toEqual([waiting.id, waiting.id]);
+    expect(row(chat, waiting.id).lastEventDueAt).toBe(now);
+    start.restore();
+    chat.app.automationScheduler.stop();
+    script.reply("done");
+    await settleRun(chat, row(chat, waiting.id).lastRunSessionId!);
+    await chat.app.shutdown();
+  });
+
   test("a slot freed while the pass runs is not lost", async () => {
     const { chat } = await stopped();
     const due = chat.app.now.value;

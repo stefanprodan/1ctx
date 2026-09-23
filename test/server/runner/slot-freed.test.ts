@@ -70,6 +70,17 @@ describe("slotFreed", () => {
     await chat.app.shutdown();
   });
 
+  test("never for a run ended by shutdown", async () => {
+    const { chat, wakes, reset } = await counted();
+    const automation = await createAutomation(chat);
+    const run = await startRun(chat, automation.id);
+    reset();
+    await chat.app.shutdown();
+    await tick();
+    expect(chat.app.sessions.byId(run.sessionId)?.status).not.toBe("running");
+    expect(wakes()).toBe(0);
+  });
+
   test("never for an abandoned preparation", async () => {
     const { chat, wakes, reset } = await counted();
     const automation = await createAutomation(chat);

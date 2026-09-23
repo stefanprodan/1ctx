@@ -274,7 +274,7 @@ export function scheduler(deps: Deps): Scheduler {
       const result = start(id, "schedule", null);
       if (result === null) return null;
       if ("wait" in result) {
-        waits.block(id, result, seen);
+        waits.block(id, result, seen, deps.clock());
         return null;
       }
       waits.started(id);
@@ -372,7 +372,9 @@ export function scheduler(deps: Deps): Scheduler {
   const pass = async (keepGoing: () => boolean = () => true): Promise<void> => {
     const now = deps.clock();
     passAt = now;
-    for (const row of deps.store.due(now)) {
+    const due = deps.store.due(now);
+    waits.prune(new Set(due.map((row) => row.id)));
+    for (const row of due) {
       if (!keepGoing()) return;
       replaceMissed(deps, row.id, now);
     }
@@ -404,11 +406,12 @@ export function scheduler(deps: Deps): Scheduler {
     const sleeper =
       deps.clock.sleep?.(ms) ??
       new Promise<void>((resolve) => setTimeout(resolve, ms));
-    const waking = new Promise<void>((resolve) => {
-      wakeWait = resolve;
+    const waking = new Promise<boolean>((resolve) => {
+      wakeWait = () => resolve(true);
     });
-    await Promise.race([sleeper, waking]);
+    const woken = await Promise.race([sleeper.then(() => false), waking]);
     wakeWait = null;
+    if (!woken) waits.expire(deps.clock(), PASS_MS);
   };
 
   const loop = async () => {

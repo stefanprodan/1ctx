@@ -223,7 +223,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     } finally {
       if (send.tools !== null) await send.tools.catch(() => {});
       send.letGo();
-      if (finalized && registry.free(send) && send.kind === "run") {
+      const freed = finalized && registry.free(send);
+      if (freed && send.kind === "run" && send.terminal !== "shutdown") {
         deps.slotFreed();
       }
     }
@@ -308,7 +309,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     if (!changed.ok) throw new BadRequest(changed.error);
     const op: SendOp =
       event !== null ? "run" : existingUser !== null ? "regenerate" : "message";
-    const policy = policyFor(project, user, agent, event, true, changed.set);
     return prepareSend({
       registry,
       pool: event === null ? CHAT_POOL : runPool(deps.limits.current()),
@@ -318,7 +318,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       run: (send) => void run(send),
       sessionId,
       session,
-      policy,
+      policy: policyFor(project, user, agent, event, true, changed.set),
       op,
       text,
       title,
