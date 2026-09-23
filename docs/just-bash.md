@@ -78,6 +78,7 @@ without a file of their own.
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | results are records of a value and the document it counts as read from; YAML output prints a top-level string raw, spaces and newlines kept, an empty string as an empty line, and `--unwrapScalar=false` quotes it again; an error in a later document fails the run after the earlier documents' results | mikefarah unwraps a top-level scalar: `[.a, .b] \| @tsv` printed `"x\ty"` with its escape, and an error in the last document dropped every earlier result |
 | `src/commands/yq/yq.ts` | `-i` groups the results by document, writes one `---` between documents and none before the first, and writes a document that is a string raw | a surviving second document started the file with `---`, and a bare string was written quoted |
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `-N` and `--no-doc` drop the `---` lines; `-j` and `--tojson` are `-o json` with mikefarah's deprecation line; a `.json` file prints JSON unless `-p` or `-o` was given, and several files print in the first one's format; YAML at `-I0` and `-I1` is indented 4 and 2 | mikefarah's meanings: `-j` joined the output here, and JSON input printed YAML |
+| `src/commands/yq/documents.ts` (new), `yq.ts`, `query-engine/evaluator.ts`, `src/index.ts` | a walker runs the top of a yq filter (`\|`, `,`, `//`, parentheses, `as`, `if`, arithmetic) and tags each result as the document, a node inside it, or computed from nothing, classifying every other node by what it is; `---` prints where the document index moves or a later file starts, a computed value counting as document 0, in stdout and in `-i`; the evaluator exports `createContext()` and `extractPathFromAst()` and the package exports the walker and the engine for our tests | mikefarah prints `---` only between values read from different documents: `length`, `keys` and `"\(.kind)"` print none, `.a // "none"` one where the index moves |
 
 ### Where our jq still differs from jq
 
@@ -179,10 +180,6 @@ for one of the reasons below. Where they part:
 - `-i` over several files writes each as it goes, so a later file that
   does not parse leaves the earlier ones written; mikefarah reads all
   first. A file with a duplicate key does not parse here.
-- mikefarah prints `---` between the results of different documents
-  only for values read from them, not for ones the filter computed
-  (`"none"`, `[.kind]`); ours prints it between every document's
-  results.
 - An alias is a copy: editing an anchor's target leaves the aliased
   places at the old value, and a plain write re-emits anchors.
 - mikefarah's own operators (`explode`, `style`, `tag`, `line_comment`,

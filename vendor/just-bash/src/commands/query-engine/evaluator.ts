@@ -213,7 +213,8 @@ function boundedFlatMap(
   return results;
 }
 
-function createContext(options?: EvaluateOptions): EvalContext {
+// exported for the yq walker in yq/documents.ts (1ctx)
+export function createContext(options?: EvaluateOptions): EvalContext {
   const vars = new Map<string, QueryValue>();
   if (options?.namedArgs) {
     // Seed $NAME variables; jq stores variable references with the $ prefix.
@@ -356,7 +357,10 @@ function getValueAtPath(
  * Returns null if the AST is not a simple path expression.
  * Handles Pipe nodes with parent/root to track path adjustments.
  */
-function extractPathFromAst(ast: AstNode): (string | number)[] | null {
+// exported for the yq walker in yq/documents.ts (1ctx)
+export function extractPathFromAst(
+  ast: AstNode,
+): (string | number)[] | null {
   if (ast.type === "Identity") return [];
   if (ast.type === "Field") {
     const basePath = ast.base ? extractPathFromAst(ast.base) : [];

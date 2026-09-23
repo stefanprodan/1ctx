@@ -7,7 +7,8 @@
     "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n",
     "config.yaml": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
     "data.json": "{\"name\": \"app\", \"items\": [{\"id\": 1, \"tag\": \"a\"}, {\"id\": 2, \"tag\": \"b\"}], \"meta\": {\"count\": 2}}\n",
-    "strings.yaml": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n"
+    "strings.yaml": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
+    "docs.yaml": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n"
   },
   "cases": [
     {
@@ -1066,6 +1067,1402 @@
         "flux.yaml"
       ],
       "stdout": "name: podinfo\nnamespace: apps\n---\nname: infra\nnamespace: flux-system\n---\nname: redis\nnamespace: cache\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | length",
+      "args": [
+        ".name | length",
+        "docs.yaml"
+      ],
+      "stdout": "5\n---\n4\n---\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | test(\"a\")",
+      "args": [
+        ".name | test(\"a\")",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | split(\"a\")",
+      "args": [
+        ".name | split(\"a\")",
+        "docs.yaml"
+      ],
+      "stdout": "- \"\"\n- lph\n- \"\"\n---\n- bet\n- \"\"\n---\n- g\n- mm\n- \"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | tostring",
+      "args": [
+        ".name | tostring",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | @base64",
+      "args": [
+        ".name | @base64",
+        "docs.yaml"
+      ],
+      "stdout": "YWxwaGE=\n---\nYmV0YQ==\n---\nZ2FtbWE=\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | @uri",
+      "args": [
+        ".name | @uri",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | trim",
+      "args": [
+        ".name | trim",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . == \"beta\"",
+      "args": [
+        ".name | . == \"beta\"",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . != \"x\"",
+      "args": [
+        ".name | . != \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | [.]",
+      "args": [
+        ".name | [.]",
+        "docs.yaml"
+      ],
+      "stdout": "- alpha\n---\n- beta\n---\n- gamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | @json",
+      "args": [
+        ".name | @json",
+        "docs.yaml"
+      ],
+      "stdout": "\"alpha\"\n---\n\"beta\"\n---\n\"gamma\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | select(. != \"x\")",
+      "args": [
+        ".name | select(. != \"x\")",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . as $x | $x",
+      "args": [
+        ".name | . as $x | $x",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | \"\\(.)!\"",
+      "args": [
+        ".name | \"\\(.)!\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha!\nbeta!\ngamma!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | contains(\"et\")",
+      "args": [
+        ".name | contains(\"et\")",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\ntrue\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . + \"!\"",
+      "args": [
+        ".name | . + \"!\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha!\n---\nbeta!\n---\ngamma!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | capture(\"(?P<first>.)\")",
+      "args": [
+        ".name | capture(\"(?P<first>.)\")",
+        "docs.yaml"
+      ],
+      "stdout": "first: a\n---\nfirst: b\n---\nfirst: g\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | length",
+      "args": [
+        ".meta | length",
+        "docs.yaml"
+      ],
+      "stdout": "2\n---\n2\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | has(\"z\")",
+      "args": [
+        ".meta | has(\"z\")",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | to_entries",
+      "args": [
+        ".meta | to_entries",
+        "docs.yaml"
+      ],
+      "stdout": "- key: z\n  value: 1\n- key: a\n  value: 2\n---\n- key: z\n  value: 3\n- key: a\n  value: 4\n---\n- key: z\n  value: 5\n- key: a\n  value: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | to_entries | .[0].key",
+      "args": [
+        ".meta | to_entries | .[0].key",
+        "docs.yaml"
+      ],
+      "stdout": "z\n---\nz\n---\nz\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | with_entries(.)",
+      "args": [
+        ".meta | with_entries(.)",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\nz: 3\na: 4\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | del(.z)",
+      "args": [
+        ".meta | del(.z)",
+        "docs.yaml"
+      ],
+      "stdout": "a: 2\n---\na: 4\n---\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | map_values(. + 1)",
+      "args": [
+        ".meta | map_values(. + 1)",
+        "docs.yaml"
+      ],
+      "stdout": "z: 2\na: 3\n---\nz: 4\na: 5\n---\nz: 6\na: 7\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . * {\"y\": 2}",
+      "args": [
+        ".meta | . * {\"y\": 2}",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\ny: 2\n---\nz: 3\na: 4\ny: 2\n---\nz: 5\na: 6\ny: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | {\"y\": 2} * .",
+      "args": [
+        ".meta | {\"y\": 2} * .",
+        "docs.yaml"
+      ],
+      "stdout": "y: 2\nz: 1\na: 2\n---\ny: 2\nz: 3\na: 4\n---\ny: 2\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . + {\"y\": 2}",
+      "args": [
+        ".meta | . + {\"y\": 2}",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\ny: 2\n---\nz: 3\na: 4\ny: 2\n---\nz: 5\na: 6\ny: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | [.]",
+      "args": [
+        ".meta | [.]",
+        "docs.yaml"
+      ],
+      "stdout": "- z: 1\n  a: 2\n---\n- z: 3\n  a: 4\n---\n- z: 5\n  a: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . == {}",
+      "args": [
+        ".meta | . == {}",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | select(.z)",
+      "args": [
+        ".meta | select(.z)",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n---\nz: 3\na: 4\n---\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z = 9",
+      "args": [
+        ".meta | .z = 9",
+        "docs.yaml"
+      ],
+      "stdout": "z: 9\na: 2\n---\nz: 9\na: 4\n---\nz: 9\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z |= . + 1",
+      "args": [
+        ".meta | .z |= . + 1",
+        "docs.yaml"
+      ],
+      "stdout": "z: 2\na: 2\n---\nz: 4\na: 4\n---\nz: 6\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | {\"n\": .z}",
+      "args": [
+        ".meta | {\"n\": .z}",
+        "docs.yaml"
+      ],
+      "stdout": "n: 1\n---\nn: 3\n---\nn: 5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | . as $m | $m",
+      "args": [
+        ".meta | . as $m | $m",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n---\nz: 3\na: 4\n---\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z + .a",
+      "args": [
+        ".meta | .z + .a",
+        "docs.yaml"
+      ],
+      "stdout": "3\n---\n7\n---\n11\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z * 2",
+      "args": [
+        ".meta | .z * 2",
+        "docs.yaml"
+      ],
+      "stdout": "2\n---\n6\n---\n10\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z - 1",
+      "args": [
+        ".meta | .z - 1",
+        "docs.yaml"
+      ],
+      "stdout": "0\n---\n2\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z < 3",
+      "args": [
+        ".meta | .z < 3",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | not",
+      "args": [
+        ".meta | not",
+        "docs.yaml"
+      ],
+      "stdout": "false\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | length",
+      "args": [
+        ".list | length",
+        "docs.yaml"
+      ],
+      "stdout": "2\n---\n2\n---\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | sort",
+      "args": [
+        ".list | sort",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n- b\n---\n- c\n- d\n---\n- e\n- f\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | sort_by(.)",
+      "args": [
+        ".list | sort_by(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n- b\n---\n- c\n- d\n---\n- e\n- f\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | reverse",
+      "args": [
+        ".list | reverse",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n- b\n---\n- c\n- d\n---\n- e\n- f\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | unique",
+      "args": [
+        ".list | unique",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | flatten",
+      "args": [
+        ".list | flatten",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | map(. + \"!\")",
+      "args": [
+        ".list | map(. + \"!\")",
+        "docs.yaml"
+      ],
+      "stdout": "- b!\n- a!\n- d!\n- c!\n- f!\n- e!\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[0]",
+      "args": [
+        ".list | .[0]",
+        "docs.yaml"
+      ],
+      "stdout": "b\n---\nd\n---\nf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[1:]",
+      "args": [
+        ".list | .[1:]",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n---\n- c\n---\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | join(\",\")",
+      "args": [
+        ".list | join(\",\")",
+        "docs.yaml"
+      ],
+      "stdout": "b,a\n---\nd,c\n---\nf,e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | @csv",
+      "args": [
+        ".list | @csv",
+        "docs.yaml"
+      ],
+      "stdout": "b,a\n---\nd,c\n---\nf,e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | @tsv",
+      "args": [
+        ".list | @tsv",
+        "docs.yaml"
+      ],
+      "stdout": "b\ta\n---\nd\tc\n---\nf\te\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | contains([\"a\"])",
+      "args": [
+        ".list | contains([\"a\"])",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\nfalse\n---\nfalse\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | group_by(.)",
+      "args": [
+        ".list | group_by(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- - b\n- - a\n---\n- - d\n- - c\n---\n- - f\n- - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[]",
+      "args": [
+        ".list | .[]",
+        "docs.yaml"
+      ],
+      "stdout": "b\na\n---\nd\nc\n---\nf\ne\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | any",
+      "args": [
+        ".list | any",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | all",
+      "args": [
+        ".list | all",
+        "docs.yaml"
+      ],
+      "stdout": "true\n---\ntrue\n---\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | .[0] = \"x\"",
+      "args": [
+        ".list | .[0] = \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "- x\n- a\n---\n- x\n- c\n---\n- x\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | . + [\"y\"]",
+      "args": [
+        ".list | . + [\"y\"]",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n- y\n---\n- d\n- c\n- y\n---\n- f\n- e\n- y\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | [.[] | select(. != \"a\")]",
+      "args": [
+        ".list | [.[] | select(. != \"a\")]",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n---\n- d\n- c\n---\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: length",
+      "args": [
+        "length",
+        "docs.yaml"
+      ],
+      "stdout": "3\n3\n3\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: has(\"name\")",
+      "args": [
+        "has(\"name\")",
+        "docs.yaml"
+      ],
+      "stdout": "true\ntrue\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: to_entries | .[0].key",
+      "args": [
+        "to_entries | .[0].key",
+        "docs.yaml"
+      ],
+      "stdout": "name\nname\nname\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.name] | .[0]",
+      "args": [
+        "[.name] | .[0]",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nbeta\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: \"\\(.name)\"",
+      "args": [
+        "\"\\(.name)\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nbeta\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.name == \"beta\")",
+      "args": [
+        "select(.name == \"beta\")",
+        "docs.yaml"
+      ],
+      "stdout": "name: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: del(.meta)",
+      "args": [
+        "del(.meta)",
+        "docs.yaml"
+      ],
+      "stdout": "name: alpha\nlist:\n  - b\n  - a\n---\nname: beta\nlist:\n  - d\n  - c\n---\nname: gamma\nlist:\n  - f\n  - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name = \"x\"",
+      "args": [
+        ".name = \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "name: x\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: x\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: x\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: . * {\"extra\": 1}",
+      "args": [
+        ". * {\"extra\": 1}",
+        "docs.yaml"
+      ],
+      "stdout": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\nextra: 1\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\nextra: 1\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\nextra: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: {\"extra\": 1} * .",
+      "args": [
+        "{\"extra\": 1} * .",
+        "docs.yaml"
+      ],
+      "stdout": "extra: 1\nname: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nextra: 1\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nextra: 1\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: {\"n\": .name}",
+      "args": [
+        "{\"n\": .name}",
+        "docs.yaml"
+      ],
+      "stdout": "n: alpha\n---\nn: beta\n---\nn: gamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.name, .list[0]] | @tsv",
+      "args": [
+        "[.name, .list[0]] | @tsv",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\tb\nbeta\td\ngamma\tf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .nope // \"none\"",
+      "args": [
+        ".nope // \"none\"",
+        "docs.yaml"
+      ],
+      "stdout": "none\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name // \"none\"",
+      "args": [
+        ".name // \"none\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name, \"x\"",
+      "args": [
+        ".name, \"x\"",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nx\n---\nbeta\n---\nx\n---\ngamma\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.name, .list[0])",
+      "args": [
+        "(.name, .list[0])",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\nb\n---\nbeta\nd\n---\ngamma\nf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .. | select(. == \"a\")",
+      "args": [
+        ".. | select(. == \"a\")",
+        "docs.yaml"
+      ],
+      "stdout": "a\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: ..",
+      "args": [
+        "..",
+        "docs.yaml"
+      ],
+      "stdout": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\nalpha\nz: 1\na: 2\n1\n2\n- b\n- a\nb\na\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\nbeta\nz: 3\na: 4\n3\n4\n- d\n- c\nd\nc\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\ngamma\nz: 5\na: 6\n5\n6\n- f\n- e\nf\ne\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list | map(.)",
+      "args": [
+        ".list | map(.)",
+        "docs.yaml"
+      ],
+      "stdout": "- b\n- a\n- d\n- c\n- f\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: . as $d | $d.name",
+      "args": [
+        ". as $d | $d.name",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name as $n | $n | length",
+      "args": [
+        ".name as $n | $n | length",
+        "docs.yaml"
+      ],
+      "stdout": "5\n---\n4\n---\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name as $n | $n",
+      "args": [
+        ".name as $n | $n",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (\"x\") as $n | $n",
+      "args": [
+        "(\"x\") as $n | $n",
+        "docs.yaml"
+      ],
+      "stdout": "x\nx\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .name | . as $n | $n",
+      "args": [
+        ".name | . as $n | $n",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.list[] | . + \"x\"] | .[0]",
+      "args": [
+        "[.list[] | . + \"x\"] | .[0]",
+        "docs.yaml"
+      ],
+      "stdout": "bx\ndx\nfx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .nope + .name",
+      "args": [
+        ".nope + .name",
+        "docs.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta.z + .nope",
+      "args": [
+        ".meta.z + .nope",
+        "docs.yaml"
+      ],
+      "stdout": "1\n---\n3\n---\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: 1",
+      "args": [
+        "1",
+        "docs.yaml"
+      ],
+      "stdout": "1\n1\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: true",
+      "args": [
+        "true",
+        "docs.yaml"
+      ],
+      "stdout": "true\ntrue\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: null",
+      "args": [
+        "null",
+        "docs.yaml"
+      ],
+      "stdout": "null\nnull\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: {}",
+      "args": [
+        "{}",
+        "docs.yaml"
+      ],
+      "stdout": "{}\n{}\n{}\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: []",
+      "args": [
+        "[]",
+        "docs.yaml"
+      ],
+      "stdout": "[]\n[]\n[]\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .list[0] // .name",
+      "args": [
+        ".list[0] // .name",
+        "docs.yaml"
+      ],
+      "stdout": "b\n---\nd\n---\nf\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta | .z, \"k\"",
+      "args": [
+        ".meta | .z, \"k\"",
+        "docs.yaml"
+      ],
+      "stdout": "1\nk\n---\n3\n---\nk\n---\n5\n---\nk\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.name != \"alpha\") | .name",
+      "args": [
+        "select(.name != \"alpha\") | .name",
+        "docs.yaml"
+      ],
+      "stdout": "beta\n---\ngamma\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: empty",
+      "args": [
+        "empty",
+        "docs.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true,
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "jq's forms mikefarah refuses work in yq: empty, if, reduce, first, last, min_by, ltrimstr, gsub and the rest."
+      }
+    },
+    {
+      "name": "documents: del(.list[0]) | .list",
+      "args": [
+        "del(.list[0]) | .list",
+        "docs.yaml"
+      ],
+      "stdout": "- a\n---\n- c\n---\n- e\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .meta * .meta",
+      "args": [
+        ".meta * .meta",
+        "docs.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n---\nz: 3\na: 4\n---\nz: 5\na: 6\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.name on pods.yaml",
+      "args": [
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata | to_entries | .[0].key on pods.yaml",
+      "args": [
+        ".metadata | to_entries | .[0].key",
+        "pods.yaml"
+      ],
+      "stdout": "name\n---\nname\n---\nname\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: length on pods.yaml",
+      "args": [
+        "length",
+        "pods.yaml"
+      ],
+      "stdout": "5\n4\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: keys | length on pods.yaml",
+      "args": [
+        "keys | length",
+        "pods.yaml"
+      ],
+      "stdout": "5\n4\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: \"\\(.kind)/\\(.metadata.name)\" on pods.yaml",
+      "args": [
+        "\"\\(.kind)/\\(.metadata.name)\"",
+        "pods.yaml"
+      ],
+      "stdout": "Pod/postgres-0\nPod/web-1\nDeployment/web\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.kind, .metadata.name] | @tsv on pods.yaml",
+      "args": [
+        "[.kind, .metadata.name] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\tpostgres-0\nPod\tweb-1\nDeployment\tweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.metadata.name] | .[0] on pods.yaml",
+      "args": [
+        "[.metadata.name] | .[0]",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb-1\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: to_entries | .[0].key on pods.yaml",
+      "args": [
+        "to_entries | .[0].key",
+        "pods.yaml"
+      ],
+      "stdout": "apiVersion\napiVersion\napiVersion\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.nodeName // \"none\" on pods.yaml",
+      "args": [
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .status.phase // \"unknown\" on pods.yaml",
+      "args": [
+        ".status.phase // \"unknown\"",
+        "pods.yaml"
+      ],
+      "stdout": "Running\nunknown\nunknown\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.name, \"x\" on pods.yaml",
+      "args": [
+        ".metadata.name, \"x\"",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nx\n---\nweb-1\n---\nx\n---\nweb\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.kind, .apiVersion) on pods.yaml",
+      "args": [
+        "(.kind, .apiVersion)",
+        "pods.yaml"
+      ],
+      "stdout": "Pod\nv1\n---\nPod\nv1\n---\nDeployment\napps/v1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.replicas // 0 | . + 1 on pods.yaml",
+      "args": [
+        ".spec.replicas // 0 | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n---\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.name as $n | $n on pods.yaml",
+      "args": [
+        ".metadata.name as $n | $n",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.metadata.name, (.spec.nodeName // \"\")] | @tsv on pods.yaml",
+      "args": [
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\tnode-a\nweb-1\t\nweb\t\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.containers[] | select(.name == \"web\") | .image on pods.yaml",
+      "args": [
+        ".spec.containers[] | select(.name == \"web\") | .image",
+        "pods.yaml"
+      ],
+      "stdout": "nginx:1.27\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata.labels.app // \"none\" on pods.yaml",
+      "args": [
+        ".metadata.labels.app // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nweb\n---\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.kind == \"Pod\") | .metadata.name on pods.yaml",
+      "args": [
+        "select(.kind == \"Pod\") | .metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .x + .metadata.name on pods.yaml",
+      "args": [
+        ".x + .metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: (.metadata.name // \"x\") + \"y\" on pods.yaml",
+      "args": [
+        "(.metadata.name // \"x\") + \"y\"",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0y\n---\nweb-1y\n---\nweby\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: [.metadata.name] on pods.yaml",
+      "args": [
+        "[.metadata.name]",
+        "pods.yaml"
+      ],
+      "stdout": "- postgres-0\n- web-1\n- web\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .spec.containers[]?.name on pods.yaml",
+      "args": [
+        ".spec.containers[]?.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres\n---\nweb\nproxy\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N .metadata.name on pods.yaml",
+      "args": [
+        "-N",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb-1\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json .metadata.name on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "\"postgres-0\"\n\"web-1\"\n\"web\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N .spec.nodeName // \"none\" on pods.yaml",
+      "args": [
+        "-N",
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "node-a\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json .spec.nodeName // \"none\" on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "\"node-a\"\n\"none\"\n\"none\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N .spec.replicas // 0 | . + 1 on pods.yaml",
+      "args": [
+        "-N",
+        ".spec.replicas // 0 | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json .spec.replicas // 0 | . + 1 on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".spec.replicas // 0 | . + 1",
+        "pods.yaml"
+      ],
+      "stdout": "1\n1\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -N [.metadata.name, (.spec.nodeName // \"\")] | @tsv on pods.yaml",
+      "args": [
+        "-N",
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\tnode-a\nweb-1\t\nweb\t\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -o json [.metadata.name, (.spec.nodeName // \"\")] | @tsv on pods.yaml",
+      "args": [
+        "-o",
+        "json",
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "\"postgres-0\\tnode-a\"\n\"web-1\\t\"\n\"web\\t\"\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.kind == \"HelmRelease\") | .status.conditions[] | select(.type == \"Ready\") | .reason on flux.yaml",
+      "args": [
+        "select(.kind == \"HelmRelease\") | .status.conditions[] | select(.type == \"Ready\") | .reason",
+        "flux.yaml"
+      ],
+      "stdout": "InstallFailed\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .status.conditions[]? | select(.status == \"False\") | .reason on flux.yaml",
+      "args": [
+        ".status.conditions[]? | select(.status == \"False\") | .reason",
+        "flux.yaml"
+      ],
+      "stdout": "InstallFailed\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .metadata | .namespace + \"/\" + .name on flux.yaml",
+      "args": [
+        ".metadata | .namespace + \"/\" + .name",
+        "flux.yaml"
+      ],
+      "stdout": "apps/podinfo\n---\nflux-system/infra\n---\ncache/redis\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: select(.spec.chart) | .spec.chart.spec.version on flux.yaml",
+      "args": [
+        "select(.spec.chart) | .spec.chart.spec.version",
+        "flux.yaml"
+      ],
+      "stdout": "6.7.0\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: .kind as $k | .metadata.name | $k + \":\" + . on flux.yaml",
+      "args": [
+        ".kind as $k | .metadata.name | $k + \":\" + .",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease:podinfo\n---\nKustomization:infra\n---\nHelmRelease:redis\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a computed value over two files",
+      "args": [
+        "\"x\"",
+        "docs.yaml",
+        "config.yaml"
+      ],
+      "stdout": "x\nx\nx\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a read value over two files",
+      "args": [
+        ".name",
+        "docs.yaml",
+        "config.yaml"
+      ],
+      "stdout": "alpha\n---\nbeta\n---\ngamma\n---\napp\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: length over two files",
+      "args": [
+        "length",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "5\n4\n4\n4\n4\n5\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over two files",
+      "args": [
+        ".spec.nodeName // \"none\"",
+        "flux.yaml",
+        "pods.yaml"
+      ],
+      "stdout": "none\nnone\nnone\n---\nnode-a\nnone\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: -i with computed results",
+      "args": [
+        "-i",
+        "length",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "4\n4\n5\n"
+      }
+    },
+    {
+      "name": "documents: -i with values read from each document",
+      "args": [
+        "-i",
+        ".metadata.name",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "podinfo\n---\ninfra\n---\nredis\n"
+      }
+    },
+    {
+      "name": "documents: -i with a default",
+      "args": [
+        "-i",
+        ".spec.nodeName // \"none\"",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pods.yaml": "node-a\nnone\nnone\n"
+      }
+    },
+    {
+      "name": "documents: a default over a.yaml c.yaml",
+      "args": [
+        ".a // \"x\"",
+        "a.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "1\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over c.yaml a.yaml c.yaml",
+      "args": [
+        ".a // \"x\"",
+        "c.yaml",
+        "a.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "x\n---\n1\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over a.yaml a.yaml",
+      "args": [
+        ".a // \"x\"",
+        "a.yaml",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "1\n---\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over d.yaml c.yaml",
+      "args": [
+        ".a // \"x\"",
+        "d.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "2\nx\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over c.yaml d.yaml",
+      "args": [
+        ".a // \"x\"",
+        "c.yaml",
+        "d.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "x\n---\n2\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a default over c.yaml a.yaml a.yaml c.yaml c.yaml a.yaml",
+      "args": [
+        ".a // \"x\"",
+        "c.yaml",
+        "a.yaml",
+        "a.yaml",
+        "c.yaml",
+        "c.yaml",
+        "a.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "x\n---\n1\n---\n1\nx\nx\n---\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "documents: a literal and a read value over three files",
+      "args": [
+        ".a, \"x\"",
+        "a.yaml",
+        "a.yaml",
+        "c.yaml"
+      ],
+      "files": {
+        "a.yaml": "a: 1\n",
+        "c.yaml": "b: 1\n",
+        "d.yaml": "a: 2\n---\nb: 3\n"
+      },
+      "stdout": "1\nx\n---\n1\nx\n---\nnull\nx\n",
       "exit": 0
     }
   ]
