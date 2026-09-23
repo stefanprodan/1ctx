@@ -26,7 +26,7 @@ import {
   evalTypeBuiltin,
 } from "./builtins/index.js";
 import type { AstNode, DestructurePattern } from "./parser.js";
-import { deletePath, setPath } from "./path-operations.js";
+import { applyAssignment } from "./path-expressions.js";
 import {
   asQueryRecord,
   isSafeKey,
@@ -48,7 +48,8 @@ import {
 
 export type { QueryValue } from "./value-operations.js";
 
-class BreakError extends Error {
+// exported for path-expressions.ts (1ctx)
+export class BreakError extends Error {
   constructor(
     public readonly label: string,
     public readonly partialResults: QueryValue[] = [],
@@ -270,7 +271,7 @@ function withVar(
  * Bind variables according to a destructuring pattern
  * Returns null if the pattern doesn't match the value
  */
-function bindPattern(
+export function bindPattern(
   ctx: EvalContext,
   pattern: DestructurePattern,
   value: QueryValue,
@@ -969,7 +970,8 @@ function evaluateNode(
     }
 
     case "UpdateOp": {
-      return [applyUpdate(value, ast.path, ast.op, ast.value, ctx)];
+      // jq semantics through path(): one output per value of the right side (1ctx)
+      return applyAssignment(value, ast.path, ast.op, ast.value, ctx);
     }
 
     case "Reduce": {
@@ -1072,514 +1074,7 @@ function normalizeIndex(idx: number, len: number): number {
   return Math.min(idx, len);
 }
 
-function applyUpdate(
-  root: QueryValue,
-  pathExpr: AstNode,
-  op: string,
-  valueExpr: AstNode,
-  ctx: EvalContext,
-): QueryValue {
-  function computeNewValue(
-    current: QueryValue,
-    newVal: QueryValue,
-  ): QueryValue {
-    switch (op) {
-      case "=":
-        return newVal;
-      case "|=": {
-        const results = evaluate(current, valueExpr, ctx);
-        return results[0] ?? null;
-      }
-      case "+=":
-        if (typeof current === "number" && typeof newVal === "number")
-          return current + newVal;
-        if (typeof current === "string" && typeof newVal === "string")
-          return current + newVal;
-        if (Array.isArray(current) && Array.isArray(newVal)) {
-          assertQueryResultCapacity(ctx, current.length, newVal.length);
-          return [...current, ...newVal];
-        }
-        if (
-          current &&
-          newVal &&
-          typeof current === "object" &&
-          typeof newVal === "object"
-        ) {
-          return nullPrototypeMerge(current, newVal);
-        }
-        return newVal;
-      case "-=":
-        if (typeof current === "number" && typeof newVal === "number")
-          return current - newVal;
-        return current;
-      case "*=":
-        if (typeof current === "number" && typeof newVal === "number")
-          return current * newVal;
-        return current;
-      case "/=":
-        if (typeof current === "number" && typeof newVal === "number")
-          return current / newVal;
-        return current;
-      case "%=":
-        if (typeof current === "number" && typeof newVal === "number")
-          return current % newVal;
-        return current;
-      case "//=":
-        return current === null || current === false ? newVal : current;
-      default:
-        return newVal;
-    }
-  }
-
-  function updateRecursive(
-    val: QueryValue,
-    path: AstNode,
-    transform: (current: QueryValue) => QueryValue,
-  ): QueryValue {
-    switch (path.type) {
-      case "Identity":
-        return transform(val);
-
-      case "Field": {
-        // Defense against prototype pollution: skip dangerous keys
-        if (!isSafeKey(path.name)) {
-          return val;
-        }
-        if (path.base) {
-          return updateRecursive(val, path.base, (baseVal) => {
-            if (
-              baseVal &&
-              typeof baseVal === "object" &&
-              !Array.isArray(baseVal)
-            ) {
-              const obj = nullPrototypeCopy(baseVal);
-              const current = Object.hasOwn(obj, path.name)
-                ? obj[path.name]
-                : undefined;
-              safeSet(obj, path.name, transform(current));
-              return obj;
-            }
-            return baseVal;
-          });
-        }
-        if (val && typeof val === "object" && !Array.isArray(val)) {
-          const obj = nullPrototypeCopy(val);
-          const current = Object.hasOwn(obj, path.name)
-            ? obj[path.name]
-            : undefined;
-          safeSet(obj, path.name, transform(current));
-          return obj;
-        }
-        return val;
-      }
-
-      case "Index": {
-        const indices = evaluate(root, path.index, ctx);
-        let idx = indices[0];
-
-        // Non-finite indices cannot allocate, so they are ordinary catchable jq
-        // errors. Prospective allocation limits below remain fatal.
-        if (typeof idx === "number" && Number.isNaN(idx)) {
-          throw new Error("Cannot set array element at NaN index");
-        }
-        if (typeof idx === "number" && !Number.isFinite(idx)) {
-          throw new Error("array index must be finite");
-        }
-
-        // Truncate float index to integer for assignment
-        if (typeof idx === "number" && !Number.isInteger(idx)) {
-          idx = Math.trunc(idx);
-        }
-
-        if (path.base) {
-          return updateRecursive(val, path.base, (baseVal) => {
-            if (typeof idx === "number" && Array.isArray(baseVal)) {
-              const arr = [...baseVal];
-              const i = idx < 0 ? arr.length + idx : idx;
-              if (i >= 0) {
-                assertQueryResultCapacity(ctx, 0, i + 1);
-                if (arr.length <= i) arr.length = i + 1;
-                for (let fill = baseVal.length; fill < i; fill++)
-                  arr[fill] = null;
-                arr[i] = transform(arr[i]);
-              }
-              return arr;
-            }
-            if (
-              typeof idx === "string" &&
-              baseVal &&
-              typeof baseVal === "object" &&
-              !Array.isArray(baseVal)
-            ) {
-              // Defense against prototype pollution: skip dangerous keys
-              if (!isSafeKey(idx)) {
-                return baseVal;
-              }
-              const obj = nullPrototypeCopy(baseVal);
-              const current = Object.hasOwn(obj, idx) ? obj[idx] : undefined;
-              safeSet(obj, idx, transform(current));
-              return obj;
-            }
-            return baseVal;
-          });
-        }
-
-        if (typeof idx === "number") {
-          // jq: Array index too large
-          const MAX_ARRAY_INDEX = 536870911;
-          if (!Number.isSafeInteger(idx) || idx > MAX_ARRAY_INDEX) {
-            throw new Error("Array index too large");
-          }
-          // jq: Out of bounds negative array index when base is null/non-array
-          if (idx < 0 && (!val || !Array.isArray(val))) {
-            throw new Error("Out of bounds negative array index");
-          }
-          if (Array.isArray(val)) {
-            const arr = [...val];
-            const i = idx < 0 ? arr.length + idx : idx;
-            if (i >= 0) {
-              assertQueryResultCapacity(ctx, 0, i + 1);
-              if (arr.length <= i) arr.length = i + 1;
-              for (let fill = val.length; fill < i; fill++) arr[fill] = null;
-              arr[i] = transform(arr[i]);
-            }
-            return arr;
-          }
-          // Create array if val is null
-          if (val === null || val === undefined) {
-            assertQueryResultCapacity(ctx, 0, idx + 1);
-            const arr: QueryValue[] = new Array(idx + 1).fill(null);
-            arr[idx] = transform(null);
-            return arr;
-          }
-          return val;
-        }
-        if (
-          typeof idx === "string" &&
-          val &&
-          typeof val === "object" &&
-          !Array.isArray(val)
-        ) {
-          // Defense against prototype pollution: skip dangerous keys
-          if (!isSafeKey(idx)) {
-            return val;
-          }
-          const obj = nullPrototypeCopy(val);
-          const current = Object.hasOwn(obj, idx) ? obj[idx] : undefined;
-          safeSet(obj, idx, transform(current));
-          return obj;
-        }
-        return val;
-      }
-
-      case "Iterate": {
-        const applyToContainer = (container: QueryValue): QueryValue => {
-          if (Array.isArray(container)) {
-            assertQueryResultCapacity(ctx, 0, container.length);
-            const result: QueryValue[] = [];
-            for (const item of container) {
-              chargeQueryWork(ctx);
-              result.push(transform(item));
-            }
-            return result;
-          }
-          if (container && typeof container === "object") {
-            // Use null-prototype to prevent prototype pollution
-            const obj: Record<string, unknown> = Object.create(null);
-            for (const [k, v] of Object.entries(container)) {
-              // Defense against prototype pollution: skip dangerous keys
-              if (isSafeKey(k)) {
-                safeSet(obj, k, transform(v));
-              }
-            }
-            return obj;
-          }
-          return container;
-        };
-
-        if (path.base) {
-          return updateRecursive(val, path.base, applyToContainer);
-        }
-        return applyToContainer(val);
-      }
-
-      case "Pipe": {
-        const leftResult = updateRecursive(val, path.left, (x) => x);
-        return updateRecursive(leftResult, path.right, transform);
-      }
-
-      default:
-        return transform(val);
-    }
-  }
-
-  const transformer = (current: QueryValue): QueryValue => {
-    if (op === "|=") {
-      return computeNewValue(current, current);
-    }
-    const newVals = evaluate(root, valueExpr, ctx);
-    return computeNewValue(current, newVals[0] ?? null);
-  };
-
-  return updateRecursive(root, pathExpr, transformer);
-}
-
-function applyDel(
-  root: QueryValue,
-  pathExpr: AstNode,
-  ctx: EvalContext,
-): QueryValue {
-  // Helper to set a value at an AST path
-  function setAtPath(
-    obj: QueryValue,
-    pathNode: AstNode,
-    newVal: QueryValue,
-  ): QueryValue {
-    switch (pathNode.type) {
-      case "Identity":
-        return newVal;
-      case "Field": {
-        // Defense against prototype pollution: skip dangerous keys
-        if (!isSafeKey(pathNode.name)) {
-          return obj;
-        }
-        if (pathNode.base) {
-          // Nested field: recurse into base
-          const nested = evaluate(obj, pathNode.base, ctx)[0];
-          const modified = setAtPath(
-            nested,
-            { type: "Field", name: pathNode.name },
-            newVal,
-          );
-          return setAtPath(obj, pathNode.base, modified);
-        }
-        // Direct field
-        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-          const result = nullPrototypeCopy(obj);
-          safeSet(result, pathNode.name, newVal);
-          return result;
-        }
-        return obj;
-      }
-      case "Index": {
-        if (pathNode.base) {
-          // Nested index: recurse into base
-          const nested = evaluate(obj, pathNode.base, ctx)[0];
-          const modified = setAtPath(
-            nested,
-            { type: "Index", index: pathNode.index },
-            newVal,
-          );
-          return setAtPath(obj, pathNode.base, modified);
-        }
-        // Direct index
-        const indices = evaluate(root, pathNode.index, ctx);
-        const idx = indices[0];
-        if (typeof idx === "number" && Array.isArray(obj)) {
-          const arr = [...obj];
-          const i = idx < 0 ? arr.length + idx : idx;
-          if (i >= 0 && i < arr.length) {
-            arr[i] = newVal;
-          }
-          return arr;
-        }
-        if (
-          typeof idx === "string" &&
-          obj &&
-          typeof obj === "object" &&
-          !Array.isArray(obj)
-        ) {
-          // Defense against prototype pollution: skip dangerous keys
-          if (!isSafeKey(idx)) {
-            return obj;
-          }
-          const result = nullPrototypeCopy(obj);
-          safeSet(result, idx, newVal);
-          return result;
-        }
-        return obj;
-      }
-      default:
-        return obj;
-    }
-  }
-
-  function deleteAt(val: QueryValue, path: AstNode): QueryValue {
-    switch (path.type) {
-      case "Identity":
-        return null;
-
-      case "Field": {
-        // Defense against prototype pollution: skip dangerous keys
-        if (!isSafeKey(path.name)) {
-          return val;
-        }
-        // If there's a base (nested field like .a.b), recurse
-        if (path.base) {
-          // Evaluate base to get the nested object
-          const nested = evaluate(val, path.base, ctx)[0];
-          if (nested === null || nested === undefined) {
-            return val;
-          }
-          // Delete field from nested object
-          const modified = deleteAt(nested, { type: "Field", name: path.name });
-          // Set the modified value back at the base path
-          return setAtPath(val, path.base, modified);
-        }
-        // Direct field deletion (no base)
-        if (val && typeof val === "object" && !Array.isArray(val)) {
-          // Defense against prototype pollution: skip dangerous keys
-          if (!isSafeKey(path.name)) {
-            return val;
-          }
-          const obj = nullPrototypeCopy(val);
-          delete obj[path.name];
-          return obj;
-        }
-        return val;
-      }
-
-      case "Index": {
-        // If there's a base (nested index like .[0].a), recurse
-        if (path.base) {
-          // Evaluate base to get the nested object/array
-          const nested = evaluate(val, path.base, ctx)[0];
-          if (nested === null || nested === undefined) {
-            return val;
-          }
-          // Delete at index from nested value
-          const modified = deleteAt(nested, {
-            type: "Index",
-            index: path.index,
-          });
-          // Set the modified value back at the base path
-          return setAtPath(val, path.base, modified);
-        }
-
-        const indices = evaluate(root, path.index, ctx);
-        const idx = indices[0];
-
-        if (typeof idx === "number" && Array.isArray(val)) {
-          const arr = [...val];
-          const i = idx < 0 ? arr.length + idx : idx;
-          if (i >= 0 && i < arr.length) {
-            arr.splice(i, 1);
-          }
-          return arr;
-        }
-        if (
-          typeof idx === "string" &&
-          val &&
-          typeof val === "object" &&
-          !Array.isArray(val)
-        ) {
-          // Defense against prototype pollution: skip dangerous keys
-          if (!isSafeKey(idx)) {
-            return val;
-          }
-          const obj = nullPrototypeCopy(val);
-          delete obj[idx];
-          return obj;
-        }
-        return val;
-      }
-
-      case "Iterate": {
-        if (Array.isArray(val)) {
-          return [];
-        }
-        if (val && typeof val === "object") {
-          return Object.create(null);
-        }
-        return val;
-      }
-
-      case "Pipe": {
-        // For nested paths like .a.b, navigate to .a and delete .b within it
-        const leftPath = path.left;
-        const rightPath = path.right;
-
-        // Helper to set a value at an AST path
-        function setAt(
-          obj: QueryValue,
-          pathNode: AstNode,
-          newVal: QueryValue,
-        ): QueryValue {
-          switch (pathNode.type) {
-            case "Identity":
-              return newVal;
-            case "Field": {
-              // Defense against prototype pollution: skip dangerous keys
-              if (!isSafeKey(pathNode.name)) {
-                return obj;
-              }
-              if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-                const result = nullPrototypeCopy(obj);
-                safeSet(result, pathNode.name, newVal);
-                return result;
-              }
-              return obj;
-            }
-            case "Index": {
-              const indices = evaluate(root, pathNode.index, ctx);
-              const idx = indices[0];
-              if (typeof idx === "number" && Array.isArray(obj)) {
-                const arr = [...obj];
-                const i = idx < 0 ? arr.length + idx : idx;
-                if (i >= 0 && i < arr.length) {
-                  arr[i] = newVal;
-                }
-                return arr;
-              }
-              if (
-                typeof idx === "string" &&
-                obj &&
-                typeof obj === "object" &&
-                !Array.isArray(obj)
-              ) {
-                // Defense against prototype pollution: skip dangerous keys
-                if (!isSafeKey(idx)) {
-                  return obj;
-                }
-                const result = nullPrototypeCopy(obj);
-                safeSet(result, idx, newVal);
-                return result;
-              }
-              return obj;
-            }
-            case "Pipe": {
-              // Recurse: set at leftPath with the result of setting at rightPath
-              const innerVal = evaluate(obj, pathNode.left, ctx)[0];
-              const modified = setAt(innerVal, pathNode.right, newVal);
-              return setAt(obj, pathNode.left, modified);
-            }
-            default:
-              return obj;
-          }
-        }
-
-        // Get the current value at the left path
-        const nested = evaluate(val, leftPath, ctx)[0];
-        if (nested === null || nested === undefined) {
-          return val; // Nothing to delete
-        }
-
-        // Apply deletion on the nested value
-        const modified = deleteAt(nested, rightPath);
-
-        // Reconstruct the object with the modified nested value
-        return setAt(val, leftPath, modified);
-      }
-
-      default:
-        return val;
-    }
-  }
-
-  return deleteAt(root, pathExpr);
-}
-
-function evalBinaryOp(
+export function evalBinaryOp(
   value: QueryValue,
   op: string,
   left: AstNode,
@@ -1809,10 +1304,6 @@ function evalBuiltin(
     ctx,
     evaluate,
     isTruthy,
-    setPath,
-    deletePath,
-    applyDel,
-    collectPaths,
   );
   if (pathResult !== null) return pathResult;
 
@@ -2106,115 +1597,32 @@ function evalBuiltin(
           }
         }
         const newCtx: EvalContext = { ...ctx, funcs: newFuncs };
-        return evaluate(value, userFunc.body, newCtx);
+        // `def f($x)` is `def f(x): x as $x`: the body runs once per value,
+        // with $x bound, which upstream left unbound (null) (1ctx)
+        const dollars = userFunc.params.filter((p) => p.startsWith("$"));
+        const bindDollars = (at: number, inner: EvalContext): QueryValue[] => {
+          if (at === dollars.length) return evaluate(value, userFunc.body, inner);
+          const param = dollars[at];
+          const choices = evaluate(
+            value,
+            { type: "Call", name: param, args: [] },
+            inner,
+          );
+          return boundedFlatMap(ctx, choices, (choice) => {
+            const funcs = new Map(inner.funcs ?? []);
+            funcs.set(`${param.slice(1)}/0`, {
+              params: [],
+              body: { type: "Literal", value: choice },
+            });
+            return bindDollars(
+              at + 1,
+              withVar({ ...inner, funcs }, param, choice),
+            );
+          });
+        };
+        return bindDollars(0, newCtx);
       }
       throw new Error(`Unknown function: ${name}`);
     }
-  }
-}
-
-function collectPaths(
-  value: QueryValue,
-  expr: AstNode,
-  ctx: EvalContext,
-  currentPath: (string | number)[],
-  paths: (string | number)[][],
-): void {
-  chargeQueryWork(ctx);
-  if (currentPath.length > ctx.limits.maxDepth) {
-    throw queryLimitError(
-      `query depth limit exceeded (${ctx.limits.maxDepth})`,
-      "recursion",
-    );
-  }
-  const appendPath = (path: (string | number)[]): void => {
-    if (path.length > ctx.limits.maxDepth) {
-      throw queryLimitError(
-        `query depth limit exceeded (${ctx.limits.maxDepth})`,
-        "recursion",
-      );
-    }
-    assertQueryResultCapacity(ctx, paths.length);
-    paths.push(path);
-  };
-  // Handle Comma - collect paths for both parts
-  if (expr.type === "Comma") {
-    const comma = expr as { type: "Comma"; left: AstNode; right: AstNode };
-    collectPaths(value, comma.left, ctx, currentPath, paths);
-    collectPaths(value, comma.right, ctx, currentPath, paths);
-    return;
-  }
-
-  // Try to extract a static path from the AST
-  const staticPath = extractPathFromAst(expr);
-  if (staticPath !== null) {
-    appendPath([...currentPath, ...staticPath]);
-    return;
-  }
-
-  // For more complex expressions, evaluate and try to infer paths
-  // This handles cases like .[] which produce multiple paths
-  if (expr.type === "Iterate") {
-    if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i++) {
-        chargeQueryWork(ctx);
-        appendPath([...currentPath, i]);
-      }
-    } else if (value && typeof value === "object") {
-      for (const key of Object.keys(value)) {
-        chargeQueryWork(ctx);
-        appendPath([...currentPath, key]);
-      }
-    }
-    return;
-  }
-
-  // Handle Recurse (..) - recursive descent, returns paths to all values
-  if (expr.type === "Recurse") {
-    const stack: Array<{ value: QueryValue; path: (string | number)[] }> = [
-      { value, path: [] },
-    ];
-    while (stack.length > 0) {
-      const entry = stack.pop();
-      if (!entry) break;
-      chargeQueryWork(ctx);
-      appendPath([...currentPath, ...entry.path]);
-      if (entry.value && typeof entry.value === "object") {
-        const entries = Array.isArray(entry.value)
-          ? entry.value.map((child, index) => [index, child] as const)
-          : Object.keys(entry.value).map(
-              (key) =>
-                [
-                  key,
-                  // @banned-pattern-ignore: Object.keys returns own properties only
-                  (entry.value as Record<string, unknown>)[key],
-                ] as const,
-            );
-        assertQueryResultCapacity(ctx, 0, stack.length + entries.length);
-        for (let i = entries.length - 1; i >= 0; i--) {
-          const [key, child] = entries[i];
-          stack.push({ value: child, path: [...entry.path, key] });
-        }
-      }
-    }
-    return;
-  }
-
-  // For Pipe expressions, collect paths through the pipe
-  if (expr.type === "Pipe") {
-    const leftPath = extractPathFromAst(expr.left);
-    if (leftPath !== null) {
-      const leftResults = evaluate(value, expr.left, ctx);
-      for (const lv of leftResults) {
-        collectPaths(lv, expr.right, ctx, [...currentPath, ...leftPath], paths);
-      }
-      return;
-    }
-  }
-
-  // Fallback: if expression produces results, push current path
-  const results = evaluate(value, expr, ctx);
-  if (results.length > 0) {
-    appendPath(currentPath);
   }
 }

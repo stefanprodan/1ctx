@@ -147,7 +147,9 @@ export function evalObjectBuiltin(
             // jq supports: key, Key, name, Name, k for the key
             const key = obj.key ?? obj.Key ?? obj.name ?? obj.Name ?? obj.k;
             // jq supports: value, Value, v for the value
-            const val = obj.value ?? obj.Value ?? obj.v;
+            // null when none is there, as in jq; undefined dropped the key
+            // from a yq -i write (1ctx)
+            const val = obj.value ?? obj.Value ?? obj.v ?? null;
             if (key !== undefined) {
               const strKey = String(key);
               // Defense against prototype pollution: skip dangerous keys

@@ -362,8 +362,12 @@ violation, and every rule has a rejected fixture under
   `docs/just-bash.md`: Bun's module-loader descriptor, so hardening runs;
   curl's redirects kept on http and https, since Bun's fetch reads
   `file:` URLs from the host's disk; the body of a response refused for
-  its length cancelled. Python, js-exec and sqlite3 are removed. A fix to
-  a command goes in the vendored source with a test, never around it.
+  its length cancelled; jq and yq assignments, `del` and `path()`
+  evaluate jq path expressions (`query-engine/path-expressions.ts`);
+  yq runs the filter on each document of a YAML stream, as mikefarah's
+  does, and `-i` keeps the file's comments (`yq/preserve.ts`).
+  Python, js-exec and sqlite3 are removed. A fix to a command goes in
+  the vendored source with a test, never around it.
   `knowledge/judge.ts` shares archive selection and judging between the
   knowledge uploader and attachment staging.
   A chat archive whose name-selected members all sit under one top-level

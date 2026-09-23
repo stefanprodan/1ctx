@@ -54,6 +54,76 @@ own.
 | `src/commands/tar/archive.ts` | gzip through the platform's `CompressionStream` and `DecompressionStream` | modern-tar 0.8, the version we pin, dropped `createGzipEncoder` and `createGzipDecoder`, thin wrappers over the same streams |
 | `src/commands/query-engine/builtins/object-builtins.ts` | `key` typed as `QueryValue` | TypeScript 7 cannot infer it (TS7022) |
 | `src/commands/registry.ts`, `src/commands/fuzz-flags.ts` | the removed commands' entries | the trim |
+| `src/commands/query-engine/path-expressions.ts` (new), `evaluator.ts`, `builtins/path-builtins.ts` | jq and yq assignments (`=`, `\|=`, `+=` and the rest), `path`, `del`, `delpaths`, `setpath`, `getpath` and `pick` evaluate the left side as jq's path expression, then set or delete each path it yields; `path-operations.ts` and the old setter are gone | upstream guessed paths from the shape of the query: `select(.kind == "Deployment").spec.replicas = 3` set every document, a pipe or `,` on the left replaced the whole input, `del` with `select` deleted nothing, and each exited 0 |
+| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | a YAML input of several documents runs the filter on each, results of different documents printed apart by `---`, and `-i` writes them all back; a document that does not parse fails the whole input | upstream refused a stream unless `-s` was given, and mikefarah's yq, the one models know, runs per document: every Kubernetes manifest and Flux list is several |
+| `src/commands/yq/yq.ts` | the leading `eval` or `e` of mikefarah's `yq eval <filter> <file>` is taken as his, `eval-all` is refused with a pointer to `-s`, `--version` answers, several files are read in turn with `-i` writing each, a value joined to `-o`, `-p` or `-I` (`-ojson`, `-I0`) is read, and JSON at `-I0` is one line | models write mikefarah's forms: `yq eval` failed on a file named after the filter, the files after the first were dropped without a word |
+| `src/commands/yq/preserve.ts` (new) | `yq -i` applies the change between each document and its result to the parsed document, so untouched nodes keep their comments, quoting and style; a result that does not read back exactly is printed plainly | the engine works on plain values, so every in-place edit deleted the file's comments |
+
+### Where our jq still differs from jq
+
+`test/server/knowledge/jq-paths.test.ts` pins path expressions against
+jq 1.8. Where they part:
+
+- Iterating null yields nothing, in path mode too, as in mikefarah's
+  yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
+  skips the documents without the key, where jq stops with an error.
+  Iterating a number, a string or a boolean is still jq's error.
+- The value evaluator keeps upstream's leniencies where jq errors:
+  `-`, `*`, `/` and `%` with null give null (so `.a -= 1` on a missing
+  key writes null), `to_entries` on an array gives null (so
+  `with_entries` on one nulls it), `map_values(f)` keeps every output
+  of `f`, `walk` never reaches scalars, `$__loc__` is null, and `?`
+  covers the whole path before it (`.a.b?`) rather than its last step.
+- `//` in path mode drops an error on its left (`(error("x") // .z) = 1`
+  writes `.z`); jq 1.8 raises it.
+- `last(f)`, `limit(n; f)` and `nth(n; f)` also work as paths, which
+  jq 1.8 refuses; `setpath` with several paths and values orders its
+  outputs path first.
+- Numbers are JavaScript's: integers past 2^53 lose precision.
+- A `\uXXXX` escape in a filter's string is read as `uXXXX`; `\t` and
+  `\n` work.
+- A `break` in the right side of an assignment outputs nothing, where jq
+  outputs the results before it; the filter form of a `$x` parameter
+  yields only the bound value (`def f($x): x`).
+
+### Where our yq still differs from mikefarah's
+
+`test/server/knowledge/yq.test.ts` pins streams and in-place edits; on
+the podinfo manifests the `-i` writes compared were mikefarah's byte
+for byte, or the same data with safer quoting. Where they part:
+
+- An `-i` edit keeps every scalar it did not change as written (`0644`,
+  `yes`, `.5`), reading the document again with the failsafe schema. A
+  string it writes that a YAML 1.1 reader would take for something else
+  (`y`, `yes`, `on`, `0644`, `1_000`) is quoted, since Kubernetes reads
+  YAML 1.1; mikefarah writes some of them bare. Printing to stdout
+  spells every value afresh.
+- On a stream, an edit through a path some documents lack leaves those
+  documents alone; mikefarah creates the missing parents in them.
+- Printing to stdout drops comments, since only `-i` goes through the
+  parsed document. An `-i` edit that cannot be carried over onto it (a
+  reordered map, an edit through an alias, a `!!binary` value) writes
+  the document afresh from values, its comments lost, and is refused,
+  the file left as it was, when a plain scalar of it reads differently
+  for YAML 1.1 and 1.2 (`0644`, `yes`), since the fresh spelling would
+  change what Kubernetes reads.
+- Merge keys (`<<: *base`) are not merged on read, and `!!binary` reads
+  as an object of bytes.
+- `-i` over several files writes each as it goes, so a later file that
+  does not parse leaves the earlier ones written; mikefarah reads all
+  first. A file with a duplicate key does not parse here.
+- mikefarah prints `---` between the results of different documents
+  only for values read from them, not for ones the filter computed
+  (`"none"`, `[.kind]`); ours prints it between every document's
+  results.
+- An alias is a copy: editing an anchor's target leaves the aliased
+  places at the old value, and a plain write re-emits anchors.
+- mikefarah's own operators (`explode`, `style`, `tag`, `line_comment`,
+  `with`, `key`) and `eval-all` are not there, and `type` answers jq's
+  names (`object`), not `!!map`. An `-i` whose filter outputs nothing,
+  as `select(type == "!!map")` does, leaves the file and exits 1.
+- The jq leniencies above apply too: `map(f)` over a missing key gives
+  null where mikefarah gives `[]`.
 
 ## Its tests
 

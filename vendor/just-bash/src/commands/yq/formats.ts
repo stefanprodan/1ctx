@@ -72,6 +72,8 @@ export interface FormatOptions {
   prettyPrint: boolean;
   /** Indentation level */
   indent: number;
+  /** quote strings a YAML 1.1 reader would retype, for an in-place write (1ctx) */
+  yaml11?: boolean;
   /** XML attribute prefix (default: +@) */
   xmlAttributePrefix: string;
   /** XML text content name (default: +content) */
@@ -233,6 +235,8 @@ export function parseInput(
 export function parseAllYamlDocuments(
   input: string,
   limits: SanitizeParsedDataLimits = {},
+  // the parsed documents, for a write that keeps their comments (1ctx)
+  parsed?: YAML.Document[],
 ): QueryValue[] {
   const maxDocuments = limits.maxElements ?? 1_000_000;
   let documents = input.trim() ? 1 : 0;
@@ -263,6 +267,7 @@ export function parseAllYamlDocuments(
     lineStart = lineEnd + 1;
   }
   const docs = YAML.parseAllDocuments(input);
+  if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
     throw new ExecutionLimitError(
       `query input document limit exceeded (${maxDocuments})`,
@@ -271,7 +276,21 @@ export function parseAllYamlDocuments(
   }
   const elementBudget = { used: docs.length };
   const values: QueryValue[] = [];
-  for (const doc of docs) {
+  if (parsed) {
+    // each document again as text alone, for a write that keeps every
+    // untouched scalar as written (1ctx)
+    const text = YAML.parseAllDocuments(input, { schema: "failsafe" });
+    if (Array.isArray(text)) parsed.push(...text);
+  }
+  for (const [index, doc] of docs.entries()) {
+    // toJS keeps going past a syntax error; a broken document fails the
+    // whole stream, so -i never writes a half-read file (1ctx)
+    const problem = doc.errors[0];
+    if (problem) {
+      throw new Error(
+        `document ${index + 1}: ${problem.message.split("\n")[0]}`,
+      );
+    }
     values.push(
       sanitizeParsedData(doc.toJS({ maxAliasCount: 100 }), {
         ...limits,
@@ -358,13 +377,15 @@ export function formatOutput(
   switch (options.outputFormat) {
     case "yaml":
       serialized = YAML.stringify(value, {
+        ...(options.yaml11 ? { compat: "yaml-1.1" as const } : {}),
         indent: options.indent,
       }).trimEnd();
       break;
 
     case "json": {
       return formatJsonValue(value, maxBytes, {
-        compact: options.compact,
+        // -I0 is one line, as mikefarah's -o json -I0 (1ctx)
+        compact: options.compact || options.indent === 0,
         raw: options.raw,
         indent: options.indent,
       });
