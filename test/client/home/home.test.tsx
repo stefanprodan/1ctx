@@ -89,7 +89,7 @@ describe("Home", () => {
     expect(html).toContain('class="composer composer-tall card"');
     expect(html).toContain('rows="2"');
     expect(html).toContain('placeholder="Search sessions"');
-    expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Loading sessions"');
     // the aside: the agents, and the week once it answers
     expect(html).toContain(
       'class="split-name split-name-link" href="/agents/assistant">assistant<',
