@@ -103,25 +103,34 @@ function Instructions({
   );
 }
 
-function NextRuns({ automation }: { automation: AutomationSummary }) {
+// the fires still ahead by the page's clock, so a page left open drops
+// the ones gone by, and a fire waiting for a slot is not listed as next
+function NextRuns({
+  automation,
+  now,
+}: {
+  automation: AutomationSummary;
+  now: number;
+}) {
   const key = previewKey(
     automation.projectId,
     automation.schedule,
     automation.tz,
   );
   const held = preview.value?.key === key ? preview.value : null;
-  const now = Date.now();
   if (automation.suspendedAt !== null) {
     return <div class="split-line">Suspended</div>;
   }
   return (
     <>
-      {(held?.fires ?? []).map((fire) => (
-        <div key={fire} class="split-line automations-fire">
-          <span>{fireLabel(fire, now, automation.tz)}</span>
-          <span class="automations-faint">{until(fire, now)}</span>
-        </div>
-      ))}
+      {(held?.fires ?? [])
+        .filter((fire) => fire > now)
+        .map((fire) => (
+          <div key={fire} class="split-line automations-fire">
+            <span>{fireLabel(fire, now, automation.tz)}</span>
+            <span class="automations-faint">{until(fire, now)}</span>
+          </div>
+        ))}
       {held?.problem && (
         <div class="split-line error">{sentence(held.problem)}</div>
       )}
@@ -216,7 +225,7 @@ export function Automation({ params }: { params: Params }) {
           aside={
             <>
               <AsideSection label="Next runs">
-                <NextRuns automation={row} />
+                <NextRuns automation={row} now={now.value} />
               </AsideSection>
               <AsideSection label="History">
                 {tally === null ? (
