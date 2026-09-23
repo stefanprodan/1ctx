@@ -30,6 +30,7 @@ import {
   createRuntimeContext,
 } from "./interpreter/index.js";
 import { MainInput } from "./interpreter/input.js";
+import { closePipes } from "./interpreter/pipes.js";
 import { setVariable } from "./interpreter/variables.js";
 import { parseOptions } from "./options.js";
 import { AwkParser } from "./parser2.js";
@@ -170,9 +171,9 @@ export const awkCommand2: RuntimeCommand = {
       cwd: ctx.cwd,
       // Wrap ctx.exec to match the expected signature for command pipe getline
       exec: execFn
-        ? (cmd: string) =>
+        ? (cmd: string, stdin?: string) =>
             withDefenseContext("command pipe exec", () =>
-              execFn(cmd, { cwd: ctx.cwd, signal: ctx.signal }),
+              execFn(cmd, { cwd: ctx.cwd, signal: ctx.signal, stdin }),
             )
         : undefined,
       coverage: ctx.coverage,
@@ -253,6 +254,7 @@ export const awkCommand2: RuntimeCommand = {
         await withDefenseContext("END execution after BEGIN exit", () =>
           interp.executeEnd(),
         );
+        await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
         return {
           stdout: interp.getOutput(),
           stderr: runtimeCtx.errorOutput,
@@ -264,6 +266,7 @@ export const awkCommand2: RuntimeCommand = {
       // END blocks need NR to be populated from reading files
       if (!hasMainRules && !hasEndBlocks) {
         // Just run END blocks (none), no input processing needed
+        await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
         return {
           stdout: interp.getOutput(),
           stderr: runtimeCtx.errorOutput,
@@ -289,6 +292,8 @@ export const awkCommand2: RuntimeCommand = {
 
       // Execute END blocks (always run, even after exit - AWK semantics)
       await withDefenseContext("END execution", () => interp.executeEnd());
+      // (1ctx) the output pipes run last, as gawk closes them at exit
+      await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
 
       // awk emits text; the pipeline handles encoding.
       return {
@@ -307,6 +312,15 @@ export const awkCommand2: RuntimeCommand = {
       const msg = e instanceof Error ? e.message : String(e);
       const exitCode =
         e instanceof ExecutionLimitError ? ExecutionLimitError.EXIT_CODE : 2;
+      // (1ctx) gawk's fatal exit still closes the pipes; a limit does not
+      if (exitCode === 2) {
+        try {
+          await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
+        } catch (inner) {
+          if (inner instanceof SecurityViolationError) throw inner;
+          rethrowFatalExecutionError(inner);
+        }
+      }
       return {
         stdout: interp.getOutput(),
         stderr: `${runtimeCtx.errorOutput}awk: ${msg}\n`,

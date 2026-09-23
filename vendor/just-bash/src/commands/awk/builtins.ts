@@ -19,6 +19,7 @@ import {
   splitText,
 } from "./interpreter/fields.js";
 import { getField, setField } from "./interpreter/fields.js";
+import { closePipe, flushOutput } from "./interpreter/pipes.js";
 import {
   looksLikeNumber,
   toAwkString,
@@ -863,6 +864,9 @@ async function awkClose(
 ): Promise<number> {
   if (args.length === 0) return -1;
   const name = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
+  // an output pipe answers its command's exit status
+  const status = await closePipe(ctx, name);
+  if (status !== null) return status;
   let closed = ctx.getlineCommandStreams.delete(name);
   if (ctx.fs && ctx.cwd) {
     const path = ctx.fs.resolvePath(ctx.cwd, name);
@@ -870,6 +874,25 @@ async function awkClose(
     if (ctx.openedFiles.delete(path)) closed = true;
   }
   return closed ? 0 : -1;
+}
+
+async function awkFflush(
+  args: AwkExpr[],
+  ctx: AwkRuntimeContext,
+  evaluator: AwkEvaluator,
+): Promise<number> {
+  if (args.length === 0) {
+    flushOutput(ctx);
+    return 0;
+  }
+  const name = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
+  if (name === "/dev/stdout" || name === "/dev/stderr") {
+    flushOutput(ctx);
+    return 0;
+  }
+  if (ctx.outputPipes.has(name)) return 0;
+  const path = ctx.fs && ctx.cwd ? ctx.fs.resolvePath(ctx.cwd, name) : name;
+  return ctx.openedFiles.has(path) ? 0 : -1;
 }
 
 // ─── Unsupported Functions ──────────────────────────────────────
@@ -925,8 +948,9 @@ export const awkBuiltins: Map<string, AwkBuiltinFn> = new Map([
   ],
   // (1ctx) close() ends a getline stream or an output file of that name
   ["close", awkClose],
-  // fflush() is a no-op in our environment (no real file handles)
-  ["fflush", () => 0],
+  // (1ctx) fflush() marks our output written, so a pipe closed later
+  // follows it; a pipe's own command still runs only when it is closed
+  ["fflush", awkFflush],
 
   // Unimplemented functions
   ["systime", unimplemented("systime")],

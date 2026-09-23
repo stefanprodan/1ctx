@@ -92,6 +92,12 @@ export interface AwkRuntimeContext {
   output: string;
   // (1ctx) what the program printed to /dev/stderr
   errorOutput: string;
+  // (1ctx) the output pipes by command, in the order opened, each holding
+  // the text printed to it, run when closed or when the program ends;
+  // flushedAt marks how much of the output a pipe's stdout must follow
+  outputPipes: Map<string, string>;
+  pipeBytes: number;
+  flushedAt: number;
 
   // Filesystem access for getline < file and print > file
   fs?: AwkFileSystem;
@@ -104,8 +110,10 @@ export interface AwkRuntimeContext {
   random?: () => number;
 
   // Exec function for command pipe getline ("cmd" | getline)
+  // (1ctx) stdin carries an output pipe's text to its command
   exec?: (
     cmd: string,
+    stdin?: string,
   ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
 
   // Feature coverage writer for fuzzing instrumentation
@@ -129,8 +137,10 @@ export interface CreateContextOptions {
   maxInputBytes?: number;
   fs?: AwkFileSystem;
   cwd?: string;
+  // (1ctx) stdin carries an output pipe's text to its command
   exec?: (
     cmd: string,
+    stdin?: string,
   ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
   coverage?: FeatureCoverageWriter;
   requireDefenseContext?: boolean;
@@ -218,6 +228,9 @@ export function createRuntimeContext(
 
     output: "",
     errorOutput: "",
+    outputPipes: new Map(),
+    pipeBytes: 0,
+    flushedAt: 0,
     openedFiles: new Set(),
 
     fs,

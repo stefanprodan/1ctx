@@ -2,6 +2,7 @@
 (fail) AGENTS.npm.md Bash examples > should have bash code blocks
 (fail) AGENTS.npm.md validation > command list completeness > should list all registered commands
 (fail) AWK prospective allocation limits > rejects record arrays before splitting beyond maxArrayElements
+(fail) Additional Syntax Features - Prototype Pollution > AWK Output Redirection > should reject pipe output via variable (sandboxed)
 (fail) Code execution exploit regressions > blocks python worker escape vectors (js bridge, ctypes, subprocess)
 (fail) Code execution exploit regressions > blocks sqlite3 extension loading attempts
 (fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md

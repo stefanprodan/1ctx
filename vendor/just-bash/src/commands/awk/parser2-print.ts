@@ -11,6 +11,7 @@ import type {
   AwkFieldRef,
   AwkStmt,
   AwkVariable,
+  AwkOutput,
 } from "./ast.js";
 import type { Token, TokenType } from "./lexer.js";
 
@@ -111,17 +112,12 @@ export function parsePrintStatement(p: PrintParserContext): AwkStmt {
     }
   }
 
-  // Check for output redirection
-  let output: { redirect: ">" | ">>"; file: AwkExpr } | undefined;
-  if (p.check(TokenTypes.GT as TokenType)) {
-    p.advance();
-    output = { redirect: ">", file: p.parsePrimary() };
-  } else if (p.check(TokenTypes.APPEND as TokenType)) {
-    p.advance();
-    output = { redirect: ">>", file: p.parsePrimary() };
+  // (1ctx) print (a, b) is print a, b, as in gawk; the tuple was read for
+  // an `in` that did not follow
+  if (args.length === 1 && args[0].type === "tuple") {
+    return { type: "print", args: args[0].elements, output: parseOutput(p) };
   }
-
-  return { type: "print", args, output };
+  return { type: "print", args, output: parseOutput(p) };
 }
 
 /**
@@ -129,6 +125,24 @@ export function parsePrintStatement(p: PrintParserContext): AwkStmt {
  * (not inside ternary) as redirection rather than comparison operators.
  * Supports assignment expressions like: print 9, a=10, 11
  */
+// The output redirection after the arguments; (1ctx) "|" takes a
+// concatenation, as gawk does (`print x | "sort " flags`)
+function parseOutput(p: PrintParserContext): AwkOutput | undefined {
+  if (p.check(TokenTypes.GT as TokenType)) {
+    p.advance();
+    return { redirect: ">", file: p.parsePrimary() };
+  }
+  if (p.check(TokenTypes.APPEND as TokenType)) {
+    p.advance();
+    return { redirect: ">>", file: p.parsePrimary() };
+  }
+  if (p.check(TokenTypes.PIPE as TokenType)) {
+    p.advance();
+    return { redirect: "|", file: parsePrintConcatenation(p) };
+  }
+  return undefined;
+}
+
 function parsePrintArg(p: PrintParserContext): AwkExpr {
   // For ternary conditions, we need to allow > as comparison
   // Check if there's a ? ahead (indicating ternary) - if so, parse full comparison
@@ -425,15 +439,5 @@ export function parsePrintfStatement(p: PrintParserContext): AwkStmt {
     p.expect(TokenTypes.RPAREN as TokenType);
   }
 
-  // Check for output redirection
-  let output: { redirect: ">" | ">>"; file: AwkExpr } | undefined;
-  if (p.check(TokenTypes.GT as TokenType)) {
-    p.advance();
-    output = { redirect: ">", file: p.parsePrimary() };
-  } else if (p.check(TokenTypes.APPEND as TokenType)) {
-    p.advance();
-    output = { redirect: ">>", file: p.parsePrimary() };
-  }
-
-  return { type: "printf", format, args, output };
+  return { type: "printf", format, args, output: parseOutput(p) };
 }

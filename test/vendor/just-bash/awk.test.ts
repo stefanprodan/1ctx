@@ -147,6 +147,48 @@ describe("awk limits and refusals", () => {
     }
   });
 
+  test("pipes closed at the end run in the order opened", async () => {
+    const r = await new Bash().exec(
+      `awk 'BEGIN { print "1" | "cat"; print "2" | "cat -n"; print "3" | "cat"; print "own" }'`,
+    );
+    expect(r.stdout).toBe("1\n3\n     1\t2\nown\n");
+    expect(r.exitCode).toBe(0);
+  });
+
+  test("a pipe's text counts against the output cap", async () => {
+    const bash = new Bash({ executionLimits: { maxOutputSize: 12 } });
+    const r = await bash.exec(
+      `awk 'BEGIN { print "12345"; print "678901" | "cat"; print "x" | "cat" }'`,
+    );
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("output size");
+    expect(r.exitCode).toBe(LIMIT_EXIT);
+  });
+
+  test("open pipes are capped", async () => {
+    const r = await new Bash().exec(
+      `awk 'BEGIN { for (i = 1; i <= 17; i++) print i | ("cat # " i) }'`,
+    );
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe("awk: output pipe limit exceeded (16)\n");
+    expect(r.exitCode).toBe(LIMIT_EXIT);
+  });
+
+  test("an abort stops the pipes before their commands run", async () => {
+    const controller = new AbortController();
+    const trip = defineCommand("trip", async () => {
+      controller.abort();
+      return { stdout: "", stderr: "", exitCode: 0 };
+    });
+    const bash = new Bash({ customCommands: [trip] });
+    const r = await bash.exec(
+      `awk 'BEGIN { print "a" | "cat"; close("trip"); "trip" | getline; print "b" | "cat" }'`,
+      { signal: controller.signal },
+    );
+    expect(r.stdout).not.toContain("a");
+    expect(r.exitCode).not.toBe(0);
+  });
+
   test("print to /dev/stderr reaches stderr", async () => {
     const r = await new Bash().exec(
       `awk '{ print "e" $0 > "/dev/stderr"; print "o" $0 }'`,
@@ -213,6 +255,16 @@ describe("gawk features we do not have", () => {
     expect(r.stderr).toBe(
       "awk: asort: a user comparison function is not supported\n",
     );
+    expect(r.exitCode).toBe(2);
+  });
+
+  test("a coprocess is refused before anything runs", async () => {
+    const r = await new Bash().exec(
+      `awk 'BEGIN { print "ran" } { print $1 |& "cat" }'`,
+      { stdin: "a\n" },
+    );
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe("awk: |& is not supported\n");
     expect(r.exitCode).toBe(2);
   });
 

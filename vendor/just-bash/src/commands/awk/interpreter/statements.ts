@@ -10,10 +10,17 @@ import {
   awaitWithDefenseContext,
 } from "../../../security/defense-context.js";
 import { utf8ByteLength } from "../../printf/escapes.js";
-import type { AwkArrayAccess, AwkExpr, AwkStmt, AwkVariable } from "../ast.js";
+import type {
+  AwkArrayAccess,
+  AwkExpr,
+  AwkOutput,
+  AwkStmt,
+  AwkVariable,
+} from "../ast.js";
 import { formatPrintf, numberToString } from "../format.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { evalExpr, setBlockExecutor } from "./expressions.js";
+import { writePipe } from "./pipes.js";
 import { isTruthy, toStr, toNumber } from "./type-coercion.js";
 import {
   deleteArray,
@@ -207,7 +214,7 @@ async function executeStmt(
 async function executePrint(
   ctx: AwkRuntimeContext,
   args: AwkExpr[],
-  output?: { redirect: ">" | ">>"; file: AwkExpr },
+  output?: AwkOutput,
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "print execution");
   const values: string[] = [];
@@ -237,7 +244,7 @@ async function executePrintf(
   ctx: AwkRuntimeContext,
   format: AwkExpr,
   args: AwkExpr[],
-  output?: { redirect: ">" | ">>"; file: AwkExpr },
+  output?: AwkOutput,
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "printf execution");
   const formatStr = toStr(ctx,
@@ -275,7 +282,7 @@ async function executePrintf(
  */
 async function writeToFile(
   ctx: AwkRuntimeContext,
-  redirect: ">" | ">>",
+  redirect: ">" | ">>" | "|",
   fileExpr: AwkExpr,
   text: string,
 ): Promise<void> {
@@ -293,6 +300,11 @@ async function writeToFile(
       evalExpr(ctx, fileExpr),
     ),
   );
+  // (1ctx) a pipe holds the text for its command
+  if (redirect === "|") {
+    writePipe(ctx, filename, text);
+    return;
+  }
   // (1ctx) the standard streams, as gawk names them
   if (filename === "/dev/stdout") {
     ctx.output += text;

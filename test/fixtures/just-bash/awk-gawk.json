@@ -3656,6 +3656,231 @@
       "stdout": "",
       "exit": 1,
       "stderr": true
+    },
+    {
+      "name": "pipes: print to sort -r",
+      "args": [
+        "{print $2 | \"sort -r\"}"
+      ],
+      "stdin": "b 2\na 1\nc 3\n",
+      "stdout": "3\n2\n1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: print to sort -u before END",
+      "args": [
+        "{print $1 | \"sort -u\"} END {print \"end\"}"
+      ],
+      "stdin": "b\na\nb\n",
+      "stdout": "a\nb\nend\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: print to wc",
+      "args": [
+        "{print | \"wc -l | tr -d ' '\"}"
+      ],
+      "stdin": "b 2\na 1\nc 3\n",
+      "stdout": "3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: printf to sort -k2n",
+      "args": [
+        "{printf \"%s %d\\n\", $1, $2 * 10 | \"sort -k2n\"}"
+      ],
+      "stdin": "x 3\ny 1\nz 2\n",
+      "stdout": "y 10\nz 20\nx 30\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: the pipe prints before what followed it",
+      "args": [
+        "{print $1 | \"sort\"; print \"own\", $1}"
+      ],
+      "stdin": "b 2\na 1\nc 3\n",
+      "stdout": "a\nb\nc\nown b\nown a\nown c\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: opening a pipe flushes what came before",
+      "args": [
+        "BEGIN {print \"1\"; print \"2\" | \"cat\"; print \"3\"}"
+      ],
+      "stdout": "1\n2\n3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: close runs the command in place",
+      "args": [
+        "BEGIN {print \"1\"; print \"2\" | \"cat\"; print \"3\"; close(\"cat\"); print \"4\"; print \"5\" | \"cat\"; print \"6\"}"
+      ],
+      "stdout": "1\n3\n2\n4\n5\n6\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: close answers the exit status",
+      "args": [
+        "BEGIN {print \"x\" | \"cat >/dev/null\"; print close(\"cat >/dev/null\"); print \"y\" | \"exit 3\"; print close(\"exit 3\"); print close(\"never\")}"
+      ],
+      "stdout": "0\n3\n-1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: a second close answers -1",
+      "args": [
+        "BEGIN {print \"a\" | \"cat\"; print close(\"cat\"), close(\"cat\")}"
+      ],
+      "stdout": "a\n0 -1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: a command writing to stderr",
+      "args": [
+        "BEGIN {print \"x\" | \"cat 1>&2\"; print \"y\"}"
+      ],
+      "stdout": "y\n",
+      "exit": 0,
+      "stderr": true
+    },
+    {
+      "name": "pipes: printf without newlines",
+      "args": [
+        "BEGIN {printf \"a\" | \"cat\"; printf \"b\" | \"cat\"; close(\"cat\"); print \"\"}"
+      ],
+      "stdout": "ab\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: the command is a concatenation",
+      "args": [
+        "BEGIN {x = \"c\"; print \"a\" | x \"at\"; close(x \"at\"); print \"b\" | \"ca\" \"t -n\"}"
+      ],
+      "stdout": "a\n     1\tb\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: parenthesized print and printf",
+      "args": [
+        "BEGIN {print(\"a\", \"b\") | \"cat\"; printf(\"%s\\n\", \"p\") | \"cat\"}"
+      ],
+      "stdout": "a b\np\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: exit in END keeps the code",
+      "args": [
+        "{print | \"cat\"} END {exit 4}"
+      ],
+      "stdin": "x\n",
+      "stdout": "x\n",
+      "exit": 4,
+      "stderr": false
+    },
+    {
+      "name": "pipes: exit in BEGIN still runs the pipe",
+      "args": [
+        "BEGIN {print \"a\" | \"cat\"; exit 2} END {print \"end\"}"
+      ],
+      "stdout": "a\nend\n",
+      "exit": 2,
+      "stderr": false
+    },
+    {
+      "name": "pipes: a fatal error still runs the pipe",
+      "args": [
+        "BEGIN {print \"a\" | \"cat\"; print 1/0}"
+      ],
+      "stdout": "a\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "pipes: fflush marks the output written",
+      "args": [
+        "BEGIN {print \"1\"; print \"2\" | \"cat\"; fflush(\"/dev/stdout\"); print \"3\"; fflush(); print \"4\"}"
+      ],
+      "stdout": "1\n3\n2\n4\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: reopened after close",
+      "args": [
+        "{print $1 | \"sort\"} END {close(\"sort\"); print \"after\"; print \"z\" | \"sort\"}"
+      ],
+      "stdin": "b\na\n",
+      "stdout": "a\nb\nafter\nz\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: OFS on a rebuilt record",
+      "args": [
+        "BEGIN {OFS = \"-\"} {$1 = $1; print | \"sort\"}"
+      ],
+      "stdin": "b 2\na 1\nc 3\n",
+      "stdout": "a-1\nb-2\nc-3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: a comparison before the pipe is a syntax error",
+      "args": [
+        "BEGIN {print 1 > 0 | \"cat\"}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "pipes: a command that is not found",
+      "args": [
+        "BEGIN {print \"1\" | \"nosuchcmd_z\"; print \"2\"}"
+      ],
+      "stdout": "2\n",
+      "exit": 0,
+      "stderr": true
+    },
+    {
+      "name": "pipes: a file redirection beside a pipe",
+      "args": [
+        "BEGIN {print \"1\" > \"o\"; print \"2\" | \"cat\"; close(\"o\"); getline l < \"o\"; print l}"
+      ],
+      "stdout": "2\n1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "pipes: many records into one sort",
+      "args": [
+        "{print $1 | \"sort -n\"} END {close(\"sort -n\"); print \"n=\" NR}"
+      ],
+      "stdin": "0\n41\n82\n22\n63\n3\n44\n85\n25\n66\n6\n47\n88\n28\n69\n9\n50\n91\n31\n72\n12\n53\n94\n34\n75\n15\n56\n97\n37\n78\n18\n59\n100\n40\n81\n21\n62\n2\n43\n84\n24\n65\n5\n46\n87\n27\n68\n8\n49\n90\n30\n71\n11\n52\n93\n33\n74\n14\n55\n96\n36\n77\n17\n58\n99\n39\n80\n20\n61\n1\n42\n83\n23\n64\n4\n45\n86\n26\n67\n7\n48\n89\n29\n70\n10\n51\n92\n32\n73\n13\n54\n95\n35\n76\n16\n57\n98\n38\n79\n19\n60\n0\n41\n82\n22\n63\n3\n44\n85\n25\n66\n6\n47\n88\n28\n69\n9\n50\n91\n31\n72\n12\n53\n94\n34\n75\n15\n56\n97\n37\n78\n18\n59\n100\n40\n81\n21\n62\n2\n43\n84\n24\n65\n5\n46\n87\n27\n68\n8\n49\n90\n30\n71\n11\n52\n93\n33\n74\n14\n55\n96\n36\n77\n17\n58\n99\n39\n80\n20\n61\n1\n42\n83\n23\n64\n4\n45\n86\n26\n67\n7\n48\n89\n29\n70\n10\n51\n92\n32\n73\n13\n54\n95\n35\n76\n16\n57\n98\n38\n79\n",
+      "stdout": "0\n0\n1\n1\n2\n2\n3\n3\n4\n4\n5\n5\n6\n6\n7\n7\n8\n8\n9\n9\n10\n10\n11\n11\n12\n12\n13\n13\n14\n14\n15\n15\n16\n16\n17\n17\n18\n18\n19\n20\n20\n21\n21\n22\n22\n23\n23\n24\n24\n25\n25\n26\n26\n27\n27\n28\n28\n29\n29\n30\n30\n31\n31\n32\n32\n33\n33\n34\n34\n35\n35\n36\n36\n37\n37\n38\n38\n39\n39\n40\n40\n41\n41\n42\n42\n43\n43\n44\n44\n45\n45\n46\n46\n47\n47\n48\n48\n49\n49\n50\n50\n51\n51\n52\n52\n53\n53\n54\n54\n55\n55\n56\n56\n57\n57\n58\n58\n59\n59\n60\n61\n61\n62\n62\n63\n63\n64\n64\n65\n65\n66\n66\n67\n67\n68\n68\n69\n69\n70\n70\n71\n71\n72\n72\n73\n73\n74\n74\n75\n75\n76\n76\n77\n77\n78\n78\n79\n79\n80\n80\n81\n81\n82\n82\n83\n83\n84\n84\n85\n85\n86\n86\n87\n87\n88\n88\n89\n89\n90\n90\n91\n91\n92\n92\n93\n93\n94\n94\n95\n95\n96\n96\n97\n97\n98\n98\n99\n99\n100\n100\nn=200\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: print with a parenthesized list",
+      "args": [
+        "BEGIN {print(\"a\", \"b\"); print (\"a\", \"b\") > \"/dev/stdout\"; x[1, 2]; print ((1, 2) in x), (1, 2) in x}"
+      ],
+      "stdout": "a b\na b\n1 1\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

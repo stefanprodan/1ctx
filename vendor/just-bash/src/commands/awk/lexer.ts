@@ -794,6 +794,8 @@ export class AwkLexer {
             column: startColumn,
           };
         }
+        // (1ctx) a coprocess is refused, not read as a pipe and a name
+        if (next === "&") throw new AwkRefusal("|& is not supported", 2);
         return {
           type: TokenType.PIPE,
           value: "|",

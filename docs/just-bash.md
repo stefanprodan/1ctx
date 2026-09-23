@@ -72,7 +72,8 @@ without a file of their own.
 | `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `input.ts`, `records.ts`, `context.ts`, `awk2.ts` | fields are capped like array elements, `ARGV` and `ENVIRON` elements count against the cap, a gap in `ARGV` is skipped whole, and the compiled record separators live with the command | `$100000000 = "x"` took gigabytes, `split(s, ARGV)` escaped the cap, `ARGC = 1e8` spun for ten seconds and a module-level cache kept each command's last input |
 | `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
 | `src/commands/awk/builtins.ts`, `check.ts` | `asort(src [, dest [, how]])` and `asorti(...)` as gawk 5.4.1 orders them: the ten `@ind_`/`@val_` `_str`/`_num`/`_type` `_asc`/`_desc` orders, the default `@val_type_asc` for asort (an uninitialized value, then numbers, then strings) and `@ind_str_asc` for asorti, ties broken as gawk breaks them, both bounded by the element cap; a user comparison function is refused | both were functions not defined, and a model reaches for `asorti` first |
-| `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
+| `src/commands/awk/interpreter/pipes.ts` (new), `statements.ts`, `context.ts`, `builtins.ts`, `awk2.ts`, `parser2-print.ts`, `lexer.ts`, `ast.ts` | `print ... \| "cmd"` and `printf ... \| "cmd"`: one pipe per command text holding what is printed to it, run through the shell with that text as stdin at `close("cmd")` (which answers its exit status) or at the end, in the order opened, its stdout placed as gawk places it (gawk flushes its own stdout when a pipe opens and closes, and closes every pipe before its last flush), its stderr on ours; pipes count against the output cap, at most 16 are open, the abort signal stops them, `fflush()` marks our output written, and `\|&` is refused | `print \| "sort"` was a parse error |
+| `src/commands/awk/parser2-print.ts` | `print (a, b)` prints every item, as gawk does | it printed the last one |
 
 ### Where our jq still differs from jq
 
@@ -111,17 +112,19 @@ they part:
 - An `RS` that can match the empty string (`X*`) is refused; gawk's
   records for one are erratic.
 - `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`,
-  `FIELDWIDTHS`, `@include`, `@load` and `@namespace` are refused;
+  `FIELDWIDTHS`, `@include`, `@load`, `@namespace` and `|&` are refused;
   `strtonum`, `patsplit`, `isarray` and `typeof` are functions not
   defined; `systime`, `mktime` and `strftime` fail when called, `system`
   is refused, and `asort` and `asorti` refuse a user comparison
   function.
 - `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
   line saying what this is, not gawk's copyright text.
+- An output pipe's command runs once, when the pipe is closed or the
+  program ends, with everything printed to it; `fflush()` runs nothing
+  early. Several pipes still open at the end run in the order opened,
+  where gawk's children print in the order the system schedules them.
 - `asort` and `asorti` class a numeric-looking string constant with the
   numbers (the strnum rule above), where gawk sorts it with the strings.
-- `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
-  line saying what this is, not gawk's copyright text.
 - A value is a string or a number, with no strnum: a variable holding a
   string constant or a string function's answer compares as a number
   when both sides look numeric, so `x = "10"; x > 9` is true where gawk
@@ -131,7 +134,6 @@ they part:
   string constant is false. `+inf` and `+nan` in the input are 0.
 - A user function that returns without a value answers `""`, a string,
   where gawk's answer is uninitialized.
-- `print | "cmd"` and `printf | "cmd"` are a parse error.
 - A local array parameter and a global array of the same name share
   storage during the call.
 - `for (k in a)` walks the elements in insertion order, gawk's order is
