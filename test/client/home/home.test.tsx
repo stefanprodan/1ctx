@@ -114,32 +114,36 @@ describe("Home", () => {
   });
 
   test("renders the rows with the project name and the state line", () => {
-    list.value = [
-      {
-        session: {
-          id: "s1",
-          projectId: "p1",
-          ownerId: "u1",
-          agentId: "a1",
-          origin: "chat",
-          automationId: null,
-          runSource: null,
-          forkedFromId: null,
-          title: "Which pods restarted",
-          status: "done",
-          revision: 2,
-          createdAt: 0,
-          lastActivityAt: Date.now() - 120_000,
-          usage: null,
-          disabledCapabilities: [],
+    list.value = {
+      next: null,
+      more: { loading: false, error: null },
+      rows: [
+        {
+          session: {
+            id: "s1",
+            projectId: "p1",
+            ownerId: "u1",
+            agentId: "a1",
+            origin: "chat",
+            automationId: null,
+            runSource: null,
+            forkedFromId: null,
+            title: "Which pods restarted",
+            status: "done",
+            revision: 2,
+            createdAt: 0,
+            lastActivityAt: Date.now() - 120_000,
+            usage: null,
+            disabledCapabilities: [],
+          },
+          agent: "assistant",
+          send: null,
+          last: { seq: 2, author: "assistant", text: "nine pods" },
+          automation: null,
+          runBy: null,
         },
-        agent: "assistant",
-        send: null,
-        last: { seq: 2, author: "assistant", text: "nine pods" },
-        automation: null,
-        runBy: null,
-      },
-    ];
+      ],
+    };
     const html = render(<Home />);
     expect(html).toContain('href="/chat/s1"');
     expect(html).toContain("status-done");
@@ -153,7 +157,11 @@ describe("Home", () => {
 
   test("the search box carries the address's query and the empty line says so", () => {
     query.value = "?q=pods";
-    list.value = [];
+    list.value = {
+      rows: [],
+      next: null,
+      more: { loading: false, error: null },
+    };
     const html = render(<Home />);
     expect(html).toContain('value="pods"');
     expect(html).toContain("No sessions match");

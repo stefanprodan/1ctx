@@ -7,6 +7,7 @@
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { RunFilter } from "../../shared/words.ts";
+import { ordered, runOrder } from "./sessions-rows.ts";
 
 const byName = (a: AutomationSummary, b: AutomationSummary) =>
   a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
@@ -33,13 +34,14 @@ export function matchesFilter(
 }
 
 // a run's envelope into the held runs: a held row moves when the
-// revision is above its own, newest first by when it was opened
+// revision is above its own, in the server's order of the runs
 export function upsertRun(rows: StreamRow[], next: StreamRow): StreamRow[] {
   const held = rows.find((r) => r.session.id === next.session.id);
   if (held !== undefined && held.session.revision >= next.session.revision) {
     return rows;
   }
-  return [...rows.filter((r) => r.session.id !== next.session.id), next].sort(
-    (a, b) => b.session.createdAt - a.session.createdAt,
+  return ordered(
+    [...rows.filter((r) => r.session.id !== next.session.id), next],
+    runOrder,
   );
 }

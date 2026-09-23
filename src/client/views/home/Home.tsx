@@ -18,6 +18,7 @@ import {
   createSession,
   homeProjectId,
   list,
+  loadMore,
   pickHomeProject,
   projectAgents,
   sending,
@@ -40,7 +41,8 @@ import { WeekAside } from "./WeekAside.tsx";
 export function Home() {
   const user = me.value!;
   const now = useSignal(Date.now());
-  const rows = list.value;
+  const held = list.value;
+  const rows = held?.rows ?? null;
   const tick = tickMs(rows);
   useEffect(() => {
     const timer = setInterval(() => {
@@ -108,6 +110,12 @@ export function Home() {
             }}
             empty={emptyLine(q, origin)}
             now={now.value}
+            more={{
+              next: (held?.next ?? null) !== null,
+              loading: held?.more.loading ?? false,
+              error: held?.more.error ?? null,
+            }}
+            onMore={() => void loadMore()}
           />
         )}
       </Split>

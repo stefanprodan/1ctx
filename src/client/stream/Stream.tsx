@@ -3,15 +3,22 @@
 //
 // The stream's card, a Rows card: the search and the filters in its
 // head, then the session rows, or the note that says why there are
-// none. The session row is the one row outside Rows: a denser feed
-// line, as the Home plan draws it. Home and the project page both draw
-// it over the entity's list; the clock that moves the times is the
-// page's.
+// none, and Show more while a later page is left. The session row is
+// the one row outside Rows: a denser feed line, as the Home plan draws
+// it. Home and the project page both draw it over the entity's list;
+// the clock that moves the times is the page's.
 
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
+import { type Failure, sentence } from "../lib/format.ts";
 import type { IconName } from "../lib/icons.tsx";
-import { RowsCard, RowsFilters, RowsNote } from "../ui/Rows.tsx";
+import {
+  RowsBlock,
+  RowsButton,
+  RowsCard,
+  RowsFilters,
+  RowsNote,
+} from "../ui/Rows.tsx";
 import { Search } from "../ui/Search.tsx";
 import { Row } from "./Row.tsx";
 import "./stream.css";
@@ -26,6 +33,13 @@ const FILTERS: {
   { value: "automation", label: "Tasks", icon: "bolt" },
 ];
 
+// whether a later page is left, and how its load went
+export type MoreState = {
+  next: boolean;
+  loading: boolean;
+  error: Failure | null;
+};
+
 export function Stream({
   rows,
   // the name of each row's project, or null on a page that is the
@@ -35,6 +49,8 @@ export function Stream({
   filter,
   empty,
   now,
+  more,
+  onMore,
 }: {
   rows: StreamRow[] | null;
   projectName: (projectId: string) => string | null;
@@ -48,6 +64,8 @@ export function Stream({
   // what the card says with no rows
   empty: string;
   now: number;
+  more: MoreState;
+  onMore: () => void;
 }) {
   return (
     <RowsCard
@@ -72,31 +90,63 @@ export function Stream({
       }
     >
       {rows === null ? (
-        <Ghosts />
+        <Ghosts count={6} />
       ) : rows.length === 0 ? (
         <RowsNote>{empty}</RowsNote>
       ) : (
-        rows.map((row) => (
-          <Row
-            key={row.session.id}
-            row={row}
-            projectName={projectName(row.session.projectId)}
-            now={now}
-          />
-        ))
+        <>
+          {rows.map((row) => (
+            <Row
+              key={row.session.id}
+              row={row}
+              projectName={projectName(row.session.projectId)}
+              now={now}
+            />
+          ))}
+          <ShowMore more={more} onMore={onMore} />
+        </>
       )}
     </RowsCard>
   );
 }
 
-// placeholder rows in the shape of the real ones while the list loads,
-// so the rows land where the shapes were
-const GHOSTS = 6;
+// the list's last row while a later page is left: the button, the
+// placeholders while the page loads, and a failure under the button
+export function ShowMore({
+  more,
+  onMore,
+}: {
+  more: MoreState;
+  onMore: () => void;
+}) {
+  if (!more.next) return null;
+  if (more.loading) return <Ghosts count={3} />;
+  return (
+    <>
+      <RowsButton onClick={onMore}>Show more</RowsButton>
+      {more.error !== null && (
+        <RowsBlock>
+          <p class="notice-failed" role="alert">
+            {sentence(more.error.words)}
+            {more.error.status !== null && (
+              <>
+                {" "}
+                <span class="code-tag">HTTP {more.error.status}</span>
+              </>
+            )}
+          </p>
+        </RowsBlock>
+      )}
+    </>
+  );
+}
 
-function Ghosts() {
+// placeholder rows in the shape of the real ones while rows load, so
+// the rows land where the shapes were
+export function Ghosts({ count }: { count: number }) {
   return (
     <div class="stream-ghosts" role="status" aria-label="Loading sessions">
-      {Array.from({ length: GHOSTS }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <div
           key={i}
           class={`stream-row stream-ghost stream-ghost-${"abc"[i % 3]}`}

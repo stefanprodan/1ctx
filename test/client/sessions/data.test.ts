@@ -20,6 +20,7 @@ import {
   list,
   live,
   loadList,
+  loadMore,
   loadProjectAgents,
   loadSession,
   onSocket,
@@ -32,7 +33,11 @@ import {
   sessionError,
   toolResults,
 } from "../../../src/client/data/sessions.ts";
-import { applyAutomationFrame } from "../../../src/client/data/stream.ts";
+import {
+  applyAutomationFrame,
+  IDLE,
+  type StreamList,
+} from "../../../src/client/data/stream.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import { WEB } from "../../../src/shared/capabilities.ts";
 import type {
@@ -74,7 +79,14 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
   };
 }
 
-const ids = (rows: StreamRow[] | null) => rows?.map((r) => r.session.id);
+const ids = (rows: StreamRow[] | StreamList | null | undefined) =>
+  (Array.isArray(rows) ? rows : rows?.rows)?.map((r) => r.session.id);
+
+const page = (rows: StreamRow[], next: string | null = null): StreamList => ({
+  rows,
+  next,
+  more: IDLE,
+});
 
 function message(changes: Partial<Message> = {}): Message {
   return {
@@ -285,8 +297,8 @@ describe("the sessions entity", () => {
       return Response.json({ rows: [row()] });
     };
     await loadList({ project: null, q: "" });
-    expect(list.value).toHaveLength(1);
-    let seen: StreamRow[] | null | undefined;
+    expect(list.value?.rows).toHaveLength(1);
+    let seen: StreamList | null | undefined;
     answer = (url) => {
       urls.push(url);
       seen = list.value;
@@ -294,7 +306,7 @@ describe("the sessions entity", () => {
     };
     await loadList({ project: null, q: "pods & co" });
     expect(seen).toBeNull();
-    expect(list.value).toEqual([]);
+    expect(list.value?.rows).toEqual([]);
     expect(urls).toEqual(["/api/sessions", "/api/sessions?q=pods+%26+co"]);
   });
 
@@ -350,7 +362,7 @@ describe("the sessions entity", () => {
       send: null,
     });
 
-    expect(list.value?.[0].session.title).toBe("Changed");
+    expect(list.value?.rows[0].session.title).toBe("Changed");
   });
 
   test("automation frames rename and clear loaded run labels", async () => {
@@ -370,14 +382,14 @@ describe("the sessions entity", () => {
       projectId: "p1",
       automation: { id: "au1", name: "new-name" },
     } as Parameters<typeof applyAutomationFrame>[0]);
-    expect(list.value?.[0]?.automation?.name).toBe("new-name");
+    expect(list.value?.rows[0]?.automation?.name).toBe("new-name");
 
     applyAutomationFrame({
       type: "automationDeleted",
       projectId: "p1",
       automationId: "au1",
     });
-    expect(list.value?.[0]?.automation).toBeNull();
+    expect(list.value?.rows[0]?.automation).toBeNull();
   });
 
   test("an envelope keeps the row's send and last line unless it carries them", async () => {
@@ -392,8 +404,8 @@ describe("the sessions entity", () => {
       messages: [],
       send: null,
     });
-    expect(list.value?.[0].send).toEqual(sent);
-    expect(list.value?.[0].last).toEqual(last);
+    expect(list.value?.rows[0].send).toEqual(sent);
+    expect(list.value?.rows[0].last).toEqual(last);
 
     const done = { ...sent, status: "done" as const, cause: "finish" as const };
     onSocket({
@@ -404,9 +416,9 @@ describe("the sessions entity", () => {
       send: done,
       last: { seq: 4, author: "assistant", text: "all expected" },
     });
-    expect(list.value?.[0].send).toEqual(done);
-    expect(list.value?.[0].last?.text).toBe("all expected");
-    expect(list.value?.[0].session.revision).toBe(3);
+    expect(list.value?.rows[0].send).toEqual(done);
+    expect(list.value?.rows[0].last?.text).toBe("all expected");
+    expect(list.value?.rows[0].session.revision).toBe(3);
 
     onSocket({
       type: "session",
@@ -416,12 +428,12 @@ describe("the sessions entity", () => {
       send: null,
       last: { seq: 1, author: "ana", text: "stale" },
     });
-    expect(list.value?.[0].session.revision).toBe(3);
-    expect(list.value?.[0].last?.text).toBe("all expected");
+    expect(list.value?.rows[0].session.revision).toBe(3);
+    expect(list.value?.rows[0].last?.text).toBe("all expected");
   });
 
   test.serial(
-    "a row not held reloads the list unless a query or another project filters it",
+    "a row not held reloads the list, a search too, unless another project filters it",
     async () => {
       const calls: string[] = [];
       answer = (url) => {
@@ -460,6 +472,7 @@ describe("the sessions entity", () => {
         "/api/sessions",
         "/api/sessions",
         "/api/sessions?q=pods",
+        "/api/sessions?q=pods",
         "/api/sessions?project=p1",
       ]);
     },
@@ -479,7 +492,7 @@ describe("the sessions entity", () => {
     });
     release(Response.json({ rows: [row({ revision: 2, title: "Older" })] }));
     await load;
-    expect(list.value?.[0].session.title).toBe("Older");
+    expect(list.value?.rows[0].session.title).toBe("Older");
 
     answer = () => new Promise((r) => (release = r));
     const again = loadList({ project: null, q: "" });
@@ -492,7 +505,7 @@ describe("the sessions entity", () => {
     });
     release(Response.json({ rows: [row({ revision: 2, title: "Older" })] }));
     await again;
-    expect(list.value?.[0].session.title).toBe("Newer");
+    expect(list.value?.rows[0].session.title).toBe("Newer");
   });
 
   test("a revocation drops a list answer in flight", async () => {
@@ -601,7 +614,7 @@ describe("the sessions entity", () => {
 
   test("rename patches the title and takes the detail", async () => {
     session.value = detail();
-    list.value = [row()];
+    list.value = page([row()]);
     let hit = "";
     let sent: unknown = null;
     let busy = false;
@@ -788,7 +801,7 @@ describe("the sessions entity", () => {
 
   test("delete drops the row, leaves the chat and opens its project", async () => {
     session.value = liveDetail();
-    list.value = [row(), row({ id: "s2" })];
+    list.value = page([row(), row({ id: "s2" })]);
     path.value = "/chat/s1";
     let hit = "";
     answer = (url, init) => {
@@ -1136,7 +1149,7 @@ describe("the sessions entity", () => {
         },
       ],
     ]);
-    list.value = [row()];
+    list.value = page([row()]);
     projectAgents.value = [];
     sending.value = true;
 
@@ -1323,7 +1336,7 @@ describe("answers held for the way back", () => {
         });
       await loadList({ project: "p1", q: "" });
       await loadList({ project: null, q: "" });
-      let seen: StreamRow[] | null | undefined;
+      let seen: StreamList | null | undefined;
       answer = () => {
         seen = list.value;
         return Response.json({ rows: [row({ id: "a" }), row({ id: "b" })] });
@@ -1345,7 +1358,7 @@ describe("answers held for the way back", () => {
     await loadList({ project: "p2", q: "" });
     await loadList({ project: "p1", q: "" });
     onSocket({ type: "revoked", projectId: "p2" });
-    const seen: (StreamRow[] | null)[] = [];
+    const seen: (StreamList | null)[] = [];
     answer = () => {
       seen.push(list.value);
       return Response.json({ rows: [] });
@@ -1360,7 +1373,7 @@ describe("answers held for the way back", () => {
     await loadList({ project: null, q: "" });
     await loadList({ project: "p1", q: "" });
     onSocket({ type: "deleted", sessionId: "a", projectId: "p1" });
-    let seen: StreamRow[] | null | undefined;
+    let seen: StreamList | null | undefined;
     answer = () => {
       seen = list.value;
       return Response.json({ rows: [] });
@@ -1490,5 +1503,220 @@ describe("answers held for the way back", () => {
     };
     await loadList({ project: "p1", q: "" });
     expect(seen).toBeNull();
+  });
+});
+
+describe("the stream's pages", () => {
+  const first = () => [
+    row({ id: "a", lastActivityAt: 50 }),
+    row({ id: "b", lastActivityAt: 40 }),
+  ];
+  const second = () => [
+    row({ id: "c", lastActivityAt: 30 }),
+    row({ id: "d", projectId: "p2", lastActivityAt: 20 }),
+  ];
+
+  // Home's chats with two pages held: a b, then c d
+  async function twoPages(q = "") {
+    const urls: string[] = [];
+    answer = (url) => {
+      urls.push(url);
+      return url.includes("before=")
+        ? Response.json({ rows: second(), next: "after-d" })
+        : Response.json({ rows: first(), next: "after-b" });
+    };
+    await loadList({ project: null, q, origin: "chat" });
+    await loadMore();
+    return urls;
+  }
+
+  const arrived = (id: string) =>
+    onSocket({
+      type: "session",
+      projectId: "p1",
+      session: summary({ id, lastActivityAt: 60 }),
+      messages: [],
+      send: null,
+    });
+
+  const headWith = (id: string) => () =>
+    Response.json({
+      rows: [row({ id, lastActivityAt: 60 }), first()[0]!],
+      next: "after-a",
+    });
+
+  test.serial(
+    "a later page follows the held rows under the same filter",
+    async () => {
+      const urls = await twoPages("pods");
+      expect(urls).toEqual([
+        "/api/sessions?q=pods&origin=chat",
+        "/api/sessions?q=pods&origin=chat&before=after-b",
+      ]);
+      expect(ids(list.value)).toEqual(["a", "b", "c", "d"]);
+      expect(list.value?.next).toBe("after-d");
+      expect(list.value?.more).toEqual(IDLE);
+    },
+  );
+
+  test.serial("a page loads once at a time and not past the end", async () => {
+    let asked = 0;
+    let release: (r: Response) => void = () => {};
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    await loadList({ project: null, q: "" });
+    answer = () => {
+      asked++;
+      return new Promise((r) => {
+        release = r;
+      });
+    };
+    const more = loadMore();
+    expect(list.value?.more.loading).toBe(true);
+    void loadMore();
+    await settle();
+    release(Response.json({ rows: second(), next: null }));
+    await more;
+    expect(asked).toBe(1);
+    await loadMore();
+    expect(asked).toBe(1);
+    expect(list.value?.next).toBeNull();
+  });
+
+  test.serial("a failed page keeps the rows and says why", async () => {
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    await loadList({ project: null, q: "" });
+    answer = () => Response.json({ error: "busy" }, { status: 503 });
+    await loadMore();
+    expect(ids(list.value)).toEqual(["a", "b"]);
+    expect(list.value?.next).toBe("after-b");
+    expect(list.value?.more).toEqual({
+      loading: false,
+      error: { words: "busy", status: 503 },
+    });
+    answer = () => Response.json({ rows: second(), next: null });
+    await loadMore();
+    expect(ids(list.value)).toEqual(["a", "b", "c", "d"]);
+    expect(list.value?.more).toEqual(IDLE);
+  });
+
+  test.serial("a cold load keeps nothing past the first page", async () => {
+    await twoPages();
+    // while the socket was down, d was deleted, c renamed and p2
+    // revoked; the first page answers as before
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    await loadList({ project: null, q: "", origin: "chat" });
+    expect(ids(list.value)).toEqual(["a", "b"]);
+    expect(list.value?.next).toBe("after-b");
+  });
+
+  test.serial("a cold load drops a page in flight", async () => {
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    await loadList({ project: null, q: "" });
+    let release: (r: Response) => void = () => {};
+    answer = () =>
+      new Promise((r) => {
+        release = r;
+      });
+    const more = loadMore();
+    await settle();
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    await loadList({ project: null, q: "" });
+    expect(list.value?.more).toEqual(IDLE);
+    release(Response.json({ rows: second(), next: null }));
+    await more;
+    expect(ids(list.value)).toEqual(["a", "b"]);
+    expect(list.value?.next).toBe("after-b");
+  });
+
+  test.serial(
+    "a search's envelope for a row not held refreshes warm, keeping the tail",
+    async () => {
+      const urls = await twoPages("pods");
+      const head = headWith("n");
+      answer = (url) => {
+        urls.push(url);
+        return head();
+      };
+      arrived("n");
+      await settle();
+      expect(urls.at(-1)).toBe("/api/sessions?q=pods&origin=chat");
+      expect(ids(list.value)).toEqual(["n", "a", "b", "c", "d"]);
+      expect(list.value?.next).toBe("after-d");
+    },
+  );
+
+  test.serial("a warm refresh leaves a page in flight to land", async () => {
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    await loadList({ project: null, q: "" });
+    let release: (r: Response) => void = () => {};
+    answer = () =>
+      new Promise((r) => {
+        release = r;
+      });
+    const more = loadMore();
+    await settle();
+    answer = headWith("n");
+    arrived("n");
+    await settle();
+    expect(list.value?.more.loading).toBe(true);
+    release(Response.json({ rows: second(), next: null }));
+    await more;
+    expect(ids(list.value)).toEqual(["n", "a", "b", "c", "d"]);
+    expect(list.value?.next).toBeNull();
+  });
+
+  test.serial(
+    "a refresh asked while a cold load is out is cold too",
+    async () => {
+      await twoPages();
+      let release: (r: Response) => void = () => {};
+      answer = () =>
+        new Promise((r) => {
+          release = r;
+        });
+      const cold = loadList({ project: null, q: "", origin: "chat" });
+      await settle();
+      answer = () => Response.json({ rows: first(), next: "after-b" });
+      arrived("n");
+      await settle();
+      release(Response.json({ rows: first(), next: "after-b" }));
+      await cold;
+      expect(ids(list.value)).toEqual(["a", "b"]);
+    },
+  );
+
+  test.serial("a held filter comes back with its first page", async () => {
+    await twoPages();
+    answer = () => Response.json({ rows: [], next: null });
+    await loadList({ project: "p1", q: "" });
+    let seen: StreamList | null | undefined;
+    answer = () => {
+      seen = list.value;
+      return Response.json({ rows: first(), next: "after-b" });
+    };
+    await loadList({ project: null, q: "", origin: "chat" });
+    expect(ids(seen)).toEqual(["a", "b"]);
+    expect(seen?.next).toBe("after-b");
+    expect(ids(list.value)).toEqual(["a", "b"]);
+  });
+
+  test.serial("a revocation loads Home cold", async () => {
+    await twoPages();
+    answer = () => Response.json({ rows: first(), next: "after-b" });
+    onSocket({ type: "revoked", projectId: "p3" });
+    await settle();
+    expect(ids(list.value)).toEqual(["a", "b"]);
+  });
+
+  test.serial("a granted project loads Home again", async () => {
+    const urls = await twoPages();
+    answer = (url) => {
+      urls.push(url);
+      return Response.json({ rows: first(), next: "after-b" });
+    };
+    onSocket({ type: "granted", projectId: "p3" });
+    await settle();
+    expect(urls.at(-1)).toBe("/api/sessions?origin=chat");
+    expect(ids(list.value)).toEqual(["a", "b"]);
   });
 });

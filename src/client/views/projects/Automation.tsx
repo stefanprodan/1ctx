@@ -5,18 +5,16 @@
 // zone, which agent is asked, then the instructions as the agent gets
 // them, cut to a few lines. Suspend or Resume and Run now, which anyone
 // in the project presses, and Edit for whoever may change it, sit over
-// two tabs. Runs is a log: what started each run, when, the answer's
-// first line, and how long it took against its deadline, with Stop while
-// it runs. Memory is the automation's own note.
+// two tabs. Runs is a log of RunRow.tsx rows, a page at a time. Memory
+// is the automation's own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
-import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import type { RunFilter, SessionStatus } from "../../../shared/words.ts";
+import type { RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
 import {
@@ -24,35 +22,23 @@ import {
   automationProject,
   automations,
   automationsError,
-  closeRunsOf,
   loadPreview,
   preview,
   previewKey,
   runDeadlineMs,
-  runs,
 } from "../../data/automations.ts";
 import { me } from "../../data/me.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
-import { projectAgents, stopSession } from "../../data/sessions.ts";
-import { longDate, says, sentence, stamp, until } from "../../lib/format.ts";
+import { closeRunsOf, loadMoreRuns, runs } from "../../data/runs.ts";
+import { projectAgents } from "../../data/sessions.ts";
+import { longDate, sentence, until } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useCut } from "../../lib/resize.ts";
-import { stateLine, whenText } from "../../stream/Row.model.ts";
+import { ShowMore } from "../../stream/Stream.tsx";
 import { Page } from "../../ui/Page.tsx";
-import {
-  RowsAvatar,
-  RowsBad,
-  RowsCard,
-  RowsEnd,
-  RowsFilters,
-  RowsGo,
-  RowsHandle,
-  RowsMeta,
-  RowsNote,
-  RowsTitle,
-} from "../../ui/Rows.tsx";
+import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
@@ -61,15 +47,12 @@ import { AutomationActions } from "./AutomationActions.tsx";
 import {
   browserZone,
   canChange,
-  deadlineShare,
   deadlineText,
-  durationOf,
-  durationText,
   eventNote,
   scheduleTitle,
-  sourceText,
   suspendedText,
 } from "./Automations.model.ts";
+import { RunRow } from "./RunRow.tsx";
 import { fireLabel } from "./Schedule.model.ts";
 import "./automations.css";
 
@@ -78,101 +61,6 @@ const FILTERS: { value: RunFilter | null; label: string }[] = [
   { value: "failed", label: "Failed" },
   { value: "manual", label: "Manual" },
 ];
-
-// a run's clock is lit by its status, as the feed's is; a stopped run
-// stays faint
-function runIcon(status: SessionStatus): string {
-  return status === "stopped" ? "automations-faint" : `status-${status}`;
-}
-
-function RunRow({
-  row,
-  deadlineMs,
-  now,
-}: {
-  row: StreamRow;
-  deadlineMs: number;
-  now: number;
-}) {
-  const failure = useSignal<string | null>(null);
-  const { session } = row;
-  const running = session.status === "running";
-  const line = stateLine(row);
-  const took = durationOf(row, now);
-  const share = took === null ? 0 : deadlineShare(took, deadlineMs);
-  return (
-    <RowsGo
-      href={`/chat/${session.id}`}
-      end={
-        running ? (
-          <RowsEnd>
-            <button
-              type="button"
-              class="btn btn-small"
-              onClick={() => {
-                failure.value = null;
-                stopSession(session.id).catch((err) => {
-                  failure.value = says(err);
-                });
-              }}
-            >
-              <Icon name="stop" size={12} />
-              Stop
-            </button>
-          </RowsEnd>
-        ) : undefined
-      }
-    >
-      {/* the icon says how the run started, and who pressed Run now
-          under the pointer, so the line is the feed's: author and words */}
-      <RowsAvatar title={sourceText(row) || undefined}>
-        <Icon
-          name={session.runSource === "manual" ? "bolt" : "clock"}
-          size={15}
-          class={runIcon(session.status)}
-        />
-      </RowsAvatar>
-      <RowsTitle
-        name={stamp(row.send?.startedAt ?? session.createdAt)}
-        sub={
-          <>
-            {line.author !== null && (
-              <>
-                <RowsHandle name={line.author} />{" "}
-              </>
-            )}
-            {/* only the failure's words are red; who ran it keeps its colour */}
-            {failure.value !== null || session.status === "failed" ? (
-              <RowsBad>{failure.value ?? line.text}</RowsBad>
-            ) : (
-              line.text
-            )}
-            {row.send?.memoryError != null && " Memory not updated."}
-            {row.send?.memorySkipped != null &&
-              row.send.memorySkipped > 0 &&
-              ` ${row.send.memorySkipped} edits no longer applied.`}
-          </>
-        }
-      />
-      <RowsMeta keep>
-        <span class="automations-run-meta">
-          <span class="automations-took">
-            <span>{took === null ? "" : durationText(took)}</span>
-            <span class="meter" aria-hidden="true">
-              <span
-                class={`meter-fill automations-bar-${session.status}`}
-                style={{ width: `${Math.round(share * 100)}%` }}
-              />
-            </span>
-          </span>
-          {!running && (
-            <span class="automations-ago">{whenText(row, now)}</span>
-          )}
-        </span>
-      </RowsMeta>
-    </RowsGo>
-  );
-}
 
 // the instructions cut to a few lines, with Show more once they run
 // past them; measured again when the width moves the cut
@@ -477,14 +365,24 @@ export function Automation({ params }: { params: Params }) {
                       : "No runs yet."}
                 </RowsNote>
               ) : (
-                held.rows.map((r) => (
-                  <RunRow
-                    key={r.session.id}
-                    row={r}
-                    deadlineMs={deadlineMs}
-                    now={now.value}
+                <>
+                  {held.rows.map((r) => (
+                    <RunRow
+                      key={r.session.id}
+                      row={r}
+                      deadlineMs={deadlineMs}
+                      now={now.value}
+                    />
+                  ))}
+                  <ShowMore
+                    more={{
+                      next: held.next !== null,
+                      loading: held.more.loading,
+                      error: held.more.error,
+                    }}
+                    onMore={() => void loadMoreRuns()}
                   />
-                ))
+                </>
               )}
             </RowsCard>
           )}

@@ -1014,9 +1014,18 @@ violation, and every rule has a rejected fixture under
   its envelope brings it. The `session.changed` envelope carries `last`
   only when its transaction wrote such a row. `stream/Row.model.ts`
   composes the state line and the time from those and never reads a
-  transcript; `data/stream.ts` holds the rows for one filter, the
-  query on the URL, and adds a row from an envelope only when no
-  query is set.
+  transcript; `data/stream.ts` holds `{rows, next, more}` for one
+  filter, the query on the URL. A first page loads cold on a
+  navigation, the socket's open, a user change, `granted` and
+  `revoked`, dropping every row past it; warm on an envelope for a row
+  not held (under any covering filter, a search included) and a
+  delete, keeping the held rows past its last row and the held `next`
+  while any are kept. A warm load asked while a cold one is out is
+  cold. `loadMore()` merges a later page by id and revision, is dropped
+  by a cold load and not by a warm one, and a failure keeps the rows
+  and sets `more.error`. The pure reducers `mergeNextPage()` and
+  `refreshHead()` sit beside `ordered()` in `data/sessions-rows.ts`,
+  taking the order: `streamOrder` or the runs' `runOrder`.
 - **Views never fetch.** `data/` owns the entities and the calls; a view
   reads signals and renders with the primitives under `ui/`. A route
   entry names its `load` in `app/routes.ts`, and `app/loading.ts`
@@ -1028,7 +1037,8 @@ violation, and every rule has a rejected fixture under
   per filter, a project, its agents and automations, a settled chat,
   a directory page) holds the answers of keys seen before in
   `data/held.ts`, so a page seen before draws them at once while its
-  load runs again; never a running chat, and nothing past a user
+  load runs again (the stream holds a filter's first page and its
+  `next` only); never a running chat, and nothing past a user
   change, a revocation, a deletion or a failed load of that key. A
   project's head and tabs draw from the rail's row, and the tab counts
   show only once all are known. A load waits for the project list only
@@ -1102,7 +1112,11 @@ violation, and every rule has a rejected fixture under
   chips of its own; its stylesheet holds only
   what an open row's body or a meta holds. The stream's session row
   (`stream/Row.tsx`) is the one row outside Rows, a denser feed line
-  inside a `RowsCard`. A card whose
+  inside a `RowsCard`. A paged list ends in `ShowMore` from
+  `stream/Stream.tsx` while `next` is set: a `RowsButton` reading Show
+  more, three `Ghosts` in its place while the page loads (six for a
+  first load), and a failure under it, words then the code tag. No
+  infinite scroll. A card whose
   list grows (the Projects page, and Users, Projects, Agents and Skills
   under Admin) passes `ui/Search.tsx` as `RowsCard`'s `search`, in
   place of the label, and filters the loaded rows through `matches()`
@@ -1138,9 +1152,14 @@ violation, and every rule has a rejected fixture under
   where the rail marks its project through `automationProject`: the
   brief (schedule, zone, agent, the instructions cut to four lines with
   Show more), then Suspend or Resume, Edit and Run now over two tabs:
-  Runs, a log with the source as the icon (who pressed Run now its
+  Runs, a log of `RunRow.tsx` rows with the source as the icon (who pressed Run now its
   title) and the feed's line, length against the deadline and Stop,
-  filtered by `?runs=` and counted by the tally, and, only
+  filtered by `?runs=` and counted by the tally, paged with Show more
+  (`loadMoreRuns()` in `data/runs.ts`, under the runs' turn, so
+  `closeRuns()`, a filter change, a revocation and a first-page load
+  drop it; a filter change is cold and keeps only the tally, a tally
+  refresh is warm, and a later page's tally replaces the held one;
+  `upsertRun()` orders by last activity then id), and, only
   with `ownMemory`, Memory, `/automations/:id/memory`, the own note
   counted by its entries (both routes name one view, so a tab change
   keeps the page mounted); and the aside of next fires, the tally and the setup. The editor is a page of
@@ -1152,7 +1171,7 @@ violation, and every rule has a rejected fixture under
   the next run, the
   zone is `ui/ZoneSelect.tsx`, and the deadline starts at the
   limit, which `GET /api/projects/:id/automations` answers beside the
-  rows. `data/automations.ts` keeps the list, the runs and the tally
+  rows. `data/automations.ts` keeps the list, and `data/runs.ts` the runs and the tally,
   current from the frames. A run's chat page names its automation over
   the transcript and has no composer, no Regenerate and no `/compact`;
   its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
