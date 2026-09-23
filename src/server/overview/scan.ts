@@ -79,6 +79,8 @@ export type ScanResult = {
   slots: [number, number][];
   staging: number;
   digests: number;
+  // usage rows in all, and those of runs of tasks that still exist
+  usage: { rows: number; runRows: number };
 };
 
 export const SLOT_MS = 900_000;
@@ -152,7 +154,10 @@ function pages(db: Db): { pages: PageRow[]; tables: string[] } {
         bytes,
       };
     }),
-    tables: schema.filter((row) => row.type === "table").map((r) => r.name),
+    tables: schema
+      .filter((row) => row.type === "table")
+      .map((r) => r.name)
+      .concat("sqlite_schema"),
   };
 }
 
@@ -254,9 +259,10 @@ function knowledge(db: Db): KnowledgeSum[] {
 }
 
 // What was added when: each row's stored bytes on the quarter hour its
-// creation time falls in. Opened and kept files take their message's
-// time, scratch its last use (it has no creation time), a skill's files
-// the fetch that wrote them.
+// creation time falls in. A live knowledge file takes its last write,
+// since a replacement keeps created_at; opened and kept files take
+// their message's time, scratch its last use (it has no creation
+// time), a skill's body and files the fetch that wrote them.
 const SLOT_SOURCES = [
   `select created_at / ${SLOT_MS} as slot, sum(${MESSAGE_BYTES}) as bytes
      from messages where created_at >= ? group by slot`,
@@ -266,8 +272,8 @@ const SLOT_SOURCES = [
   `select m.created_at / ${SLOT_MS} as slot, sum(k.bytes) as bytes
      from mcp_kept_files k join messages m on m.id = k.message_id
      where m.created_at >= ? group by slot`,
-  `select created_at / ${SLOT_MS} as slot, sum(bytes) as bytes
-     from knowledge_files where created_at >= ? group by slot`,
+  `select updated_at / ${SLOT_MS} as slot, sum(bytes) as bytes
+     from knowledge_files where updated_at >= ? group by slot`,
   `select written_at / ${SLOT_MS} as slot, sum(bytes) as bytes
      from knowledge_versions where written_at >= ? group by slot`,
   `select created_at / ${SLOT_MS} as slot, sum(bytes) as bytes
@@ -276,9 +282,10 @@ const SLOT_SOURCES = [
      from upload_staged where created_at >= ? group by slot`,
   `select used_at / ${SLOT_MS} as slot, sum(bytes) as bytes
      from session_scratch where used_at >= ? group by slot`,
-  `select s.fetched_at / ${SLOT_MS} as slot,
-          sum(octet_length(s.body)) + coalesce(sum(f.bytes), 0) as bytes
-     from skills s left join skill_files f on f.skill_id = s.id
+  `select fetched_at / ${SLOT_MS} as slot, sum(octet_length(body)) as bytes
+     from skills where fetched_at >= ? group by slot`,
+  `select s.fetched_at / ${SLOT_MS} as slot, sum(f.bytes) as bytes
+     from skill_files f join skills s on s.id = f.skill_id
      where s.fetched_at >= ? group by slot`,
 ];
 
@@ -297,7 +304,28 @@ function slots(db: Db, since: number): [number, number][] {
 const total = (db: Db, sql: string): number =>
   db.query<{ bytes: number | null }, []>(sql).get()?.bytes ?? 0;
 
+function usage(db: Db): ScanResult["usage"] {
+  return db
+    .query<ScanResult["usage"], []>(
+      `select count(*) as rows,
+              count(s.id) as runRows
+         from usage u left join sessions s
+           on s.id = u.session_id and s.automation_id is not null`,
+    )
+    .get()!;
+}
+
+// one read transaction, so every statement sees the same WAL snapshot
 export function scan(db: Db, input: ScanInput): ScanResult {
+  db.exec("begin");
+  try {
+    return read(db, input);
+  } finally {
+    db.exec("rollback");
+  }
+}
+
+function read(db: Db, input: ScanInput): ScanResult {
   const { pages: pageRows, tables } = pages(db);
   return {
     readAt: input.now,
@@ -324,5 +352,6 @@ export function scan(db: Db, input: ScanInput): ScanResult {
       db,
       "select sum(octet_length(body)) as bytes from mcp_digests",
     ),
+    usage: usage(db),
   };
 }

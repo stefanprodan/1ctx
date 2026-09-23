@@ -127,14 +127,17 @@ area together and never named, the stored bytes added a day over the
 zone's last 30 days and the 30 before, the ten largest projects, chats
 and tasks, and the retention lists. Stored is a table's `bytes`, or
 `octet_length` of the text columns of `messages` (`MESSAGE_BYTES`);
-usage, logins and the rest are their table's pages. A personal project
+usage, logins and the rest are their table's pages, and a living
+task's runs take their kept MCP files and the usage pages by their
+share of the rows. A personal project
 is counted and never named: `id`, `name` and `project` null, `owner`
-its owner. `scan.ts` is the queries, pure over a `Db`; it sums what
+its owner. `scan.ts` is the queries, pure over a `Db` inside one read
+transaction; it sums what
 was added by quarter hour of UTC, which every zone's midnight falls
 on, so one scan serves any zone. `bun:sqlite` is synchronous, so the
 scan runs in `scan.worker.ts`, a `Worker` per scan over its own
-read-only connection to the file, ended when it answers or at
-shutdown; a memory database runs it inline. The worker is the second
+read-only connection to the file, ended when it answers, after
+`SCAN_DEADLINE_MS` or at shutdown; a memory database runs it inline. The worker is the second
 entry point of `bun build --compile`, where a relative URL resolves
 against the compile root, `src/server`, so `compose.ts` builds the URL
 and passes it in. `cache.ts` keeps one scan in flight and its answer a

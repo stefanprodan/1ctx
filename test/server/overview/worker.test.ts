@@ -5,8 +5,10 @@
 // connection, the worker reads beside it, and the answer names the file.
 
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { overviewArea } from "../../../src/server/overview/index.ts";
 import { workerScanner } from "../../../src/server/overview/worker.ts";
@@ -74,6 +76,20 @@ describe("the scan worker", () => {
       fields: { error: "disk gone" },
     });
     await app.shutdown();
+  });
+
+  test("a scan past its deadline is ended and refused", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "1ctx-stuck-"));
+    try {
+      const stuck = join(dir, "stuck.worker.ts");
+      writeFileSync(stuck, "self.onmessage = () => {};\n");
+      const scanner = workerScanner("unused.sqlite", pathToFileURL(stuck), 50);
+      await expect(scanner.scan({ now: 0, since: 0 })).rejects.toThrow(
+        "scan timed out",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("close ends a scan in flight", async () => {

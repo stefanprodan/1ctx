@@ -285,9 +285,11 @@ function largest(result: ScanResult): StorageResponse["largest"] {
 }
 
 // Kept is what only a delete removes, cleaned what a sweep or a task's
-// retention takes. A run whose task is gone is a chat's equal. Rows
-// without a byte count (usage, logins, the rest) are their table's
-// pages on disk.
+// retention takes. A run whose task is gone is a chat's equal; a run
+// of a living task goes with its kept MCP files and its usage rows.
+// Rows without a byte count (usage, logins, the rest) are their
+// table's pages on disk, and the runs' usage is the table's pages by
+// the share of its rows that are theirs.
 function retention(
   result: ScanResult,
   limits: StorageLimits,
@@ -295,16 +297,21 @@ function retention(
   const table = (name: string) =>
     result.pages.find((row) => row.kind === "table" && row.name === name)
       ?.bytes ?? 0;
+  const usagePages = table("usage");
+  const runUsage =
+    result.usage.rows === 0
+      ? 0
+      : Math.round((usagePages * result.usage.runRows) / result.usage.rows);
   const kept: Record<RetentionKept, number> = {
     chats: 0,
     knowledge: 0,
     uploads: 0,
     mcp: 0,
-    usage: table("usage"),
+    usage: usagePages - runUsage,
     rest: 0,
   };
   const cleaned: Record<RetentionCleaned, number> = {
-    runs: 0,
+    runs: runUsage,
     scratch: 0,
     history: 0,
     staging: result.staging,
@@ -313,10 +320,13 @@ function retention(
   };
   for (const session of result.sessions) {
     const own = session.messageBytes + session.openedBytes;
-    if (session.automationId === null) kept.chats += own;
-    else cleaned.runs += own;
+    if (session.automationId === null) {
+      kept.chats += own;
+      kept.mcp += session.mcpBytes;
+    } else {
+      cleaned.runs += own + session.mcpBytes;
+    }
     kept.uploads += session.uploadBytes;
-    kept.mcp += session.mcpBytes;
     cleaned.scratch += session.scratchBytes;
   }
   for (const row of result.knowledge) {

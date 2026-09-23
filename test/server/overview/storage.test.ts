@@ -106,6 +106,7 @@ describe("the storage scan", () => {
     );
     expect(auto).toMatchObject({ kind: "index", table: "users" });
     expect(result.rows.users).toBe(1);
+    expect(result.rows.sqlite_schema).toBeGreaterThan(30);
     expect(result.file).toMatchObject({
       name: ":memory:",
       bytes: 0,
@@ -114,6 +115,27 @@ describe("the storage scan", () => {
       lastMigration: expect.stringMatching(/^\d{4}-/),
     });
     expect(result.file.pages).toBeGreaterThan(0);
+  });
+
+  test("sums a skill's body and its files apart", async () => {
+    const app = await testApp();
+    const now = app.now.value;
+    app.db
+      .query(
+        `insert into skills (id, name, description, body, license, compatibility,
+           metadata, allowed_tools, source_kind, source_url, source_select,
+           source_digest, digest, dropped, fetched_at, created_at)
+         values ('s1', 'notes', '', '0123456789', '', '', '{}', '', 'file',
+           'https://example.test/SKILL.md', '', '', '', '[]', ?, ?)`,
+      )
+      .run(now, now);
+    const file = app.db.query(
+      "insert into skill_files (skill_id, path, content, bytes) values ('s1', ?, 'abcde', 5)",
+    );
+    for (const path of ["a.md", "b.md", "c.md"]) file.run(path);
+    const result = scan(app.db, { now, since: 0 });
+    const added = result.slots.reduce((sum, [, bytes]) => sum + bytes, 0);
+    expect(added).toBe(10 + 3 * 5);
   });
 });
 
@@ -222,10 +244,31 @@ describe("the storage answer", () => {
       body.retention.cleaned.map((row) => [row.key, row]),
     );
     expect(kept.chats).toBe(messageBytes(chat, chatId));
-    expect(cleaned.runs).toEqual({ key: "runs", bytes: runBytes, days: 14 });
+    // the runs' share of the usage table's pages goes with the runs
+    const usagePages = body.areas
+      .flatMap((area) => area.tables)
+      .find((table) => table.name === "usage")!.bytes;
+    const usageRows = chat.app.db
+      .query<{ total: number; runs: number }, []>(
+        `select count(*) as total,
+                sum(session_id in (select id from sessions where automation_id is not null)) as runs
+           from usage`,
+      )
+      .get()!;
+    expect(usageRows.runs).toBe(2);
+    expect(usageRows.total).toBe(3);
+    const runUsage = Math.round(
+      (usagePages * usageRows.runs) / usageRows.total,
+    );
+    expect(runUsage).toBeGreaterThan(0);
+    expect(cleaned.runs).toEqual({
+      key: "runs",
+      bytes: runBytes + runUsage,
+      days: 14,
+    });
+    expect(kept.usage).toBe(usagePages - runUsage);
     expect(cleaned.scratch?.days).toBe(DEFAULT_LIMITS.scratchIdleDays);
     expect(cleaned.history?.days).toBe(DEFAULT_LIMITS.knowledgeHistoryDays);
-    expect(kept.usage).toBeGreaterThan(0);
     expect(kept.rest).toBeGreaterThan(0);
     const project = body.largest.projects[0]!;
     expect(project.parts.map((part) => part.part).sort()).toEqual([
@@ -233,6 +276,32 @@ describe("the storage answer", () => {
       "runs",
     ]);
     expect(project.bytes).toBe(runBytes + messageBytes(chat, chatId));
+  });
+
+  test("keeps a chat's MCP files and cleans a run's with the run", async () => {
+    const chat = await chatApp();
+    const chatId = await settledChat(chat);
+    const automation = await createAutomation(chat, { retentionDays: 3 });
+    const { sessionId: runId, main } = await startRun(chat, automation.id);
+    main.reply("done");
+    await settleRun(chat, runId);
+    const kept = chat.app.db.query(
+      `insert into mcp_kept_files (message_id, position, session_id, folder, dir,
+         name, bytes, text)
+       select id, 0, session_id, 1, '/mcp/0001-tool', 'result.txt', ?, 'x'
+         from messages where session_id = ? and kind = 'reply'`,
+    );
+    kept.run(700, chatId);
+    kept.run(300, runId);
+    const body = await storage(chat);
+    const keptMcp = body.retention.kept.find((row) => row.key === "mcp");
+    expect(keptMcp?.bytes).toBe(700);
+    const runs = body.retention.cleaned.find((row) => row.key === "runs")!;
+    expect(runs.bytes).toBeGreaterThanOrEqual(messageBytes(chat, runId) + 300);
+    expect(body.largest.tasks[0]?.parts).toEqual([
+      { part: "mcp", bytes: 300 },
+      { part: "runs", bytes: messageBytes(chat, runId) },
+    ]);
   });
 
   test("sums a project's live files, their versions and deleted history", async () => {
@@ -315,6 +384,32 @@ describe("the storage answer", () => {
     );
     expect(utcByDay["2026-11-01"]).toBe(bytesOf(rows[0]!.id));
     expect(utcByDay["2026-11-02"]).toBe(bytesOf(rows[1]!.id));
+  });
+
+  test("puts a replaced file's live bytes on the day it was written", async () => {
+    const chat = await chatApp();
+    chat.app.now.value = Date.parse("2026-06-10T12:00:00Z");
+    await relogin(chat);
+    const projectId = await team(chat, "docs");
+    const base = `/api/projects/${projectId}/knowledge`;
+    const created = await chat.member.call("POST", base, {
+      body: { name: "notes.md", text: "one" },
+    });
+    expect(created.status).toBe(201);
+    const { file } = await created.json();
+    chat.app.now.value = Date.parse("2026-06-15T12:00:00Z");
+    const replaced = await chat.member.call("PUT", `${base}/files/${file.id}`, {
+      body: { text: "one and two", revision: file.revision },
+    });
+    expect(replaced.status).toBe(200);
+    const body = await storage(chat);
+    const byDay = Object.fromEntries(
+      body.days.map((day) => [day.day, day.bytes]),
+    );
+    // the first version on its day; the live file and its second
+    // version on the day of the write
+    expect(byDay["2026-06-10"]).toBe(3);
+    expect(byDay["2026-06-15"]).toBe(11 + 11);
   });
 
   test("counts the days before the window", async () => {
