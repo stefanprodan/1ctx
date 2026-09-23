@@ -7,7 +7,10 @@
 import { decodeBytesToUtf8 } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { mapToRecord } from "../../helpers/env.js";
-import { ExecutionLimitError } from "../../interpreter/errors.js";
+import {
+  ExecutionAbortedError,
+  ExecutionLimitError,
+} from "../../interpreter/errors.js";
 import {
   assertDefenseContext,
   awaitWithDefenseContext,
@@ -160,6 +163,7 @@ export const awkCommand2: RuntimeCommand = {
         : undefined,
       coverage: ctx.coverage,
       requireDefenseContext: ctx.requireDefenseContext,
+      signal: ctx.signal,
     });
 
     // ARGV[0] is "awk", ARGV[1..n] the operands, read as the walk reaches them
@@ -276,7 +280,10 @@ export const awkCommand2: RuntimeCommand = {
         exitCode: interp.getExitCode(),
       };
     } catch (e) {
-      if (e instanceof SecurityViolationError) {
+      if (
+        e instanceof SecurityViolationError ||
+        e instanceof ExecutionAbortedError
+      ) {
         throw e;
       }
       // Handle errors during execution

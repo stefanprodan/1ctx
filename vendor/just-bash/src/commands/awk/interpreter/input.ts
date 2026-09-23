@@ -11,6 +11,7 @@ import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import { utf8ByteLength } from "../../printf/escapes.js";
 import { isReservedName, operandAssignment } from "../options.js";
 import type { AwkRuntimeContext } from "./context.js";
+import { nextRecord } from "./records.js";
 import { toNumber } from "./type-coercion.js";
 import { setVariable } from "./variables.js";
 
@@ -37,18 +38,17 @@ export function chargeInput(ctx: AwkRuntimeContext, bytes: number): void {
   ctx.inputBytes += bytes;
 }
 
-/** The next record of a stream, or null at its end. */
+/** The next record of a stream under the current RS, setting RT, or null. */
 export function readRecord(
   ctx: AwkRuntimeContext,
   stream: InputStream,
 ): string | null {
-  if (stream.pos >= stream.text.length) return null;
-  const nl = stream.text.indexOf("\n", stream.pos);
-  const end = nl < 0 ? stream.text.length : nl;
-  const record = stream.text.slice(stream.pos, end);
-  stream.pos = nl < 0 ? end : end + 1;
+  const next = nextRecord(stream.text, stream.pos, ctx.RS, ctx.signal);
+  if (!next) return null;
+  stream.pos = next.next;
   countRecord(ctx, stream);
-  return record;
+  ctx.RT = next.rt;
+  return next.record;
 }
 
 function countRecord(ctx: AwkRuntimeContext, stream: InputStream): void {

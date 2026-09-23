@@ -11,6 +11,7 @@ import { ExecutionLimitError } from "../../interpreter/errors.js";
 import { createUserRegex, type UserRegex } from "../../regex/index.js";
 import type { AwkExpr } from "./ast.js";
 import type { AwkRuntimeContext } from "./interpreter/context.js";
+import { splitRecord } from "./interpreter/fields.js";
 import type { AwkValue } from "./interpreter/types.js";
 
 /**
@@ -147,10 +148,7 @@ function applyTargetValue(
 ): void {
   if (targetName === "$0") {
     ctx.line = newValue;
-    ctx.fields =
-      ctx.FS === " "
-        ? newValue.trim().split(/\s+/).filter(Boolean)
-        : ctx.fieldSep.split(newValue);
+    ctx.fields = splitRecord(ctx, newValue);
     ctx.NF = ctx.fields.length;
   } else if (targetName.startsWith("$")) {
     const idx = parseInt(targetName.slice(1), 10) - 1;
@@ -592,6 +590,25 @@ async function awkSrand(
     args.length > 0 ? toNumber(await evaluator.evalExpr(args[0])) : Date.now();
   ctx.vars._srand_seed = seed;
   return seed;
+}
+
+// (1ctx) close(name) ends what gawk would: the file getline reads (by
+// path), the command getline reads (by its text, so it runs again), and
+// the output file of that name, so the next ">" truncates it.
+async function awkClose(
+  args: AwkExpr[],
+  ctx: AwkRuntimeContext,
+  evaluator: AwkEvaluator,
+): Promise<number> {
+  if (args.length === 0) return -1;
+  const name = toAwkString(await evaluator.evalExpr(args[0]));
+  let closed = ctx.getlineCommandStreams.delete(name);
+  if (ctx.fs && ctx.cwd) {
+    const path = ctx.fs.resolvePath(ctx.cwd, name);
+    if (ctx.getlineFileStreams.delete(path)) closed = true;
+    if (ctx.openedFiles.delete(path)) closed = true;
+  }
+  return closed ? 0 : -1;
 }
 
 // ─── Unsupported Functions ──────────────────────────────────────
@@ -1039,9 +1056,9 @@ export const awkBuiltins: Map<string, AwkBuiltinFn> = new Map([
       "shell execution not allowed in sandboxed environment",
     ),
   ],
-  // close() and fflush() are no-ops in our environment (no real file handles)
-  // Return 0 for success to allow programs that use them to work
-  ["close", () => 0],
+  // (1ctx) close() ends a getline stream or an output file of that name
+  ["close", awkClose],
+  // fflush() is a no-op in our environment (no real file handles)
   ["fflush", () => 0],
 
   // Unimplemented functions

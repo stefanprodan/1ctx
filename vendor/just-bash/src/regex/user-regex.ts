@@ -491,6 +491,17 @@ export class UserRegex implements RegexLike {
   }
 
   /**
+   * (1ctx) The first match at or after `from`, as offsets into the input,
+   * for callers that walk a long text one match at a time.
+   */
+  scan(input: string, from = 0): { start: number; end: number } | null {
+    if (this.signal?.aborted) throw new Error("regular expression aborted");
+    const matcher = this.acquireMatcher(input);
+    if (!matcher.find(from)) return null;
+    return { start: matcher.start(0), end: matcher.end(0) };
+  }
+
+  /**
    * Get all matches using an iterator (for global regexes).
    */
   *matchAll(input: string): IterableIterator<RegExpMatchArray> {

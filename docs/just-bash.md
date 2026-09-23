@@ -18,7 +18,8 @@ new upstream release.
 | Its packages | pinned devDependencies in our `package.json`, the versions its 3.4.2 release resolved to |
 
 Code in `src/` and `test/` imports `just-bash` as a package. Nothing
-outside `vendor/just-bash/` reaches into its files.
+outside `vendor/just-bash/` reaches into its files, but the unit tests
+of our own modules in `test/vendor/just-bash/`.
 
 The vendored tree is outside Biome (`biome.json`) and the structure test.
 `tsc` checks the files our code imports, with our settings.
@@ -60,6 +61,7 @@ without a file of their own.
 | `src/commands/yq/yq.ts` | the leading `eval` or `e` of mikefarah's `yq eval <filter> <file>` is taken as his, `eval-all` is refused with a pointer to `-s`, `--version` answers, several files are read in turn with `-i` writing each, a value joined to `-o`, `-p` or `-I` (`-ojson`, `-I0`) is read, and JSON at `-I0` is one line | models write mikefarah's forms: `yq eval` failed on a file named after the filter, the files after the first were dropped without a word |
 | `src/commands/yq/preserve.ts` (new) | `yq -i` applies the change between each document and its result to the parsed document, so untouched nodes keep their comments, quoting and style; a result that does not read back exactly is printed plainly | the engine works on plain values, so every in-place edit deleted the file's comments |
 | `src/commands/awk/awk2.ts`, `options.ts` (new), `interpreter/input.ts` (new), `interpreter/variables.ts`, `interpreter/context.ts`, `lexer.ts` | `-v` and `-F` are one ordered list of assignments replayed before `BEGIN`, their values read with awk's string escapes; `-f` reads the program from files and `--` ends the options; after `BEGIN` the operands are read from `ARGV[1]` to `ARGV[ARGC-1]` as they stand, a `name=value` operand is an assignment done when reached, `-` is stdin, a missing file is fatal (exit 2) and stdin's `FILENAME` is `-`; `ARGV` and `ENVIRON` are ordinary arrays and `ARGC` can be set | `-v OFS='\t'` printed a space, `-F` lost to an earlier `-v FS`, `-f` was refused and `FS=,` among the operands was read as a file name; models write gawk's forms |
+| `src/commands/awk/interpreter/records.ts` (new), `input.ts`, `expressions.ts`, `fields.ts`, `builtins.ts`, `src/regex/user-regex.ts` | `RS` and `RT` are built-ins: a record is read one at a time under the `RS` in force, a single character literally, `""` as paragraph mode (a newline also separates fields), two or more characters as a regular expression found through the new `UserRegex.scan()`, one that can match the empty string refused; every `getline` form reads records the same way and sets `RT`, plain `getline` moves `NR` and `FNR`, and the main input, `getline` files and commands share one byte budget; `close()` ends a `getline` file or command and an output file, answering 0 or -1; the abort signal stops the reader | the input was always split on newlines, so `RS="---"` over a kept YAML list gave one record per line with exit 0, and `close()` did nothing |
 
 ### Where our jq still differs from jq
 

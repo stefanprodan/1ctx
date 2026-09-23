@@ -7,6 +7,7 @@
 import { ConstantRegex, type RegexLike } from "../../../regex/index.js";
 import type { FeatureCoverageWriter } from "../../../types.js";
 import type { AwkFunctionDef } from "../ast.js";
+import type { InputStream } from "./input.js";
 import type { AwkFileSystem, AwkValue } from "./types.js";
 
 const DEFAULT_MAX_ITERATIONS = 10000;
@@ -28,6 +29,9 @@ export interface AwkRuntimeContext {
   RSTART: number;
   RLENGTH: number;
   SUBSEP: string;
+  // (1ctx) the record separator and the text that ended the last record
+  RS: string;
+  RT: string;
 
   // Current line data
   fields: string[];
@@ -55,8 +59,8 @@ export interface AwkRuntimeContext {
   maxInputBytes: number;
   inputBytes: number;
   /** Internal getline streams, isolated from the AWK variable namespace. */
-  getlineCommandStreams: Map<string, { lines: string[]; index: number }>;
-  getlineFileStreams: Map<string, { lines: string[]; index: number }>;
+  getlineCommandStreams: Map<string, InputStream>;
+  getlineFileStreams: Map<string, InputStream>;
   fieldSep: RegexLike;
 
   // Execution limits
@@ -100,6 +104,9 @@ export interface AwkRuntimeContext {
   // Feature coverage writer for fuzzing instrumentation
   coverage?: FeatureCoverageWriter;
 
+  // (1ctx) the command's abort signal, checked by the record reader
+  signal?: AbortSignal;
+
   // Defense context invariant flag propagated from RuntimeCommandContext
   requireDefenseContext?: boolean;
 }
@@ -118,6 +125,7 @@ export interface CreateContextOptions {
   ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
   coverage?: FeatureCoverageWriter;
   requireDefenseContext?: boolean;
+  signal?: AbortSignal;
 }
 
 export function createRuntimeContext(
@@ -135,6 +143,7 @@ export function createRuntimeContext(
     exec,
     coverage,
     requireDefenseContext,
+    signal,
   } = options;
 
   // (1ctx) ARGV and ENVIRON are ordinary arrays, so delete, in and for-in
@@ -157,6 +166,8 @@ export function createRuntimeContext(
     RSTART: 0,
     RLENGTH: -1,
     SUBSEP: "\x1c",
+    RS: "\n",
+    RT: "",
 
     fields: [],
     line: "",
@@ -203,5 +214,6 @@ export function createRuntimeContext(
     exec,
     coverage,
     requireDefenseContext,
+    signal,
   };
 }

@@ -10,9 +10,11 @@ import { toAwkString } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
 
 /**
- * Split a line into fields based on the field separator.
+ * Split a record into fields based on the field separator.
+ * (1ctx) The one splitter for records, $0 assignments and sub/gsub on $0:
+ * in paragraph mode (RS == "") a newline also separates fields.
  */
-function splitFields(ctx: AwkRuntimeContext, line: string): string[] {
+export function splitRecord(ctx: AwkRuntimeContext, line: string): string[] {
   // Empty line always has 0 fields in AWK
   if (line === "") {
     return [];
@@ -20,6 +22,9 @@ function splitFields(ctx: AwkRuntimeContext, line: string): string[] {
   if (ctx.FS === " ") {
     // Default FS: split on runs of whitespace, skip leading/trailing
     return line.trim().split(/\s+/).filter(Boolean);
+  }
+  if (ctx.RS === "") {
+    return line.split("\n").flatMap((part) => ctx.fieldSep.split(part));
   }
   return ctx.fieldSep.split(line);
 }
@@ -50,7 +55,7 @@ export function setField(
   if (index === 0) {
     // Setting $0 re-splits the line
     ctx.line = toAwkString(value);
-    ctx.fields = splitFields(ctx, ctx.line);
+    ctx.fields = splitRecord(ctx, ctx.line);
     ctx.NF = ctx.fields.length;
   } else if (index > 0) {
     // Extend fields array if needed
@@ -69,7 +74,7 @@ export function setField(
  */
 export function setCurrentLine(ctx: AwkRuntimeContext, line: string): void {
   ctx.line = line;
-  ctx.fields = splitFields(ctx, line);
+  ctx.fields = splitRecord(ctx, line);
   ctx.NF = ctx.fields.length;
 }
 

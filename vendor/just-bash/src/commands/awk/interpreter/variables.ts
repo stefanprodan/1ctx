@@ -39,6 +39,10 @@ export function getVariable(ctx: AwkRuntimeContext, name: string): AwkValue {
       return ctx.SUBSEP;
     case "ARGC":
       return ctx.ARGC;
+    case "RS":
+      return ctx.RS;
+    case "RT":
+      return ctx.RT;
   }
 
   return ctx.vars[name] ?? "";
@@ -100,6 +104,13 @@ export function setVariable(
     case "ARGC":
       // (1ctx) the input walk reads ARGC as it stands
       ctx.ARGC = toNumber(value);
+      return;
+    case "RS":
+      // (1ctx) read by the record reader at each record
+      ctx.RS = toAwkString(value);
+      return;
+    case "RT":
+      ctx.RT = toAwkString(value);
       return;
   }
 
