@@ -120,7 +120,8 @@ EXAMPLES:
     "-e, --exit-status        set exit status based on output",
     "-s, --slurp              read entire input into array",
     "-n, --null-input         don't read any input",
-    "-j, --join-output        don't print newlines after each output",
+    "-j, --tojson             JSON output, the same as -o json",
+    "-N, --no-doc             no --- between the results of different documents",
     "-f, --front-matter       extract and process front-matter only",
     "-P, --prettyPrint        pretty print output",
     "-I, --indent=N           set indent level (default: 2)",
@@ -147,11 +148,17 @@ function invalidIndent(value: string | undefined): ExecResult {
   };
 }
 
+const TOJSON_WARNING =
+  "Flag --tojson has been deprecated, please use -o=json instead\n";
+
 interface YqOptions extends FormatOptions {
   exitStatus: boolean;
   slurp: boolean;
   nullInput: boolean;
-  joinOutput: boolean;
+  /** no --- between documents, mikefarah's -N (1ctx) */
+  noDoc: boolean;
+  /** -j, mikefarah's deprecated --tojson (1ctx) */
+  tojson: boolean;
   inplace: boolean;
   frontMatter: boolean;
 }
@@ -184,7 +191,8 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     exitStatus: false,
     slurp: false,
     nullInput: false,
-    joinOutput: false,
+    noDoc: false,
+    tojson: false,
     inplace: false,
     frontMatter: false,
   };
@@ -259,8 +267,15 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       options.slurp = true;
     } else if (a === "-n" || a === "--null-input") {
       options.nullInput = true;
-    } else if (a === "-j" || a === "--join-output") {
-      options.joinOutput = true;
+    } else if (a === "-j" || a === "--tojson") {
+      // mikefarah's -j is JSON output, not jq's join (1ctx)
+      options.tojson = true;
+    } else if (a === "-N" || a === "--no-doc") {
+      options.noDoc = true;
+    } else if (a === "--unwrapScalar" || a === "--unwrapScalar=true") {
+      options.unwrapScalar = true;
+    } else if (a === "--unwrapScalar=false") {
+      options.unwrapScalar = false;
     } else if (a === "-i" || a === "--inplace") {
       options.inplace = true;
     } else if (a === "-f" || a === "--front-matter") {
@@ -306,7 +321,8 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
         else if (c === "e") options.exitStatus = true;
         else if (c === "s") options.slurp = true;
         else if (c === "n") options.nullInput = true;
-        else if (c === "j") options.joinOutput = true;
+        else if (c === "j") options.tojson = true;
+        else if (c === "N") options.noDoc = true;
         else if (c === "i") options.inplace = true;
         else if (c === "f") options.frontMatter = true;
         else if (c === "P") options.prettyPrint = true;
@@ -329,6 +345,11 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       files.push(a);
       fileAt.push(i);
     }
+  }
+
+  if (options.tojson) {
+    options.outputFormat = "json";
+    outputFormatExplicit = true;
   }
 
   return {
@@ -359,6 +380,8 @@ export const yqCommand: RuntimeCommand = {
 
     const parsed = parseArgs(args);
     if ("exitCode" in parsed) return parsed;
+    // mikefarah's words for -j, said once for every file (1ctx)
+    const warning = parsed.options.tojson ? TOJSON_WARNING : "";
 
     const {
       options,
@@ -390,6 +413,13 @@ export const yqCommand: RuntimeCommand = {
       let stderr = "";
       let misses = 0;
       const seen = new Set<string>();
+      // the first file picks the output format for them all, as mikefarah's
+      const first =
+        !inputFormatExplicit &&
+        !outputFormatExplicit &&
+        detectFormatFromExtension(files[0]) === "json"
+          ? "json"
+          : options.outputFormat;
       for (const at of fileAt) {
         // a file named twice is edited once, as mikefarah reads them all
         // before writing
@@ -399,27 +429,25 @@ export const yqCommand: RuntimeCommand = {
           seen.add(path);
         }
         const one = args.filter((_, i) => !fileAt.includes(i) || i === at);
+        if (!options.inplace && !outputFormatExplicit) one.unshift("-o", first);
         const result = await yqCommand.execute(one, ctx);
-        stderr += result.stderr;
+        stderr += result.stderr.replaceAll(TOJSON_WARNING, "");
         // a file that matched nothing leaves it and the loop goes on
         const miss =
           result.exitCode === 1 &&
           (options.exitStatus || result.stderr.includes("no matches found"));
-        if (result.exitCode !== 0 && !miss) {
-          return { stdout, stderr, exitCode: result.exitCode };
-        }
         if (miss) misses++;
         if (result.stdout !== "") {
-          const between =
-            stdout !== "" && options.outputFormat === "yaml" && !options.joinOutput
-              ? "---\n"
-              : "";
-          stdout += between + result.stdout;
+          const yaml = first === "yaml" && !options.noDoc;
+          stdout += (stdout !== "" && yaml ? "---\n" : "") + result.stdout;
+        }
+        if (result.exitCode !== 0 && !miss) {
+          return { stdout, stderr: warning + stderr, exitCode: result.exitCode };
         }
       }
       return {
         stdout,
-        stderr,
+        stderr: warning + stderr,
         exitCode: misses > 0 && misses === (options.inplace ? seen.size : fileAt.length) ? 1 : 0,
       };
     }
@@ -429,6 +457,11 @@ export const yqCommand: RuntimeCommand = {
       const detected = detectFormatFromExtension(files[0]);
       if (detected) {
         options.inputFormat = detected;
+      }
+      // a .json file prints JSON unless -p or -o was given, as mikefarah's
+      // (1ctx)
+      if (detected === "json" && !outputFormatExplicit) {
+        options.outputFormat = "json";
       }
     }
     // an in-place edit writes the file's own format back, as mikefarah's
@@ -478,15 +511,18 @@ export const yqCommand: RuntimeCommand = {
       }
     }
 
+    // results are records, so an empty string is a result and the document
+    // it came from travels with it (1ctx)
+    const records: Result[] = [];
+    // an error in a later document fails the run after the earlier
+    // documents' results, as mikefarah's streams them (1ctx)
+    let failure: unknown = null;
     try {
       const ast = parse(filter, {
         maxDepth: ctx.limits.maxQueryDepth,
         maxTokens: ctx.limits.maxQueryTokens,
         maxSourceLength: ctx.limits.maxStringLength,
       });
-      let values: QueryValue[];
-      // the document each value came from, when the input was a stream
-      const documentOf: number[] = [];
       const documents: YAML.Document[] = [];
       let documentValues: QueryValue[] = [];
 
@@ -509,9 +545,14 @@ export const yqCommand: RuntimeCommand = {
         maxDepth: ctx.limits.maxQueryDepth,
         maxElements: ctx.limits.maxQueryElements,
       };
+      const run = (input: QueryValue, document: number): void => {
+        for (const value of evaluate(input, ast, evalOptions)) {
+          if (value !== undefined) records.push({ value, document });
+        }
+      };
 
       if (options.nullInput) {
-        values = evaluate(null, ast, evalOptions);
+        run(null, 0);
       } else if (options.frontMatter) {
         // Extract and process front-matter only
         const fm = extractFrontMatter(input, dataLimits);
@@ -522,7 +563,7 @@ export const yqCommand: RuntimeCommand = {
             exitCode: 1,
           };
         }
-        values = evaluate(fm.frontMatter, ast, evalOptions);
+        run(fm.frontMatter, 0);
       } else if (options.slurp) {
         // Parse all documents into array
         let items: QueryValue[];
@@ -532,7 +573,7 @@ export const yqCommand: RuntimeCommand = {
         } else {
           items = [parseInput(input, options, dataLimits)];
         }
-        values = evaluate(items, ast, evalOptions);
+        run(items, 0);
       } else {
         // mikefarah's yq runs the filter on each document of a YAML stream,
         // where this one refused a stream it was not told to slurp (1ctx)
@@ -547,16 +588,17 @@ export const yqCommand: RuntimeCommand = {
           documentValues.length > 1 ||
           (options.inplace && documentValues.length === 1)
         ) {
-          values = [];
           for (const [index, document] of documentValues.entries()) {
-            for (const value of evaluate(document, ast, evalOptions)) {
-              values.push(value);
-              documentOf.push(index);
+            try {
+              run(document, index);
+            } catch (e) {
+              if (options.inplace) throw e;
+              failure = e;
+              break;
             }
           }
         } else {
-          const parsed = parseInput(input, options, dataLimits);
-          values = evaluate(parsed, ast, evalOptions);
+          run(parseInput(input, options, dataLimits), 0);
         }
       }
 
@@ -571,7 +613,7 @@ export const yqCommand: RuntimeCommand = {
           ctx.limits.maxOutputSize,
         );
         // nothing, or with -e only null and false: no write (1ctx)
-        if (values.length === 0 || (options.exitStatus && missed(values))) {
+        if (records.length === 0 || (options.exitStatus && missed(records))) {
           // mikefarah's answer, and no emptied file (1ctx)
           return {
             stdout: "",
@@ -579,7 +621,7 @@ export const yqCommand: RuntimeCommand = {
             exitCode: 1,
           };
         }
-        const text = inPlaceText(values, documentOf, documents, documentValues, {
+        const text = inPlaceText(records, documents, documentValues, {
           format: (value) =>
             formatOutput(value, { ...options, yaml11: true }, maxBytes),
           maxDepth: ctx.limits.maxQueryDepth,
@@ -603,86 +645,17 @@ export const yqCommand: RuntimeCommand = {
         );
         return {
           stdout: "",
-          stderr: "",
-          exitCode: options.exitStatus && missed(values) ? 1 : 0,
+          stderr: warning,
+          exitCode: options.exitStatus && missed(records) ? 1 : 0,
         };
       }
 
-      // Format output
-      const maxOutputSize = Math.min(
-        ctx.limits.maxStringLength,
-        ctx.limits.maxOutputSize,
-      );
-      const separator = options.joinOutput ? "" : "\n";
-      const output = new BoundedStringBuilder(
-        maxOutputSize,
-        "yq output",
-        () =>
-          new ExecutionLimitError(
-            `output size limit exceeded (${maxOutputSize} bytes)`,
-            "output_size",
-          ),
-      );
-      let formattedValues = 0;
-      let lastDocument = -1;
-      // results of different documents print apart, as mikefarah's do
-      const documentSeparator =
-        options.outputFormat === "yaml" && !options.joinOutput
-          ? "\n---\n"
-          : separator;
-      for (const [index, value] of values.entries()) {
-        if (
-          getValueDepth(value, ctx.limits.maxQueryDepth + 1) >
-          ctx.limits.maxQueryDepth
-        ) {
-          throw new ExecutionLimitError(
-            `query depth limit exceeded (${ctx.limits.maxQueryDepth})`,
-            "recursion",
-          );
-        }
-        const document = documentOf[index] ?? 0;
-        const between =
-          document !== lastDocument && formattedValues > 0
-            ? documentSeparator
-            : separator;
-        const separatorBytes = formattedValues > 0 ? between.length : 0;
-        const finalNewlineBytes = options.joinOutput ? 0 : 1;
-        const remainingBytes =
-          output.remainingBytes - separatorBytes - finalNewlineBytes;
-        if (remainingBytes < 0) {
-          throw new ExecutionLimitError(
-            `output size limit exceeded (${maxOutputSize} bytes)`,
-            "output_size",
-          );
-        }
-        const serializationLimit = Math.min(
-          remainingBytes,
-          ctx.executionScope?.remainingLiveBytes ?? remainingBytes,
-        );
-        const serializationLease = ctx.executionScope?.reserveBytes(
-          "yq serialization",
-          serializationLimit,
-          "yq output",
-        );
-        let text: string;
-        try {
-          text = formatOutput(value, options, serializationLimit);
-        } finally {
-          serializationLease?.release();
-        }
-        if (text === "") continue;
-        if (formattedValues > 0) output.append(between);
-        output.append(text);
-        formattedValues++;
-        lastDocument = document;
-      }
-      if (formattedValues > 0 && !options.joinOutput) output.append("\n");
-      const finalOutput = output.build();
+      const finalOutput = printRecords(records, options, ctx);
 
       // Handle inplace mode
       if (options.inplace && filePath) {
         // nothing, or with -e only null and false: no write (1ctx)
-        if (values.length === 0 || (options.exitStatus && missed(values))) {
+        if (records.length === 0 || (options.exitStatus && missed(records))) {
           return {
             stdout: "",
             stderr: "yq: no matches found, the file is left as it was\n",
@@ -694,47 +667,136 @@ export const yqCommand: RuntimeCommand = {
         );
         return {
           stdout: "",
-          stderr: "",
-          exitCode: options.exitStatus && missed(values) ? 1 : 0,
+          stderr: warning,
+          exitCode: options.exitStatus && missed(records) ? 1 : 0,
         };
       }
 
-      const exitCode = options.exitStatus && missed(values) ? 1 : 0;
+      if (failure !== null) {
+        return { ...failed(failure), stdout: finalOutput };
+      }
+      const exitCode = options.exitStatus && missed(records) ? 1 : 0;
 
       // yq emits text; the pipeline handles encoding.
       return {
         stdout: finalOutput,
-        stderr: "",
+        stderr: warning,
         exitCode,
       };
     } catch (e) {
-      if (e instanceof SecurityViolationError) {
-        throw e;
-      }
-      if (e instanceof ExecutionLimitError) {
-        const message = sanitizeErrorMessage(e.message);
-        return {
-          stdout: "",
-          stderr: `yq: ${message}\n`,
-          exitCode: ExecutionLimitError.EXIT_CODE,
-        };
-      }
-      const msg = sanitizeErrorMessage((e as Error).message);
-      if (msg.includes("Unknown function")) {
-        return {
-          stdout: "",
-          stderr: `yq: error: ${msg}\n`,
-          exitCode: 3,
-        };
-      }
-      return {
-        stdout: "",
-        stderr: `yq: parse error: ${msg}\n`,
-        exitCode: 5,
-      };
+      return failed(e);
     }
   },
 };
+
+/** The answer for an error the run stopped on. */
+function failed(e: unknown): ExecResult {
+  if (e instanceof SecurityViolationError) {
+    throw e;
+  }
+  if (e instanceof ExecutionLimitError) {
+    const message = sanitizeErrorMessage(e.message);
+    return {
+      stdout: "",
+      stderr: `yq: ${message}\n`,
+      exitCode: ExecutionLimitError.EXIT_CODE,
+    };
+  }
+  const msg = sanitizeErrorMessage((e as Error).message);
+  if (msg.includes("Unknown function")) {
+    return {
+      stdout: "",
+      stderr: `yq: error: ${msg}\n`,
+      exitCode: 3,
+    };
+  }
+  return {
+    stdout: "",
+    stderr: `yq: parse error: ${msg}\n`,
+    exitCode: 5,
+  };
+}
+
+/** A result and the document it counts as read from. (1ctx) */
+interface Result {
+  value: QueryValue;
+  document: number;
+}
+
+/**
+ * The text of the results: one per line, --- where the document moves in
+ * YAML output unless -N, a top-level string raw. (1ctx)
+ */
+function printRecords(
+  records: Result[],
+  options: YqOptions,
+  ctx: RuntimeCommandContext,
+): string {
+  const maxOutputSize = Math.min(
+    ctx.limits.maxStringLength,
+    ctx.limits.maxOutputSize,
+  );
+  const output = new BoundedStringBuilder(
+    maxOutputSize,
+    "yq output",
+    () =>
+      new ExecutionLimitError(
+        `output size limit exceeded (${maxOutputSize} bytes)`,
+        "output_size",
+      ),
+  );
+  let printed = 0;
+  let lastDocument = -1;
+  const documentSeparator =
+    options.outputFormat === "yaml" && !options.noDoc ? "\n---\n" : "\n";
+  for (const { value, document } of records) {
+    if (
+      getValueDepth(value, ctx.limits.maxQueryDepth + 1) >
+      ctx.limits.maxQueryDepth
+    ) {
+      throw new ExecutionLimitError(
+        `query depth limit exceeded (${ctx.limits.maxQueryDepth})`,
+        "recursion",
+      );
+    }
+    const between =
+      document !== lastDocument && printed > 0 ? documentSeparator : "\n";
+    const separatorBytes = printed > 0 ? between.length : 0;
+    const remainingBytes = output.remainingBytes - separatorBytes - 1;
+    if (remainingBytes < 0) {
+      throw new ExecutionLimitError(
+        `output size limit exceeded (${maxOutputSize} bytes)`,
+        "output_size",
+      );
+    }
+    const serializationLimit = Math.min(
+      remainingBytes,
+      ctx.executionScope?.remainingLiveBytes ?? remainingBytes,
+    );
+    const serializationLease = ctx.executionScope?.reserveBytes(
+      "yq serialization",
+      serializationLimit,
+      "yq output",
+    );
+    let text: string;
+    try {
+      text = formatOutput(value, options, serializationLimit);
+    } finally {
+      serializationLease?.release();
+    }
+    // a format with nothing to say for a value (ini of a list) prints no
+    // line; an empty string is one
+    if (text === "" && typeof value !== "string") {
+      continue;
+    }
+    if (printed > 0) output.append(between);
+    output.append(text);
+    printed++;
+    lastDocument = document;
+  }
+  if (printed > 0) output.append("\n");
+  return output.build();
+}
 
 import type { CommandFuzzInfo } from "../fuzz-flags-types.js";
 
@@ -756,24 +818,29 @@ export const flagsForFuzzing: CommandFuzzInfo = {
  * container result applied onto the parsed document so its comments stay,
  * documents apart by ---, one dropped when its filter output nothing. (1ctx)
  */
+/**
+ * The file an in-place edit writes: each document's results, a single
+ * container result applied onto the parsed document so its comments stay,
+ * one --- between documents and none before the first, a document dropped
+ * when its filter output nothing. (1ctx)
+ */
 function inPlaceText(
-  values: QueryValue[],
-  documentOf: number[],
+  records: Result[],
   documents: YAML.Document[],
   documentValues: QueryValue[],
   opts: { format: (value: QueryValue) => string; maxDepth: number },
 ): string | null {
   const groups: QueryValue[][] = documents.map(() => []);
-  for (const [index, value] of values.entries()) {
+  for (const { value, document } of records) {
     if (getValueDepth(value, opts.maxDepth + 1) > opts.maxDepth) {
       throw new ExecutionLimitError(
         `query depth limit exceeded (${opts.maxDepth})`,
         "recursion",
       );
     }
-    groups[documentOf[index] ?? 0].push(value);
+    groups[document].push(value);
   }
-  let text = "";
+  const parts: string[] = [];
   for (const [index, group] of groups.entries()) {
     if (group.length === 0) continue;
     // several results for one document: mikefarah writes the last
@@ -785,17 +852,16 @@ function inPlaceText(
       if (spelledFor11(documents[index])) return null;
       part = opts.format(last);
     }
-    if (part === "") continue;
-    if (text !== "") text += /^---/.test(part) ? "\n" : "\n---\n";
-    text += part;
+    // the markers are written here, one between documents
+    parts.push(part.replace(/^---\n/, ""));
   }
-  return text === "" ? "" : `${text}\n`;
+  return `${parts.join("\n---\n")}\n`;
 }
 
 /** -e: nothing came out, or only null and false. */
-function missed(values: QueryValue[]): boolean {
+function missed(records: Result[]): boolean {
   return (
-    values.length === 0 ||
-    values.every((v) => v === null || v === undefined || v === false)
+    records.length === 0 ||
+    records.every(({ value: v }) => v === null || v === false)
   );
 }

@@ -151,6 +151,9 @@
 (fail) worker protocol runtime desync probes > python3 stdout shaped like worker control payload is treated as plain output
 (fail) worker protocol runtime desync probes > sqlite3 output shaped like worker control payload is treated as query data
 (fail) worker protocol runtime desync probes > sqlite3 timed-out worker query does not execute later and mutate database
+(fail) yq > combined short options > should handle -cej for compact exit-status join
+(fail) yq > format auto-detection > should auto-detect JSON from .json extension
+(fail) yq > join-output mode > should not print newlines with -j
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'

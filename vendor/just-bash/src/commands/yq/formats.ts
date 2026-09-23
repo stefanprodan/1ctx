@@ -74,6 +74,8 @@ export interface FormatOptions {
   indent: number;
   /** quote strings a YAML 1.1 reader would retype, for an in-place write (1ctx) */
   yaml11?: boolean;
+  /** a top-level string printed as YAML without quotes, as mikefarah's --unwrapScalar (1ctx) */
+  unwrapScalar?: boolean;
   /** XML attribute prefix (default: +@) */
   xmlAttributePrefix: string;
   /** XML text content name (default: +content) */
@@ -91,6 +93,7 @@ export const defaultFormatOptions: FormatOptions = {
   compact: false,
   prettyPrint: false,
   indent: 2,
+  unwrapScalar: true,
   xmlAttributePrefix: "+@",
   xmlContentName: "+content",
   csvDelimiter: "",
@@ -370,6 +373,26 @@ export function formatOutput(
 ): string {
   if (value === undefined) return "";
 
+  // the string itself, its spaces and newlines kept, as mikefarah prints a
+  // top-level scalar (1ctx)
+  if (
+    options.outputFormat === "yaml" &&
+    typeof value === "string" &&
+    options.unwrapScalar !== false
+  ) {
+    return new BoundedStringBuilder(
+      maxBytes,
+      "yq output",
+      () =>
+        new ExecutionLimitError(
+          `output size limit exceeded (${maxBytes} bytes)`,
+          "output_size",
+        ),
+    )
+      .append(value)
+      .build();
+  }
+
   if (options.outputFormat !== "json") {
     assertExternalSerializationFits(value, options, maxBytes);
   }
@@ -378,7 +401,8 @@ export function formatOutput(
     case "yaml":
       serialized = YAML.stringify(value, {
         ...(options.yaml11 ? { compat: "yaml-1.1" as const } : {}),
-        indent: options.indent,
+        // mikefarah's -I0 and -I1 print with 4 and 2 (1ctx)
+        indent: options.indent === 0 ? 4 : Math.max(options.indent, 2),
       }).trimEnd();
       break;
 

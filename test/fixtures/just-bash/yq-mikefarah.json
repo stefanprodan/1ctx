@@ -1,0 +1,1072 @@
+{
+  "recordedWith": "yq (https://github.com/mikefarah/yq/) version v4.53.3",
+  "files": {
+    "pods.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: postgres-0\n  labels:\n    app: postgres\nspec:\n  nodeName: node-a\n  containers:\n    - name: postgres\n      image: postgres:16.4\nstatus:\n  phase: Running\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-1\n  labels:\n    app: web\nspec:\n  containers:\n    - name: web\n      image: nginx:1.27\n    - name: proxy\n      image: envoyproxy/envoy:v1.31\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 3\n",
+    "flux.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n---\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n",
+    "list.yaml": "apiVersion: v1\nkind: List\nitems:\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: frontend\n    spec:\n      ports:\n        - port: 80\n  - apiVersion: v1\n    kind: Service\n    metadata:\n      name: backend\n    spec:\n      ports:\n        - port: 8080\n        - port: 9090\n",
+    "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n",
+    "config.yaml": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - web\n  - api\n",
+    "data.json": "{\"name\": \"app\", \"items\": [{\"id\": 1, \"tag\": \"a\"}, {\"id\": 2, \"tag\": \"b\"}], \"meta\": {\"count\": 2}}\n",
+    "strings.yaml": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n"
+  },
+  "cases": [
+    {
+      "name": "raw string: .empty",
+      "args": [
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .empty",
+      "args": [
+        "-o",
+        "yaml",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .empty",
+      "args": [
+        "-r",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .empty",
+      "args": [
+        "-o",
+        "json",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .empty",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".empty",
+        "strings.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .spaces",
+      "args": [
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .spaces",
+      "args": [
+        "-o",
+        "yaml",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .spaces",
+      "args": [
+        "-r",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .spaces",
+      "args": [
+        "-o",
+        "json",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "\"   \"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .spaces",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".spaces",
+        "strings.yaml"
+      ],
+      "stdout": "   \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .trailing",
+      "args": [
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .trailing",
+      "args": [
+        "-o",
+        "yaml",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .trailing",
+      "args": [
+        "-r",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .trailing",
+      "args": [
+        "-o",
+        "json",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "\"x \"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .trailing",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "x \n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .multi",
+      "args": [
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .multi",
+      "args": [
+        "-o",
+        "yaml",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .multi",
+      "args": [
+        "-r",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .multi",
+      "args": [
+        "-o",
+        "json",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "\"first\\nsecond\\n\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .multi",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".multi",
+        "strings.yaml"
+      ],
+      "stdout": "first\nsecond\n\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .number",
+      "args": [
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .number",
+      "args": [
+        "-o",
+        "yaml",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .number",
+      "args": [
+        "-r",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .number",
+      "args": [
+        "-o",
+        "json",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "\"123\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .number",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".number",
+        "strings.yaml"
+      ],
+      "stdout": "123\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .colon",
+      "args": [
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .colon",
+      "args": [
+        "-o",
+        "yaml",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .colon",
+      "args": [
+        "-r",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .colon",
+      "args": [
+        "-o",
+        "json",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": "\": x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .colon",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".colon",
+        "strings.yaml"
+      ],
+      "stdout": ": x\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .none",
+      "args": [
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .none",
+      "args": [
+        "-o",
+        "yaml",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .none",
+      "args": [
+        "-r",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .none",
+      "args": [
+        "-o",
+        "json",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .none",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".none",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .word",
+      "args": [
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .word",
+      "args": [
+        "-o",
+        "yaml",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .word",
+      "args": [
+        "-r",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .word",
+      "args": [
+        "-o",
+        "json",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "\"null\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .word",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".word",
+        "strings.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .yes",
+      "args": [
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .yes",
+      "args": [
+        "-o",
+        "yaml",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .yes",
+      "args": [
+        "-r",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .yes",
+      "args": [
+        "-o",
+        "json",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "\"yes\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .yes",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".yes",
+        "strings.yaml"
+      ],
+      "stdout": "yes\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .octal",
+      "args": [
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .octal",
+      "args": [
+        "-o",
+        "yaml",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .octal",
+      "args": [
+        "-r",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .octal",
+      "args": [
+        "-o",
+        "json",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "\"0644\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .octal",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".octal",
+        "strings.yaml"
+      ],
+      "stdout": "0644\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: .list",
+      "args": [
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o yaml .list",
+      "args": [
+        "-o",
+        "yaml",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -r .list",
+      "args": [
+        "-r",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json .list",
+      "args": [
+        "-o",
+        "json",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "[\n  \"a b\",\n  \"c\"\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: -o json -r .list",
+      "args": [
+        "-o",
+        "json",
+        "-r",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "[\n  \"a b\",\n  \"c\"\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: --unwrapScalar=false",
+      "args": [
+        "--unwrapScalar=false",
+        ".trailing",
+        "strings.yaml"
+      ],
+      "stdout": "\"x \"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: --unwrapScalar=false on a map",
+      "args": [
+        "--unwrapScalar=false",
+        ".list",
+        "strings.yaml"
+      ],
+      "stdout": "- a b\n- c\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: the whole file",
+      "args": [
+        ".",
+        "strings.yaml"
+      ],
+      "stdout": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: |\n  first\n  second\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: yes\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
+        "exit": 0,
+        "reason": "Printing to stdout spells values afresh: mikefarah keeps each scalar's quoting and style from the file."
+      }
+    },
+    {
+      "name": "raw string: read from each document",
+      "args": [
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\n---\nweb-1\n---\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: @tsv over documents with -N",
+      "args": [
+        "-N",
+        "[.metadata.name, (.spec.nodeName // \"\")] | @tsv",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\tnode-a\nweb-1\t\nweb\t\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: a literal",
+      "args": [
+        "-n",
+        "\"a\\tb\""
+      ],
+      "stdout": "a\tb\n",
+      "exit": 0
+    },
+    {
+      "name": "raw string: an interpolation from stdin",
+      "args": [
+        "\"\\(.a)-x\""
+      ],
+      "stdin": "a: 1\n",
+      "stdout": "1-x\n",
+      "exit": 0
+    },
+    {
+      "name": "-N drops the document lines",
+      "args": [
+        "-N",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "postgres-0\nweb-1\nweb\n",
+      "exit": 0
+    },
+    {
+      "name": "--no-doc drops the document lines",
+      "args": [
+        "--no-doc",
+        ".kind",
+        "flux.yaml"
+      ],
+      "stdout": "HelmRelease\nKustomization\nHelmRelease\n",
+      "exit": 0
+    },
+    {
+      "name": "-N on whole documents",
+      "args": [
+        "-N",
+        ".",
+        "flux.yaml"
+      ],
+      "stdout": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n",
+      "exit": 0
+    },
+    {
+      "name": "-j prints json",
+      "args": [
+        "-j",
+        ".metadata.name",
+        "pods.yaml"
+      ],
+      "stdout": "\"postgres-0\"\n\"web-1\"\n\"web\"\n",
+      "exit": 0
+    },
+    {
+      "name": "--tojson prints json",
+      "args": [
+        "--tojson",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"app\",\n  \"version\": \"1.2.0\",\n  \"port\": 8080,\n  \"debug\": false,\n  \"empty\": \"\",\n  \"mode\": \"0644\",\n  \"nothing\": null,\n  \"tags\": [\n    \"web\",\n    \"api\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-j on a map",
+      "args": [
+        "-j",
+        ".metadata",
+        "flux.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"podinfo\",\n  \"namespace\": \"apps\"\n}\n{\n  \"name\": \"infra\",\n  \"namespace\": \"flux-system\"\n}\n{\n  \"name\": \"redis\",\n  \"namespace\": \"cache\"\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json input prints json",
+      "args": [
+        ".",
+        "data.json"
+      ],
+      "stdout": "{\n  \"name\": \"app\",\n  \"items\": [\n    {\n      \"id\": 1,\n      \"tag\": \"a\"\n    },\n    {\n      \"id\": 2,\n      \"tag\": \"b\"\n    }\n  ],\n  \"meta\": {\n    \"count\": 2\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json input, a path",
+      "args": [
+        ".meta",
+        "data.json"
+      ],
+      "stdout": "{\n  \"count\": 2\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json input, a string",
+      "args": [
+        ".name",
+        "data.json"
+      ],
+      "stdout": "\"app\"\n",
+      "exit": 0
+    },
+    {
+      "name": "json input, -o yaml",
+      "args": [
+        "-o",
+        "yaml",
+        ".",
+        "data.json"
+      ],
+      "stdout": "name: app\nitems:\n  - id: 1\n    tag: a\n  - id: 2\n    tag: b\nmeta:\n  count: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "-p json on stdin",
+      "args": [
+        "-p",
+        "json",
+        ".items[0]"
+      ],
+      "stdin": "{\"items\": [{\"id\": 1}]}\n",
+      "stdout": "id: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "-I0 in yaml output",
+      "args": [
+        "-I0",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n    - web\n    - api\n",
+      "exit": 0
+    },
+    {
+      "name": "-I0 on json input",
+      "args": [
+        "-I0",
+        ".",
+        "data.json"
+      ],
+      "stdout": "{\"name\":\"app\",\"items\":[{\"id\":1,\"tag\":\"a\"},{\"id\":2,\"tag\":\"b\"}],\"meta\":{\"count\":2}}\n",
+      "exit": 0
+    },
+    {
+      "name": "-o json -I0",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        ".",
+        "config.yaml"
+      ],
+      "stdout": "{\"name\":\"app\",\"version\":\"1.2.0\",\"port\":8080,\"debug\":false,\"empty\":\"\",\"mode\":\"0644\",\"nothing\":null,\"tags\":[\"web\",\"api\"]}\n",
+      "exit": 0
+    },
+    {
+      "name": "-i on a bare string document",
+      "args": [
+        "-i",
+        ".",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "-i writes a bare yes",
+      "args": [
+        "-i",
+        ". = \"yes\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "yes\n"
+      }
+    },
+    {
+      "name": "-i writes a bare number string",
+      "args": [
+        "-i",
+        ". = \"123\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "123\n"
+      }
+    },
+    {
+      "name": "-i writes an empty string",
+      "args": [
+        "-i",
+        ". = \"\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "\n"
+      }
+    },
+    {
+      "name": "-i writes a multi-line string",
+      "args": [
+        "-i",
+        ". = \"a\\nb\"",
+        "bare.yaml"
+      ],
+      "files": {
+        "bare.yaml": "hello\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "bare.yaml": "a\nb\n"
+      }
+    },
+    {
+      "name": "-i on documents ending in an empty string",
+      "args": [
+        "-i",
+        ".",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "a: 1\n---\n\"\"\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 1\n---\n\n"
+      }
+    },
+    {
+      "name": "-i on documents ending in a --- string",
+      "args": [
+        "-i",
+        ".",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "a: 1\n---\n\"---\"\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 1\n---\n---\n"
+      }
+    },
+    {
+      "name": "-i on documents ending in a multi-line string",
+      "args": [
+        "-i",
+        ".",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "a: 1\n---\n|\n  x\n  y\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 1\n---\nx\ny\n\n"
+      }
+    },
+    {
+      "name": "-i keeps only the selected document, no leading ---",
+      "args": [
+        "-i",
+        "select(.kind == \"Deployment\") | .spec.replicas = 5",
+        "pods.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pods.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 5\n"
+      }
+    },
+    {
+      "name": "-i with a leading --- in the file",
+      "args": [
+        "-i",
+        "select(.a == 2) | .b = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\na: 1\n---\na: 2\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "a: 2\nb: 1\n"
+      }
+    },
+    {
+      "name": "-i sets a field in every document",
+      "args": [
+        "-i",
+        ".metadata.labels.team = \"web\"",
+        "flux.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "flux.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\n  labels:\n    team: web\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: 6.7.0\n---\napiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: infra\n  namespace: flux-system\n  labels:\n    team: web\nspec:\n  interval: 1h\n  path: ./infrastructure\n  prune: true\n---\napiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: redis\n  namespace: cache\n  labels:\n    team: web\nspec:\n  interval: 5m\nstatus:\n  conditions:\n    - type: Ready\n      status: \"False\"\n      reason: InstallFailed\n    - type: Released\n      status: \"True\"\n      reason: InstallSucceeded\n"
+      }
+    },
+    {
+      "name": "-p json keeps yaml output",
+      "args": [
+        "-p",
+        "json",
+        ".meta",
+        "data.txt"
+      ],
+      "files": {
+        "data.txt": "{\"meta\": {\"count\": 2}}\n"
+      },
+      "stdout": "count: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "-p json on a json file keeps yaml output",
+      "args": [
+        "-p",
+        "json",
+        ".meta",
+        "data.json"
+      ],
+      "stdout": "count: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "-N over two files",
+      "args": [
+        "-N",
+        ".kind",
+        "pods.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "Pod\nPod\nDeployment\nHelmRelease\nKustomization\nHelmRelease\n",
+      "exit": 0
+    },
+    {
+      "name": "two files apart by ---",
+      "args": [
+        ".metadata.name",
+        "list.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "null\n---\npodinfo\n---\ninfra\n---\nredis\n",
+      "exit": 0
+    },
+    {
+      "name": "-j over two files",
+      "args": [
+        "-j",
+        ".kind",
+        "list.yaml",
+        "flux.yaml"
+      ],
+      "stdout": "\"List\"\n\"HelmRelease\"\n\"Kustomization\"\n\"HelmRelease\"\n",
+      "exit": 0
+    },
+    {
+      "name": "a yaml file then a json file",
+      "args": [
+        ".name",
+        "config.yaml",
+        "data.json"
+      ],
+      "stdout": "app\n---\napp\n",
+      "exit": 0
+    },
+    {
+      "name": "--unwrapScalar=false on a number",
+      "args": [
+        "--unwrapScalar=false",
+        ".port",
+        "config.yaml"
+      ],
+      "stdout": "8080\n",
+      "exit": 0
+    },
+    {
+      "name": "-e on an empty string",
+      "args": [
+        "-e",
+        ".empty",
+        "config.yaml"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "a string inside a map keeps its quotes",
+      "args": [
+        ".metadata",
+        "flux.yaml"
+      ],
+      "stdout": "name: podinfo\nnamespace: apps\n---\nname: infra\nnamespace: flux-system\n---\nname: redis\nnamespace: cache\n",
+      "exit": 0
+    }
+  ]
+}

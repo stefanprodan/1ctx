@@ -75,6 +75,9 @@ without a file of their own.
 | `src/commands/awk/interpreter/pipes.ts` (new), `statements.ts`, `context.ts`, `builtins.ts`, `awk2.ts`, `parser2-print.ts`, `lexer.ts`, `ast.ts` | `print ... \| "cmd"` and `printf ... \| "cmd"`: one pipe per command text holding what is printed to it, run through the shell with that text as stdin at `close("cmd")` (which answers its exit status) or at the end, in the order opened, its stdout placed as gawk places it (gawk flushes its own stdout when a pipe opens and closes, and closes every pipe before its last flush), its stderr on ours; pipes count against the output cap, at most 16 are open, the abort signal stops them, `fflush()` marks our output written, and `\|&` is refused | `print \| "sort"` was a parse error |
 | `src/commands/awk/parser2-print.ts` | `print (a, b)` prints every item, as gawk does | it printed the last one |
 | `src/commands/awk/interpreter/pipes.ts`, `statements.ts`, `expressions.ts` | a redirection or getline whose name is the empty string (an unset variable's too) is gawk's fatal error, `expression for \`|' redirection has null string value`, for `|`, `>`, `>>` and `<` | `print $0 \| constructor` and `getline < x` with `x` unset printed nothing and exited 0 |
+| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | results are records of a value and the document it counts as read from; YAML output prints a top-level string raw, spaces and newlines kept, an empty string as an empty line, and `--unwrapScalar=false` quotes it again; an error in a later document fails the run after the earlier documents' results | mikefarah unwraps a top-level scalar: `[.a, .b] \| @tsv` printed `"x\ty"` with its escape, and an error in the last document dropped every earlier result |
+| `src/commands/yq/yq.ts` | `-i` groups the results by document, writes one `---` between documents and none before the first, and writes a document that is a string raw | a surviving second document started the file with `---`, and a bare string was written quoted |
+| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `-N` and `--no-doc` drop the `---` lines; `-j` and `--tojson` are `-o json` with mikefarah's deprecation line; a `.json` file prints JSON unless `-p` or `-o` was given, and several files print in the first one's format; YAML at `-I0` and `-I1` is indented 4 and 2 | mikefarah's meanings: `-j` joined the output here, and JSON input printed YAML |
 
 ### Where our jq still differs from jq
 
@@ -151,7 +154,10 @@ they part:
 
 `test/vendor/just-bash/yq.test.ts` pins streams and in-place edits; on
 the podinfo manifests the `-i` writes compared were mikefarah's byte
-for byte, or the same data with safer quoting. Where they part:
+for byte, or the same data with safer quoting.
+`yq-mikefarah.test.ts` runs the cases `scripts/yq-record.ts` recorded
+from mikefarah's yq v4.53.3; a case with `accept` pins ours instead,
+for one of the reasons below. Where they part:
 
 - An `-i` edit keeps every scalar it did not change as written (`0644`,
   `yes`, `.5`), reading the document again with the failsafe schema. A
