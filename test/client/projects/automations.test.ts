@@ -17,6 +17,7 @@ import {
   closeRuns,
   loadMoreRuns,
   loadRuns,
+  relabelRuns,
   runs,
 } from "../../../src/client/data/runs.ts";
 import { IDLE } from "../../../src/client/data/stream.ts";
@@ -993,6 +994,39 @@ describe("the runs' pages", () => {
       error: { words: "busy", status: 503 },
     });
   });
+
+  test.serial("a page read before a rename carries the new name", async () => {
+    await firstPage();
+    const release = hold();
+    const more = loadMoreRuns();
+    await settle();
+    relabelRuns({ id: "au1", name: "renamed" });
+    release(Response.json({ rows: second(), tally, next: null }));
+    await more;
+    expect(runs.value?.rows?.map((r) => r.automation?.name)).toEqual([
+      "renamed",
+      "renamed",
+      "renamed",
+      "renamed",
+    ]);
+  });
+
+  test.serial(
+    "a first page read before a rename carries the new name",
+    async () => {
+      await firstPage();
+      const release = hold();
+      const load = loadRuns("au1", "manual");
+      await settle();
+      relabelRuns({ id: "au1", name: "renamed" });
+      release(Response.json({ rows: first(), tally, next: null }));
+      await load;
+      expect(runs.value?.rows?.map((r) => r.automation?.name)).toEqual([
+        "renamed",
+        "renamed",
+      ]);
+    },
+  );
 
   test.serial("closing the runs drops a page in flight", async () => {
     await firstPage();

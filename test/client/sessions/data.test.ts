@@ -455,7 +455,7 @@ describe("the sessions entity", () => {
       onSocket({
         type: "session",
         projectId: "p1",
-        session: summary({ id: "s3" }),
+        session: summary({ id: "s3", title: "restart pods" }),
         messages: [],
         send: null,
       });
@@ -1530,11 +1530,11 @@ describe("the stream's pages", () => {
     return urls;
   }
 
-  const arrived = (id: string) =>
+  const arrived = (id: string, title = "Chat") =>
     onSocket({
       type: "session",
       projectId: "p1",
-      session: summary({ id, lastActivityAt: 60 }),
+      session: summary({ id, lastActivityAt: 60, title }),
       messages: [],
       send: null,
     });
@@ -1637,11 +1637,184 @@ describe("the stream's pages", () => {
         urls.push(url);
         return head();
       };
-      arrived("n");
+      arrived("n", "restart the Pods");
       await settle();
       expect(urls.at(-1)).toBe("/api/sessions?q=pods&origin=chat");
       expect(ids(list.value)).toEqual(["n", "a", "b", "c", "d"]);
       expect(list.value?.next).toBe("after-d");
+    },
+  );
+
+  test.serial(
+    "a search asks nothing for an envelope whose title is not in it",
+    async () => {
+      const urls = await twoPages("pods");
+      const asked = urls.length;
+      arrived("n", "disk usage");
+      await settle();
+      arrived("n", "disk usage");
+      await settle();
+      expect(urls.length).toBe(asked);
+      expect(ids(list.value)).toEqual(["a", "b", "c", "d"]);
+    },
+  );
+
+  test.serial(
+    "a page read before a delete does not bring it back",
+    async () => {
+      answer = () => Response.json({ rows: first(), next: "after-b" });
+      await loadList({ project: null, q: "" });
+      let release: (r: Response) => void = () => {};
+      answer = () =>
+        new Promise((r) => {
+          release = r;
+        });
+      const more = loadMore();
+      await settle();
+      answer = () => Response.json({ rows: first(), next: "after-b" });
+      onSocket({ type: "deleted", sessionId: "c", projectId: "p1" });
+      await settle();
+      release(Response.json({ rows: second(), next: null }));
+      await more;
+      expect(ids(list.value)).toEqual(["a", "b"]);
+      expect(list.value?.next).toBe("after-b");
+      expect(list.value?.more).toEqual(IDLE);
+    },
+  );
+
+  test.serial("a grant while the first page loads asks again", async () => {
+    const urls: string[] = [];
+    let release: (r: Response) => void = () => {};
+    answer = (url) => {
+      urls.push(url);
+      return new Promise((r) => {
+        release = r;
+      });
+    };
+    const stale = loadList({ project: null, q: "" });
+    await settle();
+    const first0 = release;
+    answer = (url) => {
+      urls.push(url);
+      return Response.json({ rows: first(), next: "after-b" });
+    };
+    onSocket({ type: "granted", projectId: "p3" });
+    await settle();
+    first0(Response.json({ rows: [], next: null }));
+    await stale;
+    expect(urls).toEqual(["/api/sessions", "/api/sessions"]);
+    expect(ids(list.value)).toEqual(["a", "b"]);
+  });
+
+  test.serial("a page read before a rename carries the new name", async () => {
+    const run = (id: string, at: number): StreamRow => ({
+      ...row({
+        id,
+        lastActivityAt: at,
+        origin: "automation",
+        automationId: "t1",
+      }),
+      automation: { id: "t1", name: "old-name" },
+    });
+    answer = () => Response.json({ rows: [run("a", 50)], next: "after-a" });
+    await loadList({ project: null, q: "" });
+    let release: (r: Response) => void = () => {};
+    answer = () =>
+      new Promise((r) => {
+        release = r;
+      });
+    const more = loadMore();
+    await settle();
+    applyAutomationFrame({
+      type: "automation",
+      projectId: "p1",
+      automation: { id: "t1", name: "new-name" },
+    } as Parameters<typeof applyAutomationFrame>[0]);
+    release(Response.json({ rows: [run("b", 40)], next: null }));
+    await more;
+    expect(list.value?.rows.map((r) => r.automation?.name)).toEqual([
+      "new-name",
+      "new-name",
+    ]);
+  });
+
+  test.serial(
+    "a search holds a title as SQLite does, ASCII folded only",
+    async () => {
+      const urls = await twoPages("\u03a3");
+      const asked = urls.length;
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({ rows: first(), next: "after-b" });
+      };
+      // JavaScript lowercases this title's sigma to its final form
+      arrived("n", "A\u03a3");
+      await settle();
+      expect(urls.length).toBe(asked + 1);
+    },
+  );
+
+  test.serial(
+    "a revocation of another project leaves a project's load alone",
+    async () => {
+      let release: (r: Response) => void = () => {};
+      answer = () =>
+        new Promise((r) => {
+          release = r;
+        });
+      const load = loadList({ project: "p1", q: "" });
+      await settle();
+      onSocket({ type: "revoked", projectId: "p2" });
+      release(Response.json({ rows: first(), next: null }));
+      await load;
+      expect(ids(list.value)).toEqual(["a", "b"]);
+    },
+  );
+
+  test.serial(
+    "a delete in a project not listed leaves a page in flight",
+    async () => {
+      answer = () => Response.json({ rows: first(), next: "after-b" });
+      await loadList({ project: "p1", q: "" });
+      let release: (r: Response) => void = () => {};
+      answer = () =>
+        new Promise((r) => {
+          release = r;
+        });
+      const more = loadMore();
+      await settle();
+      onSocket({ type: "deleted", sessionId: "z", projectId: "p9" });
+      release(Response.json({ rows: second(), next: null }));
+      await more;
+      expect(ids(list.value)).toEqual(["a", "b", "c", "d"]);
+    },
+  );
+
+  test.serial(
+    "a rename is kept only over answers asked before it",
+    async () => {
+      const run = (id: string, at: number, name: string): StreamRow => ({
+        ...row({
+          id,
+          lastActivityAt: at,
+          origin: "automation",
+          automationId: "t1",
+        }),
+        automation: { id: "t1", name },
+      });
+      answer = () =>
+        Response.json({ rows: [run("a", 50, "old-name")], next: null });
+      await loadList({ project: null, q: "" });
+      applyAutomationFrame({
+        type: "automation",
+        projectId: "p1",
+        automation: { id: "t1", name: "b-name" },
+      } as Parameters<typeof applyAutomationFrame>[0]);
+      // renamed again while the socket was down; the reload says so
+      answer = () =>
+        Response.json({ rows: [run("a", 50, "c-name")], next: null });
+      await loadList({ project: null, q: "" });
+      expect(list.value?.rows[0]?.automation?.name).toBe("c-name");
     },
   );
 

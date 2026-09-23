@@ -45,6 +45,22 @@ let runsTurn = 0;
 const seen = new Map<string, string>();
 // the runs frames moved since the last first page was asked
 const moved = new Map<string, StreamRow>();
+// the automation's name as its frame last said, with the frame's
+// number, applied only over an answer asked before the frame
+let renamed: { id: string; name: string; at: number } | null = null;
+let frames = 0;
+
+function named(rows: StreamRow[], asked: number): StreamRow[] {
+  if (renamed === null || renamed.at <= asked) return rows;
+  const label = { id: renamed.id, name: renamed.name };
+  return rows.map((r) =>
+    r.automation !== null &&
+    r.automation.id === label.id &&
+    r.automation.name !== label.name
+      ? { ...r, automation: label }
+      : r,
+  );
+}
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -99,9 +115,11 @@ export async function loadRuns(
     // the new turn drops the page in flight
     runs.value = { ...held, more: IDLE };
   }
+  const asked = frames;
   try {
-    const body = await api<AutomationRunsResponse>(address(id, filter, null));
+    const answer = await api<AutomationRunsResponse>(address(id, filter, null));
     if (owner !== forUser || runsTurn !== turn) return;
+    const body = { ...answer, rows: named(answer.rows, asked) };
     const now = runs.value;
     const page =
       warm && now !== null && now.rows !== null
@@ -140,6 +158,7 @@ export async function loadMoreRuns(): Promise<void> {
   if (held.next === null || held.more.loading) return;
   const forUser = owner;
   const turn = runsTurn;
+  const asked = frames;
   runs.value = { ...held, more: { loading: true, error: null } };
   try {
     const body = await api<AutomationRunsResponse>(
@@ -151,7 +170,7 @@ export async function loadMoreRuns(): Promise<void> {
     runs.value = {
       ...now,
       rows: replayMoved(
-        mergeNextPage(now.rows, body.rows, runOrder),
+        mergeNextPage(now.rows, named(body.rows, asked), runOrder),
         now.filter,
       ),
       // the newest word on the tally
@@ -177,6 +196,7 @@ export function closeRuns(): void {
   runs.value = null;
   seen.clear();
   moved.clear();
+  renamed = null;
 }
 
 // a run's newest word into the held runs. The row moves at once, in or
@@ -232,7 +252,9 @@ export function applyRunEnvelope(
 // a rename reaches the open runs, which carry the old label
 export function relabelRuns(label: { id: string; name: string }): void {
   const open = runs.value;
-  if (open?.id !== label.id || open.rows === null) return;
+  if (open?.id !== label.id) return;
+  renamed = { ...label, at: ++frames };
+  if (open.rows === null) return;
   runs.value = {
     ...open,
     rows: open.rows.map((r) =>

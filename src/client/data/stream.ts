@@ -55,6 +55,18 @@ let head: { size: number; next: string | null } = { size: 0, next: null };
 // whether the last cold load landed: until it does, a warm one is cold
 // too, or it would keep the tail the cold one is there to drop
 let settled = true;
+// whether a first page is out, so a grant during it asks again
+let loading = false;
+// moves when a row is deleted, so a later page read before it cannot
+// bring the row back
+let pages = 0;
+// the automations' names as their frames said, each with the frame's
+// number, applied only over an answer asked before the frame
+const labels = new Map<
+  string,
+  { label: StreamRow["automation"]; at: number }
+>();
+let frames = 0;
 const kept = new Held<{ rows: StreamRow[]; next: string | null }>();
 
 const keyOf = (f: ListFilter) =>
@@ -73,7 +85,25 @@ effect(() => {
   };
   list.value = null;
   kept.clear();
+  labels.clear();
+  loading = false;
 });
+
+// a row of an automation the frames renamed or deleted since the answer
+// was read carries the frame's word
+function relabel(rows: StreamRow[], asked: number): StreamRow[] {
+  if (labels.size === 0) return rows;
+  return rows.map((row) => {
+    const id = row.automation?.id ?? row.session.automationId;
+    const said = id === null ? undefined : labels.get(id);
+    if (said === undefined || said.at <= asked) return row;
+    const label = said.label;
+    return row.automation?.name === label?.name &&
+      row.automation?.id === label?.id
+      ? row
+      : { ...row, automation: label };
+  });
+}
 
 const sameFilter = (a: ListFilter, b: ListFilter) =>
   a.project === b.project &&
@@ -143,9 +173,13 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
   }
   listFor = { ...filter, origin: filter.origin ?? null, turn, cold };
   if (!warm) settled = false;
+  loading = true;
+  const since = frames;
   try {
-    const body = await api<SessionsResponse>(address(listFor, null));
+    const answer = await api<SessionsResponse>(address(listFor, null));
     if (listFor.turn !== turn) return;
+    loading = false;
+    const body = { ...answer, rows: relabel(answer.rows, since) };
     const held = list.value;
     head = { size: body.rows.length, next: body.next };
     settled = true;
@@ -158,6 +192,7 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
             more: IDLE,
           };
   } catch {
+    if (listFor.turn === turn) loading = false;
     // a warm load that fails keeps what is held
     if (listFor.turn === turn && !(warm && list.value !== null)) {
       list.value = null;
@@ -183,22 +218,40 @@ export async function loadMore(): Promise<void> {
   const held = list.value;
   if (held === null || held.next === null || held.more.loading) return;
   const cold = listFor.cold;
+  const page = pages;
+  const asked = frames;
   list.value = { ...held, more: { loading: true, error: null } };
   try {
     const body = await api<SessionsResponse>(address(listFor, held.next));
     const now = list.value;
     if (listFor.cold !== cold || now === null) return;
+    // a row deleted since the page was read may be on it: the button
+    // comes back and asks again
+    if (pages !== page) {
+      list.value = { ...now, more: IDLE };
+      return;
+    }
     list.value = {
-      rows: mergeNextPage(now.rows, body.rows),
+      rows: mergeNextPage(now.rows, relabel(body.rows, asked)),
       next: body.next,
       more: IDLE,
     };
   } catch (err) {
     const now = list.value;
     if (listFor.cold !== cold || now === null) return;
+    if (pages !== page) {
+      list.value = { ...now, more: IDLE };
+      return;
+    }
     list.value = { ...now, more: { loading: false, error: failure(err) } };
   }
 }
+
+// the server's search: a title holding the query, ASCII letters in any
+// case and every other character as it is, as SQLite's LIKE folds
+const ascii = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
+const titled = (title: string, q: string) =>
+  ascii(title).includes(ascii(q.trim()));
 
 const without = (rows: StreamRow[], keep: (row: StreamRow) => boolean) => {
   const out = rows.filter(keep);
@@ -209,6 +262,7 @@ const without = (rows: StreamRow[], keep: (row: StreamRow) => boolean) => {
 // covers the project, since an answer in flight may still hold the row
 export function dropRow(sessionId: string, projectId: string): void {
   const keep = (row: StreamRow) => row.session.id !== sessionId;
+  if (covers(projectId)) pages++;
   kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
   const held = list.value;
   if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
@@ -227,9 +281,13 @@ export function revokeRows(projectId: string): void {
       : { ...held, rows: without(held.rows, keep) },
   );
   const held = list.value;
+  // a list of another project cannot hold its rows, and keeps its load
+  if (!covers(projectId)) return;
   listFor = { ...listFor, turn: listFor.turn + 1, cold: listFor.cold + 1 };
-  if (listFor.project === projectId) list.value = null;
-  else if (listFor.project === null) {
+  if (listFor.project === projectId) {
+    list.value = null;
+    loading = false;
+  } else if (listFor.project === null) {
     if (held !== null) {
       list.value = { ...held, rows: without(held.rows, keep), more: IDLE };
     }
@@ -240,7 +298,9 @@ export function revokeRows(projectId: string): void {
 // a project that joined what the user sees brings its rows on the
 // lists that cover it
 export function grantRows(projectId: string): void {
-  if (list.value !== null && covers(projectId)) void loadList(listFor);
+  if ((list.value !== null || loading) && covers(projectId)) {
+    void loadList(listFor);
+  }
 }
 
 // the list's copy of the row: the summary and the send are replaced,
@@ -252,13 +312,14 @@ export function grantRows(projectId: string): void {
 export function applyAutomationFrame(
   ev: Extract<SocketEvent, { type: "automation" | "automationDeleted" }>,
 ): void {
-  const held = list.value;
-  if (held === null || !covers(ev.projectId)) return;
   const id = ev.type === "automation" ? ev.automation.id : ev.automationId;
   const label =
     ev.type === "automation"
       ? { id: ev.automation.id, name: ev.automation.name }
       : null;
+  labels.set(id, { label, at: ++frames });
+  const held = list.value;
+  if (held === null || !covers(ev.projectId)) return;
   let changed = false;
   const rows = held.rows.map((row) => {
     if (row.session.origin !== "automation") return row;
@@ -282,7 +343,12 @@ export function applyEnvelope(
   if (list0 === null || !covers(ev.projectId, ev.session.origin)) return;
   const held = list0.rows.find((row) => row.session.id === ev.session.id);
   if (held === undefined) {
-    void refresh();
+    // under a search, a row whose title does not hold it is not listed,
+    // and asking again on each of its envelopes would load the page
+    // once per tool call of every chat running
+    if (listFor.q === "" || titled(ev.session.title, listFor.q)) {
+      void refresh();
+    }
     return;
   }
   if (held.session.revision >= ev.session.revision) return;

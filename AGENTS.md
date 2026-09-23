@@ -1114,9 +1114,10 @@ violation, and every rule has a rejected fixture under
   (`stream/Row.tsx`) is the one row outside Rows, a denser feed line
   inside a `RowsCard`. A paged list ends in `ShowMore` from
   `stream/Stream.tsx` while `next` is set: a `RowsButton` reading Show
-  more, three `Ghosts` in its place while the page loads (six for a
-  first load), and a failure under it, words then the code tag. No
-  infinite scroll. A card whose
+  more, three `Ghosts` in its place while the page loads, and a
+  failure under it, words then the code tag. The stream draws six
+  `Ghosts` for its first load; the Runs tab says Loading, since its
+  rows are not the stream row's shape. No infinite scroll. A card whose
   list grows (the Projects page, and Users, Projects, Agents and Skills
   under Admin) passes `ui/Search.tsx` as `RowsCard`'s `search`, in
   place of the label, and filters the loaded rows through `matches()`
