@@ -79,6 +79,8 @@
     --text-tiny: 10px;
     /* iOS zooms into a field under 16px on focus and never zooms back */
     --text-touch: 16px;
+    /* a stat tile's figure, the one size above the title */
+    --text-figure: 28px;
 
     --radius: 6px;
     --radius-cell: 2px;

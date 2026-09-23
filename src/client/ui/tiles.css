@@ -1,0 +1,66 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .tiles-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    min-height: 136px;
+    padding: var(--space-4);
+  }
+  .tiles-figure {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    margin-top: var(--space-1);
+    font-size: var(--text-figure);
+    font-weight: 500;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+  .tiles-unit {
+    font-size: var(--text-ui);
+    font-weight: 400;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .tiles-sub {
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .tiles-plot {
+    height: 36px;
+    margin: auto calc(-1 * var(--space-2)) 0;
+  }
+  .tiles-meter {
+    margin-top: auto;
+    height: 6px;
+  }
+  .tiles-meter-fill {
+    background: var(--heat-3);
+  }
+  .tiles-ghost {
+    pointer-events: none;
+  }
+
+  @media (max-width: 1099px) {
+    .tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 719px) {
+    .tiles {
+      gap: var(--space-2);
+    }
+    .tiles-tile {
+      min-height: 124px;
+      padding: var(--space-3);
+    }
+  }
+}

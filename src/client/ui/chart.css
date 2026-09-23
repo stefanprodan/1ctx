@@ -1,0 +1,243 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .chart-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .chart-spark {
+    width: 100%;
+    height: 100%;
+  }
+  .chart-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .chart-strong {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--fg);
+  }
+
+  .chart-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-3) var(--space-2);
+  }
+  .chart-bar {
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr) 112px;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 30px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+  .chart-bars-wide .chart-bar {
+    grid-template-columns: 200px minmax(0, 1fr) 72px;
+  }
+  .chart-bar-pick {
+    cursor: pointer;
+  }
+  .chart-bar:is(:hover, :focus-visible),
+  .chart-bar-on {
+    background: var(--hover);
+  }
+  .chart-bar-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  .chart-bar-on .chart-bar-name {
+    color: var(--fg);
+  }
+  .chart-bar-track {
+    display: block;
+    height: 12px;
+  }
+  .chart-bar-fill {
+    display: block;
+    height: 100%;
+    border-top-right-radius: var(--radius-cell);
+    border-bottom-right-radius: var(--radius-cell);
+    background: var(--heat-3);
+  }
+  .chart-bar:is(:hover, :focus-visible) .chart-bar-fill,
+  .chart-bar-on .chart-bar-fill {
+    background: var(--brand);
+  }
+  /* a line that sums others reads apart */
+  .chart-bar-faint .chart-bar-name {
+    color: var(--faint);
+  }
+  .chart-bar-faint .chart-bar-fill {
+    background: var(--heat-2);
+  }
+  .chart-value {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--fg);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .chart-share {
+    display: inline-block;
+    min-width: 5ch;
+    color: var(--faint);
+  }
+  .chart-foot {
+    margin: auto 0 0;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+
+  .chart-stack-wrap {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
+  .chart-stack {
+    display: flex;
+    gap: 2px;
+    height: 12px;
+  }
+  .chart-stack-first,
+  .chart-stack-second {
+    display: block;
+  }
+  .chart-stack-first:first-child {
+    border-top-left-radius: var(--radius-cell);
+    border-bottom-left-radius: var(--radius-cell);
+  }
+  .chart-stack-second:last-child,
+  .chart-stack-first:last-child {
+    border-top-right-radius: var(--radius-cell);
+    border-bottom-right-radius: var(--radius-cell);
+  }
+  .chart-stack-first {
+    background: var(--heat-4);
+  }
+  .chart-stack-second {
+    background: var(--heat-2);
+  }
+  .chart-swatch {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-cell);
+  }
+  .chart-meter-fill {
+    background: var(--heat-3);
+  }
+
+  /* bones where the figures and marks go, at their size, so nothing
+     moves when the answer lands */
+  .chart-bone {
+    display: block;
+    height: 0.7em;
+    border-radius: var(--radius-cell);
+    background: var(--line);
+    animation: pulse 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--ghost) * 0.05s);
+  }
+  .chart-bone-label {
+    width: 72px;
+    height: 14px;
+  }
+  .chart-bone-figure {
+    width: 96px;
+    height: calc(var(--text-figure) * 1.1);
+    margin-top: var(--space-1);
+  }
+  .chart-bone-sub {
+    width: 62%;
+    height: 16px;
+  }
+  .chart-bone-trend {
+    width: 100%;
+    height: 36px;
+    margin-top: auto;
+  }
+  .chart-bone-name {
+    width: 72%;
+  }
+  .chart-bone-fill {
+    height: 12px;
+  }
+  .chart-bone-value {
+    width: 52px;
+    justify-self: end;
+  }
+  .chart-bone-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .chart-bone-title {
+    width: 46%;
+  }
+  .chart-bone-meter {
+    width: 100%;
+    height: 3px;
+  }
+  .chart-bone-stack {
+    width: 100%;
+    height: 12px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chart-bone {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 719px) {
+    .chart-bar {
+      grid-template-columns: 88px minmax(0, 1fr) auto;
+      gap: var(--space-2);
+    }
+    .chart-share {
+      display: none;
+    }
+    /* a long name takes its own line over the bar, never cut */
+    .chart-bars-wide .chart-bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "name value" "track track";
+      row-gap: var(--space-1);
+      padding-block: var(--space-1);
+    }
+    .chart-bars-wide .chart-bar-name {
+      grid-area: name;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .chart-bars-wide .chart-bar-track {
+      grid-area: track;
+      height: 8px;
+    }
+    .chart-bars-wide .chart-value {
+      grid-area: value;
+    }
+  }
+}
+
+/* uPlot's own sheet is unlayered, and an unlayered rule beats every
+   layered one, so its overrides are unlayered too */
+.chart-spark .uplot {
+  font-family: var(--mono);
+}
+.chart-spark .u-legend {
+  display: none;
+}
+.chart-spark .u-hz .u-cursor-x {
+  border-right: 1px solid var(--line-strong);
+}

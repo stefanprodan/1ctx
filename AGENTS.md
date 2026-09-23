@@ -9,7 +9,7 @@ One continuous context for agents. Domain: 1ctx.dev.
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
   change: `docs/just-bash.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
-  and `modern-tar`; the vendored tar command uses modern-tar too. The
+  and `modern-tar`, and `src/client/ui/Chart.tsx` alone imports `uplot`; the vendored tar command uses modern-tar too. The
   modern-tar patch retains the raw header `typeflag` to distinguish GNU
   sparse and unknown types from regular files.
 - **Status:** alpha. No backwards compatibility and no shims for the API
@@ -210,7 +210,10 @@ violation, and every rule has a rejected fixture under
   family, font size, the `font` shorthand and radius come from
   `tokens.css` and appear nowhere else, CSS or TSX, a `var()` fallback
   included; `index.html` and `favicon.svg` are the two files in
-  `LITERAL_EXEMPTIONS`.
+  `LITERAL_EXEMPTIONS`. Every rule sits inside a layer, except in a
+  sheet listed in `UNLAYERED` with its reason: `ui/chart.css`, whose
+  overrides of uPlot's unlayered sheet must be unlayered to win, and
+  whose unlayered rules may name uPlot's classes inside its own.
 - Routes do not overlap: two patterns of one method that could match
   one path fail the router at start and the route table test.
 - No test names a real provider host; the suite never reaches a network.
@@ -1359,6 +1362,17 @@ violation, and every rule has a rejected fixture under
   `lib/format.ts` for a page's error signal and `status` on a form's
   problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
   words, and left out when the server did not answer.
+- **A dashboard is a board, not rows.** The admin's Storage page
+  (`/admin/storage`, the Admin group's first entry) is `ui/Tiles.tsx`
+  (stat tiles, the figure at `--text-figure`) over `ui/Chart.tsx`
+  panels in a grid: `ChartPanel` wears the Rows card head, `Bars` rank
+  from one baseline in CSS, `Stack` splits a whole, and `Spark` is a
+  uPlot sparkline over days, made on mount, fed by a second effect,
+  its colours tokens read at every draw, sharing its cursor by sync
+  key. Its first load draws the board in `Bone`s at the loaded sizes,
+  never a Loading line; Refresh keeps the last answer faded until the
+  next lands. `data/overview.ts` loads it on arrival and on Refresh,
+  never polled.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

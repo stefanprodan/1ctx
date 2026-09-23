@@ -19,6 +19,7 @@ import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadMcp } from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
+import { loadStorage } from "../data/overview.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -307,6 +308,16 @@ export const ROUTES: Route[] = [
           : loadAutomations(projectId),
       ]);
     },
+  },
+  {
+    path: "/admin/storage",
+    view: lazy(() =>
+      import("../views/admin/Storage.tsx").then((m) => m.Storage),
+    ),
+    title: () => "Storage",
+    role: "admin",
+    load: () => loadStorage(),
+    nav: { label: "Storage", icon: "storage", order: 7, group: "Admin" },
   },
   {
     path: "/admin/projects",
