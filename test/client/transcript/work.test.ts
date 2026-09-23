@@ -98,11 +98,18 @@ function node(changes: Partial<WorkNode> = {}): WorkNode {
 }
 
 describe("work summaries", () => {
+  test("a cap outranks a refused repeat the loop went on from", () => {
+    const repeat = message({ finishReason: "tool_repeat" });
+    const cap = message({ id: "work-2", finishReason: "tool_loop" });
+    expect(capWord([repeat, cap])).toBe("tool loop");
+  });
+
   test.each([
     ["tool_limit", "tool limit"],
     ["token_limit", "token limit"],
     ["context_limit", "context full"],
     ["tool_loop", "tool loop"],
+    ["tool_repeat", "repeat refused"],
   ])("names %s on the work row as %s", (finishReason, word) => {
     const work = message({ finishReason });
     const answer = message({

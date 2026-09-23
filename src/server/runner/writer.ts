@@ -44,6 +44,9 @@ export type { SessionsPort } from "./writer-port.ts";
 // the text a call cut before it ran gets, as its content
 export const NOT_RUN = "not run: the tool budget was spent";
 export const NOT_RUN_LOOP = "not run: the same calls came three times in a row";
+// the loop check's first trip: the calls are refused and the loop goes on
+export const NOT_RUN_REPEAT =
+  "not run: the same calls as your previous two rounds, and their results are above. Use them, call something else, or answer.";
 
 export function notRun(reason: string): string {
   return reason === "tool_loop" ? NOT_RUN_LOOP : NOT_RUN;

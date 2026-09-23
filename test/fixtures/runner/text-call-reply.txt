@@ -1,0 +1,12 @@
+I have the namespace list already. Let me query the workload-bearing resources now.
+
+<tool_call>
+<function=mcp_call>
+<parameter=name>
+mcp__flux-operator__get_kubernetes_resources
+</parameter>
+<parameter=arguments>
+{"apiVersion": "apps/v1", "kind": "Deployment", "fields": ["metadata.name", "metadata.namespace", "spec.replicas", "status.availableReplicas"]}
+</parameter>
+</function>
+</tool_call>

@@ -28,14 +28,17 @@ function isTool(row: Message): boolean {
 }
 
 export function capWord(rows: Message[]): string | null {
+  let repeat = false;
   for (const row of rows) {
     if (row.kind !== "reply") continue;
     if (row.finishReason === "tool_limit") return "tool limit";
     if (row.finishReason === "token_limit") return "token limit";
     if (row.finishReason === "context_limit") return "context full";
     if (row.finishReason === "tool_loop") return "tool loop";
+    if (row.finishReason === "tool_repeat") repeat = true;
   }
-  return null;
+  // a refused repeat the loop went on from, unless a cap ended it
+  return repeat ? "repeat refused" : null;
 }
 
 // the live clock in whole seconds: a decimal ticking ten times a

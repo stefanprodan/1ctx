@@ -996,37 +996,18 @@ describe("history", () => {
 });
 
 describe("withExhausted", () => {
-  test("appends the line to a copy of the last tool message, not the original", () => {
+  test("ends a copy with the ask as a user message, the results untouched", () => {
     const messages: ChatMessageIn[] = [
       { role: "system", content: "sys" },
       { role: "user", content: "hi" },
       { role: "tool", toolCallId: "c1", content: "a result" },
     ];
     const out = withExhausted(messages, "tool_limit");
-    expect(out[2]).toEqual({
-      role: "tool",
-      toolCallId: "c1",
-      content: `a result\n\n${EXHAUSTED_LINE}`,
-    });
-    // the original is untouched
-    expect(messages[2]).toEqual({
-      role: "tool",
-      toolCallId: "c1",
-      content: "a result",
-    });
-  });
-
-  test("with no tool message, appends a final user message", () => {
-    const messages: ChatMessageIn[] = [
-      { role: "system", content: "sys" },
-      { role: "user", content: "hi" },
-    ];
-    const out = withExhausted(messages, "tool_limit");
-    expect(out[out.length - 1]).toEqual({
-      role: "user",
-      content: EXHAUSTED_LINE,
-    });
-    expect(messages).toHaveLength(2);
+    expect(out).toEqual([
+      ...messages,
+      { role: "user", content: EXHAUSTED_LINE },
+    ]);
+    expect(messages).toHaveLength(3);
   });
 
   test("asks a loop for the answer without calling it a spent budget", () => {
@@ -1034,7 +1015,8 @@ describe("withExhausted", () => {
       [{ role: "tool", toolCallId: "c1", content: "a result" }],
       "tool_loop",
     );
-    expect(out[0]).toMatchObject({ content: `a result\n\n${LOOP_LINE}` });
+    expect(out.at(-1)).toEqual({ role: "user", content: LOOP_LINE });
+    expect(LOOP_LINE).not.toContain("budget");
   });
 });
 

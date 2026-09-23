@@ -10,13 +10,14 @@
 // The repair is pure: a work reply whose calls lack a complete set of
 // result rows is sent without its calls and without its structured
 // reasoning, as plain text if it has any, else skipped; an orphan tool
-// row is skipped. The answer round appends the exhausted line to a copy
-// of the last tool result, never the stored row. Tested on fixtures,
+// row is skipped. The answer round ends the request with the ask as a
+// user message, never a stored row. Tested on fixtures,
 // malformed histories among them.
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
+import { tokens } from "../lib/tokens.ts";
 import type {
   ChatMessageIn,
   ChatRequest,
@@ -351,34 +352,23 @@ export function summaryRequest(
   };
 }
 
-// the exhausted line the caps reached: it rides on a request-local copy
-// of the last tool result, never the stored row and never the system
-// prompt. The answer round keeps the schemas untouched so the cached
-// prefix holds; this line is what asks for the answer.
-export const EXHAUSTED_LINE =
-  "The tool budget is spent. Answer now with what the results gave you.";
-// a loop is no spent budget, and saying so would teach nothing
-export const LOOP_LINE =
-  "You made the same calls three times in a row. Answer now with what the results gave you.";
+// the ask the answer round ends with: a request-local user message after
+// the last tool result, never a stored row and never the system prompt.
+// Inside a tool result the models read it as more output and called
+// again; as the user's words they answered. The schemas stay untouched
+// so the cached prefix holds
+const ANSWER_NOW =
+  "You cannot call tools any more in this turn. Answer the user now from the results above: what you found, what is missing, and what to do next.";
+export const EXHAUSTED_LINE = `The tool budget for this turn is spent. ${ANSWER_NOW}`;
+export const LOOP_LINE = `You made the same calls three times in a row. ${ANSWER_NOW}`;
+// what the ask adds to a request: the longer line and a message's framing
+export const ASK_TOKENS =
+  Math.max(tokens(EXHAUSTED_LINE), tokens(LOOP_LINE)) + 8;
 
-// append the exhausted line to a copy of the messages, on the last tool
-// message when there is one, else as a final user message
 export function withExhausted(
   messages: ChatMessageIn[],
   reason: string,
 ): ChatMessageIn[] {
-  const line = reason === "tool_loop" ? LOOP_LINE : EXHAUSTED_LINE;
-  const copy = messages.slice();
-  for (let i = copy.length - 1; i >= 0; i--) {
-    const message = copy[i]!;
-    if (message.role === "tool") {
-      copy[i] = {
-        ...message,
-        content: `${message.content}\n\n${line}`,
-      };
-      return copy;
-    }
-  }
-  copy.push({ role: "user", content: line });
-  return copy;
+  const content = reason === "tool_loop" ? LOOP_LINE : EXHAUSTED_LINE;
+  return [...messages, { role: "user", content }];
 }

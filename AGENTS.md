@@ -864,20 +864,28 @@ violation, and every rule has a rejected fixture under
   MCP name (`tools/bash-hint.ts`).
   Main rounds spend prompt plus completion tokens, cached tokens included,
   or a request estimate without usage. The tool-work threshold and the
-  window threshold are checked before calls, forcing one answer round,
-  and so do three equal call rounds in a row (`tool_loop`), whose
-  answer line and not-run text say so rather than a spent budget.
+  window threshold are checked before calls, forcing one answer round.
+  Three equal call rounds in a row are refused once, recorded not run
+  with a result pointing at the earlier ones and finish reason
+  `tool_repeat` ("repeat refused" in the fold), and the loop goes on; a
+  second trip, or one with fewer than two rounds left, is the answer
+  round with `tool_loop`.
   The answer round sends the schemas unchanged and no `tool_choice`,
-  which would miss a server's cached prefix; the exhausted line asks
-  for the answer. A round that still calls is asked again: on
-  `openai-compatible` first with the same request, which a local
-  server's cached prefix answers in seconds, then on every wire once
-  without schemas.
+  which would miss a server's cached prefix, and ends the request with
+  the ask as a request-local user message after the last result, naming
+  the reason (the models called again when it sat inside a tool
+  result, and Gemini refuses a request ending on a model turn). A round
+  that still calls is asked again: on `openai-compatible` first with the
+  same request, which a local server's cached prefix answers in seconds,
+  then on every wire once without schemas. A reply to that last request
+  that writes a call as text (`runner/text-calls.ts`) keeps only the
+  words before it, or a stop line, with finish reason `tool_text`.
   The crossing and answer rounds may pass the tool-work budget; summaries
   and memory have their own limits. Results that outgrow the remaining
   window are cut largest first before storage, keeping bash's exit and
   receipts and a cut line. The work row carries `tool_limit`, `token_limit`,
-  `context_limit` or `tool_loop`; the answer keeps the provider's finish reason.
+  `context_limit` or `tool_loop`; the answer keeps the provider's finish
+  reason, except `tool_text`.
   The offered set is decided once per send in `runner/policy.ts` from
   the `tools` rows:
   a model that accepts tools always gets `datetime` and `bash` over the

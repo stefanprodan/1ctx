@@ -12,7 +12,10 @@
 import { describe, expect, test } from "bun:test";
 import { LOOP_LINE } from "../../src/server/runner/context.ts";
 import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
-import { NOT_RUN_LOOP } from "../../src/server/runner/writer.ts";
+import {
+  NOT_RUN_LOOP,
+  NOT_RUN_REPEAT,
+} from "../../src/server/runner/writer.ts";
 import { settleRun } from "../helpers/automations.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 import {
@@ -348,6 +351,61 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
+  for (const wire of [
+    "openai-compatible",
+    "openrouter",
+    "openai-strict",
+    "gemini",
+  ] as const) {
+    test(`a call written as text without schemas is not the answer on ${wire}`, async () => {
+      const chat = await chatApp({ wire });
+      const { sessionId } = await startChat(chat, `text call on ${wire}`);
+      const many = Array.from(
+        { length: LOOP_LIMITS.callsPerRound + 1 },
+        (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+      );
+      chat.scripted.scripts[0].toolRound(many);
+      chat.scripted.scripts[0].end();
+      // the answer round and its retries with schemas still call
+      let next = await chat.scripted.next();
+      while (next.body.tools !== undefined) {
+        next.toolRound([time(`again${chat.scripted.scripts.length}`)]);
+        next.end();
+        next = await chat.scripted.next();
+      }
+      next.reply(
+        "Let me check.\n\n<tool_call>\n<function=datetime>\n<parameter=timezone>\nUTC\n</parameter>\n</function>\n</tool_call>",
+      );
+      await settle(chat, 10);
+      const answer = chat.app.sessions
+        .messages(sessionId)
+        .filter((r) => r.kind === "reply")
+        .at(-1)!;
+      expect(answer).toMatchObject({
+        content: "Let me check.",
+        finishReason: "tool_text",
+      });
+      expect(answer.html).not.toContain("tool_call");
+      chat.app.socket.dispose();
+    });
+  }
+
+  test("an answer that quotes call markup with schemas offered is kept", async () => {
+    const chat = await chatApp();
+    const { sessionId } = await startChat(chat, "quoted markup");
+    const quoted =
+      "Models write `<tool_call>` when a server does not parse it.";
+    chat.scripted.scripts[0].reply(quoted);
+    await settle(chat, 10);
+    const answer = chat.app.sessions
+      .messages(sessionId)
+      .filter((r) => r.kind === "reply")
+      .at(-1)!;
+    expect(answer.content).toBe(quoted);
+    expect(answer.finishReason).toBe("stop");
+    chat.app.socket.dispose();
+  });
+
   test("a finish reason other than stop or tool_calls with calls ends on it", async () => {
     const chat = await chatApp();
     const { detail, sessionId } = await startChat(chat, "cut round");
@@ -373,18 +431,49 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
-  test("three identical rounds in a row are the loop check", async () => {
+  test("three identical rounds are refused once and the loop goes on", async () => {
     const chat = await chatApp();
     const { detail, sessionId } = await startChat(chat, "loop");
-    // three rounds asking for the very same call; the third trips the
-    // loop check, which records the calls not run and asks for the answer
     for (let round = 1; round <= 3; round++) {
       const script = await waitScript(chat.scripted, round);
       script.toolRound([time("same")]);
       script.end();
       await settle(chat);
     }
-    const answer = await waitScript(chat.scripted, 4);
+    // the third is refused and the next round is an ordinary one
+    const next = await waitScript(chat.scripted, 4);
+    expect(asksAnswer(next.body, LOOP_LINE)).toBe(false);
+    const sent = next.body.messages as { role: string; content: string }[];
+    expect(sent.at(-1)).toMatchObject({
+      role: "tool",
+      content: NOT_RUN_REPEAT,
+    });
+    next.toolRound([time("other", "Europe/Paris")]);
+    next.end();
+    await settle(chat);
+    const answer = await waitScript(chat.scripted, 5);
+    answer.reply("moved on");
+    await settle(chat, 10);
+    expect(chat.app.sessions.send(detail.send.id)!.status).toBe("done");
+    const rows = chat.app.sessions.messages(sessionId);
+    expect(rows.some((r) => r.finishReason === "tool_loop")).toBe(false);
+    expect(rows.some((r) => r.finishReason === "tool_repeat")).toBe(true);
+    expect(rows.find((r) => r.toolCallId === "other")?.status).toBe("done");
+    answerNodes(chat, sessionId);
+    chat.app.socket.dispose();
+  });
+
+  test("a second loop after the warning asks for the answer", async () => {
+    const chat = await chatApp();
+    const { detail, sessionId } = await startChat(chat, "loop");
+    // three equal rounds are the warning, three more the answer round
+    for (let round = 1; round <= 6; round++) {
+      const script = await waitScript(chat.scripted, round);
+      script.toolRound([time("same")]);
+      script.end();
+      await settle(chat);
+    }
+    const answer = await waitScript(chat.scripted, 7);
     expect(asksAnswer(answer.body, LOOP_LINE)).toBe(true);
     answer.reply("the answer after the loop");
     await settle(chat, 10);

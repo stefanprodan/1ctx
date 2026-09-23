@@ -90,6 +90,8 @@ export type ActiveSend = {
   // a call in the answer round is asked again: a local server first
   // with the same request, which its cached prefix answers in seconds,
   // then every wire with no schemas, which leaves nothing to call
+  // the loop check warned once: the next trip asks for the answer
+  loopWarned: boolean;
   repeated: boolean;
   bare: boolean;
   // summary rounds ignore calls and are always the send's last round
@@ -195,6 +197,7 @@ export function newSend(fields: {
     keep: null,
     signatures: [],
     answering: null,
+    loopWarned: false,
     repeated: false,
     bare: false,
     summarizing: fields.summarizing ?? false,

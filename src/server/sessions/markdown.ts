@@ -189,6 +189,7 @@ function cutReason(row: ExportRow, hideToolError = false): string | null {
       : (row.error ?? "failed");
   }
   if (row.finishReason === "length") return "cut at max tokens";
+  if (row.finishReason === "tool_text") return "tool call dropped";
   return null;
 }
 

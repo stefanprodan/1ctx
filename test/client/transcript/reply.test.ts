@@ -115,6 +115,9 @@ describe("the line under an answer", () => {
     expect(cutReason(answer({ finishReason: "length" }))?.text).toBe(
       "cut at max tokens",
     );
+    expect(cutReason(answer({ finishReason: "tool_text" }))?.text).toBe(
+      "tool call dropped",
+    );
     // a cap is the work fold's word, not this line's
     expect(cutReason(answer({ finishReason: "tool_limit" }))).toBeNull();
     expect(cutReason(answer({ finishReason: "token_limit" }))).toBeNull();

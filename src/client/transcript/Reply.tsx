@@ -46,6 +46,9 @@ export function cutReason(m: Message): { text: string; err: boolean } | null {
   if (m.finishReason === "length") {
     return { text: "cut at max tokens", err: false };
   }
+  if (m.finishReason === "tool_text") {
+    return { text: "tool call dropped", err: false };
+  }
   return null;
 }
 
