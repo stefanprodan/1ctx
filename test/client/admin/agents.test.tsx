@@ -500,6 +500,7 @@ describe("the rail", () => {
       expect(
         group?.kind === "group" && group.routes.map((r) => r.path),
       ).toEqual([
+        "/admin",
         "/admin/storage",
         "/admin/projects",
         "/admin/users",

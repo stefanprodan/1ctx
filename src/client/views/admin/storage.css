@@ -20,23 +20,6 @@
     align-items: stretch;
   }
 
-  /* the page head's words: when the answer was read */
-  .storage-loaded {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    white-space: nowrap;
-  }
-  .storage-loaded-failed {
-    color: var(--failed);
-  }
-  .storage-spin {
-    animation: spin 0.9s linear infinite;
-  }
-
   .storage-none {
     margin: 0;
     padding: var(--space-5) var(--space-4);

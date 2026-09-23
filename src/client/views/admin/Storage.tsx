@@ -18,12 +18,10 @@ import {
   storageError,
   storageLoading,
 } from "../../data/overview.ts";
-import { clock } from "../../lib/format.ts";
 import { Icon, type IconName } from "../../lib/icons.tsx";
+import { BarsGhost, Bone } from "../../ui/Bones.tsx";
 import {
   Bars,
-  BarsGhost,
-  Bone,
   ChartFoot,
   ChartPanel,
   Meter,
@@ -31,6 +29,7 @@ import {
   Stack,
   Swatch,
 } from "../../ui/Chart.tsx";
+import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsFilters } from "../../ui/Rows.tsx";
 import {
@@ -421,40 +420,13 @@ export function Storage() {
   const answer = storage.value;
   const error = storageError.value;
   const busy = storageLoading.value;
-  const status = busy
-    ? answer
-      ? "Refreshing"
-      : "Loading"
-    : error && answer
-      ? "Did not refresh"
-      : answer
-        ? `Loaded ${clock(answer.readAt)}`
-        : "";
   const actions = (
-    <>
-      <span
-        class={`storage-loaded${!busy && error && answer ? " storage-loaded-failed" : ""}`}
-        aria-live="polite"
-      >
-        {status}
-        {!busy && error && answer && error.status !== null && (
-          <span class="code-tag">HTTP {error.status}</span>
-        )}
-      </span>
-      <button
-        type="button"
-        class="btn btn-small"
-        disabled={busy}
-        onClick={() => void loadStorage()}
-      >
-        <Icon
-          name={busy ? "spinner" : "redo"}
-          size={12}
-          class={busy ? "storage-spin" : undefined}
-        />
-        Refresh
-      </button>
-    </>
+    <Loaded
+      readAt={answer?.readAt ?? null}
+      busy={busy}
+      error={error}
+      onRefresh={() => void loadStorage()}
+    />
   );
   return (
     <Page

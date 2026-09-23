@@ -372,13 +372,14 @@ describe("the page", () => {
 });
 
 describe("the rail", () => {
-  test("Projects follows Storage in the Admin group", () => {
+  test("Projects follows Overview and Storage in the Admin group", () => {
     const group = railRows("admin").find((row) => row.kind === "group");
     const entries =
       group?.kind === "group"
         ? group.routes.map((route) => route.nav!.label)
         : [];
     expect(entries).toEqual([
+      "Overview",
       "Storage",
       "Projects",
       "Users",

@@ -66,6 +66,7 @@ describe("the route table", () => {
     expect(navEntries("admin", withAdmin).map((r) => r.path)).toEqual([
       "/",
       "/projects",
+      "/admin",
       "/admin/storage",
       "/admin/projects",
       "/admin/users",

@@ -1385,17 +1385,20 @@ violation, and every rule has a rejected fixture under
   `lib/format.ts` for a page's error signal and `status` on a form's
   problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
   words, and left out when the server did not answer.
-- **A dashboard is a board, not rows.** The admin's Storage page
-  (`/admin/storage`, the Admin group's first entry) is `ui/Tiles.tsx`
-  (stat tiles, the figure at `--text-figure`) over `ui/Chart.tsx`
-  panels in a grid: `ChartPanel` wears the Rows card head, `Bars` rank
-  from one baseline in CSS, `Stack` splits a whole, and `Spark` is a
-  uPlot sparkline over days, made on mount, fed by a second effect,
-  its colours tokens read at every draw, sharing its cursor by sync
-  key. Its first load draws the board in `Bone`s at the loaded sizes,
-  never a Loading line; Refresh keeps the last answer faded until the
-  next lands. `data/overview.ts` loads it on arrival and on Refresh,
-  never polled.
+- **A dashboard is a board, not rows.** The admin's Overview
+  (`/admin`, the Admin group's first entry, its range 7, 30 or 90 days
+  on the address as `?days=`) and Storage (`/admin/storage`) are
+  `ui/Tiles.tsx` (stat tiles, the figure at `--text-figure`) over
+  `ui/Chart.tsx` panels in a grid: `ChartPanel` wears the Rows card
+  head, `Bars` rank from one baseline in CSS, `Stack` splits a whole,
+  and uPlot draws what runs over days, `Spark` in a tile and `DayBars`
+  stacked with a key; a plot is made on mount, fed by a second effect,
+  its colours tokens read at every draw, and tiles share their cursor
+  by sync key. The head is `ui/Loaded.tsx` (when the answer was read,
+  Refresh). A first load draws the board in `ui/Bones.tsx` bones at
+  the loaded sizes, never a Loading line; a later load keeps the last
+  answer faded until the next lands. `data/overview.ts` loads both on
+  arrival and on Refresh, never polled.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

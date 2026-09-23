@@ -3,8 +3,7 @@
 //
 // The parts of a board: a panel with the card head of Rows, uPlot for
 // what changes over time, and plain CSS for what is ranked (bars from
-// one baseline), what splits a whole and the bones a panel shows while
-// it loads. This is uPlot's one importer.
+// one baseline) and what splits a whole. This is uPlot's one importer.
 //
 // A plot lives in a ref: made on mount with a ResizeObserver, fed by a
 // second effect, destroyed on unmount. Its colours are tokens read at
@@ -159,6 +158,162 @@ export function Spark({
   }, [days, values]);
 
   return <div class="chart-spark" ref={box} />;
+}
+
+export type DaySeries = { label: string; values: number[] };
+
+// the greys of a stack, bottom first, light to dark in both themes'
+// order of the heat ramp
+const STACK_TOKENS = ["--heat-2", "--heat-3", "--heat-4"];
+
+// Bars over days with their parts stacked, bottom first, on one y
+// axis in the units words gives, and a key above them. The day under
+// the cursor is painted in the brand colour and onCursor hears it.
+export function DayBars({
+  days,
+  series,
+  words,
+  onCursor,
+}: {
+  // each day's start, in milliseconds
+  days: number[];
+  // at most three, bottom first
+  series: DaySeries[];
+  // an axis value in words
+  words: (value: number) => string;
+  onCursor: (index: number | null) => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const plot = useRef<uPlot | null>(null);
+  const hear = useRef(onCursor);
+  hear.current = onCursor;
+  const say = useRef(words);
+  say.current = words;
+  const parts = series.length;
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    // the tallest bar is the whole stack, drawn first; each lower part
+    // is drawn over it, so the top series holds the column's box
+    const bars = focusBars(28);
+    const plain = uPlot.paths.bars?.({ size: [0.72, 28], radius: [0.18, 0] });
+    const font = () => `${token("--text-tiny")} ${token("--mono")}`;
+    const axis = {
+      stroke: () => token("--faint"),
+      ticks: { show: false },
+      gap: 6,
+    };
+    const u = new uPlot(
+      {
+        width: el.clientWidth,
+        height: el.clientHeight,
+        legend: { show: false },
+        cursor: {
+          drag: { x: false, y: false },
+          y: false,
+          points: { show: false },
+        },
+        scales: {
+          x: {
+            time: true,
+            range: (_u, min, max) => [min - HALF_DAY, max + HALF_DAY],
+          },
+          y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] },
+        },
+        axes: [
+          {
+            ...axis,
+            font: font(),
+            size: 24,
+            space: 70,
+            grid: { show: false },
+            values: (_u, splits) =>
+              splits.map((t) =>
+                new Date(t * 1000).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                }),
+              ),
+          },
+          {
+            ...axis,
+            font: font(),
+            size: 52,
+            space: 32,
+            grid: { stroke: () => token("--line"), width: 1 },
+            values: (_u, splits) => splits.map((v) => say.current(v)),
+          },
+        ],
+        series: [
+          {},
+          ...Array.from({ length: parts }, (_, k) => {
+            const name = STACK_TOKENS[parts - 1 - k] ?? "--heat-3";
+            return {
+              stroke: () => token(name),
+              fill: () => token(name),
+              width: 0,
+              points: { show: false },
+              paths: k === 0 ? bars.paths : plain,
+            };
+          }),
+        ],
+        hooks: {
+          draw: [bars.focus],
+          setCursor: [
+            (u) => {
+              hear.current(u.cursor.idx ?? null);
+              u.redraw(false, false);
+            },
+          ],
+        },
+      },
+      [[], ...Array.from({ length: parts }, () => [] as number[])],
+      el,
+    );
+    plot.current = u;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth > 0 && el.clientWidth !== u.width) {
+        u.setSize({ width: el.clientWidth, height: el.clientHeight });
+      }
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      u.destroy();
+      plot.current = null;
+    };
+  }, [parts]);
+
+  const shade = theme.value;
+  useLayoutEffect(() => {
+    plot.current?.redraw(true);
+  }, [shade]);
+
+  useLayoutEffect(() => {
+    // each part stacked on the ones under it, the whole stack first
+    const sums: number[][] = [];
+    let run = days.map(() => 0);
+    for (const s of series) {
+      run = run.map((v, i) => v + (s.values[i] ?? 0));
+      sums.push(run);
+    }
+    plot.current?.setData([days.map((d) => d / 1000), ...sums.reverse()]);
+  }, [days, series]);
+
+  return (
+    <div class="chart-days">
+      <div class="chart-key" aria-hidden="true">
+        {series.map((s, k) => (
+          <span key={s.label} class="chart-key-item">
+            <span class={`chart-swatch chart-key-${k + 1}`} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+      <div class="chart-plot" ref={box} />
+    </div>
+  );
 }
 
 // A panel of a board: the card head of Rows over a chart's body, as
@@ -322,65 +477,5 @@ export function Meter({ share }: { share: number }) {
     <span class="meter" aria-hidden="true">
       <span class="meter-fill chart-meter-fill" style={{ width }} />
     </span>
-  );
-}
-
-export type BoneKind =
-  | "label"
-  | "figure"
-  | "sub"
-  | "trend"
-  | "name"
-  | "fill"
-  | "value"
-  | "icon"
-  | "title"
-  | "meter"
-  | "stack";
-
-// A placeholder where a word or a mark goes, at its size. at orders
-// the pulse, so the bones light one after another as the feed's do.
-export function Bone({
-  kind,
-  at,
-  width,
-}: {
-  kind: BoneKind;
-  at: number;
-  width?: number;
-}) {
-  return (
-    <span
-      class={`chart-bone chart-bone-${kind}`}
-      style={{
-        "--ghost": at,
-        ...(width === undefined ? {} : { width: `${width}%` }),
-      }}
-    />
-  );
-}
-
-// the bar rows while they load
-export function BarsGhost({
-  widths,
-  at,
-  wide,
-}: {
-  widths: number[];
-  at: number;
-  wide?: boolean;
-}) {
-  return (
-    <div class={`chart-bars${wide ? " chart-bars-wide" : ""}`}>
-      {widths.map((w, i) => (
-        <div key={i} class="chart-bar">
-          <Bone kind="name" at={at + i * 3} />
-          <span class="chart-bar-track">
-            <Bone kind="fill" at={at + i * 3 + 1} width={w} />
-          </span>
-          <Bone kind="value" at={at + i * 3 + 2} />
-        </div>
-      ))}
-    </div>
   );
 }

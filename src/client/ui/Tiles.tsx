@@ -7,7 +7,7 @@
 // bones where the words go.
 
 import type { ComponentChildren } from "preact";
-import { Bone } from "./Chart.tsx";
+import { Bone } from "./Bones.tsx";
 import "./tiles.css";
 
 export function Tiles({ children }: { children: ComponentChildren }) {

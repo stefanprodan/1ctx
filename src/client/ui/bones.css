@@ -1,0 +1,67 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  /* bones where the figures and marks go, at their size, so nothing
+     moves when the answer lands */
+  .bones-bone {
+    display: block;
+    height: 0.7em;
+    border-radius: var(--radius-cell);
+    background: var(--line);
+    animation: pulse 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--ghost) * 0.05s);
+  }
+  .bones-bone-label {
+    width: 72px;
+    height: 14px;
+  }
+  .bones-bone-figure {
+    width: 96px;
+    height: calc(var(--text-figure) * 1.1);
+    margin-top: var(--space-1);
+  }
+  .bones-bone-sub {
+    width: 62%;
+    height: 16px;
+  }
+  .bones-bone-trend {
+    width: 100%;
+    height: 36px;
+    margin-top: auto;
+  }
+  .bones-bone-name {
+    width: 72%;
+  }
+  .bones-bone-fill {
+    height: 12px;
+  }
+  .bones-bone-value {
+    width: 52px;
+    justify-self: end;
+  }
+  .bones-bone-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .bones-bone-title {
+    width: 46%;
+  }
+  .bones-bone-meter {
+    width: 100%;
+    height: 3px;
+  }
+  .bones-bone-stack {
+    width: 100%;
+    height: 12px;
+  }
+  .bones-bone-column {
+    align-self: end;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bones-bone {
+      animation: none;
+    }
+  }
+}

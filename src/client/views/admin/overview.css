@@ -1,0 +1,68 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .overview,
+  .overview-ghost {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .overview {
+    padding-bottom: var(--space-5);
+  }
+  .overview-ghost {
+    pointer-events: none;
+  }
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: stretch;
+  }
+  .overview-wide {
+    display: flex;
+    flex-direction: column;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  /* the day columns while the first answer loads */
+  .overview-ghost-days {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 0 var(--space-2) 24px 52px;
+  }
+  .overview-none {
+    margin: 0;
+    padding: var(--space-5) var(--space-4);
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+  .overview-facts {
+    margin: 0;
+    padding: 0 2px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    overflow-wrap: anywhere;
+  }
+  .overview-facts-link {
+    color: var(--dim);
+  }
+  .overview-facts-link:hover {
+    color: var(--fg);
+  }
+
+  @media (max-width: 899px) {
+    .overview-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* a load under way keeps the last answer on screen, faded */
+  .overview-stale {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+}
