@@ -19,7 +19,12 @@ import {
   splitText,
 } from "./interpreter/fields.js";
 import { getField, setField } from "./interpreter/fields.js";
-import { toAwkString, toNumber, toStr } from "./interpreter/type-coercion.js";
+import {
+  looksLikeNumber,
+  toAwkString,
+  toNumber,
+  toStr,
+} from "./interpreter/type-coercion.js";
 import {
   deleteArray,
   getVariable,
@@ -312,6 +317,153 @@ async function awkSplit(
   }
   return fields.length;
 }
+
+// (1ctx) asort and asorti as gawk 5.4.1 orders them. The default is
+// "@val_type_asc" for asort and "@ind_str_asc" for asorti; "@val_num"
+// breaks a tie by the value as a string, "@val_type" ranks an
+// uninitialized value before a number before a string, and every order
+// breaks its last tie by the index as a string; "_desc" reverses the
+// whole comparison, as gawk does.
+const SORT_ORDERS = new Set([
+  "@ind_str_asc",
+  "@ind_str_desc",
+  "@ind_num_asc",
+  "@ind_num_desc",
+  "@val_str_asc",
+  "@val_str_desc",
+  "@val_num_asc",
+  "@val_num_desc",
+  "@val_type_asc",
+  "@val_type_desc",
+]);
+
+interface SortEntry {
+  index: string;
+  value: AwkValue | undefined;
+}
+
+// code points, as gawk compares strings in a UTF-8 locale
+function compareStrings(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!/[\uD800-\uDFFF]/.test(a + b)) return a < b ? -1 : 1;
+  const x = Array.from(a);
+  const y = Array.from(b);
+  for (let i = 0; i < x.length && i < y.length; i++) {
+    const c = (x[i].codePointAt(0) ?? 0) - (y[i].codePointAt(0) ?? 0);
+    if (c !== 0) return c;
+  }
+  return x.length - y.length;
+}
+
+function compareNumbers(a: number, b: number): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function valueClass(value: AwkValue | undefined): number {
+  if (value === undefined) return 0;
+  return looksLikeNumber(value) ? 1 : 2;
+}
+
+function sortComparator(
+  how: string,
+  convfmt: string,
+): (a: SortEntry, b: SortEntry) => number {
+  const [subject, kind, direction] = how.split("_");
+  const sign = direction === "desc" ? -1 : 1;
+  const text = (v: AwkValue | undefined) =>
+    v === undefined ? "" : toAwkString(v, convfmt);
+  const number = (v: AwkValue | undefined) =>
+    v === undefined ? 0 : toNumber(v);
+  const byIndex = (a: SortEntry, b: SortEntry) =>
+    compareStrings(a.index, b.index);
+  let compare: (a: SortEntry, b: SortEntry) => number;
+  if (subject === "@ind" && kind === "num") {
+    compare = (a, b) =>
+      compareNumbers(toNumber(a.index), toNumber(b.index)) || byIndex(a, b);
+  } else if (subject === "@ind") {
+    compare = byIndex;
+  } else if (kind === "str") {
+    compare = (a, b) =>
+      compareStrings(text(a.value), text(b.value)) || byIndex(a, b);
+  } else if (kind === "num") {
+    compare = (a, b) =>
+      compareNumbers(number(a.value), number(b.value)) ||
+      compareStrings(text(a.value), text(b.value)) ||
+      byIndex(a, b);
+  } else {
+    compare = (a, b) => {
+      const ca = valueClass(a.value);
+      const cb = valueClass(b.value);
+      if (ca !== cb) return ca - cb;
+      if (ca === 1) {
+        return compareNumbers(number(a.value), number(b.value)) || byIndex(a, b);
+      }
+      if (ca === 2) {
+        return compareStrings(text(a.value), text(b.value)) || byIndex(a, b);
+      }
+      return byIndex(a, b);
+    };
+  }
+  return (a, b) => sign * compare(a, b);
+}
+
+async function sortArray(
+  fn: "asort" | "asorti",
+  args: AwkExpr[],
+  ctx: AwkRuntimeContext,
+  evaluator: AwkEvaluator,
+): Promise<number> {
+  const source = arrayArgument(ctx, args[0], fn, "first");
+  const dest =
+    args.length >= 2 ? arrayArgument(ctx, args[1], fn, "second") : source;
+  let how = fn === "asort" ? "@val_type_asc" : "@ind_str_asc";
+  if (args.length >= 3) {
+    how = toAwkString(await evaluator.evalExpr(args[2]), ctx.CONVFMT);
+    if (!SORT_ORDERS.has(how)) {
+      throw new Error(
+        ctx.functions.has(how)
+          ? `${fn}: a user comparison function is not supported`
+          : `sort comparison function '${how}' is not defined`,
+      );
+    }
+  }
+  const elements = ctx.arrays[source] ?? {};
+  const entries: SortEntry[] = Object.keys(elements).map((index) => ({
+    index,
+    value: elements[index],
+  }));
+  entries.sort(sortComparator(how, ctx.CONVFMT));
+
+  if (dest !== source) {
+    const room =
+      ctx.maxArrayElements -
+      ctx.arrayElementCount +
+      Object.keys(ctx.arrays[dest] ?? {}).length;
+    if (entries.length > room) {
+      throw new ExecutionLimitError(
+        `array element limit exceeded (${ctx.maxArrayElements})`,
+        "array_elements",
+      );
+    }
+  }
+  deleteArray(ctx, dest);
+  ctx.arrays[dest] ??= Object.create(null);
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    setArrayElement(
+      ctx,
+      dest,
+      String(i + 1),
+      fn === "asort" ? e.value : e.index,
+    );
+  }
+  return entries.length;
+}
+
+const awkAsort: AwkBuiltinFn = (args, ctx, evaluator) =>
+  sortArray("asort", args, ctx, evaluator);
+const awkAsorti: AwkBuiltinFn = (args, ctx, evaluator) =>
+  sortArray("asorti", args, ctx, evaluator);
 
 async function awkSub(
   args: AwkExpr[],
@@ -742,6 +894,8 @@ export const awkBuiltins: Map<string, AwkBuiltinFn> = new Map([
   ["substr", awkSubstr],
   ["index", awkIndex],
   ["split", awkSplit],
+  ["asort", awkAsort],
+  ["asorti", awkAsorti],
   ["sub", awkSub],
   ["gsub", awkGsub],
   ["match", awkMatch],

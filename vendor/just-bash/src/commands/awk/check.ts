@@ -26,6 +26,8 @@ const ARGUMENT_COUNTS: ReadonlyMap<string, readonly [number, number]> =
     ["substr", [2, 3]],
     ["index", [2, 2]],
     ["split", [2, 4]],
+    ["asort", [1, 3]],
+    ["asorti", [1, 3]],
     ["sub", [2, 3]],
     ["gsub", [2, 3]],
     ["match", [2, 3]],

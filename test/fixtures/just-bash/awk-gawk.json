@@ -3411,6 +3411,251 @@
       "stdout": "x\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "sort: asort by value type",
+      "args": [
+        "BEGIN {a[\"x\"] = 10; a[\"y\"] = 9; a[\"z\"] = \"b\"; a[\"w\"] = \"a\"; a[\"u\"] = 2.5; a[\"t\"] = \"\"; a[\"s\"] = \"9x\"; a[\"r\"] = -1; n = asort(a); for (i = 1; i <= n; i++) printf \"%s|\", a[i]; print n; print length(a), (\"x\" in a)}"
+      ],
+      "stdout": "-1|2.5|9|10||9x|a|b|8\n8 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort into another array",
+      "args": [
+        "BEGIN {a[\"x\"] = 10; a[\"y\"] = 9; a[\"z\"] = \"b\"; n = asort(a, b); for (i = 1; i <= n; i++) printf \"%s|\", b[i]; for (k in a) printf \"(%s=%s)\", k, a[k]; print n}"
+      ],
+      "stdout": "9|10|b|(x=10)(y=9)(z=b)3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort and asorti of an empty array",
+      "args": [
+        "BEGIN {n = asort(e); print n, length(e); m = asorti(e, f); print m, length(f)}"
+      ],
+      "stdout": "0 0\n0 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti by index string",
+      "args": [
+        "BEGIN {a[\"10\"]; a[\"9\"]; a[\"2\"]; a[\"b\"]; a[\"a\"]; n = asorti(a); for (i = 1; i <= n; i++) printf \"%s|\", a[i]; print n}"
+      ],
+      "stdout": "10|2|9|a|b|5\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti by index number both ways",
+      "args": [
+        "BEGIN {a[\"10\"] = 1; a[\"9\"] = 2; a[\"2\"] = 3; n = asorti(a, d, \"@ind_num_asc\"); for (i = 1; i <= n; i++) printf \"%s|\", d[i]; m = asorti(a, e, \"@ind_num_desc\"); for (i = 1; i <= m; i++) printf \"%s|\", e[i]; print n, m}"
+      ],
+      "stdout": "2|9|10|10|9|2|3 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort of numeric strings from the input",
+      "args": [
+        "{for (i = 1; i <= NF; i++) a[i] = $i; n = asort(a); for (i = 1; i <= n; i++) printf \"%s|\", a[i]; print n}"
+      ],
+      "stdin": "10 9 2 b a 10\n",
+      "stdout": "2|9|10|10|a|b|6\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort ties keep the index order",
+      "args": [
+        "BEGIN {split(\"2.0\", s); a[\"z\"] = 2; a[\"y\"] = s[1]; a[\"x\"] = 2.0; n = asort(a, d); for (i = 1; i <= n; i++) printf \"[%s]\", d[i]; print n}"
+      ],
+      "stdout": "[2][2.0][2]3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort by number breaks a tie by the text",
+      "args": [
+        "BEGIN {split(\"2.0\", s); a[\"y\"] = 2; a[\"x\"] = s[1]; n = asort(a, d, \"@val_num_asc\"); for (i = 1; i <= n; i++) printf \"[%s]\", d[i]; m = asort(a, e, \"@val_num_desc\"); for (i = 1; i <= m; i++) printf \"[%s]\", e[i]; print n}"
+      ],
+      "stdout": "[2][2.0][2.0][2]2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort compares code points",
+      "args": [
+        "BEGIN {a[1] = \"b\"; a[2] = \"B\"; a[3] = \"ä\"; a[4] = \"a\"; a[5] = \"👍\"; a[6] = \"z\"; n = asort(a); for (i = 1; i <= n; i++) printf \"[%s]\", a[i]; print n}"
+      ],
+      "stdout": "[B][a][b][z][ä][👍]6\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort puts an uninitialized value first",
+      "args": [
+        "BEGIN {x = a[\"k\"]; a[\"j\"] = 1; a[\"i\"] = \"s\"; n = asort(a, d); for (i = 1; i <= n; i++) printf \"[%s]\", d[i]; print n, (d[1] == 0), (d[1] == \"\")}"
+      ],
+      "stdout": "[][1][s]3 1 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti of mixed indices",
+      "args": [
+        "BEGIN {a[\"b\"]; a[\"10\"]; a[\"9\"]; a[\"-1\"]; a[\"\"]; a[\"1.5\"]; a[\"A\"]; n = asorti(a); for (i = 1; i <= n; i++) printf \"[%s]\", a[i]; print n}"
+      ],
+      "stdout": "[][-1][1.5][10][9][A][b]7\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti of mixed indices by number",
+      "args": [
+        "BEGIN {a[\"b\"]; a[\"10\"]; a[\"9\"]; a[\"-1\"]; a[\"\"]; a[\"1.5\"]; a[\"A\"]; n = asorti(a, d, \"@ind_num_asc\"); for (i = 1; i <= n; i++) printf \"[%s]\", d[i]; m = asorti(a, e, \"@ind_num_desc\"); for (i = 1; i <= m; i++) printf \"[%s]\", e[i]; print n}"
+      ],
+      "stdout": "[-1][][A][b][1.5][9][10][10][9][1.5][b][A][][-1]7\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti into the same array",
+      "args": [
+        "BEGIN {a[\"x\"] = 1; n = asorti(a, a, \"@ind_str_asc\"); print n, a[1], length(a), (\"x\" in a)}"
+      ],
+      "stdout": "1 x 1 0\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort of a scalar is fatal",
+      "args": [
+        "BEGIN {print \"before\"; x = 1; n = asort(x)}"
+      ],
+      "stdout": "before\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "sort: asort into a scalar is fatal",
+      "args": [
+        "BEGIN {a[1] = 1; n = asort(a, 5)}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "sort: an unknown order is fatal",
+      "args": [
+        "BEGIN {a[1] = 1; n = asort(a, d, \"@bad\"); print n}"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "sort: asort with four arguments is refused",
+      "args": [
+        "BEGIN {a[1] = 1; n = asort(a, b, \"@ind_str_asc\", 4)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "sort: asort with none is refused",
+      "args": [
+        "BEGIN {n = asort()}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "sort: asort clears the destination",
+      "args": [
+        "BEGIN {a[1] = 5; a[2] = 3; b[\"q\"] = 1; n = asort(a, b); print n, length(b), (\"q\" in b), b[1]}"
+      ],
+      "stdout": "2 2 0 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti of multi-key indices",
+      "args": [
+        "BEGIN {SUBSEP = \":\"; a[1, 2] = 1; a[3] = 0; n = asorti(a); print n, a[1], a[2]}"
+      ],
+      "stdout": "2 1:2 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort of infinities",
+      "args": [
+        "BEGIN {a[1] = 1e300 * 1e300; a[2] = -a[1]; a[3] = 5; n = asort(a, d); for (i = 1; i <= n; i++) printf \"[%s]\", d[i]; print n}"
+      ],
+      "stdout": "[-inf][5][+inf]3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti by value",
+      "args": [
+        "BEGIN {a[\"10\"] = \"b\"; a[\"9\"] = 3; a[\"2\"] = \"a\"; a[\"b\"] = 1; a[\"a\"] = 2; n = asorti(a, d, \"@val_str_asc\"); for (i = 1; i <= n; i++) printf \"%s|\", d[i]; m = asorti(a, e, \"@val_num_asc\"); for (i = 1; i <= m; i++) printf \"%s|\", e[i]; k = asorti(a, f, \"@val_type_asc\"); for (i = 1; i <= k; i++) printf \"%s|\", f[i]; print n}"
+      ],
+      "stdout": "b|a|9|2|10|2|10|b|a|9|b|a|9|2|10|5\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asorti by value breaks ties by the index both ways",
+      "args": [
+        "BEGIN {a[\"b\"] = \"x\"; a[\"a\"] = \"x\"; a[\"c\"] = \"x\"; n = asorti(a, d, \"@val_str_asc\"); for (i = 1; i <= n; i++) printf \"[%s]\", d[i]; m = asorti(a, e, \"@val_str_desc\"); for (i = 1; i <= m; i++) printf \"[%s]\", e[i]; print n}"
+      ],
+      "stdout": "[a][b][c][c][b][a]3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort under every order",
+      "args": [
+        "BEGIN {a[\"x\"] = 10; a[\"y\"] = 9; a[\"z\"] = \"b\"; a[\"w\"] = \"a\"; a[\"u\"] = 2.5; a[\"t\"] = \"\"; a[\"s\"] = \"9x\"; a[\"r\"] = -1; split(\"@val_str_asc @val_str_desc @val_num_asc @val_num_desc @val_type_asc @val_type_desc @ind_str_asc @ind_str_desc @ind_num_asc @ind_num_desc\", hows, \" \"); for (h = 1; h <= 10; h++) {n = asort(a, d, hows[h]); printf \"%s: \", hows[h]; for (i = 1; i <= n; i++) printf \"%s|\", d[i]; print n}}"
+      ],
+      "stdout": "@val_str_asc: |-1|10|2.5|9|9x|a|b|8\n@val_str_desc: b|a|9x|9|2.5|10|-1||8\n@val_num_asc: -1||a|b|2.5|9|9x|10|8\n@val_num_desc: 10|9x|9|2.5|b|a||-1|8\n@val_type_asc: -1|2.5|9|10||9x|a|b|8\n@val_type_desc: b|a|9x||10|9|2.5|-1|8\n@ind_str_asc: -1|9x||2.5|a|10|9|b|8\n@ind_str_desc: b|9|10|a|2.5||9x|-1|8\n@ind_num_asc: -1|9x||2.5|a|10|9|b|8\n@ind_num_desc: b|9|10|a|2.5||9x|-1|8\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: asort through a parameter",
+      "args": [
+        "function f(arr,  d, n, i) {n = asort(arr, d); for (i = 1; i <= n; i++) printf \"%s|\", d[i]; print n} BEGIN {a[1] = 3; a[2] = 1; f(a); print a[1]}"
+      ],
+      "stdout": "1|3|2\n3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: counts listed by sorted key",
+      "args": [
+        "{c[$1]++} END {n = asorti(c, k); for (i = 1; i <= n; i++) print k[i], c[k[i]]}"
+      ],
+      "stdin": "b\na\nb\n",
+      "stdout": "a 1\nb 2\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "sort: a function named asort is refused",
+      "args": [
+        "function asort(x) {return 1} BEGIN {print asort(1)}"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
     }
   ]
 }

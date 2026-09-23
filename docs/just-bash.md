@@ -71,6 +71,8 @@ without a file of their own.
 | `src/commands/awk/format.ts`, `interpreter/statements.ts`, `fields.ts`, `expressions.ts`, `awk2.ts` | `printf` with fewer arguments than conversions is fatal, a negative field is fatal, a bare `exit` keeps the code an earlier `exit` set, `print > "/dev/stdout"` prints and `print > "/dev/stderr"` reaches stderr, and `getline < "-"` or `getline < "/dev/stdin"` reads standard input | a missing argument printed empty or `0`, `$(-1)` was empty, `print > "/dev/stdout"` wrote a file that name and getline from stdin answered -1 |
 | `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `input.ts`, `records.ts`, `context.ts`, `awk2.ts` | fields are capped like array elements, `ARGV` and `ENVIRON` elements count against the cap, a gap in `ARGV` is skipped whole, and the compiled record separators live with the command | `$100000000 = "x"` took gigabytes, `split(s, ARGV)` escaped the cap, `ARGC = 1e8` spun for ten seconds and a module-level cache kept each command's last input |
 | `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
+| `src/commands/awk/builtins.ts`, `check.ts` | `asort(src [, dest [, how]])` and `asorti(...)` as gawk 5.4.1 orders them: the ten `@ind_`/`@val_` `_str`/`_num`/`_type` `_asc`/`_desc` orders, the default `@val_type_asc` for asort (an uninitialized value, then numbers, then strings) and `@ind_str_asc` for asorti, ties broken as gawk breaks them, both bounded by the element cap; a user comparison function is refused | both were functions not defined, and a model reaches for `asorti` first |
+| `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
 
 ### Where our jq still differs from jq
 
@@ -110,9 +112,14 @@ they part:
   records for one are erratic.
 - `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`,
   `FIELDWIDTHS`, `@include`, `@load` and `@namespace` are refused;
-  `asort`, `asorti`, `strtonum`, `patsplit`, `isarray` and `typeof` are
-  functions not defined; `systime`, `mktime` and `strftime` fail when
-  called, and `system` is refused.
+  `strtonum`, `patsplit`, `isarray` and `typeof` are functions not
+  defined; `systime`, `mktime` and `strftime` fail when called, `system`
+  is refused, and `asort` and `asorti` refuse a user comparison
+  function.
+- `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
+  line saying what this is, not gawk's copyright text.
+- `asort` and `asorti` class a numeric-looking string constant with the
+  numbers (the strnum rule above), where gawk sorts it with the strings.
 - `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
   line saying what this is, not gawk's copyright text.
 - A value is a string or a number, with no strnum: a variable holding a

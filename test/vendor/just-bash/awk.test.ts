@@ -190,8 +190,6 @@ describe("gawk features we do not have", () => {
 
   for (const call of [
     'strtonum("0x1A")',
-    "asort(a)",
-    "asorti(a)",
     'patsplit("a b", a)',
     "isarray(a)",
     "typeof(a)",
@@ -206,6 +204,17 @@ describe("gawk features we do not have", () => {
       expect(r.exitCode).toBe(2);
     });
   }
+
+  test("a user comparison function for asort is refused", async () => {
+    const r = await new Bash().exec(
+      `awk 'function cmp(i1, v1, i2, v2) {return v2 - v1} BEGIN { print "before"; a[1] = 1; n = asort(a, d, "cmp") }'`,
+    );
+    expect(r.stdout).toBe("before\n");
+    expect(r.stderr).toBe(
+      "awk: asort: a user comparison function is not supported\n",
+    );
+    expect(r.exitCode).toBe(2);
+  });
 
   for (const call of [
     "systime()",
