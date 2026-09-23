@@ -74,6 +74,11 @@
     gap: 2px;
     min-width: 0;
   }
+  /* a long title wraps rather than hiding its end */
+  .storage-top-name,
+  .storage-top-sub {
+    overflow-wrap: break-word;
+  }
   .storage-top-name {
     font-size: var(--text-ui);
   }

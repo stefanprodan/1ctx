@@ -116,16 +116,15 @@ export function pickedArea(
   return areas.find((a) => a.key === key) ?? areas[0] ?? null;
 }
 
-// the file on disk at the end of each day: today is what it is now,
-// and each day before it is that less the bytes added after it
-export function sizeByDay(onDisk: number, days: StorageDay[]): number[] {
-  const out = new Array<number>(days.length);
-  let at = onDisk;
-  for (let i = days.length - 1; i >= 0; i--) {
-    out[i] = Math.max(0, at);
-    at -= days[i].bytes;
-  }
-  return out;
+// the stored bytes added by the end of each day, summed from the first:
+// what the rows still here say about growth, never a history of the
+// file, which checkpoints, deletes and free pages move on their own
+export function addedByDay(days: StorageDay[]): number[] {
+  let sum = 0;
+  return days.map((d) => {
+    sum += d.bytes;
+    return sum;
+  });
 }
 
 export const added = (days: StorageDay[]): number =>
@@ -179,8 +178,13 @@ const PART_WORDS: Record<StoredPart, string> = {
   mcp: "MCP results",
 };
 
+// a size never breaks from its unit when a narrow line wraps
 const partWords = (row: LargestRow, n: number) =>
-  row.parts.slice(0, n).map((p) => `${PART_WORDS[p.part]} ${size(p.bytes)}`);
+  row.parts
+    .slice(0, n)
+    .map(
+      (p) => `${PART_WORDS[p.part]} ${size(p.bytes).replace(" ", "\u00a0")}`,
+    );
 
 // where a chat or a task is: its team project, or whose personal one
 const where = (row: LargestRow) =>

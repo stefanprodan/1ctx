@@ -213,8 +213,9 @@ violation, and every rule has a rejected fixture under
   family, font size, the `font` shorthand and radius come from
   `tokens.css` and appear nowhere else, CSS or TSX, a `var()` fallback
   included; `index.html` and `favicon.svg` are the two files in
-  `LITERAL_EXEMPTIONS`. Every rule sits inside a layer, except in a
-  sheet listed in `UNLAYERED` with its reason: `ui/chart.css`, whose
+  `LITERAL_EXEMPTIONS`. Every rule sits inside a layer (a font face
+  is not a rule and may sit outside), except in a sheet listed in
+  `UNLAYERED` with its reason: `ui/chart.css`, whose
   overrides of uPlot's unlayered sheet must be unlayered to win, and
   whose unlayered rules may name uPlot's classes inside its own.
 - Routes do not overlap: two patterns of one method that could match

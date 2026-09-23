@@ -43,6 +43,7 @@ import {
 import {
   AREA_NAMES,
   added,
+  addedByDay,
   areaBars,
   areasFoot,
   cleanedLine,
@@ -57,7 +58,6 @@ import {
   pickedArea,
   share,
   size,
-  sizeByDay,
   sizeParts,
   tableBars,
 } from "./Storage.model.ts";
@@ -73,10 +73,10 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
   const series = useMemo(
     () => ({
       starts: days.map((d) => d.start),
-      sizes: sizeByDay(onDisk, days),
+      sums: addedByDay(days),
       bytes: days.map((d) => d.bytes),
     }),
-    [days, onDisk],
+    [days],
   );
   const grown = added(days);
   const free = file.freePages * file.pageSize;
@@ -95,15 +95,15 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
         unit={disk.unit}
         sub={
           at && i !== null
-            ? `${dayWord(at.start)} · ${size(series.sizes[i])}`
+            ? `${dayWord(at.start)} · +${size(series.sums[i])} by then`
             : `+${size(grown)} in ${days.length} days`
         }
       >
-        <TilePlot label={`Size over ${days.length} days`}>
+        <TilePlot label={`Stored bytes added over ${days.length} days`}>
           <Spark
             kind="line"
             days={series.starts}
-            values={series.sizes}
+            values={series.sums}
             sync={SYNC}
             onCursor={onCursor}
           />
@@ -149,10 +149,14 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
 
 function AreasPanels({ answer }: { answer: StorageResponse }) {
   const picked = useSignal<string | null>(null);
-  const areasHint = useSignal<string | null>(null);
-  const tablesHint = useSignal<string | null>(null);
+  // the keys under the pointer; their words come from the answer held
+  // now, so a refresh that lands under the pointer says the new numbers
+  const areaOver = useSignal<string | null>(null);
+  const tableOver = useSignal<string | null>(null);
   const area = pickedArea(answer.areas, picked.value);
-  const bars = areaBars(answer.areas).map((b) => ({
+  const areas = areaBars(answer.areas);
+  const tables = area ? tableBars(area) : [];
+  const bars = areas.map((b) => ({
     key: b.key,
     name: b.name,
     value: b.value,
@@ -164,18 +168,23 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
       </>
     ),
   }));
+  const hintOf = (list: { key: string; hint: string }[], key: string | null) =>
+    list.find((b) => b.key === key)?.hint ?? null;
   return (
     <>
-      <ChartPanel label="Areas" hint={areasHint.value ?? "on disk"}>
+      <ChartPanel
+        label="Areas"
+        hint={hintOf(areas, areaOver.value) ?? "on disk"}
+      >
         <Bars
           bars={bars}
           picked={area?.key}
           onPick={(key) => {
             picked.value = key;
-            tablesHint.value = null;
+            tableOver.value = null;
           }}
-          onHover={(hint) => {
-            areasHint.value = hint;
+          onHover={(key) => {
+            areaOver.value = key;
           }}
         />
         <ChartFoot>
@@ -185,7 +194,7 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
       <ChartPanel
         label={area ? `Tables in ${AREA_NAMES[area.key]}` : "Tables"}
         hint={
-          tablesHint.value ??
+          hintOf(tables, tableOver.value) ??
           (area
             ? `${commas(area.rows)} ${area.rows === 1 ? "row" : "rows"}`
             : "")
@@ -194,7 +203,7 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
         {area && (
           <Bars
             wide
-            bars={tableBars(area).map((t) => ({
+            bars={tables.map((t) => ({
               key: t.key,
               name: t.name,
               value: t.value,
@@ -203,8 +212,8 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
               mono: !t.faint,
               faint: t.faint,
             }))}
-            onHover={(hint) => {
-              tablesHint.value = hint;
+            onHover={(key) => {
+              tableOver.value = key;
             }}
           />
         )}
@@ -251,11 +260,11 @@ function LargestPanel({ answer }: { answer: StorageResponse }) {
                 />
                 <span class="storage-top-words">
                   <span
-                    class={`storage-top-name cut${line.mono ? " chart-mono" : ""}`}
+                    class={`storage-top-name${line.mono ? " chart-mono" : ""}`}
                   >
                     {line.name}
                   </span>
-                  <span class="storage-top-sub cut">{line.sub}</span>
+                  <span class="storage-top-sub">{line.sub}</span>
                 </span>
                 <span class="storage-top-size">
                   <span class="chart-value">{size(row.bytes)}</span>
@@ -355,7 +364,7 @@ const SIX = [0, 1, 2, 3, 4, 5];
 function BoardGhost() {
   const itemGhost = (at: number) => (
     <div key={at} class="storage-item">
-      <Bone kind="name" at={at} />
+      <Bone kind="label" at={at} />
       <span />
       <Bone kind="value" at={at + 1} />
     </div>
@@ -383,8 +392,8 @@ function BoardGhost() {
               <div key={n} class="storage-top">
                 <Bone kind="icon" at={60 + n} />
                 <span class="storage-top-words">
-                  <Bone kind="title" at={61 + n} />
-                  <Bone kind="sub" at={62 + n} />
+                  <Bone kind="name" at={61 + n} />
+                  <Bone kind="title" at={62 + n} />
                 </span>
                 <span class="storage-top-size">
                   <Bone kind="value" at={63 + n} />

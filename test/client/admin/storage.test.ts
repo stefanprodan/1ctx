@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  addedByDay,
   areaBars,
   areasFoot,
   cleanedLine,
@@ -13,7 +14,6 @@ import {
   pickedArea,
   share,
   size,
-  sizeByDay,
   tableBars,
 } from "../../../src/client/views/admin/Storage.model.ts";
 import type {
@@ -100,14 +100,13 @@ describe("storage words", () => {
     expect(pickedArea([], null)).toBeNull();
   });
 
-  test("the size a day ends on today's and walks back by what was added", () => {
+  test("the sparkline sums what each day added", () => {
     const days = [
       { day: "2026-09-22", start: 1, bytes: 10 },
       { day: "2026-09-23", start: 2, bytes: 20 },
       { day: "2026-09-24", start: 3, bytes: 5 },
     ];
-    expect(sizeByDay(100, days)).toEqual([75, 95, 100]);
-    expect(sizeByDay(10, days)).toEqual([0, 5, 10]);
+    expect(addedByDay(days)).toEqual([10, 30, 35]);
   });
 
   test("growth is an average a day", () => {
@@ -164,7 +163,7 @@ describe("storage words", () => {
     ).toEqual({
       name: "platform",
       mono: true,
-      sub: "knowledge history 38 MB · uploads 12 MB",
+      sub: "knowledge history 38\u00a0MB · uploads 12\u00a0MB",
       href: "/admin/projects?open=p1",
     });
     const chat = row({

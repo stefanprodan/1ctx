@@ -206,7 +206,10 @@ export type Bar = {
 };
 
 // Bars from one baseline, the value at the end of each. With onPick
-// each is a button and the picked one is lit.
+// each is a button and the picked one is lit. onHover hears the key
+// under the pointer or the focus, so the panel reads its hint from the
+// answer it holds now; a bar's hint is also its accessible name, the
+// words a pointer would show.
 export function Bars({
   bars,
   picked,
@@ -217,13 +220,14 @@ export function Bars({
   bars: Bar[];
   picked?: string;
   onPick?: (key: string) => void;
-  onHover: (hint: string | null) => void;
+  onHover: (key: string | null) => void;
   // room for a table's name
   wide?: boolean;
 }) {
   const top = Math.max(0, ...bars.map((b) => b.value));
+  const List = onPick ? "div" : "ul";
   return (
-    <div
+    <List
       class={`chart-bars${wide ? " chart-bars-wide" : ""}`}
       onPointerLeave={() => onHover(null)}
     >
@@ -250,20 +254,26 @@ export function Bars({
             type="button"
             class={cls}
             aria-pressed={on}
+            aria-label={b.hint}
             onClick={() => onPick(b.key)}
-            onPointerEnter={() => onHover(b.hint)}
-            onFocus={() => onHover(b.hint)}
+            onPointerEnter={() => onHover(b.key)}
+            onFocus={() => onHover(b.key)}
             onBlur={() => onHover(null)}
           >
             {inner}
           </button>
         ) : (
-          <div key={b.key} class={cls} onPointerEnter={() => onHover(b.hint)}>
+          <li
+            key={b.key}
+            class={cls}
+            aria-label={b.hint}
+            onPointerEnter={() => onHover(b.key)}
+          >
             {inner}
-          </div>
+          </li>
         );
       })}
-    </div>
+    </List>
   );
 }
 
