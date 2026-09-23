@@ -33,6 +33,7 @@ export const LAYERS = [
   "tools",
   "runner",
   "automations",
+  "overview",
   "provision",
   "service",
   "web",

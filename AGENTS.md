@@ -115,6 +115,32 @@ a closure called only after the list is complete. An edge the layer
 order forbids is a port, never an import. A test that needs one area
 builds it with its factory and fakes for its ports.
 
+`overview/` is the area after `automations/` and before `provision/`:
+what an admin reads about the instance. `GET /api/admin/storage?tz=`
+(`admin` policy, `parse.ts` a 400 on anything but one valid `tz`)
+answers `StorageResponse` in `shared/api/admin.ts`: the file by stat
+and pragmas, every table on disk from `dbstat` grouped by
+`STORAGE_TABLES` in `storage.ts` (each table the migrations create in
+exactly one area, `sqlite_schema` and `migrations` under config; a
+test checks the map against the schema both ways), the indexes of an
+area together and never named, the stored bytes added a day over the
+zone's last 30 days and the 30 before, the ten largest projects, chats
+and tasks, and the retention lists. Stored is a table's `bytes`, or
+`octet_length` of the text columns of `messages` (`MESSAGE_BYTES`);
+usage, logins and the rest are their table's pages. A personal project
+is counted and never named: `id`, `name` and `project` null, `owner`
+its owner. `scan.ts` is the queries, pure over a `Db`; it sums what
+was added by quarter hour of UTC, which every zone's midnight falls
+on, so one scan serves any zone. `bun:sqlite` is synchronous, so the
+scan runs in `scan.worker.ts`, a `Worker` per scan over its own
+read-only connection to the file, ended when it answers or at
+shutdown; a memory database runs it inline. The worker is the second
+entry point of `bun build --compile`, where a relative URL resolves
+against the compile root, `src/server`, so `compose.ts` builds the URL
+and passes it in. `cache.ts` keeps one scan in flight and its answer a
+minute on the clock port; a failed scan keeps nothing, is a warning
+`storage scan failed` and the router's 500.
+
 `provision/` is the CLI-only area after `automations/` and before
 `web/`. `1ctx provision -f <file|dir|->` combines YAML inputs, validates
 offline against a database snapshot, then applies through the composed

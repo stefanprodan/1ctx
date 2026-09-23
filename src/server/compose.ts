@@ -24,6 +24,7 @@ import {
   type MemoryStore,
   memoryArea,
 } from "./memory/index.ts";
+import { type Overview, overviewArea } from "./overview/index.ts";
 import { type ProjectStore, projectsArea } from "./projects/index.ts";
 import {
   type Catalogs,
@@ -343,6 +344,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     runner,
   });
+  const overview: Overview = overviewArea({
+    db,
+    clock,
+    log: log("overview"),
+    limits,
+    // built here, at the compile root, so the binary finds its entry
+    worker: new URL("./overview/scan.worker.ts", import.meta.url),
+  });
   let repaired = 0;
   let reconciled = 0;
   if (options.activate !== false) {
@@ -366,6 +375,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...(tools.routes ?? []),
     ...runner.routes,
     ...automations.routes,
+    ...overview.routes,
     socket.route,
     healthRoute(options.version),
   ];
@@ -448,6 +458,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       const result = await runner.shutdown();
       await mcp.close();
       automations.dispose();
+      overview.close();
       socket.dispose();
       return result;
     },

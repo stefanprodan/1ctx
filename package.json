@@ -12,7 +12,7 @@
     "test": "bun test --concurrent --max-concurrency 4 test/",
     "vendor-test": "scripts/vendor-test.sh",
     "lint": "bun biome check --write . && bun tsc --noEmit",
-    "build": "mkdir -p bin && bun build src/server/main.ts --compile --sourcemap --define \"process.env.ONECTX_BUILD_VERSION=\\\"${VERSION:-}\\\"\" --outfile bin/1ctx && rm -f .*.bun-build",
+    "build": "mkdir -p bin && bun build src/server/main.ts src/server/overview/scan.worker.ts --compile --sourcemap --define \"process.env.ONECTX_BUILD_VERSION=\\\"${VERSION:-}\\\"\" --outfile bin/1ctx && rm -f .*.bun-build",
     "smoke": "scripts/smoke.sh",
     "clean": "scripts/preview.sh clean && rm -rf bin .*.bun-build",
     "preview": "scripts/preview.sh restart",
