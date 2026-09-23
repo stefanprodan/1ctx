@@ -828,9 +828,9 @@ violation, and every rule has a rejected fixture under
   carries the owner's and the suspender's usernames and a stream row
   its `runBy`, so an admin outside the project is named too. A run's session keeps `run_source`
   (`schedule` or `manual`, null for a chat and for runs made before the
-  column). `GET /api/automations/:id/runs?filter=failed|manual` narrows
-  the rows and answers the tally of every kept run by status beside
-  them; `GET /api/projects/:id/automations/preview?schedule=&tz=`
+  column). `GET /api/automations/:id/runs?filter=failed|manual&before=`
+  narrows and pages the rows, by last activity then id, and answers the
+  tally of every kept run by status beside them on every page; `GET /api/projects/:id/automations/preview?schedule=&tz=`
   answers the next `PREVIEW_FIRES` fires, or the 400 a save would get.
   The scheduler (`automations/scheduler.ts`)
   is a loop of passes on the clock port, never `Bun.cron(handler)`: a
@@ -1004,8 +1004,15 @@ violation, and every rule has a rejected fixture under
   automation), the last send, and the last line a
   person or the agent wrote (a user message or an answer reply, the
   author's username or the agent's name, the first line cut at
-  `MAX_LAST_LINE`). The `session.changed` envelope carries `last` only
-  when its transaction wrote such a row. `stream/Row.model.ts`
+  `MAX_LAST_LINE`). A page is `STREAM_LIMIT`, 50 rows: the server
+  reads one more and answers `next`, the cursor of the last row sent,
+  or null. `sessions/cursor.ts` holds both shapes, the stream's
+  `<running 0|1>.<last_activity_at>.<id>` and the runs'
+  `<last_activity_at>.<id>`, their strict parse (a 400) and their SQL;
+  `?before=` takes one, and one whose row is gone still pages. No count
+  and no offset. A row that moves above the cursor is on no later page;
+  its envelope brings it. The `session.changed` envelope carries `last`
+  only when its transaction wrote such a row. `stream/Row.model.ts`
   composes the state line and the time from those and never reads a
   transcript; `data/stream.ts` holds the rows for one filter, the
   query on the URL, and adds a row from an envelope only when no

@@ -28,6 +28,7 @@ import {
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { type FeedCursor, parseFeedCursor } from "./cursor.ts";
 
 // the body cap: the message plus the JSON around it
 export const MAX_REGENERATE_BODY =
@@ -166,15 +167,22 @@ export function parseRenameSession(body: unknown): RenameSessionRequest {
   return { title: parseTitle(b.title) };
 }
 
-// ?project=&q=: an optional project id and an optional search
+// ?project=&q=&origin=&before=: an optional project id, search, origin
+// and the cursor of a later page
 export function parseStreamQuery(url: URL): {
   project: string | null;
   q: string;
   origin: "chat" | "automation" | null;
+  before: FeedCursor | null;
 } {
   const seen = new Set<string>();
   for (const name of url.searchParams.keys()) {
-    if (name !== "project" && name !== "q" && name !== "origin") {
+    if (
+      name !== "project" &&
+      name !== "q" &&
+      name !== "origin" &&
+      name !== "before"
+    ) {
       throw new BadRequest(`unknown parameter ${name}`);
     }
     if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
@@ -183,6 +191,7 @@ export function parseStreamQuery(url: URL): {
   const project = url.searchParams.get("project");
   const q = url.searchParams.get("q") ?? "";
   const origin = url.searchParams.get("origin");
+  const before = url.searchParams.get("before");
   if (q.length > MAX_SEARCH) throw new BadRequest("q is too long");
   if (origin !== null && origin !== "chat" && origin !== "automation") {
     throw new BadRequest("origin must be chat or automation");
@@ -191,6 +200,7 @@ export function parseStreamQuery(url: URL): {
     project: project === null || project === "" ? null : project,
     q: q.trim(),
     origin,
+    before: before === null ? null : parseFeedCursor(before),
   };
 }
 

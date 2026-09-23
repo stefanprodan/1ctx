@@ -14,10 +14,11 @@ import type {
   SessionSummary,
 } from "../contracts/session.ts";
 
-// GET /api/sessions?project=&q=&origin=: every session the caller may see,
-// running first, then by last activity, each with what its row in
-// the stream shows
-export type SessionsResponse = { rows: StreamRow[] };
+// GET /api/sessions?project=&q=&origin=&before=: a page of the sessions
+// the caller may see, running first, then by last activity, each with
+// what its row in the stream shows. next is the cursor a later page
+// passes as before, null when no row is left
+export type SessionsResponse = { rows: StreamRow[]; next: string | null };
 
 // one row of the stream: the session, its last send (the counters,
 // the cause and the error while it is not running) and the last line

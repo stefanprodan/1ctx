@@ -367,10 +367,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         const automation = visible(ctx.principal!, ctx.params.id);
-        const filter = parseRunsQuery(new URL(req.url));
+        const { filter, before } = parseRunsQuery(new URL(req.url));
         const body: AutomationRunsResponse = deps.sessions.runs(
           automation.id,
           filter,
+          before,
         );
         return json(body);
       },

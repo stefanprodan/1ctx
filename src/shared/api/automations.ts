@@ -39,12 +39,17 @@ export type SaveAutomationRequest = {
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 
-// GET /api/automations/:id/runs?filter=failed|manual: its sessions,
-// newest first, at most the stream's limit, narrowed by the filter;
-// the tally counts every kept run by status, whatever the filter.
+// GET /api/automations/:id/runs?filter=failed|manual&before=: a page of
+// its sessions, newest first, narrowed by the filter, with next as for
+// the stream; the tally counts every kept run by status, whatever the
+// filter, on every page.
 // POST /api/automations/:id/run answers 201 with the run's
 // SessionResponse
-export type AutomationRunsResponse = { rows: StreamRow[]; tally: RunTally };
+export type AutomationRunsResponse = {
+  rows: StreamRow[];
+  tally: RunTally;
+  next: string | null;
+};
 export type RunTally = Record<SessionStatus, number>;
 
 // GET /api/projects/:id/automations/preview?schedule=&tz=: the next

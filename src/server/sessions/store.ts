@@ -1,15 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
-import type {
-  MessageStatus,
-  RunFilter,
-  SessionStatus,
-} from "../../shared/words.ts";
+import type { MessageStatus, SessionStatus } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { OpenedRecord } from "../knowledge/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -18,6 +14,7 @@ import {
   automationRunning,
   automationRuns,
   expiredAutomationRuns,
+  type RunsArgs,
 } from "./automation.ts";
 import { forgetCapability as forget, setDisabled } from "./capabilities.ts";
 import { exportRows, authors as readAuthors } from "./export.ts";
@@ -27,7 +24,7 @@ import {
   forkedFrom as readForkedFrom,
   readForkPoint,
 } from "./fork.ts";
-import { listSessions } from "./list.ts";
+import { type ListArgs, listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
 import {
   insertMcpSend,
@@ -53,7 +50,6 @@ import {
   type RepairedSession,
   type ReplyFinish,
   type SessionRow,
-  STREAM_LIMIT,
   session,
   type UsagePort,
 } from "./rows.ts";
@@ -81,21 +77,12 @@ export class SessionStore {
     return raw ? session(raw, this.usage.latest(raw.id)) : null;
   }
 
-  list(
-    projectIds: string[],
-    q: string,
-    origin: "chat" | "automation" | null = null,
-    limit = STREAM_LIMIT,
-  ): StreamRow[] {
-    return listSessions(this.db, this.usage, projectIds, q, origin, limit);
+  list(...args: ListArgs): SessionsResponse {
+    return listSessions(this.db, this.usage, ...args);
   }
 
-  runs(
-    automationId: string,
-    filter: RunFilter | null = null,
-    limit = STREAM_LIMIT,
-  ): AutomationRunsResponse {
-    return automationRuns(this.db, this.usage, automationId, filter, limit);
+  runs(...args: RunsArgs): AutomationRunsResponse {
+    return automationRuns(this.db, this.usage, ...args);
   }
 
   create(fields: CreateSession): SessionRow {

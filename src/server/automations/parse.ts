@@ -23,6 +23,7 @@ import {
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { parseRunsCursor, type RunsCursor } from "../sessions/index.ts";
 
 export const MAX_AUTOMATION_BODY =
   MAX_MESSAGE_BYTES +
@@ -169,13 +170,20 @@ function queryKeys(url: URL, allowed: string[]): void {
   }
 }
 
-export function parseRunsQuery(url: URL): RunFilter | null {
-  queryKeys(url, ["filter"]);
+export function parseRunsQuery(url: URL): {
+  filter: RunFilter | null;
+  before: RunsCursor | null;
+} {
+  queryKeys(url, ["filter", "before"]);
   const filter = url.searchParams.get("filter");
   if (filter !== null && !isRunFilter(filter)) {
     throw new BadRequest("filter must be failed or manual");
   }
-  return filter;
+  const before = url.searchParams.get("before");
+  return {
+    filter,
+    before: before === null ? null : parseRunsCursor(before),
+  };
 }
 
 export function parseSchedulePreview(url: URL): {

@@ -36,7 +36,7 @@ describe("admission", () => {
       body: { projectId: chat.projectId, agentId: chat.agentId, message: "c" },
     });
     expect(res.status).toBe(429);
-    expect(chat.app.sessions.list([chat.projectId], "")).toHaveLength(2);
+    expect(chat.app.sessions.list([chat.projectId], "").rows).toHaveLength(2);
     a.script.reply("done");
     await tick();
     await tick();
