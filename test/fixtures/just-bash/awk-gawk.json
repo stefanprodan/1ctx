@@ -3387,6 +3387,30 @@
       "stdout": "got a\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "fix: a lowered ARGC with a gap",
+      "args": [
+        "BEGIN {ARGV[5] = \"f1\"; ARGC = 6} {print FILENAME, $0}",
+        "f2"
+      ],
+      "files": {
+        "f1": "one\n",
+        "f2": "two\n"
+      },
+      "stdout": "f2 two\nf1 one\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "fix: an ARGC far past the operands",
+      "args": [
+        "BEGIN {ARGC = 3000000} {print}"
+      ],
+      "stdin": "x\n",
+      "stdout": "x\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

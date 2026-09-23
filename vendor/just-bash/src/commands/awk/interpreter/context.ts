@@ -4,6 +4,7 @@
  * Holds all state for AWK program execution.
  */
 
+import type { UserRegex } from "../../../regex/index.js";
 import { type FieldSeparator, SPACE_SEPARATOR } from "./fields.js";
 import type { FeatureCoverageWriter } from "../../../types.js";
 import type { AwkFunctionDef } from "../ast.js";
@@ -112,6 +113,8 @@ export interface AwkRuntimeContext {
 
   // (1ctx) the command's abort signal, checked by the record reader
   signal?: AbortSignal;
+  // (1ctx) the regex record separators this command compiled
+  separators: Map<string, UserRegex>;
 
   // Defense context invariant flag propagated from RuntimeCommandContext
   requireDefenseContext?: boolean;
@@ -153,10 +156,10 @@ export function createRuntimeContext(
   } = options;
 
   // (1ctx) ARGV and ENVIRON are ordinary arrays, so delete, in and for-in
-  // reach them; their elements are not counted against the array cap.
+  // reach them; whoever fills them counts their elements.
   const ARGV = Object.create(null) as Record<string, string>;
   const ENVIRON = Object.create(null) as Record<string, string>;
-  const arrays = Object.create(null) as Record<string, Record<string, AwkValue>>;
+  const arrays = Object.create(null) as AwkRuntimeContext["arrays"];
   arrays.ARGV = ARGV;
   arrays.ENVIRON = ENVIRON;
 
@@ -223,5 +226,6 @@ export function createRuntimeContext(
     coverage,
     requireDefenseContext,
     signal,
+    separators: new Map(),
   };
 }

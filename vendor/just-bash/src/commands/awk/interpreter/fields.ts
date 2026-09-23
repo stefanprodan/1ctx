@@ -4,6 +4,7 @@
  * Handles $0, $1, $2, etc. field access and modification.
  */
 
+import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import { createUserRegex, type UserRegex } from "../../../regex/index.js";
 import { chars } from "../chars.js";
 import type { AwkRuntimeContext } from "./context.js";
@@ -141,7 +142,17 @@ export function setField(
     ctx.line = toStr(ctx, value);
     ctx.fields = splitRecord(ctx, ctx.line);
     ctx.NF = ctx.fields.length;
-  } else if (index > 0) {
+  } else if (index < 0) {
+    // (1ctx) gawk's fatal error
+    throw new Error(`attempt to access field ${index}`);
+  } else {
+    // (1ctx) fields are bounded like array elements
+    if (index > ctx.maxArrayElements) {
+      throw new ExecutionLimitError(
+        `field limit exceeded (${ctx.maxArrayElements})`,
+        "array_elements",
+      );
+    }
     // Extend fields array if needed
     while (ctx.fields.length < index) {
       ctx.fields.push("");

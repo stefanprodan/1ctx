@@ -90,6 +90,38 @@ describe("awk limits and refusals", () => {
     expect(Date.now() - started).toBeLessThan(5_000);
   });
 
+  test("a field past the element cap is refused", async () => {
+    const bash = new Bash({ executionLimits: { maxArrayElements: 10 } });
+    const assign = await bash.exec(`awk '{ $11 = "x"; print NF }'`, {
+      stdin: "a\n",
+    });
+    expect(assign.stdout).toBe("");
+    expect(assign.stderr).toBe("awk: field limit exceeded (10)\n");
+    expect(assign.exitCode).toBe(LIMIT_EXIT);
+    const nf = await bash.exec(`awk '{ NF = 11; print NF }'`, {
+      stdin: "a\n",
+    });
+    expect(nf.stderr).toBe("awk: field limit exceeded (10)\n");
+    expect(nf.exitCode).toBe(LIMIT_EXIT);
+    const under = await bash.exec(`awk '{ $10 = "x"; print NF }'`, {
+      stdin: "a\n",
+    });
+    expect(under.stdout).toBe("10\n");
+  });
+
+  test("ARGV and ENVIRON count against the element cap", async () => {
+    const bash = new Bash({
+      env: {},
+      executionLimits: { maxArrayElements: 6 },
+    });
+    const r = await bash.exec(
+      `awk 'BEGIN { n = split("a b c d e f", ARGV); print n }'`,
+    );
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe("awk: array element limit exceeded (6)\n");
+    expect(r.exitCode).toBe(LIMIT_EXIT);
+  });
+
   test("print to /dev/stderr reaches stderr", async () => {
     const r = await new Bash().exec(
       `awk '{ print "e" $0 > "/dev/stderr"; print "o" $0 }'`,

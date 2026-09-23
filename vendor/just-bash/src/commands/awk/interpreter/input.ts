@@ -44,7 +44,13 @@ export function readRecord(
   ctx: AwkRuntimeContext,
   stream: InputStream,
 ): string | null {
-  const next = nextRecord(stream.text, stream.pos, ctx.RS, ctx.signal);
+  const next = nextRecord(
+    stream.text,
+    stream.pos,
+    ctx.RS,
+    ctx.signal,
+    ctx.separators,
+  );
   if (!next) return null;
   stream.pos = next.next;
   countRecord(ctx, stream);
@@ -107,8 +113,14 @@ export class MainInput {
         this.open("-", this.io.readStdin());
         return true;
       }
-      const arg = ctx.ARGV[String(this.index++)];
-      if (arg === undefined || arg === "") continue;
+      const arg = ctx.ARGV[String(this.index)];
+      if (arg === undefined) {
+        // a gap is skipped whole, so a large ARGC costs nothing
+        this.index = nextIndex(ctx.ARGV, this.index);
+        continue;
+      }
+      this.index++;
+      if (arg === "") continue;
       const assignment = operandAssignment(arg);
       if (assignment) {
         assignOperand(ctx, assignment.name, assignment.value);
@@ -130,6 +142,18 @@ export class MainInput {
     this.ctx.FILENAME = name;
     this.ctx.FNR = 0;
   }
+}
+
+/** The smallest whole index in ARGV above `from`, or Infinity. */
+function nextIndex(argv: Record<string, string>, from: number): number {
+  let next = Number.POSITIVE_INFINITY;
+  for (const key of Object.keys(argv)) {
+    const n = Number(key);
+    if (Number.isInteger(n) && n > from && n < next && String(n) === key) {
+      next = n;
+    }
+  }
+  return next;
 }
 
 function assignOperand(

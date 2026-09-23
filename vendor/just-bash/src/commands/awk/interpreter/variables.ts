@@ -108,6 +108,13 @@ export function setVariable(
       return;
     case "NF": {
       const newNF = Math.floor(toNumber(value));
+      // (1ctx) fields are bounded like array elements
+      if (newNF > ctx.maxArrayElements) {
+        throw new ExecutionLimitError(
+          `field limit exceeded (${ctx.maxArrayElements})`,
+          "array_elements",
+        );
+      }
       if (newNF < ctx.NF) {
         ctx.fields = ctx.fields.slice(0, newNF);
         ctx.line = ctx.fields.join(ctx.OFS);
@@ -242,7 +249,7 @@ export function setArrayElement(
     // Use null-prototype to prevent prototype pollution with user-controlled keys
     ctx.arrays[resolvedArray] = Object.create(null);
   }
-  if (!(key in ctx.arrays[resolvedArray]) && !isUncounted(resolvedArray)) {
+  if (!(key in ctx.arrays[resolvedArray])) {
     if (ctx.arrayElementCount >= ctx.maxArrayElements) {
       throw new ExecutionLimitError(
         `array element limit exceeded (${ctx.maxArrayElements})`,
@@ -279,9 +286,7 @@ export function deleteArrayElement(
   // Resolve aliases for function parameter passing
   const resolvedArray = resolveArrayName(ctx, array);
   if (ctx.arrays[resolvedArray]) {
-    if (key in ctx.arrays[resolvedArray] && !isUncounted(resolvedArray)) {
-      ctx.arrayElementCount--;
-    }
+    if (key in ctx.arrays[resolvedArray]) ctx.arrayElementCount--;
     delete ctx.arrays[resolvedArray][key];
   }
 }
@@ -294,16 +299,11 @@ export function deleteArray(ctx: AwkRuntimeContext, array: string): void {
   const resolvedArray = resolveArrayName(ctx, array);
   const elements = ctx.arrays[resolvedArray];
   if (!elements) return;
-  if (isUncounted(resolvedArray)) {
+  ctx.arrayElementCount -= Object.keys(elements).length;
+  if (resolvedArray === "ARGV" || resolvedArray === "ENVIRON") {
     // (1ctx) ARGV and ENVIRON stay the same objects the context holds
     for (const key of Object.keys(elements)) delete elements[key];
     return;
   }
-  ctx.arrayElementCount -= Object.keys(elements).length;
   delete ctx.arrays[resolvedArray];
-}
-
-// (1ctx) the arrays awk fills itself, outside the element cap
-function isUncounted(array: string): boolean {
-  return array === "ARGV" || array === "ENVIRON";
 }

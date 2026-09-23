@@ -16,15 +16,19 @@ export interface AwkRecord {
   next: number;
 }
 
-const compiled = new Map<string, UserRegex>();
 const MAX_COMPILED = 16;
 
-/** The record that starts at `from`, or null at the end of the text. */
+/**
+ * The record that starts at `from`, or null at the end of the text. The
+ * regex separators are kept in `compiled`, the caller's map, since a
+ * compiled regex keeps its last input.
+ */
 export function nextRecord(
   text: string,
   from: number,
   rs: string,
   signal?: AbortSignal,
+  compiled: Map<string, UserRegex> = new Map(),
 ): AwkRecord | null {
   if (signal?.aborted) throw new ExecutionAbortedError();
   if (rs === "") return paragraph(text, from, signal);
@@ -34,7 +38,7 @@ export function nextRecord(
     if (at < 0) return { record: text.slice(from), rt: "", next: text.length };
     return { record: text.slice(from, at), rt: rs, next: at + 1 };
   }
-  const match = separator(rs).scan(text, from);
+  const match = separator(rs, compiled).scan(text, from);
   if (!match) return { record: text.slice(from), rt: "", next: text.length };
   return {
     record: text.slice(from, match.start),
@@ -77,7 +81,7 @@ function checkAbort(index: number, signal?: AbortSignal): void {
   }
 }
 
-function separator(rs: string): UserRegex {
+function separator(rs: string, compiled: Map<string, UserRegex>): UserRegex {
   let regex = compiled.get(rs);
   if (regex) return regex;
   regex = createUserRegex(rs);
