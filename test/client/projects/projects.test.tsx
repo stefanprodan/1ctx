@@ -167,6 +167,26 @@ describe("the projects entity", () => {
     expect(projects.value).toEqual([newer]);
   });
 
+  test.serial(
+    "an older list answer draws while a newer one is out",
+    async () => {
+      const gates: ((rows: (typeof personal)[]) => void)[] = [];
+      globalThis.fetch = (() =>
+        new Promise<Response>((resolve) => {
+          gates.push((rows) => resolve(Response.json({ projects: rows })));
+        })) as unknown as typeof fetch;
+      const newer = { ...personal, name: "current" };
+      const first = loadProjects();
+      const second = loadProjects();
+      gates[0]([personal]);
+      await first;
+      expect(projects.value).toEqual([personal]);
+      gates[1]([newer]);
+      await second;
+      expect(projects.value).toEqual([newer]);
+    },
+  );
+
   test("an older project answer never overwrites a newer one", async () => {
     const gates: (() => void)[] = [];
     globalThis.fetch = ((url: string) =>

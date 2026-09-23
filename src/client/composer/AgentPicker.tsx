@@ -20,7 +20,8 @@ export function AgentPicker({
   onPick,
   field,
 }: {
-  agents: AgentSummary[];
+  // null while the project's agents load
+  agents: AgentSummary[] | null;
   agentId: string | null;
   // absent for a fixed agent
   onPick?: (id: string) => void;
@@ -29,7 +30,7 @@ export function AgentPicker({
   field?: boolean;
 }) {
   const { open, root } = useMenu();
-  const picked = agents.find((a) => a.id === agentId) ?? null;
+  const picked = agents?.find((a) => a.id === agentId) ?? null;
   const fixed = onPick === undefined;
   return (
     <div
@@ -39,7 +40,7 @@ export function AgentPicker({
       <button
         type="button"
         class={`composer-chip${field ? " composer-chip-field" : ""}`}
-        disabled={fixed || agents.length === 0}
+        disabled={fixed || agents === null || agents.length === 0}
         aria-expanded={fixed ? undefined : open.value}
         onClick={() => {
           open.value = !open.value;
@@ -50,7 +51,9 @@ export function AgentPicker({
         >
           <AvatarIcon name={picked?.avatar ?? "bot"} size={12} />
         </span>
-        <span class="composer-chip-name">{picked?.name ?? "no agent"}</span>
+        <span class="composer-chip-name">
+          {picked?.name ?? (agents === null ? "" : "no agent")}
+        </span>
         {picked && (
           <Fit
             class="composer-chip-model"
@@ -68,7 +71,7 @@ export function AgentPicker({
       </button>
       {open.value && (
         <ul class={`menu composer-menu${field ? " composer-menu-field" : ""}`}>
-          {agents.map((a) => (
+          {(agents ?? []).map((a) => (
             <li key={a.id}>
               <button
                 type="button"

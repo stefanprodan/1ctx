@@ -13,7 +13,7 @@ import { AgentsAside } from "../../agents/AgentsAside.tsx";
 import { navigate, query } from "../../app/router.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { me } from "../../data/me.ts";
-import { projects } from "../../data/projects.ts";
+import { projects, projectsError } from "../../data/projects.ts";
 import {
   createSession,
   homeProjectId,
@@ -92,20 +92,24 @@ export function Home() {
             onStop={async () => {}}
           />
         )}
-        <Stream
-          rows={rows}
-          projectName={projectName}
-          search={{
-            value: q,
-            onChange: (next) => navigate(searchHref("/", next, origin), true),
-          }}
-          filter={{
-            value: origin,
-            onPick: (next) => navigate(searchHref("/", q, next), true),
-          }}
-          empty={emptyLine(q, origin)}
-          now={now.value}
-        />
+        {/* the feed waits for the list that places the composer above it
+            and names each row's project, or it draws twice and jumps */}
+        {(projects.value !== null || projectsError.value !== null) && (
+          <Stream
+            rows={rows}
+            projectName={projectName}
+            search={{
+              value: q,
+              onChange: (next) => navigate(searchHref("/", next, origin), true),
+            }}
+            filter={{
+              value: origin,
+              onPick: (next) => navigate(searchHref("/", q, next), true),
+            }}
+            empty={emptyLine(q, origin)}
+            now={now.value}
+          />
+        )}
       </Split>
     </Page>
   );
