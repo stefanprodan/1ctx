@@ -27,6 +27,7 @@ export {
 } from "./catalog.ts";
 export {
   buildChatBody as buildGeminiChatBody,
+  FOREIGN_SIGNATURE,
   geminiError,
   geminiEvents,
   parseCatalog as parseGeminiCatalog,

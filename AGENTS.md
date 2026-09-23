@@ -437,7 +437,10 @@ violation, and every rule has a rejected fixture under
   `test/fixtures/providers/` are what the tests and the fake fetch
   answer with. A `ToolCall` may carry `signature`, an opaque token the
   provider put on the call (Gemini 3 refuses a tool round without it),
-  stored with the call and sent back as received, never shown. An agent
+  stored with the call and sent back as received, never shown; on the
+  Gemini wire a step whose calls carry no signature of that model (another
+  model's, or older rows) gets Google's placeholder
+  `skip_thought_signature_validator` on its first call. An agent
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider an agent runs on is a 409 to
   delete. A catalog row with no window and none of
