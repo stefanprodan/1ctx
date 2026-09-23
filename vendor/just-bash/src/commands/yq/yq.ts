@@ -42,7 +42,7 @@ import {
   parseAllYamlDocuments,
   parseInput,
 } from "./formats.js";
-import { preservingText } from "./preserve.js";
+import { preservingText, spelledFor11 } from "./preserve.js";
 
 const yqHelp = {
   name: "yq",
@@ -580,9 +580,18 @@ export const yqCommand: RuntimeCommand = {
           };
         }
         const text = inPlaceText(values, documentOf, documents, documentValues, {
-          format: (value) => formatOutput(value, options, maxBytes),
+          format: (value) =>
+            formatOutput(value, { ...options, yaml11: true }, maxBytes),
           maxDepth: ctx.limits.maxQueryDepth,
         });
+        if (text === null) {
+          return {
+            stdout: "",
+            stderr:
+              "yq: the file is left as it was: this edit rewrites the whole document, which would change values a YAML 1.1 reader reads (like 0644 or yes); edit without reordering keys or going through an alias\n",
+            exitCode: 1,
+          };
+        }
         if (text.length > maxBytes) {
           throw new ExecutionLimitError(
             `output size limit exceeded (${maxBytes} bytes)`,
@@ -753,7 +762,7 @@ function inPlaceText(
   documents: YAML.Document[],
   documentValues: QueryValue[],
   opts: { format: (value: QueryValue) => string; maxDepth: number },
-): string {
+): string | null {
   const groups: QueryValue[][] = documents.map(() => []);
   for (const [index, value] of values.entries()) {
     if (getValueDepth(value, opts.maxDepth + 1) > opts.maxDepth) {
@@ -769,9 +778,13 @@ function inPlaceText(
     if (group.length === 0) continue;
     // several results for one document: mikefarah writes the last
     const last = group[group.length - 1];
-    const part =
-      preservingText(documents[index], documentValues[index], last) ??
-      opts.format(last);
+    let part = preservingText(documents[index], documentValues[index], last);
+    if (part === null) {
+      // written afresh from values: refused when that would change what a
+      // YAML 1.1 reader gets from an untouched scalar (0644, yes)
+      if (spelledFor11(documents[index])) return null;
+      part = opts.format(last);
+    }
     if (part === "") continue;
     if (text !== "") text += /^---/.test(part) ? "\n" : "\n---\n";
     text += part;

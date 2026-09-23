@@ -284,4 +284,28 @@ describe("yq over several documents", () => {
     expect(result.exitCode).toBe(1);
     expect(result.file).toBe(MANIFESTS);
   });
+
+  test("with_entries keeps null values and the file's spelling", async () => {
+    const pod =
+      "metadata:\n  creationTimestamp: null\n  labels:\n    app: web\nspec:\n  mode: 0644 # rw\n";
+    const result = await yq(
+      `yq -i '.metadata |= with_entries(select(.key != "labels"))' /m.yaml`,
+      pod,
+    );
+    expect(result.file).toBe(
+      "metadata:\n  creationTimestamp: null\nspec:\n  mode: 0644 # rw\n",
+    );
+  });
+
+  test("an edit that rewrites a document whole is refused when a YAML 1.1 reader would read it differently", async () => {
+    const reorder = "yq -i 'to_entries | reverse | from_entries' /m.yaml";
+    const refused = await yq(reorder, "b: 2\nmode: 0644\n");
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain("the file is left as it was");
+    expect(refused.file).toBe("b: 2\nmode: 0644\n");
+    const merged = "d: &d {cpu: 1}\na: {<<: *d, x: 1}\n";
+    expect((await yq(reorder, merged)).file).toBe(merged);
+    const written = await yq(reorder, "b: 2\na: 1 # c\n");
+    expect(written.file).toBe("a: 1\nb: 2\n");
+  });
 });

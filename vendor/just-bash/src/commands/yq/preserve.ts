@@ -23,8 +23,11 @@ function isMap(v: QueryValue): v is Record<string, QueryValue> {
   return asQueryRecord(v) !== null;
 }
 
+// undefined reads as null, as it prints
 function same(a: QueryValue, b: QueryValue): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  const text = (v: QueryValue) =>
+    JSON.stringify(v, (_, x) => (x === undefined ? null : x));
+  return text(a) === text(b);
 }
 
 // a string a YAML 1.2 or a YAML 1.1 reader (Kubernetes) would read as
@@ -143,6 +146,39 @@ function applyChanges(
     return;
   }
   put(doc, path, after);
+}
+
+/**
+ * Whether a plain scalar of the document reads differently for a YAML 1.1
+ * reader (Kubernetes) than for YAML 1.2: 0644, yes, 1_000. Writing such a
+ * document afresh from values would change what the 1.1 reader gets.
+ */
+export function spelledFor11(doc: YAML.Document): boolean {
+  let found = false;
+  YAML.visit(doc, {
+    Scalar(_, node) {
+      if (node.type !== "PLAIN" || typeof node.value !== "string") return;
+      const text = node.value;
+      // a merge key, which a fresh 1.1 spelling quotes into a plain key
+      if (text === "<<") {
+        found = true;
+        return YAML.visit.BREAK;
+      }
+      let a: unknown;
+      let b: unknown;
+      try {
+        a = YAML.parse(text, { version: "1.1" });
+        b = YAML.parse(text, { version: "1.2" });
+      } catch {
+        return;
+      }
+      if (JSON.stringify(a) !== JSON.stringify(b)) {
+        found = true;
+        return YAML.visit.BREAK;
+      }
+    },
+  });
+  return found;
 }
 
 /**

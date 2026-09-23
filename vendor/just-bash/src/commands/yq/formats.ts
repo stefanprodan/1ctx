@@ -72,6 +72,8 @@ export interface FormatOptions {
   prettyPrint: boolean;
   /** Indentation level */
   indent: number;
+  /** quote strings a YAML 1.1 reader would retype, for an in-place write (1ctx) */
+  yaml11?: boolean;
   /** XML attribute prefix (default: +@) */
   xmlAttributePrefix: string;
   /** XML text content name (default: +content) */
@@ -375,6 +377,7 @@ export function formatOutput(
   switch (options.outputFormat) {
     case "yaml":
       serialized = YAML.stringify(value, {
+        ...(options.yaml11 ? { compat: "yaml-1.1" as const } : {}),
         indent: options.indent,
       }).trimEnd();
       break;

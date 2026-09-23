@@ -101,9 +101,17 @@ for byte, or the same data with safer quoting. Where they part:
 - On a stream, an edit through a path some documents lack leaves those
   documents alone; mikefarah creates the missing parents in them.
 - Printing to stdout drops comments, since only `-i` goes through the
-  parsed document. An `-i` edit that cannot be carried over faithfully
-  (a tag that keeps the old type, a map key YAML typed, like `1:`) is
-  written plainly, its comments lost.
+  parsed document. An `-i` edit that cannot be carried over onto it (a
+  reordered map, an edit through an alias, a `!!binary` value) writes
+  the document afresh from values, its comments lost, and is refused,
+  the file left as it was, when a plain scalar of it reads differently
+  for YAML 1.1 and 1.2 (`0644`, `yes`), since the fresh spelling would
+  change what Kubernetes reads.
+- Merge keys (`<<: *base`) are not merged on read, and `!!binary` reads
+  as an object of bytes.
+- `-i` over several files writes each as it goes, so a later file that
+  does not parse leaves the earlier ones written; mikefarah reads all
+  first. A file with a duplicate key does not parse here.
 - mikefarah prints `---` between the results of different documents
   only for values read from them, not for ones the filter computed
   (`"none"`, `[.kind]`); ours prints it between every document's
