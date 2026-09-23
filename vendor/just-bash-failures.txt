@@ -74,6 +74,10 @@
 (fail) browser bundle safety > bundle contents > should not contain tar command registration
 (fail) browser bundle safety > bundle contents > should not contain xan command registration
 (fail) browser bundle safety > bundle contents > should not contain yq command registration
+(fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when sqlite3 is used but not available
+(fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when tar is used but not available
+(fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when xan is used but not available
+(fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when yq is used but not available
 (fail) browser bundle safety > sqlite3 in Node.js > sqlite3 should be available by default in Node.js
 (fail) js-exec exploit regressions > blocks breakout chains and command-injection attempts
 (fail) js-exec exploit regressions > keeps queued execution bounded after a concurrent timeout

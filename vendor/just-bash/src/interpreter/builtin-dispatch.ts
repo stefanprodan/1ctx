@@ -5,7 +5,6 @@
  * Separated from interpreter.ts for modularity.
  */
 
-import { isBrowserExcludedCommand } from "../commands/browser-excluded.js";
 import { latin1FromBytes, unsafeBytesFromLatin1 } from "../encoding.js";
 import {
   createCommandExecutionBudget,
@@ -771,14 +770,8 @@ export async function executeExternalCommand(
     useDefaultPath ? defaultPath : undefined,
   );
   if (!resolved) {
-    // Check if this is a browser-excluded command for a more helpful error
-    if (isBrowserExcludedCommand(commandName)) {
-      return failure(
-        `bash: ${commandName}: command not available in browser environments. ` +
-          `Exclude '${commandName}' from your commands or use the Node.js bundle.\n`,
-        127,
-      );
-    }
+    // A removed command is not found like any other: the browser-bundle
+    // words sent models looking for node. (1ctx)
     return failure(`bash: ${commandName}: command not found\n`, 127);
   }
   // Handle error cases from resolveCommand
