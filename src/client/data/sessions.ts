@@ -38,7 +38,7 @@ import { me } from "./me.ts";
 import { resetValues, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
-import { applyEnvelope, dropRow, revokeRows } from "./stream.ts";
+import { applyEnvelope, dropRow, grantRows, revokeRows } from "./stream.ts";
 
 export {
   homeProjectId,
@@ -55,7 +55,7 @@ export {
   toolResults,
   toolVisuals,
 } from "./session-values.ts";
-export { type ListFilter, list, loadList } from "./stream.ts";
+export { type ListFilter, list, loadList, loadMore } from "./stream.ts";
 
 // frames kept while the watch is being answered; past this the
 // snapshot is refetched instead
@@ -454,6 +454,9 @@ export function onSocket(ev: SocketEvent): void {
       break;
     case "deleted":
       drop(ev.sessionId, ev.projectId);
+      break;
+    case "granted":
+      grantRows(ev.projectId);
       break;
     case "revoked": {
       revokeRows(ev.projectId);

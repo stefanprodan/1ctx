@@ -93,14 +93,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const principal = ctx.principal!;
-        const { project, q, origin } = parseStreamQuery(ctx.url);
+        const { project, q, origin, before } = parseStreamQuery(ctx.url);
         const ids =
           project === null
             ? (deps.access.visibleProjectIds(principal.userId) ?? [])
             : [deps.access.project(principal, project).id];
-        const body: SessionsResponse = {
-          rows: deps.store.list(ids, q, origin),
-        };
+        const body: SessionsResponse = deps.store.list(ids, q, origin, before);
         return json(body);
       },
     },

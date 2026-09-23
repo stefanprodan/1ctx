@@ -13,6 +13,7 @@ import { Composer } from "../../composer/Composer.tsx";
 import {
   createSession,
   list,
+  loadMore,
   projectAgents,
   sending,
 } from "../../data/sessions.ts";
@@ -28,7 +29,8 @@ import { Frame } from "./Frame.tsx";
 
 export function Project({ params }: { params: Params }) {
   const id = params.id ?? "";
-  const rows = list.value;
+  const held = list.value;
+  const rows = held?.rows ?? null;
   const now = useSignal(Date.now());
   const tick = tickMs(rows);
   useEffect(() => {
@@ -79,6 +81,12 @@ export function Project({ params }: { params: Params }) {
             }}
             empty={emptyLine(q, origin)}
             now={now.value}
+            more={{
+              next: (held?.next ?? null) !== null,
+              loading: held?.more.loading ?? false,
+              error: held?.more.error ?? null,
+            }}
+            onMore={() => void loadMore()}
           />
         </>
       )}

@@ -14,6 +14,7 @@ import {
   parseUserPassword,
   parseUserPatch,
 } from "../../src/server/access/parse.ts";
+import { parseRunsQuery } from "../../src/server/automations/parse.ts";
 import { BadRequest } from "../../src/server/lib/errors.ts";
 import {
   parseCreateSession,
@@ -451,18 +452,44 @@ describe("parseRenameSession", () => {
 
 describe("parseStreamQuery", () => {
   test.each([
-    ["http://one.test/api/sessions", { project: null, q: "", origin: null }],
+    [
+      "http://one.test/api/sessions",
+      { project: null, q: "", origin: null, before: null },
+    ],
     [
       "http://one.test/api/sessions?project=",
-      { project: null, q: "", origin: null },
+      { project: null, q: "", origin: null, before: null },
     ],
     [
       "http://one.test/api/sessions?project=p1&q=%20Alpha%20",
-      { project: "p1", q: "Alpha", origin: null },
+      { project: "p1", q: "Alpha", origin: null, before: null },
     ],
     [
       "http://one.test/api/sessions?origin=automation",
-      { project: null, q: "", origin: "automation" as const },
+      {
+        project: null,
+        q: "",
+        origin: "automation" as const,
+        before: null,
+      },
+    ],
+    [
+      "http://one.test/api/sessions?q=a&before=1.1700000000000.abc123def456",
+      {
+        project: null,
+        q: "a",
+        origin: null,
+        before: { running: 1 as const, at: 1700000000000, id: "abc123def456" },
+      },
+    ],
+    [
+      "http://one.test/api/sessions?before=0.0.000000000000",
+      {
+        project: null,
+        q: "",
+        origin: null,
+        before: { running: 0 as const, at: 0, id: "000000000000" },
+      },
     ],
   ])("accepts %s", (input, expected) => {
     expect(parseStreamQuery(new URL(input))).toEqual(expected);
@@ -480,6 +507,68 @@ describe("parseStreamQuery", () => {
     "http://one.test/api/sessions?q=one&q=two",
   ])("refuses unknown or duplicated parameters in %s", (input) => {
     expect(() => parseStreamQuery(new URL(input))).toThrow(BadRequest);
+  });
+
+  test.each([
+    // repeated
+    "before=0.5.abc123def456&before=0.5.abc123def456",
+    // empty and truncated
+    "before=",
+    "before=0",
+    "before=0.5",
+    "before=0.5.",
+    "before=0.5.abc123def45",
+    // signed, unsafe and malformed
+    "before=0.-5.abc123def456",
+    "before=0.%2B5.abc123def456",
+    "before=0.9007199254740992.abc123def456",
+    "before=0.1e3.abc123def456",
+    "before=0.05.abc123def456",
+    "before=0.5.5.abc123def456",
+    "before=2.5.abc123def456",
+    "before=0.5.ABC123DEF456",
+    "before=0.5.abc123def4567",
+    "before=0.%205.abc123def456",
+    // the runs' shape has no rank
+    "before=5.abc123def456",
+  ])("refuses the cursor %s", (search) => {
+    const url = new URL(`http://one.test/api/sessions?${search}`);
+    expect(() => parseStreamQuery(url)).toThrow(BadRequest);
+  });
+});
+
+describe("parseRunsQuery", () => {
+  test.each([
+    ["", { filter: null, before: null }],
+    ["?filter=failed", { filter: "failed" as const, before: null }],
+    [
+      "?filter=manual&before=1700000000000.abc123def456",
+      {
+        filter: "manual" as const,
+        before: { at: 1700000000000, id: "abc123def456" },
+      },
+    ],
+  ])("accepts %s", (search, expected) => {
+    const url = new URL(`http://one.test/api/automations/a/runs${search}`);
+    expect(parseRunsQuery(url)).toEqual(expected);
+  });
+
+  test.each([
+    "before=5.abc123def456&before=5.abc123def456",
+    "before=",
+    "before=5",
+    "before=5.",
+    "before=-5.abc123def456",
+    "before=%2B5.abc123def456",
+    "before=9007199254740992.abc123def456",
+    "before=5.abc",
+    "before=05.abc123def456",
+    // the feed's rank is refused here
+    "before=0.5.abc123def456",
+    "other=1",
+  ])("refuses %s", (search) => {
+    const url = new URL(`http://one.test/api/automations/a/runs?${search}`);
+    expect(() => parseRunsQuery(url)).toThrow(BadRequest);
   });
 });
 

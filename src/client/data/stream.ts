@@ -3,22 +3,36 @@
 //
 // The stream's rows for one filter at a time: Home's, every project
 // the user may see with a query, or one project's. The rows come from
-// the route; the socket keeps them current through the sessions
-// entity, which hands the frames here. An answer is kept only for the
-// user and the turn it was asked for, as every entity does. The rows
-// of the filters seen before are held, so going back to one draws its
-// rows at once while they load again.
+// the route a page at a time; the socket keeps them current through
+// the sessions entity, which hands the frames here. An answer is kept
+// only for the user and the turn it was asked for, as every entity
+// does. The first page of the filters seen before is held, so going
+// back to one draws it at once while it loads again.
+//
+// A first page loads cold or warm. Cold (a navigation, the socket's
+// open, a change of access) drops every row past it, so nothing missed
+// while the socket was down survives in a kept tail. Warm (a row not
+// held, a delete) keeps the held rows past it, which the envelopes on
+// this connection kept current.
 
 import { effect, signal } from "@preact/signals";
 import type { SessionsResponse, StreamRow } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
+import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
-import { ordered } from "./sessions-rows.ts";
+import { mergeNextPage, ordered, refreshHead } from "./sessions-rows.ts";
 
-export const list = signal<StreamRow[] | null>(null);
+// a later page's own state: the rows stay whatever it does
+export type More = { loading: boolean; error: Failure | null };
+// next is the cursor of the page after the rows, null at the end
+export type StreamList = { rows: StreamRow[]; next: string | null; more: More };
+
+export const IDLE: More = { loading: false, error: null };
+
+export const list = signal<StreamList | null>(null);
 // origin narrows the rows to chats or to runs; null lists both
 export type ListFilter = {
   project: string | null;
@@ -27,13 +41,33 @@ export type ListFilter = {
 };
 
 let owner: string | null = null;
-let listFor: Required<ListFilter> & { turn: number } = {
+// turn orders the first pages; cold moves on every cold load, and a
+// later page lands only under the cold it was asked in
+let listFor: Required<ListFilter> & { turn: number; cold: number } = {
   project: "",
   q: "",
   origin: null,
   turn: 0,
+  cold: 0,
 };
-const kept = new Held<StreamRow[]>();
+// the last first page's length and next, what a held filter keeps
+let head: { size: number; next: string | null } = { size: 0, next: null };
+// whether the last cold load landed: until it does, a warm one is cold
+// too, or it would keep the tail the cold one is there to drop
+let settled = true;
+// whether a first page is out, so a grant during it asks again
+let loading = false;
+// moves when a row is deleted, so a later page read before it cannot
+// bring the row back
+let pages = 0;
+// the automations' names as their frames said, each with the frame's
+// number, applied only over an answer asked before the frame
+const labels = new Map<
+  string,
+  { label: StreamRow["automation"]; at: number }
+>();
+let frames = 0;
+const kept = new Held<{ rows: StreamRow[]; next: string | null }>();
 
 const keyOf = (f: ListFilter) =>
   JSON.stringify([f.project, f.q, f.origin ?? null]);
@@ -42,10 +76,34 @@ effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
   owner = id;
-  listFor = { project: "", q: "", origin: null, turn: listFor.turn + 1 };
+  listFor = {
+    project: "",
+    q: "",
+    origin: null,
+    turn: listFor.turn + 1,
+    cold: listFor.cold + 1,
+  };
   list.value = null;
   kept.clear();
+  labels.clear();
+  loading = false;
 });
+
+// a row of an automation the frames renamed or deleted since the answer
+// was read carries the frame's word
+function relabel(rows: StreamRow[], asked: number): StreamRow[] {
+  if (labels.size === 0) return rows;
+  return rows.map((row) => {
+    const id = row.automation?.id ?? row.session.automationId;
+    const said = id === null ? undefined : labels.get(id);
+    if (said === undefined || said.at <= asked) return row;
+    const label = said.label;
+    return row.automation?.name === label?.name &&
+      row.automation?.id === label?.id
+      ? row
+      : { ...row, automation: label };
+  });
+}
 
 const sameFilter = (a: ListFilter, b: ListFilter) =>
   a.project === b.project &&
@@ -60,8 +118,9 @@ const covers = (projectId: string, origin?: SessionOrigin) =>
     listFor.origin === null ||
     listFor.origin === origin);
 
-// an answer over the rows held: a held row that moved past the
-// answer's copy while it was in flight keeps its newer word
+// a cold answer over the rows held: a held row that moved past the
+// answer's copy while it was in flight keeps its newer word, and
+// nothing past the answer stays
 function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
   if (held === null) return ordered(answer);
   const newer = new Map(held.map((row) => [row.session.id, row]));
@@ -75,89 +134,194 @@ function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
   );
 }
 
-// the rows for a filter; a different filter puts the rows on screen
-// away and shows the ones held for it, or none, so a page never shows
-// another filter's list while its own loads
-export async function loadList(filter: ListFilter): Promise<void> {
-  const turn = listFor.turn + 1;
-  if (!sameFilter(listFor, filter)) {
-    if (list.value !== null) kept.set(keyOf(listFor), list.value);
-    list.value = kept.get(keyOf(filter)) ?? null;
-  }
-  listFor = { ...filter, origin: filter.origin ?? null, turn };
+// the first page of what is on screen, as a held filter keeps it
+function firstPage(rows: StreamRow[]): {
+  rows: StreamRow[];
+  next: string | null;
+} {
+  return head.next === null
+    ? { rows, next: null }
+    : { rows: rows.slice(0, head.size), next: head.next };
+}
+
+function address(filter: Required<ListFilter>, before: string | null): string {
   const params = new URLSearchParams();
   if (filter.project !== null) params.set("project", filter.project);
   if (filter.q !== "") params.set("q", filter.q);
   if (filter.origin) params.set("origin", filter.origin);
+  if (before !== null) params.set("before", before);
   const search = params.toString();
+  return `/api/sessions${search === "" ? "" : `?${search}`}`;
+}
+
+// the first page for a filter; a different filter puts the rows on
+// screen away and shows the first page held for it, or none, so a page
+// never shows another filter's list while its own loads
+async function load(filter: ListFilter, asked: boolean): Promise<void> {
+  const warm = asked && settled;
+  const turn = listFor.turn + 1;
+  const cold = warm ? listFor.cold : listFor.cold + 1;
+  if (!sameFilter(listFor, filter)) {
+    if (list.value !== null)
+      kept.set(keyOf(listFor), firstPage(list.value.rows));
+    const held = kept.get(keyOf(filter));
+    list.value = held === undefined ? null : { ...held, more: IDLE };
+    head = { size: held?.rows.length ?? 0, next: held?.next ?? null };
+  } else if (!warm && list.value?.more.loading) {
+    // the page in flight is not wanted past a cold load
+    list.value = { ...list.value, more: IDLE };
+  }
+  listFor = { ...filter, origin: filter.origin ?? null, turn, cold };
+  if (!warm) settled = false;
+  loading = true;
+  const since = frames;
   try {
-    const body = await api<SessionsResponse>(
-      `/api/sessions${search === "" ? "" : `?${search}`}`,
-    );
-    if (listFor.turn === turn) list.value = merge(list.value, body.rows);
+    const answer = await api<SessionsResponse>(address(listFor, null));
+    if (listFor.turn !== turn) return;
+    loading = false;
+    const body = { ...answer, rows: relabel(answer.rows, since) };
+    const held = list.value;
+    head = { size: body.rows.length, next: body.next };
+    settled = true;
+    list.value =
+      warm && held !== null
+        ? { ...refreshHead(held.rows, body, held.next), more: held.more }
+        : {
+            rows: merge(held?.rows ?? null, body.rows),
+            next: body.next,
+            more: IDLE,
+          };
   } catch {
-    if (listFor.turn === turn) list.value = null;
+    if (listFor.turn === turn) loading = false;
+    // a warm load that fails keeps what is held
+    if (listFor.turn === turn && !(warm && list.value !== null)) {
+      list.value = null;
+    }
   }
 }
 
-// the list loaded again for the filter on screen
-function reload(): Promise<void> {
-  return loadList({
-    project: listFor.project,
-    q: listFor.q,
-    origin: listFor.origin,
-  });
+export function loadList(filter: ListFilter): Promise<void> {
+  return load(filter, false);
 }
 
-// the row goes, and the list is loaded again when the filter covers
-// the project, since an answer in flight may still hold the row
+// the first page again for the filter on screen, over the rows held
+function refresh(): Promise<void> {
+  return load(
+    { project: listFor.project, q: listFor.q, origin: listFor.origin },
+    true,
+  );
+}
+
+// the page after the rows held; a failure keeps the rows and says so
+// under them
+export async function loadMore(): Promise<void> {
+  const held = list.value;
+  if (held === null || held.next === null || held.more.loading) return;
+  const cold = listFor.cold;
+  const page = pages;
+  const asked = frames;
+  list.value = { ...held, more: { loading: true, error: null } };
+  try {
+    const body = await api<SessionsResponse>(address(listFor, held.next));
+    const now = list.value;
+    if (listFor.cold !== cold || now === null) return;
+    // a row deleted since the page was read may be on it: the button
+    // comes back and asks again
+    if (pages !== page) {
+      list.value = { ...now, more: IDLE };
+      return;
+    }
+    list.value = {
+      rows: mergeNextPage(now.rows, relabel(body.rows, asked)),
+      next: body.next,
+      more: IDLE,
+    };
+  } catch (err) {
+    const now = list.value;
+    if (listFor.cold !== cold || now === null) return;
+    if (pages !== page) {
+      list.value = { ...now, more: IDLE };
+      return;
+    }
+    list.value = { ...now, more: { loading: false, error: failure(err) } };
+  }
+}
+
+// the server's search: a title holding the query, ASCII letters in any
+// case and every other character as it is, as SQLite's LIKE folds
+const ascii = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
+const titled = (title: string, q: string) =>
+  ascii(title).includes(ascii(q.trim()));
+
+const without = (rows: StreamRow[], keep: (row: StreamRow) => boolean) => {
+  const out = rows.filter(keep);
+  return out.length === rows.length ? rows : out;
+};
+
+// the row goes, and the first page is loaded again when the filter
+// covers the project, since an answer in flight may still hold the row
 export function dropRow(sessionId: string, projectId: string): void {
-  kept.update((rows) => rows.filter((row) => row.session.id !== sessionId));
-  const rows = list.value;
-  if (rows !== null) {
-    list.value = rows.filter((row) => row.session.id !== sessionId);
-  }
-  if (covers(projectId)) void reload();
+  const keep = (row: StreamRow) => row.session.id !== sessionId;
+  if (covers(projectId)) pages++;
+  kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
+  const held = list.value;
+  if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
+  if (covers(projectId)) void refresh();
 }
 
 // the project may no longer be seen: its rows go, the whole list when
 // it was the project's own, and an answer in flight goes with them
-// since it may still hold rows of that project
+// since it may still hold rows of that project. What is left loads
+// cold, so no row of it stays in a tail
 export function revokeRows(projectId: string): void {
-  kept.update((rows, key) =>
+  const keep = (row: StreamRow) => row.session.projectId !== projectId;
+  kept.update((held, key) =>
     JSON.parse(key)[0] === projectId
       ? null
-      : rows.filter((row) => row.session.projectId !== projectId),
+      : { ...held, rows: without(held.rows, keep) },
   );
-  const rows = list.value;
-  listFor = { ...listFor, turn: listFor.turn + 1 };
-  if (listFor.project === projectId) list.value = null;
-  else if (listFor.project === null) {
-    if (rows !== null) {
-      list.value = rows.filter((row) => row.session.projectId !== projectId);
+  const held = list.value;
+  // a list of another project cannot hold its rows, and keeps its load
+  if (!covers(projectId)) return;
+  listFor = { ...listFor, turn: listFor.turn + 1, cold: listFor.cold + 1 };
+  if (listFor.project === projectId) {
+    list.value = null;
+    loading = false;
+  } else if (listFor.project === null) {
+    if (held !== null) {
+      list.value = { ...held, rows: without(held.rows, keep), more: IDLE };
     }
-    void reload();
+    void loadList(listFor);
+  }
+}
+
+// a project that joined what the user sees brings its rows on the
+// lists that cover it
+export function grantRows(projectId: string): void {
+  if ((list.value !== null || loading) && covers(projectId)) {
+    void loadList(listFor);
   }
 }
 
 // the list's copy of the row: the summary and the send are replaced,
 // the last line only when the envelope carries one. A row not held
 // is not guessed from the envelope, whose send and last may mean
-// unchanged: the list is loaded again when the filter would list it,
-// which is its project and no query, since the server's search is
-// not reasoned about here
+// unchanged: the first page is loaded again, warm, when the filter
+// would list it, a search included, since the row may come from a
+// page not loaded
 export function applyAutomationFrame(
   ev: Extract<SocketEvent, { type: "automation" | "automationDeleted" }>,
 ): void {
-  const rows = list.value;
-  if (rows === null || !covers(ev.projectId)) return;
   const id = ev.type === "automation" ? ev.automation.id : ev.automationId;
   const label =
     ev.type === "automation"
       ? { id: ev.automation.id, name: ev.automation.name }
       : null;
+  labels.set(id, { label, at: ++frames });
+  const held = list.value;
+  if (held === null || !covers(ev.projectId)) return;
   let changed = false;
-  const next = rows.map((row) => {
+  const rows = held.rows.map((row) => {
     if (row.session.origin !== "automation") return row;
     if ((row.automation?.id ?? row.session.automationId) !== id) return row;
     if (
@@ -169,17 +333,22 @@ export function applyAutomationFrame(
     changed = true;
     return { ...row, automation: label };
   });
-  if (changed) list.value = next;
+  if (changed) list.value = { ...held, rows };
 }
 
 export function applyEnvelope(
   ev: Extract<SocketEvent, { type: "session" }>,
 ): void {
-  const rows = list.value;
-  if (rows === null || !covers(ev.projectId, ev.session.origin)) return;
-  const held = rows.find((row) => row.session.id === ev.session.id);
+  const list0 = list.value;
+  if (list0 === null || !covers(ev.projectId, ev.session.origin)) return;
+  const held = list0.rows.find((row) => row.session.id === ev.session.id);
   if (held === undefined) {
-    if (listFor.q === "") void reload();
+    // under a search, a row whose title does not hold it is not listed,
+    // and asking again on each of its envelopes would load the page
+    // once per tool call of every chat running
+    if (listFor.q === "" || titled(ev.session.title, listFor.q)) {
+      void refresh();
+    }
     return;
   }
   if (held.session.revision >= ev.session.revision) return;
@@ -191,8 +360,11 @@ export function applyEnvelope(
     automation: held.automation,
     runBy: held.runBy,
   };
-  list.value = ordered([
-    ...rows.filter((row) => row.session.id !== ev.session.id),
-    next,
-  ]);
+  list.value = {
+    ...list0,
+    rows: ordered([
+      ...list0.rows.filter((row) => row.session.id !== ev.session.id),
+      next,
+    ]),
+  };
 }

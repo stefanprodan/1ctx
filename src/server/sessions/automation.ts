@@ -8,16 +8,27 @@ import type {
 import type { RunFilter } from "../../shared/words.ts";
 import { SESSION_STATUSES } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import { type RunsCursor, runsAfter, runsCursor } from "./cursor.ts";
 import type { RawSession, SessionRow, UsagePort } from "./rows.ts";
 import { STREAM_LIMIT, session } from "./rows.ts";
 import { streamRows } from "./stream.ts";
 
+export type RunsArgs = [
+  automationId: string,
+  filter?: RunFilter | null,
+  before?: RunsCursor | null,
+  limit?: number,
+];
+
 export function automationRuns(
   db: Db,
   usage: UsagePort,
-  automationId: string,
-  filter: RunFilter | null,
-  limit = STREAM_LIMIT,
+  ...[
+    automationId,
+    filter = null,
+    before = null,
+    limit = STREAM_LIMIT,
+  ]: RunsArgs
 ): AutomationRunsResponse {
   const condition =
     filter === "failed"
@@ -25,12 +36,16 @@ export function automationRuns(
       : filter === "manual"
         ? "and run_source = 'manual'"
         : "";
-  const rows = db
-    .query<RawSession, [string, number]>(
+  const after = runsAfter(before);
+  const read = db
+    .query<RawSession, (string | number)[]>(
       `select * from sessions where automation_id = ? ${condition}
+       ${after.sql}
        order by last_activity_at desc, id limit ?`,
     )
-    .all(automationId, limit);
+    .all(automationId, ...after.args, limit + 1);
+  const rows = read.slice(0, limit);
+  const last = rows.at(-1);
   const tally = Object.fromEntries(
     SESSION_STATUSES.map((status) => [status, 0]),
   ) as RunTally;
@@ -45,6 +60,7 @@ export function automationRuns(
   return {
     rows: streamRows(db, rows, usage.latestFor(rows.map((row) => row.id))),
     tally,
+    next: read.length > limit && last !== undefined ? runsCursor(last) : null,
   };
 }
 

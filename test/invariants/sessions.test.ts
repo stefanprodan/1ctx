@@ -158,6 +158,10 @@ describe("GET /api/sessions", () => {
     expect(narrowed.rows.map((row: StreamRow) => row.session.id)).toEqual([
       team.sessionId,
     ]);
+    expect(narrowed.next).toBeNull();
+    expect(
+      (await chat.member.call("GET", "/api/sessions?before=0.1.short")).status,
+    ).toBe(400);
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
     expect(
       (await chat.member.call("GET", `/api/sessions?project=${adminProject}`))

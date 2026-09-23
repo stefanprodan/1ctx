@@ -6,15 +6,21 @@ import {
   automationCount,
   automations,
   loadAutomations,
-  loadRuns,
   matchesFilter,
   onAutomationsSocket,
   runDeadlineMs,
-  runs,
   upsertAutomation,
   upsertRun,
 } from "../../../src/client/data/automations.ts";
 import { me } from "../../../src/client/data/me.ts";
+import {
+  closeRuns,
+  loadMoreRuns,
+  loadRuns,
+  relabelRuns,
+  runs,
+} from "../../../src/client/data/runs.ts";
+import { IDLE } from "../../../src/client/data/stream.ts";
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
@@ -44,6 +50,7 @@ import {
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
+import type { RunFilter } from "../../../src/shared/words.ts";
 
 const now = new Date(2026, 8, 14, 12).getTime();
 const HOUR = 3_600_000;
@@ -629,10 +636,37 @@ describe("the revision rule", () => {
   });
 
   test("runs keep the newest first and the higher revision", () => {
-    const older = run({ id: "s0", createdAt: now - HOUR });
+    const older = run({ id: "s0", lastActivityAt: now - HOUR });
     const rows = upsertRun([older], run({ id: "s1", revision: 2 }));
     expect(rows.map((r) => r.session.id)).toEqual(["s1", "s0"]);
     expect(upsertRun(rows, run({ id: "s1", revision: 1 }))).toBe(rows);
+  });
+
+  test("runs go in the server's order: last activity, then id", () => {
+    // opened first, active last: activity places it, not creation
+    const late = run({
+      id: "s9",
+      createdAt: now - HOUR,
+      lastActivityAt: now + HOUR,
+    });
+    const tied = [
+      run({ id: "s2", createdAt: now + 2, lastActivityAt: now }),
+      run({ id: "s1", createdAt: now + 1, lastActivityAt: now }),
+    ];
+    const rows = [late, ...tied].reduce(upsertRun, [] as StreamRow[]);
+    expect(rows.map((r) => r.session.id)).toEqual(["s9", "s1", "s2"]);
+    const running = run({
+      id: "s3",
+      status: "running",
+      revision: 2,
+      lastActivityAt: now + 2 * HOUR,
+    });
+    expect(upsertRun(rows, running).map((r) => r.session.id)).toEqual([
+      "s3",
+      "s9",
+      "s1",
+      "s2",
+    ]);
   });
 });
 
@@ -724,7 +758,14 @@ describe("the entity over the socket", () => {
       asked++;
       return Response.json({ rows: [run({ revision: 1 })], tally });
     }) as unknown as typeof fetch;
-    runs.value = { id: "au1", filter: null, rows: [], tally: null };
+    runs.value = {
+      id: "au1",
+      filter: null,
+      rows: [],
+      tally: null,
+      next: null,
+      more: IDLE,
+    };
     onAutomationsSocket({
       type: "session",
       projectId: "p1",
@@ -803,7 +844,14 @@ describe("the entity over the socket", () => {
 
     // under the failed filter a run that fails joins and one that is
     // done leaves
-    runs.value = { id: "au1", filter: "failed", rows: [], tally };
+    runs.value = {
+      id: "au1",
+      filter: "failed",
+      rows: [],
+      tally,
+      next: null,
+      more: IDLE,
+    };
     const failedRun = {
       type: "session" as const,
       projectId: "p1",
@@ -823,7 +871,14 @@ describe("the entity over the socket", () => {
       new Promise<Response>((resolve) => {
         release = resolve;
       })) as unknown as typeof fetch;
-    runs.value = { id: "au1", filter: null, rows: [run()], tally };
+    runs.value = {
+      id: "au1",
+      filter: null,
+      rows: [run()],
+      tally,
+      next: null,
+      more: IDLE,
+    };
     const staleRuns = loadRuns("au1");
     onAutomationsSocket({
       type: "session",
@@ -846,5 +901,213 @@ describe("the entity over the socket", () => {
 
     onAutomationsSocket({ type: "revoked", projectId: "p1" });
     expect(automations.value).toBeNull();
+  });
+});
+
+describe("the runs' pages", () => {
+  const realFetch = globalThis.fetch;
+  const tally = { running: 0, done: 4, failed: 0, stopped: 0 };
+  let urls: string[] = [];
+  let answer: (url: string) => Response | Promise<Response>;
+  afterEach(() => {
+    closeRuns();
+    globalThis.fetch = realFetch;
+    me.value = null;
+  });
+
+  const done = (id: string, at: number, revision = 1) =>
+    run({ id, status: "done", revision, lastActivityAt: at });
+  const first = () => [done("r4", now - 1), done("r3", now - 2)];
+  const second = () => [done("r2", now - 3), done("r1", now - 4)];
+  const ids = () => runs.value?.rows?.map((r) => r.session.id);
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const hold = () => {
+    let release: (r: Response) => void = () => {};
+    answer = () =>
+      new Promise((r) => {
+        release = r;
+      });
+    return (r: Response) => release(r);
+  };
+
+  async function firstPage(filter: RunFilter | null = null) {
+    urls = [];
+    me.value = {
+      id: "u1",
+      username: "casey",
+      fullName: "Casey",
+      role: "member",
+      mustChangePassword: false,
+    };
+    globalThis.fetch = (async (url: string) => {
+      urls.push(url);
+      return answer(url);
+    }) as unknown as typeof fetch;
+    answer = () => Response.json({ rows: first(), tally, next: "after-r3" });
+    await loadRuns("au1", filter);
+  }
+
+  test.serial(
+    "a later page follows under the filter, its tally the newest",
+    async () => {
+      await firstPage("manual");
+      const newer = { ...tally, done: 5 };
+      answer = () =>
+        Response.json({ rows: second(), tally: newer, next: null });
+      await loadMoreRuns();
+      expect(urls).toEqual([
+        "/api/automations/au1/runs?filter=manual",
+        "/api/automations/au1/runs?filter=manual&before=after-r3",
+      ]);
+      expect(ids()).toEqual(["r4", "r3", "r2", "r1"]);
+      expect(runs.value?.tally).toEqual(newer);
+      expect(runs.value?.next).toBeNull();
+    },
+  );
+
+  test.serial("an envelope places a run by its last activity", async () => {
+    await firstPage();
+    onAutomationsSocket({
+      type: "session",
+      projectId: "p1",
+      session: session({
+        id: "r3",
+        status: "done",
+        revision: 2,
+        createdAt: now - HOUR,
+        lastActivityAt: now,
+      }),
+      messages: [],
+      send: null,
+    });
+    expect(ids()).toEqual(["r3", "r4"]);
+  });
+
+  test.serial("a failed page keeps the rows and says why", async () => {
+    await firstPage();
+    answer = () => Response.json({ error: "busy" }, { status: 503 });
+    await loadMoreRuns();
+    expect(ids()).toEqual(["r4", "r3"]);
+    expect(runs.value?.next).toBe("after-r3");
+    expect(runs.value?.more).toEqual({
+      loading: false,
+      error: { words: "busy", status: 503 },
+    });
+  });
+
+  test.serial("a page read before a rename carries the new name", async () => {
+    await firstPage();
+    const release = hold();
+    const more = loadMoreRuns();
+    await settle();
+    relabelRuns({ id: "au1", name: "renamed" });
+    release(Response.json({ rows: second(), tally, next: null }));
+    await more;
+    expect(runs.value?.rows?.map((r) => r.automation?.name)).toEqual([
+      "renamed",
+      "renamed",
+      "renamed",
+      "renamed",
+    ]);
+  });
+
+  test.serial(
+    "a first page read before a rename carries the new name",
+    async () => {
+      await firstPage();
+      const release = hold();
+      const load = loadRuns("au1", "manual");
+      await settle();
+      relabelRuns({ id: "au1", name: "renamed" });
+      release(Response.json({ rows: first(), tally, next: null }));
+      await load;
+      expect(runs.value?.rows?.map((r) => r.automation?.name)).toEqual([
+        "renamed",
+        "renamed",
+      ]);
+    },
+  );
+
+  test.serial("closing the runs drops a page in flight", async () => {
+    await firstPage();
+    const release = hold();
+    const more = loadMoreRuns();
+    await settle();
+    closeRuns();
+    release(Response.json({ rows: second(), tally, next: null }));
+    await more;
+    expect(runs.value).toBeNull();
+  });
+
+  test.serial(
+    "a filter change drops a page in flight and keeps the tally",
+    async () => {
+      await firstPage();
+      const release = hold();
+      const more = loadMoreRuns();
+      await settle();
+      const releaseFailed = hold();
+      const failed = loadRuns("au1", "failed");
+      expect(runs.value?.rows).toBeNull();
+      expect(runs.value?.tally).toEqual(tally);
+      expect(runs.value?.more).toEqual(IDLE);
+      release(Response.json({ rows: second(), tally, next: null }));
+      await more;
+      expect(runs.value?.rows).toBeNull();
+      await settle();
+      releaseFailed(Response.json({ rows: [], tally, next: null }));
+      await failed;
+      expect(ids()).toEqual([]);
+      expect(runs.value?.filter).toBe("failed");
+    },
+  );
+
+  test.serial(
+    "a tally refresh drops a page in flight and keeps the tail",
+    async () => {
+      await firstPage();
+      answer = () => Response.json({ rows: second(), tally, next: "after-r1" });
+      await loadMoreRuns();
+      const release = hold();
+      const more = loadMoreRuns();
+      await settle();
+      // a new run moves the tally: the first page again, warm
+      const counted = { ...tally, running: 1 };
+      answer = () =>
+        Response.json({
+          rows: [
+            run({ id: "r5", status: "running", lastActivityAt: now }),
+            ...first(),
+          ],
+          tally: counted,
+          next: "after-r3",
+        });
+      onAutomationsSocket({
+        type: "session",
+        projectId: "p1",
+        session: session({ id: "r5", lastActivityAt: now }),
+        messages: [],
+        send: null,
+      });
+      expect(runs.value?.more).toEqual(IDLE);
+      await settle();
+      release(
+        Response.json({ rows: [done("r0", now - 5)], tally, next: null }),
+      );
+      await more;
+      expect(ids()).toEqual(["r5", "r4", "r3", "r2", "r1"]);
+      expect(runs.value?.tally).toEqual(counted);
+      expect(runs.value?.next).toBe("after-r1");
+    },
+  );
+
+  test.serial("a navigation loads the first page cold", async () => {
+    await firstPage();
+    answer = () => Response.json({ rows: second(), tally, next: null });
+    await loadMoreRuns();
+    answer = () => Response.json({ rows: first(), tally, next: "after-r3" });
+    await loadRuns("au1", null);
+    expect(ids()).toEqual(["r4", "r3"]);
+    expect(runs.value?.next).toBe("after-r3");
   });
 });

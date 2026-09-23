@@ -273,7 +273,7 @@ describe("automation scheduler", () => {
     expect(
       chat.app.sessions
         .list([chat.projectId], "")
-        .some((row) => row.session.automationId === deleted.id),
+        .rows.some((row) => row.session.automationId === deleted.id),
     ).toBe(false);
     expect(rows).toHaveLength(3);
     await chat.app.shutdown();

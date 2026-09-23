@@ -285,6 +285,17 @@ describe("automations", () => {
       "run-failed-manual",
     ]);
     expect(manual.tally).toEqual(failed.tally);
+    expect(manual.next).toBeNull();
+    for (const before of ["0.1.abc123def456", "1.bad", "-1.abc123def456"]) {
+      expect(
+        (
+          await chat.member.call(
+            "GET",
+            `/api/automations/${automation.id}/runs?before=${before}`,
+          )
+        ).status,
+      ).toBe(400);
+    }
     expect(
       (
         await chat.member.call(

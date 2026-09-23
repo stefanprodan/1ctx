@@ -25,6 +25,12 @@ import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 
 export {
+  type FeedCursor,
+  parseFeedCursor,
+  parseRunsCursor,
+  type RunsCursor,
+} from "./cursor.ts";
+export {
   chatMarkdown,
   type ExportRow,
   markdownFilename,
