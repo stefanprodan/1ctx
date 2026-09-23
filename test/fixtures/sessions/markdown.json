@@ -181,6 +181,35 @@
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nand then\n\n_cut at max tokens_\n"
   },
   {
+    "name": "an answer whose call written as text was dropped says so",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "casey",
+        "content": "long",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "Let me check.",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "finishReason": "tool_text",
+        "error": null
+      }
+    ],
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nLet me check.\n\n_tool call dropped_\n"
+  },
+  {
     "name": "a running turn and a summary stay out, a compact send leaves nothing",
     "rows": [
       {

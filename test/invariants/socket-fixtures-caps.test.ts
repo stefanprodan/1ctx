@@ -154,12 +154,12 @@ describe("socket fixtures for caps", () => {
     const conn = await watcher(chat);
     const { detail, sessionId } = await startChat(chat, "loop");
     watch(chat, conn, sessionId);
-    for (let round = 1; round <= 3; round++) {
+    for (let round = 1; round <= 6; round++) {
       const script = await waitScript(chat.scripted, round);
       toolRound(script, [call("same")]);
       await settle(chat, 6);
     }
-    const answer = await waitScript(chat.scripted, 4);
+    const answer = await waitScript(chat.scripted, 7);
     answer.reply("answered after the loop");
     await settle(chat, 10);
     record("loop-check", detail, conn);

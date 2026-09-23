@@ -118,8 +118,8 @@ export function buildRequest(
   const req = request(
     send.policy,
     send.sessionId,
-    // the answer round appends the exhausted line to a request-local
-    // copy, never the stored rows
+    // the answer round ends with the ask as a request-local user
+    // message, never a stored row
     send.answering ? withExhausted(messages, send.answering) : messages,
   );
   // The answer round keeps the schemas untouched and asks in words: a

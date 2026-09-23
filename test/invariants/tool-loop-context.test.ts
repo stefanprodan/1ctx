@@ -310,8 +310,11 @@ test("oversized round results are stored cut with bash tails and the answer and 
             content: string;
           }[]
         ).find((message) => message.tool_call_id === calls[index]!.id)?.content,
-      ).toBe(result.content + (index === 9 ? `\n\n${EXHAUSTED_LINE}` : ""));
+      ).toBe(result.content);
     }
+    expect(
+      (answer.body.messages as { role: string; content: string }[]).at(-1),
+    ).toEqual({ role: "user", content: EXHAUSTED_LINE });
     expect(send.budget.resultBytes).toBe(
       results.reduce(
         (sum, result) =>

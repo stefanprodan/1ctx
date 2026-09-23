@@ -14,16 +14,21 @@ import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
-import { tokens } from "../lib/tokens.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { isMemoryTool } from "../tools/index.ts";
-import { EXHAUSTED_LINE } from "./context.ts";
+import { ASK_TOKENS } from "./context.ts";
 import type { ToolContext, ToolResult, ToolsPort } from "./policy.ts";
 import { cutResult, fitResults, resultsFit } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
 import { type ActiveSend, type CapReason, newRound } from "./send.ts";
-import { notRun, type Writer } from "./writer.ts";
+import { dropTextCalls } from "./text-calls.ts";
+import { NOT_RUN_REPEAT, notRun, type Writer } from "./writer.ts";
+
+// the finish reason of an answer whose call written as text was dropped
+export const TEXT_CALL_REASON = "tool_text";
+// the finish reason of a work round whose repeated calls were refused
+export const REPEAT_REASON = "tool_repeat";
 
 // how many identical rounds in a row are the loop check
 export const LOOP_REPEATS = 3;
@@ -111,6 +116,13 @@ export async function toolLoop(
     // an answer round can open the one final summary round, the capped
     // answer round included: it is the request the tool results filled
     if (calls.length === 0) {
+      // a call written as text in the retry without schemas is never
+      // kept as the answer
+      const kept = send.bare ? dropTextCalls(round.content) : null;
+      if (kept !== null) {
+        round.content = kept;
+        round.finishReason = TEXT_CALL_REASON;
+      }
       const threshold = compactsAt(
         send.policy.contextLength,
         limits.contextReserve,
@@ -166,9 +178,18 @@ export async function toolLoop(
       return { cause: "finish", finishReason: reason, error: null };
     }
 
-    // the loop check: three equal signatures in a row ask for the answer
+    // the loop check: three equal signatures in a row are refused once
+    // and the loop goes on, since a model often moves on when told; a
+    // second trip, or one with no round left, asks for the answer
     send.signatures.push(signature(calls));
     if (looping(send.signatures)) {
+      if (!send.loopWarned && send.roundNo < limits.rounds - 2) {
+        send.loopWarned = true;
+        send.signatures = [];
+        deps.writer.recordUnrun(send, REPEAT_REASON, calls, NOT_RUN_REPEAT);
+        startNextRound(deps, send);
+        continue;
+      }
       goToAnswer(deps, send, "tool_loop", { calls });
       continue;
     }
@@ -192,11 +213,11 @@ export async function toolLoop(
       send.policy.contextLength,
       limits.contextReserve,
     );
-    // Leave the forced-answer instruction outside the stored result budget.
+    // leave room for the ask the answer round ends its request with
     const room =
       threshold === null
         ? null
-        : Math.max(0, threshold - round.tokens - tokens(EXHAUSTED_LINE) - 4);
+        : Math.max(0, threshold - round.tokens - ASK_TOKENS);
     const cut = await runCalls(deps, send, calls, room);
     if (send.cause !== null) return endFor(send.cause);
 
