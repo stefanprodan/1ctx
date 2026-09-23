@@ -1,9 +1,10 @@
 /**
- * Comment-keeping writes for yq -i (1ctx)
+ * Comment-keeping output for yq (1ctx)
  *
  * The query engine works on plain values, so a document printed from its
  * result loses every comment, and `yq -i` on a commented manifest deleted
- * the team's notes. Like mikefarah's yq, an in-place edit keeps them: the
+ * the team's notes. Like mikefarah's yq, an in-place edit and a result
+ * printed from a node of the document keep them: the
  * change between a document's value and the filter's result is applied to
  * the document parsed with the failsafe schema, where every scalar is its
  * source text, so untouched nodes keep their comments, quoting and exact
@@ -86,17 +87,51 @@ function build(value: QueryValue): YAML.Node {
   return scalar(value);
 }
 
-// an edited scalar keeps its node, and so its comment
+// an edited scalar keeps its node, and so its comment, and a quoted one
+// its quotes for a string, as mikefarah keeps the node's style
 function put(doc: YAML.Document, path: Key[], value: QueryValue): void {
   const current = doc.getIn(path, true);
   if (YAML.isScalar(current) && !isMap(value) && !Array.isArray(value)) {
     const next = scalar(value);
+    const quoted =
+      current.type === "QUOTE_DOUBLE" || current.type === "QUOTE_SINGLE";
     current.value = next.value;
-    current.type = next.type;
+    current.type =
+      typeof value === "string" && quoted && !value.includes("\n")
+        ? current.type
+        : next.type;
     current.tag = undefined;
     return;
   }
   doc.setIn(path, build(value));
+}
+
+// items moved, none changed: the nodes follow their items
+function reordered(
+  seq: YAML.YAMLSeq,
+  was: QueryValue[],
+  now: QueryValue[],
+): boolean {
+  if (was.length !== now.length || seq.items.length !== was.length) {
+    return false;
+  }
+  const texts = new Map<string, number[]>();
+  const text = (v: QueryValue) =>
+    JSON.stringify(v, (_, x) => (x === undefined ? null : x));
+  was.forEach((item, i) => {
+    const key = text(item);
+    texts.set(key, [...(texts.get(key) ?? []), i]);
+  });
+  const order: number[] = [];
+  for (const item of now) {
+    const free = texts.get(text(item));
+    const index = free?.shift();
+    if (index === undefined) return false;
+    order.push(index);
+  }
+  if (order.every((index, i) => index === i)) return false;
+  seq.items = order.map((index) => seq.items[index]);
+  return true;
 }
 
 function applyChanges(
@@ -115,10 +150,27 @@ function applyChanges(
   if (bothMaps) {
     const was = before as Record<string, QueryValue>;
     const now = after as Record<string, QueryValue>;
+    const parent = path.length === 0 ? doc.contents : doc.getIn(path, true);
+    // a head comment stays at the head when its key goes
+    const head = YAML.isMap(parent) ? parent.items[0]?.key : undefined;
+    const headComment = YAML.isNode(head) ? head.commentBefore : undefined;
     for (const key of Object.keys(was)) {
       if (!Object.hasOwn(now, key)) doc.deleteIn([...path, key]);
     }
-    const parent = path.length === 0 ? doc.contents : doc.getIn(path, true);
+    if (
+      headComment &&
+      YAML.isMap(parent) &&
+      parent.items[0]?.key !== head
+    ) {
+      const next = parent.items[0]?.key;
+      if (YAML.isNode(next)) {
+        next.commentBefore = next.commentBefore
+          ? `${headComment}\n${next.commentBefore}`
+          : headComment;
+      } else if (path.length === 0) {
+        doc.commentBefore = headComment;
+      }
+    }
     for (const key of Object.keys(now)) {
       if (Object.hasOwn(was, key)) {
         applyChanges(doc, [...path, key], was[key], now[key]);
@@ -133,6 +185,9 @@ function applyChanges(
   if (bothSeqs) {
     const was = before as QueryValue[];
     const now = after as QueryValue[];
+    // the same items in another order keep their nodes: sort, reverse
+    const seq = path.length === 0 ? doc.contents : doc.getIn(path, true);
+    if (YAML.isSeq(seq) && reordered(seq, was, now)) return;
     const common = Math.min(was.length, now.length);
     for (let i = 0; i < common; i++) {
       applyChanges(doc, [...path, i], was[i], now[i]);
@@ -181,35 +236,99 @@ export function spelledFor11(doc: YAML.Document): boolean {
   return found;
 }
 
-/** Whether the document holds an alias, which a fresh spelling expands. */
-export function hasAlias(doc: YAML.Document): boolean {
-  let found = false;
-  YAML.visit(doc, {
-    Alias() {
-      found = true;
-      return YAML.visit.BREAK;
+/** How a kept node is spelled: mikefarah's -I and -P, `... comments=""`. */
+export interface Spelling {
+  indent?: number;
+  /** block collections and plain scalars where the text allows */
+  pretty?: boolean;
+  /** every comment dropped, the style kept */
+  stripComments?: boolean;
+}
+
+function stripComments(doc: YAML.Document): void {
+  doc.comment = null;
+  doc.commentBefore = null;
+  if (!doc.contents) return;
+  YAML.visit(doc.contents, {
+    Node(_, node) {
+      node.comment = null;
+      node.commentBefore = null;
+    },
+    Pair(_, pair) {
+      if (YAML.isNode(pair.key)) {
+        pair.key.comment = null;
+        pair.key.commentBefore = null;
+      }
     },
   });
-  return found;
+}
+
+// -P: every collection in block style, every string plain that reads back
+function prettify(node: YAML.Node): void {
+  YAML.visit(node, {
+    Map(_, map) {
+      map.flow = false;
+    },
+    Seq(_, seq) {
+      seq.flow = false;
+    },
+    Scalar(_, scalar) {
+      if (
+        typeof scalar.value === "string" &&
+        scalar.type !== "PLAIN" &&
+        !scalar.value.includes("\n") &&
+        !ambiguous(scalar.value)
+      ) {
+        scalar.type = "PLAIN";
+      }
+    },
+  });
 }
 
 /**
- * The document's text with `after` in place of `before`, its comments and
- * every untouched scalar kept as written, or null when the edit cannot be
- * carried over faithfully. `doc` is parsed with the failsafe schema.
+ * The text of the node at `path` with `after` in place of `before`, its
+ * comments and every untouched scalar kept as written, or null when the
+ * edit cannot be carried over faithfully. `doc` is parsed with the
+ * failsafe schema; the whole document keeps its own comments too.
  */
 export function preservingText(
   doc: YAML.Document,
   before: QueryValue,
   after: QueryValue,
+  path: Key[] = [],
+  spelling: Spelling = {},
 ): string | null {
-  if (!(isMap(after) || Array.isArray(after))) return null;
-  const copy = doc.clone();
+  // only a node of the same kind is edited in place; anything else is
+  // spelled afresh by the caller
+  const bothMaps = isMap(before) && isMap(after);
+  const bothSeqs = Array.isArray(before) && Array.isArray(after);
+  if (!bothMaps && !bothSeqs) return null;
   try {
+    let copy: YAML.Document;
+    if (path.length === 0) {
+      copy = doc.clone();
+    } else {
+      // the node alone, so a long stream costs each result its own size
+      const node = doc.getIn(path, true);
+      if (!YAML.isCollection(node)) return null;
+      copy = new YAML.Document(undefined, { schema: "failsafe" });
+      copy.contents = node.clone() as typeof copy.contents;
+    }
     applyChanges(copy, [], before, after);
+    if (spelling.stripComments) stripComments(copy);
+    if (spelling.pretty && copy.contents) prettify(copy.contents);
     const text = copy
-      .toString({ flowCollectionPadding: false })
-      .replace(/\n+$/, "");
+      .toString({
+        flowCollectionPadding: false,
+        indent: spelling.indent ?? 2,
+        indentSeq: true,
+      })
+      .replace(/^---\n/, "")
+      .replace(/\n+$/, "")
+      // a head comment sits on the line above, as mikefarah writes it
+      .replace(/^((?:#[^\n]*\n)+)\n/, "$1")
+      // a foot comment follows the last line, as mikefarah writes it
+      .replace(/\n\n(?=(#[^\n]*\n?)+$)/, "\n");
     // what is written must read back as the result
     // merge keys read merged, as the values were (1ctx)
     const reread = YAML.parseDocument(text, { merge: true });

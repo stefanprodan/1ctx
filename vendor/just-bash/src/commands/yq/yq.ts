@@ -9,7 +9,7 @@
  */
 
 import { BoundedStringBuilder } from "../../bounded-builder.js";
-import { decodeBytesToUtf8 } from "../../encoding.js";
+import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import {
@@ -46,7 +46,7 @@ import {
   parseInput,
 } from "./formats.js";
 import { evaluateAll, evaluateDocument, type Input } from "./documents.js";
-import { hasAlias, preservingText, spelledFor11 } from "./preserve.js";
+import { preservingText, spelledFor11 } from "./preserve.js";
 
 const yqHelp = {
   name: "yq",
@@ -620,16 +620,18 @@ export const yqCommand: RuntimeCommand = {
             ? ""
             : files[0];
       const run = (input: QueryValue, document: number): void => {
-        for (const { value, state, index } of evaluateDocument(input, ast, {
-          ...evalOptions,
-          source: { document, file, filename, loads },
-        })) {
+        for (const { value, state, index, source } of evaluateDocument(
+          input,
+          ast,
+          { ...evalOptions, source: { document, file, filename, loads } },
+        )) {
           if (value !== undefined) {
             records.push({
               value,
               document,
               computed: state === "computed",
               index,
+              source,
             });
           }
         }
@@ -661,17 +663,12 @@ export const yqCommand: RuntimeCommand = {
       } else {
         // mikefarah's yq runs the filter on each document of a YAML stream,
         // where this one refused a stream it was not told to slurp (1ctx)
-        // -i reads every YAML file this way, to write its comments back
-        if (
-          options.inputFormat === "yaml" &&
-          (options.inplace || /^---/m.test(input))
-        ) {
+        // every YAML file is read this way, so a result that is a node of
+        // it prints with its comments, and -i writes them back
+        if (options.inputFormat === "yaml") {
           documentValues = parseAllYamlDocuments(input, dataLimits, documents);
         }
-        if (
-          documentValues.length > 1 ||
-          (options.inplace && documentValues.length === 1)
-        ) {
+        if (documentValues.length > 0) {
           for (const [index, document] of documentValues.entries()) {
             try {
               run(document, index);
@@ -736,7 +733,13 @@ export const yqCommand: RuntimeCommand = {
         };
       }
 
-      const finalOutput = printRecords(records, options, ctx, file);
+      const finalOutput = printRecords(records, options, ctx, file, {
+        plain: hasNode(ast, stripsComments),
+        nodeOf: (record) =>
+          documents.length > 0
+            ? { document: documents[record.document], value: documentValues[record.document] }
+            : undefined,
+      });
 
       // Handle inplace mode
       if (options.inplace && filePath) {
@@ -959,12 +962,25 @@ async function runEvalAll(
         computed: result.state === "computed",
         index: result.index,
         file: result.input.file,
+        source: result.source,
       });
     }
 
     if (!options.inplace) {
+      const plain = hasNode(ast, stripsComments);
       return {
-        stdout: printRecords(records, options, ctx, 0),
+        stdout: printRecords(records, options, ctx, 0, {
+          plain,
+          nodeOf: (record) => {
+            const source = read[record.file ?? 0];
+            return source?.format === "yaml"
+              ? {
+                  document: source.documents[record.document],
+                  value: source.values[record.document],
+                }
+              : undefined;
+          },
+        }),
         stderr: warning,
         exitCode: options.exitStatus && missed(records) ? 1 : 0,
       };
@@ -1067,6 +1083,60 @@ interface Result {
   index?: number;
   /** the file it was read from, in an eval-all run */
   file?: number;
+  /** the node of its document it was made from, whose comments it keeps */
+  source?: (string | number)[];
+}
+
+/** The parsed document a record was read from, and its value. (1ctx) */
+interface Node {
+  document: YAML.Document;
+  value: QueryValue;
+}
+
+// the value at a path of a document
+function valueAt(value: QueryValue, path: (string | number)[]): QueryValue {
+  let at = value;
+  for (const step of path) {
+    if (Array.isArray(at) && typeof step === "number") {
+      at = at[step] ?? null;
+    } else if (at !== null && typeof at === "object" && !Array.isArray(at)) {
+      at = Object.hasOwn(at, step) ? (at as Record<string, QueryValue>)[step] : null;
+    } else {
+      return null;
+    }
+  }
+  return at;
+}
+
+/**
+ * The text of a record made from a node of its document, with the node's
+ * comments and style, as mikefarah prints it and as -i writes it: the
+ * change from the node's value to the result is applied to the node.
+ * Null where the result is not a map or list, has no node, or does not
+ * read back exactly, and the caller prints it plainly. (1ctx)
+ */
+function keptText(
+  record: Result,
+  options: YqOptions,
+  nodeOf: (record: Result) => Node | undefined,
+  stripComments: boolean,
+): string | null {
+  if (record.source === undefined || options.outputFormat !== "yaml") {
+    return null;
+  }
+  const node = nodeOf(record);
+  if (!node) return null;
+  return preservingText(
+    node.document,
+    valueAt(node.value, record.source),
+    record.value,
+    record.source,
+    {
+      indent: options.indent === 0 ? 4 : Math.max(options.indent, 2),
+      pretty: options.prettyPrint,
+      stripComments,
+    },
+  );
 }
 
 /** The file and the document a result counts as read from. (1ctx) */
@@ -1096,6 +1166,11 @@ function printRecords(
   options: YqOptions,
   ctx: RuntimeCommandContext,
   file: number,
+  kept?: {
+    /** every comment dropped: `... comments=""` */
+    plain: boolean;
+    nodeOf: (record: Result) => Node | undefined;
+  },
 ): string {
   const maxOutputSize = Math.min(
     ctx.limits.maxStringLength,
@@ -1144,9 +1219,19 @@ function printRecords(
     );
     let text: string;
     try {
-      text = formatOutput(value, options, serializationLimit);
+      text =
+        (kept ? keptText(record, options, kept.nodeOf, kept.plain) : null) ??
+        formatOutput(value, options, serializationLimit);
     } finally {
       serializationLease?.release();
+    }
+    // a kept text is made whole, so it is measured against the same
+    // budget the plain spelling is
+    if (utf8ByteLength(text) > serializationLimit) {
+      throw new ExecutionLimitError(
+        `output size limit exceeded (${serializationLimit} bytes)`,
+        "output_size",
+      );
     }
     // a format with nothing to say for a value (ini of a list) prints no
     // line; an empty string is one
@@ -1192,7 +1277,7 @@ function inPlaceText(
   opts: {
     format: (value: QueryValue) => string;
     maxDepth: number;
-    /** written from the values, so the file's comments go */
+    /** every comment dropped: `... comments=""` */
     plain?: boolean;
   },
 ): string | null {
@@ -1214,15 +1299,13 @@ function inPlaceText(
     // several results for one document: mikefarah writes the last
     const record = group[group.length - 1];
     const last = record.value;
-    let part = opts.plain
-      ? null
-      : preservingText(documents[index], documentValues[index], last);
+    let part = preservingText(documents[index], documentValues[index], last, [], {
+      stripComments: opts.plain,
+    });
     if (part === null) {
       // written afresh from values: refused when that would change what a
-      // YAML 1.1 reader gets from an untouched scalar (0644, yes), or
-      // expand an alias
+      // YAML 1.1 reader gets from an untouched scalar (0644, yes)
       if (spelledFor11(documents[index])) return null;
-      if (opts.plain && hasAlias(documents[index])) return null;
       part = opts.format(last);
     }
     // the markers are written here, where the document moves

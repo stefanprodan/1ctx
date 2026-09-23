@@ -11,7 +11,10 @@
     "docs.yaml": "name: alpha\nmeta:\n  z: 1\n  a: 2\nlist:\n  - b\n  - a\n---\nname: beta\nmeta:\n  z: 3\n  a: 4\nlist:\n  - d\n  - c\n---\nname: gamma\nmeta:\n  z: 5\n  a: 6\nlist:\n  - f\n  - e\n",
     "nulls.yaml": "a: 1\nn: null\ns: x\nl:\n  - 1\nm:\n  k: 1\n",
     "rows.yaml": "a: x\nn: 1\nl:\n  - 1\n  - a b\n  - true\n  - null\nm:\n  k: 1\nr:\n  - k: 1\n    j: x\n  - k: 2\nq:\n  - a,b\n  - c\"d\n  - \" e\"\n  - |-\n    f\n    g\n",
-    "notes.yaml": "# top\na: 1 # one\nb:\n  - x # item\n"
+    "notes.yaml": "# top\na: 1 # one\nb:\n  - x # item\n",
+    "commented.yaml": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+    "stream.yaml": "# head one\na: 1 # one\n--- # sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+    "flow.yaml": "meta: {z: 1, a: 2} # m\nlist: [b, a]\n"
   },
   "cases": [
     {
@@ -624,12 +627,7 @@
         "strings.yaml"
       ],
       "stdout": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: \"first\\nsecond\\n\"\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: \"yes\"\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
-      "exit": 0,
-      "accept": {
-        "stdout": "empty: \"\"\nspaces: \"   \"\ntrailing: \"x \"\nmulti: |\n  first\n  second\nnumber: \"123\"\ncolon: \": x\"\nnone: null\nword: \"null\"\nyes: yes\noctal: \"0644\"\nlist:\n  - a b\n  - c\n",
-        "exit": 0,
-        "reason": "Printing to stdout spells values afresh: mikefarah keeps each scalar's quoting and style from the file."
-      }
+      "exit": 0
     },
     {
       "name": "raw string: read from each document",
@@ -1295,7 +1293,12 @@
         "docs.yaml"
       ],
       "stdout": "z: 1\na: 2\ny: 2\n---\nz: 3\na: 4\ny: 2\n---\nz: 5\na: 6\ny: 2\n",
-      "exit": 0
+      "exit": 0,
+      "accept": {
+        "stdout": "z: 1\na: 2\n\"y\": 2\n---\nz: 3\na: 4\n\"y\": 2\n---\nz: 5\na: 6\n\"y\": 2\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
     },
     {
       "name": "documents: .meta | {\"y\": 2} * .",
@@ -1313,7 +1316,12 @@
         "docs.yaml"
       ],
       "stdout": "z: 1\na: 2\ny: 2\n---\nz: 3\na: 4\ny: 2\n---\nz: 5\na: 6\ny: 2\n",
-      "exit": 0
+      "exit": 0,
+      "accept": {
+        "stdout": "z: 1\na: 2\n\"y\": 2\n---\nz: 3\na: 4\n\"y\": 2\n---\nz: 5\na: 6\n\"y\": 2\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
     },
     {
       "name": "documents: .meta | [.]",
@@ -1592,7 +1600,12 @@
         "docs.yaml"
       ],
       "stdout": "- b\n- a\n- y\n---\n- d\n- c\n- y\n---\n- f\n- e\n- y\n",
-      "exit": 0
+      "exit": 0,
+      "accept": {
+        "stdout": "- b\n- a\n- \"y\"\n---\n- d\n- c\n- \"y\"\n---\n- f\n- e\n- \"y\"\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
     },
     {
       "name": "documents: .list | [.[] | select(. != \"a\")]",
@@ -4142,9 +4155,9 @@
       "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n",
       "exit": 0,
       "accept": {
-        "stdout": "base:\n  image: nginx\n  replicas: 1\nweb:\n  image: nginx\n  replicas: 2\ntags:\n  - a\n  - b\n",
+        "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n",
         "exit": 0,
-        "reason": "Style, comments and anchors are not kept on our values: a setter of them is refused, except a comment setter with an empty string, which strips what the output never has."
+        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds."
       }
     },
     {
@@ -5178,22 +5191,24 @@
       }
     },
     {
-      "name": "comments: -i ... comments=\"\" on anchors.yaml is refused",
+      "name": "comments: -i ... comments=\"\" on anchors.yaml",
       "args": [
         "-i",
         "... comments=\"\"",
         "anchors.yaml"
       ],
-      "accept": {
-        "stdout": "",
-        "exit": 1,
-        "reason": "A fresh write of a document with an alias would expand it, so the edit is refused.",
-        "written": {}
-      },
       "stdout": "",
       "exit": 0,
       "written": {
         "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n"
+        },
+        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds."
       }
     },
     {
@@ -5665,6 +5680,943 @@
         "nope.yaml": "name: x\n"
       },
       "stdout": "app\n---\nx\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .",
+      "args": [
+        ".",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas = 5",
+      "args": [
+        ".spec.replicas = 5",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 5 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas |= . + 1",
+      "args": [
+        ".spec.replicas |= . + 1",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 4 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas += 1",
+      "args": [
+        ".spec.replicas += 1",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 4 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: del(.spec.template)",
+      "args": [
+        "del(.spec.template)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels",
+      "args": [
+        ".metadata.labels",
+        "commented.yaml"
+      ],
+      "stdout": "{app: web, tier: \"frontend\"} # flow labels\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec",
+      "args": [
+        ".spec",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0]",
+      "args": [
+        ".spec.template.spec.containers[0]",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nimage: \"nginx:1.27\"\nargs: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags",
+      "args": [
+        ".tags",
+        "commented.yaml"
+      ],
+      "stdout": "- x # first\n- \"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags[]",
+      "args": [
+        ".tags[]",
+        "commented.yaml"
+      ],
+      "stdout": "x\ny\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args",
+      "args": [
+        ".spec.template.spec.containers[0].args",
+        "commented.yaml"
+      ],
+      "stdout": "[a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: with_entries(select(.key != \"tags\"))",
+      "args": [
+        "with_entries(select(.key != \"tags\"))",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\n# foot\n",
+        "exit": 0,
+        "reason": "A foot comment belongs to the document here and stays when the last key goes; mikefarah's goes with the key."
+      }
+    },
+    {
+      "name": "comments: .metadata.labels |= with_entries(.value |= upcase)",
+      "args": [
+        ".metadata.labels |= with_entries(.value |= upcase)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: WEB, tier: \"FRONTEND\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: sort_keys(.)",
+      "args": [
+        "sort_keys(.)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec | sort_keys(.)",
+      "args": [
+        ".spec | sort_keys(.)",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].image |= sub(\"nginx\", \"httpd\")",
+      "args": [
+        ".spec.template.spec.containers[0].image |= sub(\"nginx\", \"httpd\")",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"httpd:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels.env = \"prod\"",
+      "args": [
+        ".metadata.labels.env = \"prod\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\", env: prod} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels.tier = \"back\"",
+      "args": [
+        ".metadata.labels.tier = \"back\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"back\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags += [\"z\"]",
+      "args": [
+        ".tags += [\"z\"]",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n  - z\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags | map(. + \"!\")",
+      "args": [
+        ".tags | map(. + \"!\")",
+        "commented.yaml"
+      ],
+      "stdout": "- x! # first\n- \"y!\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags | reverse",
+      "args": [
+        ".tags | reverse",
+        "commented.yaml"
+      ],
+      "stdout": "- \"y\"\n- x # first\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags | sort",
+      "args": [
+        ".tags | sort",
+        "commented.yaml"
+      ],
+      "stdout": "- x # first\n- \"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata | to_entries | from_entries",
+      "args": [
+        ".metadata | to_entries | from_entries",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nlabels: {app: web, tier: \"frontend\"} # flow labels\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: select(.kind == \"Deployment\")",
+      "args": [
+        "select(.kind == \"Deployment\")",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec * {\"paused\": true}",
+      "args": [
+        ".spec * {\"paused\": true}",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\npaused: true\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: . * {\"spec\": {\"replicas\": 9}}",
+      "args": [
+        ". * {\"spec\": {\"replicas\": 9}}",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 9 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels | keys",
+      "args": [
+        ".metadata.labels | keys",
+        "commented.yaml"
+      ],
+      "stdout": "- app\n- tier\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: (.. | select(tag == \"!!str\")) |= upcase",
+      "args": [
+        "(.. | select(tag == \"!!str\")) |= upcase",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: APPS/V1\nkind: DEPLOYMENT # the kind\nmetadata:\n  name: WEB\n  labels: {app: WEB, tier: \"FRONTEND\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: WEB\n          image: \"NGINX:1.27\"\n          args: [A, \"B\"]\ntags:\n  - X # first\n  - \"Y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ... comments=\"\"",
+      "args": [
+        "... comments=\"\"",
+        "commented.yaml"
+      ],
+      "stdout": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"}\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x\n  - \"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec | ... comments=\"\"",
+      "args": [
+        ".spec | ... comments=\"\"",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: pick([\"kind\", \"tags\"])",
+      "args": [
+        "pick([\"kind\", \"tags\"])",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\nkind: Deployment # the kind\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: omit([\"spec\"])",
+      "args": [
+        "omit([\"spec\"])",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers |= map(.image |= sub(\":.*\", \":2\"))",
+      "args": [
+        ".spec.template.spec.containers |= map(.image |= sub(\":.*\", \":2\"))",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:2\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: (.spec.template.spec.containers[] | select(.name == \"web\") | .image) = \"x\"",
+      "args": [
+        "(.spec.template.spec.containers[] | select(.name == \"web\") | .image) = \"x\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"x\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels = {\"a\": 1}",
+      "args": [
+        ".metadata.labels = {\"a\": 1}",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {a: 1} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas = \"3\"",
+      "args": [
+        ".spec.replicas = \"3\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: \"3\" # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.replicas tag = \"!!str\"",
+      "args": [
+        ".spec.replicas tag = \"!!str\"",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: \"3\" # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[] | select(.name == \"web\")",
+      "args": [
+        ".spec.template.spec.containers[] | select(.name == \"web\")",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nimage: \"nginx:1.27\"\nargs: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers | .[0] | .image |= sub(\"nginx\", \"httpd\")",
+      "args": [
+        ".spec.template.spec.containers | .[0] | .image |= sub(\"nginx\", \"httpd\")",
+        "commented.yaml"
+      ],
+      "stdout": "name: web\nimage: \"httpd:1.27\"\nargs: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: explode(.)",
+      "args": [
+        "explode(.)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: map_values(.)",
+      "args": [
+        "map_values(.)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers | sort_by(.name)",
+      "args": [
+        ".spec.template.spec.containers | sort_by(.name)",
+        "commented.yaml"
+      ],
+      "stdout": "- name: web\n  image: \"nginx:1.27\"\n  args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers | map(select(.name == \"web\"))",
+      "args": [
+        ".spec.template.spec.containers | map(select(.name == \"web\"))",
+        "commented.yaml"
+      ],
+      "stdout": "- name: web\n  image: \"nginx:1.27\"\n  args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: del(.. | select(tag == \"!!str\" and test(\"^n\")))",
+      "args": [
+        "del(.. | select(tag == \"!!str\" and test(\"^n\")))",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels | with_entries(.key |= \"x-\" + .)",
+      "args": [
+        ".metadata.labels | with_entries(.key |= \"x-\" + .)",
+        "commented.yaml"
+      ],
+      "stdout": "x-app: web\nx-tier: \"frontend\"\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "{x-app: web, x-tier: frontend} # flow labels\n",
+        "exit": 0,
+        "reason": "with_entries edits the map in place, so a renamed map keeps its flow style and comment; mikefarah builds a new block map, copying the values' quotes."
+      }
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args |= reverse",
+      "args": [
+        ".spec.template.spec.containers[0].args |= reverse",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [\"b\", a]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args += [\"c\"]",
+      "args": [
+        ".spec.template.spec.containers[0].args += [\"c\"]",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\", c]\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args | .[0] = \"z\"",
+      "args": [
+        ".spec.template.spec.containers[0].args | .[0] = \"z\"",
+        "commented.yaml"
+      ],
+      "stdout": "[z, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .spec.template.spec.containers[0].args | map(upcase)",
+      "args": [
+        ".spec.template.spec.containers[0].args | map(upcase)",
+        "commented.yaml"
+      ],
+      "stdout": "[A, \"B\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .tags |= map(upcase)",
+      "args": [
+        ".tags |= map(upcase)",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - X\n  - \"Y\"\n# foot\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - X # first\n  - \"Y\"\n# foot\n",
+        "exit": 0,
+        "reason": "An item map wrote keeps its comment here; mikefarah's map makes new nodes under |=, though .[] |= keeps them."
+      }
+    },
+    {
+      "name": "comments: .tags | .[] |= upcase",
+      "args": [
+        ".tags | .[] |= upcase",
+        "commented.yaml"
+      ],
+      "stdout": "- X # first\n- \"Y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: {\"n\": .kind}",
+      "args": [
+        "{\"n\": .kind}",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "n: Deployment\n",
+        "exit": 0,
+        "reason": "Comments and style are kept for a result made from a node of the document; a map or list the filter builds ({...}, [...]) prints afresh, where mikefarah copies the nodes' comments into it."
+      },
+      "stdout": "n: Deployment # the kind\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: [.spec.replicas]",
+      "args": [
+        "[.spec.replicas]",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "- 3\n",
+        "exit": 0,
+        "reason": "Comments and style are kept for a result made from a node of the document; a map or list the filter builds ({...}, [...]) prints afresh, where mikefarah copies the nodes' comments into it."
+      },
+      "stdout": "- 3 # scaled\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .metadata.labels | to_entries",
+      "args": [
+        ".metadata.labels | to_entries",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "- key: app\n  value: web\n- key: tier\n  value: frontend\n",
+        "exit": 0,
+        "reason": "Comments and style are kept for a result made from a node of the document; a map or list the filter builds ({...}, [...]) prints afresh, where mikefarah copies the nodes' comments into it."
+      },
+      "stdout": "- key: app\n  value: web\n- key: tier\n  value: \"frontend\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -o json .",
+      "args": [
+        "-o",
+        "json",
+        ".",
+        "commented.yaml"
+      ],
+      "stdout": "{\n  \"apiVersion\": \"apps/v1\",\n  \"kind\": \"Deployment\",\n  \"metadata\": {\n    \"name\": \"web\",\n    \"labels\": {\n      \"app\": \"web\",\n      \"tier\": \"frontend\"\n    }\n  },\n  \"spec\": {\n    \"replicas\": 3,\n    \"template\": {\n      \"spec\": {\n        \"containers\": [\n          {\n            \"name\": \"web\",\n            \"image\": \"nginx:1.27\",\n            \"args\": [\n              \"a\",\n              \"b\"\n            ]\n          }\n        ]\n      }\n    }\n  },\n  \"tags\": [\n    \"x\",\n    \"y\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -o json .metadata",
+      "args": [
+        "-o",
+        "json",
+        ".metadata",
+        "commented.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"web\",\n  \"labels\": {\n    \"app\": \"web\",\n    \"tier\": \"frontend\"\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -I 4 .",
+      "args": [
+        "-I",
+        "4",
+        ".",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n    name: web\n    labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n    replicas: 3 # scaled\n    # the template\n    template:\n        spec:\n            containers:\n                - name: web\n                  image: \"nginx:1.27\"\n                  args: [a, \"b\"]\ntags:\n    - x # first\n    - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -I 4 .spec",
+      "args": [
+        "-I",
+        "4",
+        ".spec",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n    spec:\n        containers:\n            - name: web\n              image: \"nginx:1.27\"\n              args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -P .spec",
+      "args": [
+        "-P",
+        ".spec",
+        "commented.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: nginx:1.27\n        args:\n          - a\n          - b\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -P .",
+      "args": [
+        "-P",
+        ".",
+        "commented.yaml"
+      ],
+      "accept": {
+        "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels:\n    app: web\n    tier: frontend\n    # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27\n          args:\n            - a\n            - b\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+        "exit": 0,
+        "reason": "The line comment of a flow map opened by -P ends up under it here and on the next key in mikefarah's."
+      },
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels:\n    app: web\n    tier: frontend\nspec: # flow labels\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27\n          args:\n            - a\n            - b\ntags:\n  - x # first\n  - \"y\"\n# foot\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -N .",
+      "args": [
+        "-N",
+        ".",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\n# sep\n# head two\nb: [1, 2]\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -i .spec.replicas = 5",
+      "args": [
+        "-i",
+        ".spec.replicas = 5",
+        "commented.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "commented.yaml": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 5 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n"
+      }
+    },
+    {
+      "name": "comments: -i del(.spec.template)",
+      "args": [
+        "-i",
+        "del(.spec.template)",
+        "commented.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "commented.yaml": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\ntags:\n  - x # first\n  - \"y\"\n# foot\n"
+      }
+    },
+    {
+      "name": "comments: -i ... comments=\"\"",
+      "args": [
+        "-i",
+        "... comments=\"\"",
+        "commented.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "commented.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"}\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x\n  - \"y\"\n"
+      }
+    },
+    {
+      "name": "comments: . on stream.yaml",
+      "args": [
+        ".",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\n---\n# sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a on stream.yaml",
+      "args": [
+        ".a",
+        "stream.yaml"
+      ],
+      "stdout": "1\n---\nnull\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .b on stream.yaml",
+      "args": [
+        ".b",
+        "stream.yaml"
+      ],
+      "stdout": "null\n---\n[1, 2]\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .a = 2 on stream.yaml",
+      "args": [
+        ".a = 2",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 2 # one\n---\n# sep\n# head two\nb: [1, 2]\na: 2\n---\nc: \"x\"\na: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: select(.a) on stream.yaml",
+      "args": [
+        "select(.a)",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: select(.b) on stream.yaml",
+      "args": [
+        "select(.b)",
+        "stream.yaml"
+      ],
+      "stdout": "# sep\n# head two\nb: [1, 2]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: del(.a) on stream.yaml",
+      "args": [
+        "del(.a)",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\n{}\n---\n# sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .b[0] on stream.yaml",
+      "args": [
+        ".b[0]",
+        "stream.yaml"
+      ],
+      "stdout": "null\n---\n1\n---\nnull\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .b += [3] on stream.yaml",
+      "args": [
+        ".b += [3]",
+        "stream.yaml"
+      ],
+      "stdout": "# head one\na: 1 # one\nb:\n  - 3\n---\n# sep\n# head two\nb: [1, 2, 3]\n---\nc: \"x\"\nb:\n  - 3\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .c |= upcase on stream.yaml",
+      "args": [
+        ".c |= upcase",
+        "stream.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "comments: .meta | . * {\"y\": 2} on flow.yaml",
+      "args": [
+        ".meta | . * {\"y\": 2}",
+        "flow.yaml"
+      ],
+      "stdout": "{z: 1, a: 2, y: 2} # m\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "{z: 1, a: 2, \"y\": 2} # m\n",
+        "exit": 0,
+        "reason": "A key or value the filter wrote is quoted when a YAML 1.1 reader (Kubernetes) would read it as something else (y, yes, 0644), on stdout as under -i; mikefarah writes it plain."
+      }
+    },
+    {
+      "name": "comments: .meta * {\"z\": 9} on flow.yaml",
+      "args": [
+        ".meta * {\"z\": 9}",
+        "flow.yaml"
+      ],
+      "stdout": "{z: 9, a: 2} # m\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list + [\"c\"] on flow.yaml",
+      "args": [
+        ".list + [\"c\"]",
+        "flow.yaml"
+      ],
+      "stdout": "[b, a, c]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list | . + [\"c\"] on flow.yaml",
+      "args": [
+        ".list | . + [\"c\"]",
+        "flow.yaml"
+      ],
+      "stdout": "[b, a, c]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list | sort on flow.yaml",
+      "args": [
+        ".list | sort",
+        "flow.yaml"
+      ],
+      "stdout": "[a, b]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list | reverse on flow.yaml",
+      "args": [
+        ".list | reverse",
+        "flow.yaml"
+      ],
+      "stdout": "[a, b]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta | keys on flow.yaml",
+      "args": [
+        ".meta | keys",
+        "flow.yaml"
+      ],
+      "stdout": "- z\n- a\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta | to_entries | .[0] on flow.yaml",
+      "args": [
+        ".meta | to_entries | .[0]",
+        "flow.yaml"
+      ],
+      "stdout": "key: z\nvalue: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: . * {\"meta\": {\"z\": 9}} on flow.yaml",
+      "args": [
+        ". * {\"meta\": {\"z\": 9}}",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 9, a: 2} # m\nlist: [b, a]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta | del(.z) on flow.yaml",
+      "args": [
+        ".meta | del(.z)",
+        "flow.yaml"
+      ],
+      "stdout": "{a: 2} # m\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .meta.z = 5 on flow.yaml",
+      "args": [
+        ".meta.z = 5",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 5, a: 2} # m\nlist: [b, a]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list[0] = \"z\" on flow.yaml",
+      "args": [
+        ".list[0] = \"z\"",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 1, a: 2} # m\nlist: [z, a]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: .list |= map(upcase) on flow.yaml",
+      "args": [
+        ".list |= map(upcase)",
+        "flow.yaml"
+      ],
+      "stdout": "meta: {z: 1, a: 2} # m\nlist: [B, A]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: -P . on flow.yaml",
+      "args": [
+        "-P",
+        ".",
+        "flow.yaml"
+      ],
+      "stdout": "meta:\n  z: 1\n  a: 2\nlist: # m\n  - b\n  - a\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "meta:\n  z: 1\n  a: 2\n  # m\nlist:\n  - b\n  - a\n",
+        "exit": 0,
+        "reason": "The line comment of a flow map opened by -P ends up under it here and on the next key in mikefarah's."
+      }
+    },
+    {
+      "name": "comments: -P .meta on flow.yaml",
+      "args": [
+        "-P",
+        ".meta",
+        "flow.yaml"
+      ],
+      "stdout": "z: 1\na: 2\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "z: 1\na: 2\n# m\n",
+        "exit": 0,
+        "reason": "The line comment of a flow map opened by -P ends up under it here and on the next key in mikefarah's."
+      }
+    },
+    {
+      "name": "comments: -o json .meta on flow.yaml",
+      "args": [
+        "-o",
+        "json",
+        ".meta",
+        "flow.yaml"
+      ],
+      "stdout": "{\n  \"z\": 1,\n  \"a\": 2\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea ireduce merge",
+      "args": [
+        "ea",
+        ". as $item ireduce ({}; . * $item)",
+        "config.yaml",
+        "anchors.yaml"
+      ],
+      "accept": {
+        "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags:\n  - a\n  - b\nbase:\n  image: nginx\n  replicas: 1\nweb:\n  image: nginx\n  replicas: 2\n",
+        "exit": 0,
+        "reason": "A fold builds its value from nothing and prints afresh; mikefarah's merge keeps the nodes' comments and styles."
+      },
+      "stdout": "name: app\nversion: 1.2.0\nport: 8080\ndebug: false\nempty: \"\"\nmode: \"0644\"\nnothing: null\ntags: [a, b]\n# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  \"<<\": *base\n  replicas: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea . on two files",
+      "args": [
+        "ea",
+        ".",
+        "commented.yaml",
+        "stream.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\n---\n# head one\na: 1 # one\n---\n# sep\n# head two\nb: [1, 2]\n---\nc: \"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea select on two files",
+      "args": [
+        "ea",
+        "select(.kind == \"Deployment\") | .spec",
+        "commented.yaml",
+        "stream.yaml"
+      ],
+      "stdout": "replicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "comments: ea .a = 2 on two files",
+      "args": [
+        "ea",
+        ".a = 2",
+        "stream.yaml",
+        "flow.yaml"
+      ],
+      "stdout": "# head one\na: 2 # one\n---\n# sep\n# head two\nb: [1, 2]\na: 2\n---\nc: \"x\"\na: 2\n---\nmeta: {z: 1, a: 2} # m\nlist: [b, a]\na: 2\n",
       "exit": 0
     }
   ]

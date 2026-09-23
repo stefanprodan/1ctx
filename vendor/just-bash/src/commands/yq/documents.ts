@@ -47,6 +47,8 @@ export interface Tagged {
   splitRoot?: boolean;
   /** its path from the root, where known, for key and path */
   path?: (string | number)[];
+  /** the node of the document it was made from, whose comments it keeps */
+  source?: (string | number)[];
 }
 
 type Vars = ReadonlyMap<string, State>;
@@ -295,7 +297,13 @@ function walk(
             ctx,
           );
           const state = arithmetic(ast.op, left, right);
-          for (const value of values) results.push({ value, state });
+          // a merge or an append keeps the left node, as mikefarah copies it
+          const source =
+            (ast.op === "+" || ast.op === "*") &&
+            (isMap(left.value) || Array.isArray(left.value))
+              ? left.source
+              : undefined;
+          for (const value of values) results.push({ value, state, source });
         }
       }
       return results;
@@ -336,16 +344,27 @@ function walk(
         value,
         state: index === 0 ? input.state : step(input.state),
         path: paths?.[index],
+        source: paths?.[index],
       }));
     }
   }
   const state = classify(ast, input.state, input.value, vars);
   const values = evaluate(input.value, ast, ctx);
   const paths = pathsOf(input, ast, ctx, values.length, state);
+  // a path step's result is its own node; a value built by the filter
+  // has none; any other result is made from the input node, whose
+  // comments and style it keeps where they fit
+  const pathOnly = isPathOnly(ast);
+  const source = pathOnly
+    ? undefined
+    : constructs(ast)
+      ? undefined
+      : input.source;
   return values.map((value, index) => ({
     value,
     state,
     path: paths?.[index],
+    source: pathOnly ? paths?.[index] : source,
   }));
 }
 
@@ -372,6 +391,24 @@ function isSplitDoc(ast: AstNode): boolean {
     (ast.name === "splitDoc" || ast.name === "split_doc") &&
     ast.args.length === 0
   );
+}
+
+// a value the filter builds: a literal, an interpolation, a map or a list
+// written out, keys, entries
+function constructs(ast: AstNode): boolean {
+  switch (ast.type) {
+    case "Literal":
+    case "StringInterp":
+    case "Object":
+    case "Array":
+    case "Reduce":
+    case "Foreach":
+      return true;
+    case "Call":
+      return COMPUTED.has(ast.name) && ast.name !== "with_entries";
+    default:
+      return false;
+  }
 }
 
 // a node made only of path steps, whose results path() can name
@@ -433,7 +470,7 @@ export function evaluateDocument(
   const ctx = { ...createContext(options), root: document, currentPath: [] };
   return walk(
     ast,
-    { value: document, state: "document", path: [] },
+    { value: document, state: "document", path: [], source: [] },
     { ...ctx, sourceNode: { value: document, path: [] } },
     new Map(),
   );
@@ -514,6 +551,7 @@ export function evaluateAll(
       value: input.value,
       state: "document",
       path: [],
+      source: [],
       input,
     }),
   );
