@@ -42,9 +42,9 @@ The trim keeps what the mount can run. Removed, with their tests:
 ## What we changed
 
 Every change in the source carries `(1ctx)` in a comment, so
-`grep -rn "(1ctx)" vendor/just-bash/src` lists them. The tests are in
-`test/server/knowledge/just-bash-fixes.test.ts`, beside upstream's
-own.
+`grep -rn "(1ctx)" vendor/just-bash/src` lists them. Our tests of them
+are in `test/vendor/just-bash/`, `fixes.test.ts` for the rows below
+without a file of their own.
 
 | File | Change | Why |
 |---|---|---|
@@ -61,7 +61,7 @@ own.
 
 ### Where our jq still differs from jq
 
-`test/server/knowledge/jq-paths.test.ts` pins path expressions against
+`test/vendor/just-bash/jq-paths.test.ts` pins path expressions against
 jq 1.8. Where they part:
 
 - Iterating null yields nothing, in path mode too, as in mikefarah's
@@ -88,7 +88,7 @@ jq 1.8. Where they part:
 
 ### Where our yq still differs from mikefarah's
 
-`test/server/knowledge/yq.test.ts` pins streams and in-place edits; on
+`test/vendor/just-bash/yq.test.ts` pins streams and in-place edits; on
 the podinfo manifests the `-i` writes compared were mikefarah's byte
 for byte, or the same data with safer quoting. Where they part:
 
