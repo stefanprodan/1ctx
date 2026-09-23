@@ -1039,18 +1039,19 @@ function failed(e: unknown): ExecResult {
       exitCode: ExecutionLimitError.EXIT_CODE,
     };
   }
+  // mikefarah's yq exits 1 on any error (1ctx)
   const msg = sanitizeErrorMessage((e as Error).message);
   if (msg.includes("Unknown function")) {
     return {
       stdout: "",
       stderr: `yq: error: ${msg}\n`,
-      exitCode: 3,
+      exitCode: 1,
     };
   }
   return {
     stdout: "",
     stderr: `yq: parse error: ${msg}\n`,
-    exitCode: 5,
+    exitCode: 1,
   };
 }
 

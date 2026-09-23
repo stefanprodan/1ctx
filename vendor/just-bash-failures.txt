@@ -153,6 +153,7 @@
 (fail) worker protocol runtime desync probes > sqlite3 output shaped like worker control payload is treated as query data
 (fail) worker protocol runtime desync probes > sqlite3 timed-out worker query does not execute later and mutate database
 (fail) yq > combined short options > should handle -cej for compact exit-status join
+(fail) yq > error handling > should handle invalid YAML
 (fail) yq > format auto-detection > should auto-detect JSON from .json extension
 (fail) yq > join-output mode > should not print newlines with -j
 (fail) yq format strings > edge cases > @base64 on array returns null
