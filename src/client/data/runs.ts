@@ -246,6 +246,7 @@ export function applyRunEnvelope(
     last: ev.last ?? mine?.last ?? null,
     automation: mine?.automation ?? label(held.id),
     runBy: mine?.runBy ?? null,
+    runs: null,
   });
 }
 

@@ -250,6 +250,19 @@ export class UsageStore {
       .run(sessionId).changes;
   }
 
+  // many sessions' rows a statement per 500, not one per session
+  deleteSessions(sessionIds: string[]): number {
+    let changes = 0;
+    for (let i = 0; i < sessionIds.length; i += 500) {
+      const ids = sessionIds.slice(i, i + 500);
+      const marks = ids.map(() => "?").join(", ");
+      changes += this.db
+        .query(`delete from usage where session_id in (${marks})`)
+        .run(...ids).changes;
+    }
+    return changes;
+  }
+
   latest(sessionId: string): RoundUsage | null {
     const raw = this.db
       .query<Raw, [string]>(

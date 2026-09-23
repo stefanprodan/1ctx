@@ -32,6 +32,7 @@ import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import {
   MAX_AUTOMATION_BODY,
+  parseDeleteAutomation,
   parsePatchAutomation,
   parseRunsQuery,
   parseSaveAutomation,
@@ -335,8 +336,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       method: "DELETE",
       path: "/api/automations/:id",
       policy: "authenticated",
-      handle(_req, ctx) {
+      handle(req, ctx) {
         const principal = ctx.principal!;
+        const { runs } = parseDeleteAutomation(new URL(req.url));
         const found = visible(principal, ctx.params.id);
         editable(principal, found);
         transact(deps.db, () => {
@@ -345,7 +347,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           if (deps.sessions.runningAutomation(current.id)) {
             throw new Conflict("automation has a running run");
           }
+          // before the row, whose delete nulls the runs' automation
+          if (runs) deps.sessions.deleteRuns(current.id);
           deps.store.delete(current.id);
+          // one frame for the runs, not one per run, which would have
+          // each tab load its list again per run
           return {
             result: undefined,
             events: [
@@ -354,6 +360,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
                 data: {
                   projectId: current.projectId,
                   automationId: current.id,
+                  runs,
                 },
               },
             ],

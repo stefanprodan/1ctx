@@ -127,6 +127,15 @@ export function socketArea(deps: SocketDeps): Socket {
     for (const set of byUser.values()) for (const conn of [...set]) fn(conn);
   };
 
+  // a watched session that is gone or out of sight is unwatched
+  const rewatch = (conn: Conn): void => {
+    const watching = conn.data.watching;
+    if (watching !== null) {
+      const project = deps.sessionProject(conn.data.principal, watching);
+      if (project === null || !conn.data.projects.has(project)) unwatch(conn);
+    }
+  };
+
   // the visible set again, from the rows: a project that left it is
   // announced and unwatched, a user that is gone is closed
   const recompute = (conn: Conn): void => {
@@ -156,11 +165,7 @@ export function socketArea(deps: SocketDeps): Socket {
       conn.data.projects.add(id);
       deliver(conn, { type: "granted", projectId: id });
     }
-    const watching = conn.data.watching;
-    if (watching !== null) {
-      const project = deps.sessionProject(conn.data.principal, watching);
-      if (project === null || !conn.data.projects.has(project)) unwatch(conn);
-    }
+    rewatch(conn);
   };
 
   const onBus = (event: BusEvent): void => {
@@ -202,6 +207,8 @@ export function socketArea(deps: SocketDeps): Socket {
             !conn.data.principal.mustChangePassword &&
             conn.data.projects.has(event.data.projectId)
           ) {
+            // a run it watched may be gone with the automation
+            if (event.data.runs) rewatch(conn);
             deliver(conn, { type: "automationDeleted", ...event.data });
           }
         });

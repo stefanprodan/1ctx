@@ -82,6 +82,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     latest: () => null,
     latestFor: () => new Map(),
     deleteSession: () => 0,
+    deleteSessions: () => 0,
   });
   const makeSession = () =>
     sessions.create({

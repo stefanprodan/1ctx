@@ -190,3 +190,18 @@ describe("UsageStore.days", () => {
     db.close();
   });
 });
+
+describe("deleting many sessions' rows", () => {
+  test("takes every listed session past a statement's worth", () => {
+    const store = new UsageStore(memoryDb());
+    for (let i = 0; i < 1203; i++) {
+      record(store, { projectId: "p", sendId: `s${i}`, now: i });
+    }
+    const ids = Array.from({ length: 1201 }, (_, i) => `s${i}-session`);
+    expect(store.deleteSessions(ids)).toBe(1201);
+    expect(store.deleteSessions([])).toBe(0);
+    expect(store.latest("s1201-session")).not.toBeNull();
+    expect(store.latest("s1200-session")).toBeNull();
+    expect(store.latest("s0-session")).toBeNull();
+  });
+});

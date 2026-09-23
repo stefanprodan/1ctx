@@ -38,7 +38,12 @@ export type BusEvents = {
     projectId: string;
     automation: AutomationSummary;
   };
-  "automation.deleted": { projectId: string; automationId: string };
+  // runs: its runs went with it
+  "automation.deleted": {
+    projectId: string;
+    automationId: string;
+    runs: boolean;
+  };
   "memory.changed": {
     projectId: string;
     automationId: string | null;

@@ -130,6 +130,8 @@ export function streamRows(
   db: Db,
   raws: RawSession[],
   usage: Map<string, RoundUsage>,
+  // by automation, how many runs its grouped line stands for
+  counts?: Map<string, number>,
 ): StreamRow[] {
   if (raws.length === 0) return [];
   const ids = raws.map((raw) => raw.id);
@@ -148,6 +150,10 @@ export function streamRows(
       last: lines.get(raw.id) ?? null,
       automation: automationRows.get(raw.id) ?? null,
       runBy: username === undefined ? null : { id: raw.owner_id, username },
+      runs:
+        raw.automation_id === null
+          ? null
+          : (counts?.get(raw.automation_id) ?? null),
     };
   });
 }

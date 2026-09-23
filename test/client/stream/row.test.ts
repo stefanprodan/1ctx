@@ -75,6 +75,7 @@ const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   last: { seq: 2, author: "assistant", text: "nine pods, all expected" },
   automation: null,
   runBy: null,
+  runs: null,
   ...changes,
 });
 

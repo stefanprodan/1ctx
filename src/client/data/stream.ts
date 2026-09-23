@@ -23,7 +23,12 @@ import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
-import { mergeNextPage, ordered, refreshHead } from "./sessions-rows.ts";
+import {
+  mergeNextPage,
+  ordered,
+  refreshHead,
+  swapRun,
+} from "./sessions-rows.ts";
 
 // a later page's own state: the rows stay whatever it does
 export type More = { loading: boolean; error: Failure | null };
@@ -57,6 +62,9 @@ let head: { size: number; next: string | null } = { size: 0, next: null };
 let settled = true;
 // whether a first page is out, so a grant during it asks again
 let loading = false;
+// whether a row moved while a first page was out with none held, so
+// its answer may predate it: one more page is asked once it lands
+let dirty = false;
 // moves when a row is deleted, so a later page read before it cannot
 // bring the row back
 let pages = 0;
@@ -67,6 +75,9 @@ const labels = new Map<
   { label: StreamRow["automation"]; at: number }
 >();
 let frames = 0;
+// the runs that took their automation's line in All, each with the
+// frame's number, replayed over an answer asked before it
+const swaps = new Map<string, { row: StreamRow; at: number }>();
 const kept = new Held<{ rows: StreamRow[]; next: string | null }>();
 
 const keyOf = (f: ListFilter) =>
@@ -86,6 +97,7 @@ effect(() => {
   list.value = null;
   kept.clear();
   labels.clear();
+  swaps.clear();
   loading = false;
 });
 
@@ -98,11 +110,23 @@ function relabel(rows: StreamRow[], asked: number): StreamRow[] {
     const said = id === null ? undefined : labels.get(id);
     if (said === undefined || said.at <= asked) return row;
     const label = said.label;
+    // a gone automation's runs are listed one by one
+    const runs = label === null ? null : row.runs;
     return row.automation?.name === label?.name &&
-      row.automation?.id === label?.id
+      row.automation?.id === label?.id &&
+      row.runs === runs
       ? row
-      : { ...row, automation: label };
+      : { ...row, automation: label, runs };
   });
+}
+
+// a run that took its line after the answer was asked takes it again
+function reswap(rows: StreamRow[], asked: number): StreamRow[] {
+  let out = rows;
+  for (const { row, at } of swaps.values()) {
+    if (at > asked) out = swapRun(out, row) ?? out;
+  }
+  return out;
 }
 
 const sameFilter = (a: ListFilter, b: ListFilter) =>
@@ -174,12 +198,16 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
   listFor = { ...filter, origin: filter.origin ?? null, turn, cold };
   if (!warm) settled = false;
   loading = true;
+  dirty = false;
   const since = frames;
   try {
     const answer = await api<SessionsResponse>(address(listFor, null));
     if (listFor.turn !== turn) return;
     loading = false;
-    const body = { ...answer, rows: relabel(answer.rows, since) };
+    const body = {
+      ...answer,
+      rows: reswap(relabel(answer.rows, since), since),
+    };
     const held = list.value;
     head = { size: body.rows.length, next: body.next };
     settled = true;
@@ -191,6 +219,10 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
             next: body.next,
             more: IDLE,
           };
+    if (dirty) {
+      dirty = false;
+      void refresh();
+    }
   } catch {
     if (listFor.turn === turn) loading = false;
     // a warm load that fails keeps what is held
@@ -269,6 +301,18 @@ export function dropRow(sessionId: string, projectId: string): void {
   if (covers(projectId)) void refresh();
 }
 
+// an automation's runs went with it: its rows go, and the first page is
+// loaded again as for a deleted row
+function dropRuns(automationId: string, projectId: string): void {
+  const keep = (row: StreamRow) =>
+    (row.automation?.id ?? row.session.automationId) !== automationId;
+  if (covers(projectId)) pages++;
+  kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
+  const held = list.value;
+  if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
+  if (held !== null && covers(projectId)) void refresh();
+}
+
 // the project may no longer be seen: its rows go, the whole list when
 // it was the project's own, and an answer in flight goes with them
 // since it may still hold rows of that project. What is left loads
@@ -318,37 +362,71 @@ export function applyAutomationFrame(
       ? { id: ev.automation.id, name: ev.automation.name }
       : null;
   labels.set(id, { label, at: ++frames });
+  // a first page in flight may hold a line of it: the relabel stops it
+  // counting, but only a page asked after the delete lists its runs
+  if (label === null && list.value === null && loading) {
+    if (covers(ev.projectId)) void loadList(listFor);
+    return;
+  }
+  if (ev.type === "automationDeleted" && ev.runs) {
+    dropRuns(id, ev.projectId);
+    return;
+  }
   const held = list.value;
   if (held === null || !covers(ev.projectId)) return;
   let changed = false;
+  let grouped = false;
   const rows = held.rows.map((row) => {
     if (row.session.origin !== "automation") return row;
     if ((row.automation?.id ?? row.session.automationId) !== id) return row;
+    // a gone automation's runs are listed one by one: the line stops
+    // counting them, and the first page brings the others
+    const runs = label === null ? null : row.runs;
+    grouped ||= row.runs !== runs;
     if (
+      row.runs === runs &&
       row.automation?.id === label?.id &&
       row.automation?.name === label?.name
     ) {
       return row;
     }
     changed = true;
-    return { ...row, automation: label };
+    return { ...row, automation: label, runs };
   });
   if (changed) list.value = { ...held, rows };
+  if (grouped) void refresh();
 }
 
 export function applyEnvelope(
   ev: Extract<SocketEvent, { type: "session" }>,
 ): void {
   const list0 = list.value;
-  if (list0 === null || !covers(ev.projectId, ev.session.origin)) return;
+  if (!covers(ev.projectId, ev.session.origin)) return;
+  // under a search, a row whose title does not hold it is not listed,
+  // and asking again on each of its envelopes would load the page once
+  // per tool call of every chat running
+  const listed = listFor.q === "" || titled(ev.session.title, listFor.q);
+  if (list0 === null) {
+    dirty ||= loading && listed;
+    return;
+  }
+  if (listFor.origin === null) {
+    // a run of an automation with a line held takes it or leaves it
+    const swapped = swapRun(list0.rows, ev);
+    if (swapped !== undefined) {
+      if (swapped !== null && listed) {
+        list.value = { ...list0, rows: swapped };
+        const line = swapped.find((row) => row.session.id === ev.session.id);
+        if (line !== undefined) {
+          swaps.set(ev.session.automationId ?? "", { row: line, at: ++frames });
+        }
+      }
+      return;
+    }
+  }
   const held = list0.rows.find((row) => row.session.id === ev.session.id);
   if (held === undefined) {
-    // under a search, a row whose title does not hold it is not listed,
-    // and asking again on each of its envelopes would load the page
-    // once per tool call of every chat running
-    if (listFor.q === "" || titled(ev.session.title, listFor.q)) {
-      void refresh();
-    }
+    if (listed) void refresh();
     return;
   }
   if (held.session.revision >= ev.session.revision) return;
@@ -359,6 +437,7 @@ export function applyEnvelope(
     last: ev.last ?? held.last,
     automation: held.automation,
     runBy: held.runBy,
+    runs: held.runs,
   };
   list.value = {
     ...list0,

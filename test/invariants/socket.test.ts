@@ -695,10 +695,50 @@ describe("automation socket events", () => {
         type: "automationDeleted",
         projectId: chat.projectId,
         automationId: automation.id,
+        runs: false,
       },
     ]);
     expect(frames(admin, "automationDeleted")).toEqual([]);
     close(chat, member, admin);
+    await chat.app.shutdown();
+  });
+
+  test("a delete with its runs unwatches a watched run", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat);
+    const pending = chat.scripted.next();
+    const started = await chat.member.call(
+      "POST",
+      `/api/automations/${automation.id}/run`,
+    );
+    const sessionId = (await started.json()).session.id;
+    (await pending).reply("done");
+    for (let i = 0; i < 100; i++) {
+      if (chat.app.sessions.byId(sessionId)?.status !== "running") break;
+      await tick();
+    }
+    const conn = await connection(chat, chat.member);
+    chat.app.socket.open(conn);
+    chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
+    expect(conn.data.watching).toBe(sessionId);
+    conn.frames = [];
+    const gone = await chat.member.call(
+      "DELETE",
+      `/api/automations/${automation.id}?runs=delete`,
+    );
+    expect(gone.status).toBe(204);
+    expect(conn.data.watching).toBeNull();
+    expect(frames(conn, "automationDeleted")).toEqual([
+      {
+        type: "automationDeleted",
+        projectId: chat.projectId,
+        automationId: automation.id,
+        runs: true,
+      },
+    ]);
+    // one frame for the runs, never one per run
+    expect(frames(conn, "deleted")).toEqual([]);
+    close(chat, conn);
     await chat.app.shutdown();
   });
 });

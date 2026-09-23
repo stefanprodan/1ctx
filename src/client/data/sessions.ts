@@ -147,6 +147,11 @@ export async function loadSession(id: string): Promise<void> {
       `/api/sessions/${encodeURIComponent(id)}`,
     );
     if (wanted.turn !== turn) return;
+    const from = detail.session.automationId;
+    if (from !== null && purged.has(from)) {
+      leaveRuns(from, detail.session.projectId, true);
+      return;
+    }
     // an envelope may have moved the session past this answer while it
     // was in flight; the rows held are then the newer ones
     const held = session.value;
@@ -171,11 +176,9 @@ export async function loadSession(id: string): Promise<void> {
   }
 }
 
-// the page left the chat: nothing of it is kept, so a late frame, a
-// deletion or a revocation of it moves the page nowhere
-// the page leaves a chat: with the id it leaves, nothing happens when
-// the load of another chat already owns the entity, as it does on the
-// way from a chat to its fork, so that load is not thrown away
+// nothing of the chat left is kept, so a late frame or a deletion of
+// it moves the page nowhere; with an id, nothing happens when a load of
+// another chat owns the entity, as on the way to a fork
 export function leaveSession(id?: string): void {
   if (id !== undefined && wanted.id !== "" && wanted.id !== id) return;
   wanted = { id: "", turn: wanted.turn + 1 };
@@ -264,11 +267,9 @@ export async function renameSession(id: string, title: string): Promise<void> {
   take(detail);
 }
 
-// the row goes from the list and, when it is the chat on screen or
-// the one being loaded, the page leaves it and opens its project. An
-// answer in flight may still hold the row: the detail's is dropped
-// with the watch, the list's is superseded by a load run again. The
-// socket's deleted frame after a local delete then finds nothing
+// the row goes, and the page leaves the chat on screen or loading for
+// its project; an answer in flight goes with the watch or a new load,
+// so the socket's frame after a local delete finds nothing
 function drop(sessionId: string, projectId: string): void {
   dropRow(sessionId, projectId);
   chatsKept.delete(sessionId);
@@ -278,6 +279,16 @@ function drop(sessionId: string, projectId: string): void {
   }
 }
 
+// an automation's runs went with it, a run read before that included
+const purged = new Set<string>();
+function leaveRuns(automationId: string, projectId: string, read = false) {
+  purged.add(automationId);
+  chatsKept.update((d) => (d.session.automationId === automationId ? null : d));
+  if (!read && session.value?.session.automationId !== automationId) return;
+  leaveSession();
+  navigate(`/projects/${projectId}`);
+}
+
 export async function deleteSession(
   id: string,
   projectId: string,
@@ -285,14 +296,6 @@ export async function deleteSession(
   await api(`/api/sessions/${encodeURIComponent(id)}`, "DELETE");
   drop(id, projectId);
 }
-
-// the chat as a Markdown file: a link the browser saves, never a fetch,
-// so the cookie and the server's filename do the work. The times are
-// in the browser's zone
-export const markdownHref = (id: string): string =>
-  `/api/sessions/${encodeURIComponent(id)}/markdown?tz=${encodeURIComponent(
-    Intl.DateTimeFormat().resolvedOptions().timeZone,
-  )}`;
 
 function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   applyEnvelope(ev);
@@ -454,6 +457,9 @@ export function onSocket(ev: SocketEvent): void {
       break;
     case "deleted":
       drop(ev.sessionId, ev.projectId);
+      break;
+    case "automationDeleted":
+      if (ev.runs) leaveRuns(ev.automationId, ev.projectId);
       break;
     case "granted":
       grantRows(ev.projectId);
