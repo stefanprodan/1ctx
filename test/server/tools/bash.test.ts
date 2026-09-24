@@ -342,3 +342,131 @@ describe("bash", () => {
     ).toEqual({ error: true, content: "Error: stopped" });
   });
 });
+
+describe("bash with credentials", () => {
+  const KEY = "quotes-key-0123456789";
+  const quotes = {
+    id: "quotes1",
+    name: "quotes",
+    keyName: "http-quotes",
+    prefix: "https://quotes.example.test/api/v1/",
+    header: "X-Api-Key",
+    template: "Token {key}",
+    methods: ["GET" as const],
+  };
+  const all = { mode: "all" as const, domains: [] };
+
+  test("the description signs each offered prefix, cut at 80 characters", () => {
+    const long = {
+      ...quotes,
+      id: "long1",
+      name: "long",
+      prefix: `https://long.example.test/${"a".repeat(80)}/`,
+    };
+    const words = makeBashTool(undefined, all, true, {
+      offered: [long, quotes],
+      off: [{ name: "prices", prefix: "https://prices.example.test/" }],
+    }).description;
+    expect(words).toEndWith(
+      `Save downloads in /tmp. curl to ${long.prefix.slice(0, 77)}... (long) is signed in; send no key. curl to https://quotes.example.test/api/v1/ (quotes) is signed in; send no key.`,
+    );
+    expect(words).not.toContain("prices");
+    expect(
+      makeBashTool(undefined, null, true, { offered: [quotes], off: [] })
+        .description,
+    ).toEndWith("No network.");
+  });
+
+  test("each command checks the row and reads the key, and scrubs the result", async () => {
+    const rows = new Map([
+      ["quotes1", { keyName: "http-quotes", projectIds: ["project"] }],
+      ["gone1", { keyName: "http-gone", projectIds: ["project"] }],
+      ["other1", { keyName: "http-quotes", projectIds: ["elsewhere"] }],
+    ]);
+    const reads = new Map([
+      ["http-quotes", { ok: true as const, key: KEY }],
+      ["http-gone", { ok: false as const, reason: "missing" as const }],
+    ]);
+    let seen: unknown;
+    const tool = makeBashTool(
+      {
+        async run(_projectId, _sessionId, _author, _command, caps) {
+          seen = caps;
+          return {
+            content: `echo ${KEY}\nexit 0 ${KEY}`,
+            error: false,
+            tail: `exit 0 ${KEY}`.length,
+          };
+        },
+      },
+      all,
+      true,
+      {
+        offered: [
+          quotes,
+          { ...quotes, id: "gone1", name: "gone" },
+          { ...quotes, id: "other1", name: "other" },
+          { ...quotes, id: "deleted1", name: "deleted" },
+        ],
+        off: [{ name: "prices", prefix: "https://prices.example.test/" }],
+      },
+      {
+        byId: (id) => rows.get(id) ?? null,
+        readKey: (name) => reads.get(name)!,
+      },
+    );
+    const result = await tool.run(
+      { command: "curl" },
+      { ...context(), web: all },
+    );
+    expect(result).toEqual({
+      content: "echo [credential quotes]\nexit 0 [credential quotes]",
+      error: false,
+      tail: "exit 0 [credential quotes]".length,
+    });
+    const credentials = (seen as { credentials: unknown[] }).credentials;
+    expect(credentials).toEqual([
+      {
+        name: "quotes",
+        prefix: quotes.prefix,
+        key: KEY,
+        header: "X-Api-Key",
+        value: `Token ${KEY}`,
+        methods: ["GET"],
+      },
+      { name: "gone", prefix: quotes.prefix, refused: "missing" },
+      { name: "other", prefix: quotes.prefix, refused: "deleted" },
+      { name: "deleted", prefix: quotes.prefix, refused: "deleted" },
+      {
+        name: "prices",
+        prefix: "https://prices.example.test/",
+        refused: "off",
+      },
+    ]);
+  });
+
+  test("a command without network reads no key", async () => {
+    let caps: unknown;
+    const tool = makeBashTool(
+      {
+        async run(_projectId, _sessionId, _author, _command, given) {
+          caps = given;
+          return { content: "exit 0", error: false };
+        },
+      },
+      null,
+      true,
+      { offered: [quotes], off: [] },
+      {
+        byId: () => {
+          throw new Error("no row is read");
+        },
+        readKey: () => {
+          throw new Error("no key is read");
+        },
+      },
+    );
+    await tool.run({ command: "ls" }, context());
+    expect(caps).not.toHaveProperty("credentials");
+  });
+});

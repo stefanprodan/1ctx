@@ -35,7 +35,12 @@ import {
   type Providers,
   providersArea,
 } from "./providers/index.ts";
-import { type Provision, provisionArea } from "./provision/index.ts";
+import {
+  inventoryOf,
+  type Provision,
+  projectDocsOf,
+  provisionArea,
+} from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
 import {
   type Registry,
@@ -247,6 +252,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     skills,
     mcp,
+    credentials,
     tools: {
       capabilities: () => tools.capabilities(),
       offered: (now, agentId, agentServers, mode, scope) =>
@@ -292,6 +298,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     mcp,
     memory,
     knowledge,
+    credentials,
     sessions: {
       memorySnapshot: (projectId, sessionId) =>
         sessions.memorySnapshot(projectId, sessionId),
@@ -412,31 +419,22 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret,
     webAccess: () => configuredTools.webAccess(),
     bootstrap: async () => (await users.bootstrap()) !== null,
-    projectDocs: (name) => {
-      const id = projects.store
-        .teamProjectIds()
-        .find((id) => projects.store.byId(id)?.name === name);
-      return {
-        caps: limits.current(),
-        live: id === undefined ? [] : knowledge.store.list(id),
-      };
-    },
+    projectDocs: projectDocsOf({
+      projects: projects.store,
+      limits,
+      docs: knowledge.store,
+    }),
     credentials: { key: credentials.keyState, list: credentials.bindings },
-    inventory: () => {
-      const names = users.list().map((row) => row.username);
-      return {
-        User: names.length ? names : ["admin"],
-        Project: projects.store
-          .teamProjectIds()
-          .map((id) => projects.store.byId(id)!.name),
-        Credential: credentials.store.list().map((row) => row.name),
-        Provider: providers.store.list().map((row) => row.name),
-        Skill: skills.store.summaries(() => []).map((row) => row.name),
-        McpServer: mcp.store.list().map((row) => row.name),
-        Agent: agents.store.list().map((row) => row.name),
-        Tool: ["web", "websearch", "visualize"],
-      };
-    },
+    inventory: () =>
+      inventoryOf({
+        users,
+        projects: projects.store,
+        credentials: credentials.store,
+        providers: providers.store,
+        skills: skills.store,
+        mcp: mcp.store,
+        agents: agents.store,
+      }),
   });
   const sweepLog = log("sweep");
   return {

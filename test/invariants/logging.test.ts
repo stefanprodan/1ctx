@@ -55,6 +55,8 @@ test("events omit private request and chat values", async () => {
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
       memory: null,
+      credentials: [],
+      credentialsOff: [],
       web: null,
     }),
     async run(_offered, call) {

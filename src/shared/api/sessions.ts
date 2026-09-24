@@ -109,14 +109,19 @@ export type SwitchableServer = { id: string; name: string; tools: number };
 // a skill a chat can turn off: one its agent carries
 export type SwitchableSkill = { id: string; name: string };
 
+// a credential a chat can turn off: one bound to its project
+export type SwitchableCredential = { id: string; name: string };
+
 // GET /api/projects/:id/agents: the agents the composer offers, the
 // capability keys a send starting now could turn off (`web` while the
 // admin's web access is not off), and by agent id the MCP servers it is
 // offered now and the skills it carries, in name order; an agent without
-// one has no entry
+// one has no entry. The credentials are the project's, for any agent, in
+// name order
 export type ProjectAgentsResponse = {
   agents: AgentSummary[];
   capabilities: string[];
   servers: Record<string, SwitchableServer[]>;
   skills: Record<string, SwitchableSkill[]>;
+  credentials: SwitchableCredential[];
 };

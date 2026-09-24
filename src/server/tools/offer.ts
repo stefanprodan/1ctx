@@ -5,7 +5,13 @@
 // apart from dispatch lets the agent page and the runner share the same
 // offered set without needing a live call context.
 
-import { mcpKey, skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
+import {
+  credentialKey,
+  mcpKey,
+  skillKey,
+  VISUALIZE,
+  WEB,
+} from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import {
@@ -17,6 +23,7 @@ import {
 import { catalog } from "../../shared/skills.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
+import type { CredentialRow } from "../credentials/index.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import type { Mcp, OfferedServer } from "../mcp/index.ts";
@@ -36,6 +43,7 @@ import type {
   MemoryHandle,
   MemoryScope,
   Offered,
+  OfferedCredential,
   Tool,
   ToolResult,
 } from "./types.ts";
@@ -44,20 +52,63 @@ export type SkillsPort = SkillToolsPort & {
   forAgent(agentId: string): OfferedSkill[];
 };
 
+// the credentials bound to a project, in name order
+export type CredentialsPort = {
+  forProject(projectId: string): CredentialRow[];
+};
+
+export type SendCredentials = {
+  offered: OfferedCredential[];
+  off: Offered["credentialsOff"];
+};
+
+const NO_CREDENTIALS: SendCredentials = { offered: [], off: [] };
+
 type OfferDeps = {
   store: Pick<ToolStore, "rows">;
   skills: SkillsPort;
   mcp: Pick<Mcp, "offered">;
   memory?: Pick<MemoryCapability, "work">;
   memorySessions: MemorySessionsPort;
+  credentials?: CredentialsPort;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
     web: WebSnapshot | null,
     visuals: boolean,
+    credentials: SendCredentials,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
+
+// credentials ride on the network: none without it, and none outside a
+// project
+function credentialsFor(
+  port: CredentialsPort | undefined,
+  projectId: string | null | undefined,
+  web: WebSnapshot | null,
+  disabledCapabilities: readonly string[],
+): SendCredentials {
+  if (port === undefined || web === null || !projectId) return NO_CREDENTIALS;
+  const offered: SendCredentials["offered"] = [];
+  const off: SendCredentials["off"] = [];
+  for (const row of port.forProject(projectId)) {
+    if (disabledCapabilities.includes(credentialKey(row.id))) {
+      off.push({ id: row.id, name: row.name, prefix: row.prefix });
+      continue;
+    }
+    offered.push({
+      id: row.id,
+      name: row.name,
+      keyName: row.keyName,
+      prefix: row.prefix,
+      header: row.header,
+      template: row.template,
+      methods: [...row.methods],
+    });
+  }
+  return { offered, off };
+}
 
 function memoryFor(
   memory: OfferDeps["memory"],
@@ -130,6 +181,8 @@ export function offered(
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
       memory,
+      credentials: [],
+      credentialsOff: [],
     };
   }
   const rows = new Map(deps.store.rows().map((row) => [row.name, row]));
@@ -144,6 +197,12 @@ export function offered(
           domains: [...access.hosts],
         };
   const search = web === null ? null : searchRow.provider;
+  const credentials = credentialsFor(
+    deps.credentials,
+    scope?.projectId,
+    web,
+    disabledCapabilities,
+  );
   const allowed = new Set<string>([
     "datetime",
     "bash",
@@ -173,7 +232,13 @@ export function offered(
   const baseTools = fillYear(
     [
       ...deps
-        .toolsFor(search, rows.get("visualize")!.hosts, web, visuals)
+        .toolsFor(
+          search,
+          rows.get("visualize")!.hosts,
+          web,
+          visuals,
+          credentials,
+        )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory, deps.memorySessions)),
@@ -222,5 +287,7 @@ export function offered(
     mcpPrompt,
     mcpCatalog: mcpCatalogText,
     memory,
+    credentials: credentials.offered,
+    credentialsOff: credentials.off,
   };
 }

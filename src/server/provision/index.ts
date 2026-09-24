@@ -14,6 +14,11 @@ import {
 } from "./parse.ts";
 
 export { readSources } from "./input.ts";
+export {
+  type InventorySources,
+  inventoryOf,
+  projectDocsOf,
+} from "./inventory.ts";
 export { loadKnowledge } from "./knowledge.ts";
 export {
   type CredentialsView,

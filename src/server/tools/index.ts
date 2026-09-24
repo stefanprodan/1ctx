@@ -23,7 +23,7 @@ import type { MemoryCapability } from "../memory/index.ts";
 import { type ToolCall, wireTokens } from "../providers/index.ts";
 import type { MemorySnapshot } from "../sessions/index.ts";
 import { withCommandHints } from "./bash-hint.ts";
-import { makeBashTool } from "./builtin/bash.ts";
+import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
   asMcpCall,
@@ -45,7 +45,12 @@ import {
 } from "./builtin/websearch.ts";
 import { builtinCatalog, fillYear, parametersHtml } from "./catalog.ts";
 import { shapeMcpResult } from "./kept.ts";
-import { offered, type SkillsPort } from "./offer.ts";
+import {
+  type CredentialsPort,
+  offered,
+  type SendCredentials,
+  type SkillsPort,
+} from "./offer.ts";
 import type { ToolName } from "./parse.ts";
 import { Registry } from "./registry.ts";
 import { routes } from "./routes.ts";
@@ -74,6 +79,7 @@ export type {
   MemoryHandle,
   MemoryScope,
   Offered,
+  OfferedCredential,
   Tool,
   ToolBudget,
   ToolCaps,
@@ -93,6 +99,9 @@ export type ToolsDeps = {
   mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
   memory?: Pick<MemoryCapability, "work">;
   knowledge?: Pick<KnowledgeCapability, "run">;
+  // the project's credentials for a send, and each row and key again at
+  // each command
+  credentials?: CredentialsPort & CredentialKeysPort;
   sessions?: {
     memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
   };
@@ -201,6 +210,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     hosts: readonly string[],
     web: WebSnapshot | null,
     visuals: boolean,
+    credentials: SendCredentials,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.version, fetchDeps, web)]),
@@ -215,7 +225,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           ),
         ]),
     makeVisualizeTool(hosts),
-    makeBashTool(deps.knowledge, web, visuals),
+    makeBashTool(deps.knowledge, web, visuals, credentials, deps.credentials),
   ];
 
   const mcpTools = (
@@ -343,6 +353,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           mcp: mcpService,
           memory: deps.memory,
           memorySessions,
+          credentials: deps.credentials,
           toolsFor,
           log: deps.log,
         },
@@ -383,7 +394,10 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
               server.tools.map((tool) => tool.wireName),
             );
       const base = [
-        ...toolsFor(offered.search, [], offered.web, offered.visuals)
+        ...toolsFor(offered.search, [], offered.web, offered.visuals, {
+          offered: offered.credentials,
+          off: offered.credentialsOff,
+        })
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>
             tool.name === "bash"

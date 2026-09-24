@@ -82,12 +82,16 @@ export {
 export type {
   AllowedUrl,
   AllowedUrlEntry,
+  FetchResult,
   NetworkConfig,
   RequestTransform,
   SecureFetch,
+  SecureFetchOptions,
 } from "./network/index.js";
-// the allow-list rules, for 1ctx's credential prefixes (1ctx)
+// the allow-list rules, for 1ctx's credential prefixes, and the fetch
+// 1ctx wraps to sign them (1ctx)
 export {
+  createSecureFetch,
   matchesAllowListEntry,
   NetworkAccessDeniedError,
   RedirectNotAllowedError,

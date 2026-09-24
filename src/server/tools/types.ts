@@ -8,6 +8,7 @@ import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
+import type { CredentialRow } from "../credentials/index.ts";
 import type { KeptFile, OpenedRecord } from "../knowledge/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
@@ -100,6 +101,13 @@ export type MemoryHandle = {
   settleRound(): void;
 };
 
+// a credential of the send's project, as the send began: the key is
+// read again by name at each command
+export type OfferedCredential = Pick<
+  CredentialRow,
+  "id" | "name" | "keyName" | "prefix" | "header" | "template" | "methods"
+>;
+
 export type Offered = {
   tools: ChatTool[];
   visuals: boolean;
@@ -110,4 +118,9 @@ export type Offered = {
   mcpPrompt: { text: string; digest: McpDigest };
   mcpCatalog: string;
   memory: MemoryHandle | null;
+  // the project's credentials, in name order, empty without network;
+  // those the send turned off kept apart, so a command refuses them by
+  // name
+  credentials: OfferedCredential[];
+  credentialsOff: { id: string; name: string; prefix: string }[];
 };

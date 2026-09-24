@@ -401,9 +401,11 @@ violation, and every rule has a rejected fixture under
   in the reply with the visual cards, in call order: a visual through
   `Visual.tsx`, Markdown and code as `transcript/FileCard.tsx`.
   `knowledge/mount.ts` alone runs just-bash (`credentials/check.ts`
-  imports only its allow-list rules), with pinned commands, no
+  imports only its allow-list rules, `knowledge/credentials.ts` its
+  fetch), with pinned commands, no
   host filesystem and `defenseInDepth: true`. The send's web snapshot
-  alone enables network and curl, never wget: all mode allows full
+  alone enables network and curl, through `commandFetch()` as the
+  `fetch` option, never wget: all mode allows full
   internet access, listed mode uses `urlPrefixes()` and all seven HTTP
   methods. Both set `denyPrivateRanges: false` explicitly, since Bun
   cannot pin DNS, and use the fetch deadline and body caps. No snapshot
@@ -513,6 +515,38 @@ violation, and every rule has a rejected fixture under
   takes any field but the name, a supplied `projectIds` replacing; a
   delete forgets `credential:<id>` in sessions and automations in the
   same transaction.
+- **A send signs bash's curl with its project's credentials.** The tools
+  area's `offered()` takes the project's rows through a port to
+  `credentials/`, in name order, as `credentials` (id, name, key name,
+  prefix, header, template, methods), and those whose `credential:<id>`
+  the send's set holds as `credentialsOff` (id, name, prefix); both are
+  empty without network (the admin's mode or the chat's `web` off),
+  outside a project, for a personal project and in the memory phase.
+  The bash tool, at each command with network, checks each row by id
+  (gone or unbound is `deleted`) and reads its key by the row's current
+  key name through `readKey()` (`missing`, `unusable`), so a replaced
+  file applies to the next command; the keys ride in the command caps as
+  `CommandCredential`s and nowhere else, and the tool scrubs its result
+  of them again, the tail kept apart. `knowledge/credentials.ts` builds
+  the `SecureFetch` the mount passes as just-bash's `fetch`:
+  `commandFetch()` picks once, by `matchesAllowListEntry` on the URL curl
+  asked for over every offered and off prefix, the web fetch
+  (`webNetwork()`, all or listed as before, never a transform) or that
+  credential's own `createSecureFetch`, its prefix the one allow-list
+  entry carrying the header, its methods the allowed ones. So a signed
+  redirect off the prefix, to http or to another credential is refused,
+  an unsigned request redirected into a prefix stays unsigned, and a
+  prefix is reached in listed mode without its host. An off, keyless,
+  unusable or removed credential and a method it lacks are refused by
+  its name before anything is sent, never the key file. Each fetch is
+  made on first use. Every key the command read is replaced by
+  `[credential <name>]` in the result as bytes (body, header values,
+  status text, final URL), a header whose name holds one is dropped,
+  `content-length` follows a changed body and a body grown past the cap
+  is refused; an error is rebuilt from its first line, keys replaced,
+  its name kept. The bash description adds `curl to <prefix, cut at 80>
+  (<name>) is signed in; send no key.` per offered credential; the Tools
+  catalog and the agent page count bash without any.
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
   first three answer `GET /models` under the base URL; `gemini` is
@@ -631,6 +665,8 @@ violation, and every rule has a rejected fixture under
   `GET /api/projects/:id/agents` also answers `skills`, keyed by agent
   id, with `{id, name}` in name order from `skills/switchable.ts`, one
   read. Agents without skills have no entry.
+  It also answers `credentials`, the project's `{id, name}` in name
+  order, for any agent, the same for members and admins.
 - **An MCP server is rows, discovered through the official SDK.** The
   wire is `@modelcontextprotocol/client` v2 over Streamable HTTP in
   `auto` negotiation (the modern stateless era, or the legacy
