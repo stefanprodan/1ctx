@@ -4,6 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   applyChange,
+  credentialKey,
+  credentialOf,
   isCapabilityKey,
   MAX_CAPABILITY_KEY,
   MAX_DISABLED_CAPABILITIES,
@@ -54,6 +56,21 @@ describe("capability keys", () => {
       "The user turned these skills off for this chat: gitops, plain. Do not load or follow them.",
     );
   });
+  test("a credential is a key by its id, apart from the others", () => {
+    expect(credentialKey("k3v9a0q1z2xy")).toBe("credential:k3v9a0q1z2xy");
+    expect(isCapabilityKey("credential:k3v9a0q1z2xy")).toBe(true);
+    expect(credentialOf("credential:k3v9a0q1z2xy")).toBe("k3v9a0q1z2xy");
+    expect(credentialOf("mcp:k3v9a0q1z2xy")).toBeNull();
+    expect(serverOf("credential:k3v9a0q1z2xy")).toBeNull();
+    for (const key of [
+      "credential",
+      "credential:",
+      "credential:A1",
+      "credentials:a1",
+    ]) {
+      expect(isCapabilityKey(key)).toBe(false);
+    }
+  });
   test("a change may mix web and servers", () => {
     expect(
       parseChange({ disable: ["web", "mcp:b2"], enable: ["mcp:a1"] }, "c"),
@@ -67,7 +84,7 @@ describe("capability keys", () => {
       "The user turned these MCP servers off for this chat: flux, github. Their tools are not available. Say so if one is needed.",
     );
   });
-  test("web, servers and skills are the keys this build knows", () => {
+  test("web, servers, skills and credentials are the keys this build knows", () => {
     expect(isCapabilityKey(WEB)).toBe(true);
     for (const key of ["", "Web", "web:", "visualize:x", 7, null]) {
       expect(isCapabilityKey(key)).toBe(false);

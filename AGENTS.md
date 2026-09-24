@@ -395,7 +395,8 @@ violation, and every rule has a rejected fixture under
   as `OpenedFileResponse` (`sessions/opened.ts`). The client draws them
   in the reply with the visual cards, in call order: a visual through
   `Visual.tsx`, Markdown and code as `transcript/FileCard.tsx`.
-  `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
+  `knowledge/mount.ts` alone runs just-bash (`credentials/check.ts`
+  imports only its allow-list rules), with pinned commands, no
   host filesystem and `defenseInDepth: true`. The send's web snapshot
   alone enables network and curl, never wget: all mode allows full
   internet access, listed mode uses `urlPrefixes()` and all seven HTTP
@@ -472,14 +473,41 @@ violation, and every rule has a rejected fixture under
   times do not. Mount budgets include existing uploads even over lowered
   caps, and the largest uploaded file sets an I/O budget floor.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
-  secrets directory. The closed kinds are `user-`, `provider-`, `search-`
-  and `mcp-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
+  secrets directory. The closed kinds are `user-`, `provider-`, `search-`,
+  `mcp-` and `http-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
   requires 1 to 48 lowercase ASCII letters, digits and dashes after the
   prefix, starting with a letter or digit. The secrets port checks the
   caller's kind on read, existence checks and listing; `compose.ts` binds
   each area's reader to its kind. `has()` checks existence; `read()`
-  returns null for an absent or empty file. Values are never logged,
-  returned by a route or stored in the database.
+  returns null for an absent or empty file, and for one past its
+  `maxBytes`, sized before it is read: `main.ts` reads an `http-` file
+  only up to `MAX_KEY_FILE_BYTES`. Values are never logged, returned by
+  a route or stored in the database; `http-` joins `provider-`, `search-`
+  and `mcp-` in both scrub lists (`SCRUB_KINDS` and `main.ts`), a key
+  failing its rule left out since it is never sent.
+- **An HTTP credential is a row, its key an `http-` file.**
+  `credentials/` is the area after `projects/`: the tables `credentials`
+  and `credential_projects` (links cascading with both sides), the
+  store, the routes, the parsers and the pure rules in `check.ts`. The
+  prefix is `normalizePrefix()`: https, no userinfo, query or fragment,
+  at most `MAX_PREFIX`, stored as origin and path with the host's
+  trailing dot dropped, and passing just-bash's `validateAllowList`.
+  The header is an RFC token, never a transport header or `proxy-*`
+  (case folded); the template is printable ASCII, at most
+  `MAX_TEMPLATE`, with `{key}` exactly once. The key is `isUsableKey`,
+  16 to 4,096 visible ASCII characters, read at the moment by
+  `readKey()`: `missing` with no file, `unusable` when empty, too large
+  or failing the rule. Methods default to GET and HEAD. A credential
+  binds team projects only (a personal or unknown id is a 400), at most
+  `MAX_CREDENTIALS_PER_PROJECT` to a project and never two whose
+  prefixes overlap by `prefixesOverlap()`, both checked after the write
+  in the transaction that writes the links (a 409 rolls it back).
+  `GET`, `POST /api/credentials` and `PATCH`, `DELETE
+  /api/credentials/:id` are `admin`; the list answers the `http-` key
+  names with `usable` and each row's `key` state, never a value; PATCH
+  takes any field but the name, a supplied `projectIds` replacing; a
+  delete forgets `credential:<id>` in sessions and automations in the
+  same transaction.
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
   first three answer `GET /models` under the base URL; `gemini` is
@@ -762,10 +790,11 @@ violation, and every rule has a rejected fixture under
   staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys: `web`, `mcp:<server id>` and
-  `skill:<skill id>`. The parser checks only an id's shape, 1 to 32
-  lowercase ASCII letters or digits; unknown or unassigned server and
-  skill keys are kept and ignored.
+  change with `disable` and `enable` keys: `web`, `mcp:<server id>`,
+  `skill:<skill id>` and `credential:<credential id>`. The parser
+  checks only an id's shape, 1 to 32 lowercase ASCII letters or digits;
+  unknown or unassigned server, skill and credential keys are kept and
+  ignored.
   The policy resolves it before schemas are built; `startSend` applies
   it again to the current row in its transaction, with the message's
   revision and envelope. A refused start writes nothing; a later failure

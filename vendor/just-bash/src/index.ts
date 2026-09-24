@@ -86,10 +86,13 @@ export type {
   RequestTransform,
   SecureFetch,
 } from "./network/index.js";
+// the allow-list rules, for 1ctx's credential prefixes (1ctx)
 export {
+  matchesAllowListEntry,
   NetworkAccessDeniedError,
   RedirectNotAllowedError,
   TooManyRedirectsError,
+  validateAllowList,
 } from "./network/index.js";
 // Parser
 export { parse } from "./parser/parser.js";

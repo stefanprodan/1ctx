@@ -556,7 +556,11 @@ describe("the schema", () => {
   test("0020 keeps MCP files with their row and counts the folders", () => {
     const db = seed(MIGRATIONS.slice(0, 19));
     try {
-      expect(migrate(db)).toEqual(["0020-mcp-kept", "0021-served-by"]);
+      expect(migrate(db)).toEqual([
+        "0020-mcp-kept",
+        "0021-served-by",
+        "0022-credentials",
+      ]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
         db.query("select mcp_folders from sessions where id = 'sess'").get(),
@@ -591,7 +595,7 @@ describe("the schema", () => {
   test("0021 adds who served a round, null on every existing row", () => {
     const db = seed(MIGRATIONS.slice(0, 20));
     try {
-      expect(migrate(db)).toEqual(["0021-served-by"]);
+      expect(migrate(db)).toEqual(["0021-served-by", "0022-credentials"]);
       expect(MIGRATIONS[20]?.rebuild).toBeUndefined();
       expect(
         db
@@ -609,6 +613,44 @@ describe("the schema", () => {
         expect.arrayContaining(["upstream", "served_model"]),
       );
       expect(columns("usage")).not.toContain("native_finish");
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0022 adds credentials whose links go with the project and the credential", () => {
+    const db = seed(MIGRATIONS.slice(0, 21));
+    try {
+      expect(migrate(db)).toEqual(["0022-credentials"]);
+      expect(MIGRATIONS[21]?.rebuild).toBeUndefined();
+      db.exec(`
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('t1', 'team', 'alpha', 'u', 0), ('t2', 'team', 'beta', 'u', 0);
+        insert into credentials (id, name, key_name, prefix, header, template,
+            methods, created_at, updated_at)
+          values ('c1', 'quotes', 'http-quotes', 'https://q.test/', 'X-Key',
+                  '{key}', '["GET"]', 0, 0),
+                 ('c2', 'repos', 'http-repos', 'https://r.test/', 'X-Key',
+                  '{key}', '["GET"]', 0, 0);
+        insert into credential_projects values ('c1', 't1'), ('c1', 't2'),
+          ('c2', 't1');
+      `);
+      expect(() =>
+        db
+          .query(
+            "insert into credentials values ('c3', 'quotes', 'k', 'p', 'h', 't', 'm', 0, 0)",
+          )
+          .run(),
+      ).toThrow();
+      expect(() =>
+        db.query("insert into credential_projects values ('c1', 'none')").run(),
+      ).toThrow();
+      db.query("delete from projects where id = 't1'").run();
+      db.query("delete from credentials where id = 'c2'").run();
+      expect(db.query("select * from credential_projects").all()).toEqual([
+        { credential_id: "c1", project_id: "t2" },
+      ]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();
     }
@@ -849,6 +891,7 @@ describe("additive migrations", () => {
       "0019-open",
       "0020-mcp-kept",
       "0021-served-by",
+      "0022-credentials",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -906,6 +949,7 @@ describe("0005", () => {
       "0019-open",
       "0020-mcp-kept",
       "0021-served-by",
+      "0022-credentials",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -972,6 +1016,7 @@ describe("rebuild migrations", () => {
       "0019-open",
       "0020-mcp-kept",
       "0021-served-by",
+      "0022-credentials",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1071,6 +1116,7 @@ describe("0006 skills migration", () => {
       "0019-open",
       "0020-mcp-kept",
       "0021-served-by",
+      "0022-credentials",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1129,6 +1175,7 @@ describe("0007 user tz migration", () => {
       "0019-open",
       "0020-mcp-kept",
       "0021-served-by",
+      "0022-credentials",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1166,6 +1213,7 @@ describe("0009 mcp migration", () => {
       "0019-open",
       "0020-mcp-kept",
       "0021-served-by",
+      "0022-credentials",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1419,6 +1467,7 @@ describe("0008 search tavily migration", () => {
           "0019-open",
           "0020-mcp-kept",
           "0021-served-by",
+          "0022-credentials",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

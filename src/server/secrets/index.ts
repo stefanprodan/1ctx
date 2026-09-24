@@ -6,7 +6,7 @@
 // them later; mounted mode is a Kubernetes Secret and read-only. Nothing
 // here logs or returns a value to a route; a holder reads what it needs.
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { isSecretName, SECRET_KINDS } from "../../shared/words.ts";
 
@@ -16,8 +16,9 @@ export type Secrets = {
   readonly dir: string;
   readonly mode: SecretsMode;
   // the bare value with surrounding whitespace removed, or null when the
-  // file is absent or empty
-  read(kind: string, name: string): string | null;
+  // file is absent or empty, or larger than maxBytes, which is checked
+  // before the file is read
+  read(kind: string, name: string, maxBytes?: number): string | null;
   has(kind: string, name: string): boolean;
   // the names alone, so a page can offer a pick without a value
   // crossing
@@ -40,9 +41,10 @@ export function secrets(dir: string, mode: SecretsMode): Secrets {
   return {
     dir,
     mode,
-    read(kind, name) {
+    read(kind, name, maxBytes = Number.POSITIVE_INFINITY) {
       const path = pathOf(kind, name);
-      if (!existsSync(path)) return null;
+      const size = statSync(path, { throwIfNoEntry: false })?.size;
+      if (size === undefined || size > maxBytes) return null;
       const value = readFileSync(path, "utf8").trim();
       return value === "" ? null : value;
     },

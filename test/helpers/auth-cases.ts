@@ -414,6 +414,34 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/credentials",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/credentials",
+    body: {
+      name: "quotes",
+      keyName: "http-quotes",
+      prefix: "https://api.example.test/v1/",
+      header: "X-Api-Key",
+      template: "{key}",
+    },
+    expect: { anonymous: 401, member: 403, admin: 201 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/credentials/:id",
+    body: { methods: ["GET"] },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/credentials/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/mcp",
     expect: { anonymous: 401, member: 403, admin: 200 },
   },

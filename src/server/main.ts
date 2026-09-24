@@ -9,15 +9,17 @@ import { homedir } from "node:os";
 import { dirname } from "node:path";
 import pkg from "../../package.json";
 import page from "../client/index.html";
+import type { SecretKind } from "../shared/words.ts";
 import { TOUCH_AFTER_MS } from "./access/index.ts";
 import { type ComposeOptions, compose } from "./compose.ts";
+import { httpKeys, MAX_KEY_FILE_BYTES } from "./credentials/index.ts";
 import { heldByAnother, inspect, open } from "./db/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { wallClock } from "./lib/clock.ts";
 import { logger, scrubErrors, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { loadKnowledge, parse, readSources } from "./provision/index.ts";
-import { defaultDir, secrets } from "./secrets/index.ts";
+import { defaultDir, type Secrets, secrets } from "./secrets/index.ts";
 import { runService, ServiceError } from "./service/index.ts";
 import { serve } from "./web/serve.ts";
 
@@ -36,6 +38,13 @@ function fail(message: string): never {
 }
 
 const cli = parseCli(process.argv.slice(2));
+
+// an http- file is sized before it is read, and one past a key's room
+// is never read
+function readerOf(store: Secrets) {
+  return (kind: SecretKind, name: string) =>
+    store.read(kind, name, kind === "http-" ? MAX_KEY_FILE_BYTES : undefined);
+}
 if (cli.kind === "error") fail(cli.message);
 if (cli.kind === "version") {
   console.log(VERSION);
@@ -71,7 +80,7 @@ if (cli.kind === "provision") {
       "local",
     );
     const options: Omit<ComposeOptions, "db"> = {
-      secret: (kind, name) => store.read(kind, name),
+      secret: readerOf(store),
       secretNames: (kind) => store.list(kind),
       clock: wallClock,
       log: () => silent,
@@ -121,10 +130,14 @@ const store = secrets(
   secretsDir ?? defaultDir(Bun.main, process.execPath),
   secretsMode,
 );
+const keys = httpKeys({
+  secret: readerOf(store),
+  secretNames: (kind) => store.list(kind),
+});
 const log = scrubErrors(logger("1ctx"), () =>
-  (["provider-", "search-", "mcp-"] as const).flatMap((kind) =>
+  (["provider-", "search-", "mcp-", "http-"] as const).flatMap((kind) =>
     store.list(kind).flatMap((name) => {
-      const value = store.read(kind, name);
+      const value = keys.scrubbed(kind, name);
       return value === null ? [] : [value];
     }),
   ),
@@ -132,7 +145,7 @@ const log = scrubErrors(logger("1ctx"), () =>
 
 const app = await compose({
   db,
-  secret: (kind, name) => store.read(kind, name),
+  secret: readerOf(store),
   secretNames: (kind) => store.list(kind),
   clock: wallClock,
   log: logger,

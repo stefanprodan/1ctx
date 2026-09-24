@@ -12,6 +12,7 @@ import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
+import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
@@ -117,14 +118,15 @@ export type App = {
   shutdown(): Promise<ShutdownResult>;
 };
 
-const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-"];
+const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
 
 function scrubbedLogs(options: ComposeOptions): LogFactory {
+  const { scrubbed } = httpKeys(options);
   return (area) =>
     scrubErrors(options.log(area), () =>
       SCRUB_KINDS.flatMap((kind) =>
         (options.secretNames?.(kind) ?? []).flatMap((name) => {
-          const value = options.secret(kind, name);
+          const value = scrubbed(kind, name);
           return value === null ? [] : [value];
         }),
       ),
@@ -216,6 +218,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
       deleteProject: (projectId) => usage.deleteProject(projectId),
     },
     knowledge: { counts: (projectId) => knowledge.counts(projectId) },
+  });
+  const credentials = credentialsArea({
+    db,
+    clock,
+    projects: projects.store,
+    key: httpKeys(options),
+    capabilities,
   });
   const access: Access = accessArea({
     db,
@@ -379,6 +388,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...mcp.routes,
     ...skills.routes,
     ...projects.routes,
+    ...credentials.routes,
     ...access.routes,
     ...agents.routes,
     ...memory.routes,

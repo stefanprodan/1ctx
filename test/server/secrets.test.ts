@@ -31,7 +31,13 @@ test.each([...SECRET_KINDS])(
 );
 
 test("unknown and partial kinds are not secret kinds", () => {
-  expect(SECRET_KINDS).toEqual(["user-", "provider-", "search-", "mcp-"]);
+  expect(SECRET_KINDS).toEqual([
+    "user-",
+    "provider-",
+    "search-",
+    "mcp-",
+    "http-",
+  ]);
   for (const kind of ["", "user", "webhook-", "unknown-", "provider-a"]) {
     expect(isSecretName(kind, `${kind}token`)).toBe(false);
   }
@@ -99,6 +105,9 @@ test("has checks existence, read treats an empty file as absent", () => {
     expect(store.read("provider-", "provider-empty")).toBeNull();
     expect(store.list("provider-")).toEqual(["provider-empty"]);
     expect(store.has("provider-", "provider-missing")).toBe(false);
+    writeFileSync(join(dir, "http-large.key"), "k".repeat(20));
+    expect(store.read("http-", "http-large", 20)).toBe("k".repeat(20));
+    expect(store.read("http-", "http-large", 19)).toBeNull();
     expect(store.read("provider-", "provider-missing")).toBeNull();
     const missing = secrets(join(dir, "absent"), "local");
     expect(missing.list("mcp-")).toEqual([]);
