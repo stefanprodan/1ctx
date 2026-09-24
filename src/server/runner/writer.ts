@@ -159,6 +159,9 @@ export class Writer {
       toolCalls,
       ttftMs: round.ttftMs,
       thinkingMs,
+      upstream: round.upstream,
+      servedModel: round.servedModel,
+      nativeFinish: round.nativeFinish,
       finishedAt: now,
     });
   }
@@ -181,6 +184,8 @@ export class Writer {
       reasoningTokens: usage.reasoningTokens,
       cost: usage.cost,
       contextLength: send.policy.contextLength,
+      upstream: round.upstream,
+      servedModel: round.servedModel,
       now,
     });
   }

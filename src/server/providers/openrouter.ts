@@ -13,7 +13,11 @@
 // precede the first token, and a free endpoint refuses with an HTTP 429
 // whose body names the upstream pool.
 
-import { buildChatBody as buildOpenAiChatBody, chatEvents } from "./openai.ts";
+import {
+  buildChatBody as buildOpenAiChatBody,
+  frameEvents,
+  parseFrame,
+} from "./openai.ts";
 import type { ChatEvent, ChatRequest, ReasoningDetail } from "./types.ts";
 
 // The breakpoints an Anthropic upstream caches at: the system prompt,
@@ -149,8 +153,22 @@ export function errorText(body: string): string {
   return body;
 }
 
+// Every frame names the upstream and the model, and every one says so:
+// a round stopped or failed before its finish still knows who served it
 export function openRouterEvents(json: string): ChatEvent[] {
-  return chatEvents(json);
+  const body = parseFrame(json);
+  if (!body.ok) return body.events;
+  const events = frameEvents(body.value);
+  const upstream = text(body.value?.provider);
+  const model = text(body.value?.model);
+  if (upstream !== null || model !== null) {
+    events.push({ kind: "served", upstream, model });
+  }
+  return events;
+}
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
 }
 
 // the HTTP error path joins the status and the body; the body is

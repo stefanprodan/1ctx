@@ -227,6 +227,18 @@ export async function runRound(
         round.finishReason = event.details
           ? `${event.reason}/${event.details}`
           : event.reason;
+        // a trailing frame that repeats the finish without the native
+        // reason keeps the one an earlier frame gave
+        if (event.native !== undefined) {
+          round.nativeFinish =
+            event.native !== event.reason ? event.native : null;
+        }
+        break;
+      case "served":
+        if (event.upstream !== null) round.upstream = event.upstream;
+        if (event.model !== null) {
+          round.servedModel = event.model !== req.model ? event.model : null;
+        }
         break;
       case "usage": {
         const previous = round.usage;

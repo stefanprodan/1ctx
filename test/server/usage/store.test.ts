@@ -34,6 +34,8 @@ function record(
     reasoningTokens: null,
     cost: null,
     contextLength: null,
+    upstream: null,
+    servedModel: null,
     now: fields.now,
   };
   store.record(usage);

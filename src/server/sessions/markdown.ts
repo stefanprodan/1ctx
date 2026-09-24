@@ -9,6 +9,7 @@
 // context for the model, not conversation, so they stay out.
 
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { finishWords } from "../../shared/finish.ts";
 import { attachedLine, type MessageUpload } from "../../shared/uploads.ts";
 import type { MessageKind, MessageStatus } from "../../shared/words.ts";
 
@@ -21,6 +22,7 @@ export type ExportRow = {
   status: MessageStatus;
   error: string | null;
   finishReason: string | null;
+  nativeFinish: string | null;
   // the username for a user row, the agent's name for an agent row
   author: string | null;
   content: string;
@@ -188,9 +190,7 @@ function cutReason(row: ExportRow, hideToolError = false): string | null {
       ? "failed"
       : (row.error ?? "failed");
   }
-  if (row.finishReason === "length") return "cut at max tokens";
-  if (row.finishReason === "tool_text") return "tool call dropped";
-  return null;
+  return finishWords(row.finishReason, row.nativeFinish);
 }
 
 function heading(

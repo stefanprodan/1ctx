@@ -130,6 +130,13 @@ export type Message = {
   model: string | null;
   ttftMs: number | null;
   thinkingMs: number | null;
+  // what a router said about a reply's round, null where it did not say:
+  // the upstream that served it, the model that answered when it is not
+  // the one asked for, and the upstream's own stop reason when it
+  // differs from finishReason
+  upstream: string | null;
+  servedModel: string | null;
+  nativeFinish: string | null;
   createdAt: number;
   finishedAt: number | null;
 };

@@ -53,6 +53,9 @@ function finishStoredReply(
     toolCalls: null,
     ttftMs: null,
     thinkingMs: null,
+    upstream: null,
+    servedModel: null,
+    nativeFinish: null,
     finishedAt: 1,
   });
 }
@@ -972,6 +975,9 @@ describe("the tool-loop store", () => {
       toolCalls: [{ id: "c1", name: "datetime", arguments: "{}" }],
       ttftMs: null,
       thinkingMs: null,
+      upstream: null,
+      servedModel: null,
+      nativeFinish: null,
       finishedAt: 1,
     })!;
     expect(work.slot).toBe("work");
@@ -1054,6 +1060,9 @@ describe("the tool-loop store", () => {
       toolCalls: null,
       ttftMs: null,
       thinkingMs: null,
+      upstream: null,
+      servedModel: null,
+      nativeFinish: null,
       finishedAt: 1,
     });
     const second = store.addReply({
@@ -1077,6 +1086,9 @@ describe("the tool-loop store", () => {
         toolCalls: null,
         ttftMs: null,
         thinkingMs: null,
+        upstream: null,
+        servedModel: null,
+        nativeFinish: null,
         finishedAt: 2,
       }),
     ).toThrow();
@@ -1280,6 +1292,9 @@ describe("the tool-loop store", () => {
       toolCalls: null,
       ttftMs: null,
       thinkingMs: null,
+      upstream: null,
+      servedModel: null,
+      nativeFinish: null,
       finishedAt: 1,
     });
     const phase = store.addReply({

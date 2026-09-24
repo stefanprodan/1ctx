@@ -21,6 +21,7 @@ export function exportRows(db: Db, sessionId: string): ExportRow[] {
          messages.tool_calls as toolCalls,
          messages.tool_call_id as toolCallId, messages.tool_name as toolName,
          messages.finish_reason as finishReason,
+         messages.native_finish as nativeFinish,
          coalesce(users.username, agents.name) as author,
          case when messages.kind = 'user'
              or (messages.kind = 'reply' and messages.slot = 'answer')

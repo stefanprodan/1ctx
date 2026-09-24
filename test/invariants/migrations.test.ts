@@ -556,7 +556,7 @@ describe("the schema", () => {
   test("0020 keeps MCP files with their row and counts the folders", () => {
     const db = seed(MIGRATIONS.slice(0, 19));
     try {
-      expect(migrate(db)).toEqual(["0020-mcp-kept"]);
+      expect(migrate(db)).toEqual(["0020-mcp-kept", "0021-served-by"]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
         db.query("select mcp_folders from sessions where id = 'sess'").get(),
@@ -583,6 +583,32 @@ describe("the schema", () => {
       db.query("delete from messages where id = 'm2'").run();
       expect(db.query("select * from mcp_kept_files").all()).toEqual([]);
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0021 adds who served a round, null on every existing row", () => {
+    const db = seed(MIGRATIONS.slice(0, 20));
+    try {
+      expect(migrate(db)).toEqual(["0021-served-by"]);
+      expect(MIGRATIONS[20]?.rebuild).toBeUndefined();
+      expect(
+        db
+          .query(
+            "select upstream, served_model, native_finish from messages where id = 'm2'",
+          )
+          .get(),
+      ).toEqual({ upstream: null, served_model: null, native_finish: null });
+      const columns = (table: string) =>
+        db
+          .query<{ name: string }, []>(`pragma table_info(${table})`)
+          .all()
+          .map((row) => row.name);
+      expect(columns("usage")).toEqual(
+        expect.arrayContaining(["upstream", "served_model"]),
+      );
+      expect(columns("usage")).not.toContain("native_finish");
     } finally {
       db.close();
     }
@@ -822,6 +848,7 @@ describe("additive migrations", () => {
       "0018-web-access",
       "0019-open",
       "0020-mcp-kept",
+      "0021-served-by",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -878,6 +905,7 @@ describe("0005", () => {
       "0018-web-access",
       "0019-open",
       "0020-mcp-kept",
+      "0021-served-by",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -943,6 +971,7 @@ describe("rebuild migrations", () => {
       "0018-web-access",
       "0019-open",
       "0020-mcp-kept",
+      "0021-served-by",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1041,6 +1070,7 @@ describe("0006 skills migration", () => {
       "0018-web-access",
       "0019-open",
       "0020-mcp-kept",
+      "0021-served-by",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1098,6 +1128,7 @@ describe("0007 user tz migration", () => {
       "0018-web-access",
       "0019-open",
       "0020-mcp-kept",
+      "0021-served-by",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1134,6 +1165,7 @@ describe("0009 mcp migration", () => {
       "0018-web-access",
       "0019-open",
       "0020-mcp-kept",
+      "0021-served-by",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1386,6 +1418,7 @@ describe("0008 search tavily migration", () => {
           "0018-web-access",
           "0019-open",
           "0020-mcp-kept",
+          "0021-served-by",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

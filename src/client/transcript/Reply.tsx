@@ -12,6 +12,7 @@
 import type { ComponentChildren } from "preact";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { Message } from "../../shared/contracts/session.ts";
+import { finishWords } from "../../shared/finish.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { sentence, stamp } from "../lib/format.ts";
@@ -43,13 +44,29 @@ export function cutReason(m: Message): { text: string; err: boolean } | null {
   if (m.status === "failed") {
     return { text: m.error ?? "failed", err: true };
   }
-  if (m.finishReason === "length") {
-    return { text: "cut at max tokens", err: false };
+  const words = finishWords(m.finishReason, m.nativeFinish);
+  return words === null ? null : { text: words, err: false };
+}
+
+// who served the answer, when a router said: the model that answered
+// without its org when it is not the one asked for, and the upstream;
+// the model gives way on a narrow screen, the upstream never does
+export function servedBy(
+  m: Message | null,
+): { model: string | null; via: string | null; title: string } | null {
+  if (m === null || (m.upstream === null && m.servedModel === null)) {
+    return null;
   }
-  if (m.finishReason === "tool_text") {
-    return { text: "tool call dropped", err: false };
-  }
-  return null;
+  const model =
+    m.servedModel === null
+      ? null
+      : m.servedModel.slice(m.servedModel.lastIndexOf("/") + 1);
+  const via = m.upstream === null ? null : `via ${m.upstream}`;
+  return {
+    model,
+    via,
+    title: [m.servedModel, via].filter(Boolean).join(" "),
+  };
 }
 
 // a turn that failed before it did anything: no rows, no thinking, no
@@ -101,6 +118,7 @@ export function Reply({
   const failure = cut?.err === true ? cut.text : null;
   // the stamp is when the turn ended: the answer's end, else the last
   // row's, a stopped work round included
+  const served = servedBy(m);
   const last = node.rows[node.rows.length - 1];
   const endedAt =
     m?.finishedAt ??
@@ -204,6 +222,16 @@ export function Reply({
             )}
             <span class="transcript-sep" aria-hidden="true" />
             <span class="transcript-when">{stamp(endedAt)}</span>
+            {served !== null && (
+              <span class="transcript-served" title={served.title}>
+                {served.model !== null && (
+                  <span class="transcript-served-model">{served.model}</span>
+                )}
+                {served.via !== null && (
+                  <span class="transcript-served-via">{served.via}</span>
+                )}
+              </span>
+            )}
           </div>
         )}
       </div>

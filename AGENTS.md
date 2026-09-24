@@ -150,7 +150,9 @@ router's 500.
 `OverviewResponse`: the zone's last `OVERVIEW_DAYS` days, today last,
 and their totals, a chat's sends counted as turns and a task's as runs
 apart, the ten largest projects and agents, the ten models with the
-most turns and their median and slowest ended turn, all time with the
+most turns and their median and slowest ended turn (a send counted
+under the model its last round's usage says answered, when a router
+served another than the one asked for), all time with the
 first send's start, and the instance. `range.ts` is the worker's second
 job, one read transaction over the same connection: sends by
 `started_at` and tokens, rounds and cost by `usage.created_at`, summed
@@ -504,7 +506,17 @@ violation, and every rule has a rejected fixture under
   `ChatEvent` stream; the key is read from the secrets port at each
   request and scrubbed from every error, and the recorded frames under
   `test/fixtures/providers/` are what the tests and the fake fetch
-  answer with. A `ToolCall` may carry `signature`, an opaque token the
+  answer with. On the OpenRouter wire alone, `openRouterEvents` adds a
+  `served` event (the upstream and the model that answered) on the
+  frames that end a round, and every wire's `finish` carries a
+  `native_finish_reason` when a frame has one; the round keeps the
+  upstream, the answering model only when it is not the one asked for
+  and the native reason only when it differs from the normalized one,
+  on the reply row (`upstream`, `served_model`, `native_finish`) and on
+  its usage row (the first two). The answer's foot says `via
+  <upstream>`, and `finishWords()` in `shared/finish.ts` words every
+  stop that is not an end, for the transcript and the Markdown download
+  alike. A `ToolCall` may carry `signature`, an opaque token the
   provider put on the call (Gemini 3 refuses a tool round without it),
   stored with the call and sent back as received, never shown; on the
   Gemini wire a step whose calls carry no signature of that model (another

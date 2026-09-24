@@ -47,6 +47,8 @@ function recordUsage(
     reasoningTokens: round.usage.reasoningTokens,
     cost: round.usage.cost,
     contextLength: send.policy.contextLength,
+    upstream: round.upstream,
+    servedModel: round.servedModel,
     now,
   };
   deps.usage.record(fields);
@@ -74,6 +76,9 @@ function finishAnswer(
     toolCalls: null,
     ttftMs: round.ttftMs,
     thinkingMs,
+    upstream: round.upstream,
+    servedModel: round.servedModel,
+    nativeFinish: round.nativeFinish,
     finishedAt: now,
   });
 }

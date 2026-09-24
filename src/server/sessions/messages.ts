@@ -62,7 +62,8 @@ export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {
       .query(
         `update messages set content = ?, reasoning = ?, reasoning_details = ?, html = ?,
        status = ?, error = ?, finish_reason = ?, slot = ?, tool_calls = ?,
-       ttft_ms = ?, thinking_ms = ?, finished_at = ?
+       ttft_ms = ?, thinking_ms = ?, upstream = ?, served_model = ?,
+       native_finish = ?, finished_at = ?
      where id = ? and status = 'streaming'`,
       )
       .run(
@@ -81,6 +82,9 @@ export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {
           : null,
         fields.ttftMs,
         fields.thinkingMs,
+        fields.upstream,
+        fields.servedModel,
+        fields.nativeFinish,
         fields.finishedAt,
         id,
       ).changes > 0
