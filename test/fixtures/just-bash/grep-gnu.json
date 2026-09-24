@@ -3830,7 +3830,12 @@
         "aaa.txt": "aaa\n"
       },
       "stdout": "a\na\n",
-      "exit": 0
+      "exit": 0,
+      "accept": {
+        "stdout": "a\n",
+        "exit": 0,
+        "reason": "a lookbehind runs as a prefix the match consumes, so a match inside the previous one's lookbehind is not found"
+      }
     },
     {
       "name": "perl lookahead",
@@ -4645,7 +4650,12 @@
         "a.txt"
       ],
       "stdout": "\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[K one\n\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[K two\n\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[Kd court\n\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[Kbar\n",
-      "exit": 0
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "--color=always is refused: a model never wants escapes in its output"
+      }
     },
     {
       "name": "line buffered",
@@ -5602,6 +5612,1093 @@
         "b.txt"
       ],
       "stdout": "alpha\nbeta\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab numbers",
+      "args": [
+        "-Tn",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt: 2:\tfoo one\na.txt: 3:\tfoo two\na.txt: 7:\tfood court\na.txt: 8:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab byte offset",
+      "args": [
+        "-Tb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": " 6:\tfoo one\n14:\tfoo two\n37:\tfood court\n48:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab numbers bytes",
+      "args": [
+        "-Tnb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": " 2: 6:\tfoo one\n 3:14:\tfoo two\n 7:37:\tfood court\n 8:48:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab context",
+      "args": [
+        "-TnA1",
+        "foo one",
+        "a.txt"
+      ],
+      "stdout": " 2:\tfoo one\n 3-\tfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab count",
+      "args": [
+        "-Tc",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt:4\nb.txt:0\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab stdin",
+      "args": [
+        "-Tn",
+        "c"
+      ],
+      "stdin": "ab\nc\n",
+      "stdout": "                  2:\tc\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab only",
+      "args": [
+        "-Tob",
+        "o",
+        "a.txt"
+      ],
+      "stdout": " 7:\to\n 8:\to\n10:\to\n15:\to\n16:\to\n20:\to\n23:\to\n24:\to\n38:\to\n39:\to\n43:\to\n49:\to\n50:\to\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab no head",
+      "args": [
+        "-T",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null numbers",
+      "args": [
+        "-Zn",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u00002:foo one\na.txt\u00003:foo two\na.txt\u00007:food court\na.txt\u00008:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null context",
+      "args": [
+        "-ZA1",
+        "foo two",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u0000foo two\na.txt\u0000Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "null without match",
+      "args": [
+        "-LZ",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "b.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "null initial tab",
+      "args": [
+        "-ZTn",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u0000 2:\tfoo one\na.txt\u0000 3:\tfoo two\na.txt\u0000 7:\tfood court\na.txt\u0000 8:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null data list",
+      "args": [
+        "-lz",
+        "foo"
+      ],
+      "stdin": "foo\u0000bar\u0000",
+      "stdout": "(standard input)\n",
+      "exit": 0
+    },
+    {
+      "name": "null data newline",
+      "args": [
+        "-z",
+        "bar"
+      ],
+      "stdin": "foo\nbar\u0000baz\u0000",
+      "stdout": "foo\nbar\u0000",
+      "exit": 0
+    },
+    {
+      "name": "null data not binary",
+      "args": [
+        "-zc",
+        "def",
+        "bin.dat"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "null data both",
+      "args": [
+        "-zZl",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I list",
+      "args": [
+        "-Il",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I without",
+      "args": [
+        "-IL",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "bin.dat\n",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I count two",
+      "args": [
+        "-Ic",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "bin.dat:0\na.txt:4\n",
+      "exit": 0
+    },
+    {
+      "name": "binary no messages",
+      "args": [
+        "-s",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary text count",
+      "args": [
+        "-ac",
+        "o",
+        "bin.dat"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "label count",
+      "args": [
+        "-c",
+        "--label=in",
+        "-H",
+        "c"
+      ],
+      "stdin": "c\n",
+      "stdout": "in:1\n",
+      "exit": 0
+    },
+    {
+      "name": "label list",
+      "args": [
+        "-l",
+        "--label=in",
+        "c"
+      ],
+      "stdin": "c\n",
+      "stdout": "in\n",
+      "exit": 0
+    },
+    {
+      "name": "label without H",
+      "args": [
+        "--label=in",
+        "c"
+      ],
+      "stdin": "c\n",
+      "stdout": "c\n",
+      "exit": 0
+    },
+    {
+      "name": "group separator next arg",
+      "args": [
+        "--group-separator",
+        "##",
+        "-A0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n##\nmatch c\n##\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "group separator empty",
+      "args": [
+        "--group-separator=",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "with filename short prefix",
+      "args": [
+        "--with-f",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color prefix",
+      "args": [
+        "--col=never",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color next arg is pattern",
+      "args": [
+        "--color",
+        "never",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "devices skip",
+      "args": [
+        "-D",
+        "skip",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "devices bad",
+      "args": [
+        "--devices=nope",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "exclude from missing",
+      "args": [
+        "-r",
+        "--exclude-from=nope.txt",
+        "foo",
+        "src"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "exclude from two",
+      "args": [
+        "-r",
+        "--exclude-from=ex1.txt",
+        "--exclude-from=ex2.txt",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "files": {
+        "ex1.txt": "*.ts\n",
+        "ex2.txt": "*.go\n"
+      },
+      "stdout": "src/lib/data.py:def foo():\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset only multibyte",
+      "args": [
+        "-ob",
+        "lait\\|cole",
+        "utf.txt"
+      ],
+      "stdout": "9:lait\n16:cole\n99:cole\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset context before",
+      "args": [
+        "-b",
+        "-B1",
+        "foo two",
+        "a.txt"
+      ],
+      "stdout": "6-foo one\n14:foo two\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset count ignored",
+      "args": [
+        "-bc",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "y and no ignore case",
+      "args": [
+        "-y",
+        "--no-ignore-case",
+        "Foo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind line",
+      "args": [
+        "-xP",
+        "(?<=a)b"
+      ],
+      "stdin": "ab\nb\n",
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookahead line end",
+      "args": [
+        "-xP",
+        "ab(?=$)"
+      ],
+      "stdin": "ab\nabc\n",
+      "stdout": "ab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead line refused",
+      "args": [
+        "-xP",
+        "a(?=b)"
+      ],
+      "stdin": "ab\na\n",
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookbehind start anchor line",
+      "args": [
+        "-xP",
+        "(?<=^)ab"
+      ],
+      "stdin": "ab\n",
+      "stdout": "ab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind flags",
+      "args": [
+        "-oP",
+        "(?i)(?<=ID=)\\d+",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind alternation inside",
+      "args": [
+        "-oP",
+        "(?<=id=|name=)\\w+",
+        "b.txt"
+      ],
+      "stdout": "42\nalpha\n7\nbeta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead invert",
+      "args": [
+        "-vcP",
+        "\\d(?=\\.)",
+        "b.txt"
+      ],
+      "stdout": "10\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead overlap",
+      "args": [
+        "-oP",
+        "a(?=a)",
+        "aaa.txt"
+      ],
+      "files": {
+        "aaa.txt": "aaa\n"
+      },
+      "stdout": "a\na\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead word option",
+      "args": [
+        "-owP",
+        "foo(?=_)",
+        "rep.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookbehind byte offset",
+      "args": [
+        "-obP",
+        "(?<=name=)\\w+",
+        "b.txt"
+      ],
+      "stdout": "25:alpha\n41:beta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep twice",
+      "args": [
+        "-oP",
+        "a\\Kb\\Kc"
+      ],
+      "stdin": "abc\n",
+      "stdout": "c\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep lookahead",
+      "args": [
+        "-oP",
+        "id=\\K\\d+(?= )",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep line",
+      "args": [
+        "-xoP",
+        "id=\\K\\d+.*",
+        "b.txt"
+      ],
+      "stdout": "42 name=alpha\n7 name=beta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl h unicode",
+      "args": [
+        "-cP",
+        "a\\hb"
+      ],
+      "stdin": "a b\na b\nab\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "perl H",
+      "args": [
+        "-oP",
+        "\\H+"
+      ],
+      "stdin": "a b\tc\n",
+      "stdout": "a\nb\nc\n",
+      "exit": 0
+    },
+    {
+      "name": "perl v",
+      "args": [
+        "-cP",
+        "a\\vb"
+      ],
+      "stdin": "a\u000bb\nab\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl R unicode",
+      "args": [
+        "-cP",
+        "a\\Rb"
+      ],
+      "stdin": "ab\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl s unicode",
+      "args": [
+        "-cP",
+        "a\\sb"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl S",
+      "args": [
+        "-oP",
+        "\\S+"
+      ],
+      "stdin": "x y z\n",
+      "stdout": "x\ny\nz\n",
+      "exit": 0
+    },
+    {
+      "name": "perl s ignore case",
+      "args": [
+        "-ciP",
+        "A\\sB"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl w combining",
+      "args": [
+        "-oP",
+        "\\w+"
+      ],
+      "stdin": "éx y‿z\n",
+      "stdout": "éx\ny‿z\n",
+      "exit": 0
+    },
+    {
+      "name": "perl W",
+      "args": [
+        "-oP",
+        "\\W+"
+      ],
+      "stdin": "café, ok\n",
+      "stdout": ", \n",
+      "exit": 0
+    },
+    {
+      "name": "perl w ignore case",
+      "args": [
+        "-oiP",
+        "\\w+X"
+      ],
+      "stdin": "٣x\n",
+      "stdout": "٣x\n",
+      "exit": 0
+    },
+    {
+      "name": "perl digit class unicode",
+      "args": [
+        "-cP",
+        "[[:digit:]]"
+      ],
+      "stdin": "x٣\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl d ascii",
+      "args": [
+        "-cP",
+        "\\d"
+      ],
+      "stdin": "x٣\n",
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl punct unicode",
+      "args": [
+        "-oP",
+        "[[:punct:]]"
+      ],
+      "stdin": "«€$\n",
+      "stdout": "«\n$\n",
+      "exit": 0
+    },
+    {
+      "name": "perl space class",
+      "args": [
+        "-cP",
+        "[[:space:]]"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl blank class",
+      "args": [
+        "-cP",
+        "[[:blank:]]"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl property N ignore case",
+      "args": [
+        "-oiP",
+        "\\p{N}+"
+      ],
+      "stdin": "a² 12\n",
+      "stdout": "²\n12\n",
+      "exit": 0
+    },
+    {
+      "name": "perl property not N",
+      "args": [
+        "-oP",
+        "\\P{N}+"
+      ],
+      "stdin": "ab12cd\n",
+      "stdout": "ab\ncd\n",
+      "exit": 0
+    },
+    {
+      "name": "perl property Nd class",
+      "args": [
+        "-oP",
+        "[\\p{Nd}.]+",
+        "b.txt"
+      ],
+      "stdout": "1.2.3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n.\n",
+      "exit": 0
+    },
+    {
+      "name": "perl bang class",
+      "args": [
+        "-oP",
+        "[!a]+"
+      ],
+      "stdin": "b!a\n",
+      "stdout": "!a\n",
+      "exit": 0
+    },
+    {
+      "name": "perl comment group",
+      "args": [
+        "-oP",
+        "fo(?#a comment)o",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl stray E",
+      "args": [
+        "-cP",
+        "foo\\E",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl quoted name group",
+      "args": [
+        "-oP",
+        "(?'k'\\w+)=",
+        "conf"
+      ],
+      "stdout": "name=\nport=\nempty=\ndebug=\n",
+      "exit": 0
+    },
+    {
+      "name": "perl Z end",
+      "args": [
+        "-oP",
+        "o\\Z",
+        "a.txt"
+      ],
+      "stdout": "o\n",
+      "exit": 0
+    },
+    {
+      "name": "perl quote brackets",
+      "args": [
+        "-cP",
+        "\\Q[x]\\E",
+        "b.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lazy quantifier range",
+      "args": [
+        "-oP",
+        "\\d{1,3}?",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n4\n2\n7\n1\n1\n5\n5\n5\n1\n2\n3\n4\n2\n0\n2\n6\n0\n9\n2\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl empty lookbehind",
+      "args": [
+        "-cP",
+        "(?<=a)",
+        "a.txt"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind middle",
+      "args": [
+        "-P",
+        "a(?<=b)c",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "a lookbehind is refused anywhere but the start of the pattern, where it runs as a prefix"
+      }
+    },
+    {
+      "name": "perl lookahead middle",
+      "args": [
+        "-P",
+        "a(?=b)c",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "a lookahead is refused anywhere but the end of the pattern, where it runs as a suffix"
+      }
+    },
+    {
+      "name": "perl keep in group",
+      "args": [
+        "-P",
+        "(a\\Kb)",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookbehind alternation",
+      "args": [
+        "-oP",
+        "(?<=id=)\\d+|beta",
+        "b.txt"
+      ],
+      "stdout": "42\n7\nbeta\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "lookaround and \\K are refused beside a top-level alternation, which the prefix would bind to one side"
+      }
+    },
+    {
+      "name": "perl recursion",
+      "args": [
+        "-P",
+        "a(?R)?b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "recursion and subroutine calls are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl subroutine",
+      "args": [
+        "-P",
+        "(ab)(?1)",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "recursion and subroutine calls are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl conditional",
+      "args": [
+        "-P",
+        "(a)?(?(1)b|c)",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "conditional groups are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nthe the cat\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl branch reset",
+      "args": [
+        "-oP",
+        "(?|(a)|(b))",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "branch reset groups are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "a\nb\na\nb\na\na\nb\na\nb\na\nb\na\na\nb\na\nb\na\n",
+      "exit": 0
+    },
+    {
+      "name": "perl verb",
+      "args": [
+        "-P",
+        "a(*SKIP)b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backtracking verbs are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl g backreference",
+      "args": [
+        "-P",
+        "(a)\\g1",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "aa\n",
+      "exit": 0
+    },
+    {
+      "name": "perl g relative",
+      "args": [
+        "-P",
+        "(a)\\g{-1}",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "aa\n",
+      "exit": 0
+    },
+    {
+      "name": "perl python backreference",
+      "args": [
+        "-P",
+        "(?P<x>a)(?P=x)",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "aa\n",
+      "exit": 0
+    },
+    {
+      "name": "perl possessive star",
+      "args": [
+        "-P",
+        "a*+b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\nfoo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "perl possessive range",
+      "args": [
+        "-P",
+        "a{1,2}+b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl possessive group",
+      "args": [
+        "-P",
+        "(ab)++",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl escaped plus not possessive",
+      "args": [
+        "-cP",
+        "\\++",
+        "b.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl class plus not possessive",
+      "args": [
+        "-cP",
+        "[+]+",
+        "b.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl negative lookahead end",
+      "args": [
+        "-P",
+        "foo(?!d)",
+        "a.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "negative lookarounds are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "foo one\nfoo two\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl word boundary unicode",
+      "args": [
+        "-oP",
+        "\\bfoo"
+      ],
+      "stdin": "éfoo foo\n",
+      "accept": {
+        "stdout": "foo\nfoo\n",
+        "exit": 0,
+        "reason": "\\b is ASCII in RE2, so a letter like é is no word character to it"
+      },
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep in flag group",
+      "args": [
+        "-oP",
+        "(?i:ID=\\K\\d+)",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep in repeated group",
+      "args": [
+        "-oP",
+        "(a\\Kb)+",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "\\K is refused inside a group that repeats, whose halves the prefix cannot split"
+      },
+      "stdout": "b\nb\n",
       "exit": 0
     }
   ]

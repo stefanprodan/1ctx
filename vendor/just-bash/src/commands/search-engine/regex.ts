@@ -4,6 +4,7 @@
 
 import { createUserRegex, type UserRegex } from "../../regex/index.js";
 import { GnuPatternError, translateGnu } from "./gnu-regex.js";
+import { translatePcre } from "./pcre.js";
 
 /** POSIX character class to JavaScript regex character range mapping (Map prevents prototype pollution) */
 const POSIX_CLASS_MAP = new Map<string, string>([
@@ -37,6 +38,8 @@ export interface RegexOptions {
   multiline?: boolean;
   /** Makes . match newlines in multiline mode (ripgrep --multiline-dotall) */
   multilineDotall?: boolean;
+  /** (1ctx) grep -P: PCRE2's syntax, rewritten to RE2 or refused */
+  pcre?: boolean;
 }
 
 export interface RegexResult {
@@ -190,7 +193,29 @@ export function buildPatterns(
 ): RegexResult {
   const warnings: string[] = [];
   let kResetGroup: number | undefined;
+  let anchored = false;
   const sources = patterns.map((pattern, index) => {
+    if (options.pcre) {
+      // (1ctx) quotes, code points and (?x) first, then PCRE2's syntax
+      const source = handleInlineModifiers(
+        handleUnicodeCodePoints(handleQuoteMetachars(pattern)),
+      );
+      let translated: ReturnType<typeof translatePcre>;
+      try {
+        translated = translatePcre(
+          source,
+          (options.lineRegexp ?? false) && patterns.length === 1,
+        );
+      } catch (error) {
+        if (error instanceof GnuPatternError) error.index = index;
+        throw error;
+      }
+      if (patterns.length === 1) {
+        kResetGroup = translated.keepGroup;
+        anchored = translated.anchored ?? false;
+      }
+      return translated.source;
+    }
     switch (options.mode) {
       case "fixed":
         // Escape all regex special characters for literal match
@@ -241,7 +266,7 @@ export function buildPatterns(
     // (1ctx) a multiline search cannot check words in code
     regexPattern = `\\b(?:${regexPattern})\\b`;
   }
-  if (options.lineRegexp) {
+  if (options.lineRegexp && !anchored) {
     // Wrap in a non-capturing group so alternation binds inside the anchors:
     // a|b must become ^(?:a|b)$, not ^a|b$ (which anchors only the outer
     // alternatives). Matters for multi-pattern grep (-e/-f) with -x.

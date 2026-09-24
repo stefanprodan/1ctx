@@ -105,6 +105,8 @@ export interface SearchOptions {
   nameSeparator?: string;
   /** (1ctx) A tab after the line's head (grep -T) */
   initialTab?: boolean;
+  /** (1ctx) Line numbers and byte offsets padded to this width (grep -T) */
+  offsetWidth?: number;
   /** (1ctx) What ends a line in and out: newline, or NUL for grep -z */
   lineTerminator?: string;
   /** (1ctx) Decide only whether and how often lines are selected */
@@ -333,6 +335,7 @@ export function searchContent(
     countOnlyMatching = false,
     nameSeparator,
     initialTab = false,
+    offsetWidth = 0,
     lineTerminator = "\n",
     selectOnly = false,
     preFilter,
@@ -478,9 +481,11 @@ export function searchContent(
   const head = (i: number, sep: string, byte: number | null, col?: number) => {
     let prefix = "";
     if (filename) prefix += `${filename}${nameSeparator ?? sep}`;
-    if (showLineNumbers) prefix += `${i + 1}${sep}`;
+    if (showLineNumbers) {
+      prefix += `${String(i + 1).padStart(offsetWidth)}${sep}`;
+    }
     if (col !== undefined) prefix += `${col}${sep}`;
-    if (byte !== null) prefix += `${byte}${sep}`;
+    if (byte !== null) prefix += `${String(byte).padStart(offsetWidth)}${sep}`;
     if (initialTab && prefix !== "") prefix += "\t";
     return prefix;
   };

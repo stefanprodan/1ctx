@@ -1,4 +1,4 @@
-import { decodeBytesToUtf8 } from "../../encoding.js";
+import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type { UserRegex } from "../../regex/index.js";
@@ -121,31 +121,55 @@ const grepHelp = {
     "-e, --regexp=PATTERNS     use PATTERNS for matching",
     "-f, --file=FILE           take PATTERNS from FILE",
     "-i, --ignore-case         ignore case distinctions in patterns and data",
+    "    --no-ignore-case      do not ignore case distinctions (default)",
     "-w, --word-regexp         match only whole words",
     "-x, --line-regexp         match only whole lines",
+    "-z, --null-data           a data line ends in 0 byte, not newline",
     "-s, --no-messages         suppress error messages",
     "-v, --invert-match        select non-matching lines",
+    "-V, --version             display version information and exit",
     "-m, --max-count=NUM       stop after NUM selected lines",
+    "-b, --byte-offset         print the byte offset with output lines",
     "-n, --line-number         print line number with output lines",
+    "-H, --with-filename       print file name with output lines",
     "-h, --no-filename         suppress the file name prefix on output",
+    "    --label=LABEL         use LABEL as the standard input file name prefix",
     "-o, --only-matching       show only nonempty parts of lines that match",
     "-q, --quiet, --silent     suppress all normal output",
+    "    --binary-files=TYPE   assume that binary files are TYPE;",
+    "                          TYPE is 'binary', 'text', or 'without-match'",
+    "-a, --text                equivalent to --binary-files=text",
+    "-I                        equivalent to --binary-files=without-match",
     "-d, --directories=ACTION  how to handle directories: read, recurse, skip",
     "-r, --recursive           like --directories=recurse",
     "-R, --dereference-recursive  likewise, but follow all symlinks",
     "    --include=GLOB        search only files that match GLOB",
     "    --exclude=GLOB        skip files that match GLOB",
+    "    --exclude-from=FILE   skip files that match any file pattern from FILE",
     "    --exclude-dir=GLOB    skip directories that match GLOB",
     "-L, --files-without-match print only names of FILEs with no selected lines",
     "-l, --files-with-matches  print only names of FILEs with selected lines",
     "-c, --count               print only a count of selected lines per FILE",
+    "-T, --initial-tab         make tabs line up (if needed)",
+    "-Z, --null                print 0 byte after FILE name",
     "-B, --before-context=NUM  print NUM lines of leading context",
     "-A, --after-context=NUM   print NUM lines of trailing context",
     "-C, --context=NUM         print NUM lines of output context",
     "-NUM                      same as --context=NUM",
+    "    --group-separator=SEP  print SEP on line between matches with context",
+    "    --no-group-separator  do not print separator for matches with context",
+    "    --color[=WHEN]        WHEN is 'never' or 'auto'; 'always' is refused",
     "    --help                display this help and exit",
   ],
 };
+
+/** (1ctx) What a version probe gets: GNU grep's words, as we answer as it. */
+const VERSION = `grep (GNU grep) 3.12
+Copyright (C) 2025 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+`;
 
 const USAGE =
   "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +
@@ -187,6 +211,20 @@ interface GrepOptions {
   includePatterns: string[];
   excludePatterns: string[];
   excludeDirPatterns: string[];
+  /** --exclude-from files, read once the options are parsed */
+  excludeFrom: string[];
+  byteOffset: boolean;
+  initialTab: boolean;
+  /** -Z: a NUL after a file name */
+  nullAfterName: boolean;
+  /** -z: NUL-terminated lines */
+  nullData: boolean;
+  binaryFiles: "binary" | "text" | "without-match";
+  label: string | null;
+  /** null for --no-group-separator */
+  groupSeparator: string | null;
+  /** -V, or --help for an unknown --color word, as GNU does */
+  version: boolean;
   help: boolean;
 }
 
@@ -224,6 +262,20 @@ function choice<T extends string>(
   );
 }
 
+/** (1ctx) Escapes never help a model, so only plain output is accepted. */
+function color(o: GrepOptions, value: string): void {
+  if (["always", "yes", "force"].includes(value)) {
+    throw new GrepUsageError(
+      `--color=${value} is not supported: output is always plain`,
+      false,
+    );
+  }
+  // GNU answers an unknown word with its help, and exit 0
+  if (!["", "never", "no", "none", "auto", "tty", "if-tty"].includes(value)) {
+    o.help = true;
+  }
+}
+
 const flag =
   (apply: (o: GrepOptions) => void): OptionSpec["apply"] =>
   (o) =>
@@ -251,6 +303,23 @@ const SPECS = {
   L: { arg: "none", apply: flag((o) => (o.filesWithoutMatch = true)) },
   n: { arg: "none", apply: flag((o) => (o.showLineNumbers = true)) },
   h: { arg: "none", apply: flag((o) => (o.withFilename = false)) },
+  H: { arg: "none", apply: flag((o) => (o.withFilename = true)) },
+  y: { arg: "none", apply: flag((o) => (o.ignoreCase = true)) },
+  b: { arg: "none", apply: flag((o) => (o.byteOffset = true)) },
+  T: { arg: "none", apply: flag((o) => (o.initialTab = true)) },
+  Z: { arg: "none", apply: flag((o) => (o.nullAfterName = true)) },
+  z: { arg: "none", apply: flag((o) => (o.nullData = true)) },
+  a: { arg: "none", apply: flag((o) => (o.binaryFiles = "text")) },
+  I: { arg: "none", apply: flag((o) => (o.binaryFiles = "without-match")) },
+  // CR stripping is DOS-only, so -U changes nothing here
+  U: { arg: "none", apply: flag(() => {}) },
+  V: { arg: "none", apply: flag((o) => (o.version = true)) },
+  D: {
+    arg: "required",
+    apply: (_o, v) => {
+      choice("devices", v, ["read", "skip"] as const);
+    },
+  },
   o: { arg: "none", apply: flag((o) => (o.onlyMatching = true)) },
   q: { arg: "none", apply: flag((o) => (o.quietMode = true)) },
   s: { arg: "none", apply: flag((o) => (o.noMessages = true)) },
@@ -292,6 +361,8 @@ const SPECS = {
   C: { arg: "required", apply: (o, v) => (o.context = contextLength(v)) },
 } satisfies Record<string, OptionSpec>;
 
+const COLOR: OptionSpec = { arg: "optional", apply: (o, v) => color(o, v) };
+
 const LONG: Record<string, OptionSpec> = {
   "extended-regexp": SPECS.E,
   "fixed-strings": SPECS.F,
@@ -308,6 +379,42 @@ const LONG: Record<string, OptionSpec> = {
   "files-without-match": SPECS.L,
   "line-number": SPECS.n,
   "no-filename": SPECS.h,
+  "with-filename": SPECS.H,
+  "no-ignore-case": { arg: "none", apply: flag((o) => (o.ignoreCase = false)) },
+  "byte-offset": SPECS.b,
+  "initial-tab": SPECS.T,
+  null: SPECS.Z,
+  "null-data": SPECS.z,
+  text: SPECS.a,
+  binary: SPECS.U,
+  "line-buffered": { arg: "none", apply: flag(() => {}) },
+  version: SPECS.V,
+  devices: SPECS.D,
+  "binary-files": {
+    arg: "required",
+    apply: (o, v) => {
+      o.binaryFiles = choice("binary-files", v, [
+        "binary",
+        "text",
+        "without-match",
+      ] as const);
+    },
+  },
+  label: { arg: "required", apply: (o, v) => (o.label = v) },
+  "group-separator": {
+    arg: "required",
+    apply: (o, v) => (o.groupSeparator = v),
+  },
+  "no-group-separator": {
+    arg: "none",
+    apply: flag((o) => (o.groupSeparator = null)),
+  },
+  color: COLOR,
+  colour: COLOR,
+  "exclude-from": {
+    arg: "required",
+    apply: (o, v) => o.excludeFrom.push(v),
+  },
   "only-matching": SPECS.o,
   quiet: SPECS.q,
   silent: SPECS.q,
@@ -369,6 +476,15 @@ function parseGrepArgs(args: string[]): {
     includePatterns: [],
     excludePatterns: [],
     excludeDirPatterns: [],
+    excludeFrom: [],
+    byteOffset: false,
+    initialTab: false,
+    nullAfterName: false,
+    nullData: false,
+    binaryFiles: "binary",
+    label: null,
+    groupSeparator: "--",
+    version: false,
     help: false,
   };
   const operands: string[] = [];
@@ -501,7 +617,23 @@ export const grepCommand: RuntimeCommand = {
       throw error;
     }
     const { options: o, operands } = parsed;
+    if (o.version) return { stdout: VERSION, stderr: "", exitCode: 0 };
     if (o.help) return showHelp(grepHelp);
+    for (const excludeFile of o.excludeFrom) {
+      try {
+        const text = await ctx.fs.readFile(
+          ctx.fs.resolvePath(ctx.cwd, excludeFile),
+        );
+        o.excludePatterns.push(...splitPatternFile(text));
+      } catch (error) {
+        rethrowFatalExecutionError(error);
+        return {
+          stdout: "",
+          stderr: `grep: ${excludeFile}: ${fileErrorWords(error)}\n`,
+          exitCode: 2,
+        };
+      }
+    }
 
     const {
       ignoreCase,
@@ -658,6 +790,7 @@ export const grepCommand: RuntimeCommand = {
               mode: regexMode,
               ignoreCase,
               lineRegexp,
+              pcre: regexMode === "perl",
             });
       regex = regexResult.regex;
       kResetGroup = regexResult.kResetGroup;
@@ -725,7 +858,7 @@ export const grepCommand: RuntimeCommand = {
         // filter on a file name, and stdin has none.
         appendFiles([
           {
-            path: STDIN_FILENAME,
+            path: o.label ?? STDIN_FILENAME,
             isFile: true,
             isStdin: true,
             stdinAtEof: stdinConsumed,
@@ -803,15 +936,44 @@ export const grepCommand: RuntimeCommand = {
     const showFilename =
       o.withFilename ?? (operandCount > 1 || recursedIntoDirectory);
 
-    const search = (content: string, name: string) => {
+    const nameEnd = o.nullAfterName ? "\0" : "\n";
+    const search = (content: string, name: string, isStdin: boolean) => {
       // a NUL makes the input binary: no lines, a word on stderr
-      const binary = content.includes("\0");
+      const binary =
+        !o.nullData && o.binaryFiles !== "text" && content.includes("\0");
+      if (binary && o.binaryFiles === "without-match") {
+        const count = showFilename
+          ? `${name}${o.nullAfterName ? "\0" : ":"}`
+          : "";
+        return {
+          result: {
+            output: countOnly ? `${count}0\n` : "",
+            matched: false,
+            matchCount: 0,
+          },
+          binary,
+        };
+      }
+      // -T pads numbers to the width of the file's size, as GNU does, and
+      // of the largest offset on a stream, whose size is unknown
+      let offsetWidth = 0;
+      if (o.initialTab) {
+        offsetWidth = isStdin
+          ? 19
+          : String(utf8ByteLength(content) + (showLineNumbers ? 1 : 0)).length;
+      }
       const result = searchContent(content, regex, {
         invertMatch,
         showLineNumbers,
         countOnly,
         filename: showFilename ? name : "",
         separateFirstGroup: printedAny,
+        contextSeparator: o.groupSeparator,
+        showByteOffset: o.byteOffset,
+        initialTab: o.initialTab,
+        offsetWidth,
+        nameSeparator: o.nullAfterName ? "\0" : undefined,
+        lineTerminator: o.nullData ? "\0" : "\n",
         onlyMatching,
         beforeContext,
         afterContext,
@@ -864,7 +1026,11 @@ export const grepCommand: RuntimeCommand = {
           continue;
         }
         const name = entry.path;
-        const { result, binary } = search(content, name);
+        const { result, binary } = search(
+          content,
+          name,
+          entry.isStdin ?? false,
+        );
         if (result.output !== "") printedAny = true;
         if (result.matched) {
           anyMatch = true;
@@ -874,9 +1040,9 @@ export const grepCommand: RuntimeCommand = {
           }
         }
         if (filesWithMatches) {
-          if (result.matched) stdout += `${name}\n`;
+          if (result.matched) stdout += `${name}${nameEnd}`;
         } else if (filesWithoutMatch) {
-          if (!result.matched) stdout += `${name}\n`;
+          if (!result.matched) stdout += `${name}${nameEnd}`;
         } else {
           stdout += result.output;
           if (binary && result.matched && !countOnly) {
