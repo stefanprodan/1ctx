@@ -85,7 +85,8 @@ export function createDefaultOptions(): RgOptions {
     filesWithoutMatch: false,
     stats: false,
     onlyMatching: false,
-    maxCount: 0,
+    // (1ctx) no limit; -m 0 selects nothing
+    maxCount: -1,
     lineNumber: true,
     noFilename: false,
     withFilename: false,

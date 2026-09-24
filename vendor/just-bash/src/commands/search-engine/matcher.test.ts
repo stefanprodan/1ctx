@@ -184,8 +184,9 @@ describe("searchContentMultiline — file-level preFilter", () => {
   });
 
   it("counts the union of lines touched by overlapping multiline spans", () => {
+    // (1ctx) perl mode: in GNU's ERE \n is a stray backslash before n
     const { regex } = buildRegex("a\\nb", {
-      mode: "extended",
+      mode: "perl",
       multiline: true,
     });
     const result = searchContent("a\nb\na\nb\n", regex, {

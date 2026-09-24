@@ -8,11 +8,13 @@
  */
 
 export {
+  isWholeWord,
   type SearchOptions,
   type SearchResult,
   searchContent,
 } from "./matcher.js";
 export {
+  buildPatterns,
   buildRegex,
   convertReplacement,
   type RegexMode,

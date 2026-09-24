@@ -44,7 +44,9 @@ describe("grep with binary files", () => {
     });
 
     const result = await env.exec("grep test /binary.bin");
-    expect(result.stdout).toContain("test");
+    // (1ctx) GNU grep says a binary file matches, on stderr, and prints no line
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("grep: /binary.bin: binary file matches\n");
     expect(result.exitCode).toBe(0);
   });
 });

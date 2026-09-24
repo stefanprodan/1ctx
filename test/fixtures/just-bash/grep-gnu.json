@@ -1,0 +1,6765 @@
+{
+  "recordedWith": "ggrep (GNU grep) 3.12\nPackaged by Homebrew\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Mike Haertel and others; see\n<https://git.savannah.gnu.org/cgit/grep.git/tree/AUTHORS>.\n\ngrep -P uses PCRE2 10.48 2026-08-31",
+  "env": {
+    "LC_ALL": "en_US.UTF-8"
+  },
+  "files": {
+    "a.txt": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+    "b.txt": "version 1.2.3\nid=42 name=alpha\nid=7 name=beta\n-v is a flag\narray[x] = 1\nx*y product\ncount{1} times\npath C:\\temp\\file\nphone 555-1234\n2026-09-24 date\nurl http://example.com/a/b\n",
+    "conf": "# global settings\nname=web\nport=8080\n  # indented comment\n\t# tab comment\nhost = example.com\nempty=\ndebug=true\n",
+    "pats.txt": "foo\nbar\n",
+    "empty.pat": "",
+    "blank.pat": "foo\n\nbar\n",
+    "ctx.txt": "match a\nmatch b\nother 1\nmatch c\nother 2\nother 3\nother 4\nother 5\nmatch d\nother 6\nother 7\n",
+    "rep.txt": "abab\nthe the cat\nword words sword\nababab\naa\nfoo_bar foo\nx foo-bar y\n",
+    "utf.txt": "café au lait\nÉcole normale\nstraße\n日本語のテキスト\nemoji 🎉 party\nnaïve idea\nCAFÉ\nécole\n",
+    "crlf.txt": "foo\r\nbar\r\nbaz foo\r\n",
+    "nonl.txt": "first line\nlast foo",
+    "empty.txt": "",
+    "bin.dat": "abc\u0000def\nfoo bar\nmore foo\n",
+    "page.html": "<!doctype html><html><head><title>Models</title></head><body><div id=\"app\"></div><script>window.__DATA__=[{\"id\":1,\"name\":\"model-1\",\"price\":0.25,\"discount\":false},{\"id\":2,\"name\":\"model-2\",\"price\":0.50,\"discount\":false},{\"id\":3,\"name\":\"model-3\",\"price\":0.75,\"discount\":false},{\"id\":4,\"name\":\"model-4\",\"price\":1.00,\"discount\":false},{\"id\":5,\"name\":\"model-5\",\"price\":1.25,\"discount\":false},{\"id\":6,\"name\":\"model-6\",\"price\":1.50,\"discount\":false},{\"id\":7,\"name\":\"model-7\",\"price\":1.75,\"discount\":true},{\"id\":8,\"name\":\"model-8\",\"price\":2.00,\"discount\":false},{\"id\":9,\"name\":\"model-9\",\"price\":2.25,\"discount\":false},{\"id\":10,\"name\":\"model-10\",\"price\":2.50,\"discount\":false},{\"id\":11,\"name\":\"model-11\",\"price\":2.75,\"discount\":false},{\"id\":12,\"name\":\"model-12\",\"price\":3.00,\"discount\":false},{\"id\":13,\"name\":\"model-13\",\"price\":3.25,\"discount\":false},{\"id\":14,\"name\":\"model-14\",\"price\":3.50,\"discount\":true},{\"id\":15,\"name\":\"model-15\",\"price\":3.75,\"discount\":false},{\"id\":16,\"name\":\"model-16\",\"price\":4.00,\"discount\":false},{\"id\":17,\"name\":\"model-17\",\"price\":4.25,\"discount\":false},{\"id\":18,\"name\":\"model-18\",\"price\":4.50,\"discount\":false},{\"id\":19,\"name\":\"model-19\",\"price\":4.75,\"discount\":false},{\"id\":20,\"name\":\"model-20\",\"price\":5.00,\"discount\":false},{\"id\":21,\"name\":\"model-21\",\"price\":5.25,\"discount\":true},{\"id\":22,\"name\":\"model-22\",\"price\":5.50,\"discount\":false},{\"id\":23,\"name\":\"model-23\",\"price\":5.75,\"discount\":false},{\"id\":24,\"name\":\"model-24\",\"price\":6.00,\"discount\":false},{\"id\":25,\"name\":\"model-25\",\"price\":6.25,\"discount\":false},{\"id\":26,\"name\":\"model-26\",\"price\":6.50,\"discount\":false},{\"id\":27,\"name\":\"model-27\",\"price\":6.75,\"discount\":false},{\"id\":28,\"name\":\"model-28\",\"price\":7.00,\"discount\":true},{\"id\":29,\"name\":\"model-29\",\"price\":7.25,\"discount\":false},{\"id\":30,\"name\":\"model-30\",\"price\":7.50,\"discount\":false},{\"id\":31,\"name\":\"model-31\",\"price\":7.75,\"discount\":false},{\"id\":32,\"name\":\"model-32\",\"price\":8.00,\"discount\":false},{\"id\":33,\"name\":\"model-33\",\"price\":8.25,\"discount\":false},{\"id\":34,\"name\":\"model-34\",\"price\":8.50,\"discount\":false},{\"id\":35,\"name\":\"model-35\",\"price\":8.75,\"discount\":true},{\"id\":36,\"name\":\"model-36\",\"price\":9.00,\"discount\":false},{\"id\":37,\"name\":\"model-37\",\"price\":9.25,\"discount\":false},{\"id\":38,\"name\":\"model-38\",\"price\":9.50,\"discount\":false},{\"id\":39,\"name\":\"model-39\",\"price\":9.75,\"discount\":false},{\"id\":40,\"name\":\"model-40\",\"price\":10.00,\"discount\":false},{\"id\":41,\"name\":\"model-41\",\"price\":10.25,\"discount\":false},{\"id\":42,\"name\":\"model-42\",\"price\":10.50,\"discount\":true},{\"id\":43,\"name\":\"model-43\",\"price\":10.75,\"discount\":false},{\"id\":44,\"name\":\"model-44\",\"price\":11.00,\"discount\":false},{\"id\":45,\"name\":\"model-45\",\"price\":11.25,\"discount\":false},{\"id\":46,\"name\":\"model-46\",\"price\":11.50,\"discount\":false},{\"id\":47,\"name\":\"model-47\",\"price\":11.75,\"discount\":false},{\"id\":48,\"name\":\"model-48\",\"price\":12.00,\"discount\":false},{\"id\":49,\"name\":\"model-49\",\"price\":12.25,\"discount\":true},{\"id\":50,\"name\":\"model-50\",\"price\":12.50,\"discount\":false},{\"id\":51,\"name\":\"model-51\",\"price\":12.75,\"discount\":false},{\"id\":52,\"name\":\"model-52\",\"price\":13.00,\"discount\":false},{\"id\":53,\"name\":\"model-53\",\"price\":13.25,\"discount\":false},{\"id\":54,\"name\":\"model-54\",\"price\":13.50,\"discount\":false},{\"id\":55,\"name\":\"model-55\",\"price\":13.75,\"discount\":false},{\"id\":56,\"name\":\"model-56\",\"price\":14.00,\"discount\":true},{\"id\":57,\"name\":\"model-57\",\"price\":14.25,\"discount\":false},{\"id\":58,\"name\":\"model-58\",\"price\":14.50,\"discount\":false},{\"id\":59,\"name\":\"model-59\",\"price\":14.75,\"discount\":false},{\"id\":60,\"name\":\"model-60\",\"price\":15.00,\"discount\":false},{\"id\":61,\"name\":\"model-61\",\"price\":15.25,\"discount\":false},{\"id\":62,\"name\":\"model-62\",\"price\":15.50,\"discount\":false},{\"id\":63,\"name\":\"model-63\",\"price\":15.75,\"discount\":true},{\"id\":64,\"name\":\"model-64\",\"price\":16.00,\"discount\":false},{\"id\":65,\"name\":\"model-65\",\"price\":16.25,\"discount\":false},{\"id\":66,\"name\":\"model-66\",\"price\":16.50,\"discount\":false},{\"id\":67,\"name\":\"model-67\",\"price\":16.75,\"discount\":false},{\"id\":68,\"name\":\"model-68\",\"price\":17.00,\"discount\":false},{\"id\":69,\"name\":\"model-69\",\"price\":17.25,\"discount\":false},{\"id\":70,\"name\":\"model-70\",\"price\":17.50,\"discount\":true},{\"id\":71,\"name\":\"model-71\",\"price\":17.75,\"discount\":false},{\"id\":72,\"name\":\"model-72\",\"price\":18.00,\"discount\":false},{\"id\":73,\"name\":\"model-73\",\"price\":18.25,\"discount\":false},{\"id\":74,\"name\":\"model-74\",\"price\":18.50,\"discount\":false},{\"id\":75,\"name\":\"model-75\",\"price\":18.75,\"discount\":false},{\"id\":76,\"name\":\"model-76\",\"price\":19.00,\"discount\":false},{\"id\":77,\"name\":\"model-77\",\"price\":19.25,\"discount\":true},{\"id\":78,\"name\":\"model-78\",\"price\":19.50,\"discount\":false},{\"id\":79,\"name\":\"model-79\",\"price\":19.75,\"discount\":false},{\"id\":80,\"name\":\"model-80\",\"price\":20.00,\"discount\":false},{\"id\":81,\"name\":\"model-81\",\"price\":20.25,\"discount\":false},{\"id\":82,\"name\":\"model-82\",\"price\":20.50,\"discount\":false},{\"id\":83,\"name\":\"model-83\",\"price\":20.75,\"discount\":false},{\"id\":84,\"name\":\"model-84\",\"price\":21.00,\"discount\":true},{\"id\":85,\"name\":\"model-85\",\"price\":21.25,\"discount\":false},{\"id\":86,\"name\":\"model-86\",\"price\":21.50,\"discount\":false},{\"id\":87,\"name\":\"model-87\",\"price\":21.75,\"discount\":false},{\"id\":88,\"name\":\"model-88\",\"price\":22.00,\"discount\":false},{\"id\":89,\"name\":\"model-89\",\"price\":22.25,\"discount\":false},{\"id\":90,\"name\":\"model-90\",\"price\":22.50,\"discount\":false},{\"id\":91,\"name\":\"model-91\",\"price\":22.75,\"discount\":true},{\"id\":92,\"name\":\"model-92\",\"price\":23.00,\"discount\":false},{\"id\":93,\"name\":\"model-93\",\"price\":23.25,\"discount\":false},{\"id\":94,\"name\":\"model-94\",\"price\":23.50,\"discount\":false},{\"id\":95,\"name\":\"model-95\",\"price\":23.75,\"discount\":false},{\"id\":96,\"name\":\"model-96\",\"price\":24.00,\"discount\":false},{\"id\":97,\"name\":\"model-97\",\"price\":24.25,\"discount\":false},{\"id\":98,\"name\":\"model-98\",\"price\":24.50,\"discount\":true},{\"id\":99,\"name\":\"model-99\",\"price\":24.75,\"discount\":false},{\"id\":100,\"name\":\"model-100\",\"price\":25.00,\"discount\":false},{\"id\":101,\"name\":\"model-101\",\"price\":25.25,\"discount\":false},{\"id\":102,\"name\":\"model-102\",\"price\":25.50,\"discount\":false},{\"id\":103,\"name\":\"model-103\",\"price\":25.75,\"discount\":false},{\"id\":104,\"name\":\"model-104\",\"price\":26.00,\"discount\":false},{\"id\":105,\"name\":\"model-105\",\"price\":26.25,\"discount\":true},{\"id\":106,\"name\":\"model-106\",\"price\":26.50,\"discount\":false},{\"id\":107,\"name\":\"model-107\",\"price\":26.75,\"discount\":false},{\"id\":108,\"name\":\"model-108\",\"price\":27.00,\"discount\":false},{\"id\":109,\"name\":\"model-109\",\"price\":27.25,\"discount\":false},{\"id\":110,\"name\":\"model-110\",\"price\":27.50,\"discount\":false},{\"id\":111,\"name\":\"model-111\",\"price\":27.75,\"discount\":false},{\"id\":112,\"name\":\"model-112\",\"price\":28.00,\"discount\":true},{\"id\":113,\"name\":\"model-113\",\"price\":28.25,\"discount\":false},{\"id\":114,\"name\":\"model-114\",\"price\":28.50,\"discount\":false},{\"id\":115,\"name\":\"model-115\",\"price\":28.75,\"discount\":false},{\"id\":116,\"name\":\"model-116\",\"price\":29.00,\"discount\":false},{\"id\":117,\"name\":\"model-117\",\"price\":29.25,\"discount\":false},{\"id\":118,\"name\":\"model-118\",\"price\":29.50,\"discount\":false},{\"id\":119,\"name\":\"model-119\",\"price\":29.75,\"discount\":true},{\"id\":120,\"name\":\"model-120\",\"price\":30.00,\"discount\":false},{\"id\":121,\"name\":\"model-121\",\"price\":30.25,\"discount\":false},{\"id\":122,\"name\":\"model-122\",\"price\":30.50,\"discount\":false},{\"id\":123,\"name\":\"model-123\",\"price\":30.75,\"discount\":false},{\"id\":124,\"name\":\"model-124\",\"price\":31.00,\"discount\":false},{\"id\":125,\"name\":\"model-125\",\"price\":31.25,\"discount\":false},{\"id\":126,\"name\":\"model-126\",\"price\":31.50,\"discount\":true},{\"id\":127,\"name\":\"model-127\",\"price\":31.75,\"discount\":false},{\"id\":128,\"name\":\"model-128\",\"price\":32.00,\"discount\":false},{\"id\":129,\"name\":\"model-129\",\"price\":32.25,\"discount\":false},{\"id\":130,\"name\":\"model-130\",\"price\":32.50,\"discount\":false},{\"id\":131,\"name\":\"model-131\",\"price\":32.75,\"discount\":false},{\"id\":132,\"name\":\"model-132\",\"price\":33.00,\"discount\":false},{\"id\":133,\"name\":\"model-133\",\"price\":33.25,\"discount\":true},{\"id\":134,\"name\":\"model-134\",\"price\":33.50,\"discount\":false},{\"id\":135,\"name\":\"model-135\",\"price\":33.75,\"discount\":false},{\"id\":136,\"name\":\"model-136\",\"price\":34.00,\"discount\":false},{\"id\":137,\"name\":\"model-137\",\"price\":34.25,\"discount\":false},{\"id\":138,\"name\":\"model-138\",\"price\":34.50,\"discount\":false},{\"id\":139,\"name\":\"model-139\",\"price\":34.75,\"discount\":false},{\"id\":140,\"name\":\"model-140\",\"price\":35.00,\"discount\":true},{\"id\":141,\"name\":\"model-141\",\"price\":35.25,\"discount\":false},{\"id\":142,\"name\":\"model-142\",\"price\":35.50,\"discount\":false},{\"id\":143,\"name\":\"model-143\",\"price\":35.75,\"discount\":false},{\"id\":144,\"name\":\"model-144\",\"price\":36.00,\"discount\":false},{\"id\":145,\"name\":\"model-145\",\"price\":36.25,\"discount\":false},{\"id\":146,\"name\":\"model-146\",\"price\":36.50,\"discount\":false},{\"id\":147,\"name\":\"model-147\",\"price\":36.75,\"discount\":true},{\"id\":148,\"name\":\"model-148\",\"price\":37.00,\"discount\":false},{\"id\":149,\"name\":\"model-149\",\"price\":37.25,\"discount\":false},{\"id\":150,\"name\":\"model-150\",\"price\":37.50,\"discount\":false},{\"id\":151,\"name\":\"model-151\",\"price\":37.75,\"discount\":false},{\"id\":152,\"name\":\"model-152\",\"price\":38.00,\"discount\":false},{\"id\":153,\"name\":\"model-153\",\"price\":38.25,\"discount\":false},{\"id\":154,\"name\":\"model-154\",\"price\":38.50,\"discount\":true},{\"id\":155,\"name\":\"model-155\",\"price\":38.75,\"discount\":false},{\"id\":156,\"name\":\"model-156\",\"price\":39.00,\"discount\":false},{\"id\":157,\"name\":\"model-157\",\"price\":39.25,\"discount\":false},{\"id\":158,\"name\":\"model-158\",\"price\":39.50,\"discount\":false},{\"id\":159,\"name\":\"model-159\",\"price\":39.75,\"discount\":false},{\"id\":160,\"name\":\"model-160\",\"price\":40.00,\"discount\":false},{\"id\":161,\"name\":\"model-161\",\"price\":40.25,\"discount\":true},{\"id\":162,\"name\":\"model-162\",\"price\":40.50,\"discount\":false},{\"id\":163,\"name\":\"model-163\",\"price\":40.75,\"discount\":false},{\"id\":164,\"name\":\"model-164\",\"price\":41.00,\"discount\":false},{\"id\":165,\"name\":\"model-165\",\"price\":41.25,\"discount\":false},{\"id\":166,\"name\":\"model-166\",\"price\":41.50,\"discount\":false},{\"id\":167,\"name\":\"model-167\",\"price\":41.75,\"discount\":false},{\"id\":168,\"name\":\"model-168\",\"price\":42.00,\"discount\":true},{\"id\":169,\"name\":\"model-169\",\"price\":42.25,\"discount\":false},{\"id\":170,\"name\":\"model-170\",\"price\":42.50,\"discount\":false},{\"id\":171,\"name\":\"model-171\",\"price\":42.75,\"discount\":false},{\"id\":172,\"name\":\"model-172\",\"price\":43.00,\"discount\":false},{\"id\":173,\"name\":\"model-173\",\"price\":43.25,\"discount\":false},{\"id\":174,\"name\":\"model-174\",\"price\":43.50,\"discount\":false},{\"id\":175,\"name\":\"model-175\",\"price\":43.75,\"discount\":true},{\"id\":176,\"name\":\"model-176\",\"price\":44.00,\"discount\":false},{\"id\":177,\"name\":\"model-177\",\"price\":44.25,\"discount\":false},{\"id\":178,\"name\":\"model-178\",\"price\":44.50,\"discount\":false},{\"id\":179,\"name\":\"model-179\",\"price\":44.75,\"discount\":false},{\"id\":180,\"name\":\"model-180\",\"price\":45.00,\"discount\":false},{\"id\":181,\"name\":\"model-181\",\"price\":45.25,\"discount\":false},{\"id\":182,\"name\":\"model-182\",\"price\":45.50,\"discount\":true},{\"id\":183,\"name\":\"model-183\",\"price\":45.75,\"discount\":false},{\"id\":184,\"name\":\"model-184\",\"price\":46.00,\"discount\":false},{\"id\":185,\"name\":\"model-185\",\"price\":46.25,\"discount\":false},{\"id\":186,\"name\":\"model-186\",\"price\":46.50,\"discount\":false},{\"id\":187,\"name\":\"model-187\",\"price\":46.75,\"discount\":false},{\"id\":188,\"name\":\"model-188\",\"price\":47.00,\"discount\":false},{\"id\":189,\"name\":\"model-189\",\"price\":47.25,\"discount\":true},{\"id\":190,\"name\":\"model-190\",\"price\":47.50,\"discount\":false},{\"id\":191,\"name\":\"model-191\",\"price\":47.75,\"discount\":false},{\"id\":192,\"name\":\"model-192\",\"price\":48.00,\"discount\":false},{\"id\":193,\"name\":\"model-193\",\"price\":48.25,\"discount\":false},{\"id\":194,\"name\":\"model-194\",\"price\":48.50,\"discount\":false},{\"id\":195,\"name\":\"model-195\",\"price\":48.75,\"discount\":false},{\"id\":196,\"name\":\"model-196\",\"price\":49.00,\"discount\":true},{\"id\":197,\"name\":\"model-197\",\"price\":49.25,\"discount\":false},{\"id\":198,\"name\":\"model-198\",\"price\":49.50,\"discount\":false},{\"id\":199,\"name\":\"model-199\",\"price\":49.75,\"discount\":false},{\"id\":200,\"name\":\"model-200\",\"price\":50.00,\"discount\":false},{\"id\":201,\"name\":\"model-201\",\"price\":50.25,\"discount\":false},{\"id\":202,\"name\":\"model-202\",\"price\":50.50,\"discount\":false},{\"id\":203,\"name\":\"model-203\",\"price\":50.75,\"discount\":true},{\"id\":204,\"name\":\"model-204\",\"price\":51.00,\"discount\":false},{\"id\":205,\"name\":\"model-205\",\"price\":51.25,\"discount\":false},{\"id\":206,\"name\":\"model-206\",\"price\":51.50,\"discount\":false},{\"id\":207,\"name\":\"model-207\",\"price\":51.75,\"discount\":false},{\"id\":208,\"name\":\"model-208\",\"price\":52.00,\"discount\":false},{\"id\":209,\"name\":\"model-209\",\"price\":52.25,\"discount\":false},{\"id\":210,\"name\":\"model-210\",\"price\":52.50,\"discount\":true},{\"id\":211,\"name\":\"model-211\",\"price\":52.75,\"discount\":false},{\"id\":212,\"name\":\"model-212\",\"price\":53.00,\"discount\":false},{\"id\":213,\"name\":\"model-213\",\"price\":53.25,\"discount\":false},{\"id\":214,\"name\":\"model-214\",\"price\":53.50,\"discount\":false},{\"id\":215,\"name\":\"model-215\",\"price\":53.75,\"discount\":false},{\"id\":216,\"name\":\"model-216\",\"price\":54.00,\"discount\":false},{\"id\":217,\"name\":\"model-217\",\"price\":54.25,\"discount\":true},{\"id\":218,\"name\":\"model-218\",\"price\":54.50,\"discount\":false},{\"id\":219,\"name\":\"model-219\",\"price\":54.75,\"discount\":false},{\"id\":220,\"name\":\"model-220\",\"price\":55.00,\"discount\":false},{\"id\":221,\"name\":\"model-221\",\"price\":55.25,\"discount\":false},{\"id\":222,\"name\":\"model-222\",\"price\":55.50,\"discount\":false},{\"id\":223,\"name\":\"model-223\",\"price\":55.75,\"discount\":false},{\"id\":224,\"name\":\"model-224\",\"price\":56.00,\"discount\":true},{\"id\":225,\"name\":\"model-225\",\"price\":56.25,\"discount\":false},{\"id\":226,\"name\":\"model-226\",\"price\":56.50,\"discount\":false},{\"id\":227,\"name\":\"model-227\",\"price\":56.75,\"discount\":false},{\"id\":228,\"name\":\"model-228\",\"price\":57.00,\"discount\":false},{\"id\":229,\"name\":\"model-229\",\"price\":57.25,\"discount\":false},{\"id\":230,\"name\":\"model-230\",\"price\":57.50,\"discount\":false},{\"id\":231,\"name\":\"model-231\",\"price\":57.75,\"discount\":true},{\"id\":232,\"name\":\"model-232\",\"price\":58.00,\"discount\":false},{\"id\":233,\"name\":\"model-233\",\"price\":58.25,\"discount\":false},{\"id\":234,\"name\":\"model-234\",\"price\":58.50,\"discount\":false},{\"id\":235,\"name\":\"model-235\",\"price\":58.75,\"discount\":false},{\"id\":236,\"name\":\"model-236\",\"price\":59.00,\"discount\":false},{\"id\":237,\"name\":\"model-237\",\"price\":59.25,\"discount\":false},{\"id\":238,\"name\":\"model-238\",\"price\":59.50,\"discount\":true},{\"id\":239,\"name\":\"model-239\",\"price\":59.75,\"discount\":false},{\"id\":240,\"name\":\"model-240\",\"price\":60.00,\"discount\":false},{\"id\":241,\"name\":\"model-241\",\"price\":60.25,\"discount\":false},{\"id\":242,\"name\":\"model-242\",\"price\":60.50,\"discount\":false},{\"id\":243,\"name\":\"model-243\",\"price\":60.75,\"discount\":false},{\"id\":244,\"name\":\"model-244\",\"price\":61.00,\"discount\":false},{\"id\":245,\"name\":\"model-245\",\"price\":61.25,\"discount\":true},{\"id\":246,\"name\":\"model-246\",\"price\":61.50,\"discount\":false},{\"id\":247,\"name\":\"model-247\",\"price\":61.75,\"discount\":false},{\"id\":248,\"name\":\"model-248\",\"price\":62.00,\"discount\":false},{\"id\":249,\"name\":\"model-249\",\"price\":62.25,\"discount\":false},{\"id\":250,\"name\":\"model-250\",\"price\":62.50,\"discount\":false},{\"id\":251,\"name\":\"model-251\",\"price\":62.75,\"discount\":false},{\"id\":252,\"name\":\"model-252\",\"price\":63.00,\"discount\":true},{\"id\":253,\"name\":\"model-253\",\"price\":63.25,\"discount\":false},{\"id\":254,\"name\":\"model-254\",\"price\":63.50,\"discount\":false},{\"id\":255,\"name\":\"model-255\",\"price\":63.75,\"discount\":false},{\"id\":256,\"name\":\"model-256\",\"price\":64.00,\"discount\":false},{\"id\":257,\"name\":\"model-257\",\"price\":64.25,\"discount\":false},{\"id\":258,\"name\":\"model-258\",\"price\":64.50,\"discount\":false},{\"id\":259,\"name\":\"model-259\",\"price\":64.75,\"discount\":true},{\"id\":260,\"name\":\"model-260\",\"price\":65.00,\"discount\":false},{\"id\":261,\"name\":\"model-261\",\"price\":65.25,\"discount\":false},{\"id\":262,\"name\":\"model-262\",\"price\":65.50,\"discount\":false},{\"id\":263,\"name\":\"model-263\",\"price\":65.75,\"discount\":false},{\"id\":264,\"name\":\"model-264\",\"price\":66.00,\"discount\":false},{\"id\":265,\"name\":\"model-265\",\"price\":66.25,\"discount\":false},{\"id\":266,\"name\":\"model-266\",\"price\":66.50,\"discount\":true},{\"id\":267,\"name\":\"model-267\",\"price\":66.75,\"discount\":false},{\"id\":268,\"name\":\"model-268\",\"price\":67.00,\"discount\":false},{\"id\":269,\"name\":\"model-269\",\"price\":67.25,\"discount\":false},{\"id\":270,\"name\":\"model-270\",\"price\":67.50,\"discount\":false},{\"id\":271,\"name\":\"model-271\",\"price\":67.75,\"discount\":false},{\"id\":272,\"name\":\"model-272\",\"price\":68.00,\"discount\":false},{\"id\":273,\"name\":\"model-273\",\"price\":68.25,\"discount\":true},{\"id\":274,\"name\":\"model-274\",\"price\":68.50,\"discount\":false},{\"id\":275,\"name\":\"model-275\",\"price\":68.75,\"discount\":false},{\"id\":276,\"name\":\"model-276\",\"price\":69.00,\"discount\":false},{\"id\":277,\"name\":\"model-277\",\"price\":69.25,\"discount\":false},{\"id\":278,\"name\":\"model-278\",\"price\":69.50,\"discount\":false},{\"id\":279,\"name\":\"model-279\",\"price\":69.75,\"discount\":false},{\"id\":280,\"name\":\"model-280\",\"price\":70.00,\"discount\":true},{\"id\":281,\"name\":\"model-281\",\"price\":70.25,\"discount\":false},{\"id\":282,\"name\":\"model-282\",\"price\":70.50,\"discount\":false},{\"id\":283,\"name\":\"model-283\",\"price\":70.75,\"discount\":false},{\"id\":284,\"name\":\"model-284\",\"price\":71.00,\"discount\":false},{\"id\":285,\"name\":\"model-285\",\"price\":71.25,\"discount\":false},{\"id\":286,\"name\":\"model-286\",\"price\":71.50,\"discount\":false},{\"id\":287,\"name\":\"model-287\",\"price\":71.75,\"discount\":true},{\"id\":288,\"name\":\"model-288\",\"price\":72.00,\"discount\":false},{\"id\":289,\"name\":\"model-289\",\"price\":72.25,\"discount\":false},{\"id\":290,\"name\":\"model-290\",\"price\":72.50,\"discount\":false},{\"id\":291,\"name\":\"model-291\",\"price\":72.75,\"discount\":false},{\"id\":292,\"name\":\"model-292\",\"price\":73.00,\"discount\":false},{\"id\":293,\"name\":\"model-293\",\"price\":73.25,\"discount\":false},{\"id\":294,\"name\":\"model-294\",\"price\":73.50,\"discount\":true},{\"id\":295,\"name\":\"model-295\",\"price\":73.75,\"discount\":false},{\"id\":296,\"name\":\"model-296\",\"price\":74.00,\"discount\":false},{\"id\":297,\"name\":\"model-297\",\"price\":74.25,\"discount\":false},{\"id\":298,\"name\":\"model-298\",\"price\":74.50,\"discount\":false},{\"id\":299,\"name\":\"model-299\",\"price\":74.75,\"discount\":false},{\"id\":300,\"name\":\"model-300\",\"price\":75.00,\"discount\":false}];</script></body></html>\n",
+    "data.json": "{\n  \"name\": \"web\",\n  \"version\": \"1.2.3\",\n  \"replicas\": 3,\n  \"image\": \"nginx:1.27\",\n  \"labels\": {\"app\": \"web\", \"tier\": \"front\"}\n}\n",
+    "-dash.txt": "foo in dash\n",
+    "sp ace.txt": "foo in space\n",
+    "src/app.ts": "import { util } from \"./util\";\nexport function foo() {\n  return util();\n}\n// TODO: remove foo\n",
+    "src/util.ts": "export function util() {\n  return 42;\n}\n",
+    "src/test.js": "test('foo', () => {});\n",
+    "src/lib/helper.go": "package lib\n\nfunc Foo() string {\n\treturn \"foo\"\n}\n",
+    "src/lib/data.py": "def foo():\n    return 1\n",
+    "web/index.js": "const foo = require('./foo');\nconsole.log(foo);\n",
+    "config/app.yaml": "name: web\nreplicas: 3\nimage: nginx:1.27\n",
+    "config/db.yml": "host: db\nport: 5432\n",
+    "Makefile": "build:\n\tgo build ./...\n\ntest:\n\tgo test ./... # foo\n",
+    ".hidden/secret.txt": "foo secret\n",
+    ".env": "FOO=bar\nTOKEN=foo\n",
+    ".gitignore": "*.log\nbuild/\n",
+    ".ignore": "*.log\nbuild/\n",
+    ".rgignore": "*.log\nbuild/\n",
+    "dir/d.txt": "foo in d\n",
+    "dir/sub/c.log": "foo in log\n",
+    "dir/sub/.gitignore": "*.tmp\n",
+    "dir/sub/x.tmp": "foo tmp\n",
+    "build/out.txt": "foo built\n"
+  },
+  "cases": [
+    {
+      "name": "plain word",
+      "args": [
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case",
+      "args": [
+        "-i",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "line numbers",
+      "args": [
+        "-n",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "invert",
+      "args": [
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nFoo three\n\nbar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "count",
+      "args": [
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "count invert",
+      "args": [
+        "-vc",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "5\n",
+      "exit": 0
+    },
+    {
+      "name": "files with matches",
+      "args": [
+        "-l",
+        "foo",
+        "a.txt",
+        "b.txt",
+        "conf"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "files without match",
+      "args": [
+        "-L",
+        "foo",
+        "a.txt",
+        "b.txt",
+        "conf"
+      ],
+      "stdout": "b.txt\nconf\n",
+      "exit": 0
+    },
+    {
+      "name": "line regexp",
+      "args": [
+        "-x",
+        "foo one",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "no filename",
+      "args": [
+        "-h",
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\nexport function foo() {\n// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "two files",
+      "args": [
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\nsrc/app.ts:export function foo() {\nsrc/app.ts:// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "quiet match",
+      "args": [
+        "-q",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "quiet miss",
+      "args": [
+        "-q",
+        "zzz",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "no match exits 1",
+      "args": [
+        "zzz",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "ere alternation",
+      "args": [
+        "-E",
+        "foo|bar",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "egrep style group",
+      "args": [
+        "-E",
+        "(one|two)$",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed star",
+      "args": [
+        "-F",
+        "x*y",
+        "b.txt"
+      ],
+      "stdout": "x*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed brackets",
+      "args": [
+        "-F",
+        "array[x]",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\n",
+      "exit": 0
+    },
+    {
+      "name": "anchor start",
+      "args": [
+        "^foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "anchor end",
+      "args": [
+        "end$",
+        "a.txt"
+      ],
+      "stdout": "the end\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case numbers",
+      "args": [
+        "-in",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n4:Foo three\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "only matching ids",
+      "args": [
+        "-o",
+        "id=[0-9]*",
+        "b.txt"
+      ],
+      "stdout": "id=42\nid=7\n",
+      "exit": 0
+    },
+    {
+      "name": "ere plus digits",
+      "args": [
+        "-E",
+        "[0-9]+",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\nid=42 name=alpha\nid=7 name=beta\narray[x] = 1\ncount{1} times\nphone 555-1234\n2026-09-24 date\n",
+      "exit": 0
+    },
+    {
+      "name": "ere only digits",
+      "args": [
+        "-oE",
+        "[0-9]+",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+      "exit": 0
+    },
+    {
+      "name": "word ignore case",
+      "args": [
+        "-iw",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin search",
+      "args": [
+        "foo"
+      ],
+      "stdin": "foo\nbar\nfood\n",
+      "stdout": "foo\nfood\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin count",
+      "args": [
+        "-c",
+        "o"
+      ],
+      "stdin": "foo\nbar\nfood\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin invert",
+      "args": [
+        "-v",
+        "o"
+      ],
+      "stdin": "foo\nbar\nfood\n",
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin no match",
+      "args": [
+        "zzz"
+      ],
+      "stdin": "foo\n",
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "count empty pattern",
+      "args": [
+        "-c",
+        "",
+        "a.txt"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "empty pattern prints all",
+      "args": [
+        "",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "skip comments",
+      "args": [
+        "-v",
+        "^#",
+        "conf"
+      ],
+      "stdout": "name=web\nport=8080\n  # indented comment\n\t# tab comment\nhost = example.com\nempty=\ndebug=true\n",
+      "exit": 0
+    },
+    {
+      "name": "skip comments and blanks",
+      "args": [
+        "-Ev",
+        "^\\s*(#|$)",
+        "conf"
+      ],
+      "stdout": "name=web\nport=8080\nhost = example.com\nempty=\ndebug=true\n",
+      "exit": 0
+    },
+    {
+      "name": "indented comments ere",
+      "args": [
+        "-E",
+        "^\\s*#",
+        "conf"
+      ],
+      "stdout": "# global settings\n  # indented comment\n\t# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "indented comments bracket",
+      "args": [
+        "^[[:space:]]*#",
+        "conf"
+      ],
+      "stdout": "# global settings\n  # indented comment\n\t# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "patterns from file",
+      "args": [
+        "-f",
+        "pats.txt",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "empty pattern file",
+      "args": [
+        "-f",
+        "empty.pat",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "blank line in pattern file",
+      "args": [
+        "-c",
+        "-f",
+        "blank.pat",
+        "a.txt"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "single -e",
+      "args": [
+        "-e",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "dash dash pattern",
+      "args": [
+        "--",
+        "-v",
+        "b.txt"
+      ],
+      "stdout": "-v is a flag\n",
+      "exit": 0
+    },
+    {
+      "name": "e dash pattern",
+      "args": [
+        "-e",
+        "-v",
+        "b.txt"
+      ],
+      "stdout": "-v is a flag\n",
+      "exit": 0
+    },
+    {
+      "name": "escaped dot",
+      "args": [
+        "\\.",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\nurl http://example.com/a/b\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed dot",
+      "args": [
+        "-F",
+        ".",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\nurl http://example.com/a/b\n",
+      "exit": 0
+    },
+    {
+      "name": "dot matches any",
+      "args": [
+        "-c",
+        ".",
+        "b.txt"
+      ],
+      "stdout": "11\n",
+      "exit": 0
+    },
+    {
+      "name": "posix digit",
+      "args": [
+        "[[:digit:]]",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\nid=42 name=alpha\nid=7 name=beta\narray[x] = 1\ncount{1} times\nphone 555-1234\n2026-09-24 date\n",
+      "exit": 0
+    },
+    {
+      "name": "posix upper",
+      "args": [
+        "[[:upper:]]",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "posix space",
+      "args": [
+        "-c",
+        "[[:space:]]",
+        "conf"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "posix alpha only",
+      "args": [
+        "-o",
+        "[[:alpha:]]*",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "posix alnum run",
+      "args": [
+        "-oE",
+        "[[:alnum:]]+",
+        "b.txt"
+      ],
+      "stdout": "version\n1\n2\n3\nid\n42\nname\nalpha\nid\n7\nname\nbeta\nv\nis\na\nflag\narray\nx\n1\nx\ny\nproduct\ncount\n1\ntimes\npath\nC\ntemp\nfile\nphone\n555\n1234\n2026\n09\n24\ndate\nurl\nhttp\nexample\ncom\na\nb\n",
+      "exit": 0
+    },
+    {
+      "name": "negated bracket",
+      "args": [
+        "-o",
+        "[^=]*=",
+        "conf"
+      ],
+      "stdout": "name=\nport=\nhost =\nempty=\ndebug=\n",
+      "exit": 0
+    },
+    {
+      "name": "range bracket",
+      "args": [
+        "-c",
+        "[a-c]",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "bracket with close",
+      "args": [
+        "-F",
+        "[x]",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\n",
+      "exit": 0
+    },
+    {
+      "name": "bracket literal close",
+      "args": [
+        "[]x]",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\nx*y product\nurl http://example.com/a/b\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive ignore case list",
+      "args": [
+        "-ril",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive line numbers",
+      "args": [
+        "-rn",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2:export function foo() {\nsrc/app.ts:5:// TODO: remove foo\nsrc/lib/data.py:1:def foo():\nsrc/lib/helper.go:4:\treturn \"foo\"\nsrc/test.js:1:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive count",
+      "args": [
+        "-rc",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2\nsrc/lib/data.py:1\nsrc/lib/helper.go:1\nsrc/test.js:1\nsrc/util.ts:0\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive list",
+      "args": [
+        "-rl",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive list without",
+      "args": [
+        "-rL",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive include",
+      "args": [
+        "-r",
+        "--include=*.ts",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./src/app.ts:// TODO: remove foo\n./src/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive include two",
+      "args": [
+        "-rn",
+        "--include=*.ts",
+        "--include=*.go",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2:export function foo() {\nsrc/app.ts:5:// TODO: remove foo\nsrc/lib/helper.go:4:\treturn \"foo\"\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive exclude",
+      "args": [
+        "-r",
+        "--exclude=*.ts",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive exclude dir",
+      "args": [
+        "-r",
+        "--exclude-dir=lib",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive exclude hidden",
+      "args": [
+        "-rl",
+        "--exclude-dir=.hidden",
+        "foo",
+        "dir",
+        ".hidden"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt\ndir/sub/c.log\ndir/sub/x.tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "json ids",
+      "args": [
+        "-o",
+        "\"id\":[0-9]*",
+        "data.json"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "json name",
+      "args": [
+        "-o",
+        "\"name\": \"[^\"]*\"",
+        "data.json"
+      ],
+      "stdout": "\"name\": \"web\"\n",
+      "exit": 0
+    },
+    {
+      "name": "minified discount count",
+      "args": [
+        "-c",
+        "discount\":true",
+        "page.html"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "minified discount only",
+      "args": [
+        "-o",
+        "\"name\":\"model-[0-9]*\",\"price\":[0-9.]*,\"discount\":true",
+        "page.html"
+      ],
+      "stdout": "\"name\":\"model-7\",\"price\":1.75,\"discount\":true\n\"name\":\"model-14\",\"price\":3.50,\"discount\":true\n\"name\":\"model-21\",\"price\":5.25,\"discount\":true\n\"name\":\"model-28\",\"price\":7.00,\"discount\":true\n\"name\":\"model-35\",\"price\":8.75,\"discount\":true\n\"name\":\"model-42\",\"price\":10.50,\"discount\":true\n\"name\":\"model-49\",\"price\":12.25,\"discount\":true\n\"name\":\"model-56\",\"price\":14.00,\"discount\":true\n\"name\":\"model-63\",\"price\":15.75,\"discount\":true\n\"name\":\"model-70\",\"price\":17.50,\"discount\":true\n\"name\":\"model-77\",\"price\":19.25,\"discount\":true\n\"name\":\"model-84\",\"price\":21.00,\"discount\":true\n\"name\":\"model-91\",\"price\":22.75,\"discount\":true\n\"name\":\"model-98\",\"price\":24.50,\"discount\":true\n\"name\":\"model-105\",\"price\":26.25,\"discount\":true\n\"name\":\"model-112\",\"price\":28.00,\"discount\":true\n\"name\":\"model-119\",\"price\":29.75,\"discount\":true\n\"name\":\"model-126\",\"price\":31.50,\"discount\":true\n\"name\":\"model-133\",\"price\":33.25,\"discount\":true\n\"name\":\"model-140\",\"price\":35.00,\"discount\":true\n\"name\":\"model-147\",\"price\":36.75,\"discount\":true\n\"name\":\"model-154\",\"price\":38.50,\"discount\":true\n\"name\":\"model-161\",\"price\":40.25,\"discount\":true\n\"name\":\"model-168\",\"price\":42.00,\"discount\":true\n\"name\":\"model-175\",\"price\":43.75,\"discount\":true\n\"name\":\"model-182\",\"price\":45.50,\"discount\":true\n\"name\":\"model-189\",\"price\":47.25,\"discount\":true\n\"name\":\"model-196\",\"price\":49.00,\"discount\":true\n\"name\":\"model-203\",\"price\":50.75,\"discount\":true\n\"name\":\"model-210\",\"price\":52.50,\"discount\":true\n\"name\":\"model-217\",\"price\":54.25,\"discount\":true\n\"name\":\"model-224\",\"price\":56.00,\"discount\":true\n\"name\":\"model-231\",\"price\":57.75,\"discount\":true\n\"name\":\"model-238\",\"price\":59.50,\"discount\":true\n\"name\":\"model-245\",\"price\":61.25,\"discount\":true\n\"name\":\"model-252\",\"price\":63.00,\"discount\":true\n\"name\":\"model-259\",\"price\":64.75,\"discount\":true\n\"name\":\"model-266\",\"price\":66.50,\"discount\":true\n\"name\":\"model-273\",\"price\":68.25,\"discount\":true\n\"name\":\"model-280\",\"price\":70.00,\"discount\":true\n\"name\":\"model-287\",\"price\":71.75,\"discount\":true\n\"name\":\"model-294\",\"price\":73.50,\"discount\":true\n",
+      "exit": 0
+    },
+    {
+      "name": "minified ere names",
+      "args": [
+        "-oE",
+        "\"name\":\"model-1[0-9]\"",
+        "page.html"
+      ],
+      "stdout": "\"name\":\"model-10\"\n\"name\":\"model-11\"\n\"name\":\"model-12\"\n\"name\":\"model-13\"\n\"name\":\"model-14\"\n\"name\":\"model-15\"\n\"name\":\"model-16\"\n\"name\":\"model-17\"\n\"name\":\"model-18\"\n\"name\":\"model-19\"\n",
+      "exit": 0
+    },
+    {
+      "name": "minified title",
+      "args": [
+        "-o",
+        "<title>[^<]*</title>",
+        "page.html"
+      ],
+      "stdout": "<title>Models</title>\n",
+      "exit": 0
+    },
+    {
+      "name": "missing file",
+      "args": [
+        "foo",
+        "missing.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing beside a file",
+      "args": [
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "count two files",
+      "args": [
+        "-c",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt:4\nb.txt:0\n",
+      "exit": 0
+    },
+    {
+      "name": "count missing and file",
+      "args": [
+        "-c",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "a.txt:4\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "crlf lines",
+      "args": [
+        "foo",
+        "crlf.txt"
+      ],
+      "stdout": "foo\r\nbaz foo\r\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf end anchor",
+      "args": [
+        "foo$",
+        "crlf.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "crlf count",
+      "args": [
+        "-c",
+        "ba",
+        "crlf.txt"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf only",
+      "args": [
+        "-o",
+        "ba.",
+        "crlf.txt"
+      ],
+      "stdout": "bar\nbaz\n",
+      "exit": 0
+    },
+    {
+      "name": "no final newline",
+      "args": [
+        "last",
+        "nonl.txt"
+      ],
+      "stdout": "last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "no final newline count",
+      "args": [
+        "-c",
+        "",
+        "nonl.txt"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "no final newline invert",
+      "args": [
+        "-v",
+        "first",
+        "nonl.txt"
+      ],
+      "stdout": "last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "no final newline only",
+      "args": [
+        "-o",
+        "foo",
+        "nonl.txt"
+      ],
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "empty file",
+      "args": [
+        "foo",
+        "empty.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "empty file count",
+      "args": [
+        "-c",
+        "foo",
+        "empty.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "empty file invert",
+      "args": [
+        "-v",
+        "foo",
+        "empty.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "empty file without",
+      "args": [
+        "-L",
+        "foo",
+        "empty.txt",
+        "a.txt"
+      ],
+      "stdout": "empty.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "utf ignore case",
+      "args": [
+        "-i",
+        "école",
+        "utf.txt"
+      ],
+      "stdout": "École normale\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "utf ignore case upper",
+      "args": [
+        "-i",
+        "café",
+        "utf.txt"
+      ],
+      "stdout": "café au lait\nCAFÉ\n",
+      "exit": 0
+    },
+    {
+      "name": "utf dot",
+      "args": [
+        "-o",
+        "caf.",
+        "utf.txt"
+      ],
+      "stdout": "café\n",
+      "exit": 0
+    },
+    {
+      "name": "utf cjk",
+      "args": [
+        "日本",
+        "utf.txt"
+      ],
+      "stdout": "日本語のテキスト\n",
+      "exit": 0
+    },
+    {
+      "name": "utf emoji",
+      "args": [
+        "-o",
+        "🎉",
+        "utf.txt"
+      ],
+      "stdout": "🎉\n",
+      "exit": 0
+    },
+    {
+      "name": "utf sharp s",
+      "args": [
+        "straße",
+        "utf.txt"
+      ],
+      "stdout": "straße\n",
+      "exit": 0
+    },
+    {
+      "name": "utf only word class",
+      "args": [
+        "-o",
+        "\\w*",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "utf count",
+      "args": [
+        "-c",
+        "é",
+        "utf.txt"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "dash file",
+      "args": [
+        "foo",
+        "--",
+        "-dash.txt"
+      ],
+      "stdout": "foo in dash\n",
+      "exit": 0
+    },
+    {
+      "name": "dash file dot slash",
+      "args": [
+        "foo",
+        "./-dash.txt"
+      ],
+      "stdout": "foo in dash\n",
+      "exit": 0
+    },
+    {
+      "name": "space file",
+      "args": [
+        "foo",
+        "sp ace.txt",
+        "a.txt"
+      ],
+      "stdout": "sp ace.txt:foo in space\na.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "dot slash file",
+      "args": [
+        "foo",
+        "./a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash",
+      "args": [
+        "foo",
+        "-"
+      ],
+      "stdin": "foo\n",
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash beside file",
+      "args": [
+        "foo",
+        "-",
+        "a.txt"
+      ],
+      "stdin": "foo x\n",
+      "stdout": "(standard input):foo x\na.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin with filename",
+      "args": [
+        "-H",
+        "foo"
+      ],
+      "stdin": "foo\n",
+      "stdout": "(standard input):foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin label",
+      "args": [
+        "-H",
+        "--label=in",
+        "foo"
+      ],
+      "stdin": "foo\n",
+      "stdout": "in:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin list",
+      "args": [
+        "-l",
+        "foo"
+      ],
+      "stdin": "foo\n",
+      "stdout": "(standard input)\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin count name",
+      "args": [
+        "-c",
+        "foo",
+        "-",
+        "a.txt"
+      ],
+      "stdin": "foo\n",
+      "stdout": "(standard input):1\na.txt:4\n",
+      "exit": 0
+    },
+    {
+      "name": "line regexp many",
+      "args": [
+        "-x",
+        "-e",
+        "bar",
+        "-e",
+        "foobar",
+        "a.txt"
+      ],
+      "stdout": "bar\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "word foo in rep",
+      "args": [
+        "-w",
+        "foo",
+        "rep.txt"
+      ],
+      "stdout": "foo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "word the",
+      "args": [
+        "-w",
+        "the",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\n",
+      "exit": 0
+    },
+    {
+      "name": "word words",
+      "args": [
+        "-w",
+        "word",
+        "rep.txt"
+      ],
+      "stdout": "word words sword\n",
+      "exit": 0
+    },
+    {
+      "name": "word only",
+      "args": [
+        "-wo",
+        "foo",
+        "rep.txt"
+      ],
+      "stdout": "foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "word count",
+      "args": [
+        "-wc",
+        "foo",
+        "rep.txt"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "word ignore case upper",
+      "args": [
+        "-wi",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "word underscore",
+      "args": [
+        "-w",
+        "foo_bar",
+        "rep.txt"
+      ],
+      "stdout": "foo_bar foo\n",
+      "exit": 0
+    },
+    {
+      "name": "word dash",
+      "args": [
+        "-w",
+        "bar",
+        "rep.txt"
+      ],
+      "stdout": "x foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed ignore case",
+      "args": [
+        "-Fi",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed word",
+      "args": [
+        "-Fw",
+        "foo",
+        "rep.txt"
+      ],
+      "stdout": "foo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed line",
+      "args": [
+        "-Fx",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed backslash",
+      "args": [
+        "-F",
+        "C:\\temp",
+        "b.txt"
+      ],
+      "stdout": "path C:\\temp\\file\n",
+      "exit": 0
+    },
+    {
+      "name": "bre backslash",
+      "args": [
+        "C:\\\\temp",
+        "b.txt"
+      ],
+      "stdout": "path C:\\temp\\file\n",
+      "exit": 0
+    },
+    {
+      "name": "bre literal plus",
+      "args": [
+        "1+",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "bre literal question",
+      "args": [
+        "-c",
+        "a?",
+        "a.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "bre literal braces",
+      "args": [
+        "count{1}",
+        "b.txt"
+      ],
+      "stdout": "count{1} times\n",
+      "exit": 0
+    },
+    {
+      "name": "bre literal pipe",
+      "args": [
+        "foo|bar",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "bre literal parens",
+      "args": [
+        "-c",
+        "(x)",
+        "b.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "bre group",
+      "args": [
+        "\\(ab\\)*",
+        "rep.txt"
+      ],
+      "stdout": "abab\nthe the cat\nword words sword\nababab\naa\nfoo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "bre interval",
+      "args": [
+        "-o",
+        "[0-9]\\{3\\}",
+        "b.txt"
+      ],
+      "stdout": "555\n123\n202\n",
+      "exit": 0
+    },
+    {
+      "name": "bre interval range",
+      "args": [
+        "-o",
+        "a\\{1,2\\}",
+        "rep.txt"
+      ],
+      "stdout": "a\na\na\na\na\na\naa\na\na\n",
+      "exit": 0
+    },
+    {
+      "name": "bre star",
+      "args": [
+        "-o",
+        "fo*",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "bre leading star",
+      "args": [
+        "*y",
+        "b.txt"
+      ],
+      "stdout": "x*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "bre alternation",
+      "args": [
+        "foo\\|bar",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "bre plus",
+      "args": [
+        "fo\\+",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "bre plus o",
+      "args": [
+        "-o",
+        "o\\+",
+        "a.txt"
+      ],
+      "stdout": "oo\no\noo\no\noo\noo\no\noo\n",
+      "exit": 0
+    },
+    {
+      "name": "bre question",
+      "args": [
+        "ba\\?r",
+        "a.txt"
+      ],
+      "stdout": "bar\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "bre posix plus",
+      "args": [
+        "-o",
+        "[[:digit:]]\\+",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+      "exit": 0
+    },
+    {
+      "name": "bre word boundary",
+      "args": [
+        "\\<foo\\>",
+        "rep.txt"
+      ],
+      "stdout": "foo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "bre word start",
+      "args": [
+        "-o",
+        "\\<w[a-z]*",
+        "rep.txt"
+      ],
+      "stdout": "word\nwords\n",
+      "exit": 0
+    },
+    {
+      "name": "bre word end",
+      "args": [
+        "-c",
+        "d\\>",
+        "rep.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "bre b boundary",
+      "args": [
+        "\\bthe\\b",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\n",
+      "exit": 0
+    },
+    {
+      "name": "bre B nonboundary",
+      "args": [
+        "-o",
+        "o\\B.",
+        "rep.txt"
+      ],
+      "stdout": "or\nor\nor\noo\noo\noo\n",
+      "exit": 0
+    },
+    {
+      "name": "bre w",
+      "args": [
+        "-o",
+        "\\w\\+",
+        "b.txt"
+      ],
+      "stdout": "version\n1\n2\n3\nid\n42\nname\nalpha\nid\n7\nname\nbeta\nv\nis\na\nflag\narray\nx\n1\nx\ny\nproduct\ncount\n1\ntimes\npath\nC\ntemp\nfile\nphone\n555\n1234\n2026\n09\n24\ndate\nurl\nhttp\nexample\ncom\na\nb\n",
+      "exit": 0
+    },
+    {
+      "name": "bre W",
+      "args": [
+        "-c",
+        "\\W",
+        "a.txt"
+      ],
+      "stdout": "5\n",
+      "exit": 0
+    },
+    {
+      "name": "bre s",
+      "args": [
+        "-c",
+        "\\s",
+        "conf"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "bre S",
+      "args": [
+        "-o",
+        "\\S\\+",
+        "conf"
+      ],
+      "stdout": "#\nglobal\nsettings\nname=web\nport=8080\n#\nindented\ncomment\n#\ntab\ncomment\nhost\n=\nexample.com\nempty=\ndebug=true\n",
+      "exit": 0
+    },
+    {
+      "name": "bre buffer start",
+      "args": [
+        "\\`foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "bre buffer end",
+      "args": [
+        "end\\'",
+        "a.txt"
+      ],
+      "stdout": "the end\n",
+      "exit": 0
+    },
+    {
+      "name": "bre stray backslash",
+      "args": [
+        "a\\-b",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "bre slash escape",
+      "args": [
+        "-o",
+        "http:\\/\\/[^/]*",
+        "b.txt"
+      ],
+      "stdout": "http://example.com\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "bre digit escape",
+      "args": [
+        "\\d",
+        "b.txt"
+      ],
+      "stdout": "id=42 name=alpha\nid=7 name=beta\nx*y product\n2026-09-24 date\n",
+      "exit": 0,
+      "warned": true,
+      "accept": {
+        "stdout": "version 1.2.3\nid=42 name=alpha\nid=7 name=beta\narray[x] = 1\ncount{1} times\nphone 555-1234\n2026-09-24 date\n",
+        "exit": 0,
+        "reason": "\\d is a digit: GNU 3.12 reads it as d with a warning, and a model writing \\d means a digit"
+      }
+    },
+    {
+      "name": "bre digit escape only",
+      "args": [
+        "-o",
+        "id=\\d*",
+        "b.txt"
+      ],
+      "stdout": "id=\nid=\n",
+      "exit": 0,
+      "warned": true,
+      "accept": {
+        "stdout": "id=42\nid=7\n",
+        "exit": 0,
+        "reason": "\\d is a digit: GNU 3.12 reads it as d with a warning, and a model writing \\d means a digit"
+      }
+    },
+    {
+      "name": "ere digit escape",
+      "args": [
+        "-oE",
+        "\\d+",
+        "b.txt"
+      ],
+      "stdout": "d\nd\nd\nd\n",
+      "exit": 0,
+      "warned": true,
+      "accept": {
+        "stdout": "1\n2\n3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+        "exit": 0,
+        "reason": "\\d is a digit: GNU 3.12 reads it as d with a warning, and a model writing \\d means a digit"
+      }
+    },
+    {
+      "name": "ere open brace upto",
+      "args": [
+        "-E",
+        "o{,2}d",
+        "a.txt"
+      ],
+      "stdout": "food court\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "ere open brace upto only",
+      "args": [
+        "-oE",
+        "o{,1}b",
+        "a.txt"
+      ],
+      "stdout": "b\nob\n",
+      "exit": 0
+    },
+    {
+      "name": "ere interval",
+      "args": [
+        "-oE",
+        "[0-9]{3,}",
+        "b.txt"
+      ],
+      "stdout": "555\n1234\n2026\n",
+      "exit": 0
+    },
+    {
+      "name": "ere interval exact",
+      "args": [
+        "-cE",
+        "a{2}",
+        "rep.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "ere leading star",
+      "args": [
+        "-E",
+        "*y",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\nx*y product\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "ere leading plus",
+      "args": [
+        "-E",
+        "+y",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\nx*y product\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "ere leading brace",
+      "args": [
+        "-E",
+        "{1}",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\nid=42 name=alpha\nid=7 name=beta\n-v is a flag\narray[x] = 1\nx*y product\ncount{1} times\npath C:\\temp\\file\nphone 555-1234\n2026-09-24 date\nurl http://example.com/a/b\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "ere lone close paren",
+      "args": [
+        "-E",
+        ")",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "ere lone close paren tail",
+      "args": [
+        "-cE",
+        "a)",
+        "b.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "ere double star",
+      "args": [
+        "-oE",
+        "a**",
+        "rep.txt"
+      ],
+      "stdout": "a\na\na\na\na\na\naa\na\na\n",
+      "exit": 0
+    },
+    {
+      "name": "ere plus then question",
+      "args": [
+        "-cE",
+        "a+?",
+        "a.txt"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "ere plus question only",
+      "args": [
+        "-oE",
+        "ab+?",
+        "rep.txt"
+      ],
+      "stdout": "ab\nab\na\nab\nab\nab\na\na\na\na\n",
+      "exit": 0
+    },
+    {
+      "name": "ere word boundary",
+      "args": [
+        "-E",
+        "\\<(foo|the)\\>",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\nfoo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "ere w plus",
+      "args": [
+        "-oE",
+        "\\w+=\\w+",
+        "b.txt"
+      ],
+      "stdout": "id=42\nname=alpha\nid=7\nname=beta\n",
+      "exit": 0
+    },
+    {
+      "name": "ere s",
+      "args": [
+        "-cE",
+        "\\s+",
+        "conf"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "ere literal braces",
+      "args": [
+        "-E",
+        "count\\{1\\}",
+        "b.txt"
+      ],
+      "stdout": "count{1} times\n",
+      "exit": 0
+    },
+    {
+      "name": "ere escaped plus",
+      "args": [
+        "-E",
+        "x\\*y",
+        "b.txt"
+      ],
+      "stdout": "x*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "ere backslash dot",
+      "args": [
+        "-E",
+        "1\\.2",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\n",
+      "exit": 0
+    },
+    {
+      "name": "ere stray backslash",
+      "args": [
+        "-E",
+        "a\\-b",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "ere optional group",
+      "args": [
+        "-E",
+        "https?://",
+        "b.txt"
+      ],
+      "stdout": "url http://example.com/a/b\n",
+      "exit": 0
+    },
+    {
+      "name": "ere nested groups",
+      "args": [
+        "-oE",
+        "((ab)+)",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "ere empty alternative",
+      "args": [
+        "-cE",
+        "foo|",
+        "a.txt"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "class name outside bracket",
+      "args": [
+        "[:digit:]",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "class name outside bracket ere",
+      "args": [
+        "-E",
+        "[:space:]",
+        "conf"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unmatched interval",
+      "args": [
+        "a\\{1",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unmatched bracket",
+      "args": [
+        "[abc",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unmatched group",
+      "args": [
+        "\\(ab",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unmatched ere group",
+      "args": [
+        "-E",
+        "(ab",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "invalid interval order",
+      "args": [
+        "-E",
+        "a{3,1}",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unknown class",
+      "args": [
+        "[[:foo:]]",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "trailing backslash",
+      "args": [
+        "foo\\",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "bre backreference",
+      "args": [
+        "\\(ab\\)\\1",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "ere backreference",
+      "args": [
+        "-E",
+        "(ab)\\1",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "ere backreference words",
+      "args": [
+        "-E",
+        "\\b(\\w+) \\1\\b",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "two e",
+      "args": [
+        "-e",
+        "food",
+        "-e",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "two e fixed",
+      "args": [
+        "-F",
+        "-e",
+        "food",
+        "-e",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "two e count",
+      "args": [
+        "-c",
+        "-e",
+        "food",
+        "-e",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "two e only",
+      "args": [
+        "-o",
+        "-e",
+        "foo",
+        "-e",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nbar\nfoo\nfoo\nbar\n",
+      "exit": 0
+    },
+    {
+      "name": "two e ere",
+      "args": [
+        "-E",
+        "-e",
+        "fo+d",
+        "-e",
+        "ba(r|z)",
+        "a.txt"
+      ],
+      "stdout": "bar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "two e word",
+      "args": [
+        "-w",
+        "-e",
+        "foo",
+        "-e",
+        "the",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\nfoo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "e then f",
+      "args": [
+        "-e",
+        "alpha",
+        "-f",
+        "pats.txt",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "f then e",
+      "args": [
+        "-f",
+        "pats.txt",
+        "-e",
+        "alpha",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "e after operand",
+      "args": [
+        "a.txt",
+        "-e",
+        "food"
+      ],
+      "stdout": "food court\n",
+      "exit": 0
+    },
+    {
+      "name": "three e invert",
+      "args": [
+        "-v",
+        "-e",
+        "foo",
+        "-e",
+        "bar",
+        "-e",
+        "^$",
+        "a.txt"
+      ],
+      "stdout": "alpha\nFoo three\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "e with newline",
+      "args": [
+        "-e",
+        "food\nbar",
+        "a.txt"
+      ],
+      "stdout": "bar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "regexp long",
+      "args": [
+        "--regexp=food",
+        "--regexp",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "e and bre",
+      "args": [
+        "-e",
+        "fo\\+d",
+        "-e",
+        "the",
+        "a.txt"
+      ],
+      "stdout": "food court\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "e fixed special",
+      "args": [
+        "-F",
+        "-e",
+        "x*y",
+        "-e",
+        "[x]",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\nx*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive no path",
+      "args": [
+        "-r",
+        "foo"
+      ],
+      "unordered": true,
+      "stdin": "foo from stdin\n",
+      "stdout": "-dash.txt:foo in dash\n.env:TOKEN=foo\n.hidden/secret.txt:foo secret\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\nbuild/out.txt:foo built\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\nnonl.txt:last foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "recursive no path list",
+      "args": [
+        "-rl",
+        "secret"
+      ],
+      "unordered": true,
+      "stdout": ".hidden/secret.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive dot",
+      "args": [
+        "-r",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt:foo in dash\n./.env:TOKEN=foo\n./.hidden/secret.txt:foo secret\n./Makefile:\tgo test ./... # foo\n./a.txt:foo one\n./a.txt:foo two\n./a.txt:foobar\n./a.txt:food court\n./blank.pat:foo\n./build/out.txt:foo built\n./crlf.txt:baz foo\r\n./crlf.txt:foo\r\n./dir/d.txt:foo in d\n./dir/sub/c.log:foo in log\n./dir/sub/x.tmp:foo tmp\n./nonl.txt:last foo\n./pats.txt:foo\n./rep.txt:foo_bar foo\n./rep.txt:x foo-bar y\n./sp ace.txt:foo in space\n./src/app.ts:// TODO: remove foo\n./src/app.ts:export function foo() {\n./src/lib/data.py:def foo():\n./src/lib/helper.go:\treturn \"foo\"\n./src/test.js:test('foo', () => {});\n./web/index.js:console.log(foo);\n./web/index.js:const foo = require('./foo');\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "recursive dot numbers",
+      "args": [
+        "-rn",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt:1:foo in dash\n./.env:2:TOKEN=foo\n./.hidden/secret.txt:1:foo secret\n./Makefile:5:\tgo test ./... # foo\n./a.txt:2:foo one\n./a.txt:3:foo two\n./a.txt:7:food court\n./a.txt:8:foobar\n./blank.pat:1:foo\n./build/out.txt:1:foo built\n./crlf.txt:1:foo\r\n./crlf.txt:3:baz foo\r\n./dir/d.txt:1:foo in d\n./dir/sub/c.log:1:foo in log\n./dir/sub/x.tmp:1:foo tmp\n./nonl.txt:2:last foo\n./pats.txt:1:foo\n./rep.txt:6:foo_bar foo\n./rep.txt:7:x foo-bar y\n./sp ace.txt:1:foo in space\n./src/app.ts:2:export function foo() {\n./src/app.ts:5:// TODO: remove foo\n./src/lib/data.py:1:def foo():\n./src/lib/helper.go:4:\treturn \"foo\"\n./src/test.js:1:test('foo', () => {});\n./web/index.js:1:const foo = require('./foo');\n./web/index.js:2:console.log(foo);\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "recursive dot list",
+      "args": [
+        "-rl",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt\n./.env\n./.hidden/secret.txt\n./Makefile\n./a.txt\n./bin.dat\n./blank.pat\n./build/out.txt\n./crlf.txt\n./dir/d.txt\n./dir/sub/c.log\n./dir/sub/x.tmp\n./nonl.txt\n./pats.txt\n./rep.txt\n./sp ace.txt\n./src/app.ts\n./src/lib/data.py\n./src/lib/helper.go\n./src/test.js\n./web/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive trailing slash",
+      "args": [
+        "-r",
+        "foo",
+        "dir/"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive dir",
+      "args": [
+        "-r",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive single file",
+      "args": [
+        "-r",
+        "foo",
+        "dir/d.txt"
+      ],
+      "stdout": "foo in d\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive big R",
+      "args": [
+        "-R",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive exclude dir slash",
+      "args": [
+        "-r",
+        "--exclude-dir=lib/",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive hidden dir",
+      "args": [
+        "-r",
+        "secret",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./.hidden/secret.txt:foo secret\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive dotfile",
+      "args": [
+        "-rn",
+        "TOKEN",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./.env:2:TOKEN=foo\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive include dotted",
+      "args": [
+        "-rl",
+        "--include=*.yml",
+        "--include=*.yaml",
+        ".",
+        "config"
+      ],
+      "unordered": true,
+      "stdout": "config/app.yaml\nconfig/db.yml\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive include no path",
+      "args": [
+        "-rl",
+        "--include=*.go",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/helper.go\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive two dirs",
+      "args": [
+        "-rh",
+        "foo",
+        "dir",
+        "web"
+      ],
+      "unordered": true,
+      "stdout": "console.log(foo);\nconst foo = require('./foo');\nfoo in d\nfoo in log\nfoo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive count dir",
+      "args": [
+        "-rc",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:1\ndir/sub/.gitignore:0\ndir/sub/c.log:1\ndir/sub/x.tmp:1\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive missing",
+      "args": [
+        "-r",
+        "foo",
+        "nosuchdir"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "recursive with glob files",
+      "args": [
+        "-rl",
+        "foo",
+        "src",
+        "a.txt"
+      ],
+      "unordered": true,
+      "stdout": "a.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "directory without r",
+      "args": [
+        "foo",
+        "dir"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "directory beside file",
+      "args": [
+        "foo",
+        "dir",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "list with directory",
+      "args": [
+        "-l",
+        "foo",
+        "src/app.ts",
+        "src/lib",
+        "src/util.ts"
+      ],
+      "stdout": "src/app.ts\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "silent missing",
+      "args": [
+        "-s",
+        "foo",
+        "missing.txt"
+      ],
+      "stdout": "",
+      "exit": 2
+    },
+    {
+      "name": "silent missing beside",
+      "args": [
+        "-s",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2
+    },
+    {
+      "name": "silent directory",
+      "args": [
+        "-s",
+        "foo",
+        "dir",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2
+    },
+    {
+      "name": "quiet with missing",
+      "args": [
+        "-q",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "quiet missing only",
+      "args": [
+        "-q",
+        "foo",
+        "missing.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "directories skip",
+      "args": [
+        "-d",
+        "skip",
+        "foo",
+        "dir",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "directories read",
+      "args": [
+        "-d",
+        "read",
+        "foo",
+        "dir"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "directories recurse",
+      "args": [
+        "-d",
+        "recurse",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "directories long",
+      "args": [
+        "--directories=skip",
+        "foo",
+        "dir",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive include exclude",
+      "args": [
+        "-r",
+        "--include=*.js",
+        "--exclude=test*",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./web/index.js:console.log(foo);\n./web/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "dereference recursive",
+      "args": [
+        "--dereference-recursive",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive long",
+      "args": [
+        "--recursive",
+        "-n",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt:1:foo in d\ndir/sub/c.log:1:foo in log\ndir/sub/x.tmp:1:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "after one",
+      "args": [
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "after one numbered",
+      "args": [
+        "-n",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2:match b\n3-other 1\n4:match c\n5-other 2\n--\n9:match d\n10-other 6\n",
+      "exit": 0
+    },
+    {
+      "name": "before one",
+      "args": [
+        "-B1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\n--\nother 5\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "before one numbered",
+      "args": [
+        "-nB1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2:match b\n3-other 1\n4:match c\n--\n8-other 5\n9:match d\n",
+      "exit": 0
+    },
+    {
+      "name": "context one",
+      "args": [
+        "-C1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nother 5\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context two",
+      "args": [
+        "-C2",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nother 3\nother 4\nother 5\nmatch d\nother 6\nother 7\n",
+      "exit": 0
+    },
+    {
+      "name": "after two",
+      "args": [
+        "-A",
+        "2",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nother 3\n--\nmatch d\nother 6\nother 7\n",
+      "exit": 0
+    },
+    {
+      "name": "after zero",
+      "args": [
+        "-A0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n--\nmatch c\n--\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "before zero",
+      "args": [
+        "-B0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n--\nmatch c\n--\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "context zero numbered",
+      "args": [
+        "-n",
+        "-C0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2:match b\n--\n4:match c\n--\n9:match d\n",
+      "exit": 0
+    },
+    {
+      "name": "after adjacent numbered",
+      "args": [
+        "-n",
+        "-A1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n4-Foo three\n--\n7:food court\n8:foobar\n9-the end\n",
+      "exit": 0
+    },
+    {
+      "name": "after invert",
+      "args": [
+        "-v",
+        "-A1",
+        "other",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context only",
+      "args": [
+        "-o",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match\nmatch\nmatch\n--\nmatch\n",
+      "exit": 0
+    },
+    {
+      "name": "context only numbered",
+      "args": [
+        "-on",
+        "-C1",
+        "ma",
+        "ctx.txt"
+      ],
+      "stdout": "1:ma\n2:ma\n4:ma\n--\n9:ma\n",
+      "exit": 0
+    },
+    {
+      "name": "context count",
+      "args": [
+        "-c",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "context list",
+      "args": [
+        "-l",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "ctx.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "context two files",
+      "args": [
+        "-A1",
+        "match",
+        "ctx.txt",
+        "a.txt"
+      ],
+      "stdout": "ctx.txt:match a\nctx.txt:match b\nctx.txt-other 1\nctx.txt:match c\nctx.txt-other 2\n--\nctx.txt:match d\nctx.txt-other 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context two files match",
+      "args": [
+        "-C1",
+        "foo",
+        "a.txt",
+        "rep.txt"
+      ],
+      "stdout": "a.txt-alpha\na.txt:foo one\na.txt:foo two\na.txt-Foo three\n--\na.txt-bar\na.txt:food court\na.txt:foobar\na.txt-the end\n--\nrep.txt-aa\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "context max count",
+      "args": [
+        "-m1",
+        "-A2",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\n",
+      "exit": 0
+    },
+    {
+      "name": "context max count two",
+      "args": [
+        "-m2",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\n",
+      "exit": 0
+    },
+    {
+      "name": "context max count before",
+      "args": [
+        "-m2",
+        "-B1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n",
+      "exit": 0
+    },
+    {
+      "name": "context group separator",
+      "args": [
+        "--group-separator=##",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n##\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context no group separator",
+      "args": [
+        "--no-group-separator",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context long",
+      "args": [
+        "--context=1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nother 5\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context long space",
+      "args": [
+        "--context",
+        "1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nother 5\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "after long",
+      "args": [
+        "--after-context=1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "before long",
+      "args": [
+        "--before-context=1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\n--\nother 5\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "context number option",
+      "args": [
+        "-1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nother 5\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context number option two",
+      "args": [
+        "-2",
+        "-n",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2:match b\n3-other 1\n4:match c\n5-other 2\n6-other 3\n7-other 4\n8-other 5\n9:match d\n10-other 6\n11-other 7\n",
+      "exit": 0
+    },
+    {
+      "name": "context cluster",
+      "args": [
+        "-nC1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2:match b\n3-other 1\n4:match c\n5-other 2\n--\n8-other 5\n9:match d\n10-other 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context cluster invert",
+      "args": [
+        "-vA1",
+        "other",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context cluster only",
+      "args": [
+        "-oA1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match\nmatch\nmatch\n--\nmatch\n",
+      "exit": 0
+    },
+    {
+      "name": "context space value",
+      "args": [
+        "-C",
+        "1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nother 5\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context bad value",
+      "args": [
+        "-A",
+        "x",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "context with filename",
+      "args": [
+        "-H",
+        "-B1",
+        "match d",
+        "ctx.txt"
+      ],
+      "stdout": "ctx.txt-other 5\nctx.txt:match d\n",
+      "exit": 0
+    },
+    {
+      "name": "context stdin",
+      "args": [
+        "-A1",
+        "b"
+      ],
+      "stdin": "a\nb\nc\nd\nb\n",
+      "stdout": "b\nc\n--\nb\n",
+      "exit": 0
+    },
+    {
+      "name": "context at end",
+      "args": [
+        "-A3",
+        "other 7",
+        "ctx.txt"
+      ],
+      "stdout": "other 7\n",
+      "exit": 0
+    },
+    {
+      "name": "context before start",
+      "args": [
+        "-B3",
+        "match a",
+        "ctx.txt"
+      ],
+      "stdout": "match a\n",
+      "exit": 0
+    },
+    {
+      "name": "context overlap",
+      "args": [
+        "-C3",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nother 3\nother 4\nother 5\nmatch d\nother 6\nother 7\n",
+      "exit": 0
+    },
+    {
+      "name": "context byte offset",
+      "args": [
+        "-b",
+        "-A1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "24:match c\n32-other 2\n",
+      "exit": 0
+    },
+    {
+      "name": "context max zero",
+      "args": [
+        "-m0",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "only star",
+      "args": [
+        "-o",
+        "x*",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "only value",
+      "args": [
+        "-o",
+        "[^=]*$",
+        "conf"
+      ],
+      "stdout": "# global settings\nweb\n8080\n  # indented comment\n\t# tab comment\n example.com\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "only digits star",
+      "args": [
+        "-o",
+        "[0-9]*",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+      "exit": 0
+    },
+    {
+      "name": "only empty",
+      "args": [
+        "-o",
+        "",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "only empty exit",
+      "args": [
+        "-o",
+        "zzz*",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "only star count",
+      "args": [
+        "-oc",
+        "x*",
+        "a.txt"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "only ere optional",
+      "args": [
+        "-oE",
+        "o?",
+        "a.txt"
+      ],
+      "stdout": "o\no\no\no\no\no\no\no\no\no\no\no\no\n",
+      "exit": 0
+    },
+    {
+      "name": "only value numbers",
+      "args": [
+        "-on",
+        "[^=]*$",
+        "conf"
+      ],
+      "stdout": "1:# global settings\n2:web\n3:8080\n4:  # indented comment\n5:\t# tab comment\n6: example.com\n8:true\n",
+      "exit": 0
+    },
+    {
+      "name": "only star stdin",
+      "args": [
+        "-o",
+        "b*"
+      ],
+      "stdin": "abba\nccc\n",
+      "stdout": "bb\n",
+      "exit": 0
+    },
+    {
+      "name": "only line end",
+      "args": [
+        "-o",
+        "$",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "only after equals",
+      "args": [
+        "-oP",
+        "(?<==).*",
+        "conf"
+      ],
+      "stdout": "web\n8080\n example.com\ntrue\n",
+      "exit": 0
+    },
+    {
+      "name": "max one",
+      "args": [
+        "-m1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "max two space",
+      "args": [
+        "-m",
+        "2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "max count long",
+      "args": [
+        "--max-count=1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "max count long space",
+      "args": [
+        "--max-count",
+        "2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "max count count",
+      "args": [
+        "-m1",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "max count count two",
+      "args": [
+        "-c",
+        "-m2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "max zero",
+      "args": [
+        "-m0",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "max zero count",
+      "args": [
+        "-m0",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "max zero invert",
+      "args": [
+        "-m0",
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "max count list",
+      "args": [
+        "-m1",
+        "-l",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "max count invert",
+      "args": [
+        "-m2",
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "max count only",
+      "args": [
+        "-m1",
+        "-o",
+        "o",
+        "a.txt"
+      ],
+      "stdout": "o\no\no\n",
+      "exit": 0
+    },
+    {
+      "name": "max count two files",
+      "args": [
+        "-m1",
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "a.txt:foo one\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "max count invalid",
+      "args": [
+        "-m",
+        "x",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "max count negative",
+      "args": [
+        "-m",
+        "-1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "max count quiet",
+      "args": [
+        "-q",
+        "-m1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "count only o",
+      "args": [
+        "-c",
+        "-o",
+        "o",
+        "a.txt"
+      ],
+      "stdout": "5\n",
+      "exit": 0
+    },
+    {
+      "name": "count only foo",
+      "args": [
+        "-oc",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "count only invert",
+      "args": [
+        "-ovc",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "5\n",
+      "exit": 0
+    },
+    {
+      "name": "only invert",
+      "args": [
+        "-ov",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "only count ere",
+      "args": [
+        "-cEo",
+        "[0-9]",
+        "b.txt"
+      ],
+      "stdout": "7\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset",
+      "args": [
+        "-b",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "6:foo one\n14:foo two\n37:food court\n48:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset only",
+      "args": [
+        "-bo",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "6:foo\n14:foo\n37:foo\n48:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset only utf",
+      "args": [
+        "-bo",
+        "au",
+        "utf.txt"
+      ],
+      "stdout": "6:au\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset utf",
+      "args": [
+        "-b",
+        "cole",
+        "utf.txt"
+      ],
+      "stdout": "14:École normale\n97:école\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset numbers",
+      "args": [
+        "-nb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:6:foo one\n3:14:foo two\n7:37:food court\n8:48:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset filename",
+      "args": [
+        "-Hnb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:2:6:foo one\na.txt:3:14:foo two\na.txt:7:37:food court\na.txt:8:48:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset long",
+      "args": [
+        "--byte-offset",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "33:bar\n48:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset minified",
+      "args": [
+        "-bo",
+        "\"id\":150",
+        "page.html"
+      ],
+      "stdout": "8920:\"id\":150\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset crlf",
+      "args": [
+        "-b",
+        "ba",
+        "crlf.txt"
+      ],
+      "stdout": "5:bar\r\n10:baz foo\r\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset invert",
+      "args": [
+        "-bv",
+        "o",
+        "a.txt"
+      ],
+      "stdout": "0:alpha\n32:\n33:bar\n55:the end\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset stdin",
+      "args": [
+        "-b",
+        "c"
+      ],
+      "stdin": "ab\nc\n",
+      "stdout": "3:c\n",
+      "exit": 0
+    },
+    {
+      "name": "word empty",
+      "args": [
+        "-w",
+        "",
+        "a.txt"
+      ],
+      "stdout": "\n",
+      "exit": 0
+    },
+    {
+      "name": "word empty count",
+      "args": [
+        "-wc",
+        "",
+        "a.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "word cafe",
+      "args": [
+        "-w",
+        "café",
+        "utf.txt"
+      ],
+      "stdout": "café au lait\n",
+      "exit": 0
+    },
+    {
+      "name": "word ecole",
+      "args": [
+        "-wi",
+        "école",
+        "utf.txt"
+      ],
+      "stdout": "École normale\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "word equals",
+      "args": [
+        "-w",
+        "=42",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "word equals only",
+      "args": [
+        "-wo",
+        "=42",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "word id",
+      "args": [
+        "-w",
+        "id",
+        "b.txt"
+      ],
+      "stdout": "id=42 name=alpha\nid=7 name=beta\n",
+      "exit": 0
+    },
+    {
+      "name": "word retry",
+      "args": [
+        "-wo",
+        "ab",
+        "w.txt"
+      ],
+      "files": {
+        "w.txt": "abc ab\nxab ab_ ab\n"
+      },
+      "stdout": "ab\nab\n",
+      "exit": 0
+    },
+    {
+      "name": "word retry line",
+      "args": [
+        "-w",
+        "foo",
+        "w.txt"
+      ],
+      "files": {
+        "w.txt": "food foo\nfoods\nfoo\n"
+      },
+      "stdout": "food foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "word invert",
+      "args": [
+        "-wv",
+        "foo",
+        "rep.txt"
+      ],
+      "stdout": "abab\nthe the cat\nword words sword\nababab\naa\n",
+      "exit": 0
+    },
+    {
+      "name": "word ere alt",
+      "args": [
+        "-wE",
+        "foo|the",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\nfoo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "word digits",
+      "args": [
+        "-wo",
+        "[0-9]*",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+      "exit": 0
+    },
+    {
+      "name": "word line",
+      "args": [
+        "-wx",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "word long",
+      "args": [
+        "--word-regexp",
+        "the",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\n",
+      "exit": 0
+    },
+    {
+      "name": "word non ascii neighbour",
+      "args": [
+        "-w",
+        "caf",
+        "utf.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "word naive",
+      "args": [
+        "-wo",
+        "na.ve",
+        "utf.txt"
+      ],
+      "stdout": "naïve\n",
+      "exit": 0
+    },
+    {
+      "name": "binary match",
+      "args": [
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary no match",
+      "args": [
+        "zzz",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "binary count",
+      "args": [
+        "-c",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "binary list",
+      "args": [
+        "-l",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "bin.dat\na.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "binary only",
+      "args": [
+        "-o",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary invert",
+      "args": [
+        "-v",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary numbers",
+      "args": [
+        "-n",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary quiet",
+      "args": [
+        "-q",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "binary two files",
+      "args": [
+        "foo",
+        "a.txt",
+        "bin.dat"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary stdin",
+      "args": [
+        "foo"
+      ],
+      "stdin": "a\u0000b\nfoo\n",
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary text",
+      "args": [
+        "-a",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "foo bar\nmore foo\n",
+      "exit": 0
+    },
+    {
+      "name": "binary text long",
+      "args": [
+        "--text",
+        "def",
+        "bin.dat"
+      ],
+      "stdout": "abc\u0000def\n",
+      "exit": 0
+    },
+    {
+      "name": "binary files text",
+      "args": [
+        "--binary-files=text",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "foo bar\nmore foo\n",
+      "exit": 0
+    },
+    {
+      "name": "binary files without match",
+      "args": [
+        "--binary-files=without-match",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "binary files binary",
+      "args": [
+        "--binary-files=binary",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary skip I",
+      "args": [
+        "-I",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I count",
+      "args": [
+        "-Ic",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "binary recursive",
+      "args": [
+        "-rl",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt\n./.env\n./.hidden/secret.txt\n./Makefile\n./a.txt\n./bin.dat\n./blank.pat\n./build/out.txt\n./crlf.txt\n./dir/d.txt\n./dir/sub/c.log\n./dir/sub/x.tmp\n./nonl.txt\n./pats.txt\n./rep.txt\n./sp ace.txt\n./src/app.ts\n./src/lib/data.py\n./src/lib/helper.go\n./src/test.js\n./web/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "binary recursive I",
+      "args": [
+        "-rIl",
+        "more",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "binary files bad",
+      "args": [
+        "--binary-files=nope",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "binary nul match",
+      "args": [
+        "-c",
+        "abc",
+        "bin.dat"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "binary after nul",
+      "args": [
+        "-a",
+        "-o",
+        "def",
+        "bin.dat"
+      ],
+      "stdout": "def\n",
+      "exit": 0
+    },
+    {
+      "name": "perl ignore flag",
+      "args": [
+        "-P",
+        "(?i)foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl ignore flag group",
+      "args": [
+        "-P",
+        "(?i:FOO) t",
+        "a.txt"
+      ],
+      "stdout": "foo two\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "perl extended flag",
+      "args": [
+        "-P",
+        "(?x) f o o",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl extended comment",
+      "args": [
+        "-oP",
+        "(?x) [0-9]+  # digits\n",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "perl dotall flag",
+      "args": [
+        "-cP",
+        "(?s)foo.",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl digits",
+      "args": [
+        "-oP",
+        "\\d+",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lazy",
+      "args": [
+        "-oP",
+        "=.*?\\s",
+        "b.txt"
+      ],
+      "stdout": "=42 \n=7 \n= \n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind",
+      "args": [
+        "-oP",
+        "(?<=id=)\\d+",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind value",
+      "args": [
+        "-oP",
+        "(?<=name=)\\w+",
+        "b.txt"
+      ],
+      "stdout": "alpha\nbeta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind overlap",
+      "args": [
+        "-oP",
+        "(?<=a)a",
+        "aaa.txt"
+      ],
+      "files": {
+        "aaa.txt": "aaa\n"
+      },
+      "stdout": "a\na\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "a\n",
+        "exit": 0,
+        "reason": "a lookbehind runs as a prefix the match consumes, so a match inside the previous one's lookbehind is not found"
+      }
+    },
+    {
+      "name": "perl lines holding both",
+      "args": [
+        "-nP",
+        "^(?=.*foo)(?=.*t)",
+        "a.txt"
+      ],
+      "stdout": "3:foo two\n7:food court\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lines holding both unanchored",
+      "args": [
+        "-cP",
+        "(?=.*id)(?=.*beta)",
+        "b.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl line without the other",
+      "args": [
+        "-P",
+        "^(?=.*foo)(?!.*o\\b)",
+        "a.txt"
+      ],
+      "stdout": "food court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lines without a word",
+      "args": [
+        "-vnP",
+        "^(?!.*foo)",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl only after a lookahead",
+      "args": [
+        "-oiP",
+        "^(?=.*three)\\w+",
+        "a.txt"
+      ],
+      "stdout": "Foo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl empty lower bound",
+      "args": [
+        "-oP",
+        "o{,1}d",
+        "a.txt"
+      ],
+      "stdout": "od\nd\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead",
+      "args": [
+        "-oP",
+        "\\d+(?=\\.)",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead word",
+      "args": [
+        "-oP",
+        "\\w+(?==)",
+        "conf"
+      ],
+      "stdout": "name\nport\nempty\ndebug\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookaround both",
+      "args": [
+        "-oP",
+        "(?<=\")[^\"]+(?=\")",
+        "data.json"
+      ],
+      "stdout": "name\n: \nweb\nversion\n: \n1.2.3\nreplicas\nimage\n: \nnginx:1.27\nlabels\n: {\napp\n: \nweb\n, \ntier\n: \nfront\n",
+      "exit": 0
+    },
+    {
+      "name": "perl negative lookahead",
+      "args": [
+        "-P",
+        "foo(?!bar)",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "negative lookaround is refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "perl negative lookbehind",
+      "args": [
+        "-P",
+        "(?<!f)oo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "negative lookaround is refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "perl keep",
+      "args": [
+        "-oP",
+        "id=\\K\\d+",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl backreference",
+      "args": [
+        "-P",
+        "(a|b)\\1",
+        "rep.txt"
+      ],
+      "stdout": "aa\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "perl named backreference",
+      "args": [
+        "-P",
+        "(?<w>\\w+) \\k<w>",
+        "rep.txt"
+      ],
+      "stdout": "the the cat\nword words sword\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "perl possessive",
+      "args": [
+        "-P",
+        "a++b",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers and atomic groups are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "perl atomic",
+      "args": [
+        "-P",
+        "(?>ab)+",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers and atomic groups are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "perl h",
+      "args": [
+        "-cP",
+        "\\h",
+        "conf"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl R",
+      "args": [
+        "-cP",
+        "o\\R",
+        "a.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl quote",
+      "args": [
+        "-P",
+        "\\Qx*y\\E",
+        "b.txt"
+      ],
+      "stdout": "x*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "perl named group",
+      "args": [
+        "-oP",
+        "(?<key>\\w+)=",
+        "conf"
+      ],
+      "stdout": "name=\nport=\nempty=\ndebug=\n",
+      "exit": 0
+    },
+    {
+      "name": "perl python named group",
+      "args": [
+        "-oP",
+        "(?P<key>\\w+)=",
+        "conf"
+      ],
+      "stdout": "name=\nport=\nempty=\ndebug=\n",
+      "exit": 0
+    },
+    {
+      "name": "perl word boundary",
+      "args": [
+        "-oP",
+        "\\bfoo\\b",
+        "rep.txt"
+      ],
+      "stdout": "foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl two patterns",
+      "args": [
+        "-P",
+        "-e",
+        "foo",
+        "-e",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "perl unicode",
+      "args": [
+        "-oP",
+        "caf\\x{e9}",
+        "utf.txt"
+      ],
+      "stdout": "café\n",
+      "exit": 0
+    },
+    {
+      "name": "perl minified",
+      "args": [
+        "-oP",
+        "\"name\":\"\\K[^\"]+(?=\",\"price\":[0-9.]+,\"discount\":true)",
+        "page.html"
+      ],
+      "stdout": "model-7\nmodel-14\nmodel-21\nmodel-28\nmodel-35\nmodel-42\nmodel-49\nmodel-56\nmodel-63\nmodel-70\nmodel-77\nmodel-84\nmodel-91\nmodel-98\nmodel-105\nmodel-112\nmodel-119\nmodel-126\nmodel-133\nmodel-140\nmodel-147\nmodel-154\nmodel-161\nmodel-168\nmodel-175\nmodel-182\nmodel-189\nmodel-196\nmodel-203\nmodel-210\nmodel-217\nmodel-224\nmodel-231\nmodel-238\nmodel-245\nmodel-252\nmodel-259\nmodel-266\nmodel-273\nmodel-280\nmodel-287\nmodel-294\n",
+      "exit": 0
+    },
+    {
+      "name": "perl s space",
+      "args": [
+        "-cP",
+        "\\s",
+        "conf"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl ignore case option",
+      "args": [
+        "-iP",
+        "FOO\\s",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "perl invalid",
+      "args": [
+        "-P",
+        "(",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "option after operand",
+      "args": [
+        "foo",
+        "a.txt",
+        "-n"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "option after two operands",
+      "args": [
+        "foo",
+        "a.txt",
+        "b.txt",
+        "-c"
+      ],
+      "stdout": "a.txt:4\nb.txt:0\n",
+      "exit": 0
+    },
+    {
+      "name": "options end",
+      "args": [
+        "-n",
+        "--",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "cluster rnw",
+      "args": [
+        "-rnw",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2:export function foo() {\nsrc/app.ts:5:// TODO: remove foo\nsrc/lib/data.py:1:def foo():\nsrc/lib/helper.go:4:\treturn \"foo\"\nsrc/test.js:1:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "cluster with e",
+      "args": [
+        "-ie",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "cluster with m value",
+      "args": [
+        "-nm1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "cluster with m next",
+      "args": [
+        "-nm",
+        "1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "include two words",
+      "args": [
+        "-r",
+        "--include",
+        "*.ts",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "exclude two words",
+      "args": [
+        "-r",
+        "--exclude",
+        "*.ts",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "exclude dir two words",
+      "args": [
+        "-r",
+        "--exclude-dir",
+        "lib",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "long prefix include",
+      "args": [
+        "-r",
+        "--inc=*.go",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/helper.go:\treturn \"foo\"\n",
+      "exit": 0
+    },
+    {
+      "name": "long prefix count",
+      "args": [
+        "--cou",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "long prefix ambiguous",
+      "args": [
+        "--in",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "long ignore case",
+      "args": [
+        "--ignore-case",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "long invert",
+      "args": [
+        "--invert-match",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nFoo three\n\nbar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "long count",
+      "args": [
+        "--count",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "long files",
+      "args": [
+        "--files-with-matches",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "long files without",
+      "args": [
+        "--files-without-match",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "b.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "long line number",
+      "args": [
+        "--line-number",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "long only",
+      "args": [
+        "--only-matching",
+        "fo*",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "long quiet",
+      "args": [
+        "--quiet",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "long silent",
+      "args": [
+        "--silent",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "long no filename",
+      "args": [
+        "--no-filename",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "long with filename",
+      "args": [
+        "--with-filename",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "long line regexp",
+      "args": [
+        "--line-regexp",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "long extended",
+      "args": [
+        "--extended-regexp",
+        "fo+d",
+        "a.txt"
+      ],
+      "stdout": "food court\n",
+      "exit": 0
+    },
+    {
+      "name": "long fixed",
+      "args": [
+        "--fixed-strings",
+        "x*y",
+        "b.txt"
+      ],
+      "stdout": "x*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "long basic",
+      "args": [
+        "--basic-regexp",
+        "fo\\+d",
+        "a.txt"
+      ],
+      "stdout": "food court\n",
+      "exit": 0
+    },
+    {
+      "name": "long perl",
+      "args": [
+        "--perl-regexp",
+        "fo+d",
+        "a.txt"
+      ],
+      "stdout": "food court\n",
+      "exit": 0
+    },
+    {
+      "name": "long file",
+      "args": [
+        "--file=pats.txt",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "long file space",
+      "args": [
+        "--file",
+        "pats.txt",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "long no messages",
+      "args": [
+        "--no-messages",
+        "foo",
+        "missing.txt"
+      ],
+      "stdout": "",
+      "exit": 2
+    },
+    {
+      "name": "long max count",
+      "args": [
+        "--max-count=2",
+        "-n",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n",
+      "exit": 0
+    },
+    {
+      "name": "conflicting e f",
+      "args": [
+        "-E",
+        "-F",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "conflicting p e",
+      "args": [
+        "-P",
+        "-E",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "conflicting g e",
+      "args": [
+        "-G",
+        "-E",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "same matcher twice",
+      "args": [
+        "-E",
+        "-E",
+        "fo+",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "basic G",
+      "args": [
+        "-G",
+        "fo\\+",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "unknown short",
+      "args": [
+        "-j",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unknown long",
+      "args": [
+        "--frobnicate",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "column option",
+      "args": [
+        "--column",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "e without pattern",
+      "args": [
+        "-e"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no pattern",
+      "args": [],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing value A",
+      "args": [
+        "foo",
+        "a.txt",
+        "-A"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "y is ignore case",
+      "args": [
+        "-y",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "no ignore case",
+      "args": [
+        "-i",
+        "--no-ignore-case",
+        "FOO",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "with filename H",
+      "args": [
+        "-H",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "H and h last wins",
+      "args": [
+        "-H",
+        "-h",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "h and H last wins",
+      "args": [
+        "-h",
+        "-H",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color never",
+      "args": [
+        "--color=never",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "colour auto",
+      "args": [
+        "--colour=auto",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color bare",
+      "args": [
+        "--color",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color always",
+      "args": [
+        "--color=always",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[K one\n\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[K two\n\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[Kd court\n\u001b[01;31m\u001b[Kfoo\u001b[m\u001b[Kbar\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "--color=always is refused: a model never wants escapes in its output"
+      }
+    },
+    {
+      "name": "line buffered",
+      "args": [
+        "--line-buffered",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "U binary noop",
+      "args": [
+        "-U",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "binary noop long",
+      "args": [
+        "--binary",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null after name",
+      "args": [
+        "-lZ",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "null with lines",
+      "args": [
+        "-Z",
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "a.txt\u0000foo one\na.txt\u0000foo two\na.txt\u0000food court\na.txt\u0000foobar\nsrc/app.ts\u0000export function foo() {\nsrc/app.ts\u0000// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "null long",
+      "args": [
+        "--null",
+        "-c",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u00004\nb.txt\u00000\n",
+      "exit": 0
+    },
+    {
+      "name": "null data",
+      "args": [
+        "-z",
+        "foo"
+      ],
+      "stdin": "foo one\u0000bar\u0000foo two\u0000",
+      "stdout": "foo one\u0000foo two\u0000",
+      "exit": 0
+    },
+    {
+      "name": "null data count",
+      "args": [
+        "-zc",
+        "o"
+      ],
+      "stdin": "foo\u0000bar\u0000",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "null data file",
+      "args": [
+        "--null-data",
+        "-o",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo\u0000foo\u0000foo\u0000foo\u0000",
+      "exit": 0
+    },
+    {
+      "name": "initial tab",
+      "args": [
+        "-T",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt:\tfoo one\na.txt:\tfoo two\na.txt:\tfood court\na.txt:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab long",
+      "args": [
+        "--initial-tab",
+        "-H",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:\tfoo one\na.txt:\tfoo two\na.txt:\tfood court\na.txt:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "exclude from",
+      "args": [
+        "-r",
+        "--exclude-from=ex.txt",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "files": {
+        "ex.txt": "*.ts\n*.py\n"
+      },
+      "stdout": "src/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "include no recursion",
+      "args": [
+        "--include=*.ts",
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "src/app.ts:export function foo() {\nsrc/app.ts:// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "exclude no recursion",
+      "args": [
+        "--exclude=a.txt",
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "src/app.ts:export function foo() {\nsrc/app.ts:// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "word empty pattern spaces",
+      "args": [
+        "-wn",
+        ""
+      ],
+      "stdin": "a  b\n\nx\n",
+      "stdout": "1:a  b\n2:\n",
+      "exit": 0
+    },
+    {
+      "name": "ere brace literal",
+      "args": [
+        "-oE",
+        "a{",
+        "e.txt"
+      ],
+      "files": {
+        "e.txt": "a{ ab a{x}\n"
+      },
+      "stdout": "a{\na{\n",
+      "exit": 0
+    },
+    {
+      "name": "ere brace word literal",
+      "args": [
+        "-oE",
+        "a{x}",
+        "e.txt"
+      ],
+      "files": {
+        "e.txt": "a{ ab a{x}\n"
+      },
+      "stdout": "a{x}\n",
+      "exit": 0
+    },
+    {
+      "name": "ere brace unfinished",
+      "args": [
+        "-cE",
+        "a{1",
+        "a.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "bre close brace literal",
+      "args": [
+        "-o",
+        "a\\}",
+        "e.txt"
+      ],
+      "files": {
+        "e.txt": "a} b\n"
+      },
+      "stdout": "a}\n",
+      "exit": 0
+    },
+    {
+      "name": "bre unmatched close group",
+      "args": [
+        "\\)",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "bre unmatched interval",
+      "args": [
+        "x\\{1,2",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "invalid range",
+      "args": [
+        "[z-a]",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ere backslash t",
+      "args": [
+        "-cE",
+        "\\t",
+        "Makefile"
+      ],
+      "stdout": "2\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "perl tab",
+      "args": [
+        "-cP",
+        "\\t",
+        "Makefile"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "literal tab",
+      "args": [
+        "-c",
+        "\t",
+        "Makefile"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "literal carriage return",
+      "args": [
+        "-c",
+        "\r",
+        "crlf.txt"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "todo recursive include",
+      "args": [
+        "-rn",
+        "TODO",
+        "--include=*.ts",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./src/app.ts:5:// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "ere anchored alternation",
+      "args": [
+        "-E",
+        "^(name|port)=",
+        "conf"
+      ],
+      "stdout": "name=web\nport=8080\n",
+      "exit": 0
+    },
+    {
+      "name": "count all lines",
+      "args": [
+        "-c",
+        "",
+        "conf"
+      ],
+      "stdout": "8\n",
+      "exit": 0
+    },
+    {
+      "name": "empty lines numbered",
+      "args": [
+        "-n",
+        "^$",
+        "a.txt"
+      ],
+      "stdout": "5:\n",
+      "exit": 0
+    },
+    {
+      "name": "drop empty lines",
+      "args": [
+        "-v",
+        "^$",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "drop comments and blanks two e",
+      "args": [
+        "-v",
+        "-e",
+        "^#",
+        "-e",
+        "^$",
+        "conf"
+      ],
+      "stdout": "name=web\nport=8080\n  # indented comment\n\t# tab comment\nhost = example.com\nempty=\ndebug=true\n",
+      "exit": 0
+    },
+    {
+      "name": "only urls",
+      "args": [
+        "-oE",
+        "[a-z]+://[^ ]+",
+        "b.txt"
+      ],
+      "stdout": "http://example.com/a/b\n",
+      "exit": 0
+    },
+    {
+      "name": "only emails",
+      "args": [
+        "-o",
+        "[^ ]*@[^ ]*",
+        "m.txt"
+      ],
+      "files": {
+        "m.txt": "mail ops@example.com now\nnone here\nto a@b.io and c@d.io\n"
+      },
+      "stdout": "ops@example.com\na@b.io\nc@d.io\n",
+      "exit": 0
+    },
+    {
+      "name": "after and before numbered",
+      "args": [
+        "-n",
+        "-A2",
+        "-B1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "3-other 1\n4:match c\n5-other 2\n6-other 3\n",
+      "exit": 0
+    },
+    {
+      "name": "context and after override",
+      "args": [
+        "-C3",
+        "-A0",
+        "-n",
+        "match d",
+        "ctx.txt"
+      ],
+      "stdout": "6-other 3\n7-other 4\n8-other 5\n9:match d\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case only",
+      "args": [
+        "-io",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nFoo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "word count lines",
+      "args": [
+        "-wc",
+        "the",
+        "rep.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "ere word only",
+      "args": [
+        "-Ewo",
+        "fo+",
+        "rep.txt"
+      ],
+      "stdout": "foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "no filename ere",
+      "args": [
+        "-hE",
+        "fo+d",
+        "a.txt",
+        "rep.txt"
+      ],
+      "stdout": "food court\n",
+      "exit": 0
+    },
+    {
+      "name": "count ignore case",
+      "args": [
+        "-ci",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "5\n",
+      "exit": 0
+    },
+    {
+      "name": "indented comments numbered",
+      "args": [
+        "-nE",
+        "^\\s+#",
+        "conf"
+      ],
+      "stdout": "4:  # indented comment\n5:\t# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed line patterns file",
+      "args": [
+        "-Fx",
+        "-f",
+        "pats.txt",
+        "a.txt"
+      ],
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "empty file numbered empty pattern",
+      "args": [
+        "-n",
+        "-e",
+        "",
+        "empty.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "recursive word",
+      "args": [
+        "-rw",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "upper then lower",
+      "args": [
+        "-o",
+        "[[:upper:]][[:lower:]]*",
+        "a.txt"
+      ],
+      "stdout": "Foo\n",
+      "exit": 0
+    },
+    {
+      "name": "punct count",
+      "args": [
+        "-c",
+        "[[:punct:]]",
+        "b.txt"
+      ],
+      "stdout": "11\n",
+      "exit": 0
+    },
+    {
+      "name": "utf ignore case only",
+      "args": [
+        "-io",
+        "é",
+        "utf.txt"
+      ],
+      "stdout": "é\nÉ\nÉ\né\n",
+      "exit": 0
+    },
+    {
+      "name": "utf from capital",
+      "args": [
+        "-o",
+        "É.*",
+        "utf.txt"
+      ],
+      "stdout": "École normale\nÉ\n",
+      "exit": 0
+    },
+    {
+      "name": "empty line count",
+      "args": [
+        "-xc",
+        "",
+        "a.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "max one two files numbered",
+      "args": [
+        "-m1",
+        "-n",
+        "foo",
+        "a.txt",
+        "src/app.ts"
+      ],
+      "stdout": "a.txt:2:foo one\nsrc/app.ts:2:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive without",
+      "args": [
+        "-rL",
+        "foo",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/sub/.gitignore\n",
+      "exit": 0
+    },
+    {
+      "name": "quiet silent missing",
+      "args": [
+        "-qs",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "context count both",
+      "args": [
+        "-C1",
+        "-c",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "e dash dash pattern",
+      "args": [
+        "-e",
+        "-dash",
+        "-r",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "minified max one only",
+      "args": [
+        "-o",
+        "-m1",
+        "\"price\":[0-9.]*",
+        "page.html"
+      ],
+      "stdout": "\"price\":0.25\n\"price\":0.50\n\"price\":0.75\n\"price\":1.00\n\"price\":1.25\n\"price\":1.50\n\"price\":1.75\n\"price\":2.00\n\"price\":2.25\n\"price\":2.50\n\"price\":2.75\n\"price\":3.00\n\"price\":3.25\n\"price\":3.50\n\"price\":3.75\n\"price\":4.00\n\"price\":4.25\n\"price\":4.50\n\"price\":4.75\n\"price\":5.00\n\"price\":5.25\n\"price\":5.50\n\"price\":5.75\n\"price\":6.00\n\"price\":6.25\n\"price\":6.50\n\"price\":6.75\n\"price\":7.00\n\"price\":7.25\n\"price\":7.50\n\"price\":7.75\n\"price\":8.00\n\"price\":8.25\n\"price\":8.50\n\"price\":8.75\n\"price\":9.00\n\"price\":9.25\n\"price\":9.50\n\"price\":9.75\n\"price\":10.00\n\"price\":10.25\n\"price\":10.50\n\"price\":10.75\n\"price\":11.00\n\"price\":11.25\n\"price\":11.50\n\"price\":11.75\n\"price\":12.00\n\"price\":12.25\n\"price\":12.50\n\"price\":12.75\n\"price\":13.00\n\"price\":13.25\n\"price\":13.50\n\"price\":13.75\n\"price\":14.00\n\"price\":14.25\n\"price\":14.50\n\"price\":14.75\n\"price\":15.00\n\"price\":15.25\n\"price\":15.50\n\"price\":15.75\n\"price\":16.00\n\"price\":16.25\n\"price\":16.50\n\"price\":16.75\n\"price\":17.00\n\"price\":17.25\n\"price\":17.50\n\"price\":17.75\n\"price\":18.00\n\"price\":18.25\n\"price\":18.50\n\"price\":18.75\n\"price\":19.00\n\"price\":19.25\n\"price\":19.50\n\"price\":19.75\n\"price\":20.00\n\"price\":20.25\n\"price\":20.50\n\"price\":20.75\n\"price\":21.00\n\"price\":21.25\n\"price\":21.50\n\"price\":21.75\n\"price\":22.00\n\"price\":22.25\n\"price\":22.50\n\"price\":22.75\n\"price\":23.00\n\"price\":23.25\n\"price\":23.50\n\"price\":23.75\n\"price\":24.00\n\"price\":24.25\n\"price\":24.50\n\"price\":24.75\n\"price\":25.00\n\"price\":25.25\n\"price\":25.50\n\"price\":25.75\n\"price\":26.00\n\"price\":26.25\n\"price\":26.50\n\"price\":26.75\n\"price\":27.00\n\"price\":27.25\n\"price\":27.50\n\"price\":27.75\n\"price\":28.00\n\"price\":28.25\n\"price\":28.50\n\"price\":28.75\n\"price\":29.00\n\"price\":29.25\n\"price\":29.50\n\"price\":29.75\n\"price\":30.00\n\"price\":30.25\n\"price\":30.50\n\"price\":30.75\n\"price\":31.00\n\"price\":31.25\n\"price\":31.50\n\"price\":31.75\n\"price\":32.00\n\"price\":32.25\n\"price\":32.50\n\"price\":32.75\n\"price\":33.00\n\"price\":33.25\n\"price\":33.50\n\"price\":33.75\n\"price\":34.00\n\"price\":34.25\n\"price\":34.50\n\"price\":34.75\n\"price\":35.00\n\"price\":35.25\n\"price\":35.50\n\"price\":35.75\n\"price\":36.00\n\"price\":36.25\n\"price\":36.50\n\"price\":36.75\n\"price\":37.00\n\"price\":37.25\n\"price\":37.50\n\"price\":37.75\n\"price\":38.00\n\"price\":38.25\n\"price\":38.50\n\"price\":38.75\n\"price\":39.00\n\"price\":39.25\n\"price\":39.50\n\"price\":39.75\n\"price\":40.00\n\"price\":40.25\n\"price\":40.50\n\"price\":40.75\n\"price\":41.00\n\"price\":41.25\n\"price\":41.50\n\"price\":41.75\n\"price\":42.00\n\"price\":42.25\n\"price\":42.50\n\"price\":42.75\n\"price\":43.00\n\"price\":43.25\n\"price\":43.50\n\"price\":43.75\n\"price\":44.00\n\"price\":44.25\n\"price\":44.50\n\"price\":44.75\n\"price\":45.00\n\"price\":45.25\n\"price\":45.50\n\"price\":45.75\n\"price\":46.00\n\"price\":46.25\n\"price\":46.50\n\"price\":46.75\n\"price\":47.00\n\"price\":47.25\n\"price\":47.50\n\"price\":47.75\n\"price\":48.00\n\"price\":48.25\n\"price\":48.50\n\"price\":48.75\n\"price\":49.00\n\"price\":49.25\n\"price\":49.50\n\"price\":49.75\n\"price\":50.00\n\"price\":50.25\n\"price\":50.50\n\"price\":50.75\n\"price\":51.00\n\"price\":51.25\n\"price\":51.50\n\"price\":51.75\n\"price\":52.00\n\"price\":52.25\n\"price\":52.50\n\"price\":52.75\n\"price\":53.00\n\"price\":53.25\n\"price\":53.50\n\"price\":53.75\n\"price\":54.00\n\"price\":54.25\n\"price\":54.50\n\"price\":54.75\n\"price\":55.00\n\"price\":55.25\n\"price\":55.50\n\"price\":55.75\n\"price\":56.00\n\"price\":56.25\n\"price\":56.50\n\"price\":56.75\n\"price\":57.00\n\"price\":57.25\n\"price\":57.50\n\"price\":57.75\n\"price\":58.00\n\"price\":58.25\n\"price\":58.50\n\"price\":58.75\n\"price\":59.00\n\"price\":59.25\n\"price\":59.50\n\"price\":59.75\n\"price\":60.00\n\"price\":60.25\n\"price\":60.50\n\"price\":60.75\n\"price\":61.00\n\"price\":61.25\n\"price\":61.50\n\"price\":61.75\n\"price\":62.00\n\"price\":62.25\n\"price\":62.50\n\"price\":62.75\n\"price\":63.00\n\"price\":63.25\n\"price\":63.50\n\"price\":63.75\n\"price\":64.00\n\"price\":64.25\n\"price\":64.50\n\"price\":64.75\n\"price\":65.00\n\"price\":65.25\n\"price\":65.50\n\"price\":65.75\n\"price\":66.00\n\"price\":66.25\n\"price\":66.50\n\"price\":66.75\n\"price\":67.00\n\"price\":67.25\n\"price\":67.50\n\"price\":67.75\n\"price\":68.00\n\"price\":68.25\n\"price\":68.50\n\"price\":68.75\n\"price\":69.00\n\"price\":69.25\n\"price\":69.50\n\"price\":69.75\n\"price\":70.00\n\"price\":70.25\n\"price\":70.50\n\"price\":70.75\n\"price\":71.00\n\"price\":71.25\n\"price\":71.50\n\"price\":71.75\n\"price\":72.00\n\"price\":72.25\n\"price\":72.50\n\"price\":72.75\n\"price\":73.00\n\"price\":73.25\n\"price\":73.50\n\"price\":73.75\n\"price\":74.00\n\"price\":74.25\n\"price\":74.50\n\"price\":74.75\n\"price\":75.00\n",
+      "exit": 0
+    },
+    {
+      "name": "minified keep id",
+      "args": [
+        "-oP",
+        "\"id\":\\K\\d+",
+        "page.html"
+      ],
+      "stdout": "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n65\n66\n67\n68\n69\n70\n71\n72\n73\n74\n75\n76\n77\n78\n79\n80\n81\n82\n83\n84\n85\n86\n87\n88\n89\n90\n91\n92\n93\n94\n95\n96\n97\n98\n99\n100\n101\n102\n103\n104\n105\n106\n107\n108\n109\n110\n111\n112\n113\n114\n115\n116\n117\n118\n119\n120\n121\n122\n123\n124\n125\n126\n127\n128\n129\n130\n131\n132\n133\n134\n135\n136\n137\n138\n139\n140\n141\n142\n143\n144\n145\n146\n147\n148\n149\n150\n151\n152\n153\n154\n155\n156\n157\n158\n159\n160\n161\n162\n163\n164\n165\n166\n167\n168\n169\n170\n171\n172\n173\n174\n175\n176\n177\n178\n179\n180\n181\n182\n183\n184\n185\n186\n187\n188\n189\n190\n191\n192\n193\n194\n195\n196\n197\n198\n199\n200\n201\n202\n203\n204\n205\n206\n207\n208\n209\n210\n211\n212\n213\n214\n215\n216\n217\n218\n219\n220\n221\n222\n223\n224\n225\n226\n227\n228\n229\n230\n231\n232\n233\n234\n235\n236\n237\n238\n239\n240\n241\n242\n243\n244\n245\n246\n247\n248\n249\n250\n251\n252\n253\n254\n255\n256\n257\n258\n259\n260\n261\n262\n263\n264\n265\n266\n267\n268\n269\n270\n271\n272\n273\n274\n275\n276\n277\n278\n279\n280\n281\n282\n283\n284\n285\n286\n287\n288\n289\n290\n291\n292\n293\n294\n295\n296\n297\n298\n299\n300\n",
+      "exit": 0
+    },
+    {
+      "name": "minified keep price",
+      "args": [
+        "-oP",
+        "\"price\":\\K[0-9.]+(?=,\"discount\":true)",
+        "page.html"
+      ],
+      "stdout": "1.75\n3.50\n5.25\n7.00\n8.75\n10.50\n12.25\n14.00\n15.75\n17.50\n19.25\n21.00\n22.75\n24.50\n26.25\n28.00\n29.75\n31.50\n33.25\n35.00\n36.75\n38.50\n40.25\n42.00\n43.75\n45.50\n47.25\n49.00\n50.75\n52.50\n54.25\n56.00\n57.75\n59.50\n61.25\n63.00\n64.75\n66.50\n68.25\n70.00\n71.75\n73.50\n",
+      "exit": 0
+    },
+    {
+      "name": "minified count only",
+      "args": [
+        "-oc",
+        "model-[0-9]*",
+        "page.html"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "minified comma count",
+      "args": [
+        "-c",
+        ",",
+        "page.html"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "minified around",
+      "args": [
+        "-oE",
+        ".{10}model-77\".{10}",
+        "page.html"
+      ],
+      "stdout": "7,\"name\":\"model-77\",\"price\":1\n",
+      "exit": 0
+    },
+    {
+      "name": "minified around bre",
+      "args": [
+        "-o",
+        ".\\{0,12\\}discount\":true}.\\{0,5\\}",
+        "page.html"
+      ],
+      "stdout": "rice\":1.75,\"discount\":true},{\"id\nrice\":3.50,\"discount\":true},{\"id\nrice\":5.25,\"discount\":true},{\"id\nrice\":7.00,\"discount\":true},{\"id\nrice\":8.75,\"discount\":true},{\"id\nice\":10.50,\"discount\":true},{\"id\nice\":12.25,\"discount\":true},{\"id\nice\":14.00,\"discount\":true},{\"id\nice\":15.75,\"discount\":true},{\"id\nice\":17.50,\"discount\":true},{\"id\nice\":19.25,\"discount\":true},{\"id\nice\":21.00,\"discount\":true},{\"id\nice\":22.75,\"discount\":true},{\"id\nice\":24.50,\"discount\":true},{\"id\nice\":26.25,\"discount\":true},{\"id\nice\":28.00,\"discount\":true},{\"id\nice\":29.75,\"discount\":true},{\"id\nice\":31.50,\"discount\":true},{\"id\nice\":33.25,\"discount\":true},{\"id\nice\":35.00,\"discount\":true},{\"id\nice\":36.75,\"discount\":true},{\"id\nice\":38.50,\"discount\":true},{\"id\nice\":40.25,\"discount\":true},{\"id\nice\":42.00,\"discount\":true},{\"id\nice\":43.75,\"discount\":true},{\"id\nice\":45.50,\"discount\":true},{\"id\nice\":47.25,\"discount\":true},{\"id\nice\":49.00,\"discount\":true},{\"id\nice\":50.75,\"discount\":true},{\"id\nice\":52.50,\"discount\":true},{\"id\nice\":54.25,\"discount\":true},{\"id\nice\":56.00,\"discount\":true},{\"id\nice\":57.75,\"discount\":true},{\"id\nice\":59.50,\"discount\":true},{\"id\nice\":61.25,\"discount\":true},{\"id\nice\":63.00,\"discount\":true},{\"id\nice\":64.75,\"discount\":true},{\"id\nice\":66.50,\"discount\":true},{\"id\nice\":68.25,\"discount\":true},{\"id\nice\":70.00,\"discount\":true},{\"id\nice\":71.75,\"discount\":true},{\"id\nice\":73.50,\"discount\":true},{\"id\n",
+      "exit": 0
+    },
+    {
+      "name": "minified byte offset only",
+      "args": [
+        "-ob",
+        "model-300",
+        "page.html"
+      ],
+      "stdout": "18066:model-300\n",
+      "exit": 0
+    },
+    {
+      "name": "invert count empty",
+      "args": [
+        "-vc",
+        "",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "recursive import",
+      "args": [
+        "-rn",
+        "import",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./src/app.ts:1:import { util } from \"./util\";\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive two exclude dirs",
+      "args": [
+        "-rl",
+        "--exclude-dir=.hidden",
+        "--exclude-dir=dir",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt\n./.env\n./Makefile\n./a.txt\n./bin.dat\n./blank.pat\n./build/out.txt\n./crlf.txt\n./nonl.txt\n./pats.txt\n./rep.txt\n./sp ace.txt\n./src/app.ts\n./src/lib/data.py\n./src/lib/helper.go\n./src/test.js\n./web/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive exclude src",
+      "args": [
+        "-rl",
+        "--exclude-dir=src",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt\n./.env\n./.hidden/secret.txt\n./Makefile\n./a.txt\n./bin.dat\n./blank.pat\n./build/out.txt\n./crlf.txt\n./dir/d.txt\n./dir/sub/c.log\n./dir/sub/x.tmp\n./nonl.txt\n./pats.txt\n./rep.txt\n./sp ace.txt\n./web/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "exclude dir operand",
+      "args": [
+        "-r",
+        "--exclude-dir=dir",
+        "foo",
+        "dir"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "recursive two files",
+      "args": [
+        "-r",
+        "foo",
+        "src/app.ts",
+        "src/util.ts"
+      ],
+      "stdout": "src/app.ts:export function foo() {\nsrc/app.ts:// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "with filename count",
+      "args": [
+        "-H",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:4\n",
+      "exit": 0
+    },
+    {
+      "name": "dash file numbered",
+      "args": [
+        "-n",
+        "foo",
+        "--",
+        "-dash.txt"
+      ],
+      "stdout": "1:foo in dash\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive stdin and dir",
+      "args": [
+        "-r",
+        "foo",
+        "-",
+        "dir"
+      ],
+      "unordered": true,
+      "stdin": "foo in\n",
+      "stdout": "(standard input):foo in\ndir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "ere id word",
+      "args": [
+        "-E",
+        "id=(42|7)\\b",
+        "b.txt"
+      ],
+      "stdout": "id=42 name=alpha\nid=7 name=beta\n",
+      "exit": 0
+    },
+    {
+      "name": "ere optional digits",
+      "args": [
+        "-oE",
+        "[0-9]+(\\.[0-9]+)*",
+        "b.txt"
+      ],
+      "stdout": "1.2.3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n",
+      "exit": 0
+    },
+    {
+      "name": "bre alternation group",
+      "args": [
+        "-o",
+        "\\(foo\\|bar\\)",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nbar\nfoo\nfoo\nbar\n",
+      "exit": 0
+    },
+    {
+      "name": "ere alternation longest",
+      "args": [
+        "-oE",
+        "foo|foobar",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed alternation longest",
+      "args": [
+        "-oF",
+        "-e",
+        "foo",
+        "-e",
+        "food",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfood\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "ere question",
+      "args": [
+        "-oE",
+        "colou?r",
+        "c.txt"
+      ],
+      "files": {
+        "c.txt": "color colour colouur\n"
+      },
+      "stdout": "color\ncolour\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lazy only",
+      "args": [
+        "-oP",
+        "\".*?\"",
+        "data.json"
+      ],
+      "stdout": "\"name\"\n\"web\"\n\"version\"\n\"1.2.3\"\n\"replicas\"\n\"image\"\n\"nginx:1.27\"\n\"labels\"\n\"app\"\n\"web\"\n\"tier\"\n\"front\"\n",
+      "exit": 0
+    },
+    {
+      "name": "perl greedy only",
+      "args": [
+        "-oE",
+        "\"[^\"]*\"",
+        "data.json"
+      ],
+      "stdout": "\"name\"\n\"web\"\n\"version\"\n\"1.2.3\"\n\"replicas\"\n\"image\"\n\"nginx:1.27\"\n\"labels\"\n\"app\"\n\"web\"\n\"tier\"\n\"front\"\n",
+      "exit": 0
+    },
+    {
+      "name": "perl scoped ignore",
+      "args": [
+        "-oP",
+        "(?i:foo)d",
+        "a.txt"
+      ],
+      "stdout": "food\n",
+      "exit": 0
+    },
+    {
+      "name": "perl ignore off",
+      "args": [
+        "-iP",
+        "(?-i)Foo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "perl word option",
+      "args": [
+        "-wP",
+        "foo",
+        "rep.txt"
+      ],
+      "stdout": "foo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "perl line option",
+      "args": [
+        "-xP",
+        "fo+bar",
+        "a.txt"
+      ],
+      "stdout": "foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl word unicode",
+      "args": [
+        "-oP",
+        "\\w+",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "perl alpha unicode",
+      "args": [
+        "-oP",
+        "[[:alpha:]]+",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind count",
+      "args": [
+        "-cP",
+        "(?<=foo)d",
+        "a.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead line",
+      "args": [
+        "-P",
+        "foo(?=d)",
+        "a.txt"
+      ],
+      "stdout": "food court\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep and word",
+      "args": [
+        "-oP",
+        "name=\\K\\w+",
+        "b.txt"
+      ],
+      "stdout": "alpha\nbeta\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab numbers",
+      "args": [
+        "-Tn",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt: 2:\tfoo one\na.txt: 3:\tfoo two\na.txt: 7:\tfood court\na.txt: 8:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab byte offset",
+      "args": [
+        "-Tb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": " 6:\tfoo one\n14:\tfoo two\n37:\tfood court\n48:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab numbers bytes",
+      "args": [
+        "-Tnb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": " 2: 6:\tfoo one\n 3:14:\tfoo two\n 7:37:\tfood court\n 8:48:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab context",
+      "args": [
+        "-TnA1",
+        "foo one",
+        "a.txt"
+      ],
+      "stdout": " 2:\tfoo one\n 3-\tfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab count",
+      "args": [
+        "-Tc",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt:4\nb.txt:0\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab stdin",
+      "args": [
+        "-Tn",
+        "c"
+      ],
+      "stdin": "ab\nc\n",
+      "stdout": "                  2:\tc\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab only",
+      "args": [
+        "-Tob",
+        "o",
+        "a.txt"
+      ],
+      "stdout": " 7:\to\n 8:\to\n10:\to\n15:\to\n16:\to\n20:\to\n23:\to\n24:\to\n38:\to\n39:\to\n43:\to\n49:\to\n50:\to\n",
+      "exit": 0
+    },
+    {
+      "name": "initial tab no head",
+      "args": [
+        "-T",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null numbers",
+      "args": [
+        "-Zn",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u00002:foo one\na.txt\u00003:foo two\na.txt\u00007:food court\na.txt\u00008:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null context",
+      "args": [
+        "-ZA1",
+        "foo two",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u0000foo two\na.txt\u0000Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "null without match",
+      "args": [
+        "-LZ",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "b.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "null initial tab",
+      "args": [
+        "-ZTn",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt\u0000 2:\tfoo one\na.txt\u0000 3:\tfoo two\na.txt\u0000 7:\tfood court\na.txt\u0000 8:\tfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "null data list",
+      "args": [
+        "-lz",
+        "foo"
+      ],
+      "stdin": "foo\u0000bar\u0000",
+      "stdout": "(standard input)\n",
+      "exit": 0
+    },
+    {
+      "name": "null data newline",
+      "args": [
+        "-z",
+        "bar"
+      ],
+      "stdin": "foo\nbar\u0000baz\u0000",
+      "stdout": "foo\nbar\u0000",
+      "exit": 0
+    },
+    {
+      "name": "null data not binary",
+      "args": [
+        "-zc",
+        "def",
+        "bin.dat"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "null data both",
+      "args": [
+        "-zZl",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I list",
+      "args": [
+        "-Il",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I without",
+      "args": [
+        "-IL",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "bin.dat\n",
+      "exit": 0
+    },
+    {
+      "name": "binary skip I count two",
+      "args": [
+        "-Ic",
+        "foo",
+        "bin.dat",
+        "a.txt"
+      ],
+      "stdout": "bin.dat:0\na.txt:4\n",
+      "exit": 0
+    },
+    {
+      "name": "binary no messages",
+      "args": [
+        "-s",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "binary text count",
+      "args": [
+        "-ac",
+        "o",
+        "bin.dat"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "label count",
+      "args": [
+        "-c",
+        "--label=in",
+        "-H",
+        "c"
+      ],
+      "stdin": "c\n",
+      "stdout": "in:1\n",
+      "exit": 0
+    },
+    {
+      "name": "label list",
+      "args": [
+        "-l",
+        "--label=in",
+        "c"
+      ],
+      "stdin": "c\n",
+      "stdout": "in\n",
+      "exit": 0
+    },
+    {
+      "name": "label without H",
+      "args": [
+        "--label=in",
+        "c"
+      ],
+      "stdin": "c\n",
+      "stdout": "c\n",
+      "exit": 0
+    },
+    {
+      "name": "group separator next arg",
+      "args": [
+        "--group-separator",
+        "##",
+        "-A0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n##\nmatch c\n##\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "group separator empty",
+      "args": [
+        "--group-separator=",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "with filename short prefix",
+      "args": [
+        "--with-f",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color prefix",
+      "args": [
+        "--col=never",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color next arg is pattern",
+      "args": [
+        "--color",
+        "never",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "devices skip",
+      "args": [
+        "-D",
+        "skip",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "devices bad",
+      "args": [
+        "--devices=nope",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "exclude from missing",
+      "args": [
+        "-r",
+        "--exclude-from=nope.txt",
+        "foo",
+        "src"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "exclude from two",
+      "args": [
+        "-r",
+        "--exclude-from=ex1.txt",
+        "--exclude-from=ex2.txt",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "files": {
+        "ex1.txt": "*.ts\n",
+        "ex2.txt": "*.go\n"
+      },
+      "stdout": "src/lib/data.py:def foo():\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset only multibyte",
+      "args": [
+        "-ob",
+        "lait\\|cole",
+        "utf.txt"
+      ],
+      "stdout": "9:lait\n16:cole\n99:cole\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset context before",
+      "args": [
+        "-b",
+        "-B1",
+        "foo two",
+        "a.txt"
+      ],
+      "stdout": "6-foo one\n14:foo two\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset count ignored",
+      "args": [
+        "-bc",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "y and no ignore case",
+      "args": [
+        "-y",
+        "--no-ignore-case",
+        "Foo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind line",
+      "args": [
+        "-xP",
+        "(?<=a)b"
+      ],
+      "stdin": "ab\nb\n",
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookahead line end",
+      "args": [
+        "-xP",
+        "ab(?=$)"
+      ],
+      "stdin": "ab\nabc\n",
+      "stdout": "ab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead line refused",
+      "args": [
+        "-xP",
+        "a(?=b)"
+      ],
+      "stdin": "ab\na\n",
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookbehind start anchor line",
+      "args": [
+        "-xP",
+        "(?<=^)ab"
+      ],
+      "stdin": "ab\n",
+      "stdout": "ab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind flags",
+      "args": [
+        "-oP",
+        "(?i)(?<=ID=)\\d+",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind alternation inside",
+      "args": [
+        "-oP",
+        "(?<=id=|name=)\\w+",
+        "b.txt"
+      ],
+      "stdout": "42\nalpha\n7\nbeta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead invert",
+      "args": [
+        "-vcP",
+        "\\d(?=\\.)",
+        "b.txt"
+      ],
+      "stdout": "10\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead overlap",
+      "args": [
+        "-oP",
+        "a(?=a)",
+        "aaa.txt"
+      ],
+      "files": {
+        "aaa.txt": "aaa\n"
+      },
+      "stdout": "a\na\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookahead word option",
+      "args": [
+        "-owP",
+        "foo(?=_)",
+        "rep.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookbehind byte offset",
+      "args": [
+        "-obP",
+        "(?<=name=)\\w+",
+        "b.txt"
+      ],
+      "stdout": "25:alpha\n41:beta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep twice",
+      "args": [
+        "-oP",
+        "a\\Kb\\Kc"
+      ],
+      "stdin": "abc\n",
+      "stdout": "c\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep lookahead",
+      "args": [
+        "-oP",
+        "id=\\K\\d+(?= )",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep line",
+      "args": [
+        "-xoP",
+        "id=\\K\\d+.*",
+        "b.txt"
+      ],
+      "stdout": "42 name=alpha\n7 name=beta\n",
+      "exit": 0
+    },
+    {
+      "name": "perl h unicode",
+      "args": [
+        "-cP",
+        "a\\hb"
+      ],
+      "stdin": "a b\na b\nab\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "perl H",
+      "args": [
+        "-oP",
+        "\\H+"
+      ],
+      "stdin": "a b\tc\n",
+      "stdout": "a\nb\nc\n",
+      "exit": 0
+    },
+    {
+      "name": "perl v",
+      "args": [
+        "-cP",
+        "a\\vb"
+      ],
+      "stdin": "a\u000bb\nab\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl R unicode",
+      "args": [
+        "-cP",
+        "a\\Rb"
+      ],
+      "stdin": "ab\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl s unicode",
+      "args": [
+        "-cP",
+        "a\\sb"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl S",
+      "args": [
+        "-oP",
+        "\\S+"
+      ],
+      "stdin": "x y z\n",
+      "stdout": "x\ny\nz\n",
+      "exit": 0
+    },
+    {
+      "name": "perl s ignore case",
+      "args": [
+        "-ciP",
+        "A\\sB"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl w combining",
+      "args": [
+        "-oP",
+        "\\w+"
+      ],
+      "stdin": "éx y‿z\n",
+      "stdout": "éx\ny‿z\n",
+      "exit": 0
+    },
+    {
+      "name": "perl W",
+      "args": [
+        "-oP",
+        "\\W+"
+      ],
+      "stdin": "café, ok\n",
+      "stdout": ", \n",
+      "exit": 0
+    },
+    {
+      "name": "perl w ignore case",
+      "args": [
+        "-oiP",
+        "\\w+X"
+      ],
+      "stdin": "٣x\n",
+      "stdout": "٣x\n",
+      "exit": 0
+    },
+    {
+      "name": "perl digit class unicode",
+      "args": [
+        "-cP",
+        "[[:digit:]]"
+      ],
+      "stdin": "x٣\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl d ascii",
+      "args": [
+        "-cP",
+        "\\d"
+      ],
+      "stdin": "x٣\n",
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl punct unicode",
+      "args": [
+        "-oP",
+        "[[:punct:]]"
+      ],
+      "stdin": "«€$\n",
+      "stdout": "«\n$\n",
+      "exit": 0
+    },
+    {
+      "name": "perl space class",
+      "args": [
+        "-cP",
+        "[[:space:]]"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl blank class",
+      "args": [
+        "-cP",
+        "[[:blank:]]"
+      ],
+      "stdin": "a b\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl property N ignore case",
+      "args": [
+        "-oiP",
+        "\\p{N}+"
+      ],
+      "stdin": "a² 12\n",
+      "stdout": "²\n12\n",
+      "exit": 0
+    },
+    {
+      "name": "perl property not N",
+      "args": [
+        "-oP",
+        "\\P{N}+"
+      ],
+      "stdin": "ab12cd\n",
+      "stdout": "ab\ncd\n",
+      "exit": 0
+    },
+    {
+      "name": "perl property Nd class",
+      "args": [
+        "-oP",
+        "[\\p{Nd}.]+",
+        "b.txt"
+      ],
+      "stdout": "1.2.3\n42\n7\n1\n1\n555\n1234\n2026\n09\n24\n.\n",
+      "exit": 0
+    },
+    {
+      "name": "perl bang class",
+      "args": [
+        "-oP",
+        "[!a]+"
+      ],
+      "stdin": "b!a\n",
+      "stdout": "!a\n",
+      "exit": 0
+    },
+    {
+      "name": "perl comment group",
+      "args": [
+        "-oP",
+        "fo(?#a comment)o",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl stray E",
+      "args": [
+        "-cP",
+        "foo\\E",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl quoted name group",
+      "args": [
+        "-oP",
+        "(?'k'\\w+)=",
+        "conf"
+      ],
+      "stdout": "name=\nport=\nempty=\ndebug=\n",
+      "exit": 0
+    },
+    {
+      "name": "perl Z end",
+      "args": [
+        "-oP",
+        "o\\Z",
+        "a.txt"
+      ],
+      "stdout": "o\n",
+      "exit": 0
+    },
+    {
+      "name": "perl quote brackets",
+      "args": [
+        "-cP",
+        "\\Q[x]\\E",
+        "b.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lazy quantifier range",
+      "args": [
+        "-oP",
+        "\\d{1,3}?",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n3\n4\n2\n7\n1\n1\n5\n5\n5\n1\n2\n3\n4\n2\n0\n2\n6\n0\n9\n2\n4\n",
+      "exit": 0
+    },
+    {
+      "name": "perl empty lookbehind",
+      "args": [
+        "-cP",
+        "(?<=a)",
+        "a.txt"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lookbehind middle",
+      "args": [
+        "-P",
+        "a(?<=b)c",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "a lookbehind is refused anywhere but the start of the pattern, where it runs as a prefix"
+      }
+    },
+    {
+      "name": "perl lookahead middle",
+      "args": [
+        "-P",
+        "a(?=b)c",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "a lookahead is refused anywhere but the end of the pattern, where it runs as a suffix"
+      }
+    },
+    {
+      "name": "perl keep in group",
+      "args": [
+        "-P",
+        "(a\\Kb)",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "perl lookbehind alternation",
+      "args": [
+        "-oP",
+        "(?<=id=)\\d+|beta",
+        "b.txt"
+      ],
+      "stdout": "42\n7\nbeta\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "lookaround and \\K are refused beside a top-level alternation, which the prefix would bind to one side"
+      }
+    },
+    {
+      "name": "perl recursion",
+      "args": [
+        "-P",
+        "a(?R)?b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "recursion and subroutine calls are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl subroutine",
+      "args": [
+        "-P",
+        "(ab)(?1)",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "recursion and subroutine calls are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl conditional",
+      "args": [
+        "-P",
+        "(a)?(?(1)b|c)",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "conditional groups are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nthe the cat\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl branch reset",
+      "args": [
+        "-oP",
+        "(?|(a)|(b))",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "branch reset groups are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "a\nb\na\nb\na\na\nb\na\nb\na\nb\na\na\nb\na\nb\na\n",
+      "exit": 0
+    },
+    {
+      "name": "perl verb",
+      "args": [
+        "-P",
+        "a(*SKIP)b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backtracking verbs are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl g backreference",
+      "args": [
+        "-P",
+        "(a)\\g1",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "aa\n",
+      "exit": 0
+    },
+    {
+      "name": "perl g relative",
+      "args": [
+        "-P",
+        "(a)\\g{-1}",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "aa\n",
+      "exit": 0
+    },
+    {
+      "name": "perl python backreference",
+      "args": [
+        "-P",
+        "(?P<x>a)(?P=x)",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "aa\n",
+      "exit": 0
+    },
+    {
+      "name": "perl possessive star",
+      "args": [
+        "-P",
+        "a*+b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\nfoo_bar foo\nx foo-bar y\n",
+      "exit": 0
+    },
+    {
+      "name": "perl possessive range",
+      "args": [
+        "-P",
+        "a{1,2}+b",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl possessive group",
+      "args": [
+        "-P",
+        "(ab)++",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "abab\nababab\n",
+      "exit": 0
+    },
+    {
+      "name": "perl escaped plus not possessive",
+      "args": [
+        "-cP",
+        "\\++",
+        "b.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl class plus not possessive",
+      "args": [
+        "-cP",
+        "[+]+",
+        "b.txt"
+      ],
+      "stdout": "0\n",
+      "exit": 1
+    },
+    {
+      "name": "perl negative lookahead end",
+      "args": [
+        "-P",
+        "foo(?!d)",
+        "a.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "negative lookarounds are refused: RE2, the linear-time engine, has none"
+      },
+      "stdout": "foo one\nfoo two\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl word boundary unicode",
+      "args": [
+        "-oP",
+        "\\bfoo"
+      ],
+      "stdin": "éfoo foo\n",
+      "accept": {
+        "stdout": "foo\nfoo\n",
+        "exit": 0,
+        "reason": "\\b is ASCII in RE2, so a letter like é is no word character to it"
+      },
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep in flag group",
+      "args": [
+        "-oP",
+        "(?i:ID=\\K\\d+)",
+        "b.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "perl keep in repeated group",
+      "args": [
+        "-oP",
+        "(a\\Kb)+",
+        "rep.txt"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "\\K is refused inside a group that repeats, whose halves the prefix cannot split"
+      },
+      "stdout": "b\nb\n",
+      "exit": 0
+    }
+  ]
+}

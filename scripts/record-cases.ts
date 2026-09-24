@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records what a reference binary answers for each case of a fixture under
-// test/fixtures/just-bash/, for yq-record.ts and jq-record.ts. Run by hand;
+// test/fixtures/just-bash/, for yq-record.ts, jq-record.ts and
+// grep-record.ts. Run by hand;
 // the suite reads the fixture and never needs the binary.
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 export interface RecordedCase {
   name: string;
@@ -20,6 +21,10 @@ export interface RecordedCase {
   exit?: number;
   /** the binary failed with words on stderr */
   error?: boolean;
+  /** the binary succeeded with words on stderr */
+  warned?: boolean;
+  /** stdout's lines in no fixed order, compared sorted */
+  unordered?: boolean;
   /** every file the run changed, as it was left */
   written?: Record<string, string>;
   /** ours where it differs on purpose, with the reason */
@@ -33,8 +38,21 @@ export interface RecordedCase {
 
 export interface Fixture {
   recordedWith: string;
+  /** the environment of every case, under each case's own */
+  env?: Record<string, string>;
+  /** names may hold directories */
   files: Record<string, string>;
   cases: RecordedCase[];
+}
+
+/** The lines of a text in code point order, for unordered answers. */
+export function sortLines(text: string): string {
+  if (text === "") return text;
+  const lines = text.endsWith("\n")
+    ? text.slice(0, -1).split("\n")
+    : text.split("\n");
+  lines.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return `${lines.join("\n")}\n`;
 }
 
 export async function record(
@@ -64,11 +82,17 @@ export async function record(
     try {
       const files = { ...fixture.files, ...c.files };
       for (const [name, text] of Object.entries(files)) {
+        await mkdir(dirname(join(dir, name)), { recursive: true });
         await writeFile(join(dir, name), text);
       }
       const run = Bun.spawnSync([binary, ...c.args], {
         cwd: dir,
-        env: { PATH: process.env.PATH ?? "", HOME: dir, ...c.env },
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: dir,
+          ...fixture.env,
+          ...c.env,
+        },
         stdin: new TextEncoder().encode(c.stdin ?? ""),
         stdout: "pipe",
         stderr: "pipe",
@@ -78,20 +102,39 @@ export async function record(
         const now = await readFile(join(dir, name), "utf8");
         if (now !== text) written[name] = now;
       }
+      const said = run.stderr.toString().trim() !== "";
       const next = {
-        stdout: run.stdout.toString(),
+        stdout: c.unordered
+          ? sortLines(run.stdout.toString())
+          : run.stdout.toString(),
         exit: run.exitCode ?? -1,
-        error: run.exitCode !== 0 && run.stderr.toString().trim() !== "",
+        error: run.exitCode !== 0 && said,
+        warned: run.exitCode === 0 && said,
         written,
       };
-      const before = JSON.stringify([c.stdout, c.exit, c.error, c.written]);
+      const before = JSON.stringify([
+        c.stdout,
+        c.exit,
+        c.error,
+        c.warned,
+        c.written,
+      ]);
       c.stdout = next.stdout;
       c.exit = next.exit;
       if (next.error) c.error = true;
       else delete c.error;
+      if (next.warned) c.warned = true;
+      else delete c.warned;
       if (Object.keys(written).length > 0) c.written = written;
       else delete c.written;
-      if (before !== JSON.stringify([c.stdout, c.exit, c.error, c.written])) {
+      const after = JSON.stringify([
+        c.stdout,
+        c.exit,
+        c.error,
+        c.warned,
+        c.written,
+      ]);
+      if (before !== after) {
         moved.push(c.name);
       }
     } finally {

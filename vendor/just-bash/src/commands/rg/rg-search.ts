@@ -21,6 +21,7 @@ import type { ExecResult, RuntimeCommandContext } from "../../types.js";
 import {
   buildRegex,
   convertReplacement,
+  isWholeWord,
   type RegexResult,
   searchContent,
 } from "../search-engine/index.js";
@@ -295,6 +296,11 @@ export async function executeSearch(
       passthru: options.passthru,
       multiline: options.multiline,
       kResetGroup,
+      // (1ctx) the word check, -c -o and empty -o matches, as ripgrep
+      wholeWord: options.wordRegexp,
+      countOnlyMatching: true,
+      printEmptyMatches: true,
+      contextWithOnlyMatching: true,
       maxWork: ctx.limits.maxLoopIterations,
       maxMatches: ctx.limits.maxArrayElements,
       signal: ctx.signal,
@@ -1182,6 +1188,11 @@ async function searchFiles(
             passthru: options.passthru,
             multiline: options.multiline,
             kResetGroup,
+            // (1ctx) the word check, -c -o and empty -o matches, as ripgrep
+            wholeWord: options.wordRegexp,
+            countOnlyMatching: true,
+            printEmptyMatches: true,
+            contextWithOnlyMatching: true,
             maxWork: ctx.limits.maxLoopIterations,
             maxMatches: ctx.limits.maxArrayElements,
             signal: ctx.signal,
@@ -1238,6 +1249,13 @@ async function searchFiles(
               match !== null;
               match = regex.exec(line)
             ) {
+              // (1ctx) -w is the matcher's check, not the pattern's
+              if (
+                options.wordRegexp &&
+                !isWholeWord(line, match.index, match.index + match[0].length)
+              ) {
+                continue;
+              }
               const submatch: JsonSubmatch = {
                 match: { text: match[0] },
                 start: match.index,
