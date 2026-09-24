@@ -952,8 +952,10 @@ violation, and every rule has a rejected fixture under
   absent included) or the note holds its result; else it is refused
   with the note listed. A success records its topic as seen; a refusal,
   which always lists the note, records the whole note as seen, so the
-  retry applies. Answers say "Saved to the project's memory." and the
-  size.
+  retry applies, unless it repeats the text a conflict refused: the
+  send's handle keeps that text per topic and refuses it again, asking
+  for the merge, without counting a failed round. Answers say "Saved to
+  the project's memory." and the size.
   A run with `ownMemory` reads its automation's note too and
   opens a bounded final phase with only the own-note edit tool. The
   ending claims one cause,

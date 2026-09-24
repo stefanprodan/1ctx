@@ -25,7 +25,7 @@ export type ChatEditOutcome =
       seen: MemoryEntry[];
       changed: boolean;
     }
-  | { ok: false; reason: string; seen: MemoryEntry[] };
+  | { ok: false; reason: string; seen: MemoryEntry[]; conflict: boolean };
 
 const find = (entries: readonly MemoryEntry[], topic: string) =>
   entries.find((entry) => entry.topic.toLowerCase() === topic.toLowerCase());
@@ -71,7 +71,7 @@ export function chatEdit(
       current === undefined
         ? `Another chat removed the topic ${saw!.topic} since this chat last saw it. Set it again only if it is still needed.`
         : `Another chat wrote the topic ${current.topic} since this chat last saw it. Its text is in the note below. ${edit.action === "set" ? "Merge your text into it and set it again." : "Remove it again only if it is still stale."}`;
-    return { ok: false, reason, seen: all };
+    return { ok: false, reason, seen: all, conflict: true };
   }
   const result = applyEdit(note, edit);
   if (!result.ok) {
@@ -89,7 +89,12 @@ export function chatEdit(
       result.kind === "budget"
         ? result.reason.replace(/ Cut or remove .+\.$/, "")
         : result.reason;
-    return { ok: false, reason: `${reason}${advice}`, seen: all };
+    return {
+      ok: false,
+      reason: `${reason}${advice}`,
+      seen: all,
+      conflict: false,
+    };
   }
   return {
     ok: true,

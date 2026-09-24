@@ -99,6 +99,9 @@ export type MemoryHandle = {
   // the own-note phase's working copy, null in a chat
   work: MemoryWork | null;
   chat: ChatMemoryPort | null;
+  // a chat's set refused for a conflict, by folded topic: the same text
+  // again is the merge not done
+  refused: Map<string, string>;
   queue: Promise<void>;
   stopped: boolean;
   recordEdit(success: boolean): void;

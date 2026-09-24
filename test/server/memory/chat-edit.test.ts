@@ -57,6 +57,7 @@ describe("a chat's edit of the project's note", () => {
       reason:
         "Another chat wrote the topic Units since this chat last saw it. Its text is in the note below. Merge your text into it and set it again.",
       seen: note,
+      conflict: true,
     });
     // the retry, over what the refusal showed, applies
     const retry = chatEdit(note, note, {
@@ -89,6 +90,7 @@ describe("a chat's edit of the project's note", () => {
       reason:
         "Another chat removed the topic Units since this chat last saw it. Set it again only if it is still needed.",
       seen: [],
+      conflict: true,
     });
     expect(
       chatEdit([], [], { action: "set", topic: "Units", text: "SI" }).ok,
@@ -129,6 +131,7 @@ describe("a chat's edit of the project's note", () => {
       reason:
         "No entry has topic Units. Topics: Time. Use one of the topics in the note.",
       seen: note,
+      conflict: false,
     });
   });
 

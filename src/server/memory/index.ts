@@ -40,7 +40,12 @@ export type MemoryDeps = {
 };
 
 // what a chat's edit answers the model: the saved words or the refusal
-export type ChatEditAnswer = { error: boolean; content: string };
+// conflict: refused because another chat wrote the topic since this one saw it
+export type ChatEditAnswer = {
+  error: boolean;
+  content: string;
+  conflict?: boolean;
+};
 
 export type MemoryCapability = {
   read(projectId: string, automationId: string | null): Memory;
@@ -185,6 +190,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
             result: {
               error: true,
               content: noteWords(outcome.reason, current.entries),
+              conflict: outcome.conflict,
             },
           };
         }

@@ -268,6 +268,33 @@ describe("a chat saves to the project's memory", () => {
     }
   });
 
+  test("a retry that repeats the refused text is refused until it merges", async () => {
+    const chat = await chatApp();
+    try {
+      const a = (await quiet(chat)).sessionId;
+      await saves(chat, null, [
+        [{ action: "set", topic: "Units", text: "metric" }],
+      ]);
+      const retried = await saves(chat, a, [
+        [{ action: "set", topic: "Units", text: "imperial" }],
+        [{ action: "set", topic: "Units", text: "imperial" }],
+        [{ action: "set", topic: "Units", text: "metric and imperial" }],
+      ]);
+      expect(retried.results[0]![0]).toContain("Another chat wrote the topic");
+      expect(retried.results[1]![0]).toStartWith(
+        "Error: This is the text refused for Units.",
+      );
+      expect(retried.results[1]![0]).toContain("1. Units [6/500]\nmetric\n");
+      // the unmerged retry is no failed round, so the tool is still there
+      expect(retried.results[2]![0]).toStartWith("Saved to the project's");
+      expect(note(chat).entries).toEqual([
+        entry("Units", "metric and imperial"),
+      ]);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("what a chat has seen holds across a restart over the same database", async () => {
     const file = fileDb();
     try {

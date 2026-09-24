@@ -60,6 +60,7 @@ function handleOf(
   const handle: MemoryHandle = {
     work,
     chat,
+    refused: new Map(),
     queue: Promise.resolve(),
     stopped: false,
     recordEdit(success) {
@@ -122,12 +123,27 @@ function runChatMemory(
   return throughQueue(handle, async () => {
     if (handle.stopped) return stoppedResult();
     let answer: ChatEditAnswer | null = null;
+    // the unmerged retry is not a failed round: the loop's repeat check
+    // ends a model that keeps sending it
+    let unmerged = false;
     const tool = chatEditTool((edit) => {
+      const topic = edit.topic.toLowerCase();
+      if (edit.action === "set" && handle.refused.get(topic) === edit.text) {
+        unmerged = true;
+        throw new Error(
+          `This is the text refused for ${edit.topic}. Merge the text the note holds for it, below, into yours so both are kept, and set it again.`,
+        );
+      }
       answer = chat.edit(edit);
+      if (answer.conflict && edit.action === "set") {
+        handle.refused.set(topic, edit.text);
+      } else if (!answer.error) {
+        handle.refused.delete(topic);
+      }
       return answer;
     });
     const result = await new Registry([tool]).run(call, ctx);
-    handle.recordEdit(!result.error);
+    if (!unmerged) handle.recordEdit(!result.error);
     if (!result.error) return result;
     // a refusal before the edit, of the arguments, lists the note too
     const content =
