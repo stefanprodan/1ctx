@@ -259,7 +259,8 @@ export class UserRegex implements RegexLike {
 
     // For global regex, start from lastIndex
     const startPos = this._global ? this._lastIndex : 0;
-    if (!matcher.find(startPos)) {
+    // (1ctx) past the end is no match, as for RegExp; RE2JS throws there
+    if (startPos > input.length || !matcher.find(startPos)) {
       if (this._global) {
         this._lastIndex = 0;
       }
@@ -496,6 +497,7 @@ export class UserRegex implements RegexLike {
    */
   scan(input: string, from = 0): { start: number; end: number } | null {
     if (this.signal?.aborted) throw new Error("regular expression aborted");
+    if (from > input.length) return null;
     const matcher = this.acquireMatcher(input);
     if (!matcher.find(from)) return null;
     return { start: matcher.start(0), end: matcher.end(0) };
@@ -510,6 +512,7 @@ export class UserRegex implements RegexLike {
     from = 0,
   ): Array<{ start: number; end: number }> | null {
     if (this.signal?.aborted) throw new Error("regular expression aborted");
+    if (from > input.length) return null;
     const matcher = this.acquireMatcher(input);
     if (!matcher.find(from)) return null;
     const spans: Array<{ start: number; end: number }> = [];

@@ -191,9 +191,12 @@ export const grepCommand: RuntimeCommand = {
     let onlyMatching = false;
     let noFilename = false;
     let quietMode = false;
-    let maxCount = 0; // 0 means unlimited
+    // (1ctx) undefined is no limit, 0 selects nothing
+    let maxCount: number | undefined;
     let beforeContext = 0;
     let afterContext = 0;
+    // (1ctx) any context option separates groups, -A0 included
+    let contextGiven = false;
     const includePatterns: string[] = [];
     const excludePatterns: string[] = [];
     const excludeDirPatterns: string[] = [];
@@ -267,6 +270,7 @@ export const grepCommand: RuntimeCommand = {
         const contextMatch = arg.match(/^-([ABC])(\d+)$/);
         if (contextMatch) {
           const num = parseInt(contextMatch[2], 10);
+          contextGiven = true;
           if (contextMatch[1] === "A") afterContext = num;
           else if (contextMatch[1] === "B") beforeContext = num;
           else if (contextMatch[1] === "C") {
@@ -282,6 +286,7 @@ export const grepCommand: RuntimeCommand = {
           i + 1 < args.length
         ) {
           const num = parseInt(args[++i], 10);
+          contextGiven = true;
           if (arg === "-A") afterContext = num;
           else if (arg === "-B") beforeContext = num;
           else {
@@ -349,6 +354,9 @@ export const grepCommand: RuntimeCommand = {
         operands.push(arg);
       }
     }
+
+    // (1ctx) -m 0 selects nothing and reads nothing, as GNU grep
+    if (maxCount === 0) return { stdout: "", stderr: "", exitCode: 1 };
 
     // The first operand is the pattern only when no -e/-f pattern was given.
     if (pattern === null && patternFiles.length === 0) {
@@ -494,6 +502,8 @@ export const grepCommand: RuntimeCommand = {
     // codepoints match `.` / character classes correctly.
     if (files.length === 0 && ctx.stdin !== undefined) {
       const input = stdinUsedForPatterns ? "" : decodeBytesToUtf8(ctx.stdin);
+      // (1ctx) a NUL makes the input binary: no lines, a word on stderr
+      const binary = input.includes("\0");
       const result = searchContent(input, regex, {
         invertMatch,
         showLineNumbers,
@@ -502,8 +512,11 @@ export const grepCommand: RuntimeCommand = {
         onlyMatching,
         beforeContext,
         afterContext,
+        groupSeparators: contextGiven,
         maxCount,
         kResetGroup,
+        wholeWord,
+        selectOnly: binary || quietMode || filesWithMatches || filesWithoutMatch,
         preFilter,
         maxWork: getMatcherWorkLimit(ctx),
         maxMatches: ctx.limits.maxArrayElements,
@@ -512,10 +525,18 @@ export const grepCommand: RuntimeCommand = {
       if (quietMode) {
         return { stdout: "", stderr: "", exitCode: result.matched ? 0 : 1 };
       }
+      let stdout = result.output;
+      if (filesWithMatches) stdout = result.matched ? `${STDIN_FILENAME}\n` : "";
+      else if (filesWithoutMatch) {
+        stdout = result.matched ? "" : `${STDIN_FILENAME}\n`;
+      }
+      const warned =
+        binary && result.matched && !countOnly && !filesWithMatches &&
+        !filesWithoutMatch;
       // grep emits text; the pipeline handles encoding.
       return {
-        stdout: result.output,
-        stderr: "",
+        stdout,
+        stderr: warned ? `grep: ${STDIN_FILENAME}: binary file matches\n` : "",
         exitCode: result.matched ? 0 : 1,
       };
     }
@@ -532,6 +553,8 @@ export const grepCommand: RuntimeCommand = {
     let stderr = "";
     let anyMatch = false;
     let anyError = false;
+    // (1ctx) a context group after an earlier file's lines is separated
+    let printedAny = false;
 
     // Collect all files to search (expand globs first)
     // FileEntry includes type info when available to skip stat calls
@@ -696,52 +719,11 @@ export const grepCommand: RuntimeCommand = {
 
               content = await ctx.fs.readFile(filePath);
             }
-
-            // File-level preFilter: skip searchContent entirely when no needle exists in file.
-            // Avoids content.split("\n") and all per-line work for the common zero-match case.
-            if (preFilter && !invertMatch) {
-              const haystack = preFilter.ignoreCase
-                ? content.toLowerCase()
-                : content;
-              if (!preFilter.needles.some((n) => haystack.includes(n))) {
-                if (countOnly) {
-                  const countStr = showFilename ? `${file}:0` : "0";
-                  return {
-                    file,
-                    result: {
-                      output: `${countStr}\n`,
-                      matched: false,
-                      matchCount: 0,
-                    },
-                  };
-                }
-                return {
-                  file,
-                  result: { output: "", matched: false, matchCount: 0 },
-                };
-              }
-            }
-
-            const result = searchContent(content, regex, {
-              invertMatch,
-              showLineNumbers,
-              countOnly,
-              filename: showFilename ? file : "",
-              onlyMatching,
-              beforeContext,
-              afterContext,
-              maxCount,
-              kResetGroup,
-              preFilter,
-              maxWork: getMatcherWorkLimit(ctx),
-              maxMatches: ctx.limits.maxArrayElements,
-              signal: ctx.signal,
-            });
-
-            return { file, result };
+            return { file, content };
           } catch (error) {
             rethrowFatalExecutionError(error);
-            return { error: `grep: ${file}: No such file or directory\n` };
+            // (1ctx) only a missing file is one; any other throw says what it was
+            return { error: `grep: ${file}: ${fileErrorWords(error)}\n` };
           }
         }),
       );
@@ -758,14 +740,48 @@ export const grepCommand: RuntimeCommand = {
           continue;
         }
 
-        if (!("file" in res) || !res.result) continue;
+        if (!("file" in res) || res.content === undefined) continue;
 
-        const { file, result } = res;
+        // (1ctx) searched in order, so a context group knows what came before
+        const { file, content } = res;
+        // (1ctx) a NUL makes the file binary: no lines, a word on stderr
+        const binary = content.includes("\0");
+        const result = searchContent(content, regex, {
+          invertMatch,
+          showLineNumbers,
+          countOnly,
+          filename: showFilename ? file : "",
+          separateFirstGroup: printedAny,
+          onlyMatching,
+          beforeContext,
+          afterContext,
+          groupSeparators: contextGiven,
+          maxCount,
+          kResetGroup,
+          wholeWord,
+          selectOnly:
+            binary || quietMode || filesWithMatches || filesWithoutMatch,
+          preFilter,
+          maxWork: getMatcherWorkLimit(ctx),
+          maxMatches: ctx.limits.maxArrayElements,
+          signal: ctx.signal,
+        });
+        if (result.output !== "") printedAny = true;
+        if (
+          binary &&
+          result.matched &&
+          !countOnly &&
+          !quietMode &&
+          !filesWithMatches &&
+          !filesWithoutMatch
+        ) {
+          stderr += `grep: ${file}: binary file matches\n`;
+        }
         if (result.matched) {
           anyMatch = true;
           if (quietMode) {
-            // In quiet mode, exit immediately on first match
-            return { stdout: "", stderr: "", exitCode: 0 };
+            // (1ctx) quiet stops at the first match, keeping earlier errors
+            return { stdout: "", stderr, exitCode: 0 };
           }
           if (filesWithMatches) {
             stdout += `${file}\n`;
@@ -800,7 +816,7 @@ export const grepCommand: RuntimeCommand = {
     }
 
     if (quietMode) {
-      return { stdout: "", stderr: "", exitCode };
+      return { stdout: "", stderr, exitCode };
     }
 
     return {
@@ -810,6 +826,20 @@ export const grepCommand: RuntimeCommand = {
     };
   },
 };
+
+/** (1ctx) What a failed read says: only a missing file is one. */
+function fileErrorWords(error: unknown): string {
+  const code = (error as { code?: string } | null)?.code;
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === "ENOENT" || /^ENOENT\b/.test(message)) {
+    return "No such file or directory";
+  }
+  if (code === "EISDIR" || /^EISDIR\b/.test(message)) return "Is a directory";
+  if (code === "EACCES" || /^EACCES\b/.test(message)) {
+    return "Permission denied";
+  }
+  return message;
+}
 
 /** Safety limit to prevent stack overflow on deeply nested directories */
 const MAX_GREP_DEPTH = 256;

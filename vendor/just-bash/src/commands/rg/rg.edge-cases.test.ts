@@ -367,8 +367,9 @@ describe("rg inverted context", () => {
     // Context includes the 'c' line as context for surrounding matches
     const result = await bash.exec("rg -v -C1 c");
     expect(result.exitCode).toBe(0);
+    // (1ctx) a selected line is printed as one inside another's context
     expect(result.stdout).toBe(
-      "file.txt:1:a\nfile.txt-2-b\nfile.txt-3-c\nfile.txt:4:d\nfile.txt-5-e\n",
+      "file.txt:1:a\nfile.txt:2:b\nfile.txt-3-c\nfile.txt:4:d\nfile.txt:5:e\n",
     );
     expect(result.stderr).toBe("");
   });

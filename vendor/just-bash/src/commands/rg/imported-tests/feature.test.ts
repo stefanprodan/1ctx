@@ -379,7 +379,8 @@ describe("rg feature: issue #159 - max count", () => {
     expect(result.stdout).toBe("foo:1:test\n");
   });
 
-  it("should treat -m0 as unlimited", async () => {
+  // (1ctx) ripgrep 15's -m0 selects nothing and exits 1
+  it("should treat -m0 as selecting nothing", async () => {
     const bash = new Bash({
       cwd: "/home/user",
       files: {
@@ -387,8 +388,8 @@ describe("rg feature: issue #159 - max count", () => {
       },
     });
     const result = await bash.exec("rg -m0 test");
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("foo:1:test\nfoo:2:test\n");
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
   });
 });
 

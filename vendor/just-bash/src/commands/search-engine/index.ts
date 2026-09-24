@@ -8,6 +8,7 @@
  */
 
 export {
+  isWholeWord,
   type SearchOptions,
   type SearchResult,
   searchContent,
