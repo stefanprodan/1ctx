@@ -15,6 +15,7 @@ import { isRunFilter } from "../../shared/words.ts";
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
+import { loadCredentials } from "../data/credentials.ts";
 import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadMcp } from "../data/mcp.ts";
@@ -386,7 +387,9 @@ export const ROUTES: Route[] = [
     view: toolsView,
     title: () => "Web tools",
     role: "admin",
-    load: () => loadTools(),
+    load: async () => {
+      await Promise.all([loadTools(), loadCredentials()]);
+    },
   },
   {
     path: "/admin/tools/limits",

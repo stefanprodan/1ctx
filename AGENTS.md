@@ -1116,14 +1116,23 @@ violation, and every rule has a rejected fixture under
   provider and key presence), and `visualize` (its switch and hosts).
   The one `PATCH /api/tools/:name` descriptor accepts web mode/domains,
   websearch provider, or visualize enabled/hosts, never webfetch.
-  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
+  On the page Web is four cards. Web access (`WebAccessCard.tsx`) has
   its modes, Off, All domains and Listed domains, in the card's head as
   `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
   and All domains save on the click, Listed domains opens the hosts box,
   checked through `parseDomains()` in `shared/web.ts`, and saves the mode
   with the list. Web search is the providers as radio rows with None
   first. Visuals is the visualize row with its switch and its hosts with
-  Add, Remove and Reset, apart from web access.
+  Add, Remove and Reset, apart from web access. Credentials
+  (`CredentialsCard.tsx`, its words and bodies in
+  `CredentialsCard.model.ts`, the rows and `http-` keys in
+  `data/credentials.ts`, loaded by the Web route) is `Rows`: the name
+  over the prefix and its projects, the key file as `RowsMeta`, `bad`
+  when missing or unusable; New credential and an open row are one
+  form, the key a `Select` marking unusable and missing files, the
+  methods as boxes (GET and HEAD new), the rail's team projects as
+  `RowsCheck` lines, a PATCH sending only the fields changed, and
+  Delete asked once.
   The hosts field warns that loaded URLs can send the visual's data;
   each card's head has its total. Limits is a form per scope (Per send,
   Per call, Knowledge, Scheduled tasks), each saving the full set with
