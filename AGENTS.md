@@ -971,8 +971,9 @@ violation, and every rule has a rejected fixture under
   MCP name (`tools/bash-hint.ts`).
   Main rounds spend prompt less cached, a tenth of cached rounded up
   (`CACHED_DIVISOR` in `runner/round.ts`) and completion, or a request
-  estimate without usage; `send end` logs it as `spent_tokens`. The tool-work threshold and the
-  window threshold are checked before calls, forcing one answer round.
+  estimate without usage; `send end` logs it as `spent_tokens`. The
+  tool-work threshold and the window threshold are checked before
+  calls, forcing one answer round.
   Three equal call rounds in a row are refused once, recorded not run
   with a result pointing at the earlier ones and finish reason
   `tool_repeat` ("repeat refused" in the fold), and the loop goes on; a

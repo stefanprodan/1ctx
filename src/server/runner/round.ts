@@ -259,14 +259,20 @@ export async function runRound(
 export function spentTokens(
   usage: Pick<Usage, "promptTokens" | "completionTokens" | "cachedTokens">,
 ): number {
-  const prompt = usage.promptTokens;
-  const cached = Math.min(Math.max(usage.cachedTokens ?? 0, 0), prompt);
+  const prompt = whole(usage.promptTokens);
+  const cached = Math.min(whole(usage.cachedTokens ?? 0), prompt);
   return (
     prompt -
     cached +
     Math.ceil(cached / CACHED_DIVISOR) +
-    usage.completionTokens
+    whole(usage.completionTokens)
   );
+}
+
+// a provider's count is untrusted: a negative or broken one would give
+// the budget back
+function whole(count: number): number {
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 }
 
 // the first tool call delta of a round marks it work, once; the round

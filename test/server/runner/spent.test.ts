@@ -26,3 +26,16 @@ test("a cached count above the prompt is clamped to the prompt", () => {
 test("a cached tenth rounds up", () => {
   expect(spentTokens(usage(15))).toBe(4000 - 15 + 2 + 1000);
 });
+
+test("a broken count spends nothing rather than giving the budget back", () => {
+  expect(
+    spentTokens({ promptTokens: -10, completionTokens: 5, cachedTokens: 0 }),
+  ).toBe(5);
+  expect(
+    spentTokens({
+      promptTokens: 100.7,
+      completionTokens: Number.NaN,
+      cachedTokens: -3,
+    }),
+  ).toBe(100);
+});
