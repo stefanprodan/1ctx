@@ -3838,6 +3838,66 @@
       }
     },
     {
+      "name": "perl lines holding both",
+      "args": [
+        "-nP",
+        "^(?=.*foo)(?=.*t)",
+        "a.txt"
+      ],
+      "stdout": "3:foo two\n7:food court\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lines holding both unanchored",
+      "args": [
+        "-cP",
+        "(?=.*id)(?=.*beta)",
+        "b.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "perl line without the other",
+      "args": [
+        "-P",
+        "^(?=.*foo)(?!.*o\\b)",
+        "a.txt"
+      ],
+      "stdout": "food court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl lines without a word",
+      "args": [
+        "-vnP",
+        "^(?!.*foo)",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "perl only after a lookahead",
+      "args": [
+        "-oiP",
+        "^(?=.*three)\\w+",
+        "a.txt"
+      ],
+      "stdout": "Foo\n",
+      "exit": 0
+    },
+    {
+      "name": "perl empty lower bound",
+      "args": [
+        "-oP",
+        "o{,1}d",
+        "a.txt"
+      ],
+      "stdout": "od\nd\n",
+      "exit": 0
+    },
+    {
       "name": "perl lookahead",
       "args": [
         "-oP",

@@ -8,7 +8,7 @@ import {
   ExecutionLimitError,
 } from "../../interpreter/errors.js";
 import type { UserRegex } from "../../regex/index.js";
-import type { PreFilter } from "./regex.js";
+import type { LineCondition, PreFilter } from "./regex.js";
 
 /**
  * Substring fast-path check: returns true if at least one needle is present
@@ -95,6 +95,8 @@ export interface SearchOptions {
   kResetGroup?: number;
   /** (1ctx) A match counts only with no word character on either side */
   wholeWord?: boolean;
+  /** (1ctx) Patterns a line must also match, grep -P's leading lookaheads */
+  conditions?: LineCondition[];
   /** (1ctx) -o prints an empty line for an empty match, as ripgrep */
   printEmptyMatches?: boolean;
   /** (1ctx) -o still prints context lines whole, as ripgrep; GNU grep not */
@@ -193,6 +195,7 @@ class LineMatcher {
     private readonly keepGroup: number | undefined,
     private readonly wholeWord: boolean,
     private readonly charge: (amount?: number) => void,
+    private readonly conditions: LineCondition[] = [],
   ) {}
 
   private raw(line: string, from: number): Hit | null {
@@ -217,6 +220,10 @@ class LineMatcher {
   }
 
   find(line: string, from: number): Hit | null {
+    for (const { regex, negated } of this.conditions) {
+      this.charge();
+      if ((regex.scan(line, 0) === null) !== negated) return null;
+    }
     if (!this.wholeWord) return this.raw(line, from);
     let pos = from;
     while (pos <= line.length) {
@@ -330,6 +337,7 @@ export function searchContent(
     multiline = false,
     kResetGroup,
     wholeWord = false,
+    conditions = [],
     printEmptyMatches = false,
     contextWithOnlyMatching = false,
     countOnlyMatching = false,
@@ -435,7 +443,13 @@ export function searchContent(
   const lastIdx =
     lineCount > 0 && lines[lineCount - 1] === "" ? lineCount - 1 : lineCount;
 
-  const matcher = new LineMatcher(regex, kResetGroup, wholeWord, chargeWork);
+  const matcher = new LineMatcher(
+    regex,
+    kResetGroup,
+    wholeWord,
+    chargeWork,
+    conditions,
+  );
   const lineMatches = (line: string): boolean => {
     if (preFilter && !preFilterMatches(preFilter, line)) return false;
     return matcher.find(line, 0) !== null;

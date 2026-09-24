@@ -196,7 +196,7 @@ function rewrite(pattern: string): string {
     if (ch === "{") {
       const m = QUANTIFIER.exec(pattern.slice(i));
       if (m) {
-        out += m[0];
+        out += m[0].startsWith("{,") ? `{0${m[0].slice(1)}` : m[0];
         i += m[0].length - 1;
         quantified = true;
         continue;
@@ -215,12 +215,6 @@ function rewrite(pattern: string): string {
         }
         i = close;
         continue;
-      }
-      if (rest.startsWith("(?!")) {
-        unsupported("negative lookahead (?!", "lookaround");
-      }
-      if (rest.startsWith("(?<!")) {
-        unsupported("negative lookbehind (?<!", "lookaround");
       }
       if (rest.startsWith("(?>")) {
         unsupported("an atomic group (?>", "atomic groups");
@@ -287,6 +281,12 @@ function closingParen(pattern: string, start: number): number {
 
 function lookaround(pattern: string): string | null {
   for (const { at } of tokens(pattern)) {
+    if (pattern.startsWith("(?!", at)) {
+      unsupported("negative lookahead (?!", "lookaround");
+    }
+    if (pattern.startsWith("(?<!", at)) {
+      unsupported("negative lookbehind (?<!", "lookaround");
+    }
     if (pattern.startsWith("(?<=", at)) return "lookbehind (?<=";
     if (pattern.startsWith("(?=", at)) return "lookahead (?=";
   }
@@ -360,6 +360,39 @@ export interface PcreTranslation {
   keepGroup?: number;
   /** the -x anchors are in place, around the kept part */
   anchored?: boolean;
+  /** leading lookaheads, anchored: what the line must match, or must not */
+  conditions?: Condition[];
+}
+
+export interface Condition {
+  source: string;
+  negated: boolean;
+}
+
+/**
+ * The idioms ^(?=.*a)(?=.*b) and ^(?=.*a)(?!.*b) ask for a line holding
+ * both, or one without the other: lookaheads at the line's start are
+ * separate patterns it must match there, or must not. Without the ^ that
+ * holds only for (?= with .*, where the line's start is the first start.
+ */
+function leadingLookaheads(body: string): [Condition[], string] | null {
+  const anchor = body.startsWith("^") ? "^" : "";
+  let rest = body.slice(anchor.length);
+  const conditions: Condition[] = [];
+  while (rest.startsWith("(?=") || rest.startsWith("(?!")) {
+    const close = closingParen(rest, 0);
+    if (close === -1) break;
+    const negated = rest[2] === "!";
+    conditions.push({ source: rest.slice(3, close), negated });
+    rest = rest.slice(close + 1);
+  }
+  if (conditions.length === 0) return null;
+  const free = (part: string) => part.startsWith(".*");
+  const unanchored =
+    conditions.every((c) => !c.negated && free(c.source)) &&
+    (rest === "" || free(rest));
+  if (anchor === "" && !unanchored) return null;
+  return [conditions, `^${rest}`];
 }
 
 /** Translate a grep -P pattern, after \Q...\E, \x{...} and (?x) are done. */
@@ -373,6 +406,16 @@ export function translatePcre(
   let body = s.slice(flags.length);
   let behind = "";
   let ahead = "";
+  let conditions: Condition[] = [];
+  const leading = leadingLookaheads(body);
+  if (leading !== null) [conditions, body] = leading;
+  for (const { source } of conditions) {
+    if (lookaround(source) !== null || source.includes("\\K")) {
+      throw new GnuPatternError(
+        "a leading lookahead (?= may hold no lookaround and no \\K",
+      );
+    }
+  }
   if (body.startsWith("(?<=")) {
     const close = closingParen(body, 0);
     if (close !== -1) {
@@ -395,7 +438,7 @@ export function translatePcre(
     throw new GnuPatternError(
       stray.startsWith("lookbehind")
         ? "lookbehind (?<= is supported only at the start of the pattern"
-        : "lookahead (?= is supported only at the end of the pattern",
+        : "lookahead (?= is supported only at the end of the pattern or right after a leading ^",
     );
   }
   body = liftKeep(body);
@@ -413,7 +456,18 @@ export function translatePcre(
     }
   }
   const keep = keeps.at(-1) ?? -1;
-  if (behind === "" && ahead === "" && keep === -1) return { source: s };
+  const extra =
+    conditions.length > 0
+      ? {
+          conditions: conditions.map((c) => ({
+            source: `${flags}^(?:${c.source})`,
+            negated: c.negated,
+          })),
+        }
+      : {};
+  if (behind === "" && ahead === "" && keep === -1) {
+    return { source: conditions.length > 0 ? `${flags}${body}` : s, ...extra };
+  }
   if (alternation) {
     throw new GnuPatternError(
       "lookaround and \\K are supported only beside a pattern without a top-level |: put the alternatives in a group",
@@ -437,7 +491,12 @@ export function translatePcre(
       source: `${flags}${before}^(?:${pre})(${kept})$${after}`,
       keepGroup,
       anchored: true,
+      ...extra,
     };
   }
-  return { source: `${flags}(?:${before}${pre})(${kept})${after}`, keepGroup };
+  return {
+    source: `${flags}(?:${before}${pre})(${kept})${after}`,
+    keepGroup,
+    ...extra,
+  };
 }

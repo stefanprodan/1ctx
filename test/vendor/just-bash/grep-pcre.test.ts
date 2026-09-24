@@ -89,11 +89,55 @@ describe("grep -P's rewrites", () => {
     expect(result.stdout).toBe("1:a\n1:a\n0\n");
   });
 
+  test("{,n} is {0,n}, as in PCRE2 10.43", () => {
+    expect(translatePcre("a{,2}").source).toBe("a{0,2}");
+  });
+
   test("a caseless category runs under -i", async () => {
     const result = await run("grep -oiP '\\p{N}+|\\s' hay", {
       "/work/hay": "a² 1\n",
     });
     expect(result.stdout).toBe("²\n \n1\n");
+  });
+});
+
+describe("grep -P's leading lookaheads", () => {
+  const lines = {
+    "/work/hay": "foo bar\nfoo\nbar\nFOO baz bar\n",
+  };
+
+  test("are patterns a line must match, or must not, from its start", () => {
+    expect(translatePcre("(?i)^(?=.*a)(?!.*b)\\d")).toEqual({
+      source: "(?i)^\\d",
+      conditions: [
+        { source: "(?i)^(?:.*a)", negated: false },
+        { source: "(?i)^(?:.*b)", negated: true },
+      ],
+    });
+  });
+
+  test("select a line holding both words, or one without the other", async () => {
+    const result = await run(
+      "grep -P '^(?=.*foo)(?=.*bar)' hay; grep -ciP '(?=.*foo)(?=.*bar)' hay; " +
+        "grep -nP '^(?=.*foo)(?!.*bar)' hay; grep -vP '^(?!.*bar)' hay",
+      lines,
+    );
+    expect(result.stdout).toBe(
+      "foo bar\n2\n2:foo\nfoo bar\nbar\nFOO baz bar\n",
+    );
+  });
+
+  test("-o prints what follows them", async () => {
+    const result = await run("grep -oP '^(?=.*baz)\\w+' hay", lines);
+    expect(result.stdout).toBe("FOO\n");
+  });
+
+  test("a negative one without the ^ is refused", async () => {
+    const result = await run("grep -P '(?=.*a)(?!.*b)' hay");
+    expect(result.stderr).toStartWith(
+      "grep: lookahead (?= is supported only at the end of the pattern or right after a leading ^",
+    );
+    expect(result.exitCode).toBe(2);
   });
 });
 

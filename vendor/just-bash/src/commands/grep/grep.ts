@@ -780,6 +780,7 @@ export const grepCommand: RuntimeCommand = {
 
     let regex: UserRegex;
     let kResetGroup: number | undefined;
+    let conditions: import("../search-engine/regex.js").LineCondition[] = [];
     let preFilter: import("../search-engine/regex.js").PreFilter | undefined;
     let stderr = "";
     try {
@@ -794,6 +795,7 @@ export const grepCommand: RuntimeCommand = {
             });
       regex = regexResult.regex;
       kResetGroup = regexResult.kResetGroup;
+      conditions = regexResult.conditions ?? [];
       preFilter = regexResult.preFilter;
       for (const warning of regexResult.warnings ?? []) {
         stderr += `grep: warning: ${warning}\n`;
@@ -981,6 +983,7 @@ export const grepCommand: RuntimeCommand = {
         maxCount,
         kResetGroup,
         wholeWord,
+        conditions,
         selectOnly: binary || quietMode || filesWithMatches || filesWithoutMatch,
         preFilter,
         maxWork: getMatcherWorkLimit(ctx),

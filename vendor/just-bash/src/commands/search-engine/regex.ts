@@ -4,7 +4,7 @@
 
 import { createUserRegex, type UserRegex } from "../../regex/index.js";
 import { GnuPatternError, translateGnu } from "./gnu-regex.js";
-import { translatePcre } from "./pcre.js";
+import { type Condition, translatePcre } from "./pcre.js";
 
 /** POSIX character class to JavaScript regex character range mapping (Map prevents prototype pollution) */
 const POSIX_CLASS_MAP = new Map<string, string>([
@@ -55,6 +55,14 @@ export interface RegexResult {
   preFilter?: PreFilter;
   /** (1ctx) GNU grep's warnings about the pattern, each once */
   warnings?: string[];
+  /** (1ctx) grep -P's leading lookaheads: a line must match each of these */
+  conditions?: LineCondition[];
+}
+
+/** (1ctx) A pattern a selected line must match, or must not */
+export interface LineCondition {
+  regex: UserRegex;
+  negated: boolean;
 }
 
 export interface PreFilter {
@@ -194,6 +202,7 @@ export function buildPatterns(
   const warnings: string[] = [];
   let kResetGroup: number | undefined;
   let anchored = false;
+  let conditions: Condition[] = [];
   const sources = patterns.map((pattern, index) => {
     if (options.pcre) {
       // (1ctx) quotes, code points and (?x) first, then PCRE2's syntax
@@ -213,6 +222,7 @@ export function buildPatterns(
       if (patterns.length === 1) {
         kResetGroup = translated.keepGroup;
         anchored = translated.anchored ?? false;
+        conditions = translated.conditions ?? [];
       }
       return translated.source;
     }
@@ -287,10 +297,19 @@ export function buildPatterns(
     (options.multilineDotall ? "s" : "") +
     (needsUnicode ? "u" : "");
   const preFilter = extractPreFilter(regexPattern, options.ignoreCase ?? false);
+  const unicode = (source: string) =>
+    /\\u\{[0-9A-Fa-f]+\}/.test(source) ? "u" : "";
   return {
     regex: createUserRegex(regexPattern, flags, {
       longest: options.mode !== "perl",
     }),
+    conditions: conditions.map(({ source, negated }) => ({
+      regex: createUserRegex(
+        source,
+        `g${options.ignoreCase ? "i" : ""}${unicode(source)}`,
+      ),
+      negated,
+    })),
     kResetGroup,
     preFilter: preFilter ?? undefined,
     warnings,
