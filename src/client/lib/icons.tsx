@@ -131,6 +131,8 @@ const PATHS: Record<string, string> = {
   file: "M4 1.5h5l3 3V14a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 14zM9 1.5v3h3",
   archive: "M2 3h12v3H2zM3 6v7.5h10V6M6.5 9h3",
   visual: "M2 2.5h12v11H2zM5 11V8M8 11V5.5M11 11V7",
+  // a bookmark: what the project's memory keeps
+  memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
   // the database file: the admin's Storage page
   storage:
     "M3 4c0-1.1 2.2-2 5-2s5 .9 5 2-2.2 2-5 2-5-.9-5-2zM3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2",

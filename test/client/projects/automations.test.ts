@@ -483,6 +483,8 @@ describe("the form", () => {
         "mcp:a1",
         "mcp:b2",
         "mcp:gone",
+        // runs are never offered memory_edit, so the aside says nothing
+        "memory",
         "skill:gone",
         "skill:s1",
         "skill:s2",
@@ -497,6 +499,11 @@ describe("the form", () => {
       skillsOff: ["gitops", "visualize"],
       credentialsOff: [],
     });
+    // nor does the editor keep a key it never shows
+    const saved = requestOf(draftOf(row, "a1", "UTC", LIMIT), LIMIT);
+    expect(
+      "body" in saved ? saved.body.disabledCapabilities : null,
+    ).not.toContain("memory");
   });
 
   test("credentials off follow the row and save only for the project's", () => {

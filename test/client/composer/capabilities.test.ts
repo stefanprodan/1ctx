@@ -11,7 +11,7 @@ import {
   flip,
   isOff,
 } from "../../../src/client/data/capabilities.ts";
-import { WEB } from "../../../src/shared/capabilities.ts";
+import { MEMORY, WEB } from "../../../src/shared/capabilities.ts";
 
 // the pending flips are module state
 describe("pending capability flips", () => {
@@ -34,6 +34,15 @@ describe("pending capability flips", () => {
     flip("s1", [], WEB);
     expect(isOff("s1", [], WEB)).toBe(true);
     expect(changeOf("s1")).toEqual({ capabilities: { disable: [WEB] } });
+  });
+
+  test.serial("the memory key flips as web access does", () => {
+    flip("s1", [], MEMORY);
+    expect(isOff("s1", [], MEMORY)).toBe(true);
+    expect(isOff("s1", [], WEB)).toBe(false);
+    expect(changeOf("s1")).toEqual({ capabilities: { disable: [MEMORY] } });
+    flip("s1", [], MEMORY);
+    expect(changeOf("s1")).toEqual({});
   });
 
   test.serial("turning on what the chat has off is an enable", () => {

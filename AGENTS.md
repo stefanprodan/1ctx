@@ -1472,7 +1472,10 @@ violation, and every rule has a rejected fixture under
   drawn as the rail's theme switch is, which leaves the menu open, and
   the third is Visuals, the same switch over the `visualize` key
   (`visualsItem()` beside `webItem()` in `Add.model.ts`), off with the
-  same reasons.
+  same reasons. The fourth is Memory, over the `memory` key
+  (`memoryItem()`), which the server always answers as switchable, so
+  it is off only for an agent without tools. The automation editor and
+  its Setup aside show nothing for it and drop it on save.
   `composer/Add.model.ts` decides it: off with "Agent cannot use tools"
   or "Turned off by an admin" under it when it cannot be switched, the
   second from `capabilities` on `GET /api/projects/:id/agents`, held as
@@ -1493,12 +1496,12 @@ violation, and every rule has a rejected fixture under
   off", while the web is not on. Picking another agent keeps pending
   `credential:` flips; Home's composer moving to another project drops
   them.
-  The fourth item, MCP servers, is there when the picked agent has an
+  The fifth item, MCP servers, is there when the picked agent has an
   entry in `servers` of the same answer, held beside `switchable`. It
   says how many are on (`2 on`, `0 on`, `onWords()`, as every pane item
   does) and swaps the menu's rows, inside the same
   `.menu` box, for `composer/AddPane.tsx`: a back row, then a
-  `role="switch"` item per server with its tool count. The fifth item,
+  `role="switch"` item per server with its tool count. The sixth item,
   Skills, is the same pane over the agent's entry in `skills`, a switch
   per skill with nothing to count. Escape or Back
   returns to the menu through `useMenu(back)`; a flip leaves the pane

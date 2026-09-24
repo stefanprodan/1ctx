@@ -5,11 +5,12 @@
 // agent takes tools and the instance has web access on, and then on
 // unless the chat turned it off. When the project has credentials it
 // leads to a pane instead: Web access first, then a switch per
-// credential, which goes with it. MCP servers is there when the picked
-// agent is offered any, and leads to a switch per server; Skills is the
-// same for the skills it carries. A pane's item counts what is on. An
-// item that cannot be switched shows off and says why on a line under
-// its name.
+// credential, which goes with it. Memory is live whenever the agent
+// takes tools, since no admin switch governs it. MCP servers is there
+// when the picked agent is offered any, and leads to a switch per
+// server; Skills is the same for the skills it carries. A pane's item
+// counts what is on. An item that cannot be switched shows off and says
+// why on a line under its name.
 
 import type {
   SwitchableCredential,
@@ -18,6 +19,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import {
   credentialKey,
+  MEMORY,
   mcpKey,
   skillKey,
   VISUALIZE,
@@ -68,6 +70,16 @@ export function visualsItem(input: {
   off: boolean;
 }): WebItem {
   return kindItem(VISUALIZE, input);
+}
+
+// saving to the project's memory; the server always answers it as
+// switchable
+export function memoryItem(input: {
+  tools: boolean;
+  switchable: readonly string[] | null;
+  off: boolean;
+}): WebItem {
+  return kindItem(MEMORY, input);
 }
 
 // whether another agent was picked. The list going away for a moment,
