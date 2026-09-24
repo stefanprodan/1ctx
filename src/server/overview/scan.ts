@@ -75,8 +75,9 @@ export type ScanResult = {
   projects: ProjectRow[];
   automations: AutomationRow[];
   knowledge: KnowledgeSum[];
-  // stored bytes added per quarter hour of UTC since the input's cut
-  slots: [number, number][];
+  // stored bytes and rows added per quarter hour of UTC since the
+  // input's cut
+  slots: Slot[];
   staging: number;
   digests: number;
   // usage rows in all, and those of runs of tasks that still exist
@@ -84,6 +85,9 @@ export type ScanResult = {
 };
 
 export const SLOT_MS = 900_000;
+
+// a quarter hour, the stored bytes and the rows created in it
+export type Slot = [slot: number, bytes: number, rows: number];
 
 // the text a message row stores; the short columns are left out
 export const MESSAGE_BYTES =
@@ -184,7 +188,8 @@ const sums = (db: Db, sql: string): Map<string, number> =>
 function sessions(db: Db): SessionSum[] {
   const messages = db
     .query<{ id: string; count: number; bytes: number }, []>(
-      `select session_id as id, count(*) as count, sum(${MESSAGE_BYTES}) as bytes
+      `select session_id as id, count(*) as count, sum(${MESSAGE_BYTES}) as bytes,
+       count(*) as rows
          from messages group by session_id`,
     )
     .all();
@@ -258,47 +263,61 @@ function knowledge(db: Db): KnowledgeSum[] {
   }));
 }
 
-// What was added when: each row's stored bytes on the quarter hour its
-// creation time falls in. A live knowledge file takes its last write,
-// since a replacement keeps created_at; opened and kept files take
-// their message's time, scratch its last use (it has no creation
+// What was added when: each row, and its stored bytes, on the quarter
+// hour its creation time falls in. A live knowledge file takes its last
+// write, since a replacement keeps created_at; opened and kept files
+// take their message's time, scratch its last use (it has no creation
 // time), a skill's body and files the fetch that wrote them.
 const SLOT_SOURCES = [
-  `select created_at / ${SLOT_MS} as slot, sum(${MESSAGE_BYTES}) as bytes
+  `select created_at / ${SLOT_MS} as slot, sum(${MESSAGE_BYTES}) as bytes,
+       count(*) as rows
      from messages where created_at >= ? group by slot`,
-  `select m.created_at / ${SLOT_MS} as slot, sum(o.bytes) as bytes
+  `select m.created_at / ${SLOT_MS} as slot, sum(o.bytes) as bytes,
+       count(*) as rows
      from opened_files o join messages m on m.id = o.message_id
      where m.created_at >= ? group by slot`,
-  `select m.created_at / ${SLOT_MS} as slot, sum(k.bytes) as bytes
+  `select m.created_at / ${SLOT_MS} as slot, sum(k.bytes) as bytes,
+       count(*) as rows
      from mcp_kept_files k join messages m on m.id = k.message_id
      where m.created_at >= ? group by slot`,
-  `select updated_at / ${SLOT_MS} as slot, sum(bytes) as bytes
+  `select updated_at / ${SLOT_MS} as slot, sum(bytes) as bytes,
+       count(*) as rows
      from knowledge_files where updated_at >= ? group by slot`,
-  `select written_at / ${SLOT_MS} as slot, sum(bytes) as bytes
+  `select written_at / ${SLOT_MS} as slot, sum(bytes) as bytes,
+       count(*) as rows
      from knowledge_versions where written_at >= ? group by slot`,
-  `select created_at / ${SLOT_MS} as slot, sum(bytes) as bytes
+  `select created_at / ${SLOT_MS} as slot, sum(bytes) as bytes,
+       count(*) as rows
      from session_upload_files where created_at >= ? group by slot`,
-  `select created_at / ${SLOT_MS} as slot, sum(bytes) as bytes
+  `select created_at / ${SLOT_MS} as slot, sum(bytes) as bytes,
+       count(*) as rows
      from upload_staged where created_at >= ? group by slot`,
-  `select used_at / ${SLOT_MS} as slot, sum(bytes) as bytes
+  `select used_at / ${SLOT_MS} as slot, sum(bytes) as bytes,
+       count(*) as rows
      from session_scratch where used_at >= ? group by slot`,
-  `select fetched_at / ${SLOT_MS} as slot, sum(octet_length(body)) as bytes
+  `select fetched_at / ${SLOT_MS} as slot, sum(octet_length(body)) as bytes,
+       count(*) as rows
      from skills where fetched_at >= ? group by slot`,
-  `select s.fetched_at / ${SLOT_MS} as slot, sum(f.bytes) as bytes
+  `select s.fetched_at / ${SLOT_MS} as slot, sum(f.bytes) as bytes,
+       count(*) as rows
      from skill_files f join skills s on s.id = f.skill_id
      where s.fetched_at >= ? group by slot`,
 ];
 
-function slots(db: Db, since: number): [number, number][] {
-  const totals = new Map<number, number>();
+function slots(db: Db, since: number): Slot[] {
+  const totals = new Map<number, Slot>();
   for (const sql of SLOT_SOURCES) {
     for (const row of db
-      .query<{ slot: number; bytes: number }, [number]>(sql)
+      .query<{ slot: number; bytes: number; rows: number }, [number]>(sql)
       .all(since)) {
-      totals.set(row.slot, (totals.get(row.slot) ?? 0) + row.bytes);
+      const held = totals.get(row.slot);
+      if (held) {
+        held[1] += row.bytes;
+        held[2] += row.rows;
+      } else totals.set(row.slot, [row.slot, row.bytes, row.rows]);
     }
   }
-  return [...totals.entries()].sort((a, b) => a[0] - b[0]);
+  return [...totals.values()].sort((a, b) => a[0] - b[0]);
 }
 
 const total = (db: Db, sql: string): number =>

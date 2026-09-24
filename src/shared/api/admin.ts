@@ -48,9 +48,14 @@ export type StorageFile = {
   lastMigration: string | null;
 };
 
-// Stored bytes of the rows created in one day of the zone; start is
-// its local midnight
-export type StorageDay = { day: string; start: number; bytes: number };
+// The rows created in one day of the zone, of the tables that keep a
+// creation time, and their stored bytes; start is its local midnight
+export type StorageDay = {
+  day: string;
+  start: number;
+  bytes: number;
+  rows: number;
+};
 
 // What a large row's stored bytes are made of
 export type StoredPart =

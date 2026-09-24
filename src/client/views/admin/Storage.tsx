@@ -1,10 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The database as a board: four tiles (on disk, free space, growth,
-// the write-ahead log), then the areas beside one area's tables and
-// the largest rows beside retention, then a faint line of file facts.
-// Areas and tables are pages on disk, Largest and Retention the bytes
+// The database as a board: four tiles (the rows, the size and its
+// reusable share, growth, the write-ahead log), then the areas beside
+// one area's tables and the largest rows beside retention, then a
+// faint line of file facts.
+// Areas and tables are pages in the file, Largest and Retention the bytes
 // the rows store, so each panel names its unit. Loaded on arrival and
 // on Refresh; the first load draws the board in bones, a refresh fades
 // the last answer until the next lands.
@@ -47,18 +48,23 @@ import {
   areasFoot,
   cleanedLine,
   commas,
-  dayWord,
   factsLine,
   freeWords,
+  growthDay,
+  growthWords,
   keptLine,
   type LargestKind,
   largestLine,
+  logHeights,
   perDay,
   pickedArea,
+  rowsDay,
+  rowsTile,
   share,
   size,
   sizeParts,
   tableBars,
+  walWords,
 } from "./Storage.model.ts";
 import "./storage.css";
 
@@ -66,14 +72,14 @@ const SYNC = "storage";
 
 function StorageTiles({ answer }: { answer: StorageResponse }) {
   const { file, days, before } = answer;
-  // the day under either sparkline's cursor, shared through the sync key
+  // the day under either line's cursor, shared through the sync key
   const day = useSignal<number | null>(null);
   const onDisk = file.bytes + file.walBytes;
   const series = useMemo(
     () => ({
       starts: days.map((d) => d.start),
       sums: addedByDay(days),
-      bytes: days.map((d) => d.bytes),
+      rows: logHeights(days.map((d) => d.rows)),
     }),
     [days],
   );
@@ -82,6 +88,7 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
   const i = day.value;
   const at = i === null ? null : days[i];
   const disk = sizeParts(onDisk);
+  const rows = rowsTile(answer.areas);
   const growth = perDay(grown, days.length);
   const onCursor = (index: number | null) => {
     day.value = index;
@@ -89,13 +96,38 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
   return (
     <Tiles>
       <Tile
-        label="On disk"
+        label="Database"
+        figure={rows.figure}
+        unit={rows.unit}
+        sub={at ? rowsDay(at) : rows.sub}
+      >
+        <TilePlot label="Rows added per day">
+          <Spark
+            kind="bars"
+            days={series.starts}
+            values={series.rows}
+            sync={SYNC}
+            onCursor={onCursor}
+          />
+        </TilePlot>
+      </Tile>
+      <Tile
+        label="Size"
         figure={disk.figure}
         unit={disk.unit}
+        sub={freeWords(file)}
+      >
+        {/* the used share; the words say what is reusable */}
+        <TileMeter share={onDisk > 0 ? 1 - free / onDisk : 0} />
+      </Tile>
+      <Tile
+        label="Growth"
+        figure={growth.figure}
+        unit={growth.unit}
         sub={
           at && i !== null
-            ? `${dayWord(at.start)} · +${size(series.sums[i])} by then`
-            : `+${size(grown)} in ${days.length} days`
+            ? growthDay(at.start, series.sums[i])
+            : growthWords(before, days.length)
         }
       >
         <TilePlot label={`Stored bytes added over ${days.length} days`}>
@@ -109,39 +141,13 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
         </TilePlot>
       </Tile>
       <Tile
-        label="Free space"
-        figure={sizeParts(free).figure}
-        unit={sizeParts(free).unit}
-        sub={freeWords(file)}
-      >
-        <TileMeter share={file.bytes > 0 ? free / file.bytes : 0} />
-      </Tile>
-      <Tile
-        label="Growth"
-        figure={growth.figure}
-        unit={growth.unit}
-        sub={
-          at
-            ? `${dayWord(at.start)} · +${size(at.bytes)}`
-            : `${size(days.length > 0 ? before / days.length : 0)} a day the ${days.length} before`
-        }
-      >
-        <TilePlot label="Bytes added per day">
-          <Spark
-            kind="bars"
-            days={series.starts}
-            values={series.bytes}
-            sync={SYNC}
-            onCursor={onCursor}
-          />
-        </TilePlot>
-      </Tile>
-      <Tile
         label="Write-ahead log"
         figure={sizeParts(file.walBytes).figure}
         unit={sizeParts(file.walBytes).unit}
-        sub="folded in at each checkpoint"
-      />
+        sub={walWords(file)}
+      >
+        <TileMeter share={onDisk > 0 ? file.walBytes / onDisk : 0} />
+      </Tile>
     </Tiles>
   );
 }
@@ -171,10 +177,7 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
     list.find((b) => b.key === key)?.hint ?? null;
   return (
     <>
-      <ChartPanel
-        label="Areas"
-        hint={hintOf(areas, areaOver.value) ?? "on disk"}
-      >
+      <ChartPanel label="Areas" hint={hintOf(areas, areaOver.value) ?? ""}>
         <Bars
           bars={bars}
           picked={area?.key}

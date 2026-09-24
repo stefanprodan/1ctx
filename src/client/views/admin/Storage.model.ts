@@ -15,7 +15,7 @@ import type {
   StorageFile,
   StoredPart,
 } from "../../../shared/api/admin.ts";
-import { weekdayDayMonth } from "../../lib/format.ts";
+import { count, dayMonth, weekdayDayMonth } from "../../lib/format.ts";
 
 const KB = 1024;
 const MB = KB * 1024;
@@ -73,7 +73,7 @@ export function areaBars(areas: StorageArea[]) {
     value: a.bytes,
     size: size(a.bytes),
     share: share(a.bytes, total),
-    hint: `${AREA_NAMES[a.key]} · ${size(a.bytes)} on disk · ${plural(a.rows, "row", "rows")}`,
+    hint: `${AREA_NAMES[a.key]} · ${size(a.bytes)} · ${plural(a.rows, "row", "rows")}`,
   }));
 }
 
@@ -81,7 +81,7 @@ export function areaBars(areas: StorageArea[]) {
 export function areasFoot(areas: StorageArea[]): string {
   const total = areas.reduce((sum, a) => sum + a.bytes, 0);
   const rows = areas.reduce((sum, a) => sum + a.rows, 0);
-  return `${size(total)} on disk in ${areas.length} areas · ${plural(rows, "row", "rows")}`;
+  return `${size(total)} in ${areas.length} areas · ${plural(rows, "row", "rows")}`;
 }
 
 // one area's tables, largest first, then its indexes as one faint line
@@ -91,7 +91,7 @@ export function tableBars(area: StorageArea) {
     name: t.name,
     value: t.bytes,
     size: size(t.bytes),
-    hint: `${t.name} · ${plural(t.rows, "row", "rows")} · ${size(t.bytes)} on disk`,
+    hint: `${t.name} · ${plural(t.rows, "row", "rows")} · ${size(t.bytes)}`,
     faint: false,
   }));
   const { count, bytes } = area.indexes;
@@ -102,7 +102,7 @@ export function tableBars(area: StorageArea) {
       name,
       value: bytes,
       size: size(bytes),
-      hint: `${name} · ${size(bytes)} on disk`,
+      hint: `${name} · ${size(bytes)}`,
       faint: true,
     });
   }
@@ -134,16 +134,56 @@ export const added = (days: StorageDay[]): number =>
 // "Tue 23 Sep"
 export const dayWord = weekdayDayMonth;
 
+// the database tile: the rows in every area, and the tables they sit in
+export function rowsTile(areas: StorageArea[]) {
+  const rows = areas.reduce((sum, a) => sum + a.rows, 0);
+  const tables = areas.reduce((sum, a) => sum + a.tables.length, 0);
+  return {
+    figure: count(rows),
+    unit: rows === 1 ? "row" : "rows",
+    sub: plural(tables, "table", "tables"),
+  };
+}
+
+// bar heights on a log scale, so a day of a few rows still shows beside
+// a day of thousands; zero stays zero, and the words carry the counts
+export const logHeights = (values: number[]): number[] =>
+  values.map((v) => Math.log10(1 + Math.max(0, v)));
+
+// the rows a day under the cursor added, short enough for a phone's tile
+export const rowsDay = (day: StorageDay): string =>
+  `${dayMonth(day.start)} · ${plural(day.rows, "row", "rows")}`;
+
 // the average a day, as the growth tile's figure: "+4.1", "MB a day"
 export function perDay(bytes: number, days: number) {
   const { figure, unit } = sizeParts(days > 0 ? bytes / days : 0);
   return { figure: `+${figure}`, unit: `${unit} a day` };
 }
 
+// the growth line under the cursor, short enough for a phone's tile
+export const growthDay = (start: number, total: number): string =>
+  `${dayMonth(start)} · +${size(total)}`;
+
+// under the growth figure: the range, and the average before it only
+// when the rows kept from then add anything
+export function growthWords(before: number, days: number): string {
+  const range = `last ${days} days`;
+  if (before <= 0 || days <= 0) return range;
+  return `${range} · was ${size(before / days)}`;
+}
+
+// pages deleted rows left inside the file, which new rows fill before
+// it grows: room to spare, never a disk running out. A share of the
+// size, which counts the log with the file.
 export function freeWords(file: StorageFile): string {
   const free = file.freePages * file.pageSize;
-  const vacuum = file.autoVacuum === "none" ? "off" : file.autoVacuum;
-  return `${share(free, file.bytes)} of the file · auto vacuum ${vacuum}`;
+  return `${share(free, file.bytes + file.walBytes)} reusable`;
+}
+
+// the log's share of the database size, which counts it with the file
+export function walWords(file: StorageFile): string {
+  const total = file.bytes + file.walBytes;
+  return share(file.walBytes, total);
 }
 
 // the faint line under the board
@@ -154,6 +194,7 @@ export function factsLine(file: StorageFile): string {
     file.name,
     `${plural(file.pages, "page", "pages")} of ${size(file.pageSize)}`,
     `${journal} journal`,
+    `auto vacuum ${file.autoVacuum === "none" ? "off" : file.autoVacuum}`,
   ];
   if (file.shmBytes > 0) parts.push(`shared memory ${size(file.shmBytes)}`);
   parts.push(`SQLite ${file.sqliteVersion}`);

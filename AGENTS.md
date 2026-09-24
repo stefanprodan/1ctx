@@ -124,8 +124,9 @@ and pragmas, every table on disk from `dbstat` grouped by
 `STORAGE_TABLES` in `storage.ts` (each table the migrations create in
 exactly one area, `sqlite_schema` and `migrations` under config; a
 test checks the map against the schema both ways), the indexes of an
-area together and never named, the stored bytes added a day over the
-zone's last 30 days and the 30 before, the ten largest projects, chats
+area together and never named, the stored bytes and the rows of the
+tables with a creation time added a day over the zone's last 30 days
+(the bytes of the 30 before too), the ten largest projects, chats
 and tasks, and the retention lists. Stored is a table's `bytes`, or
 `octet_length` of the text columns of `messages` (`MESSAGE_BYTES`);
 usage, logins and the rest are their table's pages, and a living

@@ -143,13 +143,15 @@ function days(
   const window = daysWindow(result.readAt, timeZone, STORAGE_DAYS * 2);
   const bounds = [...window.starts, window.until];
   const totals = new Array<number>(bounds.length - 1).fill(0);
+  const rows = new Array<number>(bounds.length - 1).fill(0);
   let day = 0;
-  for (const [slot, bytes] of result.slots) {
+  for (const [slot, bytes, count] of result.slots) {
     const at = slot * SLOT_MS;
     if (at < bounds[0]!) continue;
     while (day < totals.length && at >= bounds[day + 1]!) day++;
     if (day >= totals.length) break;
     totals[day]! += bytes;
+    rows[day]! += count;
   }
   const before = totals
     .slice(0, STORAGE_DAYS)
@@ -159,6 +161,7 @@ function days(
       day: label,
       start: window.starts[STORAGE_DAYS + i]!,
       bytes: totals[STORAGE_DAYS + i]!,
+      rows: rows[STORAGE_DAYS + i]!,
     })),
     before,
   };
