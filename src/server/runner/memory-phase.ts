@@ -31,11 +31,9 @@ export function commitMemory(
   deps: MemoryCommitDeps,
   send: ActiveSend,
 ): number | null {
-  const automation = send.policy.memoryOffered?.memory ?? null;
-  if (automation === null || automation.work.operations.length === 0) {
-    return null;
-  }
-  const skipped = deps.memory.commit(automation.work, send.sessionId).skipped;
+  const work = send.policy.memoryOffered?.memory?.work ?? null;
+  if (work === null || work.operations.length === 0) return null;
+  const skipped = deps.memory.commit(work, send.sessionId).skipped;
   return skipped === 0 ? null : skipped;
 }
 
@@ -152,7 +150,7 @@ function memoryRequest(
       error: send.error,
       rows,
       guidance: send.policy.automation?.memoryGuidance ?? "",
-      entries: offered.memory?.work.entries ?? [],
+      entries: offered.memory?.work?.entries ?? [],
     },
     {
       phase: historyMessages(

@@ -53,6 +53,8 @@ function setup(
         operations: [],
         failedRounds: 0,
       }),
+      edit: () => ({ error: false, content: "" }),
+      refuse: (_projectId, _sessionId, reason) => reason,
     },
   });
   return { db, mcp, tools, flux, docs, links };

@@ -38,12 +38,12 @@ describe("memory round settlement", () => {
       call("memory_edit", { action: "set" }),
     ]);
     const second = await waitScript(chat.scripted, 3);
-    expect(handle.work.failedRounds).toBe(1);
+    expect(handle.work!.failedRounds).toBe(1);
     expect(handle.stopped).toBe(false);
     round(second, [call("memory_edit", "[]")]);
     await settleRun(chat, run.sessionId);
 
-    expect(handle.work.failedRounds).toBe(2);
+    expect(handle.work!.failedRounds).toBe(2);
     expect(handle.stopped).toBe(true);
     expect(chat.scripted.scripts).toHaveLength(3);
     expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
@@ -59,7 +59,7 @@ describe("memory round settlement", () => {
       rows.filter((row) => row.kind === "reply").map((row) => row.round),
     ).toEqual([1, 2, 3]);
     expect(rows.filter((row) => row.status === "streaming")).toEqual([]);
-    expect(handle.work.entries).toEqual([]);
+    expect(handle.work!.entries).toEqual([]);
     expect(
       chat.app.memory.read({
         projectId: chat.projectId,

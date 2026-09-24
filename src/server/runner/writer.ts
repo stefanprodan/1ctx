@@ -7,6 +7,7 @@
 // round and launches tools; finishTool ends one; cut calls are recorded not run.
 // startRound begins the next round; finalizeSend ends the send once.
 
+import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type {
   Message,
   SendSummary,
@@ -64,6 +65,12 @@ export type WriterDeps = {
     deleteSend(sendId: string): boolean;
   };
   commitMemory(send: ActiveSend): number | null;
+  // a chat's snapshot of the project's note, started with its first send
+  // and dropped by a summary, inside the caller's transaction
+  views: {
+    start(sessionId: string, snapshot: readonly MemoryEntry[]): void;
+    end(sessionId: string): void;
+  };
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
@@ -471,6 +478,10 @@ export class Writer {
         status,
         now,
       })!;
+      // the send after a summary takes the note as it is then
+      if (reply?.kind === "summary" && reply.status === "done") {
+        this.deps.views.end(send.sessionId);
+      }
       const changed = [...(reply ? [reply] : []), ...stopped];
       const last =
         reply?.status === "done" && reply.slot === "answer"

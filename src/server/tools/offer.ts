@@ -7,6 +7,7 @@
 
 import {
   credentialKey,
+  MEMORY,
   mcpKey,
   skillKey,
   VISUALIZE,
@@ -31,7 +32,11 @@ import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
-import { makeMemoryHandle, makeMemoryTools } from "./builtin/memory.ts";
+import {
+  makeChatMemoryHandle,
+  makeMemoryHandle,
+  makeMemoryTools,
+} from "./builtin/memory.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import { fillYear, schema } from "./catalog.ts";
 import type { ToolStore } from "./store.ts";
@@ -64,7 +69,7 @@ type OfferDeps = {
   store: Pick<ToolStore, "rows">;
   skills: SkillsPort;
   mcp: Pick<Mcp, "offered">;
-  memory?: Pick<MemoryCapability, "work">;
+  memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   credentials?: CredentialsPort;
   toolsFor(
     search: SearchProvider | null,
@@ -107,20 +112,39 @@ function credentialsFor(
 
 function memoryFor(
   memory: OfferDeps["memory"],
-  scope?: MemoryScope,
+  scope: MemoryScope | undefined,
+  disabledCapabilities: readonly string[],
 ): MemoryHandle | null {
-  // only a run's own-note phase edits a note
+  if (scope === undefined || memory === undefined) return null;
+  if (scope.phase === "memory") {
+    if (
+      scope.projectId === null ||
+      scope.automation === null ||
+      !scope.automation.ownMemory
+    ) {
+      return null;
+    }
+    return makeMemoryHandle(memory.work(scope.projectId, scope.automation.id));
+  }
+  // a chat's main rounds save to the project's note, a run's never do;
+  // the switch drops the tool and leaves the note in the prompt
+  const chat = scope.chat ?? null;
   if (
-    scope === undefined ||
-    scope.phase !== "memory" ||
-    scope.projectId === null ||
-    scope.automation === null ||
-    !scope.automation.ownMemory ||
-    memory === undefined
+    chat === null ||
+    scope.automation !== null ||
+    disabledCapabilities.includes(MEMORY)
   ) {
     return null;
   }
-  return makeMemoryHandle(memory.work(scope.projectId, scope.automation.id));
+  // the agent page counts the schema with no project to save to
+  const projectId = (): string => {
+    if (scope.projectId === null) throw new Error("no project to save to");
+    return scope.projectId;
+  };
+  return makeChatMemoryHandle({
+    edit: (edit) => memory.edit(projectId(), chat.sessionId, edit, chat.userId),
+    refuse: (reason) => memory.refuse(projectId(), chat.sessionId, reason),
+  });
 }
 
 function promptServers(servers: OfferedServer[]): PromptServer[] {
@@ -154,7 +178,7 @@ export function offered(
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
 ): Offered {
-  const memory = memoryFor(deps.memory, scope);
+  const memory = memoryFor(deps.memory, scope, disabledCapabilities);
   if (scope?.phase === "memory") {
     const phaseTools = memory === null ? [] : makeMemoryTools(memory);
     return {

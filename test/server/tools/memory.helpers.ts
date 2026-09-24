@@ -42,6 +42,8 @@ export function area(): ToolsArea {
           failedRounds: 0,
         };
       },
+      edit: () => ({ error: false, content: "" }),
+      refuse: (_projectId, _sessionId, reason) => reason,
     },
   });
 }

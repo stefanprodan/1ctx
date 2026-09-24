@@ -140,6 +140,9 @@ export function buildPolicy(input: {
   limits: Limits;
   knowledge: SendPolicy["knowledge"];
   automation?: SendPolicy["automation"];
+  // the chat a message or a regenerate saves from; a compaction offers
+  // no tools and a run saves nothing
+  sessionId?: string | null;
   projectMemory?: readonly MemoryEntry[];
   automationMemory?: readonly MemoryEntry[];
   deadlineMs?: number | null;
@@ -164,6 +167,10 @@ export function buildPolicy(input: {
             projectId: input.project.id,
             automation: automationScope,
             phase: "main",
+            chat:
+              automationScope === null && input.sessionId
+                ? { sessionId: input.sessionId, userId: user.id }
+                : null,
           },
           disabledCapabilities,
         )

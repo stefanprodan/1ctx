@@ -8,6 +8,7 @@
 // app with it, a provider, an agent and a member, and signs the member
 // in.
 
+import type { Db } from "../../src/server/db/index.ts";
 import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
@@ -331,6 +332,8 @@ export async function chatApp(
     fetcher?: typeof fetch;
     logFactory?: LogFactory;
     window?: number;
+    // a file the test reopens, for a restart over the same rows
+    db?: Db;
   } = {},
 ): Promise<ChatApp> {
   const scripted = scriptedFetch(options.fetcher, options.window);
@@ -341,6 +344,7 @@ export async function chatApp(
     registry: options.registry,
     secrets,
     tools: options.tools,
+    db: options.db,
   });
   const admin = app.client();
   await admin.login("admin", "hunter2-test");

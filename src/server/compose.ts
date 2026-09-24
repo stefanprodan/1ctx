@@ -329,6 +329,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     memory: {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),
+      view: (sessionId) => memory.view(sessionId),
+      startView: (sessionId, snapshot) => memory.startView(sessionId, snapshot),
+      endView: (sessionId) => memory.endView(sessionId),
     },
     limits,
     usage,

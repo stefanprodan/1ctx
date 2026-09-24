@@ -9,6 +9,7 @@ import {
   type CapabilityChange,
   sameSet,
 } from "../../shared/capabilities.ts";
+import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type {
   Message,
   SendSummary,
@@ -56,6 +57,9 @@ type StartDeps = {
   sessions: SessionsPort;
   uploads: UploadsPort;
   usage: { deleteSend(sendId: string): boolean };
+  views: {
+    start(sessionId: string, snapshot: readonly MemoryEntry[]): void;
+  };
 };
 
 export function startSend(deps: StartDeps, fields: StartFields): Started {
@@ -125,6 +129,10 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       }
       user = replacement.user;
       removedMessageIds = replacement.removedMessageIds;
+    }
+    // a chat keeps the note its first send read; a run reads it live
+    if ((fields.kind ?? "chat") === "chat") {
+      deps.views.start(base.id, policy.projectMemory);
     }
     const previousMcpDigest = deps.sessions.lastMcpDigest(base.id, send.id);
     const reply = deps.sessions.addReply({

@@ -729,9 +729,11 @@ violation, and every rule has a rejected fixture under
   prompt is the agent's prompt, the project and user or automation
   part, the skills catalog, the MCP catalog, the servers' instructions
   as the delimited `<mcp_instructions>` block (capped, tags neutered,
-  off per server), the two memory blocks, the knowledge block, the date
+  off per server), the project memory block (a chat's snapshot, a run's
+  live note), the automation memory block, the knowledge block, the date
   line, the chat's web-off line when applicable, the visualize-off line
-  when applicable, the MCP-off line when applicable, the skills-off line
+  when applicable, the memory-off line when applicable, the MCP-off line
+  when applicable, the skills-off line
   when applicable, and last the change note. The policy's `mcpOff` holds the
   sorted names of disabled linked servers with otherwise-offered tools,
   empty for a model without tools; `mcpOffLine()` names them.
@@ -837,11 +839,11 @@ violation, and every rule has a rejected fixture under
   staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys: `web`, `mcp:<server id>`,
-  `skill:<skill id>` and `credential:<credential id>`. The parser
-  checks only an id's shape, 1 to 32 lowercase ASCII letters or digits;
-  unknown or unassigned server, skill and credential keys are kept and
-  ignored.
+  change with `disable` and `enable` keys: `web`, `visualize`, `memory`,
+  `mcp:<server id>`, `skill:<skill id>` and `credential:<credential id>`.
+  The parser checks only an id's shape, 1 to 32 lowercase ASCII
+  letters or digits; unknown or unassigned server, skill and credential
+  keys are kept and ignored.
   The policy resolves it before schemas are built; `startSend` applies
   it again to the current row in its transaction, with the message's
   revision and envelope. A refused start writes nothing; a later failure
@@ -926,23 +928,49 @@ violation, and every rule has a rejected fixture under
   `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
   send limits. History starts from the last done summary. Compact on
   demand is a send of kind `compact` under the same runner lock.
-- **A note is a working copy until the run ends.** Every send reads the
-  project's note once; a run with `ownMemory` reads its automation's too.
-  `ownMemory` opens a bounded final phase with only the edit tool; no
-  main round is offered a memory tool. The ending claims one cause,
+- **A chat saves to the project's note at once; a run's own note is a
+  working copy until the run ends.** A chat send (a message or a
+  regenerate) whose model takes tools is offered `memory_edit` over the
+  project's note, `set` and `remove` only, unless its set holds
+  `memory`; never a compaction or a run's main rounds. The handle is
+  built per send in `tools/offer.ts` with the session and author bound,
+  and each call goes through the handle's queue to the memory
+  capability's `edit()`: one `transact()` that reads the note, applies
+  the seen rule (`memory/edit.ts`, pure), writes the entries with
+  `previous_entries`, the revision up one, `updated_by` and
+  `session_id`, writes the chat's `seen` and publishes one
+  `memory.changed`. An edit whose result the note holds writes nothing
+  and succeeds. Nothing happens at the send's end: a stop, a failure, a
+  regenerate or a deleted chat keeps what was saved. `memory_views`
+  holds per chat the `snapshot` its prompt carries and what it has
+  `seen` since. The runner reads the snapshot, or the current note when
+  there is no row; `startSend` writes the row when there was none, seen
+  equal to the snapshot, and `finalizeSend` deletes it after a done
+  summary, so a fork, a new chat and the send after a summary take the
+  current note. A run reads the note live. The seen rule: an edit
+  applies when its topic's current text is what the chat saw (both
+  absent included) or the note holds its result; else it is refused
+  with the note listed. A success records its topic as seen; a refusal,
+  which always lists the note, records the whole note as seen, so the
+  retry applies. Answers say "Saved to the project's memory." and the
+  size.
+  A run with `ownMemory` reads its automation's note too and
+  opens a bounded final phase with only the own-note edit tool. The
+  ending claims one cause,
   releases the main round, runs that phase on finish, deadline or
   failure, then finalizes once. Its own-note block appears even when
   empty and says a separate step after the answer updates it. Two
-  settled rounds with edits but no success stop the edit tool; a
-  success resets the count. The phase then stops without another
-  request, and stopped calls fail. An edited automation copy commits on
+  settled rounds with edits but no success stop the edit tool, in a
+  chat's main rounds and in the phase alike; a success resets the count.
+  The phase then stops without another request, and stopped calls fail. An edited automation copy commits on
   any cause after its phase starts. Each changed note sends one frame.
   Project and automation memory routes let anyone who sees the project
   read, save and undo. Entries are `{topic, text}`;
   `shared/memory.ts` owns sanitizing, topic equality, diff and the
   rendered count (60 characters per topic, 500 per text, 2,200 per note).
-  `memory_edit` takes `set`, `remove` or `none`, naming a topic.
-  The server's memory writing rules live in the edit tool description
+  The phase's `memory_edit` takes `set`, `remove` or `none`, naming a
+  topic.
+  The server's memory writing rules live in the edit tools' descriptions
   and the phase ask, not the system prompt.
   Replay checks the text each operation expected and skips conflicts
   with a hand edit or Undo. If a topic's first operation expected text
@@ -1091,14 +1119,21 @@ violation, and every rule has a rejected fixture under
   the `visualize` tool and only the tool when the send's set holds it,
   `open` and the skill untouched, and the prompt adds the constant
   `VISUALIZE_OFF_LINE` after the web line by the same rule. The
-  capabilities answer names it while the admin's Visuals row is on. The memory phase offers `memory_edit` alone.
+  capabilities answer names it while the admin's Visuals row is on.
+  `memory` (`MEMORY`) is the third: the offer drops the chat's
+  `memory_edit` and the note stays in the prompt; `MEMORY_OFF_LINE`
+  follows the visualize line when the set holds it, the send offers
+  tools and it is a chat. The capabilities answer always names it; an
+  automation's set accepts it and it means nothing there. The memory
+  phase offers the own-note `memory_edit` alone.
   Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
   a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
   `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
   built-in schema, including `bash`, `webfetch` and `websearch`, by name from
   `tools/catalog.ts`, built by the send's own factories with sample
-  inputs (name enums empty), each row `RowsTitle`
+  inputs (name enums empty, `memory_edit` the chat's with the own-note
+  text as its `variant`), each row `RowsTitle`
   (the name over the first sentence) with its tokens by `wireTokens()`
   as `RowsMeta`, read-only. The bash catalog sample uses all-mode words.
   The Web tab's API holds `access` (mode and domains), `search` (nullable
@@ -1276,7 +1311,8 @@ violation, and every rule has a rejected fixture under
   agent's page carries the provider's name, the skills with their
   descriptions and fetch times, the built-in tools the tools area would
   offer a send now (none when the model takes no tools, websearch with
-  its search provider, the skill tools left out of the list), and
+  its search provider, `memory_edit` as a chat is offered it, the skill
+  tools left out of the list), and
   token counts for the prompt, the skill bodies together and every
   offered schema by `wireTokens()` in `providers/`, the skill tools
   included, the one count of schemas every page shows. Tokens are

@@ -225,7 +225,7 @@ export function memoryBlock(
   const body = renderEntries(normalize(entries)).slice(0, MEMORY_CHARS);
   const words =
     tag === "project-memory"
-      ? "Project memory, notes kept for this project."
+      ? "Project memory, notes this project's chats saved."
       : "Automation memory, notes kept from past runs.";
   const step =
     tag === "automation-memory"

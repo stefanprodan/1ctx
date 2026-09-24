@@ -5,12 +5,18 @@ import type {
   SaveMemoryRequest,
   UndoMemoryRequest,
 } from "../../shared/api/memory.ts";
-import type { Memory } from "../../shared/contracts/memory.ts";
+import type { Memory, MemoryEntry } from "../../shared/contracts/memory.ts";
 import { MEMORY_CHARS, memoryChars } from "../../shared/memory.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { summary, type UserRow } from "../users/index.ts";
+import {
+  type ChatMemoryEdit,
+  chatEdit,
+  noteWords,
+  savedWords,
+} from "./edit.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import {
   type MemoryCommit,
@@ -32,6 +38,9 @@ export type MemoryDeps = {
   users: { byId(id: string): UserRow | null };
   runs: RunInfoPort;
 };
+
+// what a chat's edit answers the model: the saved words or the refusal
+export type ChatEditAnswer = { error: boolean; content: string };
 
 export type MemoryCapability = {
   read(projectId: string, automationId: string | null): Memory;
@@ -56,6 +65,21 @@ export type MemoryCapability = {
     skipped: number;
     skippedOperations: number[];
   };
+  // a chat's save to the project's note, at once, in one transaction
+  edit(
+    projectId: string,
+    sessionId: string,
+    edit: ChatMemoryEdit,
+    userId: string,
+  ): ChatEditAnswer;
+  // a refusal before any edit, the note listed and so seen whole
+  refuse(projectId: string, sessionId: string, reason: string): string;
+  // the note a chat's prompt carries, null before its first send and
+  // after a summary
+  view(sessionId: string): MemoryEntry[] | null;
+  // inside the caller's transaction
+  startView(sessionId: string, snapshot: readonly MemoryEntry[]): void;
+  endView(sessionId: string): void;
 };
 
 export type MemoryArea = MemoryCapability & {
@@ -140,6 +164,63 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
         };
       });
     },
+    edit(projectId, sessionId, edit, userId) {
+      return transact<ChatEditAnswer>(deps.db, () => {
+        const note = target(projectId, null);
+        const current = store.read(note);
+        const view = store.view(sessionId);
+        const outcome = chatEdit(
+          current.entries,
+          view?.seen ?? current.entries,
+          edit,
+        );
+        store.setSeen(
+          sessionId,
+          outcome.seen,
+          view?.snapshot ?? current.entries,
+        );
+        if (!outcome.ok) {
+          return {
+            result: {
+              error: true,
+              content: noteWords(outcome.reason, current.entries),
+            },
+          };
+        }
+        if (!outcome.changed) {
+          return {
+            result: { error: false, content: savedWords(current.entries) },
+          };
+        }
+        const row = store.saveFromChat(
+          note,
+          current,
+          outcome.entries,
+          userId,
+          sessionId,
+          deps.clock(),
+        );
+        return {
+          result: { error: false, content: savedWords(row.entries) },
+          events: [changed(row)],
+        };
+      });
+    },
+    refuse(projectId, sessionId, reason) {
+      return transact(deps.db, () => {
+        const current = store.read(target(projectId, null));
+        const view = store.view(sessionId);
+        store.setSeen(
+          sessionId,
+          current.entries,
+          view?.snapshot ?? current.entries,
+        );
+        return { result: noteWords(reason, current.entries) };
+      });
+    },
+    view: (sessionId) => store.view(sessionId)?.snapshot ?? null,
+    startView: (sessionId, snapshot) => store.startView(sessionId, snapshot),
+    endView: (sessionId) => store.endView(sessionId),
   };
   return {
     store,
@@ -148,6 +229,13 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
   };
 }
 
+export {
+  type ChatEditOutcome,
+  type ChatMemoryEdit,
+  chatEdit,
+  noteWords,
+  savedWords,
+} from "./edit.ts";
 export {
   MAX_MEMORY_BODY,
   parseSaveMemory,
@@ -160,6 +248,7 @@ export {
   type MemoryRow,
   MemoryStore,
   type MemoryTarget,
+  type MemoryView,
   type MemoryWork,
   memoryWork,
   replay,

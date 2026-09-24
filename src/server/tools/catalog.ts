@@ -4,7 +4,8 @@
 // The built-ins as the tools page lists them. Each schema comes from the
 // factory a send uses, called with sample inputs, so the page never
 // restates a schema. A schema that lists skill or MCP tool names is shown
-// with none, since the names are the send's.
+// with none, since the names are the send's; memory_edit is the chat's,
+// with the own-note phase's text as its variant.
 
 import type {
   BuiltinToolSummary,
@@ -21,7 +22,11 @@ import {
   formatDatetime,
 } from "./builtin/datetime.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
-import { makeMemoryHandle, makeMemoryTools } from "./builtin/memory.ts";
+import {
+  makeChatMemoryHandle,
+  makeMemoryHandle,
+  makeMemoryTools,
+} from "./builtin/memory.ts";
 import { makeSkillTools } from "./builtin/skill.ts";
 import { makeWebfetchTool } from "./builtin/webfetch.ts";
 import { makeWebsearchTool } from "./builtin/websearch.ts";
@@ -64,7 +69,8 @@ const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
   websearch: "webSearch",
 };
 
-function memoryTools(): Tool[] {
+// the schemas are built, never run
+function ownMemoryTools(): Tool<string | ToolResult>[] {
   const work: MemoryWork = {
     target: { projectId: "", automationId: "" },
     baseRevision: 0,
@@ -73,6 +79,15 @@ function memoryTools(): Tool[] {
     failedRounds: 0,
   };
   return makeMemoryTools(makeMemoryHandle(work));
+}
+
+function chatMemoryTools(): Tool<string | ToolResult>[] {
+  return makeMemoryTools(
+    makeChatMemoryHandle({
+      edit: () => ({ error: true, content: "" }),
+      refuse: () => "",
+    }),
+  );
 }
 
 // the name enum a send fills, emptied
@@ -114,10 +129,11 @@ export function builtinCatalog(
         file: () => null,
       }).map(withoutNames),
       ...makeMcpCatalogTools([server]),
-      ...memoryTools(),
+      ...chatMemoryTools(),
     ].map(schema),
     now,
   );
+  const own = fillYear(ownMemoryTools().map(schema), now);
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
   const names: BuiltinToolSummary["name"][] = [
     ...BUILTIN_TOOLS,
@@ -138,7 +154,12 @@ export function builtinCatalog(
         "enum" in
         ((tool.parameters as { properties?: { name?: object } }).properties
           ?.name ?? {}),
-      variant: null,
+      variant: (() => {
+        const other = own.find((held) => held.name === name);
+        return other === undefined
+          ? null
+          : { description: other.description, tokens: wireTokens([other]) };
+      })(),
     };
   });
 }

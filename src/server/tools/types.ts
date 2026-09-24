@@ -12,7 +12,11 @@ import type { CredentialRow } from "../credentials/index.ts";
 import type { KeptFile, OpenedRecord } from "../knowledge/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
-import type { MemoryWork } from "../memory/index.ts";
+import type {
+  ChatEditAnswer,
+  ChatMemoryEdit,
+  MemoryWork,
+} from "../memory/index.ts";
 import type { ChatTool } from "../providers/index.ts";
 
 export type { ToolCaps } from "../limits/index.ts";
@@ -81,10 +85,20 @@ export type MemoryScope = {
     ownMemory: boolean;
   } | null;
   phase: "main" | "memory";
+  // the chat a main round saves from; absent for a run and a compaction
+  chat?: { sessionId: string; userId: string } | null;
+};
+
+// a chat's saves, bound to its project, session and author
+export type ChatMemoryPort = {
+  edit(edit: ChatMemoryEdit): ChatEditAnswer;
+  refuse(reason: string): string;
 };
 
 export type MemoryHandle = {
-  work: MemoryWork;
+  // the own-note phase's working copy, null in a chat
+  work: MemoryWork | null;
+  chat: ChatMemoryPort | null;
   queue: Promise<void>;
   stopped: boolean;
   recordEdit(success: boolean): void;

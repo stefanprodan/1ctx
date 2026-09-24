@@ -8,7 +8,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import { skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
+import { MEMORY, skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
@@ -63,7 +63,11 @@ import type {
 } from "./types.ts";
 
 export { DEFAULT_TIMEZONE, formatDatetime } from "./builtin/datetime.ts";
-export { isMemoryTool, MEMORY_WRITE_RULES } from "./builtin/memory.ts";
+export {
+  CHAT_MEMORY_DESCRIPTION,
+  isMemoryTool,
+  MEMORY_WRITE_RULES,
+} from "./builtin/memory.ts";
 export { TOOL_CAPS } from "./limits.ts";
 export type { SkillsPort } from "./offer.ts";
 export {
@@ -74,6 +78,7 @@ export {
 } from "./parse.ts";
 export { type ToolRow, ToolStore } from "./store.ts";
 export type {
+  ChatMemoryPort,
   KeepPort,
   MemoryHandle,
   MemoryScope,
@@ -96,7 +101,7 @@ export type ToolsDeps = {
   render: (markdown: string, streaming: boolean) => string;
   skills: SkillsPort;
   mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
-  memory?: Pick<MemoryCapability, "work">;
+  memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   knowledge?: Pick<KnowledgeCapability, "run">;
   // the project's credentials for a send, and each row and key again at
   // each command
@@ -303,6 +308,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       ...(store.rows().find((row) => row.name === "visualize")!.enabled
         ? [VISUALIZE]
         : []),
+      // no admin row governs it
+      MEMORY,
     ],
     serverNames: (links) =>
       mcpService.switchable(links).map((server) => server.name),
@@ -398,7 +405,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           return new Registry([failed]).run({ ...call, arguments: "{}" }, ctx);
         }
       }
-      if (offered.memory !== null) {
+      if (offered.memory?.work) {
         return new Registry(base, () => PHASE_ONLY).run(call, ctx);
       }
       const runtime =

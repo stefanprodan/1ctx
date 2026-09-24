@@ -45,7 +45,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   mcp: ["mcp_kept_files", "mcp_digests"],
   usage: ["usage"],
   skills: ["skills", "skill_files", "agent_skills"],
-  memory: ["memory_notes"],
+  memory: ["memory_notes", "memory_views"],
   config: [
     "users",
     "logins",

@@ -659,7 +659,7 @@ describe("the schema", () => {
     }
   });
 
-  test("0023 drops the chat cursors and the project memory switch, keeping the automation", () => {
+  test("0023 drops the chat cursors and the project memory switch, keeping the automation, and adds the chat views", () => {
     const db = seed(MIGRATIONS.slice(0, 22));
     try {
       db.exec(`
@@ -691,6 +691,21 @@ describe("the schema", () => {
       ).toEqual({ n: 0 });
       const { project_memory: _, ...kept } = before[0]!;
       expect(db.query("select * from automations").all()).toEqual([kept]);
+      // a chat's view of the project's note goes with the chat
+      expect(
+        db
+          .query<{ name: string }, []>("pragma table_info(memory_views)")
+          .all()
+          .map((row) => row.name),
+      ).toEqual(["session_id", "snapshot", "seen"]);
+      expect(
+        db
+          .query<{ table: string; on_delete: string }, []>(
+            "pragma foreign_key_list(memory_views)",
+          )
+          .all()
+          .map(({ table, on_delete }) => ({ table, on_delete })),
+      ).toEqual([{ table: "sessions", on_delete: "CASCADE" }]);
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();

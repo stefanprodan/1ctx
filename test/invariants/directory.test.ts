@@ -150,6 +150,7 @@ describe("the directory", () => {
       { name: "webfetch", provider: null },
       { name: "visualize", provider: null },
       { name: "bash", provider: null },
+      { name: "memory_edit", provider: null },
     ]);
     // the agent has no prompt and no skills; the tool schemas cost,
     // and no MCP server is offered
@@ -188,6 +189,7 @@ describe("the directory", () => {
       "datetime",
       "visualize",
       "bash",
+      "memory_edit",
     ]);
     // one schema fewer on the wire, fewer tokens
     expect(after.tokens.tools).toBeLessThan(body.tokens.tools);
@@ -271,6 +273,7 @@ describe("the directory", () => {
       "webfetch",
       "visualize",
       "bash",
+      "memory_edit",
     ]);
     expect(body.tokens.tools).toBeGreaterThan(bare.tokens.tools);
     expect(body.tokens.skills).toBe(

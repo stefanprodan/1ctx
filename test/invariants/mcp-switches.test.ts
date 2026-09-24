@@ -372,7 +372,7 @@ test("project agents expose the same switchable map to members and admins", asyn
       [noTools]: [{ id: flux.id, name: "flux", tools: 1 }],
     });
     expect(body.servers).not.toHaveProperty(plain);
-    expect(body.capabilities).toEqual(["web", "visualize"]);
+    expect(body.capabilities).toEqual(["web", "visualize", "memory"]);
     chat.app.mcp.updateSettings(flux.id, { read: false });
     chat.app.mcp.updateSettings(docs.id, { read: false });
     expect(

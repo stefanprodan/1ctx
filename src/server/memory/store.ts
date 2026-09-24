@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The durable note and the pure replay used when its revision moved while a
-// run held a working copy.
+// The durable note, the pure replay used when its revision moved while a
+// run held a working copy, and each chat's view of the project's note:
+// the snapshot its prompt carries and what it has seen of the note since.
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import {
@@ -40,6 +41,11 @@ export type MemoryWork = {
   entries: MemoryEntry[];
   operations: MemoryOperation[];
   failedRounds: number;
+};
+
+export type MemoryView = {
+  snapshot: MemoryEntry[];
+  seen: MemoryEntry[];
 };
 
 export type MemoryCommit = {
@@ -228,6 +234,63 @@ export class MemoryStore {
       skippedOperations: applied.skippedOperations,
       changed: true,
     };
+  }
+
+  // a chat's save: the caller checked the edit and holds the transaction
+  saveFromChat(
+    target: MemoryTarget,
+    current: MemoryRow,
+    next: readonly MemoryEntry[],
+    userId: string,
+    sessionId: string,
+    now: number,
+  ): MemoryRow {
+    this.write(target, current, next, userId, sessionId, now);
+    return this.read(target);
+  }
+
+  view(sessionId: string): MemoryView | null {
+    const raw = this.db
+      .query<{ snapshot: string; seen: string }, [string]>(
+        "select snapshot, seen from memory_views where session_id = ?",
+      )
+      .get(sessionId);
+    return raw
+      ? { snapshot: entries(raw.snapshot), seen: entries(raw.seen) }
+      : null;
+  }
+
+  // the chat's first send after none, or after a summary: what it sees
+  // starts as what its prompt carries
+  startView(sessionId: string, snapshot: readonly MemoryEntry[]): void {
+    const json = JSON.stringify(snapshot);
+    this.db
+      .query(
+        `insert into memory_views (session_id, snapshot, seen)
+         values (?, ?, ?) on conflict(session_id) do nothing`,
+      )
+      .run(sessionId, json, json);
+  }
+
+  // the snapshot is kept when the row is there
+  setSeen(
+    sessionId: string,
+    seen: readonly MemoryEntry[],
+    snapshot: readonly MemoryEntry[],
+  ): void {
+    this.db
+      .query(
+        `insert into memory_views (session_id, snapshot, seen)
+         values (?, ?, ?)
+         on conflict(session_id) do update set seen = excluded.seen`,
+      )
+      .run(sessionId, JSON.stringify(snapshot), JSON.stringify(seen));
+  }
+
+  endView(sessionId: string): void {
+    this.db
+      .query("delete from memory_views where session_id = ?")
+      .run(sessionId);
   }
 
   private assertTarget(target: MemoryTarget): void {
