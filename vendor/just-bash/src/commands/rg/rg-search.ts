@@ -20,14 +20,22 @@ import { createUserRegex, type UserRegex } from "../../regex/index.js";
 import type { ExecResult, RuntimeCommandContext } from "../../types.js";
 import {
   buildRegex,
-  convertReplacement,
   isWholeWord,
   type RegexResult,
   searchContent,
 } from "../search-engine/index.js";
 import { FileTypeRegistry } from "./file-types.js";
-import { GitignoreManager, loadGitignores } from "./gitignore.js";
+import { loadGitignores } from "./gitignore.js";
+import { GlobError, Overrides } from "./globs.js";
+import {
+  type Collected,
+  collectFiles,
+  type Filters,
+  type Haystack,
+  STDIN_NAME,
+} from "./rg-files.js";
 import type { RgOptions } from "./rg-options.js";
+import { compileReplacement } from "./replace.js";
 
 /**
  * Check if data is gzip compressed (magic bytes)
@@ -36,32 +44,10 @@ function isGzip(data: Uint8Array): boolean {
   return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b;
 }
 
-/**
- * Validate glob pattern for errors (e.g., unclosed character class)
- * Returns error message if invalid, null if valid
- */
-function validateGlob(glob: string): string | null {
-  // Check for unclosed character class
-  let inClass = false;
-  for (let i = 0; i < glob.length; i++) {
-    const char = glob[i];
-    if (char === "[" && !inClass) {
-      inClass = true;
-    } else if (char === "]" && inClass) {
-      inClass = false;
-    }
-  }
-  if (inClass) {
-    return `rg: glob '${glob}' has an unclosed character class`;
-  }
-  return null;
-}
-
 export interface SearchContext {
   ctx: RuntimeCommandContext;
   options: RgOptions;
   paths: string[];
-  explicitLineNumbers: boolean;
 }
 
 function reservePatternSource(
@@ -99,7 +85,8 @@ function appendPatternLines(
   let lineStart = 0;
   for (let index = 0; index <= content.length; index++) {
     if (index < content.length && content.charCodeAt(index) !== 10) continue;
-    if (index > lineStart) {
+    // (1ctx) a blank line is the empty pattern; only the last newline ends
+    if (index < content.length || index > lineStart) {
       if (patterns.length >= ctx.limits.maxArrayElements) {
         throw new ExecutionLimitError(
           `rg: pattern limit exceeded (${ctx.limits.maxArrayElements})`,
@@ -136,20 +123,28 @@ export async function executeSearch(
 ): Promise<ExecResult> {
   const { ctx, options, paths: inputPaths } = searchCtx;
 
-  // Validate glob patterns for errors
-  for (const glob of options.globs) {
-    const globToValidate = glob.startsWith("!") ? glob.slice(1) : glob;
-    const error = validateGlob(globToValidate);
-    if (error) {
-      return { stdout: "", stderr: `${error}\n`, exitCode: 1 };
+  // (1ctx) one compiler for -g and --iglob, refusing a broken glob
+  const overrides = new Overrides();
+  for (const [glob, caseInsensitive] of [
+    ...options.globs.map((g) => [g, options.globCaseInsensitive] as const),
+    ...options.iglobs.map((g) => [g, true] as const),
+  ]) {
+    try {
+      overrides.add(glob, caseInsensitive);
+    } catch (error) {
+      if (!(error instanceof GlobError)) throw error;
+      return {
+        stdout: "",
+        stderr: `rg: error parsing glob '${glob}': ${error.message}\n`,
+        exitCode: 2,
+      };
     }
   }
+  const filters = await makeFilters(ctx, options, overrides);
 
-  // Handle --files mode: list files without searching
-  // In --files mode, positional args (including what would be the pattern) are paths
+  // In --files mode every operand is a path
   if (options.files) {
-    const filesPaths = [...options.patterns, ...inputPaths];
-    return listFiles(ctx, filesPaths, options);
+    return listFiles(ctx, inputPaths, filters);
   }
 
   if (options.patterns.length > ctx.limits.maxArrayElements) {
@@ -243,6 +238,14 @@ export async function executeSearch(
       };
     }
 
+    // (1ctx) ripgrep refuses a newline without -U rather than miss it
+    if (
+      !options.multiline &&
+      patterns.some((p) => hasNewline(p, options.fixedStrings))
+    ) {
+      return { stdout: "", stderr: NEWLINE_REFUSED, exitCode: 2 };
+    }
+
     // Determine case sensitivity and compile while pattern storage is leased.
     const effectiveIgnoreCase = determineIgnoreCase(options, patterns);
     try {
@@ -264,129 +267,131 @@ export async function executeSearch(
     for (const lease of patternSourceLeases) lease.release();
   }
 
-  // If no paths given and stdin has content, search stdin (like real rg).
-  // In a pipeline, the previous command's stdout becomes this command's
-  // stdin — search that text instead of defaulting to the current directory.
-  // Skip when `-f -` already consumed stdin for patterns to avoid
-  // double-consuming it as both pattern source and search input.
-  const stdinConsumedByPatternFile = options.patternFiles.includes("-");
-  const stdinText = decodeBytesToUtf8(ctx.stdin);
-  if (
-    inputPaths.length === 0 &&
-    stdinText.length > 0 &&
-    !stdinConsumedByPatternFile
-  ) {
-    const content = stdinText;
-    const result = searchContent(content, regex, {
-      invertMatch: options.invertMatch,
-      showLineNumbers: options.lineNumber,
-      countOnly: options.count,
-      countMatches: options.countMatches,
-      filename: "",
-      onlyMatching: options.onlyMatching,
-      beforeContext: options.beforeContext,
-      afterContext: options.afterContext,
-      maxCount: options.maxCount,
-      contextSeparator: options.contextSeparator,
-      showColumn: options.column,
-      vimgrep: options.vimgrep,
-      showByteOffset: options.byteOffset,
-      replace:
-        options.replace !== null ? convertReplacement(options.replace) : null,
-      passthru: options.passthru,
-      multiline: options.multiline,
-      kResetGroup,
-      // (1ctx) the word check, -c -o and empty -o matches, as ripgrep
-      wholeWord: options.wordRegexp,
-      countOnlyMatching: true,
-      printEmptyMatches: true,
-      contextWithOnlyMatching: true,
-      maxWork: ctx.limits.maxLoopIterations,
-      maxMatches: ctx.limits.maxArrayElements,
-      signal: ctx.signal,
-    });
+  // (1ctx) stdin when no path is given and something was piped, else the
+  // directory; `-` is stdin among the paths
+  const implicit = inputPaths.length === 0;
+  const collected: Collected =
+    implicit &&
+    !options.patternFiles.includes("-") &&
+    latin1FromBytes(ctx.stdin).length > 0
+      ? {
+          files: [{ path: STDIN_NAME, stdin: true, given: true }],
+          named: false,
+          errors: [],
+        }
+      : await collectFiles(ctx, inputPaths, filters, implicit);
 
-    if (options.quiet) {
-      return { stdout: "", stderr: "", exitCode: result.matched ? 0 : 1 };
-    }
-
-    if (options.filesWithMatches) {
-      return {
-        stdout: result.matched ? "(standard input)\n" : "",
-        stderr: "",
-        exitCode: result.matched ? 0 : 1,
-      };
-    }
-
-    if (options.filesWithoutMatch) {
-      return {
-        stdout: result.matched ? "" : "(standard input)\n",
-        stderr: "",
-        exitCode: result.matched ? 1 : 0,
-      };
-    }
-
-    return {
-      stdout: result.output,
-      stderr: "",
-      exitCode: result.matched ? 0 : 1,
-    };
+  if (implicit && collected.files.length === 0) {
+    return { stdout: "", stderr: NOTHING_SEARCHED, exitCode: 2 };
   }
 
-  // Default to current directory
-  const paths = inputPaths.length === 0 ? ["."] : inputPaths;
-
-  // Load gitignore files
-  let gitignore: GitignoreManager | null = null;
-  if (!options.noIgnore) {
-    gitignore = await loadGitignores(
-      ctx.fs,
-      ctx.cwd,
-      options.noIgnoreDot,
-      options.noIgnoreVcs,
-      options.ignoreFiles,
-    );
-  }
-
-  // Create file type registry and apply --type-clear and --type-add
-  const typeRegistry = new FileTypeRegistry();
-  for (const name of options.typeClear) {
-    typeRegistry.clearType(name);
-  }
-  for (const spec of options.typeAdd) {
-    typeRegistry.addType(spec);
-  }
-
-  // Collect files to search
-  const { files, singleExplicitFile } = await collectFiles(
-    ctx,
-    paths,
-    options,
-    gitignore,
-    typeRegistry,
-  );
-
-  if (files.length === 0) {
-    return { stdout: "", stderr: "", exitCode: 1 };
-  }
-
-  // Determine output settings
+  // file names when searching a directory or more than one path
   const showFilename =
-    !options.noFilename &&
-    (options.withFilename || !singleExplicitFile || files.length > 1);
+    !options.noFilename && (options.withFilename || collected.named);
 
-  // (1ctx) line numbers only when asked for, as ripgrep when piped
-  const effectiveLineNumbers = options.lineNumber;
-
-  // Search files
-  return searchFiles(
+  const result = await searchFiles(
     ctx,
-    files,
+    collected.files,
     regex,
     options,
     showFilename,
-    effectiveLineNumbers,
     kResetGroup,
+  );
+  return withErrors(result, collected.errors, options.quiet);
+}
+
+const NEWLINE_REFUSED = `rg: the literal "\\n" is not allowed in a regex
+
+Consider enabling multiline mode with the --multiline flag (or -U for short).
+When multiline mode is enabled, new line characters can be matched.
+`;
+
+const NOTHING_SEARCHED = `rg: No files were searched, which means ripgrep probably applied a filter you didn't expect.
+Running with --debug will show why files are being skipped.
+`;
+
+/** (1ctx) A newline in the pattern, typed or as `\n`. */
+function hasNewline(pattern: string, fixed: boolean): boolean {
+  if (pattern.includes("\n")) return true;
+  if (fixed) return false;
+  for (let i = 0; i < pattern.length; i++) {
+    if (pattern[i] !== "\\") continue;
+    if (pattern[i + 1] === "n") return true;
+    i++;
+  }
+  return false;
+}
+
+/**
+ * (1ctx) A missing path is reported and the others searched; the run
+ * then exits 2, but for -q once a match was found.
+ */
+function withErrors(
+  result: ExecResult,
+  errors: string[],
+  quiet: boolean,
+): ExecResult {
+  if (errors.length === 0) return result;
+  return {
+    ...result,
+    stderr: `${errors.join("\n")}\n${result.stderr}`,
+    exitCode: quiet && result.exitCode === 0 ? 0 : 2,
+  };
+}
+
+async function makeFilters(
+  ctx: RuntimeCommandContext,
+  options: RgOptions,
+  overrides: Overrides,
+): Promise<Filters> {
+  const gitignore = options.noIgnore
+    ? null
+    : await loadGitignores(
+        ctx.fs,
+        ctx.cwd,
+        options.noIgnoreDot,
+        options.noIgnoreVcs,
+        options.ignoreFiles,
+      );
+  // Create file type registry and apply --type-clear and --type-add
+  const types = new FileTypeRegistry();
+  for (const name of options.typeClear) types.clearType(name);
+  for (const spec of options.typeAdd) types.addType(spec);
+  return { options, gitignore, types, overrides };
+}
+
+/**
+ * List files that would be searched (--files mode)
+ */
+async function listFiles(
+  ctx: RuntimeCommandContext,
+  inputPaths: string[],
+  filters: Filters,
+): Promise<ExecResult> {
+  const { files, errors } = await collectFiles(
+    ctx,
+    inputPaths,
+    filters,
+    inputPaths.length === 0,
+  );
+  const listed = files.filter((file) => !file.stdin);
+  if (filters.options.quiet) {
+    return withErrors(
+      { stdout: "", stderr: "", exitCode: listed.length > 0 ? 0 : 1 },
+      errors,
+      true,
+    );
+  }
+  const sep = filters.options.nullSeparator ? "\0" : "\n";
+  const output = new BoundedStringBuilder(
+    Math.min(ctx.limits.maxOutputSize, ctx.limits.maxStringLength),
+    "rg",
+  );
+  for (const file of listed) output.append(file.path).append(sep);
+  return withErrors(
+    { stdout: output.build(), stderr: "", exitCode: listed.length > 0 ? 0 : 1 },
+    errors,
+    false,
   );
 }
 
@@ -437,402 +442,6 @@ function buildSearchRegex(
   });
 }
 
-interface CollectFilesResult {
-  files: string[];
-  singleExplicitFile: boolean;
-}
-
-/**
- * Collect files to search based on paths and options
- */
-async function collectFiles(
-  ctx: RuntimeCommandContext,
-  paths: string[],
-  options: RgOptions,
-  gitignore: GitignoreManager | null,
-  typeRegistry: FileTypeRegistry,
-): Promise<CollectFilesResult> {
-  const files: string[] = [];
-  const traversalBudget = new FileTraversalBudget({
-    limits: ctx.limits,
-    signal: ctx.signal,
-    executionScope: ctx.executionScope,
-    site: "rg",
-  });
-  let explicitFileCount = 0;
-  let directoryCount = 0;
-
-  for (const path of paths) {
-    traversalBudget.checkpoint();
-    const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
-
-    try {
-      const stat = await ctx.fs.stat(fullPath);
-
-      if (stat.isFile) {
-        explicitFileCount++;
-        // Check max filesize
-        if (options.maxFilesize > 0 && stat.size > options.maxFilesize) {
-          continue;
-        }
-        if (
-          shouldIncludeFile(path, options, gitignore, fullPath, typeRegistry)
-        ) {
-          if (files.length >= ctx.limits.maxArrayElements) {
-            throw new ExecutionLimitError(
-              `rg: file collection limit exceeded (${ctx.limits.maxArrayElements})`,
-              "array_elements",
-            );
-          }
-          files.push(path);
-        }
-      } else if (stat.isDirectory) {
-        directoryCount++;
-        await walkDirectory(
-          ctx,
-          path,
-          fullPath,
-          0,
-          options,
-          gitignore,
-          typeRegistry,
-          files,
-          traversalBudget,
-          new Set(),
-        );
-      }
-    } catch (error) {
-      rethrowFatalExecutionError(error);
-      // Path doesn't exist - skip silently
-    }
-  }
-
-  const sortedFiles = options.sort === "path" ? files.sort() : files;
-
-  return {
-    files: sortedFiles,
-    singleExplicitFile: explicitFileCount === 1 && directoryCount === 0,
-  };
-}
-
-/**
- * Recursively walk a directory and collect matching files
- */
-async function walkDirectory(
-  ctx: RuntimeCommandContext,
-  relativePath: string,
-  absolutePath: string,
-  depth: number,
-  options: RgOptions,
-  gitignore: GitignoreManager | null,
-  typeRegistry: FileTypeRegistry,
-  files: string[],
-  budget: FileTraversalBudget,
-  activeDirectories: Set<string>,
-): Promise<void> {
-  if (depth >= options.maxDepth) {
-    return;
-  }
-  budget.visit(depth);
-
-  let directoryIdentity: string | undefined;
-  if (options.followSymlinks) {
-    try {
-      const stat = await ctx.fs.stat(absolutePath);
-      directoryIdentity =
-        stat.identity !== undefined
-          ? `identity:${stat.identity}`
-          : stat.dev !== undefined && stat.ino !== undefined
-            ? `inode:${String(stat.dev)}:${String(stat.ino)}`
-            : `path:${await ctx.fs.realpath(absolutePath)}`;
-      if (activeDirectories.has(directoryIdentity)) return;
-      activeDirectories.add(directoryIdentity);
-    } catch (error) {
-      rethrowFatalExecutionError(error);
-      return;
-    }
-  }
-
-  // Load ignore files for this directory (per-directory ignore loading)
-  if (gitignore) {
-    await gitignore.loadForDirectory(absolutePath);
-  }
-
-  try {
-    const entries = ctx.fs.readdirWithFileTypes
-      ? await ctx.fs.readdirWithFileTypes(absolutePath)
-      : (await ctx.fs.readdir(absolutePath)).map((name) => ({
-          name,
-          isFile: undefined as boolean | undefined,
-        }));
-
-    for (const entry of entries) {
-      budget.checkpoint();
-      const name = entry.name;
-
-      // Skip common ignored directories (VCS, node_modules, etc.)
-      if (!options.noIgnore && GitignoreManager.isCommonIgnored(name)) {
-        continue;
-      }
-
-      // Hidden file check is done after gitignore to allow negation patterns
-      // to whitelist specific hidden files (e.g., "!.foo" in .gitignore)
-      const isHidden = name.startsWith(".");
-
-      const entryRelativePath =
-        relativePath === "."
-          ? name
-          : relativePath === "./"
-            ? `./${name}`
-            : relativePath.endsWith("/")
-              ? `${relativePath}${name}`
-              : `${relativePath}/${name}`;
-      const entryAbsolutePath = ctx.fs.resolvePath(absolutePath, name);
-
-      let isFile: boolean;
-      let isDirectory: boolean;
-      let isSymlink = false;
-
-      // Check if entry has type info from readdirWithFileTypes
-      const hasTypeInfo = entry.isFile !== undefined && "isDirectory" in entry;
-
-      if (hasTypeInfo) {
-        // Use type info from readdirWithFileTypes
-        const dirent = entry as {
-          name: string;
-          isFile: boolean;
-          isDirectory: boolean;
-          isSymbolicLink?: boolean;
-        };
-        isSymlink = dirent.isSymbolicLink === true;
-
-        if (isSymlink && !options.followSymlinks) {
-          continue; // Skip symlinks unless -L is specified
-        }
-
-        if (isSymlink && options.followSymlinks) {
-          // For symlinks with -L, stat the target to get actual type
-          try {
-            const stat = await ctx.fs.stat(entryAbsolutePath);
-            isFile = stat.isFile;
-            isDirectory = stat.isDirectory;
-          } catch {
-            continue; // Broken symlink, skip
-          }
-        } else {
-          isFile = dirent.isFile;
-          isDirectory = dirent.isDirectory;
-        }
-      } else {
-        try {
-          // Use lstat to detect symlinks
-          const lstat = ctx.fs.lstat
-            ? await ctx.fs.lstat(entryAbsolutePath)
-            : await ctx.fs.stat(entryAbsolutePath);
-          isSymlink = lstat.isSymbolicLink === true;
-
-          if (isSymlink && !options.followSymlinks) {
-            continue; // Skip symlinks unless -L is specified
-          }
-
-          // For symlinks with -L, stat the target
-          const stat =
-            isSymlink && options.followSymlinks
-              ? await ctx.fs.stat(entryAbsolutePath)
-              : lstat;
-          isFile = stat.isFile;
-          isDirectory = stat.isDirectory;
-        } catch {
-          continue;
-        }
-      }
-
-      // Check gitignore patterns first
-      const gitignoreIgnored = gitignore?.matches(
-        entryAbsolutePath,
-        isDirectory,
-      );
-      if (gitignoreIgnored) {
-        continue;
-      }
-
-      // Skip hidden files unless:
-      // - --hidden is set, OR
-      // - gitignore explicitly whitelists this file with a negation pattern (e.g., "!.foo")
-      if (isHidden && !options.hidden) {
-        const isWhitelisted = gitignore?.isWhitelisted(
-          entryAbsolutePath,
-          isDirectory,
-        );
-        if (!isWhitelisted) {
-          continue;
-        }
-      }
-
-      if (isDirectory) {
-        await walkDirectory(
-          ctx,
-          entryRelativePath,
-          entryAbsolutePath,
-          depth + 1,
-          options,
-          gitignore,
-          typeRegistry,
-          files,
-          budget,
-          activeDirectories,
-        );
-      } else if (isFile) {
-        budget.visit(depth + 1);
-        // Check max filesize
-        if (options.maxFilesize > 0) {
-          try {
-            const fileStat = await ctx.fs.stat(entryAbsolutePath);
-            if (fileStat.size > options.maxFilesize) {
-              continue;
-            }
-          } catch {
-            continue;
-          }
-        }
-        if (
-          shouldIncludeFile(
-            entryRelativePath,
-            options,
-            gitignore,
-            entryAbsolutePath,
-            typeRegistry,
-          )
-        ) {
-          if (files.length >= ctx.limits.maxArrayElements) {
-            throw new ExecutionLimitError(
-              `rg: file collection limit exceeded (${ctx.limits.maxArrayElements})`,
-              "array_elements",
-            );
-          }
-          files.push(entryRelativePath);
-        }
-      }
-    }
-  } catch (error) {
-    rethrowFatalExecutionError(error);
-    // Directory read failed - skip
-  } finally {
-    if (directoryIdentity !== undefined) {
-      activeDirectories.delete(directoryIdentity);
-    }
-  }
-}
-
-/**
- * Check if a file should be included based on filters
- */
-function shouldIncludeFile(
-  relativePath: string,
-  options: RgOptions,
-  gitignore: GitignoreManager | null,
-  absolutePath: string,
-  typeRegistry: FileTypeRegistry,
-): boolean {
-  const filename = relativePath.split("/").pop() || relativePath;
-
-  if (gitignore?.matches(absolutePath, false)) {
-    return false;
-  }
-
-  if (
-    options.types.length > 0 &&
-    !typeRegistry.matchesType(filename, options.types)
-  ) {
-    return false;
-  }
-
-  if (
-    options.typesNot.length > 0 &&
-    typeRegistry.matchesType(filename, options.typesNot)
-  ) {
-    return false;
-  }
-
-  if (options.globs.length > 0) {
-    const ignoreCase = options.globCaseInsensitive;
-    const positiveGlobs = options.globs.filter((g) => !g.startsWith("!"));
-    const negativeGlobs = options.globs
-      .filter((g) => g.startsWith("!"))
-      .map((g) => g.slice(1));
-
-    if (positiveGlobs.length > 0) {
-      let matchesPositive = false;
-      for (const glob of positiveGlobs) {
-        if (
-          matchGlob(filename, glob, ignoreCase) ||
-          matchGlob(relativePath, glob, ignoreCase)
-        ) {
-          matchesPositive = true;
-          break;
-        }
-      }
-      if (!matchesPositive) {
-        return false;
-      }
-    }
-
-    for (const glob of negativeGlobs) {
-      if (glob.startsWith("/")) {
-        const rootedGlob = glob.slice(1);
-        if (matchGlob(relativePath, rootedGlob, ignoreCase)) {
-          return false;
-        }
-      } else if (
-        matchGlob(filename, glob, ignoreCase) ||
-        matchGlob(relativePath, glob, ignoreCase)
-      ) {
-        return false;
-      }
-    }
-  }
-
-  // Handle iglobs (case-insensitive globs)
-  if (options.iglobs.length > 0) {
-    const positiveIglobs = options.iglobs.filter((g) => !g.startsWith("!"));
-    const negativeIglobs = options.iglobs
-      .filter((g) => g.startsWith("!"))
-      .map((g) => g.slice(1));
-
-    if (positiveIglobs.length > 0) {
-      let matchesPositive = false;
-      for (const glob of positiveIglobs) {
-        if (
-          matchGlob(filename, glob, true) ||
-          matchGlob(relativePath, glob, true)
-        ) {
-          matchesPositive = true;
-          break;
-        }
-      }
-      if (!matchesPositive) {
-        return false;
-      }
-    }
-
-    for (const glob of negativeIglobs) {
-      if (glob.startsWith("/")) {
-        const rootedGlob = glob.slice(1);
-        if (matchGlob(relativePath, rootedGlob, true)) {
-          return false;
-        }
-      } else if (
-        matchGlob(filename, glob, true) ||
-        matchGlob(relativePath, glob, true)
-      ) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
 /**
  * Simple glob matching
  */
@@ -874,68 +483,6 @@ function matchGlob(str: string, pattern: string, ignoreCase = false): boolean {
 }
 
 /**
- * List files that would be searched (--files mode)
- */
-async function listFiles(
-  ctx: RuntimeCommandContext,
-  inputPaths: string[],
-  options: RgOptions,
-): Promise<ExecResult> {
-  // Load gitignore files
-  let gitignore: GitignoreManager | null = null;
-  if (!options.noIgnore) {
-    gitignore = await loadGitignores(
-      ctx.fs,
-      ctx.cwd,
-      options.noIgnoreDot,
-      options.noIgnoreVcs,
-      options.ignoreFiles,
-    );
-  }
-
-  // Create file type registry and apply --type-clear and --type-add
-  const typeRegistry = new FileTypeRegistry();
-  for (const name of options.typeClear) {
-    typeRegistry.clearType(name);
-  }
-  for (const spec of options.typeAdd) {
-    typeRegistry.addType(spec);
-  }
-
-  // Default to current directory
-  const paths = inputPaths.length === 0 ? ["."] : inputPaths;
-
-  // Collect files
-  const { files } = await collectFiles(
-    ctx,
-    paths,
-    options,
-    gitignore,
-    typeRegistry,
-  );
-
-  if (files.length === 0) {
-    return { stdout: "", stderr: "", exitCode: 1 };
-  }
-
-  // In quiet mode, just indicate success without output
-  if (options.quiet) {
-    return { stdout: "", stderr: "", exitCode: 0 };
-  }
-
-  // Output file list
-  const sep = options.nullSeparator ? "\0" : "\n";
-  const output = new BoundedStringBuilder(
-    Math.min(ctx.limits.maxOutputSize, ctx.limits.maxStringLength),
-    "rg",
-  );
-  for (const file of files) output.append(file).append(sep);
-  const stdout = output.build();
-
-  return { stdout, stderr: "", exitCode: 0 };
-}
-
-/**
  * Check if a file matches any pre-glob patterns
  */
 function matchesPreGlob(filename: string, preGlobs: string[]): boolean {
@@ -952,6 +499,16 @@ function matchesPreGlob(filename: string, preGlobs: string[]): boolean {
 /**
  * Read file content, handling preprocessing and gzip decompression if needed
  */
+/** (1ctx) Standard input, searched as a file named `<stdin>`. */
+function readStdin(ctx: RuntimeCommandContext): {
+  content: string;
+  isBinary: boolean;
+  lease?: ResourceLease;
+} {
+  const content = decodeBytesToUtf8(ctx.stdin);
+  return { content, isBinary: content.slice(0, 8192).includes("\0") };
+}
+
 async function readFileContent(
   ctx: RuntimeCommandContext,
   filePath: string,
@@ -1120,13 +677,15 @@ interface JsonMatch {
  */
 async function searchFiles(
   ctx: RuntimeCommandContext,
-  files: string[],
+  haystacks: Haystack[],
   regex: UserRegex,
   options: RgOptions,
   showFilename: boolean,
-  effectiveLineNumbers: boolean,
   kResetGroup?: number,
 ): Promise<ExecResult> {
+  const files = haystacks.map((file) => file.path);
+  const expand =
+    options.replace !== null ? compileReplacement(options.replace) : undefined;
   let stdout = "";
   let anyMatch = false;
 
@@ -1140,20 +699,27 @@ async function searchFiles(
   // string while being searched. Keep their concurrency deliberately small.
   const BATCH_SIZE = options.searchZip ? 2 : 50;
   outer: for (let i = 0; i < files.length; i += BATCH_SIZE) {
-    const batch = files.slice(i, i + BATCH_SIZE);
+    const batch = haystacks.slice(i, i + BATCH_SIZE);
 
     const results = await Promise.all(
-      batch.map(async (file) => {
-        const filePath = ctx.fs.resolvePath(ctx.cwd, file);
-        const fileData = await readFileContent(ctx, filePath, file, options);
+      batch.map(async (haystack) => {
+        const file = haystack.path;
+        const fileData = haystack.stdin
+          ? readStdin(ctx)
+          : await readFileContent(
+              ctx,
+              ctx.fs.resolvePath(ctx.cwd, file),
+              file,
+              options,
+            );
 
         if (!fileData) return null;
 
         const { content, isBinary, lease } = fileData;
         bytesSearched += content.length;
 
-        // Skip binary files unless -a/--text is specified.
-        if (isBinary && !options.searchBinary) {
+        // Skip binary files found in a walk unless -a/--text is specified.
+        if (isBinary && !options.searchBinary && !haystack.given) {
           lease?.release();
           return null;
         }
@@ -1162,7 +728,7 @@ async function searchFiles(
         try {
           const result = searchContent(content, regex, {
             invertMatch: options.invertMatch,
-            showLineNumbers: effectiveLineNumbers,
+            showLineNumbers: options.lineNumber,
             countOnly: options.count,
             countMatches: options.countMatches,
             filename: filenameForSearch,
@@ -1171,13 +737,16 @@ async function searchFiles(
             afterContext: options.afterContext,
             maxCount: options.maxCount,
             contextSeparator: options.contextSeparator,
+            // (1ctx) ripgrep's field separators and replacement syntax
+            fieldSeparators: {
+              match: options.fieldMatchSeparator,
+              context: options.fieldContextSeparator,
+            },
             showColumn: options.column,
             vimgrep: options.vimgrep,
             showByteOffset: options.byteOffset,
-            replace:
-              options.replace !== null
-                ? convertReplacement(options.replace)
-                : null,
+            replace: options.replace,
+            expand,
             passthru: options.passthru,
             multiline: options.multiline,
             kResetGroup,
@@ -1190,6 +759,19 @@ async function searchFiles(
             maxMatches: ctx.limits.maxArrayElements,
             signal: ctx.signal,
           });
+
+          // (1ctx) a binary file given by name reports that it matched
+          if (
+            isBinary &&
+            !options.searchBinary &&
+            result.matched &&
+            !options.count &&
+            !options.countMatches
+          ) {
+            const offset = utf8ByteLength(content.slice(0, content.indexOf("\0")));
+            const name = showFilename ? `${file}: ` : "";
+            result.output = `${name}binary file matches (found "\\0" byte around offset ${offset})\n`;
+          }
 
           // JSON formatting below needs the source after this task ends, so
           // transfer lease ownership with the returned batch item.
@@ -1302,6 +884,16 @@ async function searchFiles(
           // In heading mode, always show filename header (even for single files)
           if (options.heading && !options.noFilename) {
             stdout += `${file}\n`;
+          } else if (
+            // (1ctx) the context separator also parts files
+            stdout !== "" &&
+            result.output !== "" &&
+            options.contextSeparator !== null &&
+            (options.beforeContext > 0 || options.afterContext > 0) &&
+            !options.count &&
+            !options.countMatches
+          ) {
+            stdout += `${options.contextSeparator}\n`;
           }
           stdout += result.output;
         }

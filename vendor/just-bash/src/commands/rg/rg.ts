@@ -116,7 +116,6 @@ export const rgCommand: RuntimeCommand = {
       ctx,
       options: parseResult.options,
       paths: parseResult.paths,
-      explicitLineNumbers: parseResult.explicitLineNumbers,
     });
   },
 };

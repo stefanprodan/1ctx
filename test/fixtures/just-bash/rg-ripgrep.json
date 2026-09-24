@@ -3491,6 +3491,46 @@
       "exit": 0
     },
     {
+      "name": "ignore nested negation",
+      "args": [
+        "--files",
+        "dir"
+      ],
+      "unordered": true,
+      "files": {
+        "dir/sub/.gitignore": "*.tmp\n!c.log\n"
+      },
+      "stdout": "dir/d.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore rgignore over gitignore",
+      "args": [
+        "--files",
+        "dir"
+      ],
+      "unordered": true,
+      "files": {
+        ".rgignore": "!*.log\n",
+        ".ignore": ""
+      },
+      "stdout": "dir/d.txt\ndir/sub/c.log\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore unclosed class",
+      "args": [
+        "--files"
+      ],
+      "unordered": true,
+      "files": {
+        ".gitignore": "[abc\n*.log\nbuild/\n",
+        "[abc": "x\n"
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
       "name": "ignore nested off",
       "args": [
         "--files",

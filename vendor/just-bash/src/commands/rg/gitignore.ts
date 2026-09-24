@@ -10,217 +10,69 @@
  */
 
 import type { IFileSystem } from "../../fs/interface.js";
-import { createUserRegex, type RegexLike } from "../../regex/index.js";
+import {
+  compileIgnoreGlob,
+  type GlobMatch,
+  type IgnoreGlob,
+  matchGlobs,
+} from "./globs.js";
 
-interface GitignorePattern {
-  /** Original pattern string */
-  pattern: string;
-  /** Compiled regex for matching */
-  regex: RegexLike;
-  /** Whether this is a negation pattern (starts with !) */
-  negated: boolean;
-  /** Whether this only matches directories (ends with /) */
-  directoryOnly: boolean;
-  /** Whether this is rooted (starts with / or contains /) */
-  rooted: boolean;
-}
+/** (1ctx) Which ignore file a parser read: its rank, highest first. */
+export type IgnoreKind = "rgignore" | "ignore" | "gitignore" | "explicit";
+
+const RANK: Record<IgnoreKind, number> = {
+  rgignore: 0,
+  ignore: 1,
+  gitignore: 2,
+  explicit: 3,
+};
 
 export class GitignoreParser {
-  private patterns: GitignorePattern[] = [];
+  private patterns: IgnoreGlob[] = [];
   private basePath: string;
+  readonly kind: IgnoreKind;
 
-  constructor(basePath: string = "/") {
+  constructor(basePath: string = "/", kind: IgnoreKind = "gitignore") {
     this.basePath = basePath;
+    this.kind = kind;
   }
 
   /**
    * Parse .gitignore content and add patterns
    */
   parse(content: string): void {
-    const lines = content.split("\n");
-
-    for (const line of lines) {
-      // Trim trailing whitespace (but not leading - significant in gitignore)
-      let trimmed = line.replace(/\s+$/, "");
-
-      // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith("#")) {
-        continue;
+    for (const line of content.split("\n")) {
+      // (1ctx) trailing spaces go unless escaped, and a CR with them
+      let trimmed = line.replace(/\r$/, "");
+      trimmed = trimmed.replace(/(^|[^\\])\s+$/, "$1");
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      try {
+        // (1ctx) ripgrep's glob rules, braces included
+        this.patterns.push(compileIgnoreGlob(trimmed, false, true));
+      } catch {
+        // a line that is not a glob is skipped, as ripgrep skips it
       }
-
-      // Handle negation
-      let negated = false;
-      if (trimmed.startsWith("!")) {
-        negated = true;
-        trimmed = trimmed.slice(1);
-      }
-
-      // Handle directory-only patterns
-      let directoryOnly = false;
-      if (trimmed.endsWith("/")) {
-        directoryOnly = true;
-        trimmed = trimmed.slice(0, -1);
-      }
-
-      // Handle rooted patterns
-      let rooted = false;
-      if (trimmed.startsWith("/")) {
-        rooted = true;
-        trimmed = trimmed.slice(1);
-      } else if (trimmed.includes("/") && !trimmed.startsWith("**/")) {
-        // Patterns with / in the middle are rooted
-        rooted = true;
-      }
-
-      // Convert gitignore pattern to regex
-      const regex = this.patternToRegex(trimmed, rooted);
-
-      this.patterns.push({
-        pattern: line,
-        regex,
-        negated,
-        directoryOnly,
-        rooted,
-      });
     }
   }
 
-  /**
-   * Convert a gitignore pattern to a regex
-   */
-  private patternToRegex(pattern: string, rooted: boolean): RegexLike {
-    let regexStr = "";
-
-    // If not rooted, can match at any depth
-    if (!rooted) {
-      regexStr = "(?:^|/)";
-    } else {
-      regexStr = "^";
-    }
-
-    let i = 0;
-    while (i < pattern.length) {
-      const char = pattern[i];
-
-      if (char === "*") {
-        if (pattern[i + 1] === "*") {
-          // ** matches any number of directories
-          if (pattern[i + 2] === "/") {
-            // **/ matches zero or more directories
-            regexStr += "(?:.*/)?";
-            i += 3;
-          } else if (i + 2 >= pattern.length) {
-            // ** at end matches everything
-            regexStr += ".*";
-            i += 2;
-          } else {
-            // ** in middle
-            regexStr += ".*";
-            i += 2;
-          }
-        } else {
-          // * matches anything except /
-          regexStr += "[^/]*";
-          i++;
-        }
-      } else if (char === "?") {
-        // ? matches any single character except /
-        regexStr += "[^/]";
-        i++;
-      } else if (char === "[") {
-        // Character class - find the closing ]
-        let j = i + 1;
-        if (j < pattern.length && pattern[j] === "!") j++;
-        if (j < pattern.length && pattern[j] === "]") j++;
-        while (j < pattern.length && pattern[j] !== "]") j++;
-
-        if (j < pattern.length) {
-          // Valid character class
-          let charClass = pattern.slice(i, j + 1);
-          // Convert [!...] to [^...]
-          if (charClass.startsWith("[!")) {
-            charClass = `[^${charClass.slice(2)}`;
-          }
-          regexStr += charClass;
-          i = j + 1;
-        } else {
-          // No closing ], treat [ as literal
-          regexStr += "\\[";
-          i++;
-        }
-      } else if (char === "/") {
-        regexStr += "/";
-        i++;
-      } else {
-        // Escape regex special characters
-        regexStr += char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        i++;
-      }
-    }
-
-    // Pattern should match the full path component
-    regexStr += "(?:/.*)?$";
-
-    return createUserRegex(regexStr);
+  /** (1ctx) What the last matching line says of a path. */
+  match(relativePath: string, isDirectory: boolean): GlobMatch {
+    const path = relativePath.replace(/^\.\//, "").replace(/^\//, "");
+    return matchGlobs(this.patterns, path, isDirectory);
   }
 
   /**
    * Check if a path should be ignored
-   *
-   * @param relativePath Path relative to the gitignore location
-   * @param isDirectory Whether the path is a directory
-   * @returns true if the path should be ignored
    */
   matches(relativePath: string, isDirectory: boolean): boolean {
-    // Normalize path - remove leading ./
-    let path = relativePath.replace(/^\.\//, "");
-
-    // Ensure path starts without /
-    path = path.replace(/^\//, "");
-
-    let ignored = false;
-
-    for (const pattern of this.patterns) {
-      // Skip directory-only patterns for files
-      if (pattern.directoryOnly && !isDirectory) {
-        continue;
-      }
-
-      if (pattern.regex.test(path)) {
-        ignored = !pattern.negated;
-      }
-    }
-
-    return ignored;
+    return this.match(relativePath, isDirectory) === "ignore";
   }
 
   /**
    * Check if a path is explicitly whitelisted by a negation pattern
-   *
-   * @param relativePath Path relative to the gitignore location
-   * @param isDirectory Whether the path is a directory
-   * @returns true if the path is whitelisted by a negation pattern
    */
   isWhitelisted(relativePath: string, isDirectory: boolean): boolean {
-    // Normalize path - remove leading ./
-    let path = relativePath.replace(/^\.\//, "");
-
-    // Ensure path starts without /
-    path = path.replace(/^\//, "");
-
-    for (const pattern of this.patterns) {
-      // Skip directory-only patterns for files
-      if (pattern.directoryOnly && !isDirectory) {
-        continue;
-      }
-
-      // Check if a negation pattern matches
-      if (pattern.negated && pattern.regex.test(path)) {
-        return true;
-      }
-    }
-
-    return false;
+    return this.match(relativePath, isDirectory) === "whitelist";
   }
 
   /**
@@ -229,6 +81,12 @@ export class GitignoreParser {
   getBasePath(): string {
     return this.basePath;
   }
+}
+
+function kindOf(filename: string): IgnoreKind {
+  if (filename === ".rgignore") return "rgignore";
+  if (filename === ".ignore") return "ignore";
+  return "gitignore";
 }
 
 /**
@@ -288,7 +146,7 @@ export class GitignoreManager {
         const ignorePath = this.fs.resolvePath(dir, filename);
         try {
           const content = await this.fs.readFile(ignorePath);
-          const parser = new GitignoreParser(dir);
+          const parser = new GitignoreParser(dir, kindOf(filename));
           parser.parse(content);
           this.parsers.push(parser);
         } catch {
@@ -318,7 +176,7 @@ export class GitignoreManager {
       const ignorePath = this.fs.resolvePath(dir, filename);
       try {
         const content = await this.fs.readFile(ignorePath);
-        const parser = new GitignoreParser(dir);
+        const parser = new GitignoreParser(dir, kindOf(filename));
         parser.parse(content);
         this.parsers.push(parser);
       } catch {
@@ -332,56 +190,49 @@ export class GitignoreManager {
    * Used for --ignore-file flag.
    */
   addPatternsFromContent(content: string, basePath: string): void {
-    const parser = new GitignoreParser(basePath);
+    const parser = new GitignoreParser(basePath, "explicit");
     parser.parse(content);
     this.parsers.push(parser);
   }
 
   /**
+   * (1ctx) What the ignore files say of a path, as ripgrep weighs them:
+   * .rgignore over .ignore over .gitignore over --ignore-file, and within
+   * each the deepest directory's file first.
+   */
+  match(absolutePath: string, isDirectory: boolean): GlobMatch {
+    const ordered = [...this.parsers].sort(
+      (a, b) =>
+        RANK[a.kind] - RANK[b.kind] ||
+        b.getBasePath().length - a.getBasePath().length,
+    );
+    for (const parser of ordered) {
+      const basePath = parser.getBasePath();
+      const prefix = basePath.endsWith("/") ? basePath : `${basePath}/`;
+      if (absolutePath !== basePath && !absolutePath.startsWith(prefix)) {
+        continue;
+      }
+      const found = parser.match(
+        absolutePath.slice(prefix.length),
+        isDirectory,
+      );
+      if (found !== "none") return found;
+    }
+    return "none";
+  }
+
+  /**
    * Check if a path should be ignored
-   *
-   * @param absolutePath Absolute path to check
-   * @param isDirectory Whether the path is a directory
-   * @returns true if the path should be ignored
    */
   matches(absolutePath: string, isDirectory: boolean): boolean {
-    for (const parser of this.parsers) {
-      // Get path relative to the gitignore location
-      const basePath = parser.getBasePath();
-      if (!absolutePath.startsWith(basePath)) continue;
-
-      const relativePath = absolutePath
-        .slice(basePath.length)
-        .replace(/^\//, "");
-      if (parser.matches(relativePath, isDirectory)) {
-        return true;
-      }
-    }
-    return false;
+    return this.match(absolutePath, isDirectory) === "ignore";
   }
 
   /**
    * Check if a path is explicitly whitelisted by a negation pattern.
-   * Used to include hidden files that have negation patterns like "!.foo"
-   *
-   * @param absolutePath Absolute path to check
-   * @param isDirectory Whether the path is a directory
-   * @returns true if the path is whitelisted by a negation pattern
    */
   isWhitelisted(absolutePath: string, isDirectory: boolean): boolean {
-    for (const parser of this.parsers) {
-      // Get path relative to the gitignore location
-      const basePath = parser.getBasePath();
-      if (!absolutePath.startsWith(basePath)) continue;
-
-      const relativePath = absolutePath
-        .slice(basePath.length)
-        .replace(/^\//, "");
-      if (parser.isWhitelisted(relativePath, isDirectory)) {
-        return true;
-      }
-    }
-    return false;
+    return this.match(absolutePath, isDirectory) === "whitelist";
   }
 
   /**

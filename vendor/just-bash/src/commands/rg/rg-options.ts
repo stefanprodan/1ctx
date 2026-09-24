@@ -35,7 +35,12 @@ export interface RgOptions {
   replace: string | null;
   afterContext: number;
   beforeContext: number;
-  contextSeparator: string;
+  /** (1ctx) null with --no-context-separator */
+  contextSeparator: string | null;
+  /** (1ctx) after the name, number and column of a context line */
+  fieldContextSeparator: string;
+  /** (1ctx) after the name, number and column of a matching line */
+  fieldMatchSeparator: string;
   quiet: boolean;
   heading: boolean;
   passthru: boolean;
@@ -99,6 +104,8 @@ export function createDefaultOptions(): RgOptions {
     afterContext: 0,
     beforeContext: 0,
     contextSeparator: "--",
+    fieldContextSeparator: "-",
+    fieldMatchSeparator: ":",
     quiet: false,
     heading: false,
     passthru: false,

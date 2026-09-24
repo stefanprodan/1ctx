@@ -30,7 +30,8 @@ describe("rg regression: r16 - directory trailing slash", () => {
       },
     });
     const result = await bash.exec("rg xyz");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -130,7 +131,8 @@ describe("rg regression: r65 - simple directory ignore", () => {
       },
     });
     const result = await bash.exec("rg xyz");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -165,7 +167,8 @@ describe("rg regression: r87 - double-star pattern", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -695,7 +698,8 @@ describe("rg regression: r829 - anchored gitignore patterns", () => {
       },
     });
     const result = await bash.exec("rg Sample");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 
   it("r829_2731: should handle negation of build directory", async () => {
@@ -760,7 +764,8 @@ describe("rg regression: r829 - anchored gitignore patterns", () => {
       },
     });
     const result = await bash.exec("rg --files-with-matches needle");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -807,7 +812,8 @@ describe("rg regression: r1098 - gitignore with adjacent stars", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -905,7 +911,8 @@ describe("rg regression: r1173 - double star gitignore", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -921,7 +928,8 @@ describe("rg regression: r1174 - triple double star", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -1435,7 +1443,8 @@ describe("rg regression: r2770 - gitignore with double star path", () => {
       },
     });
     const result = await bash.exec("rg -l quux");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 

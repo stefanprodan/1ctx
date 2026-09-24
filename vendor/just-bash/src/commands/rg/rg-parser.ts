@@ -1,16 +1,19 @@
 /**
- * Argument parsing for rg command - Declarative approach
+ * Argument parsing for rg command
+ *
+ * (1ctx) ripgrep's parser: `--` ends the options, a value-taking short
+ * option takes the rest of its cluster or the next argument, a long one
+ * `=VALUE` or the next argument, options may follow operands, and every
+ * refusal exits 2 in ripgrep's words.
  */
 
 import type { ExecResult } from "../../types.js";
-import { unknownOption } from "../help.js";
 import { createDefaultOptions, type RgOptions } from "./rg-options.js";
 
 export interface ParseResult {
   success: true;
   options: RgOptions;
   paths: string[];
-  explicitLineNumbers: boolean;
 }
 
 export interface ParseError {
@@ -20,829 +23,337 @@ export interface ParseError {
 
 export type ParseArgsResult = ParseResult | ParseError;
 
-/**
- * Parse a filesize string (e.g., "10K", "5M", "1G")
- */
-function parseFilesize(value: string): number {
-  const match = value.match(/^(\d+)([KMG])?$/i);
-  if (!match) {
-    return 0; // Invalid format, will be caught by validation
-  }
-  const num = parseInt(match[1], 10);
-  const suffix = (match[2] || "").toUpperCase();
-  switch (suffix) {
-    case "K":
-      return num * 1024;
-    case "M":
-      return num * 1024 * 1024;
-    case "G":
-      return num * 1024 * 1024 * 1024;
-    default:
-      return num;
-  }
+/** A refusal in ripgrep's words, exit 2. */
+function refuse(message: string): ParseError {
+  return {
+    success: false,
+    error: { stdout: "", stderr: `rg: ${message}\n`, exitCode: 2 },
+  };
 }
 
-/**
- * Validate a filesize string
- */
-function validateFilesize(value: string): ExecResult | null {
-  if (!/^\d+[KMG]?$/i.test(value)) {
-    return {
-      stdout: "",
-      stderr: `rg: invalid --max-filesize value: ${value}\n`,
-      exitCode: 1,
-    };
-  }
-  return null;
+interface State {
+  after: number | null;
+  before: number | null;
+  context: number | null;
 }
 
-function validateNonnegativeInteger(
-  option: string,
+/** Returns an error message for a value it refuses. */
+type Apply = (
+  o: RgOptions,
   value: string,
-): ExecResult | null {
-  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
-    return {
-      stdout: "",
-      stderr: `rg: invalid --${option} value: ${value}\n`,
-      exitCode: 1,
-    };
-  }
-  return null;
+  state: State,
+) => string | undefined;
+
+interface Spec {
+  value: boolean;
+  apply: Apply;
 }
 
-/**
- * Validate a file type name
- * Note: We don't strictly validate type names because --type-add can define custom types.
- * If a type doesn't exist (and isn't defined via --type-add), the search will simply
- * return no matches.
- */
-function validateType(_typeName: string): ExecResult | null {
-  // Allow all type names - if they don't exist, the search returns no results
-  return null;
-}
-
-// Declarative value option definitions
-interface ValueOptDef {
-  short?: string;
-  long: string;
-  /** Where to store the parsed value. Required unless `ignored` is true. */
-  target?: keyof RgOptions;
-  multi?: boolean;
-  parse?: (val: string) => number;
-  validate?: (val: string) => ExecResult | null;
-  /**
-   * When true, consume the option's value but do NOT write it anywhere.
-   * Used for compatibility-only flags like `-j`/`--threads` that have
-   * no effect in this single-threaded environment. Previously these
-   * reused `target: "maxDepth"` as dummy storage, which silently
-   * clobbered the user's max-depth setting (HIGH_BUG finding).
-   */
-  ignored?: boolean;
-}
-
-const VALUE_OPTS: ValueOptDef[] = [
-  { short: "g", long: "glob", target: "globs", multi: true },
-  { long: "iglob", target: "iglobs", multi: true },
-  {
-    short: "t",
-    long: "type",
-    target: "types",
-    multi: true,
-    validate: validateType,
-  },
-  {
-    short: "T",
-    long: "type-not",
-    target: "typesNot",
-    multi: true,
-    validate: validateType,
-  },
-  { long: "type-add", target: "typeAdd", multi: true },
-  { long: "type-clear", target: "typeClear", multi: true },
-  { short: "m", long: "max-count", target: "maxCount", parse: parseInt },
-  { short: "e", long: "regexp", target: "patterns", multi: true },
-  { short: "f", long: "file", target: "patternFiles", multi: true },
-  { short: "r", long: "replace", target: "replace" },
-  {
-    short: "d",
-    long: "max-depth",
-    target: "maxDepth",
-    parse: (value) => Number(value),
-    validate: (value) => validateNonnegativeInteger("max-depth", value),
-  },
-  {
-    long: "max-filesize",
-    target: "maxFilesize",
-    parse: parseFilesize,
-    validate: validateFilesize,
-  },
-  { long: "context-separator", target: "contextSeparator" },
-  // Thread count (no-op in single-threaded environment). Must NOT be
-  // wired to a real RgOptions field — earlier versions used
-  // `target: "maxDepth"` as a dummy and silently overrode the user's
-  // max-depth setting to Infinity, disabling the safe default of 256.
-  { short: "j", long: "threads", ignored: true },
-  // Custom ignore file
-  { long: "ignore-file", target: "ignoreFiles", multi: true },
-  // Preprocessing
-  { long: "pre", target: "preprocessor" },
-  { long: "pre-glob", target: "preprocessorGlobs", multi: true },
-];
-
-// Declarative boolean flag definitions
-type BoolFlagHandler = (options: RgOptions) => void;
-
-const BOOL_FLAGS = new Map<string, BoolFlagHandler>([
-  // Case sensitivity
-  [
-    "i",
-    (o) => {
-      o.ignoreCase = true;
-      o.caseSensitive = false;
-      o.smartCase = false;
-    },
-  ],
-  [
-    "--ignore-case",
-    (o) => {
-      o.ignoreCase = true;
-      o.caseSensitive = false;
-      o.smartCase = false;
-    },
-  ],
-  [
-    "s",
-    (o) => {
-      o.caseSensitive = true;
-      o.ignoreCase = false;
-      o.smartCase = false;
-    },
-  ],
-  [
-    "--case-sensitive",
-    (o) => {
-      o.caseSensitive = true;
-      o.ignoreCase = false;
-      o.smartCase = false;
-    },
-  ],
-  [
-    "S",
-    (o) => {
-      o.smartCase = true;
-      o.ignoreCase = false;
-      o.caseSensitive = false;
-    },
-  ],
-  [
-    "--smart-case",
-    (o) => {
-      o.smartCase = true;
-      o.ignoreCase = false;
-      o.caseSensitive = false;
-    },
-  ],
-
-  // Pattern matching
-  [
-    "F",
-    (o) => {
-      o.fixedStrings = true;
-    },
-  ],
-  [
-    "--fixed-strings",
-    (o) => {
-      o.fixedStrings = true;
-    },
-  ],
-  [
-    "w",
-    (o) => {
-      o.wordRegexp = true;
-    },
-  ],
-  [
-    "--word-regexp",
-    (o) => {
-      o.wordRegexp = true;
-    },
-  ],
-  [
-    "x",
-    (o) => {
-      o.lineRegexp = true;
-    },
-  ],
-  [
-    "--line-regexp",
-    (o) => {
-      o.lineRegexp = true;
-    },
-  ],
-  [
-    "v",
-    (o) => {
-      o.invertMatch = true;
-    },
-  ],
-  [
-    "--invert-match",
-    (o) => {
-      o.invertMatch = true;
-    },
-  ],
-  [
-    "U",
-    (o) => {
-      o.multiline = true;
-    },
-  ],
-  [
-    "--multiline",
-    (o) => {
-      o.multiline = true;
-    },
-  ],
-  [
-    "--multiline-dotall",
-    (o) => {
-      o.multilineDotall = true;
-      o.multiline = true; // dotall implies multiline
-    },
-  ],
-
-  // Output modes
-  [
-    "c",
-    (o) => {
-      o.count = true;
-    },
-  ],
-  [
-    "--count",
-    (o) => {
-      o.count = true;
-    },
-  ],
-  [
-    "--count-matches",
-    (o) => {
-      o.countMatches = true;
-    },
-  ],
-  [
-    "l",
-    (o) => {
-      o.filesWithMatches = true;
-    },
-  ],
-  [
-    "--files",
-    (o) => {
-      o.files = true;
-    },
-  ],
-  [
-    "--files-with-matches",
-    (o) => {
-      o.filesWithMatches = true;
-    },
-  ],
-  [
-    "--files-without-match",
-    (o) => {
-      o.filesWithoutMatch = true;
-    },
-  ],
-  [
-    "--stats",
-    (o) => {
-      o.stats = true;
-    },
-  ],
-  [
-    "o",
-    (o) => {
-      o.onlyMatching = true;
-    },
-  ],
-  [
-    "--only-matching",
-    (o) => {
-      o.onlyMatching = true;
-    },
-  ],
-  [
-    "q",
-    (o) => {
-      o.quiet = true;
-    },
-  ],
-  [
-    "--quiet",
-    (o) => {
-      o.quiet = true;
-    },
-  ],
-
-  // Line numbers
-  [
-    "N",
-    (o) => {
-      o.lineNumber = false;
-    },
-  ],
-  [
-    "--no-line-number",
-    (o) => {
-      o.lineNumber = false;
-    },
-  ],
-
-  // Filename display
-  [
-    "H",
-    (o) => {
-      o.withFilename = true;
-    },
-  ],
-  [
-    "--with-filename",
-    (o) => {
-      o.withFilename = true;
-    },
-  ],
-  [
-    "I",
-    (o) => {
-      o.noFilename = true;
-    },
-  ],
-  [
-    "--no-filename",
-    (o) => {
-      o.noFilename = true;
-    },
-  ],
-  [
-    "0",
-    (o) => {
-      o.nullSeparator = true;
-    },
-  ],
-  [
-    "--null",
-    (o) => {
-      o.nullSeparator = true;
-    },
-  ],
-
-  // Column and byte offset
-  [
-    "b",
-    (o) => {
-      o.byteOffset = true;
-    },
-  ],
-  [
-    "--byte-offset",
-    (o) => {
-      o.byteOffset = true;
-    },
-  ],
-  [
-    "--column",
-    (o) => {
-      o.column = true;
-      o.lineNumber = true;
-    },
-  ],
-  [
-    "--no-column",
-    (o) => {
-      o.column = false;
-    },
-  ],
-  [
-    "--vimgrep",
-    (o) => {
-      o.vimgrep = true;
-      o.column = true;
-      o.lineNumber = true;
-    },
-  ],
-  [
-    "--json",
-    (o) => {
-      o.json = true;
-    },
-  ],
-
-  // File selection
-  [
-    "--hidden",
-    (o) => {
-      o.hidden = true;
-    },
-  ],
-  [
-    "--no-ignore",
-    (o) => {
-      o.noIgnore = true;
-    },
-  ],
-  [
-    "--no-ignore-dot",
-    (o) => {
-      o.noIgnoreDot = true;
-    },
-  ],
-  [
-    "--no-ignore-vcs",
-    (o) => {
-      o.noIgnoreVcs = true;
-    },
-  ],
-  [
-    "L",
-    (o) => {
-      o.followSymlinks = true;
-    },
-  ],
-  [
-    "--follow",
-    (o) => {
-      o.followSymlinks = true;
-    },
-  ],
-  [
-    "z",
-    (o) => {
-      o.searchZip = true;
-    },
-  ],
-  [
-    "--search-zip",
-    (o) => {
-      o.searchZip = true;
-    },
-  ],
-  [
-    "a",
-    (o) => {
-      o.searchBinary = true;
-    },
-  ],
-  [
-    "--text",
-    (o) => {
-      o.searchBinary = true;
-    },
-  ],
-
-  // Output formatting
-  [
-    "--heading",
-    (o) => {
-      o.heading = true;
-    },
-  ],
-  [
-    "--passthru",
-    (o) => {
-      o.passthru = true;
-    },
-  ],
-  [
-    "--include-zero",
-    (o) => {
-      o.includeZero = true;
-    },
-  ],
-  [
-    "--glob-case-insensitive",
-    (o) => {
-      o.globCaseInsensitive = true;
-    },
-  ],
-]);
-
-// Special flags that return a value indicating line number was explicitly set
-const LINE_NUMBER_FLAGS = new Set(["n", "--line-number"]);
-
-// Handle unrestricted mode (-u, -uu, -uuu)
-function handleUnrestricted(options: RgOptions): void {
-  if (options.hidden) {
-    options.searchBinary = true;
-  } else if (options.noIgnore) {
-    options.hidden = true;
-  } else {
-    options.noIgnore = true;
-  }
-}
-
-/**
- * Try to parse a value option, returning the new index if matched
- */
-function tryParseValueOpt(
-  args: string[],
-  i: number,
-  options: RgOptions,
-): { newIndex: number; error?: ExecResult } | null {
-  const arg = args[i];
-
-  for (const def of VALUE_OPTS) {
-    // Check --long=VALUE form
-    if (arg.startsWith(`--${def.long}=`)) {
-      const value = arg.slice(`--${def.long}=`.length);
-      const error = applyValueOpt(options, def, value);
-      if (error) return { newIndex: i, error };
-      return { newIndex: i };
-    }
-
-    // Check -xVALUE form (short option with value attached, e.g., -f-)
-    if (def.short && arg.startsWith(`-${def.short}`) && arg.length > 2) {
-      const value = arg.slice(2);
-      const error = applyValueOpt(options, def, value);
-      if (error) return { newIndex: i, error };
-      return { newIndex: i };
-    }
-
-    // Check -x VALUE or --long VALUE form
-    if ((def.short && arg === `-${def.short}`) || arg === `--${def.long}`) {
-      if (i + 1 >= args.length) return null;
-      const value = args[i + 1];
-      const error = applyValueOpt(options, def, value);
-      if (error) return { newIndex: i + 1, error };
-      return { newIndex: i + 1 };
-    }
-  }
-
-  return null;
-}
-
-/**
- * Find a value option definition by its short flag
- */
-function findValueOptByShort(shortFlag: string): ValueOptDef | undefined {
-  return VALUE_OPTS.find((def) => def.short === shortFlag);
-}
-
-/**
- * Apply a value option to options object
- */
-function applyValueOpt(
-  options: RgOptions,
-  def: ValueOptDef,
-  value: string,
-): ExecResult | undefined {
-  if (def.validate) {
-    const error = def.validate(value);
-    if (error) return error;
-  }
-
-  // Compatibility-only flags consume their value but don't store it.
-  if (def.ignored || !def.target) {
+const flag = (set: (o: RgOptions) => void): Spec => ({
+  value: false,
+  apply: (o) => {
+    set(o);
     return undefined;
-  }
+  },
+});
 
-  const parsed = def.parse ? def.parse(value) : value;
+const text = (set: (o: RgOptions, v: string) => void): Spec => ({
+  value: true,
+  apply: (o, v) => {
+    set(o, v);
+    return undefined;
+  },
+});
 
-  if (def.multi) {
-    (options[def.target] as string[]).push(parsed as string);
-  } else {
-    (options[def.target] as string | number | null) = parsed;
-  }
-  return undefined;
+function number(value: string): number | null {
+  if (!/^\d+$/.test(value)) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) ? n : null;
 }
 
-/**
- * Parse sort option
- */
-function parseSort(
-  args: string[],
-  i: number,
-): { value: "path" | "none"; newIndex: number } | null {
-  const arg = args[i];
-
-  if (arg === "--sort" && i + 1 < args.length) {
-    const val = args[i + 1];
-    if (val === "path" || val === "none") {
-      return { value: val, newIndex: i + 1 };
+const count = (set: (o: RgOptions, n: number, s: State) => void): Spec => ({
+  value: true,
+  apply: (o, v, s) => {
+    const n = number(v);
+    if (n === null) {
+      return "value is not a valid number: invalid digit found in string";
     }
-  }
+    set(o, n, s);
+    return undefined;
+  },
+});
 
-  if (arg.startsWith("--sort=")) {
-    const val = arg.slice("--sort=".length);
-    if (val === "path" || val === "none") {
-      return { value: val, newIndex: i };
-    }
-  }
-
-  return null;
+/** --context-separator and the field separators read escapes. */
+function unescape(value: string): string {
+  return value.replace(/\\(x[0-9A-Fa-f]{2}|[tnr0\\])/g, (_, e: string) => {
+    if (e[0] === "x") return String.fromCharCode(Number.parseInt(e.slice(1), 16));
+    return { t: "\t", n: "\n", r: "\r", "0": "\0", "\\": "\\" }[e] ?? e;
+  });
 }
 
-/**
- * Parse context flag (-A, -B, -C)
- */
-function parseContextFlag(
-  args: string[],
-  i: number,
-): { flag: "A" | "B" | "C"; value: number; newIndex: number } | null {
-  const arg = args[i];
+const caseMode = (mode: "i" | "s" | "S") =>
+  flag((o) => {
+    o.ignoreCase = mode === "i";
+    o.caseSensitive = mode === "s";
+    o.smartCase = mode === "S";
+  });
 
-  // -A2, -B3, -C1 form
-  const attached = arg.match(/^-([ABC])(\d+)$/);
-  if (attached) {
-    return {
-      flag: attached[1] as "A" | "B" | "C",
-      value: parseInt(attached[2], 10),
-      newIndex: i,
-    };
-  }
+const SPECS: Record<string, Spec> = {
+  "ignore-case": caseMode("i"),
+  "case-sensitive": caseMode("s"),
+  "smart-case": caseMode("S"),
+  "fixed-strings": flag((o) => (o.fixedStrings = true)),
+  "word-regexp": flag((o) => (o.wordRegexp = true)),
+  "line-regexp": flag((o) => (o.lineRegexp = true)),
+  "invert-match": flag((o) => (o.invertMatch = true)),
+  multiline: flag((o) => (o.multiline = true)),
+  "multiline-dotall": flag((o) => {
+    o.multilineDotall = true;
+    o.multiline = true;
+  }),
+  count: flag((o) => (o.count = true)),
+  "count-matches": flag((o) => (o.countMatches = true)),
+  "files-with-matches": flag((o) => (o.filesWithMatches = true)),
+  files: flag((o) => (o.files = true)),
+  "files-without-match": flag((o) => (o.filesWithoutMatch = true)),
+  stats: flag((o) => (o.stats = true)),
+  "only-matching": flag((o) => (o.onlyMatching = true)),
+  quiet: flag((o) => (o.quiet = true)),
+  "line-number": flag((o) => (o.lineNumber = true)),
+  "no-line-number": flag((o) => (o.lineNumber = false)),
+  "with-filename": flag((o) => {
+    o.withFilename = true;
+    o.noFilename = false;
+  }),
+  "no-filename": flag((o) => {
+    o.noFilename = true;
+    o.withFilename = false;
+  }),
+  null: flag((o) => (o.nullSeparator = true)),
+  "byte-offset": flag((o) => (o.byteOffset = true)),
+  column: flag((o) => {
+    o.column = true;
+    o.lineNumber = true;
+  }),
+  "no-column": flag((o) => (o.column = false)),
+  vimgrep: flag((o) => {
+    o.vimgrep = true;
+    o.column = true;
+    o.lineNumber = true;
+  }),
+  json: flag((o) => (o.json = true)),
+  hidden: flag((o) => (o.hidden = true)),
+  "no-ignore": flag((o) => (o.noIgnore = true)),
+  "no-ignore-dot": flag((o) => (o.noIgnoreDot = true)),
+  "no-ignore-vcs": flag((o) => (o.noIgnoreVcs = true)),
+  follow: flag((o) => (o.followSymlinks = true)),
+  "search-zip": flag((o) => (o.searchZip = true)),
+  text: flag((o) => (o.searchBinary = true)),
+  heading: flag((o) => (o.heading = true)),
+  passthru: flag((o) => (o.passthru = true)),
+  "include-zero": flag((o) => (o.includeZero = true)),
+  "glob-case-insensitive": flag((o) => (o.globCaseInsensitive = true)),
+  "no-context-separator": flag((o) => (o.contextSeparator = null)),
+  // -u, -uu, -uuu: no ignore files, then hidden, then binary
+  unrestricted: flag((o) => {
+    if (o.hidden) o.searchBinary = true;
+    else if (o.noIgnore) o.hidden = true;
+    else o.noIgnore = true;
+  }),
+  glob: text((o, v) => o.globs.push(v)),
+  iglob: text((o, v) => o.iglobs.push(v)),
+  type: text((o, v) => o.types.push(v)),
+  "type-not": text((o, v) => o.typesNot.push(v)),
+  "type-add": text((o, v) => o.typeAdd.push(v)),
+  "type-clear": text((o, v) => o.typeClear.push(v)),
+  regexp: text((o, v) => o.patterns.push(v)),
+  file: text((o, v) => o.patternFiles.push(v)),
+  replace: text((o, v) => (o.replace = v)),
+  "context-separator": text((o, v) => (o.contextSeparator = unescape(v))),
+  "field-context-separator": text(
+    (o, v) => (o.fieldContextSeparator = unescape(v)),
+  ),
+  "field-match-separator": text(
+    (o, v) => (o.fieldMatchSeparator = unescape(v)),
+  ),
+  "ignore-file": text((o, v) => o.ignoreFiles.push(v)),
+  pre: text((o, v) => (o.preprocessor = v)),
+  "pre-glob": text((o, v) => o.preprocessorGlobs.push(v)),
+  "max-count": count((o, n) => (o.maxCount = n)),
+  "max-depth": count((o, n) => (o.maxDepth = n)),
+  // a no-op in a single-threaded shell, never stored
+  threads: count(() => undefined),
+  "after-context": count((_, n, s) => (s.after = n)),
+  "before-context": count((_, n, s) => (s.before = n)),
+  context: count((_, n, s) => (s.context = n)),
+  "max-filesize": {
+    value: true,
+    apply: (o, v) => {
+      const m = v.match(/^(\d+)([KMG])?$/);
+      if (!m) {
+        return `invalid size: invalid format for size '${v}', which should be a non-empty sequence of digits followed by an optional 'K', 'M' or 'G' suffix`;
+      }
+      const unit = { K: 1024, M: 1024 ** 2, G: 1024 ** 3 }[m[2] ?? ""] ?? 1;
+      o.maxFilesize = Number(m[1]) * unit;
+      return undefined;
+    },
+  },
+  sort: {
+    value: true,
+    apply: (o, v) => {
+      if (v !== "path" && v !== "none") {
+        return `choice '${v}' is unrecognized`;
+      }
+      o.sort = v;
+      return undefined;
+    },
+  },
+};
 
-  // -A 2, -B 3, -C 1 form
-  if ((arg === "-A" || arg === "-B" || arg === "-C") && i + 1 < args.length) {
-    return {
-      flag: arg[1] as "A" | "B" | "C",
-      value: parseInt(args[i + 1], 10),
-      newIndex: i + 1,
-    };
-  }
+const ALIASES: Record<string, string> = {
+  passthrough: "passthru",
+  maxdepth: "max-depth",
+};
 
-  return null;
-}
+const SHORT: Record<string, string> = {
+  i: "ignore-case",
+  s: "case-sensitive",
+  S: "smart-case",
+  F: "fixed-strings",
+  w: "word-regexp",
+  x: "line-regexp",
+  v: "invert-match",
+  U: "multiline",
+  c: "count",
+  l: "files-with-matches",
+  o: "only-matching",
+  q: "quiet",
+  n: "line-number",
+  N: "no-line-number",
+  H: "with-filename",
+  I: "no-filename",
+  "0": "null",
+  b: "byte-offset",
+  ".": "hidden",
+  L: "follow",
+  z: "search-zip",
+  a: "text",
+  u: "unrestricted",
+  g: "glob",
+  t: "type",
+  T: "type-not",
+  e: "regexp",
+  f: "file",
+  r: "replace",
+  m: "max-count",
+  d: "max-depth",
+  j: "threads",
+  A: "after-context",
+  B: "before-context",
+  C: "context",
+};
 
-/**
- * Parse max-count with attached number (-m2)
- */
-function parseMaxCountAttached(arg: string): number | null {
-  const match = arg.match(/^-m(\d+)$/);
-  return match ? parseInt(match[1], 10) : null;
-}
+const PCRE2: ParseError = {
+  success: false,
+  error: {
+    stdout: "",
+    stderr: "rg: PCRE2 is not supported. Use standard regex syntax instead.\n",
+    exitCode: 1,
+  },
+};
 
 /**
  * Parse rg command arguments
  */
 export function parseArgs(args: string[]): ParseArgsResult {
   const options = createDefaultOptions();
-  let positionalPattern: string | null = null;
-  const paths: string[] = [];
+  const state: State = { after: null, before: null, context: null };
+  const positionals: string[] = [];
 
-  // Context tracking with MAX precedence
-  let explicitA = -1;
-  let explicitB = -1;
-  let explicitC = -1;
-  let explicitLineNumbers = false;
+  const take = (
+    name: string,
+    shown: string,
+    inline: string | undefined,
+    i: number,
+  ): { next: number; error?: ParseError } => {
+    const spec = SPECS[name];
+    let value = inline;
+    let next = i;
+    if (spec.value && value === undefined) {
+      if (i + 1 >= args.length) {
+        return {
+          next,
+          error: refuse(
+            `missing value for flag ${shown}: missing argument for option '${shown}'`,
+          ),
+        };
+      }
+      value = args[i + 1];
+      next = i + 1;
+    }
+    const message = spec.apply(options, value ?? "", state);
+    if (message !== undefined) {
+      return { next, error: refuse(`error parsing flag ${shown}: ${message}`) };
+    }
+    return { next };
+  };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-
-    if (arg.startsWith("-") && arg !== "-") {
-      // Try context flags first (-A, -B, -C)
-      const contextResult = parseContextFlag(args, i);
-      if (contextResult) {
-        const { flag, value, newIndex } = contextResult;
-        if (flag === "A") explicitA = Math.max(explicitA, value);
-        else if (flag === "B") explicitB = Math.max(explicitB, value);
-        else explicitC = value; // -C overwrites, doesn't max
-        i = newIndex;
-        continue;
-      }
-
-      // Try max-count with attached number (-m2)
-      const maxCountNum = parseMaxCountAttached(arg);
-      if (maxCountNum !== null) {
-        options.maxCount = maxCountNum;
-        continue;
-      }
-
-      // Try value options
-      const valueResult = tryParseValueOpt(args, i, options);
-      if (valueResult) {
-        if (valueResult.error) {
-          return { success: false, error: valueResult.error };
-        }
-        i = valueResult.newIndex;
-        continue;
-      }
-
-      // Try sort option
-      const sortResult = parseSort(args, i);
-      if (sortResult) {
-        options.sort = sortResult.value;
-        i = sortResult.newIndex;
-        continue;
-      }
-
-      // Parse boolean flags (handles both --flag and -xyz combined)
-      const flags = arg.startsWith("--") ? [arg] : arg.slice(1).split("");
-      let consumedNextArg = false;
-
-      for (const flag of flags) {
-        // Check for line number flags (special case that returns a value)
-        if (LINE_NUMBER_FLAGS.has(flag)) {
-          options.lineNumber = true;
-          explicitLineNumbers = true;
-          continue;
-        }
-
-        // Check for unrestricted mode
-        if (flag === "u" || flag === "--unrestricted") {
-          handleUnrestricted(options);
-          continue;
-        }
-
-        // PCRE2 not supported
-        if (flag === "P" || flag === "--pcre2") {
-          return {
-            success: false,
-            error: {
-              stdout: "",
-              stderr:
-                "rg: PCRE2 is not supported. Use standard regex syntax instead.\n",
-              exitCode: 1,
-            },
-          };
-        }
-
-        // Check if this is a value option short form (e.g., 'f' in '-Ff')
-        if (flag.length === 1) {
-          const valueDef = findValueOptByShort(flag);
-          if (valueDef) {
-            // Value option in combined flags - consume next argument
-            if (i + 1 >= args.length) {
-              return { success: false, error: unknownOption("rg", `-${flag}`) };
-            }
-            const error = applyValueOpt(options, valueDef, args[i + 1]);
-            if (error) {
-              return { success: false, error };
-            }
-            i++;
-            consumedNextArg = true;
-            continue;
-          }
-        }
-
-        // Try boolean flags
-        const handler = BOOL_FLAGS.get(flag);
-        if (handler) {
-          handler(options);
-          continue;
-        }
-
-        // Unknown flag
-        if (flag.startsWith("--")) {
-          return { success: false, error: unknownOption("rg", flag) };
-        }
-        if (flag.length === 1) {
-          return { success: false, error: unknownOption("rg", `-${flag}`) };
-        }
-      }
-      // If we consumed the next arg (for a value option in combined flags),
-      // the outer loop will naturally skip it since i was incremented
-      void consumedNextArg;
-    } else if (
-      positionalPattern === null &&
-      options.patterns.length === 0 &&
-      options.patternFiles.length === 0
-    ) {
-      // First positional arg is pattern only if no -e patterns or -f files provided
-      positionalPattern = arg;
-    } else {
-      paths.push(arg);
+    if (arg === "--") {
+      positionals.push(...args.slice(i + 1));
+      break;
     }
+    if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
+      const written = eq < 0 ? arg.slice(2) : arg.slice(2, eq);
+      if (written === "pcre2") return PCRE2;
+      const name = ALIASES[written] ?? written;
+      const shown = `--${written}`;
+      const spec = SPECS[name];
+      if (!spec) return refuse(`unrecognized flag ${shown}`);
+      const inline = eq < 0 ? undefined : arg.slice(eq + 1);
+      if (!spec.value && inline !== undefined) {
+        return refuse(`error parsing flag ${shown}: flag does not take a value`);
+      }
+      const taken = take(name, shown, inline, i);
+      if (taken.error) return taken.error;
+      i = taken.next;
+      continue;
+    }
+    if (arg.startsWith("-") && arg !== "-") {
+      for (let k = 1; k < arg.length; k++) {
+        const ch = arg[k];
+        if (ch === "P") return PCRE2;
+        const name = SHORT[ch];
+        if (!name) return refuse(`unrecognized flag -${ch}`);
+        if (SPECS[name].value) {
+          const rest = arg.slice(k + 1);
+          const taken = take(name, `-${ch}`, rest === "" ? undefined : rest, i);
+          if (taken.error) return taken.error;
+          i = taken.next;
+          break;
+        }
+        take(name, `-${ch}`, undefined, i);
+      }
+      continue;
+    }
+    positionals.push(arg);
   }
 
-  // Resolve context values with MAX precedence
-  if (explicitA >= 0 || explicitC >= 0) {
-    options.afterContext = Math.max(
-      explicitA >= 0 ? explicitA : 0,
-      explicitC >= 0 ? explicitC : 0,
-    );
-  }
-  if (explicitB >= 0 || explicitC >= 0) {
-    options.beforeContext = Math.max(
-      explicitB >= 0 ? explicitB : 0,
-      explicitC >= 0 ? explicitC : 0,
-    );
+  // -A and -B win over -C whatever their order
+  options.afterContext = state.after ?? state.context ?? 0;
+  options.beforeContext = state.before ?? state.context ?? 0;
+
+  const paths = positionals.slice();
+  if (
+    !options.files &&
+    options.patterns.length === 0 &&
+    options.patternFiles.length === 0 &&
+    paths.length > 0
+  ) {
+    options.patterns.push(paths.shift() as string);
   }
 
-  // Add positional pattern
-  if (positionalPattern !== null) {
-    options.patterns.push(positionalPattern);
-  }
-
-  // --column and --vimgrep imply line numbers
-  if (options.column || options.vimgrep) {
-    explicitLineNumbers = true;
-  }
-
-  return {
-    success: true,
-    options,
-    paths,
-    explicitLineNumbers,
-  };
+  return { success: true, options, paths };
 }

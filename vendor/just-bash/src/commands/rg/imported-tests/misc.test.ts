@@ -410,7 +410,8 @@ describe("rg misc: file_type_clear", () => {
     });
     // Clear py type, then search for it - should find nothing
     const result = await bash.exec("rg --type-clear py -t py test");
-    expect(result.exitCode).toBe(1); // No matches since py type is empty
+    // (1ctx) nothing is left to search, which ripgrep refuses with exit 2
+    expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe("");
   });
 });
@@ -864,7 +865,8 @@ describe("rg misc: ignore_hidden", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -898,7 +900,8 @@ describe("rg misc: ignore_git", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -913,7 +916,8 @@ describe("rg misc: ignore_generic", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -928,7 +932,8 @@ describe("rg misc: ignore_ripgrep", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 

@@ -87,6 +87,8 @@ export interface SearchOptions {
   showByteOffset?: boolean;
   /** Replace matched text with this string */
   replace?: string | null;
+  /** (1ctx) Builds each replacement in place of `replace`'s own syntax */
+  expand?: (match: RegExpExecArray) => string;
   /** Print all lines (matches use :, non-matches use -) */
   passthru?: boolean;
   /** Enable multiline matching (patterns can span lines) */
@@ -103,6 +105,8 @@ export interface SearchOptions {
   contextWithOnlyMatching?: boolean;
   /** (1ctx) -c with -o counts matches, as ripgrep; GNU grep counts lines */
   countOnlyMatching?: boolean;
+  /** (1ctx) Written in place of : and - after each field (rg's separators) */
+  fieldSeparators?: { match: string; context: string };
   /** (1ctx) Written after the file name in place of : and - (grep -Z) */
   nameSeparator?: string;
   /** (1ctx) A tab after the line's head (grep -T) */
@@ -333,6 +337,7 @@ export function searchContent(
     vimgrep = false,
     showByteOffset = false,
     replace = null,
+    expand,
     passthru = false,
     multiline = false,
     kResetGroup,
@@ -342,6 +347,7 @@ export function searchContent(
     contextWithOnlyMatching = false,
     countOnlyMatching = false,
     nameSeparator,
+    fieldSeparators,
     initialTab = false,
     offsetWidth = 0,
     lineTerminator = "\n",
@@ -492,7 +498,12 @@ export function searchContent(
     }
   }
 
-  const head = (i: number, sep: string, byte: number | null, col?: number) => {
+  const head = (i: number, mark: string, byte: number | null, col?: number) => {
+    const sep = fieldSeparators
+      ? mark === ":"
+        ? fieldSeparators.match
+        : fieldSeparators.context
+      : mark;
     let prefix = "";
     if (filename) prefix += `${filename}${nameSeparator ?? sep}`;
     if (showLineNumbers) {
@@ -508,7 +519,7 @@ export function searchContent(
     regex.lastIndex = hit.fullStart;
     const match = regex.exec(line);
     if (match === null) return rep;
-    return applyReplacement(rep, match);
+    return expand ? expand(match) : applyReplacement(rep, match);
   };
 
   const printSelected = (i: number): void => {

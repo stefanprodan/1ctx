@@ -254,14 +254,16 @@ describe("rg error handling", () => {
     expect(result.stderr).toBe("rg: no pattern given\n");
   });
 
+  // (1ctx) ripgrep's words and exit 2
   it("should error on unknown option", async () => {
     const bash = new Bash();
     const result = await bash.exec("rg --unknown-option pattern");
-    expect(result.exitCode).toBe(1);
+    expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("rg: unrecognized option '--unknown-option'\n");
+    expect(result.stderr).toBe("rg: unrecognized flag --unknown-option\n");
   });
 
+  // (1ctx) a type that selects no file leaves nothing searched, exit 2
   it("should return no matches for unknown type", async () => {
     // Unknown types don't produce an error - they just match no files
     // This allows --type-add to define custom types
@@ -272,8 +274,8 @@ describe("rg error handling", () => {
       },
     });
     const result = await bash.exec("rg -t unknowntype hello");
-    expect(result.exitCode).toBe(1); // No matches
+    expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("");
+    expect(result.stderr).not.toBe("");
   });
 });

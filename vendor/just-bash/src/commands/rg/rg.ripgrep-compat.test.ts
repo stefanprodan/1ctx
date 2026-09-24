@@ -426,7 +426,8 @@ describe("rg ripgrep-compat: hidden files", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 
   // (1ctx) ripgrep numbers lines only with -n when piped
@@ -455,7 +456,8 @@ describe("rg ripgrep-compat: gitignore", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 
   // (1ctx) ripgrep numbers lines only with -n when piped
@@ -626,7 +628,8 @@ describe("rg ripgrep-compat: gitignore patterns", () => {
       },
     });
     const result = await bash.exec("rg xyz");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 
   // (1ctx) ripgrep numbers lines only with -n when piped

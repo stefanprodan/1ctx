@@ -30,6 +30,7 @@ describe("rg binary: basic detection", () => {
     expect(result.stdout).toBe("text.txt:1:hello world\n");
   });
 
+  // (1ctx) ripgrep reports a match in a binary file given by name
   it("should skip binary files when searching single explicit file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -38,8 +39,8 @@ describe("rg binary: basic detection", () => {
       },
     });
     const result = await bash.exec("rg hello binary.bin");
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout).toBe("");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/^binary file matches \(found "\\0" byte/);
   });
 
   it("should detect binary in first 8KB of file", async () => {
