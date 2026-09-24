@@ -47,6 +47,37 @@ function byPath(a: Haystack, b: Haystack): number {
   return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
 }
 
+/**
+ * (1ctx) --sort and --sortr: by path, or by time, which is the file's
+ * mtime for every time key, since that is the one time a stat gives.
+ */
+async function sorted(
+  ctx: RuntimeCommandContext,
+  files: Haystack[],
+  options: RgOptions,
+): Promise<Haystack[]> {
+  if (options.sort === "none") return files;
+  let order = byPath;
+  if (options.sort !== "path") {
+    const times = new Map<string, number>();
+    for (const file of files) {
+      let time = 0;
+      try {
+        const stat = await ctx.fs.stat(ctx.fs.resolvePath(ctx.cwd, file.path));
+        time = stat.mtime.getTime();
+      } catch (error) {
+        rethrowFatalExecutionError(error);
+      }
+      times.set(file.path, time);
+    }
+    order = (a, b) =>
+      (times.get(a.path) ?? 0) - (times.get(b.path) ?? 0) || byPath(a, b);
+  }
+  files.sort(order);
+  if (options.sortReverse) files.reverse();
+  return files;
+}
+
 export async function collectFiles(
   ctx: RuntimeCommandContext,
   paths: string[],
@@ -96,8 +127,7 @@ export async function collectFiles(
       const found: Haystack[] = [];
       const shown = implicit ? "" : path;
       await walkDirectory(ctx, shown, fullPath, 0, filters, found, budget);
-      if (filters.options.sort === "path") found.sort(byPath);
-      for (const file of found) push(file);
+      for (const file of await sorted(ctx, found, filters.options)) push(file);
     }
   }
   return { files, named, errors };

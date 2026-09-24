@@ -105,6 +105,7 @@ describe("rg misc: with_filename", () => {
 
 // 6. with_heading
 describe("rg misc: with_heading", () => {
+  // (1ctx) one file has no heading, as ripgrep piped, unless -H
   it("should show heading format", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -112,7 +113,7 @@ describe("rg misc: with_heading", () => {
         "/home/user/sherlock": SHERLOCK,
       },
     });
-    const result = await bash.exec("rg --heading Sherlock sherlock");
+    const result = await bash.exec("rg --heading -H Sherlock sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "sherlock\nFor the Doctor Watsons of this world, as opposed to the Sherlock\nbe, to a very large extent, the result of luck. Sherlock Holmes\n",

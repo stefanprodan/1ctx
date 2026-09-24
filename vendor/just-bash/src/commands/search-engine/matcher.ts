@@ -97,6 +97,17 @@ export interface SearchOptions {
   kResetGroup?: number;
   /** (1ctx) A match counts only with no word character on either side */
   wholeWord?: boolean;
+  /** (1ctx) A match starts a word, rg's leading \< */
+  wordStart?: boolean;
+  /** (1ctx) A match ends a word, rg's trailing \> */
+  wordEnd?: boolean;
+  /** (1ctx) A line's final \r is left out of matching, rg --crlf */
+  crlf?: boolean;
+  /**
+   * (1ctx) What a printed line becomes, rg's -M and --trim: `starts` are
+   * where matches begin in `text`, for the words that count them
+   */
+  display?: (text: string, kind: LineKind, starts: number[]) => string;
   /** (1ctx) Patterns a line must also match, grep -P's leading lookaheads */
   conditions?: LineCondition[];
   /** (1ctx) -o prints an empty line for an empty match, as ripgrep */
@@ -129,6 +140,13 @@ export interface SearchOptions {
   /** Cooperative cancellation signal checked during long scans. */
   signal?: AbortSignal;
 }
+
+/**
+ * (1ctx) A printed line: a selected one, a context one, one -o match, or
+ * a selected one whose matches are drawn apart (replaced, --vimgrep or
+ * --column).
+ */
+export type LineKind = "match" | "context" | "only" | "spans";
 
 export interface SearchResult {
   /** The formatted output string */
@@ -187,6 +205,33 @@ export function isWholeWord(line: string, start: number, end: number): boolean {
   return !isWordBefore(line, start) && !isWordAt(line, end);
 }
 
+/** (1ctx) The word checks a match must pass: -w, and rg's \< and \>. */
+export interface WordEdges {
+  whole?: boolean;
+  start?: boolean;
+  end?: boolean;
+}
+
+function startOk(edges: WordEdges, line: string, index: number): boolean {
+  if ((edges.whole || edges.start) && isWordBefore(line, index)) return false;
+  return !edges.start || isWordAt(line, index);
+}
+
+function endOk(edges: WordEdges, line: string, index: number): boolean {
+  if ((edges.whole || edges.end) && isWordAt(line, index)) return false;
+  return !edges.end || isWordBefore(line, index);
+}
+
+/** (1ctx) Whether a span passes the word checks. */
+export function edgesOk(
+  edges: WordEdges,
+  line: string,
+  start: number,
+  end: number,
+): boolean {
+  return startOk(edges, line, start) && endOk(edges, line, end);
+}
+
 /**
  * (1ctx) Finds matches in one line: the \K group, the -w check done in code
  * as GNU grep does (no word character on either side, a shorter match at
@@ -197,7 +242,7 @@ class LineMatcher {
   constructor(
     private readonly regex: UserRegex,
     private readonly keepGroup: number | undefined,
-    private readonly wholeWord: boolean,
+    private readonly edges: WordEdges,
     private readonly charge: (amount?: number) => void,
     private readonly conditions: LineCondition[] = [],
   ) {}
@@ -228,20 +273,21 @@ class LineMatcher {
       this.charge();
       if ((regex.scan(line, 0) === null) !== negated) return null;
     }
-    if (!this.wholeWord) return this.raw(line, from);
+    const { whole, start: atStart, end: atEnd } = this.edges;
+    if (!whole && !atStart && !atEnd) return this.raw(line, from);
     let pos = from;
     while (pos <= line.length) {
       const hit = this.raw(line, pos);
       if (hit === null) return null;
       const start = hit.start;
-      if (!isWordBefore(line, start)) {
-        if (!isWordAt(line, hit.end)) return hit;
+      if (startOk(this.edges, line, start)) {
+        if (endOk(this.edges, line, hit.end)) return hit;
         const shorter = this.shorter(line, hit);
         if (shorter !== null) return shorter;
       }
       // the next start with no word character before it
       pos = start < line.length ? nextIndex(line, start) : start + 1;
-      while (pos <= line.length && isWordBefore(line, pos)) {
+      while (pos <= line.length && (whole || atStart) && isWordBefore(line, pos)) {
         pos = nextIndex(line, pos);
       }
     }
@@ -252,13 +298,13 @@ class LineMatcher {
   private shorter(line: string, hit: Hit): Hit | null {
     if (this.keepGroup !== undefined) return null;
     for (let k = hit.end - 1; k >= hit.start; k--) {
-      if (isWordAt(line, k)) continue;
+      if (!endOk(this.edges, line, k)) continue;
       // (1ctx) a retry re-reads the prefix: cubic on a hostile line, so it
       // pays toward the work limit and fails in seconds, not minutes
       this.charge(1 + ((k - hit.start) >> 6));
       const candidate = this.raw(line.slice(0, k), hit.start);
       if (candidate === null || candidate.start !== hit.start) return null;
-      if (!isWordAt(line, candidate.end)) return candidate;
+      if (endOk(this.edges, line, candidate.end)) return candidate;
       k = candidate.end;
     }
     return null;
@@ -342,6 +388,10 @@ export function searchContent(
     multiline = false,
     kResetGroup,
     wholeWord = false,
+    wordStart = false,
+    wordEnd = false,
+    crlf = false,
+    display,
     conditions = [],
     printEmptyMatches = false,
     contextWithOnlyMatching = false,
@@ -381,6 +431,7 @@ export function searchContent(
       showColumn,
       showByteOffset,
       replace,
+      expand,
       kResetGroup,
       preFilter,
       maxWork,
@@ -412,10 +463,12 @@ export function searchContent(
   };
 
   const counting = countOnly || countMatches;
+  // (1ctx) rg --crlf ends the lines it writes itself with \r\n
+  const eol = crlf ? "\r" : "";
   const countResult = (count: number): SearchResult => {
     const name = filename ? `${filename}${nameSeparator ?? ":"}` : "";
     return {
-      output: `${name}${count}\n`,
+      output: `${name}${count}${eol}\n`,
       matched: count > 0,
       matchCount: count,
     };
@@ -452,17 +505,22 @@ export function searchContent(
   const matcher = new LineMatcher(
     regex,
     kResetGroup,
-    wholeWord,
+    { whole: wholeWord, start: wordStart, end: wordEnd },
     chargeWork,
     conditions,
   );
+  // (1ctx) what the pattern sees of a line: without its \r under --crlf
+  const subject = (i: number): string =>
+    crlf && lines[i].endsWith("\r") ? lines[i].slice(0, -1) : lines[i];
+  const show = (text: string, kind: LineKind, starts: number[]): string =>
+    display ? display(text, kind, starts) : text;
   const lineMatches = (line: string): boolean => {
     if (preFilter && !preFilterMatches(preFilter, line)) return false;
     return matcher.find(line, 0) !== null;
   };
   const isSelected = (i: number): boolean => {
     chargeWork();
-    return lineMatches(lines[i]) !== invertMatch;
+    return lineMatches(subject(i)) !== invertMatch;
   };
 
   // Count modes: selected lines, or with --count-matches their matches
@@ -479,7 +537,7 @@ export function searchContent(
         count++;
         continue;
       }
-      for (const _ of matcher.all(lines[i])) {
+      for (const _ of matcher.all(subject(i))) {
         chargeWork();
         count++;
       }
@@ -522,62 +580,89 @@ export function searchContent(
     return expand ? expand(match) : applyReplacement(rep, match);
   };
 
+  /** (1ctx) The line with every match replaced, and where each begins. */
+  const replaced = (i: number, rep: string): [string, number[]] => {
+    const line = lines[i];
+    const sub = subject(i);
+    let out = "";
+    let last = 0;
+    const starts: number[] = [];
+    for (const hit of matcher.all(sub)) {
+      chargeWork();
+      if (hit.end === hit.start && !printEmptyMatches) continue;
+      out += line.slice(last, hit.start);
+      starts.push(out.length);
+      out += replaceHit(sub, hit, rep);
+      last = hit.end;
+    }
+    return [out + line.slice(last), starts];
+  };
+
+  const hitStarts = (i: number): number[] => {
+    const starts: number[] = [];
+    if (!display) return starts;
+    for (const hit of matcher.all(subject(i))) {
+      chargeWork();
+      starts.push(hit.start);
+    }
+    return starts;
+  };
+
   const printSelected = (i: number): void => {
     const line = lines[i];
+    const sub = subject(i);
     if (onlyMatching) {
-      const bytes = new ByteCounter(line);
-      for (const hit of matcher.all(line)) {
+      const bytes = new ByteCounter(sub);
+      for (const hit of matcher.all(sub)) {
         chargeWork();
         if (hit.end === hit.start && !printEmptyMatches) continue;
         const text =
           replace !== null
-            ? replaceHit(line, hit, replace)
-            : line.slice(hit.start, hit.end);
+            ? replaceHit(sub, hit, replace)
+            : sub.slice(hit.start, hit.end);
         const byte = showByteOffset
           ? lineStarts[i] + bytes.at(hit.start)
           : null;
         const col = showColumn ? bytes.at(hit.start) + 1 : undefined;
-        pushOutput(head(i, ":", byte, col) + text);
+        pushOutput(head(i, ":", byte, col) + show(text, "only", [0]) + eol);
       }
       return;
     }
     const byte = showByteOffset ? lineStarts[i] : null;
     if (vimgrep) {
-      const bytes = new ByteCounter(line);
-      for (const hit of matcher.all(line)) {
+      // (1ctx) replaced once, printed once per match
+      const [text, starts] =
+        replace !== null ? replaced(i, replace) : [line, hitStarts(i)];
+      const shown = show(text, "spans", starts);
+      const bytes = new ByteCounter(sub);
+      for (const hit of matcher.all(sub)) {
         chargeWork();
-        pushOutput(head(i, ":", byte, bytes.at(hit.start) + 1) + line);
+        pushOutput(head(i, ":", byte, bytes.at(hit.start) + 1) + shown);
       }
       return;
     }
     let text = line;
     let col: number | undefined;
+    let kind: LineKind = "match";
+    let starts: number[] = [];
     if ((showColumn || replace !== null) && !invertMatch) {
-      const first = matcher.find(line, 0);
+      const first = matcher.find(sub, 0);
       if (showColumn) {
-        col = first ? utf8ByteLength(line.slice(0, first.start)) + 1 : 1;
+        col = first ? utf8ByteLength(sub.slice(0, first.start)) + 1 : 1;
       }
-      if (replace !== null) {
-        let out = "";
-        let last = 0;
-        for (const hit of matcher.all(line)) {
-          chargeWork();
-          if (hit.end === hit.start && !printEmptyMatches) continue;
-          out += line.slice(last, hit.start) + replaceHit(line, hit, replace);
-          last = hit.end;
-        }
-        text = out + line.slice(last);
-      }
+      kind = "spans";
+      if (replace !== null) [text, starts] = replaced(i, replace);
+      else starts = hitStarts(i);
     } else if (showColumn) {
       col = 1;
     }
-    pushOutput(head(i, ":", byte, col) + text);
+    pushOutput(head(i, ":", byte, col) + show(text, kind, starts));
   };
 
   const printContext = (i: number): void => {
     if (onlyMatching && !contextWithOnlyMatching) return;
     const byte = showByteOffset ? lineStarts[i] : null;
-    pushOutput(head(i, "-", byte, undefined) + lines[i]);
+    pushOutput(head(i, "-", byte, undefined) + show(lines[i], "context", []));
   };
 
   let matchCount = 0;
@@ -670,6 +755,7 @@ function searchContentMultiline(
     showColumn: boolean;
     showByteOffset: boolean;
     replace: string | null;
+    expand?: (match: RegExpExecArray) => string;
     kResetGroup?: number;
     preFilter?: PreFilter | null;
     maxWork?: number;
@@ -691,6 +777,7 @@ function searchContentMultiline(
     showColumn,
     showByteOffset,
     replace,
+    expand,
     kResetGroup,
     preFilter,
     maxWork,
@@ -814,6 +901,9 @@ function searchContentMultiline(
     byteOffset: number;
     column: number;
     matchText: string;
+    /** (1ctx) the whole match's length and what replaces it */
+    length: number;
+    replacement: string;
   }> = [];
 
   regex.lastIndex = 0;
@@ -844,6 +934,13 @@ function searchContentMultiline(
       byteOffset: match.index,
       column: getColumn(match.index),
       matchText: extractedMatch,
+      length: match[0].length,
+      replacement:
+        replace === null
+          ? ""
+          : expand
+            ? expand(match)
+            : applyReplacement(replace, match),
     });
 
     // Prevent infinite loop on zero-length matches
@@ -888,14 +985,44 @@ function searchContentMultiline(
   let lastPrintedLine = -1;
   const outputLines: string[] = [];
 
-  for (const span of matchSpans) {
+  // (1ctx) prefixes for each line of a printed piece, numbered on
+  const printPiece = (
+    text: string,
+    firstLine: number,
+    span: { byteOffset: number; column: number },
+  ): void => {
+    const pieces = text.split("\n");
+    for (let n = 0; n < pieces.length; n++) {
+      let prefix = filename ? `${filename}:` : "";
+      if (showByteOffset && n === 0) prefix += `${span.byteOffset}:`;
+      if (showLineNumbers) prefix += `${firstLine + n + 1}:`;
+      if (showColumn && n === 0) prefix += `${span.column}:`;
+      outputLines.push(prefix + pieces[n]);
+    }
+  };
+
+  for (let k = 0; k < matchSpans.length; k++) {
+    const span = matchSpans[k];
     chargeWork();
+    // (1ctx) a replacement rewrites every match on the lines it prints
+    let endLine = span.endLine;
+    let lastSpan = k;
+    if (replace !== null && !onlyMatching) {
+      while (
+        lastSpan + 1 < matchSpans.length &&
+        matchSpans[lastSpan + 1].startLine <= endLine + 1
+      ) {
+        lastSpan++;
+        endLine = Math.max(endLine, matchSpans[lastSpan].endLine);
+      }
+    }
     const contextStart = Math.max(0, span.startLine - beforeContext);
-    const contextEnd = Math.min(lastIdx - 1, span.endLine + afterContext);
+    const contextEnd = Math.min(lastIdx - 1, endLine + afterContext);
 
     // Add separator if there's a gap
     if (
       contextSeparator !== null &&
+      (beforeContext > 0 || afterContext > 0) &&
       lastPrintedLine >= 0 &&
       contextStart > lastPrintedLine + 1
     ) {
@@ -918,18 +1045,43 @@ function searchContentMultiline(
     // Match lines
     if (onlyMatching) {
       // Output only the matched text
-      const matchText = replace !== null ? replace : span.matchText;
-      let prefix = filename ? `${filename}:` : "";
-      if (showByteOffset) prefix += `${span.byteOffset}:`;
-      if (showLineNumbers) prefix += `${span.startLine + 1}:`;
-      if (showColumn) prefix += `${span.column}:`;
-      outputLines.push(prefix + matchText);
+      printPiece(
+        replace !== null ? span.replacement : span.matchText,
+        span.startLine,
+        span,
+      );
       // Mark lines as printed to handle context correctly
       for (let i = span.startLine; i <= span.endLine; i++) {
         chargeWork();
         printedLines.add(i);
         lastPrintedLine = i;
       }
+    } else if (replace !== null) {
+      const from = lineOffsets[span.startLine];
+      const to =
+        endLine + 1 < lineOffsets.length
+          ? lineOffsets[endLine + 1]
+          : content.length;
+      let block = "";
+      let pos = from;
+      for (let m = k; m <= lastSpan; m++) {
+        chargeWork();
+        const each = matchSpans[m];
+        block += content.slice(pos, each.byteOffset) + each.replacement;
+        pos = Math.max(pos, each.byteOffset + each.length);
+      }
+      block += content.slice(pos, to);
+      printPiece(
+        block.endsWith("\n") ? block.slice(0, -1) : block,
+        span.startLine,
+        span,
+      );
+      for (let i = span.startLine; i <= endLine; i++) {
+        chargeWork();
+        printedLines.add(i);
+        lastPrintedLine = i;
+      }
+      k = lastSpan;
     } else {
       // Output full lines containing the match
       for (let i = span.startLine; i <= span.endLine && i < lastIdx; i++) {
@@ -937,24 +1089,18 @@ function searchContentMultiline(
         if (!printedLines.has(i)) {
           printedLines.add(i);
           lastPrintedLine = i;
-          let line = lines[i];
-          // Apply replacement if specified (for the first line of the match)
-          if (replace !== null && i === span.startLine) {
-            regex.lastIndex = 0;
-            line = regex.replace(line, replace);
-          }
           let prefix = filename ? `${filename}:` : "";
           if (showByteOffset && i === span.startLine)
             prefix += `${span.byteOffset}:`;
           if (showLineNumbers) prefix += `${i + 1}:`;
           if (showColumn && i === span.startLine) prefix += `${span.column}:`;
-          outputLines.push(prefix + line);
+          outputLines.push(prefix + lines[i]);
         }
       }
     }
 
     // After context
-    for (let i = span.endLine + 1; i <= contextEnd; i++) {
+    for (let i = endLine + 1; i <= contextEnd; i++) {
       chargeWork();
       if (!printedLines.has(i)) {
         printedLines.add(i);

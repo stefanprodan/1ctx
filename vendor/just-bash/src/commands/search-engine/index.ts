@@ -8,10 +8,13 @@
  */
 
 export {
+  edgesOk,
   isWholeWord,
+  type LineKind,
   type SearchOptions,
   type SearchResult,
   searchContent,
+  type WordEdges,
 } from "./matcher.js";
 export {
   buildPatterns,

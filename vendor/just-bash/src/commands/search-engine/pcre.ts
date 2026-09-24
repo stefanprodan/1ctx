@@ -8,40 +8,7 @@
  */
 
 import { GnuPatternError } from "./gnu-regex.js";
-
-const H =
-  "\\t \\x{a0}\\x{1680}\\x{180e}\\x{2000}-\\x{200a}\\x{202f}\\x{205f}\\x{3000}";
-const V = "\\n\\x0b\\f\\r\\x{85}\\x{2028}\\x{2029}";
-
-const categories = new Map<string, string>();
-
-/**
- * A general category as code point ranges. RE2JS folds case with tables
- * that lack the caseless categories and throws on \p{N} under -i, so every
- * category but the letters and marks is spelled out, once per process.
- */
-function category(name: string): string {
-  if (/^[LM]/.test(name)) return `\\p{${name}}`;
-  let ranges = categories.get(name);
-  if (ranges !== undefined) return ranges;
-  const re = new RegExp(`^\\p{${name}}$`, "u");
-  const hex = (cp: number) => `\\x{${cp.toString(16)}}`;
-  ranges = "";
-  let start = -1;
-  for (let cp = 0; cp <= 0x110000; cp++) {
-    const inside = cp < 0x110000 && re.test(String.fromCodePoint(cp));
-    if (inside && start < 0) start = cp;
-    if (!inside && start >= 0) {
-      ranges += start === cp - 1 ? hex(start) : `${hex(start)}-${hex(cp - 1)}`;
-      start = -1;
-    }
-  }
-  categories.set(name, ranges);
-  return ranges;
-}
-
-/** JavaScript's names for the general categories, which RE2 shares. */
-const GENERAL = /^(?:[LMNPSZC][a-z]?)$/;
+import { category, GENERAL, H, spaceSet, V } from "./unicode-sets.js";
 
 interface Sets {
   space: string;
@@ -54,7 +21,7 @@ let built: Sets | undefined;
 
 function sets(): Sets {
   if (built) return built;
-  const space = `${H}${V}${category("Z")}`;
+  const space = spaceSet();
   const word = `\\p{L}${category("N")}\\p{Mn}${category("Pc")}`;
   built = {
     space,

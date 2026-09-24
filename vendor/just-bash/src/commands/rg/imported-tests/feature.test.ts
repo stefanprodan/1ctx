@@ -953,33 +953,30 @@ describe("rg feature: --stats", () => {
   });
 });
 
-describe("rg feature: PCRE2 not supported", () => {
-  it("should error on -P flag", async () => {
+// (1ctx) -P goes through grep's -P layer, which refuses what RE2 cannot run
+describe("rg feature: PCRE2 on RE2", () => {
+  it("should search with -P", async () => {
     const bash = new Bash({
       cwd: "/home/user",
       files: {
         "/home/user/file": "test\n",
       },
     });
-    const result = await bash.exec("rg -P test");
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toBe(
-      "rg: PCRE2 is not supported. Use standard regex syntax instead.\n",
-    );
+    const result = await bash.exec("rg -P test file");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("test\n");
   });
 
-  it("should error on --pcre2 flag", async () => {
+  it("should refuse a backreference with --pcre2", async () => {
     const bash = new Bash({
       cwd: "/home/user",
       files: {
         "/home/user/file": "test\n",
       },
     });
-    const result = await bash.exec("rg --pcre2 test");
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toBe(
-      "rg: PCRE2 is not supported. Use standard regex syntax instead.\n",
-    );
+    const result = await bash.exec("rg --pcre2 '(t)\\1' file");
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("backreference \\1 is not supported");
   });
 });
 

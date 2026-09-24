@@ -5,6 +5,7 @@
 import { createUserRegex, type UserRegex } from "../../regex/index.js";
 import { GnuPatternError, translateGnu } from "./gnu-regex.js";
 import { type Condition, translatePcre } from "./pcre.js";
+import { translateRust } from "./rust-regex.js";
 
 /** POSIX character class to JavaScript regex character range mapping (Map prevents prototype pollution) */
 const POSIX_CLASS_MAP = new Map<string, string>([
@@ -40,6 +41,8 @@ export interface RegexOptions {
   multilineDotall?: boolean;
   /** (1ctx) grep -P: PCRE2's syntax, rewritten to RE2 or refused */
   pcre?: boolean;
+  /** (1ctx) rg's syntax: Unicode classes unless `unicode` is false, word edges */
+  rust?: { unicode: boolean };
 }
 
 export interface RegexResult {
@@ -57,6 +60,9 @@ export interface RegexResult {
   warnings?: string[];
   /** (1ctx) grep -P's leading lookaheads: a line must match each of these */
   conditions?: LineCondition[];
+  /** (1ctx) rg's leading \< and trailing \>, checked in code */
+  wordStart?: boolean;
+  wordEnd?: boolean;
 }
 
 /** (1ctx) A pattern a selected line must match, or must not */
@@ -203,6 +209,8 @@ export function buildPatterns(
   let kResetGroup: number | undefined;
   let anchored = false;
   let conditions: Condition[] = [];
+  let wordStart = false;
+  let wordEnd = false;
   const sources = patterns.map((pattern, index) => {
     if (options.pcre) {
       // (1ctx) quotes, code points and (?x) first, then PCRE2's syntax
@@ -260,6 +268,17 @@ export function buildPatterns(
         // Handle inline modifiers (?i:...), (?i), etc.
         regexPattern = handleInlineModifiers(regexPattern);
 
+        if (options.rust) {
+          const rust = translateRust(
+            regexPattern,
+            options.rust.unicode,
+            patterns.length === 1,
+          );
+          regexPattern = rust.source;
+          wordStart = rust.wordStart;
+          wordEnd = rust.wordEnd;
+        }
+
         // Handle \K (Perl regex reset match start)
         const kResult = handlePerlKReset(regexPattern);
         if (patterns.length === 1) kResetGroup = kResult.kResetGroup;
@@ -275,6 +294,12 @@ export function buildPatterns(
   if (options.wholeWord && options.multiline) {
     // (1ctx) a multiline search cannot check words in code
     regexPattern = `\\b(?:${regexPattern})\\b`;
+  }
+  if (options.multiline && (wordStart || wordEnd)) {
+    // (1ctx) nor edges: RE2's ASCII \b in their place
+    regexPattern = `${wordStart ? "\\b" : ""}(?:${regexPattern})${wordEnd ? "\\b" : ""}`;
+    wordStart = false;
+    wordEnd = false;
   }
   if (options.lineRegexp && !anchored) {
     // Wrap in a non-capturing group so alternation binds inside the anchors:
@@ -313,6 +338,8 @@ export function buildPatterns(
     kResetGroup,
     preFilter: preFilter ?? undefined,
     warnings,
+    wordStart,
+    wordEnd,
   };
 }
 

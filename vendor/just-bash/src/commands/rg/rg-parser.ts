@@ -8,7 +8,11 @@
  */
 
 import type { ExecResult } from "../../types.js";
-import { createDefaultOptions, type RgOptions } from "./rg-options.js";
+import {
+  createDefaultOptions,
+  type RgOptions,
+  type SortKey,
+} from "./rg-options.js";
 
 export interface ParseResult {
   success: true;
@@ -91,6 +95,41 @@ function unescape(value: string): string {
   });
 }
 
+/** A value from a closed list, then any refusal of its own. */
+function choice(
+  allowed: string[],
+  check: (o: RgOptions, v: string) => string | undefined = () => undefined,
+): Spec {
+  return {
+    value: true,
+    apply: (o, v) =>
+      allowed.includes(v) ? check(o, v) : `choice '${v}' is unrecognized`,
+  };
+}
+
+const SORT_KEYS = ["path", "none", "modified", "accessed", "created"];
+
+const sortKey = (reverse: boolean): Spec =>
+  choice(SORT_KEYS, (o, v) => {
+    o.sort = v as SortKey;
+    o.sortReverse = reverse;
+    return undefined;
+  });
+
+/** Files are read as UTF-8: another encoding is refused, an unknown one too. */
+function encodingRefusal(label: string): string | undefined {
+  const name = label.toLowerCase();
+  if (name === "none" || name === "auto") return undefined;
+  let encoding: string;
+  try {
+    encoding = new TextDecoder(name).encoding;
+  } catch {
+    return `grep config error: unknown encoding: ${label}`;
+  }
+  if (encoding === "utf-8") return undefined;
+  return `encoding ${label} is not supported: files are read as UTF-8`;
+}
+
 const caseMode = (mode: "i" | "s" | "S") =>
   flag((o) => {
     o.ignoreCase = mode === "i";
@@ -156,16 +195,93 @@ const SPECS: Record<string, Spec> = {
   "no-context-separator": flag((o) => (o.contextSeparator = null)),
   // -u, -uu, -uuu: no ignore files, then hidden, then binary
   unrestricted: flag((o) => {
-    if (o.hidden) o.searchBinary = true;
+    if (o.hidden) o.binary = true;
     else if (o.noIgnore) o.hidden = true;
     else o.noIgnore = true;
   }),
+  // (1ctx) the options ripgrep has that were refused
+  "no-heading": flag((o) => (o.heading = false)),
+  pretty: flag((o) => {
+    o.heading = true;
+    o.lineNumber = true;
+  }),
+  "max-columns-preview": flag((o) => (o.maxColumnsPreview = true)),
+  "no-max-columns-preview": flag((o) => (o.maxColumnsPreview = false)),
+  trim: flag((o) => (o.trim = true)),
+  "no-trim": flag((o) => (o.trim = false)),
+  binary: flag((o) => (o.binary = true)),
+  "no-binary": flag((o) => (o.binary = false)),
+  crlf: flag((o) => (o.crlf = true)),
+  "no-crlf": flag((o) => (o.crlf = false)),
+  "no-messages": flag((o) => (o.noMessages = true)),
+  messages: flag((o) => (o.noMessages = false)),
+  "no-ignore-parent": flag((o) => (o.noIgnoreParent = true)),
+  "no-ignore-files": flag((o) => (o.noIgnoreFiles = true)),
+  "require-git": flag((o) => (o.requireGit = true)),
+  "no-require-git": flag((o) => (o.requireGit = false)),
+  "no-unicode": flag((o) => (o.unicode = false)),
+  unicode: flag((o) => (o.unicode = true)),
+  pcre2: flag((o) => (o.pcre = true)),
+  "no-pcre2": flag((o) => (o.pcre = false)),
+  "sort-files": flag((o) => {
+    o.sort = "path";
+    o.sortReverse = false;
+  }),
+  "type-list": flag((o) => (o.typeList = true)),
+  version: flag((o) => (o.version = "long")),
+  // nothing here reads a config file, a terminal or other file systems
+  "no-config": flag(() => undefined),
+  "one-file-system": flag(() => undefined),
+  "no-one-file-system": flag(() => undefined),
+  "line-buffered": flag(() => undefined),
+  "block-buffered": flag(() => undefined),
+  "no-ignore-global": flag(() => undefined),
+  "no-ignore-exclude": flag(() => undefined),
+  "auto-hybrid-regex": flag(() => undefined),
+  "no-auto-hybrid-regex": flag(() => undefined),
+  "pcre2-unicode": flag(() => undefined),
+  "no-pcre2-unicode": flag(() => undefined),
+  debug: flag(() => undefined),
+  colors: text(() => undefined),
+  color: choice(["never", "auto", "always", "ansi"], (_, v) =>
+    v === "always" || v === "ansi"
+      ? `--color=${v} is not supported: output is always plain`
+      : undefined,
+  ),
+  engine: {
+    value: true,
+    apply: (o, v) => {
+      if (v !== "default" && v !== "auto" && v !== "pcre2") {
+        return `unrecognized regex engine '${v}'`;
+      }
+      o.pcre = v === "pcre2";
+      return undefined;
+    },
+  },
+  encoding: {
+    value: true,
+    apply: (_, v) => encodingRefusal(v),
+  },
+  "path-separator": {
+    value: true,
+    apply: (o, v) => {
+      const bytes = new TextEncoder().encode(v).length;
+      if (bytes !== 1) {
+        return `A path separator must be exactly one byte, but the given separator is ${bytes} bytes: ${v}\nIn some shells on Windows '/' is automatically expanded. Use '//' instead.`;
+      }
+      o.pathSeparator = v;
+      return undefined;
+    },
+  },
+  "max-columns": count((o, n) => (o.maxColumns = n)),
   glob: text((o, v) => o.globs.push(v)),
   iglob: text((o, v) => o.iglobs.push(v)),
   type: text((o, v) => o.types.push(v)),
   "type-not": text((o, v) => o.typesNot.push(v)),
-  "type-add": text((o, v) => o.typeAdd.push(v)),
-  "type-clear": text((o, v) => o.typeClear.push(v)),
+  "type-add": text((o, v) => o.typeChanges.push({ kind: "add", value: v })),
+  "type-clear": text((o, v) =>
+    o.typeChanges.push({ kind: "clear", value: v }),
+  ),
   regexp: text((o, v) => o.patterns.push(v)),
   file: text((o, v) => o.patternFiles.push(v)),
   replace: text((o, v) => (o.replace = v)),
@@ -198,16 +314,8 @@ const SPECS: Record<string, Spec> = {
       return undefined;
     },
   },
-  sort: {
-    value: true,
-    apply: (o, v) => {
-      if (v !== "path" && v !== "none") {
-        return `choice '${v}' is unrecognized`;
-      }
-      o.sort = v;
-      return undefined;
-    },
-  },
+  sort: sortKey(false),
+  sortr: sortKey(true),
 };
 
 const ALIASES: Record<string, string> = {
@@ -251,15 +359,10 @@ const SHORT: Record<string, string> = {
   A: "after-context",
   B: "before-context",
   C: "context",
-};
-
-const PCRE2: ParseError = {
-  success: false,
-  error: {
-    stdout: "",
-    stderr: "rg: PCRE2 is not supported. Use standard regex syntax instead.\n",
-    exitCode: 1,
-  },
+  M: "max-columns",
+  E: "encoding",
+  p: "pretty",
+  P: "pcre2",
 };
 
 /**
@@ -307,7 +410,6 @@ export function parseArgs(args: string[]): ParseArgsResult {
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
       const written = eq < 0 ? arg.slice(2) : arg.slice(2, eq);
-      if (written === "pcre2") return PCRE2;
       const name = ALIASES[written] ?? written;
       const shown = `--${written}`;
       const spec = SPECS[name];
@@ -324,7 +426,11 @@ export function parseArgs(args: string[]): ParseArgsResult {
     if (arg.startsWith("-") && arg !== "-") {
       for (let k = 1; k < arg.length; k++) {
         const ch = arg[k];
-        if (ch === "P") return PCRE2;
+        // -V is ripgrep's one line, --version its whole text
+        if (ch === "V") {
+          options.version ??= "short";
+          continue;
+        }
         const name = SHORT[ch];
         if (!name) return refuse(`unrecognized flag -${ch}`);
         if (SPECS[name].value) {

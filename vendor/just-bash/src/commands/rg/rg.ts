@@ -15,7 +15,6 @@ import type {
   RuntimeCommandContext,
 } from "../../types.js";
 import { hasHelpFlag, showHelp } from "../help.js";
-import { formatTypeList } from "./file-types.js";
 import { parseArgs } from "./rg-parser.js";
 import { executeSearch } from "./rg-search.js";
 
@@ -43,6 +42,8 @@ EXAMPLES:
     "-s, --case-sensitive    case-sensitive search (default)",
     "-S, --smart-case        case-insensitive unless the pattern has uppercase",
     "-F, --fixed-strings     treat pattern as literal string",
+    // (1ctx) the options ripgrep has that were refused
+    "-P, --pcre2             Perl syntax on RE2; backreferences and negative lookaround refused",
     "-w, --word-regexp       match whole words only",
     "-x, --line-regexp       match whole lines only",
     "-v, --invert-match      select non-matching lines",
@@ -79,8 +80,14 @@ EXAMPLES:
     "    --hidden            search hidden files and directories",
     "    --no-ignore         don't respect .gitignore/.ignore files",
     "-d, --max-depth NUM     maximum search depth",
-    "    --sort TYPE         sort files (path, none)",
+    "    --sort KEY          sort files (path, modified, accessed, created, none)",
+    "    --sortr KEY         sort files in reverse",
+    "-M, --max-columns NUM   omit lines longer than NUM bytes",
+    "    --max-columns-preview  show the start of an omitted line",
+    "    --trim              drop leading whitespace from each line",
+    "-p, --pretty            --heading and --line-number",
     "    --heading           show file path above matches",
+    "    --no-heading        show file path on each line",
     "    --passthru          print all lines (non-matches use - separator)",
     "    --include-zero      include files with 0 matches in count output",
     "    --type-list         list all available file types",
@@ -99,17 +106,15 @@ export const rgCommand: RuntimeCommand = {
       return showHelp(rgHelp);
     }
 
-    if (args.includes("--type-list")) {
-      return {
-        stdout: formatTypeList(),
-        stderr: "",
-        exitCode: 0,
-      };
-    }
-
     const parseResult = parseArgs(args);
     if (!parseResult.success) {
       return parseResult.error;
+    }
+    // (1ctx) ripgrep's version: -V its line, --version with the features
+    const { version } = parseResult.options;
+    if (version !== null) {
+      const more = version === "long" ? "\nfeatures:+pcre2\n" : "";
+      return { stdout: `ripgrep 15.2.0\n${more}`, stderr: "", exitCode: 0 };
     }
 
     return executeSearch({

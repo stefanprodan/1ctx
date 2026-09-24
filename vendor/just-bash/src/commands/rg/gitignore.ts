@@ -101,29 +101,63 @@ export class GitignoreManager {
   private skipDotIgnore: boolean;
   private skipVcsIgnore: boolean;
   private loadedDirs = new Set<string>();
+  /** (1ctx) --require-git: .gitignore only inside a repository */
+  private requireGit: boolean;
+  private repos = new Map<string, Promise<boolean>>();
 
   constructor(
     fs: IFileSystem,
     _rootPath: string,
     skipDotIgnore = false,
     skipVcsIgnore = false,
+    requireGit = false,
   ) {
     this.fs = fs;
     this.skipDotIgnore = skipDotIgnore;
     this.skipVcsIgnore = skipVcsIgnore;
+    this.requireGit = requireGit;
+  }
+
+  /** (1ctx) A .git in the directory or one above it, as ripgrep looks. */
+  private inRepo(dir: string): Promise<boolean> {
+    let found = this.repos.get(dir);
+    if (found === undefined) {
+      found = this.fs.exists(this.fs.resolvePath(dir, ".git")).then((here) => {
+        if (here) return true;
+        const parent = this.fs.resolvePath(dir, "..");
+        return parent === dir ? false : this.inRepo(parent);
+      });
+      this.repos.set(dir, found);
+    }
+    return found;
+  }
+
+  /** (1ctx) The ignore files a directory's own may be. */
+  private async namesFor(dir: string): Promise<string[]> {
+    const names: string[] = [];
+    if (
+      !this.skipVcsIgnore &&
+      (!this.requireGit || (await this.inRepo(dir)))
+    ) {
+      names.push(".gitignore");
+    }
+    if (!this.skipDotIgnore) names.push(".rgignore", ".ignore");
+    return names;
   }
 
   /**
    * Load all .gitignore and .ignore files from root to the specified path
    */
-  async load(targetPath: string): Promise<void> {
+  async load(targetPath: string, noParents = false): Promise<void> {
     // Build list of directories from filesystem root to target
     // ripgrep loads ignore files from all parent directories
+    // (1ctx) but for --no-ignore-parent
     const dirs: string[] = [];
     let current = targetPath;
 
     while (true) {
       dirs.unshift(current);
+      if (noParents) break;
       const parent = this.fs.resolvePath(current, "..");
       if (parent === current) break; // Reached filesystem root
       current = parent;
@@ -133,16 +167,9 @@ export class GitignoreManager {
     // ripgrep loads them in order: .gitignore, then .rgignore, then .ignore
     // --no-ignore-dot skips .rgignore and .ignore
     // --no-ignore-vcs skips .gitignore
-    const ignoreFiles: string[] = [];
-    if (!this.skipVcsIgnore) {
-      ignoreFiles.push(".gitignore");
-    }
-    if (!this.skipDotIgnore) {
-      ignoreFiles.push(".rgignore", ".ignore");
-    }
     for (const dir of dirs) {
       this.loadedDirs.add(dir);
-      for (const filename of ignoreFiles) {
+      for (const filename of await this.namesFor(dir)) {
         const ignorePath = this.fs.resolvePath(dir, filename);
         try {
           const content = await this.fs.readFile(ignorePath);
@@ -164,15 +191,7 @@ export class GitignoreManager {
     if (this.loadedDirs.has(dir)) return;
     this.loadedDirs.add(dir);
 
-    const ignoreFiles: string[] = [];
-    if (!this.skipVcsIgnore) {
-      ignoreFiles.push(".gitignore");
-    }
-    if (!this.skipDotIgnore) {
-      ignoreFiles.push(".rgignore", ".ignore");
-    }
-
-    for (const filename of ignoreFiles) {
+    for (const filename of await this.namesFor(dir)) {
       const ignorePath = this.fs.resolvePath(dir, filename);
       try {
         const content = await this.fs.readFile(ignorePath);
@@ -267,17 +286,30 @@ export class GitignoreManager {
 export async function loadGitignores(
   fs: IFileSystem,
   startPath: string,
-  skipDotIgnore = false,
-  skipVcsIgnore = false,
-  customIgnoreFiles: string[] = [],
+  {
+    skipDotIgnore = false,
+    skipVcsIgnore = false,
+    customIgnoreFiles = [],
+    noParents = false,
+    requireGit = false,
+  }: {
+    skipDotIgnore?: boolean;
+    skipVcsIgnore?: boolean;
+    customIgnoreFiles?: string[];
+    /** (1ctx) --no-ignore-parent */
+    noParents?: boolean;
+    /** (1ctx) --require-git */
+    requireGit?: boolean;
+  } = {},
 ): Promise<GitignoreManager> {
   const manager = new GitignoreManager(
     fs,
     startPath,
     skipDotIgnore,
     skipVcsIgnore,
+    requireGit,
   );
-  await manager.load(startPath);
+  await manager.load(startPath, noParents);
 
   // Load custom ignore files (--ignore-file)
   for (const ignoreFile of customIgnoreFiles) {
