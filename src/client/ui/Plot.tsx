@@ -23,6 +23,9 @@ const token = (name: string) =>
 // whole
 const HALF_DAY = 43_200;
 
+// a repaint from the data, since redraw(true) pads the padded range again
+const repaint = (u: uPlot | null) => u?.setData(u.data);
+
 // Bars that remember where uPlot drew them, so the one under the
 // cursor can be painted over in the brand colour.
 function focusBars(sizeMax: number) {
@@ -149,7 +152,7 @@ export function Spark({
   // read in the render, so a theme flip draws the plot again
   const shade = theme.value;
   useLayoutEffect(() => {
-    plot.current?.redraw(true);
+    repaint(plot.current);
   }, [shade]);
 
   useLayoutEffect(() => {
@@ -293,7 +296,7 @@ export function DayBars({
 
   const shade = theme.value;
   useLayoutEffect(() => {
-    plot.current?.redraw(true);
+    repaint(plot.current);
   }, [shade]);
 
   useLayoutEffect(() => {
