@@ -13,7 +13,6 @@ export const automationBody = (
     tz: string;
     deadlineMs: number | null;
     retentionDays: number;
-    projectMemory: boolean;
     ownMemory: boolean;
     memoryGuidance: string;
     disabledCapabilities: string[];
@@ -26,7 +25,6 @@ export const automationBody = (
   tz: fields.tz ?? "UTC",
   deadlineMs: fields.deadlineMs ?? null,
   retentionDays: fields.retentionDays ?? 30,
-  projectMemory: fields.projectMemory ?? false,
   ownMemory: fields.ownMemory ?? false,
   ...(fields.disabledCapabilities === undefined
     ? {}

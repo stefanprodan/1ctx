@@ -129,9 +129,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         );
         agent(body.agentId);
         deadline(body.deadlineMs);
-        if (body.ownMemory && body.projectMemory) {
-          throw new BadRequest("ownMemory and projectMemory cannot both be on");
-        }
         const now = deps.clock();
         const nextAt = checkSchedule(body.schedule, body.tz, now);
         const automation = transact(deps.db, () => {
@@ -234,11 +231,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const current = visible(principal, found.id);
           editable(principal, current);
           const next = { ...current, ...patch };
-          if (next.ownMemory && next.projectMemory) {
-            throw new BadRequest(
-              "ownMemory and projectMemory cannot both be on",
-            );
-          }
           agent(next.agentId);
           deadline(next.deadlineMs);
           if (deps.store.nameTaken(current.projectId, next.name, current.id)) {
@@ -264,7 +256,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             deadlineMs: next.deadlineMs,
             retentionDays: next.retentionDays,
             nextAt,
-            projectMemory: next.projectMemory,
             ownMemory: next.ownMemory,
             memoryGuidance: next.memoryGuidance,
             disabledCapabilities: next.disabledCapabilities,

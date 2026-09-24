@@ -43,37 +43,6 @@ export function area(): ToolsArea {
         };
       },
     },
-    sessions: {
-      memorySnapshot(projectId, sessionId) {
-        if (projectId !== "p1" || sessionId === "missing") return null;
-        return {
-          id: sessionId,
-          title: "A chat",
-          lastActivityAt: 20,
-          markdown: "# A chat\n\n## @user 1970-01-01 00:00\n\nA long answer.",
-        };
-      },
-    },
-    markers: {
-      unread(_automationId, _projectId, _cap, exclude) {
-        return {
-          chats: exclude.includes("s1")
-            ? []
-            : [
-                {
-                  id: "s1",
-                  title: "A chat",
-                  author: "user",
-                  lastActivityAt: 20,
-                  userMessages: 2,
-                  readBefore: true,
-                  changedSince: true,
-                },
-              ],
-          remaining: 0,
-        };
-      },
-    },
   });
 }
 
@@ -96,6 +65,6 @@ export function context(resultCut = TOOL_CAPS.resultCut): ToolContext {
 
 export const task = {
   projectId: "p1",
-  automation: { id: "a1", projectMemory: true, ownMemory: true },
-  phase: "main" as const,
+  automation: { id: "a1", ownMemory: true },
+  phase: "memory" as const,
 };

@@ -914,9 +914,8 @@ violation, and every rule has a rejected fixture under
   YYYY-MM-DD HH:mm` in the zone, the answer with the transcript's cut
   line (stopped, the error, cut at max tokens); no work, tools,
   summaries or running turns, and the title and errors escaped. User
-  records add an escaped `attachedLine()` under the text in downloads and
-  memory snapshots. The
-  chat menu offers Download to everyone and, to the owner and admins,
+  records add an escaped `attachedLine()` under the text in downloads.
+  The chat menu offers Download to everyone and, to the owner and admins,
   Rename and Delete; its `<h1>` is the title button alone, or, while
   Rename is open, the title box in the button's place and type (Enter
   saves, Escape or leaving the box gives the title back). A run's menu
@@ -929,32 +928,17 @@ violation, and every rule has a rejected fixture under
   demand is a send of kind `compact` under the same runner lock.
 - **A note is a working copy until the run ends.** Every send reads the
   project's note once; a run with `ownMemory` reads its automation's too.
-  An automation enables neither memory flag, `ownMemory` alone or
-  `projectMemory` alone. Create and PATCH refuse both on with a 400;
-  PATCH checks the merged row, so one patch can switch between them.
-  `projectMemory` gives a memory task the chat list, chat read and edit
-  tools in its main rounds; `ownMemory` opens a bounded final phase with
-  only the edit tool. A memory chat snapshot adds `Tools:` receipts
-  before each answer, in call order: name, one-line arguments capped
-  at 200 characters including `...`, and done, failed or not run.
-  MCP writes use the server's current patterns; missing servers and
-  unknown tools have no write mark. Tool results, tool errors, work,
-  running turns and runs stay out. Download Markdown has no receipts.
-  Receipts count toward the snapshot's server-paged text.
-  The ending claims one cause, releases the main
-  round, runs that phase on finish, deadline or failure, then finalizes
-  once. Its own-note block appears even when empty and says a separate
-  step after the answer updates it. Two settled rounds with edits but no
-  success stop the memory tools; a success resets the count, reads leave
-  it, and main rounds and the phase count apart. The phase stops without
-  another request; main rounds lose all three tools, and stopped calls
-  fail. A completed chat read is pending until a successful project edit
-  or `none` keeps it. A finished memory task commits its project edits
-  and kept marks together, dropping marks whose edit replay skips;
-  pending marks are dropped at the limit or the end. An edited automation
-  copy commits on any cause after its phase starts. Each changed note
-  sends one frame. Project and automation memory routes let anyone who
-  sees the project read, save and undo. Entries are `{topic, text}`;
+  `ownMemory` opens a bounded final phase with only the edit tool; no
+  main round is offered a memory tool. The ending claims one cause,
+  releases the main round, runs that phase on finish, deadline or
+  failure, then finalizes once. Its own-note block appears even when
+  empty and says a separate step after the answer updates it. Two
+  settled rounds with edits but no success stop the edit tool; a
+  success resets the count. The phase then stops without another
+  request, and stopped calls fail. An edited automation copy commits on
+  any cause after its phase starts. Each changed note sends one frame.
+  Project and automation memory routes let anyone who sees the project
+  read, save and undo. Entries are `{topic, text}`;
   `shared/memory.ts` owns sanitizing, topic equality, diff and the
   rendered count (60 characters per topic, 500 per text, 2,200 per note).
   `memory_edit` takes `set`, `remove` or `none`, naming a topic.
@@ -1114,8 +1098,7 @@ violation, and every rule has a rejected fixture under
   `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
   built-in schema, including `bash`, `webfetch` and `websearch`, by name from
   `tools/catalog.ts`, built by the send's own factories with sample
-  inputs (name enums empty,
-  `memory_edit`'s own-note text as the variant), each row `RowsTitle`
+  inputs (name enums empty), each row `RowsTitle`
   (the name over the first sentence) with its tokens by `wireTokens()`
   as `RowsMeta`, read-only. The bash catalog sample uses all-mode words.
   The Web tab's API holds `access` (mode and domains), `search` (nullable

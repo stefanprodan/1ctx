@@ -245,7 +245,6 @@ describe("memory routes", () => {
           tz: "UTC",
           deadlineMs: null,
           retentionDays: 30,
-          projectMemory: false,
           ownMemory: true,
         },
       },

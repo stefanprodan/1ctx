@@ -13,7 +13,6 @@ import type { Clock } from "../lib/clock.ts";
 import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import type { MemorySnapshot } from "./memory.ts";
 import {
   type AccessPort,
   detail,
@@ -35,7 +34,6 @@ export {
   type ExportRow,
   markdownFilename,
 } from "./markdown.ts";
-export { type MemorySnapshot, memorySnapshot } from "./memory.ts";
 export {
   lineFrom,
   MAX_REGENERATE_BODY,
@@ -75,7 +73,6 @@ export type SessionsDeps = {
   live: LivePort;
   usage: UsagePort;
   uploads: UploadsPort;
-  isWrite: (name: string) => boolean;
 };
 
 export type Sessions = {
@@ -87,7 +84,6 @@ export type Sessions = {
   sessionProject(principal: Principal, id: string): string | null;
   usesAgent(agentId: string): boolean;
   runInfo(sessionId: string): Memory["run"];
-  memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -139,8 +135,6 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         .get(sessionId);
       return row ?? null;
     },
-    memorySnapshot: (projectId, sessionId) =>
-      store.memorySnapshot(projectId, sessionId, deps.isWrite),
     repair() {
       const touched = transact(deps.db, () => {
         const rows = store.repair(deps.clock(), RESTART_ERROR);

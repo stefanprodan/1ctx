@@ -560,6 +560,7 @@ describe("the schema", () => {
         "0020-mcp-kept",
         "0021-served-by",
         "0022-credentials",
+        "0023-chat-memory",
       ]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
@@ -595,7 +596,7 @@ describe("the schema", () => {
   test("0021 adds who served a round, null on every existing row", () => {
     const db = seed(MIGRATIONS.slice(0, 20));
     try {
-      expect(migrate(db)).toEqual(["0021-served-by", "0022-credentials"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 21))).toEqual(["0021-served-by"]);
       expect(MIGRATIONS[20]?.rebuild).toBeUndefined();
       expect(
         db
@@ -621,7 +622,9 @@ describe("the schema", () => {
   test("0022 adds credentials whose links go with the project and the credential", () => {
     const db = seed(MIGRATIONS.slice(0, 21));
     try {
-      expect(migrate(db)).toEqual(["0022-credentials"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 22))).toEqual([
+        "0022-credentials",
+      ]);
       expect(MIGRATIONS[21]?.rebuild).toBeUndefined();
       db.exec(`
         insert into projects (id, kind, name, owner_id, created_at)
@@ -650,6 +653,44 @@ describe("the schema", () => {
       expect(db.query("select * from credential_projects").all()).toEqual([
         { credential_id: "c1", project_id: "t2" },
       ]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0023 drops the chat cursors and the project memory switch, keeping the automation", () => {
+    const db = seed(MIGRATIONS.slice(0, 22));
+    try {
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at,
+           project_memory, own_memory)
+          values ('auto', 'p', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 1000, 0, 0, 1, 0);
+        insert into automation_memory_reads values ('auto', 'sess', 5);
+      `);
+      const columns = () =>
+        db
+          .query<{ name: string }, []>("pragma table_info(automations)")
+          .all()
+          .map((row) => row.name);
+      const before = db
+        .query<Record<string, unknown>, []>("select * from automations")
+        .all();
+      expect(migrate(db)).toEqual(["0023-chat-memory"]);
+      expect(MIGRATIONS[22]?.rebuild).toBeUndefined();
+      expect(columns()).not.toContain("project_memory");
+      expect(
+        db
+          .query(
+            "select count(*) as n from sqlite_schema where name like 'automation_memory_reads%'",
+          )
+          .get(),
+      ).toEqual({ n: 0 });
+      const { project_memory: _, ...kept } = before[0]!;
+      expect(db.query("select * from automations").all()).toEqual([kept]);
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();
@@ -892,6 +933,7 @@ describe("additive migrations", () => {
       "0020-mcp-kept",
       "0021-served-by",
       "0022-credentials",
+      "0023-chat-memory",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -950,6 +992,7 @@ describe("0005", () => {
       "0020-mcp-kept",
       "0021-served-by",
       "0022-credentials",
+      "0023-chat-memory",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -1017,6 +1060,7 @@ describe("rebuild migrations", () => {
       "0020-mcp-kept",
       "0021-served-by",
       "0022-credentials",
+      "0023-chat-memory",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1117,6 +1161,7 @@ describe("0006 skills migration", () => {
       "0020-mcp-kept",
       "0021-served-by",
       "0022-credentials",
+      "0023-chat-memory",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1176,6 +1221,7 @@ describe("0007 user tz migration", () => {
       "0020-mcp-kept",
       "0021-served-by",
       "0022-credentials",
+      "0023-chat-memory",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1214,6 +1260,7 @@ describe("0009 mcp migration", () => {
       "0020-mcp-kept",
       "0021-served-by",
       "0022-credentials",
+      "0023-chat-memory",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1468,6 +1515,7 @@ describe("0008 search tavily migration", () => {
           "0020-mcp-kept",
           "0021-served-by",
           "0022-credentials",
+          "0023-chat-memory",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

@@ -8,18 +8,10 @@ import { messageUploads } from "./rows.ts";
 
 export function exportRows(db: Db, sessionId: string): ExportRow[] {
   return db
-    .query<
-      Omit<ExportRow, "toolCalls" | "uploads"> & {
-        toolCalls: string | null;
-        uploads: string | null;
-      },
-      [string]
-    >(
+    .query<Omit<ExportRow, "uploads"> & { uploads: string | null }, [string]>(
       `select messages.send_id as sendId, messages.round,
          sends.memory_round as memoryRound, messages.kind, messages.slot,
          messages.status, messages.error, messages.uploads,
-         messages.tool_calls as toolCalls,
-         messages.tool_call_id as toolCallId, messages.tool_name as toolName,
          messages.finish_reason as finishReason,
          messages.native_finish as nativeFinish,
          coalesce(users.username, agents.name) as author,
@@ -38,7 +30,6 @@ export function exportRows(db: Db, sessionId: string): ExportRow[] {
     .all(sessionId)
     .map((row) => ({
       ...row,
-      toolCalls: row.toolCalls === null ? null : JSON.parse(row.toolCalls),
       uploads: row.kind === "user" ? messageUploads(row.uploads) : null,
     }));
 }

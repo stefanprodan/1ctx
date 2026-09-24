@@ -14,7 +14,6 @@ import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type { MemoryWork } from "../memory/index.ts";
 import type { ChatTool } from "../providers/index.ts";
-import type { MemorySnapshot } from "../sessions/index.ts";
 
 export type { ToolCaps } from "../limits/index.ts";
 
@@ -79,22 +78,13 @@ export type MemoryScope = {
   projectId: string | null;
   automation: {
     id: string;
-    projectMemory: boolean;
     ownMemory: boolean;
   } | null;
   phase: "main" | "memory";
 };
 
 export type MemoryHandle = {
-  note: "project" | "automation";
   work: MemoryWork;
-  read: {
-    projectId: string;
-    automationId: string;
-    pending: Map<string, number>;
-    marks: Map<string, { readActivityAt: number; operation: number }>;
-    snapshot: (MemorySnapshot & { cursor: number }) | null;
-  } | null;
   queue: Promise<void>;
   stopped: boolean;
   recordEdit(success: boolean): void;

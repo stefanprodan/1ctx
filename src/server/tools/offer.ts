@@ -31,11 +31,7 @@ import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
-import {
-  type MemorySessionsPort,
-  makeMemoryHandle,
-  makeMemoryTools,
-} from "./builtin/memory.ts";
+import { makeMemoryHandle, makeMemoryTools } from "./builtin/memory.ts";
 import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import { fillYear, schema } from "./catalog.ts";
 import type { ToolStore } from "./store.ts";
@@ -69,7 +65,6 @@ type OfferDeps = {
   skills: SkillsPort;
   mcp: Pick<Mcp, "offered">;
   memory?: Pick<MemoryCapability, "work">;
-  memorySessions: MemorySessionsPort;
   credentials?: CredentialsPort;
   toolsFor(
     search: SearchProvider | null,
@@ -114,26 +109,18 @@ function memoryFor(
   memory: OfferDeps["memory"],
   scope?: MemoryScope,
 ): MemoryHandle | null {
+  // only a run's own-note phase edits a note
   if (
     scope === undefined ||
+    scope.phase !== "memory" ||
     scope.projectId === null ||
     scope.automation === null ||
+    !scope.automation.ownMemory ||
     memory === undefined
   ) {
     return null;
   }
-  if (scope.phase === "memory") {
-    if (!scope.automation.ownMemory) return null;
-    return makeMemoryHandle(
-      memory.work(scope.projectId, scope.automation.id),
-      scope.automation.id,
-    );
-  }
-  if (!scope.automation.projectMemory) return null;
-  return makeMemoryHandle(
-    memory.work(scope.projectId, null),
-    scope.automation.id,
-  );
+  return makeMemoryHandle(memory.work(scope.projectId, scope.automation.id));
 }
 
 function promptServers(servers: OfferedServer[]): PromptServer[] {
@@ -169,8 +156,7 @@ export function offered(
 ): Offered {
   const memory = memoryFor(deps.memory, scope);
   if (scope?.phase === "memory") {
-    const phaseTools =
-      memory === null ? [] : makeMemoryTools(memory, deps.memorySessions);
+    const phaseTools = memory === null ? [] : makeMemoryTools(memory);
     return {
       tools: fillYear(phaseTools.map(schema), now),
       visuals: false,
@@ -241,7 +227,7 @@ export function offered(
         )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
-      ...(memory === null ? [] : makeMemoryTools(memory, deps.memorySessions)),
+      ...(memory === null ? [] : makeMemoryTools(memory)),
     ].map(schema),
     now,
   );

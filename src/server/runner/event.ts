@@ -12,7 +12,6 @@ export type Event = {
     id: string;
     name: string;
     tz: string;
-    projectMemory: boolean;
     ownMemory: boolean;
     memoryGuidance: string;
     disabledCapabilities: string[];

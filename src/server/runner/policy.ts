@@ -103,7 +103,6 @@ export type SendPolicy = {
     source: EventSource;
     dueAt: number;
     tz: string;
-    projectMemory: boolean;
     ownMemory: boolean;
     memoryGuidance: string;
   } | null;
@@ -152,7 +151,6 @@ export function buildPolicy(input: {
       ? null
       : {
           id: input.automation.id,
-          projectMemory: input.automation.projectMemory,
           ownMemory: input.automation.ownMemory,
         };
   const offered =

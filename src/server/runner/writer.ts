@@ -63,7 +63,7 @@ export type WriterDeps = {
     record(fields: UsageFields): unknown;
     deleteSend(sendId: string): boolean;
   };
-  commitMemory(send: ActiveSend, cause: SendCause): number | null;
+  commitMemory(send: ActiveSend): number | null;
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
@@ -438,7 +438,7 @@ export class Writer {
     const now = this.deps.clock();
     const status = statusOf(cause);
     const result = transact(this.deps.db, () => {
-      const memorySkipped = this.deps.commitMemory(send, cause);
+      const memorySkipped = this.deps.commitMemory(send);
       // a work reply is never finalized twice: finalizeRound runs only
       // when a round is streaming
       const reply =

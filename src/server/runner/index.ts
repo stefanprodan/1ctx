@@ -93,12 +93,6 @@ export type RunnerDeps = {
       ids: readonly string[],
     ): void;
   };
-  markers: {
-    mark(
-      automationId: string,
-      marks: readonly { sessionId: string; readActivityAt: number }[],
-    ): number;
-  };
   limits: { current(): Limits };
   usage: WriterDeps["usage"];
   render: WriterDeps["render"];
@@ -139,8 +133,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     sessions: deps.sessions,
     uploads: deps.uploads,
     usage: deps.usage,
-    commitMemory: (send, cause) =>
-      commitMemory({ memory: deps.memory, markers: deps.markers }, send, cause),
+    commitMemory: (send) => commitMemory({ memory: deps.memory }, send),
     render: deps.render,
     stream: deps.stream,
   });

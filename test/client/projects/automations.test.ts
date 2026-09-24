@@ -40,7 +40,6 @@ import {
   followDeadlineLimit,
   nextLine,
   OWN_MEMORY_GUIDANCE,
-  PROJECT_MEMORY_TASK,
   pickMemory,
   requestOf,
   rowState,
@@ -72,7 +71,6 @@ const automation = (
   tz: "Europe/Bucharest",
   deadlineMs: null,
   retentionDays: 30,
-  projectMemory: false,
   ownMemory: false,
   memoryGuidance: "",
   suspendedAt: null,
@@ -338,7 +336,6 @@ describe("the form", () => {
         tz: "UTC",
         deadlineMs: 300_000,
         retentionDays: 30,
-        projectMemory: false,
         ownMemory: true,
         memoryGuidance: OWN_MEMORY_GUIDANCE,
         disabledCapabilities: [],
@@ -547,25 +544,18 @@ describe("the form", () => {
     expect(off.credentialsOff).toEqual([]);
   });
 
-  test("memory is one of none, own and project, never both notes", () => {
-    const mode = (projectMemory: boolean, ownMemory: boolean) =>
-      draftOf(automation({ projectMemory, ownMemory }), "a1", "UTC", LIMIT)
-        .memory;
-    expect(mode(false, false)).toBe("none");
-    expect(mode(false, true)).toBe("own");
-    expect(mode(true, false)).toBe("project");
-    const flags = (memory: Draft["memory"]) => {
+  test("memory is none or the task's own note", () => {
+    const mode = (ownMemory: boolean) =>
+      draftOf(automation({ ownMemory }), "a1", "UTC", LIMIT).memory;
+    expect(mode(false)).toBe("none");
+    expect(mode(true)).toBe("own");
+    const own = (memory: Draft["memory"]) => {
       const sent = requestOf(filled({ memory }), LIMIT);
-      return "body" in sent
-        ? [sent.body.projectMemory, sent.body.ownMemory]
-        : null;
+      return "body" in sent ? sent.body.ownMemory : null;
     };
-    expect(flags("none")).toEqual([false, false]);
-    expect(flags("own")).toEqual([false, true]);
-    expect(flags("project")).toEqual([true, false]);
-    expect(
-      automationFieldOf("ownMemory and projectMemory cannot both be on"),
-    ).toBe("memory");
+    expect(own("none")).toBe(false);
+    expect(own("own")).toBe(true);
+    expect(automationFieldOf("ownMemory must be boolean")).toBe("memory");
   });
 
   test("the server's range refusals land at their fields", () => {
@@ -581,27 +571,17 @@ describe("the form", () => {
     ).toBe("memoryGuidance");
   });
 
-  test("a mode fills its empty box with a suggestion and takes it back unchanged", () => {
-    const fresh = draftOf(null, "a1", "UTC", LIMIT);
-    const project = pickMemory(fresh, "project");
-    expect(project).toMatchObject({
-      memory: "project",
-      instructions: PROJECT_MEMORY_TASK,
-      memoryGuidance: "",
-    });
-    expect(pickMemory(project, "none")).toMatchObject({
-      instructions: "",
-      memoryGuidance: "",
-    });
-    expect(pickMemory(project, "own")).toMatchObject({
-      instructions: "",
+  test("own memory fills an empty box with a suggestion and takes it back unchanged", () => {
+    const fresh = { ...draftOf(null, "a1", "UTC", LIMIT), memoryGuidance: "" };
+    const none = pickMemory(fresh, "none");
+    expect(none).toMatchObject({ memory: "none", memoryGuidance: "" });
+    const own = pickMemory(none, "own");
+    expect(own).toMatchObject({
+      memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
     });
-    // what someone typed stays, in the box and across modes
-    const typed = { ...fresh, instructions: "Check the clusters" };
-    expect(pickMemory(typed, "project").instructions).toBe(
-      "Check the clusters",
-    );
+    expect(pickMemory(own, "none").memoryGuidance).toBe("");
+    // what someone typed stays across modes
     const edited = { ...fresh, memoryGuidance: "Keep the versions" };
     expect(pickMemory(edited, "none").memoryGuidance).toBe("Keep the versions");
     expect(pickMemory(edited, "own")).toBe(edited);

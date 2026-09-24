@@ -5,7 +5,6 @@ import { describe, expect, test } from "bun:test";
 import {
   chatMarkdown,
   type ExportRow,
-  memorySnapshot,
   type SessionRow,
 } from "../../src/server/sessions/index.ts";
 import type { MessageUpload } from "../../src/shared/uploads.ts";
@@ -42,9 +41,6 @@ const row = (fields: Partial<ExportRow>): ExportRow => ({
   author: "coder",
   content: "Answer.",
   uploads: null,
-  toolCalls: null,
-  toolCallId: null,
-  toolName: null,
   createdAt: now,
   finishedAt: now,
   ...fields,
@@ -71,16 +67,6 @@ const outputs = [
   {
     name: "Markdown download",
     render: (rows: ExportRow[]) => chatMarkdown(session.title, rows, "UTC"),
-  },
-  {
-    name: "memory chat snapshot",
-    render: (rows: ExportRow[]) =>
-      memorySnapshot(
-        session.projectId,
-        session.id,
-        { byId: () => session, exportRows: () => rows },
-        () => false,
-      )!.markdown,
   },
 ];
 

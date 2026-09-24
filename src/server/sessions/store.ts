@@ -32,10 +32,6 @@ import {
   lastMcpDigest as readLastMcpDigest,
   sweepMcpDigests,
 } from "./mcp.ts";
-import {
-  type MemorySnapshot,
-  memorySnapshot as readMemorySnapshot,
-} from "./memory.ts";
 import { addAgentMessage, finishReply } from "./messages.ts";
 import { readOpenedFile, writeOpenedFiles } from "./opened-store.ts";
 import { titleFrom } from "./parse.ts";
@@ -244,14 +240,6 @@ export class SessionStore {
 
   exportRows(sessionId: string): ExportRow[] {
     return exportRows(this.db, sessionId);
-  }
-
-  memorySnapshot(
-    projectId: string,
-    id: string,
-    isWrite: (name: string) => boolean,
-  ): MemorySnapshot | null {
-    return readMemorySnapshot(projectId, id, this, isWrite);
   }
 
   message(id: string): Message | null {

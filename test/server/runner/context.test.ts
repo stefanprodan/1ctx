@@ -236,7 +236,6 @@ describe("systemPrompt", () => {
             source,
             dueAt: Date.UTC(2026, 8, 14, 17, 10),
             tz: "Europe/Bucharest",
-            projectMemory: false,
             ownMemory: false,
             memoryGuidance: "",
           },
@@ -274,7 +273,6 @@ describe("systemPrompt", () => {
         source: "manual",
         dueAt: NOW,
         tz: "UTC",
-        projectMemory: true,
         ownMemory: true,
         memoryGuidance: "Keep failed hosts under Sources.",
       },
@@ -324,7 +322,6 @@ describe("systemPrompt", () => {
       source: "manual",
       dueAt: NOW,
       tz: "UTC",
-      projectMemory: false,
       ownMemory: true,
       memoryGuidance: "",
     };
@@ -366,7 +363,6 @@ describe("systemPrompt", () => {
         source: "manual",
         dueAt: NOW,
         tz: "UTC",
-        projectMemory: false,
         ownMemory: tag === "automation-memory",
         memoryGuidance: "",
       };

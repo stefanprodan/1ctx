@@ -346,209 +346,86 @@ describe("automation memory phase", () => {
   });
 });
 
-describe("memory task run", () => {
-  test("separate automations commit each note and carry them into later sends", async () => {
+describe("own memory and the project note", () => {
+  test("a run commits its own note and every send reads the project note live", async () => {
     const chat = await chatApp();
-    const source = await startChat(chat, "The cluster is in eu-west-1.");
-    source.script.reply("Recorded in the chat.");
-    await settle(chat, source.sessionId);
+    const saved = await chat.member.call(
+      "PUT",
+      `/api/projects/${chat.projectId}/memory`,
+      {
+        body: {
+          entries: [{ topic: "Note", text: "The cluster is in eu-west-1." }],
+          revision: 0,
+        },
+      },
+    );
+    expect(saved.status).toBe(200);
     const automation = await createAutomation(chat, {
-      name: "memory-task",
-      projectMemory: true,
-    });
-
-    const first = await startRun(chat, automation.id);
-    first.main.toolRound([
-      {
-        id: "list",
-        name: "sessions_list",
-        arguments: "{}",
-      },
-    ]);
-    first.main.end();
-    const read = await waitScript(chat.scripted, 3);
-    read.toolRound([
-      {
-        id: "read",
-        name: "session_read",
-        arguments: JSON.stringify({ id: source.sessionId }),
-      },
-    ]);
-    read.end();
-    const projectEdit = await waitScript(chat.scripted, 4);
-    projectEdit.toolRound([
-      {
-        id: "project-memory",
-        name: "memory_edit",
-        arguments:
-          '{"action":"set","topic":"Note","text":"The cluster is in eu-west-1."}',
-      },
-    ]);
-    projectEdit.end();
-    const mainFinish = await waitScript(chat.scripted, 5);
-    mainFinish.reply("Project memory prepared.");
-    await settle(chat, first.sessionId);
-    const ownAutomation = await createAutomation(chat, {
       name: "own-note",
       ownMemory: true,
     });
-    const ownRun = await startRun(chat, ownAutomation.id);
-    ownRun.main.reply("The first memory pass completed.");
-    const ownEdit = await waitScript(chat.scripted, 7);
-    ownEdit.toolRound([
+    const first = await startRun(chat, automation.id);
+    expect(JSON.stringify(first.main.body.messages)).toContain(
+      "The cluster is in eu-west-1.",
+    );
+    first.main.reply("The first pass completed.");
+    const edit = await waitScript(chat.scripted, 2);
+    edit.toolRound([
       {
         id: "own-memory",
         name: "memory_edit",
         arguments:
-          '{"action":"set","topic":"Note","text":"The first memory pass completed."}',
+          '{"action":"set","topic":"Note","text":"The first pass completed."}',
       },
     ]);
-    ownEdit.end();
-    await settle(chat, ownRun.sessionId);
+    edit.end();
+    await settle(chat, first.sessionId);
+    expect(notes(chat, null).entries).toEqual([
+      { topic: "Note", text: "The cluster is in eu-west-1." },
+    ]);
+    expect(notes(chat, automation.id).entries).toEqual([
+      { topic: "Note", text: "The first pass completed." },
+    ]);
 
-    expect(
-      chat.app.memory.read({
-        projectId: chat.projectId,
-        automationId: null,
-      }).entries,
-    ).toEqual([{ topic: "Note", text: "The cluster is in eu-west-1." }]);
-    expect(
-      chat.app.memory.read({
-        projectId: chat.projectId,
-        automationId: ownAutomation.id,
-      }).entries,
-    ).toEqual([{ topic: "Note", text: "The first memory pass completed." }]);
-    expect(
-      chat.app.db
-        .query<{ count: number }, [string, string]>(
-          `select count(*) as count from automation_memory_reads
-           where automation_id = ? and session_id = ?`,
-        )
-        .get(automation.id, source.sessionId)!.count,
-    ).toBe(1);
-
-    const second = await startRun(chat, automation.id);
-    const secondPrompt = JSON.stringify(second.main.body.messages);
-    expect(secondPrompt).toContain("The cluster is in eu-west-1.");
-    expect(secondPrompt).not.toContain("The first memory pass completed.");
-    second.main.toolRound([
+    const moved = await chat.member.call(
+      "PUT",
+      `/api/projects/${chat.projectId}/memory`,
       {
-        id: "list-again",
-        name: "sessions_list",
-        arguments: "{}",
+        body: {
+          entries: [{ topic: "Note", text: "The cluster moved to us-east-1." }],
+          revision: 1,
+        },
       },
-    ]);
-    second.main.end();
-    const secondFinish = await waitScript(chat.scripted, 9);
-    const listResult = chat.app.sessions
-      .messages(second.sessionId)
-      .find((row) => row.kind === "tool" && row.toolName === "sessions_list");
-    expect(listResult?.content).toBe("Every chat is read.");
-    secondFinish.reply("Nothing new.");
+    );
+    expect(moved.status).toBe(200);
+    const second = await startRun(chat, automation.id);
+    const prompt = JSON.stringify(second.main.body.messages);
+    expect(prompt).toContain("The cluster moved to us-east-1.");
+    expect(prompt).toContain("The first pass completed.");
+    second.main.reply("Nothing new.");
+    const phase = await waitScript(chat.scripted, 4);
+    phase.reply("Nothing to change.");
     await settle(chat, second.sessionId);
 
-    const ownSecond = await startRun(chat, ownAutomation.id);
-    const ownPrompt = JSON.stringify(ownSecond.main.body.messages);
-    expect(ownPrompt).toContain("The cluster is in eu-west-1.");
-    expect(ownPrompt).toContain("The first memory pass completed.");
-    ownSecond.main.reply("Nothing new.");
-    const secondPhase = await waitScript(chat.scripted, 11);
-    secondPhase.reply("Nothing to change.");
-    await settle(chat, ownSecond.sessionId);
-
     const later = await startChat(chat, "Where is the cluster?");
-    expect(JSON.stringify(later.script.body.messages)).toContain(
-      "The cluster is in eu-west-1.",
-    );
-    later.script.reply("It is in eu-west-1.");
+    const chatPrompt = JSON.stringify(later.script.body.messages);
+    expect(chatPrompt).toContain("The cluster moved to us-east-1.");
+    expect(chatPrompt).not.toContain("The first pass completed.");
+    later.script.reply("It is in us-east-1.");
     await settle(chat, later.sessionId);
     await chat.app.shutdown();
   });
-});
 
-// a memory task run that reads one chat and edits the project note,
-// left open on its third round for the caller to end
-async function readAndEdit(
-  chat: ChatApp,
-  automationId: string,
-  sourceId: string,
-) {
-  const run = await startRun(chat, automationId);
-  const first = chat.scripted.scripts.length;
-  run.main.toolRound([
-    {
-      id: "read",
-      name: "session_read",
-      arguments: JSON.stringify({ id: sourceId }),
-    },
-  ]);
-  run.main.end();
-  const edit = await waitScript(chat.scripted, first + 1);
-  edit.toolRound([
-    {
-      id: "edit",
-      name: "memory_edit",
-      arguments: '{"action":"set","topic":"Note","text":"A pending fact."}',
-    },
-  ]);
-  edit.end();
-  await waitScript(chat.scripted, first + 2);
-  return run;
-}
-
-function notes(chat: ChatApp, automationId: string | null) {
-  return chat.app.memory.read({ projectId: chat.projectId, automationId });
-}
-
-function marks(chat: ChatApp, automationId: string): number {
-  return chat.app.db
-    .query<{ count: number }, [string]>(
-      `select count(*) as count from automation_memory_reads
-       where automation_id = ?`,
-    )
-    .get(automationId)!.count;
-}
-
-describe("project memory working copy", () => {
-  test("writes nothing and sends no frame before the run ends", async () => {
+  test("writes the own note and sends its frame only when the run ends", async () => {
     const chat = await chatApp();
     const conn = await watcher(chat);
     const automation = await createAutomation(chat, {
-      name: "note-task",
-      projectMemory: true,
-    });
-    const run = await startRun(chat, automation.id);
-    run.main.toolRound([
-      {
-        id: "edit",
-        name: "memory_edit",
-        arguments:
-          '{"action":"set","topic":"Note","text":"The cluster is in eu-west-1."}',
-      },
-    ]);
-    run.main.end();
-    await waitScript(chat.scripted, 2);
-    expect(notes(chat, null)).toMatchObject({ entries: [], revision: 0 });
-    expect(frames(conn, "memory")).toEqual([]);
-
-    // a chat that starts between two edits reads the note as it stands
-    const between = await startChat(chat, "where is the cluster?");
-    expect(JSON.stringify(between.script.body.messages)).not.toContain(
-      "eu-west-1",
-    );
-    between.script.reply("I do not know.");
-    await settle(chat, between.sessionId);
-
-    const mainFinish = await waitScript(chat.scripted, 2);
-    mainFinish.reply("Project memory prepared.");
-    await settle(chat, run.sessionId);
-    const ownAutomation = await createAutomation(chat, {
       name: "own-note",
       ownMemory: true,
     });
-    const ownRun = await startRun(chat, ownAutomation.id);
-    ownRun.main.reply("The first pass is done.");
-    const phase = await waitScript(chat.scripted, 5);
+    const run = await startRun(chat, automation.id);
+    run.main.reply("The first pass is done.");
+    const phase = await waitScript(chat.scripted, 2);
     phase.toolRound([
       {
         id: "own",
@@ -564,42 +441,24 @@ describe("project memory working copy", () => {
       },
     ]);
     phase.end();
-    const phaseFinish = await waitScript(chat.scripted, 6);
-    expect(notes(chat, ownAutomation.id)).toMatchObject({
+    const finish = await waitScript(chat.scripted, 3);
+    expect(notes(chat, automation.id)).toMatchObject({
       entries: [],
       revision: 0,
     });
-    expect(frames(conn, "memory")).toEqual([
-      {
-        type: "memory",
-        projectId: chat.projectId,
-        automationId: null,
-        revision: 1,
-      },
-    ]);
-    phaseFinish.reply("Recorded.");
-    await settle(chat, ownRun.sessionId);
+    expect(frames(conn, "memory")).toEqual([]);
+    finish.reply("Recorded.");
+    await settle(chat, run.sessionId);
 
-    expect(notes(chat, null)).toMatchObject({
-      entries: [{ topic: "Note", text: "The cluster is in eu-west-1." }],
-      revision: 1,
-    });
-    expect(notes(chat, ownAutomation.id)).toMatchObject({
+    expect(notes(chat, automation.id)).toMatchObject({
       entries: [{ topic: "Note", text: "The first pass is done." }],
       revision: 1,
     });
-    // one frame per note, each carrying the revision it committed
     expect(frames(conn, "memory")).toEqual([
       {
         type: "memory",
         projectId: chat.projectId,
-        automationId: null,
-        revision: 1,
-      },
-      {
-        type: "memory",
-        projectId: chat.projectId,
-        automationId: ownAutomation.id,
+        automationId: automation.id,
         revision: 1,
       },
     ]);
@@ -607,147 +466,44 @@ describe("project memory working copy", () => {
     await chat.app.shutdown();
   });
 
-  test("drops edits and read marks when a run is stopped", async () => {
-    const chat = await chatApp();
-    const source = await startChat(chat, "Keep this fact.");
-    source.script.reply("The fact is in this chat.");
-    await settle(chat, source.sessionId);
-    const automation = await createAutomation(chat, {
-      name: "stopped-memory",
-      projectMemory: true,
-    });
-    const run = await readAndEdit(chat, automation.id, source.sessionId);
-    await chat.member.call("POST", `/api/sessions/${run.sessionId}/stop`);
-    await settle(chat, run.sessionId);
-
-    expect(chat.app.sessions.lastSend(run.sessionId)?.cause).toBe("stop");
-    expect(notes(chat, null).entries).toEqual([]);
-    expect(marks(chat, automation.id)).toBe(0);
-    await chat.app.shutdown();
-  });
-
-  test("drops edits and read marks when the run deadline cuts it", async () => {
-    const chat = await chatApp();
-    const source = await startChat(chat, "Keep this fact.");
-    source.script.reply("The fact is in this chat.");
-    await settle(chat, source.sessionId);
-    const automation = await createAutomation(chat, {
-      name: "cut-memory",
-      projectMemory: true,
-    });
-    const run = await readAndEdit(chat, automation.id, source.sessionId);
-    chat.app.now.value += DEFAULT_LIMITS.runDeadlineMs;
-    await settle(chat, run.sessionId);
-
-    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
-      cause: "deadline",
-      status: "stopped",
-    });
-    expect(notes(chat, null).entries).toEqual([]);
-    expect(marks(chat, automation.id)).toBe(0);
-    await chat.app.shutdown();
-  });
-
-  test("drops edits and read marks when a memory task fails", async () => {
-    const chat = await chatApp();
-    const source = await startChat(chat, "Keep this fact.");
-    source.script.reply("The fact is in this chat.");
-    await settle(chat, source.sessionId);
-    const automation = await createAutomation(chat, {
-      name: "failing-memory",
-      projectMemory: true,
-    });
-    const run = await startRun(chat, automation.id);
-    run.main.toolRound([
-      { id: "list", name: "sessions_list", arguments: "{}" },
-    ]);
-    run.main.end();
-    const read = await waitScript(chat.scripted, 3);
-    read.toolRound([
-      {
-        id: "read",
-        name: "session_read",
-        arguments: JSON.stringify({ id: source.sessionId }),
-      },
-    ]);
-    read.end();
-    const edit = await waitScript(chat.scripted, 4);
-    edit.toolRound([
-      {
-        id: "edit",
-        name: "memory_edit",
-        arguments: '{"action":"set","topic":"Note","text":"A pending fact."}',
-      },
-    ]);
-    edit.end();
-    expect(
-      chat.app.memory.read({
-        projectId: chat.projectId,
-        automationId: null,
-      }).entries,
-    ).toEqual([]);
-    const fail = await waitScript(chat.scripted, 5);
-    fail.end();
-    await settle(chat, run.sessionId);
-
-    expect(chat.app.sessions.lastSend(run.sessionId)?.cause).toBe("failure");
-    expect(
-      chat.app.memory.read({
-        projectId: chat.projectId,
-        automationId: null,
-      }).entries,
-    ).toEqual([]);
-    const marks = chat.app.db
-      .query<{ count: number }, [string]>(
-        `select count(*) as count from automation_memory_reads
-         where automation_id = ?`,
-      )
-      .get(automation.id)!;
-    expect(marks.count).toBe(0);
-    await chat.app.shutdown();
-  });
-
   test("replays over a hand edit and records an edit that no longer applies", async () => {
     const chat = await chatApp();
-    const saved = await chat.member.call(
-      "PUT",
-      `/api/projects/${chat.projectId}/memory`,
-      {
-        body: { entries: [{ topic: "Note", text: "old entry" }], revision: 0 },
-      },
-    );
-    expect(saved.status).toBe(200);
     const automation = await createAutomation(chat, {
       name: "replay-memory",
-      projectMemory: true,
+      ownMemory: true,
     });
+    const target = { projectId: chat.projectId, automationId: automation.id };
+    chat.app.memory.save(
+      target,
+      [{ topic: "Note", text: "old entry" }],
+      0,
+      chat.memberId,
+      chat.app.now.value,
+    );
     const run = await startRun(chat, automation.id);
-    run.main.toolRound([
+    run.main.reply("Done.");
+    const phase = await waitScript(chat.scripted, 2);
+    phase.toolRound([
       {
         id: "edit",
         name: "memory_edit",
         arguments: '{"action":"set","topic":"Note","text":"run entry"}',
       },
-    ]);
-    run.main.end();
-    const finish = await waitScript(chat.scripted, 2);
-    expect(
-      chat.app.memory.read({
-        projectId: chat.projectId,
-        automationId: null,
-      }),
-    ).toMatchObject({
-      entries: [{ topic: "Note", text: "old entry" }],
-      revision: 1,
-    });
-    const hand = await chat.member.call(
-      "PUT",
-      `/api/projects/${chat.projectId}/memory`,
       {
-        body: { entries: [{ topic: "Note", text: "hand entry" }], revision: 1 },
+        id: "missing",
+        name: "memory_edit",
+        arguments: '{"action":"remove","topic":"Missing"}',
       },
+    ]);
+    phase.end();
+    const finish = await waitScript(chat.scripted, 3);
+    chat.app.memory.save(
+      target,
+      [{ topic: "Note", text: "hand entry" }],
+      1,
+      chat.memberId,
+      chat.app.now.value,
     );
-    expect(hand.status).toBe(200);
     finish.reply("Finished.");
     await settle(chat, run.sessionId);
 
@@ -755,18 +511,17 @@ describe("project memory working copy", () => {
       cause: "finish",
       memorySkipped: 1,
     });
-    expect(
-      chat.app.memory.read({
-        projectId: chat.projectId,
-        automationId: null,
-      }),
-    ).toMatchObject({
+    expect(notes(chat, automation.id)).toMatchObject({
       entries: [{ topic: "Note", text: "hand entry" }],
       revision: 2,
     });
     await chat.app.shutdown();
   });
 });
+
+function notes(chat: ChatApp, automationId: string | null) {
+  return chat.app.memory.read({ projectId: chat.projectId, automationId });
+}
 
 describe("memory phase room", () => {
   test("counts tool schemas before sending and records a note that cannot fit", async () => {

@@ -21,7 +21,6 @@ import type { Log } from "../lib/log.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ToolCall, wireTokens } from "../providers/index.ts";
-import type { MemorySnapshot } from "../sessions/index.ts";
 import { withCommandHints } from "./bash-hint.ts";
 import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
@@ -32,7 +31,7 @@ import {
   mcpCallName,
   resolveMcpCall,
 } from "./builtin/mcp.ts";
-import { isMemoryTool, runMemory, type UnreadChats } from "./builtin/memory.ts";
+import { runMemory } from "./builtin/memory.ts";
 import { makeSkillTools } from "./builtin/skill.ts";
 import { makeVisualizeTool } from "./builtin/visualize.ts";
 import {
@@ -102,17 +101,6 @@ export type ToolsDeps = {
   // the project's credentials for a send, and each row and key again at
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;
-  sessions?: {
-    memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
-  };
-  markers?: {
-    unread(
-      automationId: string,
-      projectId: string,
-      cap: number,
-      exclude: readonly string[],
-    ): UnreadChats;
-  };
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
 };
@@ -167,20 +155,6 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       throw new Error("MCP is not configured");
     },
     validateArguments: () => null,
-  };
-  const memorySessions = {
-    snapshot: (projectId: string, sessionId: string) =>
-      deps.sessions?.memorySnapshot(projectId, sessionId) ?? null,
-    unread: (
-      automationId: string,
-      projectId: string,
-      cap: number,
-      exclude: readonly string[],
-    ) =>
-      deps.markers?.unread(automationId, projectId, cap, exclude) ?? {
-        chats: [],
-        remaining: 0,
-      },
   };
   const fetchDeps: FetchDependencies = deps.fetchDeps ?? {
     fetch: deps.fetcher,
@@ -352,7 +326,6 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           skills: skillStore,
           mcp: mcpService,
           memory: deps.memory,
-          memorySessions,
           credentials: deps.credentials,
           toolsFor,
           log: deps.log,
@@ -379,12 +352,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     async run(offered, call, ctx) {
       ctx = { ...ctx, web: offered.web };
       const memory = offered.memory;
-      if (
-        memory !== null &&
-        isMemoryTool(call.name) &&
-        (memory.stopped || memory.read !== null || call.name === "memory_edit")
-      ) {
-        return runMemory(memory, memorySessions, call, ctx);
+      if (memory !== null && call.name === "memory_edit") {
+        return runMemory(memory, call, ctx);
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const catalog =
@@ -429,7 +398,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           return new Registry([failed]).run({ ...call, arguments: "{}" }, ctx);
         }
       }
-      if (offered.memory?.note === "automation") {
+      if (offered.memory !== null) {
         return new Registry(base, () => PHASE_ONLY).run(call, ctx);
       }
       const runtime =

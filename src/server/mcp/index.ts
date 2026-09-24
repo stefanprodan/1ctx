@@ -4,12 +4,10 @@
 import type { SwitchableServer } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
-  classify,
   type McpDigest,
   offeredServers,
   type PromptServer,
   promptSnapshot,
-  splitWireName,
   wireName,
 } from "../../shared/mcp.ts";
 import type { Db } from "../db/index.ts";
@@ -108,7 +106,6 @@ export type Mcp = {
   switchableBy(
     agents: { id: string; servers: AgentServer[] }[],
   ): Record<string, SwitchableServer[]>;
-  isWrite(name: string): boolean;
   refreshSoon(id: string, observed: string): void;
   start(): void;
   close(): Promise<void>;
@@ -274,19 +271,6 @@ export function mcpArea(deps: McpDeps): Mcp {
               : switchableOver(rows, agent.servers);
           return servers.length === 0 ? [] : [[agent.id, servers]];
         }),
-      );
-    },
-    isWrite(name) {
-      const split = splitWireName(name);
-      if (split === null) return false;
-      const server = store.byName(split.server);
-      if (server === null) return false;
-      return (
-        classify(server.name, server.tools, {
-          read: server.readPatterns,
-          write: server.writePatterns,
-          excluded: server.excludedPatterns,
-        }).get(split.tool) === "write"
       );
     },
     refreshSoon: (id, observed) => coordinator.refreshSoon(id, observed),

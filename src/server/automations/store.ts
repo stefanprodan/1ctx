@@ -23,7 +23,6 @@ type Raw = {
   tz: string;
   deadline_ms: number | null;
   retention_days: number;
-  project_memory: number;
   own_memory: number;
   memory_guidance: string;
   disabled_capabilities: string;
@@ -63,7 +62,6 @@ const row = (raw: Raw): AutomationSummary => ({
   tz: raw.tz,
   deadlineMs: raw.deadline_ms,
   retentionDays: raw.retention_days,
-  projectMemory: raw.project_memory === 1,
   ownMemory: raw.own_memory === 1,
   memoryGuidance: raw.memory_guidance,
   disabledCapabilities: JSON.parse(raw.disabled_capabilities),
@@ -96,7 +94,6 @@ export type AutomationFields = Pick<
   | "tz"
   | "deadlineMs"
   | "retentionDays"
-  | "projectMemory"
   | "ownMemory"
   | "memoryGuidance"
   | "disabledCapabilities"
@@ -199,10 +196,10 @@ export class AutomationStore {
       .query(
         `insert into automations
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
-           tz, deadline_ms, retention_days, project_memory, own_memory,
+           tz, deadline_ms, retention_days, own_memory,
            memory_guidance, disabled_capabilities,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -215,7 +212,6 @@ export class AutomationStore {
         fields.tz,
         fields.deadlineMs,
         fields.retentionDays,
-        fields.projectMemory ? 1 : 0,
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
         JSON.stringify(fields.disabledCapabilities),
@@ -238,7 +234,6 @@ export class AutomationStore {
       | "deadlineMs"
       | "retentionDays"
       | "nextAt"
-      | "projectMemory"
       | "ownMemory"
       | "memoryGuidance"
       | "disabledCapabilities"
@@ -248,7 +243,7 @@ export class AutomationStore {
       .query(
         `update automations set agent_id = ?, name = ?, instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
-           next_at = ?, project_memory = ?, own_memory = ?, memory_guidance = ?,
+           next_at = ?, own_memory = ?, memory_guidance = ?,
            disabled_capabilities = ?,
            revision = revision + 1, updated_at = ? where id = ?`,
       )
@@ -261,7 +256,6 @@ export class AutomationStore {
         fields.deadlineMs,
         fields.retentionDays,
         fields.nextAt,
-        fields.projectMemory ? 1 : 0,
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
         JSON.stringify(fields.disabledCapabilities),

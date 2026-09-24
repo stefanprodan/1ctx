@@ -232,48 +232,36 @@ export function canChange(
   return a.ownerId === user.id || (kind === "team" && user.role === "admin");
 }
 
-// A task keeps no memory, its own note, or the project's note from the
-// chats it reads, never both notes.
-export type MemoryMode = "none" | "own" | "project";
+// A task keeps no memory or its own note.
+export type MemoryMode = "none" | "own";
 
 export const MEMORY_MODES: { value: MemoryMode; label: string }[] = [
   { value: "none", label: "None" },
   { value: "own", label: "Own memory" },
-  { value: "project", label: "Project memory" },
 ];
 
-// A starting prompt for each memory mode, since a good one is hard to
-// write from nothing: own memory's goes in What to remember, project
-// memory's is the task itself. Both stay domain-neutral.
+// A starting prompt for What to remember, since a good one is hard to
+// write from nothing. It stays domain-neutral.
 export const OWN_MEMORY_GUIDANCE =
   "Keep a few topics that each hold a short list, and update them in place: what worked and what failed and why, where the information lives, what the last run found that the next one should build on, and what was already covered. Add an item to its list instead of making a topic for it, and drop the oldest items when the note is full. Leave out the answer itself, anything copied from the task, and errors that went away.";
-
-export const PROJECT_MEMORY_TASK =
-  "Read the chats you have not read. Keep facts that later chats in this project need: the systems, services and tools people work with and how they are set up, decisions that were made, and how people here want answers. Write each as a short fact, not an instruction, under a topic that says what it is about, and update a topic that exists instead of adding one. Leave out one-off questions, work in progress, fixes the chat did not confirm, and anything that will be stale within a week. If a chat has nothing worth keeping, record nothing.";
 
 // Picking a mode fills its empty box with the suggestion, and leaving a
 // mode takes back a suggestion nobody changed, so it is never saved
 // under a mode it was not written for.
 export function pickMemory(d: Draft, memory: MemoryMode): Draft {
   if (memory === d.memory) return d;
-  let { instructions, memoryGuidance } = d;
+  let { memoryGuidance } = d;
   if (d.memory === "own" && memoryGuidance === OWN_MEMORY_GUIDANCE) {
     memoryGuidance = "";
-  }
-  if (d.memory === "project" && instructions === PROJECT_MEMORY_TASK) {
-    instructions = "";
   }
   if (memory === "own" && memoryGuidance.trim() === "") {
     memoryGuidance = OWN_MEMORY_GUIDANCE;
   }
-  if (memory === "project" && instructions.trim() === "") {
-    instructions = PROJECT_MEMORY_TASK;
-  }
-  return { ...d, memory, instructions, memoryGuidance };
+  return { ...d, memory, memoryGuidance };
 }
 
-const modeOf = (a: Pick<AutomationSummary, "projectMemory" | "ownMemory">) =>
-  a.ownMemory ? "own" : a.projectMemory ? "project" : "none";
+const modeOf = (a: Pick<AutomationSummary, "ownMemory">): MemoryMode =>
+  a.ownMemory ? "own" : "none";
 
 export type Draft = {
   name: string;
@@ -390,7 +378,7 @@ export function automationFieldOf(
   if (message.startsWith("deadline")) return "deadline";
   if (message.startsWith("retention")) return "retention";
   if (message.startsWith("memory guidance")) return "memoryGuidance";
-  if (/^(ownMemory|projectMemory)/.test(message)) return "memory";
+  if (message.startsWith("ownMemory")) return "memory";
   return undefined;
 }
 
@@ -443,7 +431,6 @@ export function requestOf(
       // the limit when an admin moves it
       deadlineMs: ms === limitMs ? null : ms,
       retentionDays: Number(days),
-      projectMemory: d.memory === "project",
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
       disabledCapabilities: disabledOf(d, servers, skills, credentials),

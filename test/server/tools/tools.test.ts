@@ -250,19 +250,13 @@ describe("the built-in catalog", () => {
       skill_file: "skillFiles",
       mcp_describe: "mcpCatalog",
       mcp_call: "mcpCatalog",
-      sessions_list: "projectMemory",
-      session_read: "projectMemory",
       memory_edit: "memory",
       webfetch: "web",
       websearch: "webSearch",
     });
     const edit = catalog.find((tool) => tool.name === "memory_edit")!;
-    expect(edit.description).toContain("the project's memory");
-    expect(edit.variant?.description).toContain("this automation's own memory");
-    expect(edit.variant?.tokens).toBeGreaterThan(0);
-    expect(
-      catalog.filter((tool) => tool.variant !== null).map((t) => t.name),
-    ).toEqual(["memory_edit"]);
+    expect(edit.description).toContain("this automation's own memory");
+    expect(catalog.filter((tool) => tool.variant !== null)).toEqual([]);
   });
 });
 
