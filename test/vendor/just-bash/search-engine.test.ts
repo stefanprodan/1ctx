@@ -9,6 +9,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
+import {
+  buildRegex,
+  searchContent,
+} from "../../../vendor/just-bash/src/commands/search-engine/index.ts";
 
 const files = {
   "/work/a.txt": "foo one\nfoo two\nbar\nbaz\nfoo three\n",
@@ -73,5 +77,20 @@ describe("the search engine's errors", () => {
       "grep: broken.txt: EIO: input/output error, read\n",
     );
     expect(result.exitCode).toBe(2);
+  });
+});
+
+describe("the -w retries", () => {
+  test("pay toward the work limit on a line built to make them cubic", () => {
+    // each shorter match again ends before a word character
+    const line = `a${" ab".repeat(200)}\n`;
+    const { regex } = buildRegex("a[ ab]*a", { mode: "basic" });
+    expect(() =>
+      searchContent(line, regex, { wholeWord: true, maxWork: 50_000 }),
+    ).toThrow("matching work limit exceeded");
+    expect(
+      searchContent("a ab ab!\n", regex, { wholeWord: true, countOnly: true })
+        .output,
+    ).toBe("0\n");
   });
 });

@@ -190,7 +190,7 @@ class LineMatcher {
     private readonly regex: UserRegex,
     private readonly keepGroup: number | undefined,
     private readonly wholeWord: boolean,
-    private readonly charge: () => void,
+    private readonly charge: (amount?: number) => void,
   ) {}
 
   private raw(line: string, from: number): Hit | null {
@@ -240,6 +240,9 @@ class LineMatcher {
     if (this.keepGroup !== undefined) return null;
     for (let k = hit.end - 1; k >= hit.start; k--) {
       if (isWordAt(line, k)) continue;
+      // (1ctx) a retry re-reads the prefix: cubic on a hostile line, so it
+      // pays toward the work limit and fails in seconds, not minutes
+      this.charge(1 + ((k - hit.start) >> 6));
       const candidate = this.raw(line.slice(0, k), hit.start);
       if (candidate === null || candidate.start !== hit.start) return null;
       if (!isWordAt(line, candidate.end)) return candidate;

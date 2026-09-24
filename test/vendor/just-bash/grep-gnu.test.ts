@@ -77,8 +77,11 @@ const KNOWN = new Set<string>([
   "perl alpha unicode",
   "perl lookbehind count",
   "perl lookahead line",
+  "binary recursive I",
+  "no ignore case",
 ]);
 
 describe("grep as GNU grep 3.12", () => {
-  recordedCases("grep", recorded as Fixture, KNOWN);
+  // grep's 1 is no match and 2 an error, which a script tells apart
+  recordedCases("grep", recorded as Fixture, KNOWN, true);
 });

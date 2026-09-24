@@ -47,12 +47,19 @@ export async function runCase(
 function matches(
   c: RecordedCase,
   result: Awaited<ReturnType<typeof runCase>>,
+  exactExit: boolean,
 ): boolean {
   const stdout = c.accept ? c.accept.stdout : c.stdout;
   const exit = c.accept ? c.accept.exit : c.exit;
   const got = c.unordered ? sortLines(result.stdout) : result.stdout;
   if (got !== stdout) return false;
-  if ((exit === 0) !== (result.exitCode === 0)) return false;
+  if (
+    exactExit
+      ? result.exitCode !== exit
+      : (exit === 0) !== (result.exitCode === 0)
+  ) {
+    return false;
+  }
   if ((c.error || c.warned) && !c.accept && result.stderr === "") return false;
   const written = c.accept?.written ?? c.written ?? {};
   return Bun.deepEquals(result.written, written);
@@ -60,12 +67,14 @@ function matches(
 
 /**
  * Runs every case. A case named in `known` is one we still answer
- * differently, and fails when it passes.
+ * differently, and fails when it passes. `exactExit` compares the exit
+ * code itself, where a tool's 1 and 2 mean different things.
  */
 export function recordedCases(
   command: string,
   fixture: Fixture,
   known: ReadonlySet<string> = new Set(),
+  exactExit = false,
 ): void {
   if (known.size > 0) {
     test("every known difference names a case", () => {
@@ -77,14 +86,15 @@ export function recordedCases(
     test(c.name, async () => {
       const result = await runCase(command, fixture, c);
       if (known.has(c.name)) {
-        expect(matches(c, result)).toBe(false);
+        expect(matches(c, result, exactExit)).toBe(false);
         return;
       }
       const stdout = c.accept ? c.accept.stdout : c.stdout;
       const exit = c.accept ? c.accept.exit : c.exit;
       const got = c.unordered ? sortLines(result.stdout) : result.stdout;
       expect(got).toBe(stdout as string);
-      if (exit === 0) expect(result.exitCode).toBe(0);
+      if (exactExit) expect(result.exitCode).toBe(exit as number);
+      else if (exit === 0) expect(result.exitCode).toBe(0);
       else expect(result.exitCode).not.toBe(0);
       if ((c.error || c.warned) && !c.accept) {
         expect(result.stderr).not.toBe("");
