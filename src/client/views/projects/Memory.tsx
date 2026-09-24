@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A project's Memory tab: the project's note, which every chat and run
-// reads and anyone in the project edits.
+// reads, a chat's agent saves to, and anyone in the project edits.
 
 import type { Params } from "../../app/params.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
@@ -18,7 +18,7 @@ export function Memory({ params }: { params: Params }) {
           memory={notes.value.get(key) ?? null}
           memoryKey={key}
           error={noteErrors.value.get(key) ?? null}
-          empty="No memory yet. Every chat and run in this project reads it."
+          empty="No memory yet. Ask an agent in a chat to remember something."
         />
       )}
     </Frame>

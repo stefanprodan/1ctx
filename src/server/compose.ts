@@ -269,7 +269,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     access,
     users,
-    runs: { runInfo: (sessionId) => sessions.runInfo(sessionId) },
+    sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
   const knowledge = knowledgeArea({ db, clock, limits, access });
   sessions = sessionsArea({

@@ -83,7 +83,7 @@ export type Sessions = {
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
   usesAgent(agentId: string): boolean;
-  runInfo(sessionId: string): Memory["run"];
+  sessionInfo(sessionId: string): Memory["session"];
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -115,17 +115,11 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     usesAgent: (agentId) => store.usesAgent(agentId),
-    runInfo(sessionId) {
+    sessionInfo(sessionId) {
       const row = deps.db
-        .query<
-          {
-            sessionId: string;
-            automationId: string | null;
-            automationName: string | null;
-          },
-          [string]
-        >(
-          `select sessions.id as sessionId,
+        .query<NonNullable<Memory["session"]>, [string]>(
+          `select sessions.id as id, sessions.title as title,
+             sessions.origin as origin,
              automations.id as automationId,
              automations.name as automationName
            from sessions

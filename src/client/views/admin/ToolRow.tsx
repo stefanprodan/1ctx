@@ -37,6 +37,7 @@ import {
   hostsFieldOf,
   NAMES_WORDS,
   tokensText,
+  VARIANT_WHEN_WORDS,
   WHEN_WORDS,
 } from "./Tools.model.ts";
 import "../../transcript/hljs.css";
@@ -241,6 +242,7 @@ export function ToolRow({
               Description for an automation's own memory,{" "}
               {tokensText(builtin.variant.tokens)}
             </div>
+            <div class="hint">{VARIANT_WHEN_WORDS}</div>
             <div class="tools-text">{builtin.variant.description}</div>
           </>
         )}

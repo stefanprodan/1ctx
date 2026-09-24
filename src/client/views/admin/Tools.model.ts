@@ -187,12 +187,17 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
   skills: "Sent when the agent has skills.",
   skillFiles: "Sent when one of the agent's skills has files.",
   mcpCatalog: "Sent when the agent's MCP tools go as a catalog.",
-  memory: "Sent in the step after a run that updates its own memory.",
+  memory: "Sent in every chat, over the project's memory.",
   knowledge:
     "Sent in every chat and run, over the project's knowledge base. Its tokens leave out the project's credentials.",
   web: "Sent while web access is on for the chat or the run.",
   webSearch: "Sent while web access is on and a search provider is chosen.",
 };
+
+// when a send carries a built-in's variant, the own-note text of
+// memory_edit, the one tool that has one
+export const VARIANT_WHEN_WORDS =
+  "Sent in the step after a run that updates its own memory.";
 
 export const NAMES_WORDS =
   "Shown without names. Each skill or tool name a send lists adds tokens.";

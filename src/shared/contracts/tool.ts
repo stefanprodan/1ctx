@@ -31,8 +31,9 @@ export type ToolCall = {
 };
 
 // when a send carries a built-in: always, when the agent has skills,
-// when one of them has files, when MCP runs as a catalog, in an own-note
-// phase, or in every send of a project for the knowledge base
+// when one of them has files, when MCP runs as a catalog, in every chat
+// for the project's memory, or in every send of a project for the
+// knowledge base
 export type ToolWhen =
   | "always"
   | "knowledge"

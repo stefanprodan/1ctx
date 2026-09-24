@@ -27,8 +27,8 @@ import {
   memoryWork,
 } from "./store.ts";
 
-export type RunInfoPort = {
-  runInfo(sessionId: string): Memory["run"];
+export type SessionInfoPort = {
+  sessionInfo(sessionId: string): Memory["session"];
 };
 
 export type MemoryDeps = {
@@ -36,7 +36,7 @@ export type MemoryDeps = {
   clock: Clock;
   access: AccessPort;
   users: { byId(id: string): UserRow | null };
-  runs: RunInfoPort;
+  sessions: SessionInfoPort;
 };
 
 // what a chat's edit answers the model: the saved words or the refusal
@@ -109,7 +109,8 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
             const user = deps.users.byId(row.updatedBy);
             return user === null ? null : summary(user);
           })(),
-    run: row.sessionId === null ? null : deps.runs.runInfo(row.sessionId),
+    session:
+      row.sessionId === null ? null : deps.sessions.sessionInfo(row.sessionId),
   });
   const changed = (row: MemoryRow) => ({
     type: "memory.changed" as const,

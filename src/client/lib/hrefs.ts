@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The addresses of a user's page, an agent's page and a chat's
+// The addresses of a user's page, an agent's page, a chat and a chat's
 // download, so every link to them is built one way.
 
 export function userHref(username: string): string {
@@ -10,6 +10,10 @@ export function userHref(username: string): string {
 
 export function agentHref(name: string): string {
   return `/agents/${encodeURIComponent(name)}`;
+}
+
+export function chatHref(id: string): string {
+  return `/chat/${encodeURIComponent(id)}`;
 }
 
 // the chat as a Markdown file: a link the browser saves, never a fetch,

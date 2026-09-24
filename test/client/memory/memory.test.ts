@@ -199,31 +199,78 @@ describe("the note card", () => {
     revision: 2,
     updatedAt: now - 60_000,
     updatedBy: null,
-    run: { sessionId: "s1", automationId: "au1", automationName: "digest" },
+    session: {
+      id: "s1",
+      title: "digest",
+      origin: "automation",
+      automationId: "au1",
+      automationName: "digest",
+    },
     ...changes,
   });
 
-  test("names the run, the user, or nobody", () => {
+  const user = {
+    id: "u1",
+    username: "casey",
+    fullName: "",
+    role: "member" as const,
+  };
+
+  test("names the run, the chat, the user, or nobody", () => {
     expect(writerOf(memory(), now)).toMatchObject({
       kind: "run",
+      sessionId: "s1",
+      automationId: "au1",
       automationName: "digest",
       when: "1m ago",
     });
+    // a run whose automation is gone
     expect(
       writerOf(
         memory({
-          run: null,
-          updatedBy: {
-            id: "u1",
-            username: "casey",
-            fullName: "",
-            role: "member",
+          session: {
+            id: "s1",
+            title: "digest",
+            origin: "automation",
+            automationId: null,
+            automationName: null,
           },
         }),
         now,
       ),
-    ).toMatchObject({ kind: "user", username: "casey" });
+    ).toMatchObject({ kind: "run", automationId: null });
+    // a chat's save names the chat
+    expect(
+      writerOf(
+        memory({
+          updatedBy: user,
+          session: {
+            id: "c1",
+            title: "Pricing check",
+            origin: "chat",
+            automationId: null,
+            automationName: null,
+          },
+        }),
+        now,
+      ),
+    ).toEqual({
+      kind: "user",
+      username: "casey",
+      chat: { id: "c1", title: "Pricing check" },
+      when: "1m ago",
+    });
+    // a hand edit, and a chat's save once the chat is deleted
+    expect(writerOf(memory({ session: null, updatedBy: user }), now)).toEqual({
+      kind: "user",
+      username: "casey",
+      chat: null,
+      when: "1m ago",
+    });
     expect(writerOf(memory({ updatedAt: null }), now)).toEqual({
+      kind: "none",
+    });
+    expect(writerOf(memory({ session: null }), now)).toEqual({
       kind: "none",
     });
   });

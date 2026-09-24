@@ -965,7 +965,12 @@ violation, and every rule has a rejected fixture under
   The phase then stops without another request, and stopped calls fail. An edited automation copy commits on
   any cause after its phase starts. Each changed note sends one frame.
   Project and automation memory routes let anyone who sees the project
-  read, save and undo. Entries are `{topic, text}`;
+  read, save and undo. `Memory.session` names the chat or run that
+  saved last (id, title, origin, the automation for a run), from the
+  memory area's session info port, null for a hand edit or once the
+  session is deleted; the note card's writer line reads "@user in
+  <chat>", "a run of <automation>" or "@user" (`Note.model.ts`).
+  Entries are `{topic, text}`;
   `shared/memory.ts` owns sanitizing, topic equality, diff and the
   rendered count (60 characters per topic, 500 per text, 2,200 per note).
   The phase's `memory_edit` takes `set`, `remove` or `none`, naming a

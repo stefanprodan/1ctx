@@ -377,6 +377,44 @@ describe("a chat saves to the project's memory", () => {
     }
   });
 
+  test("a summary inside a chat send drops the snapshot", async () => {
+    const chat = await chatApp();
+    try {
+      const a = (await quiet(chat)).sessionId;
+      expect(views(chat, a)).toBe(1);
+      await saves(chat, null, [
+        [{ action: "set", topic: "Time", text: "UTC" }],
+      ]);
+
+      // an answer whose usage passes the window's threshold opens the
+      // send's own summary round
+      const sent = await message(chat, a, "hello");
+      expect(promptOf(sent.script)).not.toContain("## Time");
+      const count = chat.scripted.scripts.length;
+      sent.script.content("hi");
+      sent.script.finish();
+      sent.script.usage({ prompt: 10_000_000 });
+      sent.script.end();
+      const summary = await waitScript(chat.scripted, count + 1);
+      expect(chat.app.runner.registry.get(a)!.policy.offered.tools).not.toEqual(
+        [],
+      );
+      summary.reply("The chat so far.");
+      await settled(chat, a);
+      const summaries = chat.app.sessions
+        .messages(a)
+        .filter((row: Message) => row.kind === "summary");
+      expect(summaries.map((row) => row.status)).toEqual(["done"]);
+      expect(views(chat, a)).toBe(0);
+
+      const next = await quiet(chat, a);
+      expect(next.prompt).toContain("## Time\nUTC");
+      expect(views(chat, a)).toBe(1);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a stop, a failure, a regenerate and a delete keep what was saved", async () => {
     const chat = await chatApp();
     try {
@@ -419,6 +457,14 @@ describe("a chat saves to the project's memory", () => {
       expect(chat.app.sessions.byId(a)!.status).toBe("failed");
       expect(note(chat)).toMatchObject({ revision: 2, sessionId: a });
 
+      const memoryPath = `/api/projects/${chat.projectId}/memory`;
+      expect(
+        (await (await chat.member.call("GET", memoryPath)).json()).memory,
+      ).toMatchObject({
+        updatedBy: { id: chat.memberId },
+        session: { id: a, origin: "chat", automationId: null },
+      });
+
       // deleted: the note stays, no longer naming the chat
       expect(views(chat, a)).toBe(1);
       const deleted = await chat.member.call("DELETE", `/api/sessions/${a}`);
@@ -429,6 +475,9 @@ describe("a chat saves to the project's memory", () => {
         revision: 2,
         sessionId: null,
       });
+      expect(
+        (await (await chat.member.call("GET", memoryPath)).json()).memory,
+      ).toMatchObject({ updatedBy: { id: chat.memberId }, session: null });
     } finally {
       await chat.app.shutdown();
     }

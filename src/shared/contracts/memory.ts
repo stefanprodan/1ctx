@@ -6,6 +6,7 @@
 // version. The revision counts the writes; a save names the revision
 // it read.
 
+import type { SessionOrigin } from "../words.ts";
 import type { UserSummary } from "./user.ts";
 
 export type MemoryEntry = { topic: string; text: string };
@@ -22,12 +23,15 @@ export type Memory = {
   revision: number;
   // null before the first write
   updatedAt: number | null;
-  // a user for a hand edit or an undo, null for a run
+  // a user for a hand edit, an undo or a chat's save, null for a run
   updatedBy: UserSummary | null;
-  // the run that last committed, null for a hand edit; the automation
-  // is null once deleted
-  run: {
-    sessionId: string;
+  // the chat or run that last saved, null for a hand edit and once that
+  // session is deleted; the automation is null for a chat and once
+  // deleted
+  session: {
+    id: string;
+    title: string;
+    origin: SessionOrigin;
     automationId: string | null;
     automationName: string | null;
   } | null;
