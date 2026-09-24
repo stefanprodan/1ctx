@@ -45,7 +45,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   toolWorkTokens: {
     label: "Tool-work tokens",
-    text: "Tokens a send may spend on tools before it must answer.",
+    text: "Tokens a send may spend on tools before it must answer. Cached input counts as a tenth.",
   },
   callTimeoutMs: {
     label: "Call timeout",

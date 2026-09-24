@@ -46,7 +46,11 @@ export type Script = {
   content(text: string): void;
   reasoning(text: string): void;
   finish(reason?: string): void;
-  usage(fields?: { prompt?: number; completion?: number }): void;
+  usage(fields?: {
+    prompt?: number;
+    completion?: number;
+    cached?: number;
+  }): void;
   // one tool call delta, in the wire's shape; several with the same
   // index or id accumulate into one call, as a real stream fragments
   toolCall(call: ToolCallFrame): void;
@@ -58,6 +62,7 @@ export type Script = {
     usage?: {
       prompt?: number;
       completion?: number;
+      cached?: number;
     },
   ): void;
   // close the stream: without a finish the wire reports it ended early
@@ -214,6 +219,9 @@ export function scriptedFetch(
             prompt_tokens: fields.prompt ?? 10,
             completion_tokens: fields.completion ?? 5,
             total_tokens: (fields.prompt ?? 10) + (fields.completion ?? 5),
+            ...(fields.cached === undefined
+              ? {}
+              : { prompt_tokens_details: { cached_tokens: fields.cached } }),
           },
         }),
       end: () => {

@@ -69,6 +69,7 @@ describe("the terminal transition", () => {
         tools: 0,
         prompt_tokens: 0,
         completion_tokens: 0,
+        spent_tokens: 0,
         duration: 25,
         error_type: "exception",
         error: "stream ended early",
@@ -111,6 +112,7 @@ describe("the terminal transition", () => {
         tools: 1,
         prompt_tokens: 28,
         completion_tokens: 5,
+        spent_tokens: 33,
         duration: 0,
       },
     });

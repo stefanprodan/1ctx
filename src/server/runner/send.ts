@@ -32,6 +32,8 @@ export type RoundState = {
   finishReason: string | null;
   usage: Usage | null;
   tokens: number;
+  // what the tool-work budget adds: tokens with cached reads weighed
+  spent: number;
   // the tool calls the provider assembled this round, once the stream
   // ends normally; the loop reads them after the round
   calls: ToolCall[];
@@ -145,6 +147,7 @@ export function newRound(messageId: string, now: number): RoundState {
     finishReason: null,
     usage: null,
     tokens: 0,
+    spent: 0,
     calls: [],
     drafts: new Map(),
     slotMarked: false,
