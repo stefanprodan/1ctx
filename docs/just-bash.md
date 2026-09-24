@@ -89,6 +89,10 @@ without a file of their own.
 | `src/commands/yq/preserve.ts`, `yq.ts`, `documents.ts` | a YAML result made from a node of the document (the document itself, a node reached by a path, or a function's result on one: `=`, `del`, `with_entries`, `map`, `sort`, a merge or an append) prints through the parsed document as `-i` writes it, so comments, flow style, quoting and anchors stay: the walker records each result's source node, the documents as written are parsed once and only when such a result prints or `-i` writes (a scalar, a computed value or another output format costs no more than before), the change from the node's value to the result is applied to a clone of that node alone (to the document itself when it prints once), only the nodes the edit wrote are read back to check them unless an anchor or merge key is in play, a reorder of a list keeps its items' nodes, an edited quoted string keeps its quotes, a head comment stays when its key goes, `... comments=""` strips the comments and keeps the style (stdout and `-i`), `-I` and `-P` apply to the kept text; a result that does not read back exactly, a value the filter builds (`{...}`, `[...]`, a literal, `keys`) and every other output format print afresh as before | models preview an edit on stdout before `-i`, and stdout dropped every comment and wrote `[2, 3]` in block style, unlike the file `-i` would write |
 | `src/commands/yq/formats.ts`, `src/commands/yq/preserve.ts` | merge keys (`<<: *base`) merge on read, the explicit keys winning; `-i` keeps the key as written | `.web.image` through a merge key answered null and `-o json` showed a `<<` key |
 | `src/commands/yq/yq.ts`, `src/commands/yq/documents.ts`, `query-engine/parser.ts` | `ea` and `eval-all` read every document of every file (or stdin) first and run the filter once over the list: a pipe hands the whole list on, `[...]` at the top collects every result into one array, `EXPR as $x ireduce (INIT; UPDATE)` folds them, and every other node runs per document; `-i` writes each file its own documents' results; `ireduce` parses in both dialects and jq refuses it | the idioms that sort or count documents across a stream, or merge files, were refused with a pointer to `-s` |
+| `src/commands/search-engine/matcher.ts`, `src/regex/user-regex.ts`, `src/commands/rg/rg-search.ts`, `rg-options.ts` | the engine grep and rg share: a selected line inside an earlier line's context prints as a match, `--` separates groups that do not touch and files, `-A0` included; an empty match moves one code point on and never asks RE2JS past the line's end; only a missing file reads `No such file or directory`; `-m` stops at the NUM-th selected line in every mode and `-m 0` selects nothing; grep's `-c -o` counts lines, rg's matches; `-b`, `--column` and `--vimgrep` count UTF-8 bytes; `-w` is checked in code on Unicode letters, digits and `_`, a shorter match at the same start tried first, each retry charged to the work limit; a NUL makes input binary (grep's `binary file matches` on stderr, rg's line on stdout); `(?i)`, `(?s)`, `(?m)`, `(?U)` reach RE2 and `(?x)` is stripped; BRE and ERE match leftmost-longest | context lines hid matches, `-o` threw on empty matches, every read error was a missing file, `-m` was ignored beside `-c` and `-l`, offsets counted UTF-16 units, `-w café` and `-w '=42'` failed, and a binary file printed its lines |
+| `src/commands/search-engine/gnu-regex.ts` (new), `regex.ts` | grep's BRE and ERE are translated as GNU grep 3.12 reads them: `\+`, `\?`, `\\|`, `\{n,m\}`, `\<`, `\>`, `\b`, `\B`, `\w`, `\W`, `\s`, `\S`, `` \` `` and `\'`, `{,n}`, a leading `*` or `{1}` repeating nothing with GNU's warning, a lone `)`, `a**`, a stray backslash warned about, GNU's error words and exit 2; a backreference is refused naming it | the translation missed most of GNU's escapes and answered errors as matches |
+| `src/commands/grep/grep.ts`, upstream's grep tests | GNU's option parser: a value in the same argument or the next, a value-taking option ending a cluster, `-NUM`, options after operands, long-option prefixes, conflicting matchers refused; `-e` and `-f` accumulate; `-r` with no operand searches `.` without `./`, dotfiles included, a directory without `-r` is an error, `-s` silences and still exits 2, `-d`; and the options it refused: `-b`, `-H`, `-a`, `-I`, `--binary-files`, `-T` (padded as GNU pads to the file's size), `-Z`, `-z`, `-y`, `--no-ignore-case`, `--exclude-from`, `--label`, `--group-separator`, `--no-group-separator`, `-V`, `--color` (`always` refused), with `--line-buffered`, `-U`, `--binary` and `-D` accepted; the upstream tests that pinned the old answers now pin GNU's | models write GNU grep's forms, and the last `-e` won, `-C1` was refused, `-r` without a path read stdin and `-b`, `-H` and `-Z` were unknown |
+| `src/commands/search-engine/pcre.ts` (new), `regex.ts` | grep `-P` on RE2: a leading lookbehind is a prefix and a trailing lookahead a suffix the reported match leaves out, the next `-o` match starting where the kept part ends; `\K` is moved out of groups that neither repeat nor have alternatives; with `-x` the anchors sit around the kept part; `\h`, `\v`, `\R`, `\s`, `\w` and the POSIX classes are PCRE2's Unicode sets, the caseless categories spelled as ranges since RE2JS throws on `\p{N}` under `-i`; `\Q...\E`, `(?#...)`, `(?P<n>)` and `(?'n')` are read; backreferences, negative lookaround, possessive quantifiers, atomic groups, recursion, conditionals, branch resets and verbs are refused naming them, exit 2 | `(?<=id=)\d+` and `\d+(?=\.)` failed to compile, and no pattern may run on a backtracking engine |
 
 ### The jq and yq dialects
 
@@ -198,6 +202,29 @@ they part:
 - NaN prints as `+nan` whatever its sign.
 - Regular expressions are RE2's, without backreferences and without
   gawk's `\<`, `\>` and `\y` word boundaries.
+
+### Where our grep still differs from GNU grep
+
+`test/fixtures/just-bash/grep-gnu.json` holds what GNU grep 3.12
+answered, recorded by `scripts/grep-record.ts`, and
+`test/vendor/just-bash/grep-gnu.test.ts` holds our grep to it; a case
+with `accept` pins ours. Where they part:
+
+- `\d` in BRE and ERE is a digit; GNU reads it as `d` with a warning.
+- Backreferences, negative lookaround, possessive quantifiers, atomic
+  groups, recursion and conditionals are refused in every mode, since
+  RE2 has none. A lookbehind anywhere but the start of a `-P` pattern, a
+  lookahead anywhere but its end, and either beside a top-level `|`, are
+  refused too.
+- A lookbehind is a prefix the match consumes, so `grep -oP '(?<=a)a'`
+  on `aaa` finds one match where GNU finds two. A lookbehind of any
+  length is accepted, where PCRE2 refuses an unbounded one.
+- `\b` under `-P` is ASCII; GNU's is Unicode, so `\bfoo` matches in
+  `éfoo`.
+- A file that is not valid UTF-8 is text; GNU calls it binary.
+- `--color=always` is refused.
+- `-T` pads numbers on standard input to 19 places, as GNU does on a
+  pipe, also when the shell redirected a file there.
 
 ### Where our yq still differs from mikefarah's
 
