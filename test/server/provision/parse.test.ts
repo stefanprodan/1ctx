@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { readSources } from "../../../src/server/provision/input.ts";
 import {
   type Document,
@@ -33,6 +34,7 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   ...existing,
 });
 const web = { mode: "all" as const, domains: [] };
+const noDocs = () => ({ caps: DEFAULT_LIMITS, live: [] });
 const secret = (kind: SecretKind, name: string) =>
   kind === "user-" && name === "user-zed" ? "test-password" : null;
 function source(
@@ -52,7 +54,7 @@ function source(
   };
 }
 function check(docs: Document[], existing: Partial<Inventory> = {}) {
-  return preflight(docs, inventory(existing), secret, web);
+  return preflight(docs, inventory(existing), secret, web, noDocs);
 }
 
 describe("provision documents", () => {
@@ -445,10 +447,22 @@ describe("provision preflight", () => {
       source("User", "zed-user", { role: "member", passwordFrom: "user-zed" }),
     ]);
     expect(() =>
-      preflight(docs, inventory({ User: ["zed-user"] }), () => null, web),
+      preflight(
+        docs,
+        inventory({ User: ["zed-user"] }),
+        () => null,
+        web,
+        noDocs,
+      ),
     ).toThrow("spec.passwordFrom");
     expect(
-      preflight(docs, inventory({ User: ["zed-user"] }), () => "short", web),
+      preflight(
+        docs,
+        inventory({ User: ["zed-user"] }),
+        () => "short",
+        web,
+        noDocs,
+      ),
     ).toBeUndefined();
     expect(JSON.stringify(docs)).not.toContain("short");
   });
@@ -456,16 +470,22 @@ describe("provision preflight", () => {
   test("new user passwords have the API floor and byte cap, without revealing a value", async () => {
     const docs = parse([await fixture("good")]);
     for (const value of ["short", "é".repeat(MAX_PASSWORD_BYTES / 2 + 1)]) {
-      expect(() => preflight(docs, inventory(), () => value, web)).toThrow(
-        "spec.passwordFrom",
-      );
+      expect(() =>
+        preflight(docs, inventory(), () => value, web, noDocs),
+      ).toThrow("spec.passwordFrom");
       try {
-        preflight(docs, inventory(), () => value, web);
+        preflight(docs, inventory(), () => value, web, noDocs);
       } catch (error) {
         expect((error as Error).message).not.toContain(value);
       }
     }
-    preflight(docs, inventory(), () => "é".repeat(MAX_PASSWORD_BYTES / 2), web);
+    preflight(
+      docs,
+      inventory(),
+      () => "é".repeat(MAX_PASSWORD_BYTES / 2),
+      web,
+      noDocs,
+    );
   });
 
   test("secret failures never echo the callback error or returned values", () => {
@@ -483,7 +503,7 @@ describe("provision preflight", () => {
       },
     ]) {
       try {
-        preflight(docs, inventory(), read, web);
+        preflight(docs, inventory(), read, web, noDocs);
         throw new Error("expected missing secret");
       } catch (error) {
         expect((error as Error).message).toContain("spec.keyFrom");

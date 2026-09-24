@@ -182,7 +182,15 @@ server before provisioning. Omitted fields stay, supplied membership
 lists replace, passwords and their change flag are creation-only, and
 objects not named are never deleted. Tool objects configure `web` with
 mode and domains, `websearch` with a nullable provider, and `visualize`
-with its switch and hosts; webfetch is read-only.
+with its switch and hosts; webfetch is read-only. A `Project`'s
+`knowledge` names a folder relative to its YAML file, never from stdin:
+`loadKnowledge()` in `provision/knowledge.ts` reads it before
+validation, each file a doc named by its path, the uploader's metadata
+left out and a symlink refused; preflight checks the docs with the
+knowledge area's `checkFile`, `checkNames` and `checkTotals` against the
+project's live docs, and apply creates a missing doc or replaces one
+whose text differs, never deleting one. Staging copies only the
+`knowledge/` folder beside the YAML.
 
 `service/` is the CLI-only area after `provision/`; it imports only
 `lib/`, composes nothing and opens no database. `1ctx service

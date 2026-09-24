@@ -3,6 +3,10 @@
 
 import type { AgentsResponse } from "../../shared/api/agents.ts";
 import type { DirectoryUserResponse } from "../../shared/api/directory.ts";
+import type {
+  KnowledgeFileDetailResponse,
+  KnowledgeListResponse,
+} from "../../shared/api/knowledge.ts";
 import type { McpResponse, PatchMcpSettings } from "../../shared/api/mcp.ts";
 import type {
   ProjectResponse,
@@ -75,7 +79,10 @@ async function user(
   return "updated";
 }
 
-async function project(api: Client, doc: Of<"Project">): Promise<Action> {
+async function project(
+  api: Client,
+  doc: Of<"Project">,
+): Promise<{ action: Action; id: string }> {
   const { projects } = await api.call<ProjectsResponse>("GET", "/api/projects");
   const before = projects.find(
     (row) => row.kind === "team" && row.name === doc.name,
@@ -119,7 +126,45 @@ async function project(api: Client, doc: Of<"Project">): Promise<Action> {
       if (before) action = "updated";
     }
   }
-  return action;
+  return { action, id: project.id };
+}
+
+// The folder wins over a live doc's text and a doc it does not name is
+// kept: a replaced text stays in the doc's history, nothing is pruned.
+async function docs(
+  api: Client,
+  doc: Of<"Project">,
+  projectId: string,
+  report: (action: Action, kind: string, name: string) => void,
+): Promise<void> {
+  if (doc.docs === undefined) return;
+  const base = `/api/projects/${projectId}/knowledge`;
+  const { files } = await api.call<KnowledgeListResponse>("GET", base);
+  const live = new Map(files.map((file) => [file.name, file.id]));
+  for (const file of doc.docs) {
+    try {
+      const id = live.get(file.name);
+      if (id === undefined) {
+        await api.call("POST", base, { name: file.name, text: file.text });
+        report("created", "Knowledge", `${doc.name}/${file.name}`);
+        continue;
+      }
+      const { file: current } = await api.call<KnowledgeFileDetailResponse>(
+        "GET",
+        `${base}/files/${id}`,
+      );
+      if (current.text === file.text) continue;
+      await api.call("PUT", `${base}/files/${id}`, {
+        text: file.text,
+        revision: current.revision,
+      });
+      report("updated", "Knowledge", `${doc.name}/${file.name}`);
+    } catch (error) {
+      throw new Error(
+        `knowledge ${file.name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 }
 
 async function provider(api: Client, doc: Of<"Provider">): Promise<Action> {
@@ -331,9 +376,12 @@ export async function apply(
           case "User":
             action = await user(api, doc, secret);
             break;
-          case "Project":
-            action = await project(api, doc);
-            break;
+          case "Project": {
+            const made = await project(api, doc);
+            report(made.action, doc.kind, doc.name);
+            await docs(api, doc, made.id, report);
+            continue;
+          }
           case "Provider":
             action = await provider(api, doc);
             break;

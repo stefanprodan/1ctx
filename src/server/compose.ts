@@ -402,6 +402,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret,
     webAccess: () => configuredTools.webAccess(),
     bootstrap: async () => (await users.bootstrap()) !== null,
+    projectDocs: (name) => {
+      const id = projects.store
+        .teamProjectIds()
+        .find((id) => projects.store.byId(id)?.name === name);
+      return {
+        caps: limits.current(),
+        live: id === undefined ? [] : knowledge.store.list(id),
+      };
+    },
     inventory: () => {
       const names = users.list().map((row) => row.username);
       return {

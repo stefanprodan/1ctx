@@ -13,6 +13,8 @@ import {
   type SecretKind,
 } from "../../shared/words.ts";
 import { parseUserPassword } from "../access/index.ts";
+import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
+import type { KnowledgeCaps } from "../limits/index.ts";
 import { object } from "./fields.ts";
 import * as spec from "./spec.ts";
 
@@ -29,13 +31,22 @@ export const KINDS = [
 export type Kind = (typeof KINDS)[number];
 export type Source = { path: string; text: string };
 export type Inventory = Record<Kind, string[]>;
+// a team project's live docs and the limits they are held to, empty for
+// a project not made yet
+export type ProjectDocs = (project: string) => {
+  caps: KnowledgeCaps;
+  live: { name: string; bytes: number }[];
+};
+// a project doc read from the folder spec.knowledge names; bytes are
+// the text's UTF-8 length, as the store counts them
+export type KnowledgeDoc = { name: string; text: string; bytes: number };
 export type Document = {
   [K in Kind]: {
     source: string;
     kind: K;
     name: string;
     spec: spec.Specs[K];
-  };
+  } & (K extends "Project" ? { docs?: KnowledgeDoc[] } : unknown);
 }[Kind];
 
 export type {
@@ -170,6 +181,7 @@ export function preflight(
   inventory: Inventory,
   secret: (kind: SecretKind, name: string) => string | null,
   web: Pick<WebAccess, "mode" | "domains">,
+  projectDocs: ProjectDocs,
 ): void {
   duplicate(documents);
   const known = Object.fromEntries(
@@ -229,6 +241,35 @@ export function preflight(
       case "Project":
         for (const name of doc.spec.members ?? [])
           reference("members", "User", name);
+        if (doc.docs !== undefined) {
+          const { caps, live } = projectDocs(doc.name);
+          const named = new Set(doc.docs.map((file) => file.name));
+          const kept = live.filter((file) => !named.has(file.name));
+          const previous = new Map(live.map((file) => [file.name, file.bytes]));
+          const bytes = (files: { bytes: number }[]) =>
+            files.reduce((sum, file) => sum + file.bytes, 0);
+          try {
+            for (const file of doc.docs) {
+              checkFile(
+                file.name,
+                file.bytes,
+                previous.get(file.name) ?? 0,
+                caps,
+              );
+            }
+            checkNames([...kept.map((file) => file.name), ...named]);
+            checkTotals(
+              { files: live.length, bytes: bytes(live) },
+              {
+                files: kept.length + doc.docs.length,
+                bytes: bytes(kept) + bytes(doc.docs),
+              },
+              caps,
+            );
+          } catch (error) {
+            fail("knowledge", (error as Error).message);
+          }
+        }
         break;
       case "Provider":
         if (!exists) required(["wire", "baseUrl"]);
