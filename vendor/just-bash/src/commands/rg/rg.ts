@@ -61,6 +61,7 @@ EXAMPLES:
     "-N, --no-line-number    do not print line numbers",
     "-I, --no-filename       suppress the prefixing of file names",
     "-0, --null              use NUL as filename separator",
+    "    --null-data         use NUL as the line terminator",
     "-b, --byte-offset       show byte offset of each match",
     "    --column            show column number of first match",
     "    --vimgrep           show results in vimgrep format",
@@ -102,7 +103,8 @@ export const rgCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    if (hasHelpFlag(args)) {
+    // (1ctx) -h is ripgrep's short help
+    if (hasHelpFlag(args) || args.includes("-h")) {
       return showHelp(rgHelp);
     }
 

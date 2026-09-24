@@ -308,6 +308,7 @@ async function searchFiles(
     // (1ctx) a binary file in a walk is skipped but under -a, --binary, -uuu
     if (
       isBinary &&
+      !options.nullData &&
       !options.searchBinary &&
       !options.binary &&
       !haystack.given
@@ -355,14 +356,22 @@ async function searchFiles(
         display,
         countOnlyMatching: true,
         printEmptyMatches: true,
+        invertedLines: true,
         contextWithOnlyMatching: true,
+        lineTerminator: options.nullData ? "\0" : "\n",
         maxWork: ctx.limits.maxLoopIterations,
         maxMatches: ctx.limits.maxArrayElements,
         signal: ctx.signal,
       });
 
       // (1ctx) a binary file searched whole reports that it matched
-      if (isBinary && !options.searchBinary && result.matched && !counting) {
+      if (
+        isBinary &&
+        !options.nullData &&
+        !options.searchBinary &&
+        result.matched &&
+        !counting
+      ) {
         const offset = utf8ByteLength(content.slice(0, content.indexOf("\0")));
         const prefix = showFilename ? `${name}: ` : "";
         result.output = `${prefix}binary file matches (found "\\0" byte around offset ${offset})\n`;

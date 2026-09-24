@@ -105,11 +105,19 @@ export interface SearchOptions {
   crlf?: boolean;
   /**
    * (1ctx) What a printed line becomes, rg's -M and --trim: `starts` are
-   * where matches begin in `text`, for the words that count them
+   * where matches begin in `text`, for the words that count them, and
+   * `ends` the bytes of the line's terminator, which -M counts
    */
-  display?: (text: string, kind: LineKind, starts: number[]) => string;
+  display?: (
+    text: string,
+    kind: LineKind,
+    starts: number[],
+    ends: number,
+  ) => string;
   /** (1ctx) Patterns a line must also match, grep -P's leading lookaheads */
   conditions?: LineCondition[];
+  /** (1ctx) -o with -v prints the selected lines whole, as ripgrep */
+  invertedLines?: boolean;
   /** (1ctx) -o prints an empty line for an empty match, as ripgrep */
   printEmptyMatches?: boolean;
   /** (1ctx) -o still prints context lines whole, as ripgrep; GNU grep not */
@@ -394,6 +402,7 @@ export function searchContent(
     display,
     conditions = [],
     printEmptyMatches = false,
+    invertedLines = false,
     contextWithOnlyMatching = false,
     countOnlyMatching = false,
     nameSeparator,
@@ -512,8 +521,16 @@ export function searchContent(
   // (1ctx) what the pattern sees of a line: without its \r under --crlf
   const subject = (i: number): string =>
     crlf && lines[i].endsWith("\r") ? lines[i].slice(0, -1) : lines[i];
-  const show = (text: string, kind: LineKind, starts: number[]): string =>
-    display ? display(text, kind, starts) : text;
+  const show = (
+    text: string,
+    kind: LineKind,
+    starts: number[],
+    i?: number,
+  ): string => {
+    if (!display) return text;
+    const ends = i !== undefined && i < lineCount - 1 ? lineTerminator.length : 0;
+    return display(text, kind, starts, ends);
+  };
   const lineMatches = (line: string): boolean => {
     if (preFilter && !preFilterMatches(preFilter, line)) return false;
     return matcher.find(line, 0) !== null;
@@ -611,7 +628,7 @@ export function searchContent(
   const printSelected = (i: number): void => {
     const line = lines[i];
     const sub = subject(i);
-    if (onlyMatching) {
+    if (onlyMatching && !(invertMatch && invertedLines)) {
       const bytes = new ByteCounter(sub);
       for (const hit of matcher.all(sub)) {
         chargeWork();
@@ -633,7 +650,7 @@ export function searchContent(
       // (1ctx) replaced once, printed once per match
       const [text, starts] =
         replace !== null ? replaced(i, replace) : [line, hitStarts(i)];
-      const shown = show(text, "spans", starts);
+      const shown = show(text, "spans", starts, i);
       const bytes = new ByteCounter(sub);
       for (const hit of matcher.all(sub)) {
         chargeWork();
@@ -656,13 +673,13 @@ export function searchContent(
     } else if (showColumn) {
       col = 1;
     }
-    pushOutput(head(i, ":", byte, col) + show(text, kind, starts));
+    pushOutput(head(i, ":", byte, col) + show(text, kind, starts, i));
   };
 
   const printContext = (i: number): void => {
     if (onlyMatching && !contextWithOnlyMatching) return;
     const byte = showByteOffset ? lineStarts[i] : null;
-    pushOutput(head(i, "-", byte, undefined) + show(lines[i], "context", []));
+    pushOutput(head(i, "-", byte, undefined) + show(lines[i], "context", [], i));
   };
 
   let matchCount = 0;

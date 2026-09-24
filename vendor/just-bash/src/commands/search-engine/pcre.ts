@@ -362,11 +362,30 @@ function leadingLookaheads(body: string): [Condition[], string] | null {
   return [conditions, `^${rest}`];
 }
 
+/** PCRE2's default limit, which also bounds the \K rewrite's rescans. */
+const MAX_NESTING = 250;
+
+function checkNesting(pattern: string): void {
+  let depth = 0;
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") i++;
+    else if (inClass) inClass = ch !== "]";
+    else if (ch === "[") inClass = true;
+    else if (ch === ")") depth--;
+    else if (ch === "(" && ++depth > MAX_NESTING) {
+      throw new GnuPatternError("parentheses are too deeply nested");
+    }
+  }
+}
+
 /** Translate a grep -P pattern, after \Q...\E, \x{...} and (?x) are done. */
 export function translatePcre(
   pattern: string,
   lineRegexp = false,
 ): PcreTranslation {
+  checkNesting(pattern);
   const s = rewrite(pattern);
   // leading flags apply to the whole pattern, a lookbehind after them too
   const flags = /^(?:\(\?[a-zA-Z]*(?:-[a-zA-Z]*)?\))*/.exec(s)?.[0] ?? "";

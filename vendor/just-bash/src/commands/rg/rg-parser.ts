@@ -169,6 +169,8 @@ const SPECS: Record<string, Spec> = {
     o.withFilename = false;
   }),
   null: flag((o) => (o.nullSeparator = true)),
+  // (1ctx) ripgrep's NUL-terminated lines
+  "null-data": flag((o) => (o.nullData = true)),
   "byte-offset": flag((o) => (o.byteOffset = true)),
   column: flag((o) => {
     o.column = true;
@@ -450,6 +452,17 @@ export function parseArgs(args: string[]): ParseArgsResult {
   // -A and -B win over -C whatever their order
   options.afterContext = state.after ?? state.context ?? 0;
   options.beforeContext = state.before ?? state.context ?? 0;
+
+  // (1ctx) ripgrep prints counts and names as they are under --json
+  if (
+    options.count ||
+    options.countMatches ||
+    options.files ||
+    options.filesWithMatches ||
+    options.filesWithoutMatch
+  ) {
+    options.json = false;
+  }
 
   const paths = positionals.slice();
   if (

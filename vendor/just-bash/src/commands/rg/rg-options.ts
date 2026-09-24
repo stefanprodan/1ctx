@@ -29,6 +29,8 @@ export interface RgOptions {
   noFilename: boolean;
   withFilename: boolean;
   nullSeparator: boolean;
+  /** (1ctx) --null-data: NUL ends a line, and no file is binary */
+  nullData: boolean;
   byteOffset: boolean;
   column: boolean;
   vimgrep: boolean;
@@ -135,6 +137,7 @@ export function createDefaultOptions(): RgOptions {
     noFilename: false,
     withFilename: false,
     nullSeparator: false,
+    nullData: false,
     byteOffset: false,
     column: false,
     vimgrep: false,

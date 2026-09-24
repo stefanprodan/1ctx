@@ -5355,6 +5355,7 @@
     {
       "name": "null list",
       "args": [
+        "-j1",
         "-0",
         "-l",
         "foo",
@@ -5980,6 +5981,96 @@
         "ml.txt"
       ],
       "stdout": "[foo\nn]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns at the limit",
+      "args": [
+        "-M",
+        "7",
+        "one",
+        "a.txt"
+      ],
+      "stdout": "[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns past the limit",
+      "args": [
+        "-M",
+        "8",
+        "one",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "only matching inverted",
+      "args": [
+        "-o",
+        "-n",
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1:alpha\n4:Foo three\n5:\n6:bar\n9:the end\n",
+      "exit": 0
+    },
+    {
+      "name": "glob globstar in braces",
+      "args": [
+        "--files",
+        "-g",
+        "{src/**/*.ts,config/**}"
+      ],
+      "unordered": true,
+      "stdout": "config/app.yaml\nconfig/db.yml\nsrc/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 nested too deep",
+      "args": [
+        "-P",
+        "((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((a))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "json count",
+      "args": [
+        "--json",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "json list",
+      "args": [
+        "-j1",
+        "--json",
+        "-l",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\nnonl.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "null data",
+      "args": [
+        "--null-data",
+        "foo"
+      ],
+      "stdin": "foo\u0000bar\u0000",
+      "stdout": "foo\u0000",
       "exit": 0
     }
   ]

@@ -37,6 +37,12 @@ describe("rg's words", () => {
     expect(result.exitCode).toBe(2);
   });
 
+  test("-h prints the help, as ripgrep's short help", async () => {
+    const result = await run("rg -h");
+    expect(result.stdout).toStartWith("rg - recursively search");
+    expect(result.exitCode).toBe(0);
+  });
+
   test("--version says what ripgrep says first", async () => {
     const result = await run("rg --version");
     expect(result.stdout).toBe("ripgrep 15.2.0\n\nfeatures:+pcre2\n");

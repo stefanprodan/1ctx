@@ -59,11 +59,17 @@ export function globSource(glob: string, lenient = false): string {
     if (ch === "*") {
       let stars = 1;
       while (glob[i + stars] === "*") stars++;
-      const atStart = i === 0 || glob[i - 1] === "/";
+      const prev = glob[i - 1];
       const next = glob[i + stars];
-      const atEnd = next === undefined || next === "/";
-      if (stars >= 2 && atStart && atEnd && depth === 0) {
-        if (next === undefined) {
+      // an alternative inside braces is a glob of its own
+      const atStart =
+        i === 0 || prev === "/" || (depth > 0 && (prev === "{" || prev === ","));
+      const atEnd =
+        next === undefined ||
+        next === "/" ||
+        (depth > 0 && (next === "," || next === "}"));
+      if (stars >= 2 && atStart && atEnd) {
+        if (next !== "/") {
           // a trailing ** is anything below, a whole ** anything at all
           out = i === 0 ? ".*" : `${out}.*`;
           i += stars;

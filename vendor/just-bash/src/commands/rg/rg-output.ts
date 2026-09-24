@@ -33,14 +33,16 @@ function more(count: number): string {
 /** The matcher's `display`, or nothing when neither -M nor --trim is on. */
 export function lineDisplay(
   options: RgOptions,
-): ((text: string, kind: LineKind, starts: number[]) => string) | undefined {
+):
+  | ((text: string, kind: LineKind, starts: number[], ends: number) => string)
+  | undefined {
   const limit = options.maxColumns;
   if (limit === 0 && !options.trim) return undefined;
-  return (text, kind, starts) => {
+  return (text, kind, starts, ends) => {
     let line = text;
     let at = starts;
-    // the limit counts the line as it was, before --trim
-    const long = limit > 0 && utf8ByteLength(line) > limit;
+    // the limit counts the line as it was, before --trim, with its end
+    const long = limit > 0 && utf8ByteLength(line) + ends > limit;
     if (options.trim) {
       const cut = LEADING.exec(line)?.[0].length ?? 0;
       line = line.slice(cut);

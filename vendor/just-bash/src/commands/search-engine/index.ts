@@ -7,6 +7,7 @@
  * - Regex building for different modes (basic, extended, fixed, perl)
  */
 
+// (1ctx) edgesOk, LineKind and WordEdges serve rg's word edges and -M
 export {
   edgesOk,
   isWholeWord,
