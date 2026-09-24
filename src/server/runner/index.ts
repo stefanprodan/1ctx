@@ -87,7 +87,7 @@ export type RunnerDeps = {
   tools: ToolsPort;
   memory: Pick<
     MemoryCapability,
-    "read" | "commit" | "view" | "startView" | "endView"
+    "read" | "commit" | "view" | "startView" | "endView" | "resetSeen"
   >;
   knowledge: Pick<KnowledgeCapability, "snapshot" | "startKept">;
   uploads: WriterDeps["uploads"] & {
@@ -142,6 +142,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       start: (sessionId, snapshot) =>
         deps.memory.startView(sessionId, snapshot),
       end: (sessionId) => deps.memory.endView(sessionId),
+      resetSeen: (sessionId) => deps.memory.resetSeen(sessionId),
     },
     render: deps.render,
     stream: deps.stream,

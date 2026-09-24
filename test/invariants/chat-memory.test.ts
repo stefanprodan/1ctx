@@ -295,6 +295,63 @@ describe("a chat saves to the project's memory", () => {
     }
   });
 
+  test("a set refused because the topic was removed may be sent again as it was", async () => {
+    const chat = await chatApp();
+    try {
+      const b = (
+        await saves(chat, null, [
+          [{ action: "set", topic: "Units", text: "metric" }],
+        ])
+      ).sessionId;
+      await saves(chat, null, [[{ action: "remove", topic: "Units" }]]);
+      const again = await saves(chat, b, [
+        [{ action: "set", topic: "Units", text: "metric and kelvin" }],
+        [{ action: "set", topic: "Units", text: "metric and kelvin" }],
+      ]);
+      expect(again.results[0]![0]).toContain("Another chat removed the topic");
+      expect(again.results[1]![0]).toStartWith("Saved to the project's");
+      expect(note(chat).entries).toEqual([entry("Units", "metric and kelvin")]);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a regenerate forgets what the dropped turn saved", async () => {
+    const chat = await chatApp();
+    try {
+      const a = (
+        await saves(chat, null, [
+          [{ action: "set", topic: "Units", text: "metric, per the user" }],
+        ])
+      ).sessionId;
+      // the regenerated turn no longer shows the save, so a set of the
+      // topic is refused with its text rather than replacing it unseen
+      const count = chat.scripted.scripts.length;
+      const pending = chat.scripted.next();
+      const regenerated = await chat.member.call(
+        "POST",
+        `/api/sessions/${a}/regenerate`,
+      );
+      expect(regenerated.status).toBe(201);
+      const script = await pending;
+      script.toolRound([
+        call("regen", { action: "set", topic: "Units", text: "imperial" }),
+      ]);
+      script.end();
+      const next = await waitScript(chat.scripted, count + 2);
+      expect(results(next, ["regen"])[0]).toContain(
+        "1. Units [20/500]\nmetric, per the user\n",
+      );
+      next.reply("done");
+      await settled(chat, a);
+      expect(note(chat).entries).toEqual([
+        entry("Units", "metric, per the user"),
+      ]);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("what a chat has seen holds across a restart over the same database", async () => {
     const file = fileDb();
     try {

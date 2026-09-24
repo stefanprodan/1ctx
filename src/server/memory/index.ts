@@ -40,11 +40,12 @@ export type MemoryDeps = {
 };
 
 // what a chat's edit answers the model: the saved words or the refusal
-// conflict: refused because another chat wrote the topic since this one saw it
+// conflict: refused because another chat wrote or removed the topic since
+// this one saw it
 export type ChatEditAnswer = {
   error: boolean;
   content: string;
-  conflict?: boolean;
+  conflict?: "wrote" | "removed" | null;
 };
 
 export type MemoryCapability = {
@@ -85,6 +86,9 @@ export type MemoryCapability = {
   // inside the caller's transaction
   startView(sessionId: string, snapshot: readonly MemoryEntry[]): void;
   endView(sessionId: string): void;
+  // what the chat saw falls back to its snapshot, inside the caller's
+  // transaction
+  resetSeen(sessionId: string): void;
 };
 
 export type MemoryArea = MemoryCapability & {
@@ -228,6 +232,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
     view: (sessionId) => store.view(sessionId)?.snapshot ?? null,
     startView: (sessionId, snapshot) => store.startView(sessionId, snapshot),
     endView: (sessionId) => store.endView(sessionId),
+    resetSeen: (sessionId) => store.resetSeen(sessionId),
   };
   return {
     store,

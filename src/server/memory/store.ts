@@ -287,6 +287,14 @@ export class MemoryStore {
       .run(sessionId, JSON.stringify(snapshot), JSON.stringify(seen));
   }
 
+  // a regenerate drops the rows that saved, so the chat has seen only
+  // what its prompt carries
+  resetSeen(sessionId: string): void {
+    this.db
+      .query("update memory_views set seen = snapshot where session_id = ?")
+      .run(sessionId);
+  }
+
   endView(sessionId: string): void {
     this.db
       .query("delete from memory_views where session_id = ?")

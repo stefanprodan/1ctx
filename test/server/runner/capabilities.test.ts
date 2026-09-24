@@ -383,7 +383,7 @@ describe("a send's disabled capabilities", () => {
           sessions: chat.app.sessions,
           uploads: chat.app.knowledge,
           usage: chat.app.usage,
-          views: { start: () => {} },
+          views: { start: () => {}, resetSeen: () => {} },
         },
         {
           sendId: newId(),

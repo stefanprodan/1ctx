@@ -332,6 +332,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       view: (sessionId) => memory.view(sessionId),
       startView: (sessionId, snapshot) => memory.startView(sessionId, snapshot),
       endView: (sessionId) => memory.endView(sessionId),
+      resetSeen: (sessionId) => memory.resetSeen(sessionId),
     },
     limits,
     usage,

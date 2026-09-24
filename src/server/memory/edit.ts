@@ -25,7 +25,13 @@ export type ChatEditOutcome =
       seen: MemoryEntry[];
       changed: boolean;
     }
-  | { ok: false; reason: string; seen: MemoryEntry[]; conflict: boolean };
+  | {
+      ok: false;
+      reason: string;
+      seen: MemoryEntry[];
+      // another chat wrote or removed the topic since this chat saw it
+      conflict: "wrote" | "removed" | null;
+    };
 
 const find = (entries: readonly MemoryEntry[], topic: string) =>
   entries.find((entry) => entry.topic.toLowerCase() === topic.toLowerCase());
@@ -71,7 +77,12 @@ export function chatEdit(
       current === undefined
         ? `Another chat removed the topic ${saw!.topic} since this chat last saw it. Set it again only if it is still needed.`
         : `Another chat wrote the topic ${current.topic} since this chat last saw it. Its text is in the note below. ${edit.action === "set" ? "Merge your text into it and set it again." : "Remove it again only if it is still stale."}`;
-    return { ok: false, reason, seen: all, conflict: true };
+    return {
+      ok: false,
+      reason,
+      seen: all,
+      conflict: current === undefined ? "removed" : "wrote",
+    };
   }
   const result = applyEdit(note, edit);
   if (!result.ok) {
@@ -93,7 +104,7 @@ export function chatEdit(
       ok: false,
       reason: `${reason}${advice}`,
       seen: all,
-      conflict: false,
+      conflict: null,
     };
   }
   return {

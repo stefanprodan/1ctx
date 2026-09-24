@@ -131,11 +131,11 @@ function runChatMemory(
       if (edit.action === "set" && handle.refused.get(topic) === edit.text) {
         unmerged = true;
         throw new Error(
-          `This is the text refused for ${edit.topic}. Merge the text the note holds for it, below, into yours so both are kept, and set it again.`,
+          `This is the text refused for ${edit.topic}. Merge the text the note holds for it, below, into yours so both are kept, and set it again. If the user asked to replace that text, remove the topic first, then set it.`,
         );
       }
       answer = chat.edit(edit);
-      if (answer.conflict && edit.action === "set") {
+      if (answer.conflict === "wrote" && edit.action === "set") {
         handle.refused.set(topic, edit.text);
       } else if (!answer.error) {
         handle.refused.delete(topic);
