@@ -187,7 +187,12 @@ server before provisioning. Omitted fields stay, supplied membership
 lists replace, passwords and their change flag are creation-only, and
 objects not named are never deleted. Tool objects configure `web` with
 mode and domains, `websearch` with a nullable provider, and `visualize`
-with its switch and hosts; webfetch is read-only. A `Project`'s
+with its switch and hosts; webfetch is read-only. A `Credential`
+(`keyFrom`, `url`, `header`, `value`, `methods`, `projects` by team
+name) is applied after `Project`; its preflight checks the key file by
+`readKey()`, refuses a personal or missing project, and checks the
+per-project cap and prefix overlaps over the held rows with the input
+laid on them. A `Project`'s
 `knowledge` names a folder relative to its YAML file, never from stdin:
 `loadKnowledge()` in `provision/knowledge.ts` reads it before
 validation, each file a doc named by its path, the uploader's metadata

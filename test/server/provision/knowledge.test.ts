@@ -49,6 +49,7 @@ const docsOf = (documents: Document[]) =>
 const inventory: Inventory = {
   User: ["admin"],
   Project: ["nebula"],
+  Credential: [],
   Provider: [],
   Skill: [],
   McpServer: [],
@@ -161,6 +162,7 @@ describe("provision knowledge preflight", () => {
           caps: { ...DEFAULT_LIMITS, ...caps },
           live,
         }),
+        { key: () => "ok", list: () => [] },
       );
   };
 

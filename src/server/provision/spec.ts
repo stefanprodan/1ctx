@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { sourceKind } from "../../shared/skills.ts";
 import { isWebAccessMode, type WebAccessMode } from "../../shared/web.ts";
 import {
@@ -34,6 +35,13 @@ import {
   MAX_PROMPT,
   MAX_SERVERS_PER_AGENT,
 } from "../agents/index.ts";
+import {
+  parseKeyName as parseCredentialKey,
+  parseHeader,
+  parseMethods,
+  parsePrefix,
+  parseTemplate,
+} from "../credentials/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   parseMcpKeyName,
@@ -82,6 +90,15 @@ export function folderPath(value: unknown): string {
   }
   return value;
 }
+
+export type CredentialSpec = {
+  keyFrom?: string;
+  url?: string;
+  header?: string;
+  value?: string;
+  methods?: HttpMethod[];
+  projects?: string[];
+};
 
 export type ProviderSpec = {
   wire?: Wire;
@@ -133,6 +150,7 @@ export type ToolSpec = {
 export type Specs = {
   User: UserSpec;
   Project: ProjectSpec;
+  Credential: CredentialSpec;
   Provider: ProviderSpec;
   Skill: SkillSpec;
   McpServer: McpServerSpec;
@@ -183,6 +201,24 @@ export function project(value: unknown): ProjectSpec {
       ),
       members: (v) => names(v, isUsername),
       knowledge: folderPath,
+    },
+  );
+}
+
+export function credential(value: unknown): CredentialSpec {
+  return optional<CredentialSpec>(
+    object(
+      value,
+      ["keyFrom", "url", "header", "value", "methods", "projects"],
+      "spec",
+    ),
+    {
+      keyFrom: parseCredentialKey,
+      url: parsePrefix,
+      header: parseHeader,
+      value: parseTemplate,
+      methods: parseMethods,
+      projects: (v) => names(v, isName),
     },
   );
 }

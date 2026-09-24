@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { CredentialStore } from "../../../src/server/credentials/index.ts";
 import { parse } from "../../../src/server/provision/index.ts";
 import { testApp } from "../../helpers/app.ts";
 import {
@@ -29,7 +30,11 @@ async function instance() {
   const app = await testApp({
     activate: false,
     fetcher: fake.fetcher,
-    secrets: { "user-zed": "test-password", "provider-alternate": "other-key" },
+    secrets: {
+      "user-zed": "test-password",
+      "provider-alternate": "other-key",
+      "http-quotes": "quotes-test-key-0123456789",
+    },
   });
   return { app, fake };
 }
@@ -75,7 +80,7 @@ describe("provision through the composed app", () => {
       expect(lines[0]).toBe("bootstrapped user/admin from user-admin.key");
       // the bootstrapped admin is not an object in the file, so it is
       // said on its own line and counted nowhere
-      expect(counts.created).toBe(6);
+      expect(counts.created).toBe(7);
       expect(counts.created + counts.updated + counts.unchanged).toBe(
         docs.length,
       );
@@ -85,6 +90,7 @@ describe("provision through the composed app", () => {
       expect(kinds).toEqual([
         "user",
         "project",
+        "credential",
         "provider",
         "skill",
         "mcpserver",
@@ -103,6 +109,17 @@ describe("provision through the composed app", () => {
       const projectId = app.projects.teamProjectIds()[0]!;
       expect(app.projects.byId(projectId)?.name).toBe("nebula");
       expect(app.projects.isMember(projectId, zed.id)).toBeTrue();
+      expect(new CredentialStore(app.db).list()).toMatchObject([
+        {
+          name: "quotes",
+          keyName: "http-quotes",
+          prefix: "https://quotes.example.test/api/v1/",
+          header: "X-Api-Key",
+          template: "{key}",
+          methods: ["GET"],
+          projectIds: [projectId],
+        },
+      ]);
       expect(app.providers.list()[0]).toMatchObject({
         name: "mock-provider",
         baseUrl: MODEL_URL,
@@ -125,6 +142,7 @@ describe("provision through the composed app", () => {
       expect(fake.calls).toContain(MCP_URL);
       expect(loginCount(app.db)).toBe(0);
       expect(lines.join("\n")).not.toContain("test-password");
+      expect(lines.join("\n")).not.toContain("quotes-test-key");
       expect(lines.join("\n")).not.toContain("hunter2-test");
       const client = app.client();
       expect((await client.login("admin", "hunter2-test")).status).toBe(200);

@@ -421,6 +421,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         live: id === undefined ? [] : knowledge.store.list(id),
       };
     },
+    credentials: { key: credentials.keyState, list: credentials.bindings },
     inventory: () => {
       const names = users.list().map((row) => row.username);
       return {
@@ -428,6 +429,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         Project: projects.store
           .teamProjectIds()
           .map((id) => projects.store.byId(id)!.name),
+        Credential: credentials.store.list().map((row) => row.name),
         Provider: providers.store.list().map((row) => row.name),
         Skill: skills.store.summaries(() => []).map((row) => row.name),
         McpServer: mcp.store.list().map((row) => row.name),

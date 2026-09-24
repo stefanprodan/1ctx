@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { readSources } from "../../../src/server/provision/input.ts";
 import {
+  type CredentialsView,
   type Document,
   type Inventory,
   KINDS,
@@ -26,6 +27,7 @@ const fixture = async (name: string): Promise<Source> => ({
 const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   User: [],
   Project: [],
+  Credential: [],
   Provider: [],
   Skill: [],
   McpServer: [],
@@ -35,6 +37,8 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
 });
 const web = { mode: "all" as const, domains: [] };
 const noDocs = () => ({ caps: DEFAULT_LIMITS, live: [] });
+// every key usable and nothing bound yet
+const creds: CredentialsView = { key: () => "ok", list: () => [] };
 const secret = (kind: SecretKind, name: string) =>
   kind === "user-" && name === "user-zed" ? "test-password" : null;
 function source(
@@ -54,7 +58,7 @@ function source(
   };
 }
 function check(docs: Document[], existing: Partial<Inventory> = {}) {
-  return preflight(docs, inventory(existing), secret, web, noDocs);
+  return preflight(docs, inventory(existing), secret, web, noDocs, creds);
 }
 
 describe("provision documents", () => {
@@ -453,6 +457,7 @@ describe("provision preflight", () => {
         () => null,
         web,
         noDocs,
+        creds,
       ),
     ).toThrow("spec.passwordFrom");
     expect(
@@ -462,6 +467,7 @@ describe("provision preflight", () => {
         () => "short",
         web,
         noDocs,
+        creds,
       ),
     ).toBeUndefined();
     expect(JSON.stringify(docs)).not.toContain("short");
@@ -471,10 +477,10 @@ describe("provision preflight", () => {
     const docs = parse([await fixture("good")]);
     for (const value of ["short", "é".repeat(MAX_PASSWORD_BYTES / 2 + 1)]) {
       expect(() =>
-        preflight(docs, inventory(), () => value, web, noDocs),
+        preflight(docs, inventory(), () => value, web, noDocs, creds),
       ).toThrow("spec.passwordFrom");
       try {
-        preflight(docs, inventory(), () => value, web, noDocs);
+        preflight(docs, inventory(), () => value, web, noDocs, creds);
       } catch (error) {
         expect((error as Error).message).not.toContain(value);
       }
@@ -485,6 +491,7 @@ describe("provision preflight", () => {
       () => "é".repeat(MAX_PASSWORD_BYTES / 2),
       web,
       noDocs,
+      creds,
     );
   });
 
@@ -503,7 +510,7 @@ describe("provision preflight", () => {
       },
     ]) {
       try {
-        preflight(docs, inventory(), read, web, noDocs);
+        preflight(docs, inventory(), read, web, noDocs, creds);
         throw new Error("expected missing secret");
       } catch (error) {
         expect((error as Error).message).toContain("spec.keyFrom");

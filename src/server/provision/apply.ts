@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AgentsResponse } from "../../shared/api/agents.ts";
+import type { CredentialsResponse } from "../../shared/api/credentials.ts";
 import type { DirectoryUserResponse } from "../../shared/api/directory.ts";
 import type {
   KnowledgeFileDetailResponse,
@@ -165,6 +166,39 @@ async function docs(
       );
     }
   }
+}
+
+async function credential(api: Client, doc: Of<"Credential">): Promise<Action> {
+  const { credentials } = await api.call<CredentialsResponse>(
+    "GET",
+    "/api/credentials",
+  );
+  const before = credentials.find((row) => row.name === doc.name);
+  const { keyFrom, url, value, projects, ...fields } = doc.spec;
+  let projectIds: string[] | undefined;
+  if (projects !== undefined) {
+    const found = await api.call<ProjectsResponse>("GET", "/api/projects");
+    const teams = found.projects.filter((row) => row.kind === "team");
+    projectIds = projects.map((name) => idOf(teams, name));
+  }
+  const desired = {
+    ...(keyFrom === undefined ? {} : { keyName: keyFrom }),
+    ...(url === undefined ? {} : { prefix: url }),
+    ...(value === undefined ? {} : { template: value }),
+    ...fields,
+    ...(projectIds === undefined ? {} : { projectIds }),
+  };
+  if (!before) {
+    await api.call("POST", "/api/credentials", { name: doc.name, ...desired });
+    return "created";
+  }
+  const patch = difference(
+    { ...before, projectIds: before.projects.map((row) => row.id) },
+    desired,
+  );
+  if (!Object.keys(patch).length) return "unchanged";
+  await api.call("PATCH", `/api/credentials/${before.id}`, patch);
+  return "updated";
 }
 
 async function provider(api: Client, doc: Of<"Provider">): Promise<Action> {
@@ -382,6 +416,9 @@ export async function apply(
             await docs(api, doc, made.id, report);
             continue;
           }
+          case "Credential":
+            action = await credential(api, doc);
+            break;
           case "Provider":
             action = await provider(api, doc);
             break;

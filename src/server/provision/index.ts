@@ -6,6 +6,7 @@ import { MAX_PASSWORD_BYTES, MIN_PASSWORD } from "../../shared/words.ts";
 import { type Action, apply, type Counts, type Secret } from "./apply.ts";
 import { client, type Handle } from "./client.ts";
 import {
+  type CredentialsView,
   type Document,
   type Inventory,
   type ProjectDocs,
@@ -14,12 +15,18 @@ import {
 
 export { readSources } from "./input.ts";
 export { loadKnowledge } from "./knowledge.ts";
-export { type Document, type Inventory, parse } from "./parse.ts";
+export {
+  type CredentialsView,
+  type Document,
+  type Inventory,
+  parse,
+} from "./parse.ts";
 
 export type ProvisionDeps = {
   handle: Handle;
   inventory(): Inventory;
   projectDocs: ProjectDocs;
+  credentials: CredentialsView;
   webAccess(): Pick<WebAccess, "mode" | "domains">;
   bootstrap(): Promise<boolean>;
   secret: Secret;
@@ -35,6 +42,7 @@ export function provisionArea(deps: ProvisionDeps) {
       secret,
       deps.webAccess(),
       deps.projectDocs,
+      deps.credentials,
     );
     const password = secret("user-", "user-admin");
     if (

@@ -21,6 +21,18 @@ spec:
   members: [zed-user]
 ---
 apiVersion: config.1ctx.dev/v1
+kind: Credential
+metadata:
+  name: quotes
+spec:
+  keyFrom: http-quotes
+  url: https://quotes.example.test/api/v1/
+  header: X-Api-Key
+  value: "{key}"
+  methods: [GET]
+  projects: [nebula]
+---
+apiVersion: config.1ctx.dev/v1
 kind: Provider
 metadata:
   name: mock-provider
