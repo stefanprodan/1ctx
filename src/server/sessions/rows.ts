@@ -123,6 +123,9 @@ export type RawMessage = {
   model: string | null;
   ttft_ms: number | null;
   thinking_ms: number | null;
+  upstream: string | null;
+  served_model: string | null;
+  native_finish: string | null;
   prompt_tokens: number | null;
   created_at: number;
   finished_at: number | null;
@@ -139,6 +142,7 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
    messages.status, messages.error, messages.finish_reason,
    messages.tool_calls, messages.tool_call_id, messages.tool_name,
    messages.model, messages.ttft_ms, messages.thinking_ms,
+   messages.upstream, messages.served_model, messages.native_finish,
    (select usage.prompt_tokens from usage
     where usage.send_id = messages.send_id and usage.round = messages.round)
     as prompt_tokens,
@@ -193,6 +197,9 @@ export const message = (raw: RawMessage): Message => ({
   model: raw.model,
   ttftMs: raw.ttft_ms,
   thinkingMs: raw.thinking_ms,
+  upstream: raw.upstream,
+  servedModel: raw.served_model,
+  nativeFinish: raw.native_finish,
   createdAt: raw.created_at,
   finishedAt: raw.finished_at,
 });
@@ -283,5 +290,8 @@ export type ReplyFinish = {
   toolCalls: ToolCall[] | null;
   ttftMs: number | null;
   thinkingMs: number | null;
+  upstream: string | null;
+  servedModel: string | null;
+  nativeFinish: string | null;
   finishedAt: number;
 };

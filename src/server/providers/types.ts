@@ -93,7 +93,11 @@ export type ChatEvent =
       signature?: string;
     }
   | { kind: "toolCalls"; calls: ToolCall[] }
-  | { kind: "finish"; reason: string; details: string | null }
+  // native: the upstream's own stop reason, when a router passes it on
+  | { kind: "finish"; reason: string; details: string | null; native?: string }
+  // who served the round, from a router's frames: the upstream and the
+  // model that answered, as the router named them
+  | { kind: "served"; upstream: string | null; model: string | null }
   | { kind: "usage"; usage: Usage }
   | { kind: "error"; message: string; unanswered?: boolean };
 

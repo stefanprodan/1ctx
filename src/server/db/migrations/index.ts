@@ -26,6 +26,7 @@ import { m0017 } from "./0017-chat-uploads.ts";
 import { m0018 } from "./0018-web-access.ts";
 import { m0019 } from "./0019-open.ts";
 import { m0020 } from "./0020-mcp-kept.ts";
+import { m0021 } from "./0021-served-by.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -48,4 +49,5 @@ export const MIGRATIONS: Migration[] = [
   m0018,
   m0019,
   m0020,
+  m0021,
 ];

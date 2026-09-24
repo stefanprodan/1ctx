@@ -235,24 +235,40 @@ function byProjects(db: Db, bounds: Bounds): GroupRow[] {
   );
 }
 
+// the model that answered a send: its answer round's, when a router
+// served another than the one asked for. Only that round counts: an
+// earlier round's pick says nothing about a last round without usage,
+// and the memory phase, when it ran, is the round after the answer
+const ANSWERED = `coalesce((select u.served_model from usage u
+     where u.send_id = s.id
+       and u.round = coalesce(s.memory_round - 1, s.rounds)), s.model)`;
+
 // the chat turns of each model; a run's length is its task's, not the
 // model's
 function models(db: Db, bounds: Bounds): ModelRow[] {
   const rows = db
-    .query<{ provider: string; model: string; turns: number }, Bounds>(
-      `select p.name as provider, s.model, count(*) as turns
+    .query<{ provider: string; answered: string; turns: number }, Bounds>(
+      `select p.name as provider, ${ANSWERED} as answered, count(*) as turns
          from sends s join providers p on p.id = s.provider_id
          where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
-         group by s.provider_id, s.model order by turns desc, provider, model`,
+         group by s.provider_id, answered
+         order by turns desc, provider, answered`,
     )
     .all(...bounds)
-    .map((row): ModelRow => ({ ...row, lengths: [] }));
+    .map(
+      (row): ModelRow => ({
+        provider: row.provider,
+        model: row.answered,
+        turns: row.turns,
+        lengths: [],
+      }),
+    );
   const byKey = new Map(
     rows.map((row) => [`${row.provider}\n${row.model}`, row]),
   );
   for (const ended of db
     .query<{ provider: string; model: string; ms: number }, Bounds>(
-      `select p.name as provider, s.model,
+      `select p.name as provider, ${ANSWERED} as model,
               max(s.finished_at - s.started_at, 0) as ms
          from sends s join providers p on p.id = s.provider_id
          where s.kind != 'run' and s.started_at >= ? and s.started_at < ?

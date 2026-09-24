@@ -30,6 +30,12 @@ export type RoundState = {
   html: string;
   htmlAt: number;
   finishReason: string | null;
+  // from a router's frames, null where they did not say: the upstream,
+  // the model that answered when it is not the one asked for, and the
+  // upstream's stop reason when it differs from finishReason
+  upstream: string | null;
+  servedModel: string | null;
+  nativeFinish: string | null;
   usage: Usage | null;
   tokens: number;
   // what the tool-work budget adds: tokens with cached reads weighed
@@ -145,6 +151,9 @@ export function newRound(messageId: string, now: number): RoundState {
     html: "",
     htmlAt: 0,
     finishReason: null,
+    upstream: null,
+    servedModel: null,
+    nativeFinish: null,
     usage: null,
     tokens: 0,
     spent: 0,

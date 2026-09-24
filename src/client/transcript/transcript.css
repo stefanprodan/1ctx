@@ -167,6 +167,23 @@
   .transcript-after .transcript-cut {
     margin-right: var(--space-2);
   }
+  /* the time and the upstream stay whole; the model that answered
+     gives way on a narrow screen */
+  .transcript-served {
+    display: flex;
+    gap: var(--space-2);
+    min-width: 0;
+    margin-left: var(--space-2);
+    white-space: nowrap;
+  }
+  .transcript-served-model {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .transcript-served-via {
+    flex-shrink: 0;
+  }
   /* the fork menu hangs under its button, the agents as the composer's
      chip lists them, the session's own first */
   .transcript-fork {

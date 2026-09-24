@@ -28,6 +28,10 @@ const fixture = (name: string) =>
   );
 const toolsStream = await fixture("chat-tools.sse").text();
 const plainStream = await fixture("chat-stream.sse").text();
+// recorded 2026-09-24 from a DeepSeek request a full-price upstream served
+const servedStream = await fixture("chat-served.sse").text();
+// a router's pick cut by the upstream's filter, written by hand
+const filteredStream = await fixture("chat-filtered.sse").text();
 const refused = await fixture("error-429.json").text();
 
 const KEY = "sk-or-v1-test-key-that-must-never-leak";
@@ -396,6 +400,65 @@ describe("OpenRouter stream", () => {
         '{"error":{"message":"m","metadata":{"raw":"upstream said no"}}}',
       ),
     ).toBe("upstream said no");
+  });
+});
+
+describe("who served a round", () => {
+  const served = (events: ChatEvent[]) =>
+    events.filter((e) => e.kind === "served");
+
+  test("every frame says who served it, the first text frame included", async () => {
+    const { events } = await stream(servedStream);
+    const seen = served(events);
+    // one per frame: the text, the finish and the usage
+    expect(seen).toHaveLength(3);
+    for (const event of seen) {
+      expect(event).toEqual({
+        kind: "served",
+        upstream: "Wafer",
+        model: "deepseek/deepseek-v4.1-flash",
+      });
+    }
+    // a round stopped after its first text still knows
+    const kinds = events.map((e) => e.kind);
+    expect(kinds.indexOf("served")).toBeLessThan(kinds.indexOf("finish"));
+    expect(events).toContainEqual({
+      kind: "finish",
+      reason: "stop",
+      details: null,
+      native: "stop",
+    });
+  });
+
+  test("a filter's cut carries the upstream's own reason", async () => {
+    const { events } = await stream(filteredStream);
+    expect(events).toContainEqual({
+      kind: "finish",
+      reason: "content_filter",
+      details: null,
+      native: "SAFETY",
+    });
+    expect(served(events)[0]).toEqual({
+      kind: "served",
+      upstream: "Filterhost",
+      model: "vendor/picked-model",
+    });
+  });
+
+  test("the plain wire never says who served, whatever the frames hold", async () => {
+    const fetcher = (async () =>
+      new Response(servedStream, {
+        headers: { "content-type": "text/event-stream" },
+      })) as unknown as typeof fetch;
+    const local = providerFor(
+      { ...row, wire: "openai-compatible", keyName: null },
+      { fetcher, secret: () => null },
+    );
+    const events: ChatEvent[] = [];
+    for await (const event of local.chat(request, new AbortController().signal))
+      events.push(event);
+    expect(served(events)).toEqual([]);
+    expect(events.some((e) => e.kind === "usage")).toBe(true);
   });
 });
 

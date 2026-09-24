@@ -38,6 +38,7 @@ const row = (fields: Partial<ExportRow>): ExportRow => ({
   status: "done",
   error: null,
   finishReason: null,
+  nativeFinish: null,
   author: "coder",
   content: "Answer.",
   uploads: null,

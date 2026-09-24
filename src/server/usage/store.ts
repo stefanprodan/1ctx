@@ -25,6 +25,10 @@ export type UsageFields = {
   cost: number | null;
   // the window as the policy saw it, not as the agent says it now
   contextLength: number | null;
+  // what a router said served the round; null when it did not say, and
+  // servedModel null when it is the model asked for
+  upstream: string | null;
+  servedModel: string | null;
   now: number;
 };
 
@@ -69,6 +73,8 @@ type Raw = {
   reasoning_tokens: number | null;
   cost: number | null;
   context_length: number | null;
+  upstream: string | null;
+  served_model: string | null;
   seq: number;
   created_at: number;
 };
@@ -89,6 +95,8 @@ const row = (raw: Raw): UsageRow => ({
   reasoningTokens: raw.reasoning_tokens,
   cost: raw.cost,
   contextLength: raw.context_length,
+  upstream: raw.upstream,
+  servedModel: raw.served_model,
   seq: raw.seq,
   createdAt: raw.created_at,
 });
@@ -111,8 +119,9 @@ export class UsageStore {
       .query(
         `insert into usage (id, send_id, session_id, project_id, user_id, agent_id,
            provider_id, model, round, prompt_tokens, completion_tokens,
-           cached_tokens, reasoning_tokens, cost, context_length, created_at, seq)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+           cached_tokens, reasoning_tokens, cost, context_length, upstream,
+           served_model, created_at, seq)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
            (select coalesce(max(seq), 0) + 1 from usage where session_id = ?))`,
       )
       .run(
@@ -131,6 +140,8 @@ export class UsageStore {
         fields.reasoningTokens,
         fields.cost,
         fields.contextLength,
+        fields.upstream,
+        fields.servedModel,
         fields.now,
         fields.sessionId,
       );

@@ -2,19 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The OpenAI chat completions wire, as every provider speaks it: the
-// request body from a ChatRequest, the SSE frames to ChatEvents, the
-// tool call fragments joined into calls, and the stream with its
+// request body from a ChatRequest, the SSE frames split and read into
+// ChatEvents (frames.ts), the tool call fragments joined into calls,
+// and the stream with its
 // timeouts and caps. What reaches the provider goes through the fetcher
 // the caller passes, so a test hands it recorded frames and the suite
 // never reaches a network.
 
 import { tokens } from "../lib/tokens.ts";
+import { chatEvents } from "./frames.ts";
 import type {
   ChatEvent,
   ChatRequest,
   ChatTool,
   Fetcher,
-  ReasoningDetail,
   ToolCall,
 } from "./types.ts";
 
@@ -26,8 +27,7 @@ const CHAT_ERROR_BODY_MAX_BYTES = 4 * 1024;
 const CHAT_ERROR_BODY_TIMEOUT_MS = 10_000;
 const OVERSIZED_SSE_FRAME = "the provider sent an oversized stream frame";
 
-const num = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) ? value : 0;
+export { chatEvents, frameEvents, parseFrame } from "./frames.ts";
 
 // the name field on a user message, as OpenAI-compatible servers accept
 // it: letters, digits, underscore and dash, at most 64; a username's
@@ -167,89 +167,6 @@ export function parseSse(
     throw new Error(OVERSIZED_SSE_FRAME);
   }
   return { frames, rest };
-}
-
-export function chatEvents(json: string): ChatEvent[] {
-  if (json.trim() === "[DONE]") return [];
-  let body: any;
-  try {
-    body = JSON.parse(json);
-  } catch {
-    return [{ kind: "error", message: "invalid JSON in the stream" }];
-  }
-  if (body?.error) {
-    const message =
-      typeof body.error.message === "string"
-        ? body.error.message
-        : typeof body.error === "string"
-          ? body.error
-          : "the provider failed";
-    return [{ kind: "error", message }];
-  }
-  const events: ChatEvent[] = [];
-  const choice = Array.isArray(body?.choices) ? body.choices[0] : undefined;
-  const delta = choice?.delta;
-  if (typeof delta?.reasoning_content === "string" && delta.reasoning_content) {
-    events.push({ kind: "reasoning", text: delta.reasoning_content });
-  } else if (typeof delta?.reasoning === "string" && delta.reasoning) {
-    // OpenRouter's name for the same delta; reasoning_details below
-    // carries the structured form the next request sends back
-    events.push({ kind: "reasoning", text: delta.reasoning });
-  }
-  if (Array.isArray(delta?.reasoning_details)) {
-    for (const item of delta.reasoning_details) {
-      if (typeof item?.type === "string") {
-        events.push({ kind: "reasoningDetail", item: item as ReasoningDetail });
-      }
-    }
-  }
-  if (typeof delta?.content === "string" && delta.content) {
-    events.push({ kind: "content", text: delta.content });
-  }
-  if (Array.isArray(delta?.tool_calls)) {
-    for (const item of delta.tool_calls) {
-      const event: Extract<ChatEvent, { kind: "toolCallDelta" }> = {
-        kind: "toolCallDelta",
-      };
-      if (typeof item?.index === "number") event.index = item.index;
-      if (typeof item?.id === "string") event.id = item.id;
-      if (typeof item?.function?.name === "string") {
-        event.name = item.function.name;
-      }
-      if (typeof item?.function?.arguments === "string") {
-        event.arguments = item.function.arguments;
-      }
-      events.push(event);
-    }
-  }
-  if (typeof choice?.finish_reason === "string") {
-    events.push({
-      kind: "finish",
-      reason: choice.finish_reason,
-      details:
-        typeof choice.finish_details?.type === "string"
-          ? choice.finish_details.type
-          : null,
-    });
-  }
-  // the usage chunk: choices empty on an OpenAI-shaped server, one
-  // content-free choice repeating the finish on OpenRouter
-  if (body?.usage && typeof body.usage === "object") {
-    const usage = body.usage;
-    const cached = usage.prompt_tokens_details?.cached_tokens;
-    const reasoning = usage.completion_tokens_details?.reasoning_tokens;
-    events.push({
-      kind: "usage",
-      usage: {
-        promptTokens: num(usage.prompt_tokens),
-        completionTokens: num(usage.completion_tokens),
-        cachedTokens: typeof cached === "number" ? cached : null,
-        reasoningTokens: typeof reasoning === "number" ? reasoning : null,
-        cost: typeof usage.cost === "number" ? usage.cost : null,
-      },
-    });
-  }
-  return events;
 }
 
 type TrackedCall = {

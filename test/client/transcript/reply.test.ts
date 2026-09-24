@@ -6,6 +6,7 @@ import {
   cutReason,
   emptyFailure,
   replyRunning,
+  servedBy,
 } from "../../../src/client/transcript/Reply.tsx";
 import type {
   ReplyNode,
@@ -44,6 +45,9 @@ function answer(changes: Partial<Message> = {}): Message {
     model: "model",
     ttftMs: 10,
     thinkingMs: null,
+    upstream: null,
+    servedModel: null,
+    nativeFinish: null,
     createdAt: 10_000,
     finishedAt: 20_000,
     ...changes,
@@ -123,6 +127,11 @@ describe("the line under an answer", () => {
     expect(cutReason(answer({ finishReason: "token_limit" }))).toBeNull();
     expect(cutReason(answer({ finishReason: "context_limit" }))).toBeNull();
     expect(cutReason(answer({ finishReason: "tool_loop" }))).toBeNull();
+    expect(
+      cutReason(
+        answer({ finishReason: "content_filter", nativeFinish: "SAFETY" }),
+      ),
+    ).toEqual({ text: "cut by the provider's filter (SAFETY)", err: false });
   });
 });
 
@@ -160,5 +169,37 @@ describe("a failed turn's fold", () => {
     ).toBeFalse();
     expect(emptyFailure(work(), failed, "OpenRouter 403", "half")).toBeFalse();
     expect(emptyFailure(work(), failed, null, "")).toBeFalse();
+  });
+});
+
+describe("servedBy", () => {
+  test("nothing when no router said", () => {
+    expect(servedBy(null)).toBeNull();
+    expect(servedBy(answer())).toBeNull();
+  });
+
+  test("the upstream alone, or the answering model without its org first", () => {
+    expect(servedBy(answer({ upstream: "Wafer" }))).toEqual({
+      model: null,
+      via: "via Wafer",
+      title: "via Wafer",
+    });
+    expect(
+      servedBy(
+        answer({
+          upstream: "Nvidia",
+          servedModel: "nvidia/nemotron-3-super-120b-a12b:free",
+        }),
+      ),
+    ).toEqual({
+      model: "nemotron-3-super-120b-a12b:free",
+      via: "via Nvidia",
+      title: "nvidia/nemotron-3-super-120b-a12b:free via Nvidia",
+    });
+    expect(servedBy(answer({ servedModel: "bare-model" }))).toEqual({
+      model: "bare-model",
+      via: null,
+      title: "bare-model",
+    });
   });
 });

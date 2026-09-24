@@ -107,6 +107,8 @@ type Round = {
   cached?: number | null;
   cost?: number | null;
   at?: number;
+  // the model a router said answered, when it is not the one asked for
+  served?: string;
 };
 
 let ids = 0;
@@ -161,8 +163,8 @@ function addSend(
     db.query(
       `insert into usage (id, send_id, session_id, project_id, user_id,
          agent_id, provider_id, model, round, seq, prompt_tokens,
-         completion_tokens, cached_tokens, cost, created_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         completion_tokens, cached_tokens, cost, created_at, served_model)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       `${id}-${i}`,
       id,
@@ -179,6 +181,7 @@ function addSend(
       round.cached ?? null,
       round.cost ?? null,
       round.at ?? fields.at,
+      round.served ?? null,
     );
   });
   return id;
@@ -574,6 +577,44 @@ describe("the overview turn lengths", () => {
     expect(body.lengths.map((row) => row.model)).toEqual(
       [12, 11, 10, 9, 8, 7, 6, 5, 4, 3].map((i) => `model-${i}`),
     );
+  });
+
+  test("count a router's turns under the model its last round said answered", async () => {
+    const chat = await fixture();
+    const sessionId = await settledChat(chat);
+    hide(chat);
+    const router = "openrouter/free";
+    for (let n = 0; n < 3; n++) {
+      addSend(chat, sessionId, {
+        at: NOW,
+        model: router,
+        rounds: 2,
+        usage: [{ served: "vendor/first-pick" }, { served: "vendor/picked" }],
+      });
+    }
+    addSend(chat, sessionId, {
+      at: NOW,
+      model: router,
+      usage: [{ served: "vendor/other" }],
+    });
+    // no usage row, or none that said: the model asked for
+    addSend(chat, sessionId, { at: NOW, model: router });
+    addSend(chat, sessionId, { at: NOW, model: router, usage: [{}] });
+    // an earlier round's pick says nothing about a last round without
+    // usage, as a stopped one has
+    addSend(chat, sessionId, {
+      at: NOW,
+      model: router,
+      rounds: 2,
+      usage: [{ served: "vendor/first-pick" }],
+    });
+    const body = await overview(chat);
+    expect(body.lengths.map((row) => [row.model, row.turns])).toEqual([
+      // a tie goes by name
+      [router, 3],
+      ["vendor/picked", 3],
+      ["vendor/other", 1],
+    ]);
   });
 });
 
