@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../index.js";
 
 describe("rg -L (follow symlinks)", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should accept -L/--follow flag without error", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -15,11 +16,12 @@ describe("rg -L (follow symlinks)", () => {
         "/home/user/file.txt": "hello world\n",
       },
     });
-    const result = await bash.exec("rg -L hello");
+    const result = await bash.exec("rg -n -L hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello world\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should accept --follow flag without error", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -27,11 +29,12 @@ describe("rg -L (follow symlinks)", () => {
         "/home/user/file.txt": "hello world\n",
       },
     });
-    const result = await bash.exec("rg --follow hello");
+    const result = await bash.exec("rg -n --follow hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello world\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should skip symlinks by default in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -41,11 +44,12 @@ describe("rg -L (follow symlinks)", () => {
     });
     await bash.exec("ln -s real.txt /home/user/link.txt");
 
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("real.txt:1:hello\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should follow symlinks with -L in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -55,11 +59,12 @@ describe("rg -L (follow symlinks)", () => {
     });
     await bash.exec("ln -s real.txt /home/user/link.txt");
 
-    const result = await bash.exec("rg -L --sort path hello");
+    const result = await bash.exec("rg -n -L --sort path hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("link.txt:1:hello\nreal.txt:1:hello\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should follow symlinks to directories with -L", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -70,12 +75,12 @@ describe("rg -L (follow symlinks)", () => {
     await bash.exec("ln -s subdir /home/user/linkdir");
 
     // Without -L, should only find file in real directory
-    let result = await bash.exec("rg hello");
+    let result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("subdir/file.txt:1:hello\n");
 
     // With -L, should find file through both paths
-    result = await bash.exec("rg -L --sort path hello");
+    result = await bash.exec("rg -n -L --sort path hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "linkdir/file.txt:1:hello\nsubdir/file.txt:1:hello\n",
@@ -84,6 +89,7 @@ describe("rg -L (follow symlinks)", () => {
 });
 
 describe("rg -u (unrestricted)", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should ignore gitignore with -u", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -94,14 +100,15 @@ describe("rg -u (unrestricted)", () => {
       },
     });
     // Without -u, ignored.txt should not be searched
-    let result = await bash.exec("rg hello");
+    let result = await bash.exec("rg -n hello");
     expect(result.stdout).toBe("visible.txt:1:hello\n");
 
     // With -u, ignored.txt should be searched
-    result = await bash.exec("rg -u --sort path hello");
+    result = await bash.exec("rg -n -u --sort path hello");
     expect(result.stdout).toBe("ignored.txt:1:hello\nvisible.txt:1:hello\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search hidden files with -uu", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -111,11 +118,11 @@ describe("rg -u (unrestricted)", () => {
       },
     });
     // Without -uu, .hidden should not be searched
-    let result = await bash.exec("rg hello");
+    let result = await bash.exec("rg -n hello");
     expect(result.stdout).toBe("visible.txt:1:hello\n");
 
     // With -uu (--no-ignore --hidden), .hidden should be searched
-    result = await bash.exec("rg -uu --sort path hello");
+    result = await bash.exec("rg -n -uu --sort path hello");
     expect(result.stdout).toBe(".hidden:1:hello\nvisible.txt:1:hello\n");
   });
 
@@ -146,6 +153,7 @@ describe("rg -u (unrestricted)", () => {
 });
 
 describe("rg -a (text/binary)", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search binary files as text with -a", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -159,7 +167,7 @@ describe("rg -a (text/binary)", () => {
     expect(result.stdout).toBe("");
 
     // With -a, binary should be searched
-    result = await bash.exec("rg -a hello");
+    result = await bash.exec("rg -n -a hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("binary.bin:1:hello\x00world\n");
   });

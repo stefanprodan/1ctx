@@ -6,7 +6,7 @@
  * - Respects .gitignore
  * - Skips hidden files by default
  * - Skips binary files by default
- * - Smart case sensitivity (case-insensitive unless pattern has uppercase)
+ * - (1ctx) Case-sensitive, and line numbers only with -n, as ripgrep piped
  */
 
 import type {
@@ -39,8 +39,9 @@ EXAMPLES:
     "-e, --regexp PATTERN    search for PATTERN (can be used multiple times)",
     "-f, --file FILE         read patterns from FILE, one per line",
     "-i, --ignore-case       case-insensitive search",
-    "-s, --case-sensitive    case-sensitive search (overrides smart-case)",
-    "-S, --smart-case        smart case (default: case-insensitive unless pattern has uppercase)",
+    // (1ctx) case-sensitive and without line numbers by default
+    "-s, --case-sensitive    case-sensitive search (default)",
+    "-S, --smart-case        case-insensitive unless the pattern has uppercase",
     "-F, --fixed-strings     treat pattern as literal string",
     "-w, --word-regexp       match whole words only",
     "-x, --line-regexp       match whole lines only",
@@ -55,7 +56,7 @@ EXAMPLES:
     "-m, --max-count NUM     stop after NUM matches per file",
     "-q, --quiet             suppress output, exit 0 on match",
     "    --stats             print search statistics",
-    "-n, --line-number       print line numbers (default: on)",
+    "-n, --line-number       print line numbers",
     "-N, --no-line-number    do not print line numbers",
     "-I, --no-filename       suppress the prefixing of file names",
     "-0, --null              use NUL as filename separator",

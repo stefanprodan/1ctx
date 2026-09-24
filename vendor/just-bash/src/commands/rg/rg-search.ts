@@ -134,7 +134,7 @@ function accountPatternInput(
 export async function executeSearch(
   searchCtx: SearchContext,
 ): Promise<ExecResult> {
-  const { ctx, options, paths: inputPaths, explicitLineNumbers } = searchCtx;
+  const { ctx, options, paths: inputPaths } = searchCtx;
 
   // Validate glob patterns for errors
   for (const glob of options.globs) {
@@ -375,15 +375,8 @@ export async function executeSearch(
     !options.noFilename &&
     (options.withFilename || !singleExplicitFile || files.length > 1);
 
-  let effectiveLineNumbers = options.lineNumber;
-  if (!explicitLineNumbers) {
-    if (singleExplicitFile && files.length === 1) {
-      effectiveLineNumbers = false;
-    }
-    if (options.onlyMatching) {
-      effectiveLineNumbers = false;
-    }
-  }
+  // (1ctx) line numbers only when asked for, as ripgrep when piped
+  const effectiveLineNumbers = options.lineNumber;
 
   // Search files
   return searchFiles(

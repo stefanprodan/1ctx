@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 
 describe("rg basic search", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search for pattern in current directory", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -9,12 +10,13 @@ describe("rg basic search", () => {
         "/home/user/file.txt": "hello world\nfoo bar\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello world\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search multiple files and sort output", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -23,12 +25,13 @@ describe("rg basic search", () => {
         "/home/user/b.txt": "hello\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a.txt:1:hello\nb.txt:1:hello\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search in specified path", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -37,7 +40,7 @@ describe("rg basic search", () => {
         "/home/user/README.md": "# Hello\n",
       },
     });
-    const result = await bash.exec("rg hello src");
+    const result = await bash.exec("rg -n hello src");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("src/app.ts:1:const hello = 'world';\n");
     expect(result.stderr).toBe("");
@@ -56,6 +59,7 @@ describe("rg basic search", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should show line numbers by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -63,7 +67,7 @@ describe("rg basic search", () => {
         "/home/user/file.txt": "line1\nhello\nline3\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:2:hello\n");
     expect(result.stderr).toBe("");
@@ -82,6 +86,7 @@ describe("rg basic search", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search in subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -89,7 +94,7 @@ describe("rg basic search", () => {
         "/home/user/src/lib/util.ts": "export const hello = 1;\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("src/lib/util.ts:1:export const hello = 1;\n");
     expect(result.stderr).toBe("");
@@ -97,14 +102,16 @@ describe("rg basic search", () => {
 });
 
 describe("rg case sensitivity", () => {
-  it("should use smart case by default (lowercase = case-insensitive)", async () => {
+  // (1ctx) ripgrep is case-sensitive unless -i or -S, and numbers lines
+  // only with -n when piped
+  it("should use smart case with -S (lowercase = case-insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
       files: {
         "/home/user/file.txt": "Hello World\nhello world\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n -S hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt:1:Hello World\nfile.txt:2:hello world\n",
@@ -112,6 +119,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should use smart case (uppercase in pattern = case-sensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -119,12 +127,13 @@ describe("rg case sensitivity", () => {
         "/home/user/file.txt": "Hello World\nhello world\n",
       },
     });
-    const result = await bash.exec("rg Hello");
+    const result = await bash.exec("rg -n Hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:Hello World\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should be case-insensitive with -i", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -132,7 +141,7 @@ describe("rg case sensitivity", () => {
         "/home/user/file.txt": "Hello World\nhello world\nHELLO WORLD\n",
       },
     });
-    const result = await bash.exec("rg -i HELLO");
+    const result = await bash.exec("rg -n -i HELLO");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt:1:Hello World\nfile.txt:2:hello world\nfile.txt:3:HELLO WORLD\n",
@@ -140,6 +149,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should be case-sensitive with -s (override smart case)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -147,12 +157,13 @@ describe("rg case sensitivity", () => {
         "/home/user/file.txt": "Hello World\nhello world\n",
       },
     });
-    const result = await bash.exec("rg -s hello");
+    const result = await bash.exec("rg -n -s hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:2:hello world\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should override smart case with -i when pattern has uppercase", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -160,7 +171,7 @@ describe("rg case sensitivity", () => {
         "/home/user/file.txt": "Hello World\nhello world\n",
       },
     });
-    const result = await bash.exec("rg -i Hello");
+    const result = await bash.exec("rg -n -i Hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt:1:Hello World\nfile.txt:2:hello world\n",
@@ -168,6 +179,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should use smart case with numbers only (case-insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -175,12 +187,13 @@ describe("rg case sensitivity", () => {
         "/home/user/file.txt": "ABC123\nabc123\n",
       },
     });
-    const result = await bash.exec("rg 123");
+    const result = await bash.exec("rg -n 123");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:ABC123\nfile.txt:2:abc123\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should use smart case with symbols only (case-insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -188,7 +201,7 @@ describe("rg case sensitivity", () => {
         "/home/user/file.txt": "foo::bar\nFOO::BAR\n",
       },
     });
-    const result = await bash.exec("rg -F '::'");
+    const result = await bash.exec("rg -n -F '::'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:foo::bar\nfile.txt:2:FOO::BAR\n");
     expect(result.stderr).toBe("");
@@ -196,6 +209,7 @@ describe("rg case sensitivity", () => {
 });
 
 describe("rg binary files", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should skip binary files by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -204,7 +218,7 @@ describe("rg binary files", () => {
         "/home/user/binary.bin": "hello\x00world\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("text.txt:1:hello\n");
     expect(result.stderr).toBe("");
@@ -212,6 +226,7 @@ describe("rg binary files", () => {
 });
 
 describe("rg max depth", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should limit search depth with --max-depth", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -223,7 +238,7 @@ describe("rg max depth", () => {
     });
     // ripgrep: --max-depth N includes files at depths 0 through N-1
     // --max-depth 2 includes depth 0 and 1
-    const result = await bash.exec("rg --max-depth 2 hello");
+    const result = await bash.exec("rg -n --max-depth 2 hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("dir1/level1.txt:1:hello\nlevel0.txt:1:hello\n");
     expect(result.stderr).toBe("");

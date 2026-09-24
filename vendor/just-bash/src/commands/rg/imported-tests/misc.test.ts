@@ -35,6 +35,7 @@ describe("rg misc: single_file", () => {
 
 // 2. dir
 describe("rg misc: dir", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should search directory with filename prefix", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -42,7 +43,7 @@ describe("rg misc: dir", () => {
         "/home/user/sherlock": SHERLOCK,
       },
     });
-    const result = await bash.exec("rg Sherlock");
+    const result = await bash.exec("rg -n Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "sherlock:1:For the Doctor Watsons of this world, as opposed to the Sherlock\nsherlock:3:be, to a very large extent, the result of luck. Sherlock Holmes\n",
@@ -328,6 +329,7 @@ describe("rg misc: replace_with_only_matching", () => {
 
 // 20. file_types
 describe("rg misc: file_types", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should filter by type with -t", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -337,7 +339,7 @@ describe("rg misc: file_types", () => {
         "/home/user/file.rs": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg -t rust Sherlock");
+    const result = await bash.exec("rg -n -t rust Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.rs:1:Sherlock\n");
   });
@@ -345,6 +347,7 @@ describe("rg misc: file_types", () => {
 
 // 21. file_types_all
 describe("rg misc: file_types_all", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should filter type 'all' (only typed files)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -353,7 +356,7 @@ describe("rg misc: file_types_all", () => {
         "/home/user/file.py": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg -t all Sherlock");
+    const result = await bash.exec("rg -n -t all Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.py:1:Sherlock\n");
   });
@@ -361,6 +364,7 @@ describe("rg misc: file_types_all", () => {
 
 // 22. file_types_negate
 describe("rg misc: file_types_negate", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should negate type with -T", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -369,7 +373,7 @@ describe("rg misc: file_types_negate", () => {
         "/home/user/file.rs": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg -T rust Sherlock");
+    const result = await bash.exec("rg -n -T rust Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.py:1:Sherlock\n");
   });
@@ -377,6 +381,7 @@ describe("rg misc: file_types_negate", () => {
 
 // 23. file_types_negate_all
 describe("rg misc: file_types_negate_all", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should negate type 'all' (only untyped files)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -385,7 +390,7 @@ describe("rg misc: file_types_negate_all", () => {
         "/home/user/file.py": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg -T all Sherlock");
+    const result = await bash.exec("rg -n -T all Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "sherlock:1:For the Doctor Watsons of this world, as opposed to the Sherlock\nsherlock:3:be, to a very large extent, the result of luck. Sherlock Holmes\n",
@@ -412,6 +417,7 @@ describe("rg misc: file_type_clear", () => {
 
 // 25. file_type_add
 describe("rg misc: file_type_add", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should add type patterns with --type-add", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -422,7 +428,7 @@ describe("rg misc: file_type_add", () => {
     });
     // Add new type 'custom' for .foo files
     const result = await bash.exec(
-      "rg --type-add 'custom:*.foo' -t custom test",
+      "rg -n --type-add 'custom:*.foo' -t custom test",
     );
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.foo:1:test\n");
@@ -431,6 +437,7 @@ describe("rg misc: file_type_add", () => {
 
 // 26. file_type_add_compose
 describe("rg misc: file_type_add_compose", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should compose types with include", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -442,7 +449,7 @@ describe("rg misc: file_type_add_compose", () => {
     });
     // Create 'web' type that includes js type patterns
     const result = await bash.exec(
-      "rg --type-add 'web:include:js' -t web test",
+      "rg -n --type-add 'web:include:js' -t web test",
     );
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.js:1:test\n");
@@ -483,6 +490,7 @@ describe("rg misc: preprocessing", () => {
 
 // 27. glob
 describe("rg misc: glob", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should filter by glob with -g", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -492,7 +500,7 @@ describe("rg misc: glob", () => {
         "/home/user/file.rs": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg -g '*.rs' Sherlock");
+    const result = await bash.exec("rg -n -g '*.rs' Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.rs:1:Sherlock\n");
   });
@@ -500,6 +508,7 @@ describe("rg misc: glob", () => {
 
 // 28. glob_negate
 describe("rg misc: glob_negate", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should negate glob with -g !", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -508,7 +517,7 @@ describe("rg misc: glob_negate", () => {
         "/home/user/file.rs": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg -g '!*.rs' Sherlock");
+    const result = await bash.exec("rg -n -g '!*.rs' Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.py:1:Sherlock\n");
   });
@@ -516,6 +525,7 @@ describe("rg misc: glob_negate", () => {
 
 // 29. glob_case_insensitive
 describe("rg misc: glob_case_insensitive", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should use case-insensitive glob matching with --iglob", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -524,7 +534,7 @@ describe("rg misc: glob_case_insensitive", () => {
         "/home/user/file2.html": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg --iglob '*.html' Sherlock");
+    const result = await bash.exec("rg -n --iglob '*.html' Sherlock");
     expect(result.exitCode).toBe(0);
     // Both files should match since iglob is case-insensitive
     expect(result.stdout).toBe(
@@ -535,6 +545,7 @@ describe("rg misc: glob_case_insensitive", () => {
 
 // 30. glob_case_sensitive
 describe("rg misc: glob_case_sensitive", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should use case-sensitive glob matching", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -543,7 +554,7 @@ describe("rg misc: glob_case_sensitive", () => {
         "/home/user/file2.html": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg --glob '*.html' Sherlock");
+    const result = await bash.exec("rg -n --glob '*.html' Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file2.html:1:Sherlock\n");
   });
@@ -551,6 +562,7 @@ describe("rg misc: glob_case_sensitive", () => {
 
 // 31. glob_always_case_insensitive
 describe("rg misc: glob_always_case_insensitive", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should make all globs case-insensitive with --glob-case-insensitive", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -560,7 +572,7 @@ describe("rg misc: glob_always_case_insensitive", () => {
       },
     });
     const result = await bash.exec(
-      "rg --glob-case-insensitive --glob '*.html' Sherlock",
+      "rg -n --glob-case-insensitive --glob '*.html' Sherlock",
     );
     expect(result.exitCode).toBe(0);
     // Both files should match
@@ -800,6 +812,7 @@ describe("rg misc: context_line_numbers", () => {
 
 // 47-52. max_filesize_*
 describe("rg misc: max_filesize", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should filter files by size with --max-filesize", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -809,11 +822,12 @@ describe("rg misc: max_filesize", () => {
       },
     });
     // Only small file should match
-    const result = await bash.exec("rg --max-filesize 50 Sherlock");
+    const result = await bash.exec("rg -n --max-filesize 50 Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("small.txt:1:Sherlock\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should accept K suffix for kilobytes", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -821,11 +835,12 @@ describe("rg misc: max_filesize", () => {
         "/home/user/test.txt": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg --max-filesize 1K Sherlock");
+    const result = await bash.exec("rg -n --max-filesize 1K Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("test.txt:1:Sherlock\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should accept M suffix for megabytes", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -833,7 +848,7 @@ describe("rg misc: max_filesize", () => {
         "/home/user/test.txt": "Sherlock\n",
       },
     });
-    const result = await bash.exec("rg --max-filesize 1M Sherlock");
+    const result = await bash.exec("rg -n --max-filesize 1M Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("test.txt:1:Sherlock\n");
   });
@@ -855,6 +870,7 @@ describe("rg misc: ignore_hidden", () => {
 
 // 54. no_ignore_hidden
 describe("rg misc: no_ignore_hidden", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should include hidden files with --hidden", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -862,7 +878,7 @@ describe("rg misc: no_ignore_hidden", () => {
         "/home/user/.sherlock": SHERLOCK,
       },
     });
-    const result = await bash.exec("rg --hidden Sherlock");
+    const result = await bash.exec("rg -n --hidden Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       ".sherlock:1:For the Doctor Watsons of this world, as opposed to the Sherlock\n.sherlock:3:be, to a very large extent, the result of luck. Sherlock Holmes\n",
@@ -918,6 +934,7 @@ describe("rg misc: ignore_ripgrep", () => {
 
 // 58. no_ignore
 describe("rg misc: no_ignore", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should ignore .gitignore with --no-ignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -926,7 +943,7 @@ describe("rg misc: no_ignore", () => {
         "/home/user/.gitignore": "sherlock\n",
       },
     });
-    const result = await bash.exec("rg --no-ignore Sherlock");
+    const result = await bash.exec("rg -n --no-ignore Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "sherlock:1:For the Doctor Watsons of this world, as opposed to the Sherlock\nsherlock:3:be, to a very large extent, the result of luck. Sherlock Holmes\n",
@@ -983,6 +1000,7 @@ describe("rg misc: symlink_follow", () => {
 
 // 66. unrestricted1
 describe("rg misc: unrestricted1", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should ignore .gitignore with -u", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -991,7 +1009,7 @@ describe("rg misc: unrestricted1", () => {
         "/home/user/.gitignore": "sherlock\n",
       },
     });
-    const result = await bash.exec("rg -u Sherlock");
+    const result = await bash.exec("rg -n -u Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "sherlock:1:For the Doctor Watsons of this world, as opposed to the Sherlock\nsherlock:3:be, to a very large extent, the result of luck. Sherlock Holmes\n",
@@ -1001,6 +1019,7 @@ describe("rg misc: unrestricted1", () => {
 
 // 67. unrestricted2
 describe("rg misc: unrestricted2", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should include hidden files with -uu", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1008,7 +1027,7 @@ describe("rg misc: unrestricted2", () => {
         "/home/user/.sherlock": SHERLOCK,
       },
     });
-    const result = await bash.exec("rg -uu Sherlock");
+    const result = await bash.exec("rg -n -uu Sherlock");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       ".sherlock:1:For the Doctor Watsons of this world, as opposed to the Sherlock\n.sherlock:3:be, to a very large extent, the result of luck. Sherlock Holmes\n",
@@ -1178,6 +1197,7 @@ describe("rg misc: type_list", () => {
 
 // 91. sort_files
 describe("rg misc: sort_files", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should sort files by path with --sort path", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1188,7 +1208,7 @@ describe("rg misc: sort_files", () => {
         "/home/user/dir/d": "test\n",
       },
     });
-    const result = await bash.exec("rg --sort path test");
+    const result = await bash.exec("rg -n --sort path test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "a:1:test\nb:1:test\ndir/c:1:test\ndir/d:1:test\n",

@@ -69,7 +69,8 @@ export function createDefaultOptions(): RgOptions {
   return {
     ignoreCase: false,
     caseSensitive: false,
-    smartCase: true,
+    // (1ctx) case-sensitive and no line numbers, as ripgrep when piped
+    smartCase: false,
     fixedStrings: false,
     wordRegexp: false,
     lineRegexp: false,
@@ -87,7 +88,7 @@ export function createDefaultOptions(): RgOptions {
     onlyMatching: false,
     // (1ctx) no limit; -m 0 selects nothing
     maxCount: -1,
-    lineNumber: true,
+    lineNumber: false,
     noFilename: false,
     withFilename: false,
     nullSeparator: false,
