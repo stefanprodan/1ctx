@@ -16,8 +16,8 @@ export type Secrets = {
   readonly dir: string;
   readonly mode: SecretsMode;
   // the bare value with surrounding whitespace removed, or null when the
-  // file is absent or empty, or larger than maxBytes, which is checked
-  // before the file is read
+  // file is absent, empty or not a regular file, or larger than maxBytes,
+  // which is checked before the file is read
   read(kind: string, name: string, maxBytes?: number): string | null;
   has(kind: string, name: string): boolean;
   // the names alone, so a page can offer a pick without a value
@@ -43,8 +43,11 @@ export function secrets(dir: string, mode: SecretsMode): Secrets {
     mode,
     read(kind, name, maxBytes = Number.POSITIVE_INFINITY) {
       const path = pathOf(kind, name);
-      const size = statSync(path, { throwIfNoEntry: false })?.size;
-      if (size === undefined || size > maxBytes) return null;
+      // a FIFO or a device sizes as 0 and could block the read
+      const stat = statSync(path, { throwIfNoEntry: false });
+      if (stat === undefined || !stat.isFile() || stat.size > maxBytes) {
+        return null;
+      }
       const value = readFileSync(path, "utf8").trim();
       return value === "" ? null : value;
     },

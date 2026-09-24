@@ -17,6 +17,7 @@ import {
   NetworkAccessDeniedError,
   type NetworkConfig,
   type SecureFetch,
+  type SecureFetchOptions,
 } from "just-bash";
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { urlPrefixes, type WebSnapshot } from "../../shared/web.ts";
@@ -32,7 +33,7 @@ const ALL_METHODS: HttpMethod[] = [
 ];
 
 // why a credential signs nothing in this command
-export type Refusal = "off" | "missing" | "unusable" | "deleted";
+export type Refusal = "off" | "missing" | "unusable" | "deleted" | "changed";
 
 // one credential of the send as a command sees it: the key read for this
 // command, or why it signs nothing. The key rides here and nowhere else
@@ -48,7 +49,39 @@ const REFUSALS: Record<Refusal, string> = {
   missing: "has no key",
   unusable: "has an unusable key",
   deleted: "was removed",
+  changed: "was changed since this send began",
 };
+
+// headers that pick where a server routes a request or what it does
+// with it, so a signed request could carry the key somewhere else
+const ROUTING_HEADERS = new Set([
+  "host",
+  "forwarded",
+  "x-forwarded-host",
+  "x-forwarded-for",
+  "x-forwarded-proto",
+  "x-original-url",
+  "x-rewrite-url",
+  "x-http-method-override",
+  "x-http-method",
+  "x-method-override",
+]);
+
+// a Host override reaches past Listed domains, so the web fetch refuses
+// the headers that name another host
+const HOST_HEADERS = new Set(["host", "forwarded", "x-forwarded-host"]);
+
+function headerNames(headers: SecureFetchOptions["headers"]): string[] {
+  if (headers === undefined) return [];
+  const names =
+    headers instanceof Headers ? [...headers.keys()] : Object.keys(headers);
+  return names.map((name) => name.toLowerCase());
+}
+
+const refusedHeader = (
+  headers: SecureFetchOptions["headers"],
+  refused: ReadonlySet<string>,
+): string | undefined => headerNames(headers).find((name) => refused.has(name));
 
 export function webNetwork(
   web: WebSnapshot,
@@ -70,11 +103,52 @@ export function webNetwork(
 
 type Secret = { key: string; label: string };
 
+const ALNUM = /[A-Za-z0-9]/;
+const UNRESERVED = /[A-Za-z0-9._~-]/;
+
+// a key as JSON encoders write it: `/` as `\/`, and the characters
+// they escape as \uXXXX in either case, so an API echoing it escaped
+// is caught too
+export function escapedForms(key: string): string[] {
+  const forms = new Set([key]);
+  const hex = (char: string, upper: boolean) => {
+    const code = char.charCodeAt(0).toString(16).padStart(4, "0");
+    return `\\u${upper ? code.toUpperCase() : code}`;
+  };
+  const encode = (
+    slash: boolean,
+    kept: RegExp | null,
+    upper: boolean,
+    html: boolean,
+  ) =>
+    [...key]
+      .map((char) => {
+        if (slash && char === "/") return "\\/";
+        if (kept !== null && !kept.test(char)) return hex(char, upper);
+        if (html && "<>&".includes(char)) return hex(char, upper);
+        if (char === '"' || char === "\\") return `\\${char}`;
+        return char;
+      })
+      .join("");
+  for (const slash of [false, true]) {
+    for (const upper of [false, true]) {
+      forms.add(encode(slash, null, upper, false));
+      forms.add(encode(slash, null, upper, true));
+      forms.add(encode(slash, UNRESERVED, upper, false));
+      forms.add(encode(slash, ALNUM, upper, false));
+    }
+  }
+  return [...forms];
+}
+
 function secretsOf(credentials: readonly CommandCredential[]): Secret[] {
   return credentials
     .flatMap((credential) =>
       "key" in credential
-        ? [{ key: credential.key, label: `[credential ${credential.name}]` }]
+        ? escapedForms(credential.key).map((key) => ({
+            key,
+            label: `[credential ${credential.name}]`,
+          }))
         : [],
     )
     .sort((a, b) => b.key.length - a.key.length);
@@ -202,6 +276,13 @@ export function commandFetch(
       );
       let result: FetchResult;
       if (credential === undefined) {
+        const header = refusedHeader(options.headers, HOST_HEADERS);
+        if (header !== undefined) {
+          throw new NetworkAccessDeniedError(
+            url,
+            `the ${header} header is not allowed`,
+          );
+        }
         webFetch ??= createSecureFetch(webNetwork(web, limits));
         result = await webFetch(url, options);
       } else if ("refused" in credential) {
@@ -210,6 +291,13 @@ export function commandFetch(
           `credential ${credential.name} ${REFUSALS[credential.refused]}`,
         );
       } else {
+        const header = refusedHeader(options.headers, ROUTING_HEADERS);
+        if (header !== undefined) {
+          throw new NetworkAccessDeniedError(
+            url,
+            `credential ${credential.name} refuses the ${header} header`,
+          );
+        }
         const method = (options.method ?? "GET").toUpperCase();
         if (!credential.methods.includes(method as HttpMethod)) {
           throw new Error(

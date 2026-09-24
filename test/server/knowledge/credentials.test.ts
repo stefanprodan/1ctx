@@ -391,3 +391,109 @@ test.serial(
     }
   },
 );
+
+test.serial(
+  "a signed request that sets a routing header is refused before it leaves",
+  async () => {
+    await withTransport(
+      () => new Response("ok"),
+      async (seen) => {
+        const fetch = commandFetch(ALL, [quotes()], limits);
+        const names = [
+          "Host",
+          "forwarded",
+          "X-Forwarded-Host",
+          "x-forwarded-for",
+          "X-Forwarded-Proto",
+          "x-original-url",
+          "X-Rewrite-Url",
+          "x-http-method-override",
+          "X-HTTP-Method",
+          "x-method-override",
+        ];
+        for (const name of names) {
+          for (const headers of [
+            { [name]: "attacker.example" },
+            new Headers({ [name]: "attacker.example" }),
+          ]) {
+            const refused = await fetch(`${PREFIX}q`, { headers }).catch(
+              (error) => error,
+            );
+            expect(refused.name).toBe("NetworkAccessDeniedError");
+            expect(refused.message).toBe(
+              `Network access denied: credential quotes refuses the ${name.toLowerCase()} header: ${PREFIX}q`,
+            );
+          }
+        }
+        expect(seen).toHaveLength(0);
+        await fetch(`${PREFIX}q`, { headers: { Accept: "text/plain" } });
+        expect(seen).toHaveLength(1);
+      },
+    );
+  },
+);
+
+test.serial("an unsigned request may not name another host", async () => {
+  await withTransport(
+    () => new Response("ok"),
+    async (seen) => {
+      for (const web of [ALL, LISTED]) {
+        const fetch = commandFetch(web, [quotes()], limits);
+        for (const name of ["Host", "Forwarded", "x-forwarded-host"]) {
+          const refused = await fetch("https://docs.example.test/", {
+            headers: new Headers({ [name]: "internal.example" }),
+          }).catch((error) => error);
+          expect(refused.message).toBe(
+            `Network access denied: the ${name.toLowerCase()} header is not allowed: https://docs.example.test/`,
+          );
+        }
+      }
+      expect(seen).toHaveLength(0);
+      const fetch = commandFetch(ALL, [quotes()], limits);
+      await fetch("https://docs.example.test/", {
+        headers: { "X-Forwarded-For": "10.0.0.1" },
+      });
+      expect(seen).toHaveLength(1);
+    },
+  );
+});
+
+test.serial("a key echoed JSON-escaped is redacted too", async () => {
+  const key = 'abc/def+ghi=jkl<01>&"23\\45';
+  const hex = (char: string) =>
+    `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+  const escaped = [
+    JSON.stringify(key).slice(1, -1),
+    JSON.stringify(key).slice(1, -1).replaceAll("/", "\\/"),
+    [...key].map((c) => (/[A-Za-z0-9]/.test(c) ? c : hex(c))).join(""),
+    [...key]
+      .map((c) => (/[A-Za-z0-9]/.test(c) ? c : hex(c).toUpperCase()))
+      .join("")
+      .replaceAll("\\U", "\\u"),
+    [...key].map((c) => (/[A-Za-z0-9._~-]/.test(c) ? c : hex(c))).join(""),
+    // Go's encoder: <, > and & as \u, the rest as JSON, / kept
+    JSON.stringify(key)
+      .slice(1, -1)
+      .replace(/[<>&]/g, (c) => hex(c)),
+  ];
+  await withTransport(
+    () =>
+      new Response(escaped.map((form) => `{"k":"${form}"}`).join("\n"), {
+        headers: { "x-echo": escaped[1]! },
+      }),
+    async () => {
+      const fetch = commandFetch(
+        ALL,
+        [quotes({ key, value: `Token ${key}` })],
+        limits,
+      );
+      const result = await fetch(`${PREFIX}echo`);
+      const body = text(result.body);
+      for (const form of escaped) expect(body).not.toContain(form);
+      expect(body.split("\n")).toEqual(
+        escaped.map(() => '{"k":"[credential quotes]"}'),
+      );
+      expect(result.headers["x-echo"]).toBe("[credential quotes]");
+    },
+  );
+});

@@ -9,6 +9,7 @@ import { headerValue, type KeyRead } from "../../credentials/index.ts";
 import {
   type CommandCredential,
   type KnowledgeCapability,
+  type Refusal,
   scrubKeys,
 } from "../../knowledge/index.ts";
 import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
@@ -17,7 +18,14 @@ import { domainWords } from "../web.ts";
 // what a command asks of the credentials area: the row as it is now and
 // the key its file holds now
 export type CredentialKeysPort = {
-  byId(id: string): { keyName: string; projectIds: string[] } | null;
+  byId(
+    id: string,
+  ):
+    | (Pick<
+        OfferedCredential,
+        "keyName" | "prefix" | "header" | "template" | "methods"
+      > & { projectIds: string[] })
+    | null;
   readKey(keyName: string): KeyRead;
 };
 
@@ -53,9 +61,21 @@ function networkWords(
   ].join(" ");
 }
 
+// a send signs only as its snapshot says, so a row moved under it, the
+// key file it names included, refuses until the next send
+const changed = (
+  snapshot: OfferedCredential,
+  row: NonNullable<ReturnType<CredentialKeysPort["byId"]>>,
+) =>
+  row.keyName !== snapshot.keyName ||
+  row.prefix !== snapshot.prefix ||
+  row.header !== snapshot.header ||
+  row.template !== snapshot.template ||
+  row.methods.join() !== snapshot.methods.join();
+
 // each credential as this command sees it: the row checked by id and the
 // key read now, so a replaced file applies to the next command and a
-// removed row refuses it
+// removed or changed row refuses it
 export function commandCredentials(
   credentials: BashCredentials,
   port: CredentialKeysPort | undefined,
@@ -63,7 +83,7 @@ export function commandCredentials(
 ): CommandCredential[] {
   const refused = (
     credential: { name: string; prefix: string },
-    why: "off" | "missing" | "unusable" | "deleted",
+    why: Refusal,
   ): CommandCredential => ({
     name: credential.name,
     prefix: credential.prefix,
@@ -75,6 +95,7 @@ export function commandCredentials(
       if (row === null || !row.projectIds.includes(projectId)) {
         return refused(credential, "deleted");
       }
+      if (changed(credential, row)) return refused(credential, "changed");
       const read = port!.readKey(row.keyName);
       if (!read.ok) return refused(credential, read.reason);
       return {

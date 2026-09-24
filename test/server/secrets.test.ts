@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { secrets } from "../../src/server/secrets/index.ts";
@@ -112,6 +118,25 @@ test("has checks existence, read treats an empty file as absent", () => {
     const missing = secrets(join(dir, "absent"), "local");
     expect(missing.list("mcp-")).toEqual([]);
     expect(() => missing.list("webhook-")).toThrow("bad secret kind");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("read answers null for anything but a regular file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "1ctx-secrets-"));
+  try {
+    mkdirSync(join(dir, "http-folder.key"));
+    const made = Bun.spawnSync(["mkfifo", join(dir, "http-pipe.key")]);
+    expect(made.exitCode).toBe(0);
+    symlinkSync(join(dir, "http-pipe.key"), join(dir, "http-linkpipe.key"));
+    writeFileSync(join(dir, "real.txt"), "k".repeat(20));
+    symlinkSync(join(dir, "real.txt"), join(dir, "http-linked.key"));
+    const store = secrets(dir, "local");
+    expect(store.read("http-", "http-folder", 100)).toBeNull();
+    expect(store.read("http-", "http-pipe", 100)).toBeNull();
+    expect(store.read("http-", "http-linkpipe", 100)).toBeNull();
+    expect(store.read("http-", "http-linked", 100)).toBe("k".repeat(20));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

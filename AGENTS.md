@@ -486,8 +486,9 @@ violation, and every rule has a rejected fixture under
   prefix, starting with a letter or digit. The secrets port checks the
   caller's kind on read, existence checks and listing; `compose.ts` binds
   each area's reader to its kind. `has()` checks existence; `read()`
-  returns null for an absent or empty file, and for one past its
-  `maxBytes`, sized before it is read: `main.ts` reads an `http-` file
+  returns null for an absent or empty file, one that is not a regular
+  file after links are followed, and one past its `maxBytes`, sized
+  before it is read: `main.ts` reads an `http-` file
   only up to `MAX_KEY_FILE_BYTES`. Values are never logged, returned by
   a route or stored in the database; `http-` joins `provider-`, `search-`
   and `mcp-` in both scrub lists (`SCRUB_KINDS` and `main.ts`), a key
@@ -523,9 +524,10 @@ violation, and every rule has a rejected fixture under
   empty without network (the admin's mode or the chat's `web` off),
   outside a project, for a personal project and in the memory phase.
   The bash tool, at each command with network, checks each row by id
-  (gone or unbound is `deleted`) and reads its key by the row's current
-  key name through `readKey()` (`missing`, `unusable`), so a replaced
-  file applies to the next command; the keys ride in the command caps as
+  (gone or unbound is `deleted`; a key name, prefix, header, template or
+  methods differing from the send's is `changed`) and reads its key by
+  the key name through `readKey()` (`missing`, `unusable`), so a
+  replaced file applies to the next command; the keys ride in the command caps as
   `CommandCredential`s and nowhere else, and the tool scrubs its result
   of them again, the tail kept apart. `knowledge/credentials.ts` builds
   the `SecureFetch` the mount passes as just-bash's `fetch`:
@@ -537,9 +539,13 @@ violation, and every rule has a rejected fixture under
   redirect off the prefix, to http or to another credential is refused,
   an unsigned request redirected into a prefix stays unsigned, and a
   prefix is reached in listed mode without its host. An off, keyless,
-  unusable or removed credential and a method it lacks are refused by
-  its name before anything is sent, never the key file. Each fetch is
-  made on first use. Every key the command read is replaced by
+  unusable, removed or changed credential, a method it lacks and a
+  routing header the command sets (`ROUTING_HEADERS`: host, forwarded,
+  the `x-forwarded-*`, URL rewrite and method override headers) are
+  refused by its name before anything is sent, never the key file; the
+  web fetch refuses `host`, `forwarded` and `x-forwarded-host`. Each fetch is
+  made on first use. Every key the command read, and its JSON-escaped
+  forms (`escapedForms()`: `\/`, `\u` in either case), is replaced by
   `[credential <name>]` in the result as bytes (body, header values,
   status text, final URL), a header whose name holds one is dropped,
   `content-length` follows a changed body and a body grown past the cap

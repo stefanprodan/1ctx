@@ -13,7 +13,10 @@ import {
 } from "../../../src/server/knowledge/queue.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
-import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
+import {
+  commandCredentials,
+  makeBashTool,
+} from "../../../src/server/tools/builtin/bash.ts";
 import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
@@ -379,9 +382,9 @@ describe("bash with credentials", () => {
 
   test("each command checks the row and reads the key, and scrubs the result", async () => {
     const rows = new Map([
-      ["quotes1", { keyName: "http-quotes", projectIds: ["project"] }],
-      ["gone1", { keyName: "http-gone", projectIds: ["project"] }],
-      ["other1", { keyName: "http-quotes", projectIds: ["elsewhere"] }],
+      ["quotes1", { ...quotes, projectIds: ["project"] }],
+      ["gone1", { ...quotes, keyName: "http-gone", projectIds: ["project"] }],
+      ["other1", { ...quotes, projectIds: ["elsewhere"] }],
     ]);
     const reads = new Map([
       ["http-quotes", { ok: true as const, key: KEY }],
@@ -404,7 +407,7 @@ describe("bash with credentials", () => {
       {
         offered: [
           quotes,
-          { ...quotes, id: "gone1", name: "gone" },
+          { ...quotes, id: "gone1", name: "gone", keyName: "http-gone" },
           { ...quotes, id: "other1", name: "other" },
           { ...quotes, id: "deleted1", name: "deleted" },
         ],
@@ -443,6 +446,45 @@ describe("bash with credentials", () => {
         refused: "off",
       },
     ]);
+  });
+
+  test("a row changed since the send began refuses its credential", async () => {
+    const moved = {
+      keyName: { keyName: "http-other" },
+      prefix: { prefix: "https://evil.example.test/" },
+      header: { header: "X-Other" },
+      template: { template: "Bearer {key}" },
+      methods: { methods: ["GET" as const, "POST" as const] },
+    };
+    const reads: string[] = [];
+    for (const [field, change] of Object.entries(moved)) {
+      const [credential] = commandCredentials(
+        { offered: [quotes], off: [] },
+        {
+          byId: () => ({ ...quotes, ...change, projectIds: ["project"] }),
+          readKey: (name) => {
+            reads.push(name);
+            return { ok: true, key: KEY };
+          },
+        },
+        "project",
+      );
+      expect(credential, field).toEqual({
+        name: "quotes",
+        prefix: quotes.prefix,
+        refused: "changed",
+      });
+    }
+    expect(reads).toEqual([]);
+    const [same] = commandCredentials(
+      { offered: [quotes], off: [] },
+      {
+        byId: () => ({ ...quotes, projectIds: ["project"] }),
+        readKey: () => ({ ok: true, key: `${KEY}-new` }),
+      },
+      "project",
+    );
+    expect(same).toMatchObject({ key: `${KEY}-new` });
   });
 
   test("a command without network reads no key", async () => {
