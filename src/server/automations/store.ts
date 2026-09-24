@@ -156,6 +156,17 @@ export class AutomationStore {
       .get(after, after)!.next_at;
   }
 
+  // every row, and those not suspended whose fire was due by dueBy
+  tally(dueBy: number): { total: number; waiting: number } {
+    return this.db
+      .query<{ total: number; waiting: number }, [number]>(
+        `select count(*) as total,
+                coalesce(sum(suspended_at is null and next_at <= ?), 0) as waiting
+           from automations`,
+      )
+      .get(dueBy)!;
+  }
+
   count(projectId: string): number {
     return this.db
       .query<{ n: number }, [string]>(

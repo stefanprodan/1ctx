@@ -4,7 +4,7 @@
 // One read at a time per key, its answer kept a minute on the clock
 // port: a request while a read runs waits for that read, one inside
 // the minute gets the kept answer, and a failed read keeps nothing.
-// The storage scan has one key; the overview a key per zone and range.
+// The storage scan has one key; the overview a key per zone.
 // Expired answers go on every get, and past MAX_KEPT keys the oldest.
 
 import type { Clock } from "../lib/clock.ts";

@@ -1,10 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The storage route takes the caller's zone and nothing else, the
-// overview route the zone and its range; anything unexpected is a 400.
+// The storage and the overview routes take the caller's zone and
+// nothing else, the load route nothing; anything unexpected is a 400.
 
-import { OVERVIEW_RANGES, type OverviewRange } from "../../shared/api/admin.ts";
 import { isTimeZone } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -31,21 +30,13 @@ function zone(url: URL): string {
     .timeZone;
 }
 
-export function parseStorageQuery(url: URL): string {
+// the storage and the overview routes take the zone and nothing else
+export function parseZoneQuery(url: URL): string {
   only(url, ["tz"]);
   return zone(url);
 }
 
-export function parseOverviewQuery(url: URL): {
-  timeZone: string;
-  days: OverviewRange;
-} {
-  only(url, ["tz", "days"]);
-  const timeZone = zone(url);
-  const raw = one(url, "days");
-  const days = OVERVIEW_RANGES.find((range) => String(range) === raw);
-  if (days === undefined) {
-    throw new BadRequest(`days must be one of ${OVERVIEW_RANGES.join(", ")}`);
-  }
-  return { timeZone, days };
+// the load is the process's, in no zone
+export function parseLoadQuery(url: URL): void {
+  only(url, []);
 }

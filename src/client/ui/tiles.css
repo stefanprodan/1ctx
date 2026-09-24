@@ -45,6 +45,9 @@
   .tiles-meter-fill {
     background: var(--heat-3);
   }
+  .tiles-meter-full {
+    background: var(--failed);
+  }
   .tiles-ghost {
     pointer-events: none;
   }

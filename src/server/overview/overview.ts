@@ -1,49 +1,46 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The overview answer from one range read: the quarter hours laid on
-// the zone's days, the last `days` as the days and the same number
-// before them summed as before, the ten largest rows of each
-// breakdown, the ten models with the most sends, and the instance. The
-// pools and the sockets come from the caller, read at each request.
+// The overview answer from one read: the quarter hours laid on the
+// zone's days, their totals, the ten largest rows of each breakdown,
+// the ten models with the most turns, all time and the instance.
 
-import type {
-  ModelHealth,
-  OverviewDay,
-  OverviewRange,
-  OverviewResponse,
-  OverviewTotals,
-  UsageBy,
-  UsageRow,
+import {
+  OVERVIEW_DAYS,
+  type OverviewDay,
+  type OverviewResponse,
+  type OverviewTotals,
+  type TurnLength,
+  USAGE_BY,
+  type UsageBy,
+  type UsageRow,
 } from "../../shared/api/admin.ts";
-import { USAGE_BY } from "../../shared/api/admin.ts";
 import { daysWindow, type UsageWindow } from "../usage/index.ts";
-import type { GroupRow, ModelRow, RangeResult } from "./range.ts";
+import type {
+  GroupRow,
+  ModelRow,
+  RangeResult,
+  SendSlot,
+  UsageSlot,
+} from "./range.ts";
 import { SLOT_MS } from "./range.ts";
 
 const TOP = 10;
-
-export type Now = OverviewResponse["now"];
 
 export type Instance = Pick<
   OverviewResponse["instance"],
   "version" | "startedAt"
 >;
 
-// the range's bounds in the zone: the days, and the same number before
-export function rangeWindow(
-  now: number,
-  timeZone: string,
-  days: OverviewRange,
-): UsageWindow {
-  return daysWindow(now, timeZone, days * 2);
-}
+// the days' bounds in the zone
+export const daysOf = (now: number, timeZone: string): UsageWindow =>
+  daysWindow(now, timeZone, OVERVIEW_DAYS);
 
-type Bucket = OverviewTotals;
-
-const bucket = (): Bucket => ({
-  sends: 0,
-  failed: 0,
+const empty = (): OverviewTotals => ({
+  turns: 0,
+  turnsFailed: 0,
+  runs: 0,
+  runsFailed: 0,
   promptTokens: 0,
   cachedTokens: 0,
   completionTokens: 0,
@@ -52,18 +49,48 @@ const bucket = (): Bucket => ({
   cost: null,
 });
 
-const addCost = (into: Bucket, priced: number, cost: number | null) => {
-  into.pricedRounds += priced;
-  if (priced > 0) into.cost = (into.cost ?? 0) + (cost ?? 0);
+const addSends = (into: OverviewTotals, row: Omit<SendSlot, "slot">) => {
+  into.turns += row.turns;
+  into.turnsFailed += row.turnsFailed;
+  into.runs += row.runs;
+  into.runsFailed += row.runsFailed;
 };
+
+type Usage = Pick<
+  OverviewTotals,
+  | "promptTokens"
+  | "cachedTokens"
+  | "completionTokens"
+  | "rounds"
+  | "pricedRounds"
+  | "cost"
+>;
+
+const addUsage = (into: OverviewTotals, row: Usage) => {
+  into.promptTokens += row.promptTokens;
+  into.cachedTokens += row.cachedTokens;
+  into.completionTokens += row.completionTokens;
+  into.rounds += row.rounds;
+  into.pricedRounds += row.pricedRounds;
+  if (row.pricedRounds > 0) into.cost = (into.cost ?? 0) + (row.cost ?? 0);
+};
+
+const usageOf = (row: Omit<UsageSlot, "slot">): Usage => ({
+  promptTokens: row.prompt,
+  cachedTokens: row.cached,
+  completionTokens: row.completion,
+  rounds: row.rounds,
+  pricedRounds: row.priced,
+  cost: row.cost,
+});
 
 // each slot's row onto the day it falls in; a slot before the window
 // is skipped, one past it ends the walk
 function lay<T extends { slot: number }>(
   rows: T[],
   bounds: number[],
-  add: (into: Bucket, row: T) => void,
-  buckets: Bucket[],
+  add: (into: OverviewTotals, row: T) => void,
+  buckets: OverviewTotals[],
 ): void {
   let day = 0;
   for (const row of rows) {
@@ -75,70 +102,49 @@ function lay<T extends { slot: number }>(
   }
 }
 
-function sum(buckets: Bucket[]): OverviewTotals {
-  const total = bucket();
-  for (const b of buckets) {
-    total.sends += b.sends;
-    total.failed += b.failed;
-    total.promptTokens += b.promptTokens;
-    total.cachedTokens += b.cachedTokens;
-    total.completionTokens += b.completionTokens;
-    total.rounds += b.rounds;
-    addCost(total, b.pricedRounds, b.cost);
-  }
-  return total;
-}
-
 function days(
   result: RangeResult,
   window: UsageWindow,
-  count: OverviewRange,
-): Pick<OverviewResponse, "days" | "totals" | "before"> {
+): Pick<OverviewResponse, "days" | "totals"> {
   const bounds = [...window.starts, window.until];
-  const buckets = Array.from({ length: bounds.length - 1 }, bucket);
-  lay(
-    result.sends,
-    bounds,
-    (into, row) => {
-      into.sends += row.sends;
-      into.failed += row.failed;
-    },
-    buckets,
-  );
+  const buckets = window.starts.map(empty);
+  lay(result.sends, bounds, addSends, buckets);
   lay(
     result.usage,
     bounds,
-    (into, row) => {
-      into.promptTokens += row.prompt;
-      into.cachedTokens += row.cached;
-      into.completionTokens += row.completion;
-      into.rounds += row.rounds;
-      addCost(into, row.priced, row.cost);
-    },
+    (into, row) => addUsage(into, usageOf(row)),
     buckets,
   );
-  const own = buckets.slice(count);
+  const totals = empty();
+  for (const b of buckets) {
+    addSends(totals, b);
+    addUsage(totals, b);
+  }
   return {
-    days: window.days.slice(count).map(
+    days: window.days.map(
       (label, i): OverviewDay => ({
         day: label,
-        start: window.starts[count + i]!,
-        sends: own[i]!.sends,
-        failed: own[i]!.failed,
-        promptTokens: own[i]!.promptTokens,
-        cachedTokens: own[i]!.cachedTokens,
-        completionTokens: own[i]!.completionTokens,
+        start: window.starts[i]!,
+        turns: buckets[i]!.turns,
+        turnsFailed: buckets[i]!.turnsFailed,
+        runs: buckets[i]!.runs,
+        runsFailed: buckets[i]!.runsFailed,
+        promptTokens: buckets[i]!.promptTokens,
+        cachedTokens: buckets[i]!.cachedTokens,
+        completionTokens: buckets[i]!.completionTokens,
+        cost: buckets[i]!.cost,
       }),
     ),
-    totals: sum(own),
-    before: sum(buckets.slice(0, count)),
+    totals,
   };
 }
 
 const top = (rows: GroupRow[]): UsageRow[] =>
   rows
-    .filter((row) => row.tokens > 0 || row.sends > 0)
-    .sort((a, b) => b.tokens - a.tokens || b.sends - a.sends)
+    .filter((row) => row.tokens > 0 || row.turns > 0 || row.runs > 0)
+    .sort(
+      (a, b) => b.tokens - a.tokens || b.turns + b.runs - (a.turns + a.runs),
+    )
     .slice(0, TOP)
     .map(({ key: _key, ...row }) => row);
 
@@ -157,29 +163,32 @@ export function median(values: number[]): number | null {
     : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
-const health = (row: ModelRow): ModelHealth => ({
+const length = (row: ModelRow): TurnLength => ({
   provider: row.provider,
   model: row.model,
-  sends: row.sends,
-  failed: row.failed,
+  turns: row.turns,
   medianMs: median(row.lengths),
   slowestMs: row.lengths.length === 0 ? null : Math.max(...row.lengths),
-  medianRounds: median(row.rounds),
 });
+
+function allTime(result: RangeResult): OverviewResponse["all"] {
+  const all = { ...empty(), since: result.all.since };
+  addSends(all, result.all);
+  addUsage(all, usageOf(result.all));
+  return all;
+}
 
 export function overviewResponse(
   result: RangeResult,
   window: UsageWindow,
-  count: OverviewRange,
-  now: Now,
   instance: Instance,
 ): OverviewResponse {
   return {
     readAt: result.readAt,
-    ...days(result, window, count),
-    now,
+    ...days(result, window),
     by: by(result),
-    models: result.models.slice(0, TOP).map(health),
+    lengths: result.models.slice(0, TOP).map(length),
+    all: allTime(result),
     instance: { ...instance, ...result.instance },
   };
 }

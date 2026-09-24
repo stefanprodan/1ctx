@@ -7,6 +7,7 @@
 // flags; the test helper calls it with a memory db and a fake clock,
 // so a test exercises the wiring the binary runs.
 
+import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
 import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
@@ -358,6 +359,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       chatsCap: runner.registry.chatsCap,
     }),
     online: () => socket.online(),
+    automations: () => automations.store.tally(clock() - WAIT_GRACE_MS),
     // built here, at the compile root, so the binary finds its entry
     worker: new URL("./overview/scan.worker.ts", import.meta.url),
   });
@@ -367,6 +369,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     await users.bootstrap();
     repaired = sessions.repair();
     reconciled = automations.start();
+    overview.start();
   }
   const routes: RouteDescriptor[] = [
     ...users.routes,

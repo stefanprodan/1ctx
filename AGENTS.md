@@ -146,24 +146,31 @@ and passes it in. `cache.ts` keeps one read in flight per key and its
 answer a minute on the clock port; a failed read keeps nothing, is a
 warning (`storage scan failed`, `overview read failed`) and the
 router's 500.
-`GET /api/admin/overview?tz=&days=7|30|90` (`admin`, both parameters
-once, `days` one of `OVERVIEW_RANGES`) answers `OverviewResponse`: the
-range's days in the zone, today last, their totals and the same number
-of days before, the sends running now, the ten largest rows of each
-breakdown, the ten models with the most sends, and the instance.
-`range.ts` is the worker's second job, one read transaction over the
-same connection: sends by `started_at` and tokens, rounds and cost by
-`usage.created_at`, summed by quarter hour and laid on the zone's days
-in `overview.ts`; a breakdown sums tokens from `usage` and sends from
-`sends` apart and joins them by key, so a send of many rounds counts
-once; a model's median and slowest length and median rounds are over
-its ended sends. The range is kept a minute per zone and range. `now`
-(the pools from `runner.registry.running()` and `chatsCap`, `runsCap`
-the current `runsRunning`, `online` the users with a socket through a
-port to `web/`) and the version and start `compose.ts` passes are
-read at every request, never kept. A personal project and its tasks
-are counted and never named: `id` and `name` null, `owner` its
-owner.
+`GET /api/admin/overview?tz=` (`admin`, one `tz`) answers
+`OverviewResponse`: the zone's last `OVERVIEW_DAYS` days, today last,
+and their totals, a chat's sends counted as turns and a task's as runs
+apart, the ten largest projects and agents, the ten models with the
+most turns and their median and slowest ended turn, all time with the
+first send's start, and the instance. `range.ts` is the worker's second
+job, one read transaction over the same connection: sends by
+`started_at` and tokens, rounds and cost by `usage.created_at`, summed
+by quarter hour and laid on the zone's days in `overview.ts`; a
+breakdown sums tokens from `usage` and sends from `sends` apart and
+joins them by key, so a send of many rounds counts once. The answer is
+kept a minute per zone. A personal project is counted and never named:
+`id` and `name` null, `owner` its owner.
+`GET /api/admin/load` (`admin`, no parameter) is read from memory at
+every request, never kept: the pools from `runner.registry.running()`
+and `chatsCap`, `runsCap` the current `runsRunning`, `online` the users
+with a socket through a port to `web/`, the automations and those due
+past `WAIT_GRACE_MS` through a port to their store, and `load.ts`'s
+ring of `LOAD_SAMPLES` samples taken every `LOAD_SAMPLE_MS` from start:
+the process's CPU over `availableParallelism()` cores and its `rss`
+against `process.constrainedMemory()`, `contained` when that is below
+the host's memory, sampled only once `compose()` activates the app.
+While the Overview is on screen and the tab is seen, `watchOverview()`
+in `data/overview.ts` polls it one request at a time and reads the
+overview again once a minute; the page has no Refresh.
 
 `provision/` is the CLI-only area after `automations/` and before
 `web/`. `1ctx provision -f <file|dir|->` combines YAML inputs, validates
@@ -1388,8 +1395,8 @@ violation, and every rule has a rejected fixture under
   problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
   words, and left out when the server did not answer.
 - **A dashboard is a board, not rows.** The admin's Overview
-  (`/admin`, the Admin group's first entry, its range 7, 30 or 90 days
-  on the address as `?days=`) and Storage (`/admin/storage`) are
+  (`/admin`, the Admin group's first entry: rows Now, Last 30 days and
+  All time) and Storage (`/admin/storage`) are
   `ui/Tiles.tsx` (stat tiles, the figure at `--text-figure`) over
   `ui/Chart.tsx` panels in a grid: `ChartPanel` wears the Rows card
   head, `Bars` rank from one baseline in CSS, `Stack` splits a whole,
@@ -1397,11 +1404,13 @@ violation, and every rule has a rejected fixture under
   tile and `DayBars` stacked with a key and a table for a screen
   reader; a plot is made on mount, fed by a second effect,
   its colours tokens read at every draw, and tiles share their cursor
-  by sync key. The head is `ui/Loaded.tsx` (when the answer was read,
-  Refresh). A first load draws the board in `ui/Bones.tsx` bones at
-  the loaded sizes, never a Loading line; a later load keeps the last
-  answer faded until the next lands. `data/overview.ts` loads both on
-  arrival and on Refresh, never polled.
+  by sync key. Storage's head is `ui/Loaded.tsx` (when the answer was
+  read, Refresh). A first load draws the board in `ui/Bones.tsx` bones
+  at the loaded sizes, never a Loading line; a later Storage load keeps
+  the last answer faded until the next lands. `data/overview.ts` loads
+  Storage on arrival and on Refresh. The Overview keeps itself current
+  and has no head actions: a failed read keeps a row's last answer
+  faded, its head saying since when in the failed colour.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

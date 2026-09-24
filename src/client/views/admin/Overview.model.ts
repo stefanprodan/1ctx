@@ -1,23 +1,28 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Overview's words and numbers, pure: the tiles' figures and lines,
-// a day's words, the bars of a breakdown and of the models, and the
-// instance's line.
+// The Overview's words and numbers, pure: the Now tiles from the load,
+// the last 30 days' tiles and a day's words, the bars of a breakdown
+// and of the turn lengths, all time, and the faint lines. A chat's send
+// is a turn and a task's a run; "send" is never shown.
 
 import type {
-  ModelHealth,
+  LoadResponse,
   OverviewDay,
   OverviewResponse,
   OverviewTotals,
+  TurnLength,
   UsageBy,
   UsageRow,
 } from "../../../shared/api/admin.ts";
-import { count, elapsed } from "../../lib/format.ts";
-import { dayWord, share, size } from "./Storage.model.ts";
+import { clock, count, dayMonth, elapsed } from "../../lib/format.ts";
+import { commas, share, size, sizeParts } from "./Storage.model.ts";
 
 const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
+  `${commas(n)} ${n === 1 ? one : many}`;
+
+// a container's memory past this share is marked
+export const MEMORY_FULL = 0.8;
 
 // "$4.12", "<$0.01" for a cost that is there but under a cent
 export function money(n: number): string {
@@ -30,114 +35,180 @@ export const tokensOf = (t: {
   completionTokens: number;
 }): number => t.promptTokens + t.completionTokens;
 
-// against the range before: "+12% on the 30 days before", or what
-// there was when a share would mislead
-export function change(now: number, before: number, days: number): string {
-  const range = `the ${days} days before`;
-  if (before === 0) return now === 0 ? `none ${range} either` : `none ${range}`;
-  const delta = Math.round(((now - before) / before) * 100);
-  if (delta === 0) return `same as ${range}`;
-  return `${delta > 0 ? "+" : ""}${delta}% on ${range}`;
-}
-
-// the sends tile's line: the failed share, then the change
-export function sendsLine(
-  totals: OverviewTotals,
-  before: OverviewTotals,
-  days: number,
-): string {
-  const failed =
-    totals.failed === 0
-      ? "none failed"
-      : `${share(totals.failed, totals.sends)} failed`;
-  return `${failed} · ${change(totals.sends, before.sends, days)}`;
-}
-
-// the tokens tile's line: how much of the prompt a cache served
-export function cachedLine(totals: OverviewTotals): string {
-  if (totals.promptTokens === 0) return "no prompt tokens";
-  return `${share(totals.cachedTokens, totals.promptTokens)} of the prompt cached`;
-}
-
-// the cost tile: never $0 for a range no provider priced
-export function costTile(totals: OverviewTotals) {
-  if (totals.cost === null) {
-    return {
-      figure: "None",
-      sub:
-        totals.rounds === 0
-          ? "no rounds in the range"
-          : "no provider reported a cost",
-    };
-  }
-  return {
-    figure: money(totals.cost),
-    sub: `${plural(totals.pricedRounds, "round", "rounds")} of ${totals.rounds.toLocaleString("en-GB")} priced`,
-  };
-}
-
-// the running tile: its figure, its line and its meter
-export function runningTile(now: OverviewResponse["now"]) {
-  const running = now.chats + now.runs;
-  const caps = now.chatsCap + now.runsCap;
+// a pool's tile: the sends running against the process's cap
+function pool(running: number, cap: number, sub: string) {
   return {
     figure: String(running),
-    unit: running === 1 ? "send" : "sends",
-    sub: `${plural(now.chats, "chat", "chats")} of ${now.chatsCap} · ${plural(now.runs, "run", "runs")} of ${now.runsCap} · ${now.online} online`,
-    share: caps > 0 ? running / caps : 0,
+    unit: `/ ${cap} slots`,
+    sub,
+    share: cap > 0 ? running / cap : 0,
+    full: cap > 0 && running >= cap,
   };
 }
 
-// the words of a day under the cursor
-export function dayLine(day: OverviewDay): string {
-  const tokens = tokensOf(day);
-  const parts = [dayWord(day.start), `${count(tokens)} tokens`];
+export const chatTile = (load: LoadResponse) =>
+  pool(
+    load.chats,
+    load.chatsCap,
+    plural(load.online, "user online", "users online"),
+  );
+
+export const automationsTile = (load: LoadResponse) =>
+  pool(
+    load.runs,
+    load.runsCap,
+    [
+      plural(load.automations, "automation", "automations"),
+      ...(load.waiting > 0 ? [`${load.waiting} waiting`] : []),
+    ].join(" · "),
+  );
+
+export const percent = (cpu: number): string => `${Math.round(cpu * 100)}%`;
+
+export function cpuTile(load: LoadResponse) {
+  return {
+    figure: percent(load.samples.cpu.at(-1) ?? 0),
+    sub: `of ${plural(load.cores, "core", "cores")}`,
+  };
+}
+
+// memory against the host's, or a container's limit with a meter
+export function memoryTile(load: LoadResponse) {
+  const rss = load.samples.rss.at(-1) ?? 0;
+  const parts = sizeParts(rss);
+  const used = load.memoryLimit > 0 ? rss / load.memoryLimit : 0;
+  return {
+    figure: parts.figure,
+    unit: parts.unit,
+    sub: load.contained
+      ? `of ${size(load.memoryLimit)} limit`
+      : `of ${size(load.memoryLimit)}`,
+    share: used,
+    full: load.contained && used >= MEMORY_FULL,
+  };
+}
+
+// a sample under the cursor: "11:32 · 4%"
+export const sampleLine = (at: number, words: string): string =>
+  `${clock(at)} · ${words}`;
+
+// The memory line's scale: the window's lowest to highest with room
+// around it, so a steady process draws through the middle and a climb
+// leaves the top; a flat window gets 2% either side.
+export function zoomed(min: number, max: number): [number, number] {
+  const pad = Math.max((max - min) * 0.3, max * 0.02);
+  return [Math.max(0, min - pad), max + pad];
+}
+
+// a row whose read failed: since when its numbers are, or that there
+// are none yet
+export const staleWords = (at: number | null): string =>
+  at === null ? "Did not load" : `Not updated since ${clock(at)}`;
+
+// "1% failed", or that there was none
+function failedLine(failed: number, of: number): string {
+  if (of === 0) return "none yet";
+  return failed === 0 ? "none failed" : `${share(failed, of)} failed`;
+}
+
+const onDay = (day: OverviewDay, words: string) =>
+  `${dayMonth(day.start)} · ${words}`;
+
+const failedOn = (failed: number) => (failed > 0 ? ` · ${failed} failed` : "");
+
+export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
+  return {
+    figure: commas(totals.turns),
+    unit: totals.turns === 1 ? "turn" : "turns",
+    sub: at
+      ? onDay(at, plural(at.turns, "turn", "turns") + failedOn(at.turnsFailed))
+      : failedLine(totals.turnsFailed, totals.turns),
+  };
+}
+
+export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
+  return {
+    figure: commas(totals.runs),
+    unit: totals.runs === 1 ? "run" : "runs",
+    sub: at
+      ? onDay(at, plural(at.runs, "run", "runs") + failedOn(at.runsFailed))
+      : failedLine(totals.runsFailed, totals.runs),
+  };
+}
+
+// how much of the input a cache served
+export function cachedLine(t: OverviewTotals): string {
+  if (t.promptTokens === 0) return "none yet";
+  return `${share(t.cachedTokens, t.promptTokens)} cached`;
+}
+
+export function tokensTile(totals: OverviewTotals, at: OverviewDay | null) {
+  return {
+    figure: count(tokensOf(totals)),
+    sub: at ? onDay(at, count(tokensOf(at))) : cachedLine(totals),
+  };
+}
+
+// the cost: never $0 where no provider priced a round
+export function costWords(t: OverviewTotals) {
+  if (t.rounds === 0) return { figure: "None", sub: "none yet" };
+  if (t.cost === null) return { figure: "None", sub: "no provider priced" };
+  return {
+    figure: money(t.cost),
+    sub: `${commas(t.pricedRounds)} of ${commas(t.rounds)} priced`,
+  };
+}
+
+export function costTile(totals: OverviewTotals, at: OverviewDay | null) {
+  const words = costWords(totals);
+  return at && totals.cost !== null
+    ? { ...words, sub: onDay(at, money(at.cost ?? 0)) }
+    : words;
+}
+
+// the tokens chart's hint, at rest and on a day
+export const tokensHint = (t: OverviewTotals): string =>
+  `${count(tokensOf(t))} tokens`;
+
+export function dayTokensHint(day: OverviewDay): string {
+  const parts = [dayMonth(day.start), `${count(tokensOf(day))} tokens`];
   if (day.promptTokens > 0) {
     parts.push(`${share(day.cachedTokens, day.promptTokens)} cached`);
   }
-  parts.push(plural(day.sends, "send", "sends"));
-  if (day.failed > 0) parts.push(`${day.failed} failed`);
   return parts.join(" · ");
 }
 
-// the range's words when no day is under the cursor
-export function rangeLine(totals: OverviewTotals): string {
-  return `${count(tokensOf(totals))} tokens · ${plural(totals.sends, "send", "sends")}`;
-}
-
-// A breakdown's row as a bar: its name (a personal project's owner,
-// never its name), its tokens and share of the range, and the hint.
-export function usageBars(kind: UsageBy, rows: UsageRow[], total: number) {
+// A breakdown's row as a bar: a personal project by its owner, a team
+// project by its name, an agent in mono. The hint says only what the
+// bar does not: the share and what ran.
+export function usageBars(kind: UsageBy, rows: UsageRow[]) {
+  const total = rows.reduce((sum, row) => sum + row.tokens, 0);
   return rows.map((row, i) => {
-    const personal = row.owner !== null;
-    const named = row.name ?? "";
-    const name = personal
-      ? kind === "tasks"
-        ? `a task of @${row.owner}`
-        : `personal of @${row.owner}`
-      : kind === "models"
-        ? shortModel(named)
-        : named;
+    const name =
+      row.owner !== null
+        ? `@${row.owner}`
+        : kind === "projects"
+          ? `#${row.name ?? ""}`
+          : (row.name ?? "");
     const hint = [
-      row.sub && !personal ? `${named} · ${row.sub}` : name,
-      `${count(row.tokens)} tokens, ${share(row.tokens, total)}`,
-      plural(row.sends, "send", "sends"),
-      ...(row.failed > 0 ? [`${row.failed} failed`] : []),
-      ...(row.cost !== null ? [money(row.cost)] : []),
+      share(row.tokens, total),
+      ...(row.turns > 0 || row.runs === 0
+        ? [plural(row.turns, "turn", "turns")]
+        : []),
+      ...(row.runs > 0 ? [plural(row.runs, "run", "runs")] : []),
     ].join(" · ");
     return {
       key: row.id ?? `${row.owner ?? "row"}-${i}`,
       name,
-      mono: kind !== "users" && !personal,
+      mono: kind === "agents",
       value: row.tokens,
-      tokens: count(row.tokens),
-      share: share(row.tokens, total),
+      label: count(row.tokens),
       hint,
     };
   });
 }
 
-// a send's length: "41s", "3m 20s", "1h 5m"
+// a turn's length: "41s", "3m 20s", "1h 5m"
 export function lengthWord(ms: number): string {
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -150,49 +221,67 @@ export function lengthWord(ms: number): string {
 }
 
 // A model without its org, as the agent rows show it, unless what is
-// left is a bare word ("openrouter/free"); the hint carries the whole.
+// left is a bare word ("openrouter/free").
 export function shortModel(model: string): string {
   const rest = model.slice(model.lastIndexOf("/") + 1);
   return /[\d-]/.test(rest) ? rest : model;
 }
 
-// the models by their median send, with what else they did in the hint
-export function modelBars(models: ModelHealth[]) {
-  return models.map((m) => {
-    const hint = [
-      `${m.model} · ${m.provider}`,
-      plural(m.sends, "send", "sends"),
-      m.failed > 0 ? `${share(m.failed, m.sends)} failed` : "none failed",
+// the models by their median turn, the turns and the slowest the hint
+export function lengthBars(lengths: TurnLength[]) {
+  return lengths.map((m) => ({
+    key: `${m.provider}/${m.model}`,
+    name: shortModel(m.model),
+    value: m.medianMs ?? 0,
+    label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
+    hint: [
+      plural(m.turns, "turn", "turns"),
       ...(m.slowestMs !== null ? [`slowest ${lengthWord(m.slowestMs)}`] : []),
-      ...(m.medianRounds !== null
-        ? [`median ${plural(m.medianRounds, "round", "rounds")}`]
-        : []),
-    ].join(" · ");
-    return {
-      key: `${m.provider}/${m.model}`,
-      name: shortModel(m.model),
-      value: m.medianMs ?? 0,
-      label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
-      hint,
-    };
-  });
+    ].join(" · "),
+  }));
 }
 
-// the instance in one line; the database's size is its own link
-export function instanceLine(
-  instance: OverviewResponse["instance"],
-  now: number,
-): string {
+// all time's four figures
+export function allCells(all: OverviewResponse["all"]) {
   return [
-    instance.version,
-    `up ${elapsed(now - instance.startedAt)}`,
+    {
+      label: "Chats",
+      figure: commas(all.turns),
+      unit: all.turns === 1 ? "turn" : "turns",
+      sub: failedLine(all.turnsFailed, all.turns),
+    },
+    {
+      label: "Automations",
+      figure: commas(all.runs),
+      unit: all.runs === 1 ? "run" : "runs",
+      sub: failedLine(all.runsFailed, all.runs),
+    },
+    { label: "Tokens", figure: count(tokensOf(all)), sub: cachedLine(all) },
+    { label: "Cost", ...costWords(all) },
+  ];
+}
+
+export const sinceWords = (since: number | null): string =>
+  since === null ? "" : `since ${dayMonth(since)}`;
+
+// all time's foot, before the database's size, which is its own link;
+// each part is kept whole where the line breaks
+export function instanceParts(
+  instance: OverviewResponse["instance"],
+): string[] {
+  return [
     plural(instance.users, "user", "users"),
-    plural(instance.projects, "team project", "team projects"),
     plural(instance.agents, "agent", "agents"),
-    plural(instance.tasks, "task", "tasks"),
-    plural(instance.servers, "MCP server", "MCP servers"),
-  ].join(" · ");
+    plural(instance.projects, "team project", "team projects"),
+    plural(instance.automations, "automation", "automations"),
+  ];
 }
 
 export const databaseWords = (bytes: number): string =>
   `database ${size(bytes)}`;
+
+// the build and how long it has been up
+export const buildLine = (
+  instance: OverviewResponse["instance"],
+  now: number,
+): string => `${instance.version} · up ${elapsed(now - instance.startedAt)}`;

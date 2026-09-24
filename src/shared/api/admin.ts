@@ -121,28 +121,31 @@ export type StorageResponse = {
   };
 };
 
-// The ranges the Overview reads, in days of the zone
-export const OVERVIEW_RANGES = [7, 30, 90] as const;
-export type OverviewRange = (typeof OVERVIEW_RANGES)[number];
-
-// A day of the range: the sends started in it and how many of them
-// failed, and the tokens of the rounds in it. start is its local
-// midnight
+// A day of the zone: the chat turns and the automation runs started in
+// it and how many of each failed, and the tokens and the cost of the
+// rounds in it. A turn is a send of a chat (a message, a regenerate, a
+// compact), a run a send of a task. cost is null when no round of the
+// day carried one. start is its local midnight
 export type OverviewDay = {
   day: string;
   start: number;
-  sends: number;
-  failed: number;
+  turns: number;
+  turnsFailed: number;
+  runs: number;
+  runsFailed: number;
   promptTokens: number;
   cachedTokens: number;
   completionTokens: number;
+  cost: number | null;
 };
 
-// What a range adds up to. cost sums the rounds that carry one and
-// pricedRounds counts them; cost is null when no round did
+// What the days, or all time, add up to. cost sums the rounds that
+// carry one and pricedRounds counts them; cost is null when no round did
 export type OverviewTotals = {
-  sends: number;
-  failed: number;
+  turns: number;
+  turnsFailed: number;
+  runs: number;
+  runsFailed: number;
   promptTokens: number;
   cachedTokens: number;
   completionTokens: number;
@@ -151,71 +154,78 @@ export type OverviewTotals = {
   cost: number | null;
 };
 
-export const USAGE_BY = [
-  "users",
-  "agents",
-  "models",
-  "projects",
-  "tasks",
-] as const;
+export const USAGE_BY = ["projects", "agents"] as const;
 export type UsageBy = (typeof USAGE_BY)[number];
 
 // A row of a breakdown, by prompt plus completion tokens. name is the
-// username, the agent's name, the model, the team project's or the
-// task's name; a project or a task in a personal project has id and
-// name null and owner set. sub is a model's provider or a task's team
-// project. cost is null when none of the row's rounds carried one
+// team project's or the agent's; a personal project has id and name
+// null and owner set
 export type UsageRow = {
   id: string | null;
   name: string | null;
   owner: string | null;
-  sub: string | null;
   tokens: number;
-  sends: number;
-  failed: number;
-  cost: number | null;
+  turns: number;
+  runs: number;
 };
 
-// A provider's model over the range: its sends and failed sends, and
-// the median and slowest length and median rounds of the ended ones
-export type ModelHealth = {
+// A provider's model over the days: its chat turns, and the median and
+// slowest length of the ended ones
+export type TurnLength = {
   provider: string;
   model: string;
-  sends: number;
-  failed: number;
+  turns: number;
   medianMs: number | null;
   slowestMs: number | null;
-  medianRounds: number | null;
 };
 
-// GET /api/admin/overview?tz=&days=7|30|90: the range's days, today
-// last, its totals and the same over the range before it, the sends
-// running now against their caps and the users with an open socket,
-// the ten largest rows of each breakdown, the ten models with the most
-// sends, and the instance's counts, as of readAt. The range is read at
-// most once a minute per zone and range; now is read every time
+// GET /api/admin/overview?tz=: the zone's last OVERVIEW_DAYS days, today
+// last, and their totals, the ten largest rows of each breakdown, the
+// ten models with the most turns, all time with the first send's start
+// (null before any), and the instance, as of readAt. Read at most once
+// a minute per zone
 export type OverviewResponse = {
   readAt: number;
   days: OverviewDay[];
   totals: OverviewTotals;
-  before: OverviewTotals;
-  now: {
-    chats: number;
-    chatsCap: number;
-    runs: number;
-    runsCap: number;
-    online: number;
-  };
   by: Record<UsageBy, UsageRow[]>;
-  models: ModelHealth[];
+  lengths: TurnLength[];
+  all: OverviewTotals & { since: number | null };
   instance: {
     version: string;
     startedAt: number;
     users: number;
     projects: number;
     agents: number;
-    tasks: number;
-    servers: number;
+    automations: number;
     databaseBytes: number;
   };
+};
+
+export const OVERVIEW_DAYS = 30;
+
+// the server's load sampled every LOAD_SAMPLE_MS, LOAD_SAMPLES kept
+export const LOAD_SAMPLE_MS = 5_000;
+export const LOAD_SAMPLES = 180;
+
+// GET /api/admin/load: the process now, read from memory at each
+// request. chats and runs are the sends running in each pool against
+// their process caps; online the users with an open socket; waiting
+// the automations whose fire is past due by WAIT_GRACE_MS. cpu is the
+// process's share of the cores it may use, 0 to 1; rss its resident
+// bytes against memoryLimit, a container's limit when contained, else
+// the host's memory. The samples are oldest first, the last the newest
+export type LoadResponse = {
+  at: number;
+  chats: number;
+  chatsCap: number;
+  runs: number;
+  runsCap: number;
+  online: number;
+  automations: number;
+  waiting: number;
+  cores: number;
+  memoryLimit: number;
+  contained: boolean;
+  samples: { at: number[]; cpu: number[]; rss: number[] };
 };

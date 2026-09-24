@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What runs over days, drawn by uPlot, its one importer: a sparkline
-// for a tile and bars stacked by part with a key.
+// What runs over time, drawn by uPlot, its one importer: a sparkline
+// for a tile and bars over days stacked by part with a key.
 //
 // A plot lives in a ref: made on mount with a ResizeObserver, fed by a
 // second effect, destroyed on unmount. Its colours are tokens read at
@@ -23,13 +23,21 @@ const token = (name: string) =>
 // whole
 const HALF_DAY = 43_200;
 
+// half a step of room at each end, so the first and last bars are whole
+const padded = (u: uPlot, min: number, max: number): uPlot.Range.MinMax => {
+  const x = u.data[0] as number[];
+  const half = x.length > 1 ? (x[1]! - x[0]!) / 2 : HALF_DAY;
+  return [min - half, max + half];
+};
+
 // a repaint from the data, since redraw(true) pads the padded range again
 const repaint = (u: uPlot | null) => u?.setData(u.data);
 
-// Bars that remember where uPlot drew them, so the one under the
-// cursor can be painted over in the brand colour.
-function focusBars(sizeMax: number) {
-  const boxes: [number, number, number, number][] = [];
+type Box = [number, number, number, number];
+
+// Bars that remember where uPlot drew them, for a hook to paint over.
+function boxedBars(sizeMax: number) {
+  const boxes: Box[] = [];
   const paths = uPlot.paths.bars?.({
     size: [0.72, sizeMax],
     radius: [0.18, 0],
@@ -37,6 +45,12 @@ function focusBars(sizeMax: number) {
       boxes[i] = [left, top, width, height];
     },
   });
+  return { boxes, paths };
+}
+
+// the bar under the cursor painted over in the brand colour
+function focusBars(sizeMax: number) {
+  const { boxes, paths } = boxedBars(sizeMax);
   const focus = (u: uPlot) => {
     const i = u.cursor.idx;
     const box = i == null ? undefined : boxes[i];
@@ -49,28 +63,54 @@ function focusBars(sizeMax: number) {
   return { paths, focus };
 }
 
-// A sparkline over days: a line ending in a marked point, or a bar a
-// day. No axes: the tile's words hold the numbers. Plots of one sync
-// key share the cursor, and onCursor hears the day under it, or null.
+// Every bar but the one under the cursor washed with the card, so a
+// stack keeps its parts readable on the day picked.
+function fadeBars(sizeMax: number) {
+  const { boxes, paths } = boxedBars(sizeMax);
+  const fade = (u: uPlot) => {
+    const i = u.cursor.idx;
+    if (i == null) return;
+    u.ctx.save();
+    u.ctx.globalAlpha = 0.65;
+    u.ctx.fillStyle = token("--card");
+    boxes.forEach((box, k) => {
+      if (k !== i && box) u.ctx.fillRect(...box);
+    });
+    u.ctx.restore();
+  };
+  return { paths, fade };
+}
+
+// A sparkline: a line ending in a marked point, or a bar a step. No
+// axes: the tile's words hold the numbers. The scale runs from zero to
+// top, or to the highest value, or where zoom puts it. Plots of one
+// sync key share the cursor, and onCursor hears the point under it, or
+// null.
 export function Spark({
   kind,
-  days,
+  times,
   values,
   sync,
   onCursor,
+  top,
+  zoom,
 }: {
   kind: "line" | "bars";
-  // each day's start, in milliseconds
-  days: number[];
+  // each point's time, in milliseconds
+  times: number[];
   values: number[];
   sync: string;
   onCursor: (index: number | null) => void;
+  top?: number;
+  zoom?: (min: number, max: number) => [number, number];
 }) {
   const box = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
   // the hook reads the latest callback without the plot being rebuilt
   const hear = useRef(onCursor);
   hear.current = onCursor;
+  const scale = useRef({ top, zoom });
+  scale.current = { top, zoom };
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -89,13 +129,13 @@ export function Spark({
           points: { show: false },
         },
         scales: {
-          x: {
-            time: true,
-            range: bars
-              ? (_u, min, max) => [min - HALF_DAY, max + HALF_DAY]
-              : undefined,
+          x: { time: true, range: bars ? padded : undefined },
+          y: {
+            range: (_u, min, max) => {
+              const { top, zoom } = scale.current;
+              return zoom ? zoom(min, max) : [0, top ?? (max || 1)];
+            },
           },
-          y: bars ? { range: (_u, _min, max) => [0, max || 1] } : {},
         },
         axes: [{ show: false }, { show: false }],
         series: [
@@ -156,27 +196,29 @@ export function Spark({
   }, [shade]);
 
   useLayoutEffect(() => {
-    plot.current?.setData([days.map((d) => d / 1000), values]);
-  }, [days, values]);
+    plot.current?.setData([times.map((t) => t / 1000), values]);
+  }, [times, values]);
 
   return <div class="chart-spark" ref={box} />;
 }
 
 export type DaySeries = { label: string; values: number[] };
 
-// the greys of a stack, bottom first, light to dark in both themes'
-// order of the heat ramp
-const STACK_TOKENS = ["--heat-2", "--heat-3", "--heat-4"];
+// a stack's parts, bottom first: the bars' grey, the softer grey
+// nearer the card, and the brand colour on top, as the key's swatches
+const STACK_TOKENS = ["--heat-3", "--heat-2", "--brand"];
 
-// Bars over days with their parts stacked, bottom first, on one y
-// axis in the units words gives, and a key above them. The day under
-// the cursor is painted in the brand colour and onCursor hears it.
+// Bars over days with their parts stacked, bottom first and without a
+// gap, on one y axis in the units words gives, and a key above them.
+// The day under the cursor keeps its shades while the others fade, and
+// onCursor hears it; a sync key shares the cursor with sparklines.
 export function DayBars({
   label,
   days,
   series,
   words,
   onCursor,
+  sync,
 }: {
   // names the table a screen reader reads in place of the plot
   label: string;
@@ -187,6 +229,7 @@ export function DayBars({
   // an axis value in words
   words: (value: number) => string;
   onCursor: (index: number | null) => void;
+  sync?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
@@ -201,8 +244,8 @@ export function DayBars({
     if (!el) return;
     // the tallest bar is the whole stack, drawn first; each lower part
     // is drawn over it, so the top series holds the column's box
-    const bars = focusBars(28);
-    const plain = uPlot.paths.bars?.({ size: [0.72, 28], radius: [0.18, 0] });
+    const bars = fadeBars(28);
+    const plain = uPlot.paths.bars?.({ size: [0.72, 28], radius: [0, 0] });
     const font = () => `${token("--text-tiny")} ${token("--mono")}`;
     const axis = {
       stroke: () => token("--faint"),
@@ -215,15 +258,13 @@ export function DayBars({
         height: el.clientHeight,
         legend: { show: false },
         cursor: {
+          ...(sync ? { sync: { key: sync, setSeries: false } } : {}),
           drag: { x: false, y: false },
           y: false,
           points: { show: false },
         },
         scales: {
-          x: {
-            time: true,
-            range: (_u, min, max) => [min - HALF_DAY, max + HALF_DAY],
-          },
+          x: { time: true, range: padded },
           y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] },
         },
         axes: [
@@ -268,7 +309,7 @@ export function DayBars({
           }),
         ],
         hooks: {
-          draw: [bars.focus],
+          draw: [bars.fade],
           setCursor: [
             (u) => {
               hear.current(u.cursor.idx ?? null);
@@ -292,7 +333,7 @@ export function DayBars({
       u.destroy();
       plot.current = null;
     };
-  }, [parts]);
+  }, [parts, sync]);
 
   const shade = theme.value;
   useLayoutEffect(() => {

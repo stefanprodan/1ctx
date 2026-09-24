@@ -47,6 +47,10 @@
     color: var(--faint);
     overflow-wrap: anywhere;
   }
+  /* a phone breaks the foot between its parts, never inside one */
+  .overview-part {
+    white-space: nowrap;
+  }
   .overview-facts-link {
     color: var(--dim);
   }
@@ -54,12 +58,67 @@
     color: var(--fg);
   }
 
-  .overview-range-head {
+  /* the rows Refresh reads again, spaced as the board is */
+  .overview-past {
     display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
-  .overview-range-row {
-    display: none;
+  /* a row's head: its name, and its scope or its trouble */
+  .overview-section {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin: var(--space-2) 2px calc(-1 * var(--space-1));
   }
+  .overview-section-note {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
+  .overview-section-stale .overview-section-note {
+    color: var(--failed);
+  }
+
+  /* All time: figures side by side in one card, the counts at its foot */
+  .overview-all {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .overview-totals {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .overview-total {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-4);
+  }
+  .overview-total + .overview-total {
+    border-left: 1px solid var(--line);
+  }
+  .overview-total-figure {
+    font-size: var(--text-title);
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .overview-total-unit {
+    margin-left: var(--space-1);
+    font-size: var(--text-ui);
+    font-weight: 400;
+    color: var(--faint);
+  }
+  .overview-total-sub {
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
   @media (max-width: 899px) {
     .overview-grid {
       grid-template-columns: minmax(0, 1fr);
@@ -67,17 +126,31 @@
   }
 
   @media (max-width: 719px) {
-    .overview-range-head {
-      display: none;
+    .overview-totals {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .overview-range-row {
-      display: flex;
+    .overview-total {
+      padding: var(--space-3);
+    }
+    .overview-total:nth-child(3) {
+      border-left: 0;
+    }
+    .overview-total:nth-child(3),
+    .overview-total:nth-child(4) {
+      border-top: 1px solid var(--line);
     }
   }
 
-  /* a load under way keeps the last answer on screen, faded */
+  /* a failed read keeps the last answer on screen, faded */
   .overview-stale {
     opacity: 0.5;
     transition: opacity 0.2s;
+  }
+  /* the rows' heads stay whole, so their failure reads in full */
+  .overview-past.overview-stale {
+    opacity: 1;
+  }
+  .overview-past.overview-stale > :not(.overview-section) {
+    opacity: 0.5;
   }
 }

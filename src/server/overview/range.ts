@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The overview's range: every query the answer needs over one
-// connection, read once in one transaction and shaped into plain data
-// the worker can post. The days come as sums by quarter hour of UTC,
-// which every zone's midnight falls on, laid on the zone's days by the
-// caller; the breakdowns and the models take the range's bounds. A
+// The overview's days and all time: every query the answer needs over
+// one connection, read once in one transaction and shaped into plain
+// data the worker can post. The days come as sums by quarter hour of
+// UTC, which every zone's midnight falls on, laid on the zone's days by
+// the caller; the breakdowns and the models take the days' bounds. A
 // send has many usage rows, so sends and tokens are summed from their
 // own table each and joined by key afterwards, never in one query.
 
@@ -14,14 +14,19 @@ import type { Db } from "../db/index.ts";
 
 export type RangeInput = {
   now: number;
-  // the slots cover [since, until), the range before it included
+  // the slots, the breakdowns and the lengths cover [since, until)
   since: number;
   until: number;
-  // the breakdowns and the models cover [rangeSince, until)
-  rangeSince: number;
 };
 
-export type SendSlot = { slot: number; sends: number; failed: number };
+// a turn is a send of a chat, a run a send of a task
+export type SendSlot = {
+  slot: number;
+  turns: number;
+  turnsFailed: number;
+  runs: number;
+  runsFailed: number;
+};
 
 export type UsageSlot = {
   slot: number;
@@ -40,41 +45,34 @@ export type GroupRow = {
   id: string | null;
   name: string | null;
   owner: string | null;
-  sub: string | null;
   tokens: number;
-  sends: number;
-  failed: number;
-  cost: number | null;
+  turns: number;
+  runs: number;
 };
 
 export type ModelRow = {
   provider: string;
   model: string;
-  sends: number;
-  failed: number;
-  // the lengths and the rounds of the ended sends
+  turns: number;
+  // the lengths of the ended turns
   lengths: number[];
-  rounds: number[];
 };
+
+export type AllTime = Omit<SendSlot, "slot"> &
+  Omit<UsageSlot, "slot"> & { since: number | null };
 
 export type RangeResult = {
   readAt: number;
   sends: SendSlot[];
   usage: UsageSlot[];
-  by: {
-    users: GroupRow[];
-    agents: GroupRow[];
-    models: GroupRow[];
-    projects: GroupRow[];
-    tasks: GroupRow[];
-  };
+  by: { projects: GroupRow[]; agents: GroupRow[] };
   models: ModelRow[];
+  all: AllTime;
   instance: {
     users: number;
     projects: number;
     agents: number;
-    tasks: number;
-    servers: number;
+    automations: number;
     databaseBytes: number;
   };
 };
@@ -83,34 +81,64 @@ export const SLOT_MS = 900_000;
 
 type Bounds = [number, number];
 
+const SEND_SUMS = `sum(kind != 'run') as turns,
+       sum(kind != 'run' and status = 'failed') as turnsFailed,
+       sum(kind = 'run') as runs,
+       sum(kind = 'run' and status = 'failed') as runsFailed`;
+
 function sendSlots(db: Db, bounds: Bounds): SendSlot[] {
   return db
     .query<SendSlot, Bounds>(
-      `select started_at / ${SLOT_MS} as slot, count(*) as sends,
-              sum(status = 'failed') as failed
+      `select started_at / ${SLOT_MS} as slot, ${SEND_SUMS}
          from sends where started_at >= ? and started_at < ?
          group by slot order by slot`,
     )
     .all(...bounds);
 }
 
+const USAGE_SUMS = `sum(prompt_tokens) as prompt,
+       sum(coalesce(cached_tokens, 0)) as cached,
+       sum(completion_tokens) as completion,
+       count(*) as rounds, count(cost) as priced, sum(cost) as cost`;
+
 function usageSlots(db: Db, bounds: Bounds): UsageSlot[] {
   return db
     .query<UsageSlot, Bounds>(
-      `select created_at / ${SLOT_MS} as slot,
-              sum(prompt_tokens) as prompt,
-              sum(coalesce(cached_tokens, 0)) as cached,
-              sum(completion_tokens) as completion,
-              count(*) as rounds, count(cost) as priced, sum(cost) as cost
+      `select created_at / ${SLOT_MS} as slot, ${USAGE_SUMS}
          from usage where created_at >= ? and created_at < ?
          group by slot order by slot`,
     )
     .all(...bounds);
 }
 
-type Tokens = { key: string; tokens: number; priced: number; cost: number };
-type Sends = { key: string; sends: number; failed: number };
-type Named = Pick<GroupRow, "key" | "id" | "name" | "owner" | "sub">;
+// every send and every round there is; sums of no rows are null
+function allTime(db: Db): AllTime {
+  const sends = db
+    .query<Omit<SendSlot, "slot"> & { since: number | null }, []>(
+      `select ${SEND_SUMS}, min(started_at) as since from sends`,
+    )
+    .get()!;
+  const usage = db
+    .query<Omit<UsageSlot, "slot">, []>(`select ${USAGE_SUMS} from usage`)
+    .get()!;
+  return {
+    turns: sends.turns ?? 0,
+    turnsFailed: sends.turnsFailed ?? 0,
+    runs: sends.runs ?? 0,
+    runsFailed: sends.runsFailed ?? 0,
+    since: sends.since,
+    prompt: usage.prompt ?? 0,
+    cached: usage.cached ?? 0,
+    completion: usage.completion ?? 0,
+    rounds: usage.rounds,
+    priced: usage.priced,
+    cost: usage.priced > 0 ? usage.cost : null,
+  };
+}
+
+type Tokens = { key: string; tokens: number };
+type Sends = { key: string; turns: number; runs: number };
+type Named = Pick<GroupRow, "key" | "id" | "name" | "owner">;
 
 // the tokens of a group from usage alone and its sends from sends
 // alone, joined by key: a send with three rounds counts once
@@ -141,38 +169,16 @@ function grouped(
     rows.push({
       ...named,
       tokens: t?.tokens ?? 0,
-      sends: s?.sends ?? 0,
-      failed: s?.failed ?? 0,
-      cost: t !== undefined && t.priced > 0 ? t.cost : null,
+      turns: s?.turns ?? 0,
+      runs: s?.runs ?? 0,
     });
   }
   return rows;
 }
 
 const USAGE_BY = (key: string) =>
-  `select ${key} as key, sum(prompt_tokens + completion_tokens) as tokens,
-          count(cost) as priced, coalesce(sum(cost), 0) as cost
+  `select ${key} as key, sum(prompt_tokens + completion_tokens) as tokens
      from usage where created_at >= ? and created_at < ? group by key`;
-
-const SENDS_BY = (key: string) =>
-  `select ${key} as key, count(*) as sends, sum(status = 'failed') as failed
-     from sends where started_at >= ? and started_at < ? group by key`;
-
-function byUsers(db: Db, bounds: Bounds): GroupRow[] {
-  const names = db
-    .query<{ id: string; username: string }, []>(
-      "select id, username from users",
-    )
-    .all()
-    .map((row) => ({
-      key: row.id,
-      id: row.id,
-      name: row.username,
-      owner: null,
-      sub: null,
-    }));
-  return grouped(db, bounds, USAGE_BY("user_id"), SENDS_BY("user_id"), names);
-}
 
 function byAgents(db: Db, bounds: Bounds): GroupRow[] {
   const names = db
@@ -183,41 +189,14 @@ function byAgents(db: Db, bounds: Bounds): GroupRow[] {
       id: row.id,
       name: row.name,
       owner: null,
-      sub: null,
     }));
-  return grouped(db, bounds, USAGE_BY("agent_id"), SENDS_BY("agent_id"), names);
-}
-
-// a model is keyed by its provider too, since two providers may list
-// one id
-function byModels(db: Db, bounds: Bounds): GroupRow[] {
-  const providers = new Map(
-    db
-      .query<{ id: string; name: string }, []>("select id, name from providers")
-      .all()
-      .map((row) => [row.id, row.name]),
-  );
-  const keys = db
-    .query<{ providerId: string; model: string }, [...Bounds, ...Bounds]>(
-      `select provider_id as providerId, model from usage
-         where created_at >= ? and created_at < ?
-       union
-       select provider_id as providerId, model from sends
-         where started_at >= ? and started_at < ?`,
-    )
-    .all(...bounds, ...bounds);
-  const names = keys.map((row) => ({
-    key: `${row.providerId}\n${row.model}`,
-    id: null,
-    name: row.model,
-    owner: null,
-    sub: providers.get(row.providerId) ?? null,
-  }));
   return grouped(
     db,
     bounds,
-    USAGE_BY("provider_id || char(10) || model"),
-    SENDS_BY("provider_id || char(10) || model"),
+    USAGE_BY("agent_id"),
+    `select agent_id as key, sum(kind != 'run') as turns,
+            sum(kind = 'run') as runs
+       from sends where started_at >= ? and started_at < ? group by key`,
     names,
   );
 }
@@ -237,96 +216,50 @@ const projectNames = (db: Db): ProjectRow[] =>
     )
     .all();
 
-// a personal project is counted and never named
-const naming = (
-  project: ProjectRow,
-  own: { id: string; name: string },
-  sub: string | null,
-): Pick<GroupRow, "id" | "name" | "owner" | "sub"> =>
-  project.kind === "personal"
-    ? { id: null, name: null, owner: project.owner, sub: null }
-    : { id: own.id, name: own.name, owner: null, sub };
-
 function byProjects(db: Db, bounds: Bounds): GroupRow[] {
-  const names = projectNames(db).map((project) => ({
-    key: project.id,
-    ...naming(project, project, null),
-  }));
+  // a personal project is counted and never named
+  const names = projectNames(db).map((project) =>
+    project.kind === "personal"
+      ? { key: project.id, id: null, name: null, owner: project.owner }
+      : { key: project.id, id: project.id, name: project.name, owner: null },
+  );
   return grouped(
     db,
     bounds,
     USAGE_BY("project_id"),
-    `select x.project_id as key, count(*) as sends,
-            sum(s.status = 'failed') as failed
+    `select x.project_id as key, sum(s.kind != 'run') as turns,
+            sum(s.kind = 'run') as runs
        from sends s join sessions x on x.id = s.session_id
        where s.started_at >= ? and s.started_at < ? group by key`,
     names,
   );
 }
 
-function byTasks(db: Db, bounds: Bounds): GroupRow[] {
-  const projects = new Map(projectNames(db).map((row) => [row.id, row]));
-  const names: Named[] = [];
-  for (const task of db
-    .query<{ id: string; projectId: string; name: string }, []>(
-      "select id, project_id as projectId, name from automations",
-    )
-    .all()) {
-    const project = projects.get(task.projectId);
-    if (project === undefined) continue;
-    names.push({ key: task.id, ...naming(project, task, project.name) });
-  }
-  return grouped(
-    db,
-    bounds,
-    `select x.automation_id as key,
-            sum(u.prompt_tokens + u.completion_tokens) as tokens,
-            count(u.cost) as priced, coalesce(sum(u.cost), 0) as cost
-       from usage u join sessions x on x.id = u.session_id
-       where x.automation_id is not null
-         and u.created_at >= ? and u.created_at < ? group by key`,
-    `select x.automation_id as key, count(*) as sends,
-            sum(s.status = 'failed') as failed
-       from sends s join sessions x on x.id = s.session_id
-       where x.automation_id is not null
-         and s.started_at >= ? and s.started_at < ? group by key`,
-    names,
-  );
-}
-
+// the chat turns of each model; a run's length is its task's, not the
+// model's
 function models(db: Db, bounds: Bounds): ModelRow[] {
   const rows = db
-    .query<
-      { provider: string; model: string; sends: number; failed: number },
-      Bounds
-    >(
-      `select p.name as provider, s.model, count(*) as sends,
-              sum(s.status = 'failed') as failed
+    .query<{ provider: string; model: string; turns: number }, Bounds>(
+      `select p.name as provider, s.model, count(*) as turns
          from sends s join providers p on p.id = s.provider_id
-         where s.started_at >= ? and s.started_at < ?
-         group by s.provider_id, s.model order by sends desc, provider, model`,
+         where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
+         group by s.provider_id, s.model order by turns desc, provider, model`,
     )
     .all(...bounds)
-    .map((row) => ({ ...row, lengths: [], rounds: [] }) as ModelRow);
+    .map((row): ModelRow => ({ ...row, lengths: [] }));
   const byKey = new Map(
     rows.map((row) => [`${row.provider}\n${row.model}`, row]),
   );
   for (const ended of db
-    .query<
-      { provider: string; model: string; ms: number; rounds: number },
-      Bounds
-    >(
+    .query<{ provider: string; model: string; ms: number }, Bounds>(
       `select p.name as provider, s.model,
-              max(s.finished_at - s.started_at, 0) as ms, s.rounds
+              max(s.finished_at - s.started_at, 0) as ms
          from sends s join providers p on p.id = s.provider_id
-         where s.started_at >= ? and s.started_at < ?
+         where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
            and s.status != 'running' and s.finished_at is not null`,
     )
     .all(...bounds)) {
-    const row = byKey.get(`${ended.provider}\n${ended.model}`);
-    if (row === undefined) continue;
-    row.lengths.push(ended.ms);
-    row.rounds.push(ended.rounds);
+    byKey.get(`${ended.provider}\n${ended.model}`)?.lengths.push(ended.ms);
   }
   return rows;
 }
@@ -351,8 +284,7 @@ function instance(db: Db): RangeResult["instance"] {
       "select count(*) as n from projects where kind = 'team'",
     ),
     agents: count(db, "select count(*) as n from agents"),
-    tasks: count(db, "select count(*) as n from automations"),
-    servers: count(db, "select count(*) as n from mcp_servers"),
+    automations: count(db, "select count(*) as n from automations"),
     databaseBytes: memory
       ? 0
       : sizeOf(db.filename) + sizeOf(`${db.filename}-wal`),
@@ -370,20 +302,14 @@ export function range(db: Db, input: RangeInput): RangeResult {
 }
 
 function read(db: Db, input: RangeInput): RangeResult {
-  const all: Bounds = [input.since, input.until];
-  const own: Bounds = [input.rangeSince, input.until];
+  const days: Bounds = [input.since, input.until];
   return {
     readAt: input.now,
-    sends: sendSlots(db, all),
-    usage: usageSlots(db, all),
-    by: {
-      users: byUsers(db, own),
-      agents: byAgents(db, own),
-      models: byModels(db, own),
-      projects: byProjects(db, own),
-      tasks: byTasks(db, own),
-    },
-    models: models(db, own),
+    sends: sendSlots(db, days),
+    usage: usageSlots(db, days),
+    by: { projects: byProjects(db, days), agents: byAgents(db, days) },
+    models: models(db, days),
+    all: allTime(db),
     instance: instance(db),
   };
 }

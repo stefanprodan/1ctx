@@ -104,7 +104,7 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
         <TilePlot label="Rows added per day">
           <Spark
             kind="bars"
-            days={series.starts}
+            times={series.starts}
             values={series.rows}
             sync={SYNC}
             onCursor={onCursor}
@@ -133,7 +133,7 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
         <TilePlot label={`Stored bytes added over ${days.length} days`}>
           <Spark
             kind="line"
-            days={series.starts}
+            times={series.starts}
             values={series.sums}
             sync={SYNC}
             onCursor={onCursor}
