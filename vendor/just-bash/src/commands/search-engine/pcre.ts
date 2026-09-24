@@ -8,40 +8,7 @@
  */
 
 import { GnuPatternError } from "./gnu-regex.js";
-
-const H =
-  "\\t \\x{a0}\\x{1680}\\x{180e}\\x{2000}-\\x{200a}\\x{202f}\\x{205f}\\x{3000}";
-const V = "\\n\\x0b\\f\\r\\x{85}\\x{2028}\\x{2029}";
-
-const categories = new Map<string, string>();
-
-/**
- * A general category as code point ranges. RE2JS folds case with tables
- * that lack the caseless categories and throws on \p{N} under -i, so every
- * category but the letters and marks is spelled out, once per process.
- */
-function category(name: string): string {
-  if (/^[LM]/.test(name)) return `\\p{${name}}`;
-  let ranges = categories.get(name);
-  if (ranges !== undefined) return ranges;
-  const re = new RegExp(`^\\p{${name}}$`, "u");
-  const hex = (cp: number) => `\\x{${cp.toString(16)}}`;
-  ranges = "";
-  let start = -1;
-  for (let cp = 0; cp <= 0x110000; cp++) {
-    const inside = cp < 0x110000 && re.test(String.fromCodePoint(cp));
-    if (inside && start < 0) start = cp;
-    if (!inside && start >= 0) {
-      ranges += start === cp - 1 ? hex(start) : `${hex(start)}-${hex(cp - 1)}`;
-      start = -1;
-    }
-  }
-  categories.set(name, ranges);
-  return ranges;
-}
-
-/** JavaScript's names for the general categories, which RE2 shares. */
-const GENERAL = /^(?:[LMNPSZC][a-z]?)$/;
+import { category, GENERAL, H, spaceSet, V } from "./unicode-sets.js";
 
 interface Sets {
   space: string;
@@ -54,7 +21,7 @@ let built: Sets | undefined;
 
 function sets(): Sets {
   if (built) return built;
-  const space = `${H}${V}${category("Z")}`;
+  const space = spaceSet();
   const word = `\\p{L}${category("N")}\\p{Mn}${category("Pc")}`;
   built = {
     space,
@@ -395,11 +362,30 @@ function leadingLookaheads(body: string): [Condition[], string] | null {
   return [conditions, `^${rest}`];
 }
 
+/** PCRE2's default limit, which also bounds the \K rewrite's rescans. */
+const MAX_NESTING = 250;
+
+function checkNesting(pattern: string): void {
+  let depth = 0;
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") i++;
+    else if (inClass) inClass = ch !== "]";
+    else if (ch === "[") inClass = true;
+    else if (ch === ")") depth--;
+    else if (ch === "(" && ++depth > MAX_NESTING) {
+      throw new GnuPatternError("parentheses are too deeply nested");
+    }
+  }
+}
+
 /** Translate a grep -P pattern, after \Q...\E, \x{...} and (?x) are done. */
 export function translatePcre(
   pattern: string,
   lineRegexp = false,
 ): PcreTranslation {
+  checkNesting(pattern);
   const s = rewrite(pattern);
   // leading flags apply to the whole pattern, a lookbehind after them too
   const flags = /^(?:\(\?[a-zA-Z]*(?:-[a-zA-Z]*)?\))*/.exec(s)?.[0] ?? "";

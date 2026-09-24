@@ -30,12 +30,14 @@ describe("rg regression: r16 - directory trailing slash", () => {
       },
     });
     const result = await bash.exec("rg xyz");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
 // r25: https://github.com/BurntSushi/ripgrep/issues/25
 describe("rg regression: r25 - rooted gitignore pattern", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle rooted pattern in gitignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -45,7 +47,7 @@ describe("rg regression: r25 - rooted gitignore pattern", () => {
         "/home/user/src/llvm/foo": "test\n",
       },
     });
-    const result = await bash.exec("rg test");
+    const result = await bash.exec("rg -n test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("src/llvm/foo:1:test\n");
   });
@@ -53,6 +55,7 @@ describe("rg regression: r25 - rooted gitignore pattern", () => {
 
 // r30: https://github.com/BurntSushi/ripgrep/issues/30
 describe("rg regression: r30 - negation after double-star", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle negation after double-star in gitignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -62,7 +65,7 @@ describe("rg regression: r30 - negation after double-star", () => {
         "/home/user/vendor/other": "test\n",
       },
     });
-    const result = await bash.exec("rg test");
+    const result = await bash.exec("rg -n test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("vendor/manifest:1:test\n");
   });
@@ -128,12 +131,14 @@ describe("rg regression: r65 - simple directory ignore", () => {
       },
     });
     const result = await bash.exec("rg xyz");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
 // r67: https://github.com/BurntSushi/ripgrep/issues/67
 describe("rg regression: r67 - negation of root", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle negation of root with include", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -144,7 +149,7 @@ describe("rg regression: r67 - negation of root", () => {
         "/home/user/dir/bar": "test\n",
       },
     });
-    const result = await bash.exec("rg test");
+    const result = await bash.exec("rg -n test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("dir/bar:1:test\n");
   });
@@ -162,12 +167,14 @@ describe("rg regression: r87 - double-star pattern", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
 // r90: https://github.com/BurntSushi/ripgrep/issues/90
 describe("rg regression: r90 - negation of hidden file", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle negation of hidden file in gitignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -177,7 +184,7 @@ describe("rg regression: r90 - negation of hidden file", () => {
         "/home/user/.foo": "test\n",
       },
     });
-    const result = await bash.exec("rg test");
+    const result = await bash.exec("rg -n test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(".foo:1:test\n");
   });
@@ -185,6 +192,7 @@ describe("rg regression: r90 - negation of hidden file", () => {
 
 // r93: https://github.com/BurntSushi/ripgrep/issues/93
 describe("rg regression: r93 - IP address regex", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match IP address pattern", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -192,7 +200,7 @@ describe("rg regression: r93 - IP address regex", () => {
         "/home/user/foo": "192.168.1.1\n",
       },
     });
-    const result = await bash.exec("rg '(\\d{1,3}\\.){3}\\d{1,3}'");
+    const result = await bash.exec("rg -n '(\\d{1,3}\\.){3}\\d{1,3}'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo:1:192.168.1.1\n");
   });
@@ -321,6 +329,7 @@ describe("rg regression: r156 - complex regex pattern", () => {
 
 // r184: https://github.com/BurntSushi/ripgrep/issues/184
 describe("rg regression: r184 - dot star gitignore", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle .* in gitignore properly", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -329,7 +338,7 @@ describe("rg regression: r184 - dot star gitignore", () => {
         "/home/user/foo/bar/baz": "test\n",
       },
     });
-    const result = await bash.exec("rg test");
+    const result = await bash.exec("rg -n test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo/bar/baz:1:test\n");
   });
@@ -337,6 +346,7 @@ describe("rg regression: r184 - dot star gitignore", () => {
 
 // r199: https://github.com/BurntSushi/ripgrep/issues/199
 describe("rg regression: r199 - smart case with word boundary", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should use smart case with word boundary regex", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -344,7 +354,7 @@ describe("rg regression: r199 - smart case with word boundary", () => {
         "/home/user/foo": "tEsT\n",
       },
     });
-    const result = await bash.exec("rg --smart-case '\\btest\\b'");
+    const result = await bash.exec("rg -n --smart-case '\\btest\\b'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo:1:tEsT\n");
   });
@@ -352,6 +362,7 @@ describe("rg regression: r199 - smart case with word boundary", () => {
 
 // r206: https://github.com/BurntSushi/ripgrep/issues/206
 describe("rg regression: r206 - glob with subdirectory", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match glob in subdirectory", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -359,7 +370,7 @@ describe("rg regression: r206 - glob with subdirectory", () => {
         "/home/user/foo/bar.txt": "test\n",
       },
     });
-    const result = await bash.exec("rg test -g '*.txt'");
+    const result = await bash.exec("rg -n test -g '*.txt'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo/bar.txt:1:test\n");
   });
@@ -387,6 +398,7 @@ describe("rg regression: r229 - smart case with bracket expression", () => {
 
 // r251: https://github.com/BurntSushi/ripgrep/issues/251
 describe("rg regression: r251 - unicode case folding", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match cyrillic with -i", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -394,7 +406,7 @@ describe("rg regression: r251 - unicode case folding", () => {
         "/home/user/foo": "привет\nПривет\nПрИвЕт\n",
       },
     });
-    const result = await bash.exec("rg -i привет");
+    const result = await bash.exec("rg -n -i привет");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo:1:привет\nfoo:2:Привет\nfoo:3:ПрИвЕт\n");
   });
@@ -435,6 +447,7 @@ describe("rg regression: r256 - follow directory symlinks", () => {
 
 // r270: https://github.com/BurntSushi/ripgrep/issues/270
 describe("rg regression: r270 - pattern starting with dash", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle -e with pattern starting with dash", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -442,7 +455,7 @@ describe("rg regression: r270 - pattern starting with dash", () => {
         "/home/user/foo": "-test\n",
       },
     });
-    const result = await bash.exec("rg -e '-test'");
+    const result = await bash.exec("rg -n -e '-test'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo:1:-test\n");
   });
@@ -486,6 +499,7 @@ describe("rg regression: r391 - complex glob patterns", () => {
 
 // r405: https://github.com/BurntSushi/ripgrep/issues/405
 describe("rg regression: r405 - negated glob with path", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle negated glob with path", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -494,7 +508,7 @@ describe("rg regression: r405 - negated glob with path", () => {
         "/home/user/bar/foo/file2.txt": "test\n",
       },
     });
-    const result = await bash.exec("rg -g '!/foo/**' test");
+    const result = await bash.exec("rg -n -g '!/foo/**' test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("bar/foo/file2.txt:1:test\n");
   });
@@ -656,6 +670,7 @@ describe("rg regression: r693 - context in count mode", () => {
 
 // r807: https://github.com/BurntSushi/ripgrep/issues/807
 describe("rg regression: r807 - hidden with gitignore", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle gitignore for hidden subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -666,7 +681,7 @@ describe("rg regression: r807 - hidden with gitignore", () => {
         "/home/user/.a/c/file": "test\n",
       },
     });
-    const result = await bash.exec("rg --hidden test");
+    const result = await bash.exec("rg -n --hidden test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(".a/c/file:1:test\n");
   });
@@ -683,7 +698,8 @@ describe("rg regression: r829 - anchored gitignore patterns", () => {
       },
     });
     const result = await bash.exec("rg Sample");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 
   it("r829_2731: should handle negation of build directory", async () => {
@@ -748,7 +764,8 @@ describe("rg regression: r829 - anchored gitignore patterns", () => {
       },
     });
     const result = await bash.exec("rg --files-with-matches needle");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -769,6 +786,7 @@ describe("rg regression: r900 - empty pattern file", () => {
 
 // r1064: https://github.com/BurntSushi/ripgrep/issues/1064
 describe("rg regression: r1064 - capture group", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match with capture group", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -776,7 +794,7 @@ describe("rg regression: r1064 - capture group", () => {
         "/home/user/input": "abc\n",
       },
     });
-    const result = await bash.exec("rg 'a(.*c)'");
+    const result = await bash.exec("rg -n 'a(.*c)'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("input:1:abc\n");
   });
@@ -794,7 +812,8 @@ describe("rg regression: r1098 - gitignore with adjacent stars", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -863,6 +882,7 @@ describe("rg regression: r1159 - exit codes", () => {
 
 // r1163: https://github.com/BurntSushi/ripgrep/issues/1163
 describe("rg regression: r1163 - BOM handling", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle UTF-8 BOM", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -870,7 +890,7 @@ describe("rg regression: r1163 - BOM handling", () => {
         "/home/user/bom.txt": "\uFEFFtest123\ntest123\n",
       },
     });
-    const result = await bash.exec("rg '^test123'");
+    const result = await bash.exec("rg -n '^test123'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("bom.txt:1:test123\nbom.txt:2:test123\n");
   });
@@ -891,7 +911,8 @@ describe("rg regression: r1173 - double star gitignore", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -907,7 +928,8 @@ describe("rg regression: r1174 - triple double star", () => {
       },
     });
     const result = await bash.exec("rg test");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -1099,6 +1121,7 @@ it.skip("r1446: requires git worktree support", () => {});
 
 // r1537: https://github.com/BurntSushi/ripgrep/issues/1537
 describe("rg regression: r1537 - semicolon comma pattern", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match semicolon comma pattern", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1106,7 +1129,7 @@ describe("rg regression: r1537 - semicolon comma pattern", () => {
         "/home/user/foo": "abc;de,fg\n",
       },
     });
-    const result = await bash.exec("rg ';(.*,){1}'");
+    const result = await bash.exec("rg -n ';(.*,){1}'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foo:1:abc;de,fg\n");
   });
@@ -1420,7 +1443,8 @@ describe("rg regression: r2770 - gitignore with double star path", () => {
       },
     });
     const result = await bash.exec("rg -l quux");
-    expect(result.exitCode).toBe(1);
+    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -1444,6 +1468,7 @@ it.skip("r2990: trailing dot directory edge case", () => {});
 
 // r3067: https://github.com/BurntSushi/ripgrep/issues/3067
 describe("rg regression: r3067 - gitignore foobar/debug", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle foobar/debug pattern", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1454,7 +1479,7 @@ describe("rg regression: r3067 - gitignore foobar/debug", () => {
         "/home/user/foobar/debug/flag2": "baz\n",
       },
     });
-    const result = await bash.exec("rg baz");
+    const result = await bash.exec("rg -n baz");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("foobar/some/debug/flag:1:baz\n");
   });

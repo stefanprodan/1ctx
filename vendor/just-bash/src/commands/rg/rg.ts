@@ -6,7 +6,7 @@
  * - Respects .gitignore
  * - Skips hidden files by default
  * - Skips binary files by default
- * - Smart case sensitivity (case-insensitive unless pattern has uppercase)
+ * - (1ctx) Case-sensitive, and line numbers only with -n, as ripgrep piped
  */
 
 import type {
@@ -15,7 +15,6 @@ import type {
   RuntimeCommandContext,
 } from "../../types.js";
 import { hasHelpFlag, showHelp } from "../help.js";
-import { formatTypeList } from "./file-types.js";
 import { parseArgs } from "./rg-parser.js";
 import { executeSearch } from "./rg-search.js";
 
@@ -39,9 +38,12 @@ EXAMPLES:
     "-e, --regexp PATTERN    search for PATTERN (can be used multiple times)",
     "-f, --file FILE         read patterns from FILE, one per line",
     "-i, --ignore-case       case-insensitive search",
-    "-s, --case-sensitive    case-sensitive search (overrides smart-case)",
-    "-S, --smart-case        smart case (default: case-insensitive unless pattern has uppercase)",
+    // (1ctx) case-sensitive and without line numbers by default
+    "-s, --case-sensitive    case-sensitive search (default)",
+    "-S, --smart-case        case-insensitive unless the pattern has uppercase",
     "-F, --fixed-strings     treat pattern as literal string",
+    // (1ctx) the options ripgrep has that were refused
+    "-P, --pcre2             Perl syntax on RE2; backreferences and negative lookaround refused",
     "-w, --word-regexp       match whole words only",
     "-x, --line-regexp       match whole lines only",
     "-v, --invert-match      select non-matching lines",
@@ -55,10 +57,11 @@ EXAMPLES:
     "-m, --max-count NUM     stop after NUM matches per file",
     "-q, --quiet             suppress output, exit 0 on match",
     "    --stats             print search statistics",
-    "-n, --line-number       print line numbers (default: on)",
+    "-n, --line-number       print line numbers",
     "-N, --no-line-number    do not print line numbers",
     "-I, --no-filename       suppress the prefixing of file names",
     "-0, --null              use NUL as filename separator",
+    "    --null-data         use NUL as the line terminator",
     "-b, --byte-offset       show byte offset of each match",
     "    --column            show column number of first match",
     "    --vimgrep           show results in vimgrep format",
@@ -78,8 +81,14 @@ EXAMPLES:
     "    --hidden            search hidden files and directories",
     "    --no-ignore         don't respect .gitignore/.ignore files",
     "-d, --max-depth NUM     maximum search depth",
-    "    --sort TYPE         sort files (path, none)",
+    "    --sort KEY          sort files (path, modified, accessed, created, none)",
+    "    --sortr KEY         sort files in reverse",
+    "-M, --max-columns NUM   omit lines longer than NUM bytes",
+    "    --max-columns-preview  show the start of an omitted line",
+    "    --trim              drop leading whitespace from each line",
+    "-p, --pretty            --heading and --line-number",
     "    --heading           show file path above matches",
+    "    --no-heading        show file path on each line",
     "    --passthru          print all lines (non-matches use - separator)",
     "    --include-zero      include files with 0 matches in count output",
     "    --type-list         list all available file types",
@@ -94,28 +103,26 @@ export const rgCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    if (hasHelpFlag(args)) {
+    // (1ctx) -h is ripgrep's short help
+    if (hasHelpFlag(args) || args.includes("-h")) {
       return showHelp(rgHelp);
-    }
-
-    if (args.includes("--type-list")) {
-      return {
-        stdout: formatTypeList(),
-        stderr: "",
-        exitCode: 0,
-      };
     }
 
     const parseResult = parseArgs(args);
     if (!parseResult.success) {
       return parseResult.error;
     }
+    // (1ctx) ripgrep's version: -V its line, --version with the features
+    const { version } = parseResult.options;
+    if (version !== null) {
+      const more = version === "long" ? "\nfeatures:+pcre2\n" : "";
+      return { stdout: `ripgrep 15.2.0\n${more}`, stderr: "", exitCode: 0 };
+    }
 
     return executeSearch({
       ctx,
       options: parseResult.options,
       paths: parseResult.paths,
-      explicitLineNumbers: parseResult.explicitLineNumbers,
     });
   },
 };

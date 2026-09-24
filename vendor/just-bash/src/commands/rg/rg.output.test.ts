@@ -87,6 +87,7 @@ describe("rg output modes", () => {
 });
 
 describe("rg context lines", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should show lines after match with -A", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -94,12 +95,13 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "line1\nhello\nline3\nline4\n",
       },
     });
-    const result = await bash.exec("rg -A 1 hello");
+    const result = await bash.exec("rg -n -A 1 hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:2:hello\nfile.txt-3-line3\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should show lines before match with -B", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -107,12 +109,13 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "line1\nline2\nhello\nline4\n",
       },
     });
-    const result = await bash.exec("rg -B 1 hello");
+    const result = await bash.exec("rg -n -B 1 hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt-2-line2\nfile.txt:3:hello\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should show context with -C", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -120,7 +123,7 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "line1\nline2\nhello\nline4\nline5\n",
       },
     });
-    const result = await bash.exec("rg -C 1 hello");
+    const result = await bash.exec("rg -n -C 1 hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt-2-line2\nfile.txt:3:hello\nfile.txt-4-line4\n",
@@ -128,6 +131,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle context at start of file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -135,12 +139,13 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "match\nline2\nline3\n",
       },
     });
-    const result = await bash.exec("rg -B 2 match");
+    const result = await bash.exec("rg -n -B 2 match");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:match\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle context at end of file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -148,12 +153,13 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "line1\nline2\nmatch\n",
       },
     });
-    const result = await bash.exec("rg -A 2 match");
+    const result = await bash.exec("rg -n -A 2 match");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:3:match\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle overlapping context from multiple matches", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -161,7 +167,7 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "a\nmatch1\nb\nmatch2\nc\n",
       },
     });
-    const result = await bash.exec("rg -C 1 match");
+    const result = await bash.exec("rg -n -C 1 match");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt-1-a\nfile.txt:2:match1\nfile.txt-3-b\nfile.txt:4:match2\nfile.txt-5-c\n",
@@ -169,6 +175,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should support combined context format -A2", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -176,7 +183,7 @@ describe("rg context lines", () => {
         "/home/user/file.txt": "a\nhello\nb\nc\nd\n",
       },
     });
-    const result = await bash.exec("rg -A2 hello");
+    const result = await bash.exec("rg -n -A2 hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt:2:hello\nfile.txt-3-b\nfile.txt-4-c\n",

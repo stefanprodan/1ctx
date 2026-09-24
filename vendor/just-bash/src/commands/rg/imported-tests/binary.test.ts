@@ -15,6 +15,7 @@ const BINARY_CONTENT = "hello\x00world\n";
 const TEXT_CONTENT = "hello world\n";
 
 describe("rg binary: basic detection", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should skip binary files by default in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -23,12 +24,13 @@ describe("rg binary: basic detection", () => {
         "/home/user/binary.bin": BINARY_CONTENT,
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     // Should only find match in text file, not binary
     expect(result.stdout).toBe("text.txt:1:hello world\n");
   });
 
+  // (1ctx) ripgrep reports a match in a binary file given by name
   it("should skip binary files when searching single explicit file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -37,8 +39,8 @@ describe("rg binary: basic detection", () => {
       },
     });
     const result = await bash.exec("rg hello binary.bin");
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout).toBe("");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/^binary file matches \(found "\\0" byte/);
   });
 
   it("should detect binary in first 8KB of file", async () => {
@@ -53,6 +55,7 @@ describe("rg binary: basic detection", () => {
     expect(result.exitCode).toBe(1);
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should not detect binary if NUL after 8KB sample", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -61,7 +64,7 @@ describe("rg binary: basic detection", () => {
         "/home/user/late.txt": `pattern\n${"a".repeat(9000)}\x00end\n`,
       },
     });
-    const result = await bash.exec("rg pattern");
+    const result = await bash.exec("rg -n pattern");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("late.txt:1:pattern\n");
   });
@@ -98,6 +101,7 @@ describe("rg binary: with files-with-matches flag", () => {
 });
 
 describe("rg binary: mixed content", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should only search text files in mixed directory", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -107,13 +111,14 @@ describe("rg binary: mixed content", () => {
         "/home/user/script.sh": "echo documentation\n",
       },
     });
-    const result = await bash.exec("rg --sort path documentation");
+    const result = await bash.exec("rg -n --sort path documentation");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "readme.md:1:documentation\nscript.sh:1:echo documentation\n",
     );
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle multiple binary and text files", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -124,7 +129,7 @@ describe("rg binary: mixed content", () => {
         "/home/user/d.bin": "test\x00\n",
       },
     });
-    const result = await bash.exec("rg test");
+    const result = await bash.exec("rg -n test");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a.txt:1:test\nc.txt:1:test\n");
   });
@@ -177,6 +182,7 @@ describe("rg binary: edge cases", () => {
 });
 
 describe("rg binary: common binary file types", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should skip files with common binary signatures", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -191,13 +197,14 @@ describe("rg binary: common binary file types", () => {
         "/home/user/text.txt": "data\n",
       },
     });
-    const result = await bash.exec("rg data");
+    const result = await bash.exec("rg -n data");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("text.txt:1:data\n");
   });
 });
 
 describe("rg binary: with other flags", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should work with -i flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -206,11 +213,12 @@ describe("rg binary: with other flags", () => {
         "/home/user/binary.bin": "HELLO\x00world\n",
       },
     });
-    const result = await bash.exec("rg -i hello");
+    const result = await bash.exec("rg -n -i hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("text.txt:1:HELLO world\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should work with -v flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -219,11 +227,12 @@ describe("rg binary: with other flags", () => {
         "/home/user/binary.bin": "keep\x00remove\n",
       },
     });
-    const result = await bash.exec("rg -v remove");
+    const result = await bash.exec("rg -n -v remove");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("text.txt:1:keep\ntext.txt:3:keep\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should work with -w flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -232,11 +241,12 @@ describe("rg binary: with other flags", () => {
         "/home/user/binary.bin": "foo bar\x00\n",
       },
     });
-    const result = await bash.exec("rg -w foo");
+    const result = await bash.exec("rg -n -w foo");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("text.txt:1:foo bar\n");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should work with context flags", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -245,13 +255,14 @@ describe("rg binary: with other flags", () => {
         "/home/user/binary.bin": "before\x00match\nafter\n",
       },
     });
-    const result = await bash.exec("rg -C1 match");
+    const result = await bash.exec("rg -n -C1 match");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "text.txt-1-before\ntext.txt:2:match\ntext.txt-3-after\n",
     );
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should work with -m flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -260,13 +271,14 @@ describe("rg binary: with other flags", () => {
         "/home/user/binary.bin": "match\x00match\n",
       },
     });
-    const result = await bash.exec("rg -m1 match");
+    const result = await bash.exec("rg -n -m1 match");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("text.txt:1:match\n");
   });
 });
 
 describe("rg binary: subdirectories", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should skip binary files in subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -276,7 +288,7 @@ describe("rg binary: subdirectories", () => {
         "/home/user/lib/util.ts": "export function foo() {}\n",
       },
     });
-    const result = await bash.exec("rg --sort path export");
+    const result = await bash.exec("rg -n --sort path export");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "lib/util.ts:1:export function foo() {}\nsrc/code.ts:1:export const x = 1;\n",

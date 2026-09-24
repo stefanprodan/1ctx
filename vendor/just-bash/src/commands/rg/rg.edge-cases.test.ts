@@ -28,6 +28,7 @@ describe("rg empty and whitespace", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match empty lines with ^$", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -35,12 +36,13 @@ describe("rg empty and whitespace", () => {
         "/home/user/file.txt": "foo\n\nbar\n",
       },
     });
-    const result = await bash.exec("rg '^$'");
+    const result = await bash.exec("rg -n '^$'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:2:\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle file with trailing whitespace", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -48,12 +50,13 @@ describe("rg empty and whitespace", () => {
         "/home/user/file.txt": "hello   \nworld\n",
       },
     });
-    const result = await bash.exec("rg 'hello   '");
+    const result = await bash.exec("rg -n 'hello   '");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello   \n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle file with only whitespace", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -61,7 +64,7 @@ describe("rg empty and whitespace", () => {
         "/home/user/file.txt": "   \n   \n",
       },
     });
-    const result = await bash.exec("rg '^ +$'");
+    const result = await bash.exec("rg -n '^ +$'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:   \nfile.txt:2:   \n");
     expect(result.stderr).toBe("");
@@ -71,6 +74,7 @@ describe("rg empty and whitespace", () => {
 // Note: -m (max count) tests removed - feature not yet implemented
 
 describe("rg special characters", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match literal dots with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -78,12 +82,13 @@ describe("rg special characters", () => {
         "/home/user/file.txt": "a.b.c\nabc\n",
       },
     });
-    const result = await bash.exec("rg -F 'a.b'");
+    const result = await bash.exec("rg -n -F 'a.b'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:a.b.c\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match literal brackets with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -91,12 +96,13 @@ describe("rg special characters", () => {
         "/home/user/file.txt": "array[0]\narray0\n",
       },
     });
-    const result = await bash.exec("rg -F '[0]'");
+    const result = await bash.exec("rg -n -F '[0]'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:array[0]\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match literal parens with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -104,12 +110,13 @@ describe("rg special characters", () => {
         "/home/user/file.txt": "func()\nfunc\n",
       },
     });
-    const result = await bash.exec("rg -F '()'");
+    const result = await bash.exec("rg -n -F '()'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:func()\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match literal asterisks with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -117,12 +124,13 @@ describe("rg special characters", () => {
         "/home/user/file.txt": "a*b\nab\naab\n",
       },
     });
-    const result = await bash.exec("rg -F 'a*b'");
+    const result = await bash.exec("rg -n -F 'a*b'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:a*b\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match backslashes with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -131,7 +139,7 @@ describe("rg special characters", () => {
       },
     });
     // Search for "path\" which appears at start of backslash path
-    const result = await bash.exec("rg -F 'path\\'");
+    const result = await bash.exec("rg -n -F 'path\\'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:path\\to\\file\n");
     expect(result.stderr).toBe("");
@@ -152,6 +160,7 @@ describe("rg line boundaries", () => {
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should not match end of line at end of file without newline", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -159,12 +168,13 @@ describe("rg line boundaries", () => {
         "/home/user/file.txt": "hello",
       },
     });
-    const result = await bash.exec("rg 'hello$'");
+    const result = await bash.exec("rg -n 'hello$'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match anchored pattern at start", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -172,7 +182,7 @@ describe("rg line boundaries", () => {
         "/home/user/file.txt": "  hello\nhello\n",
       },
     });
-    const result = await bash.exec("rg '^hello'");
+    const result = await bash.exec("rg -n '^hello'");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:2:hello\n");
     expect(result.stderr).toBe("");
@@ -180,6 +190,7 @@ describe("rg line boundaries", () => {
 });
 
 describe("rg unicode", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match unicode characters", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -187,12 +198,13 @@ describe("rg unicode", () => {
         "/home/user/file.txt": "hello 世界\nfoo bar\n",
       },
     });
-    const result = await bash.exec("rg 世界");
+    const result = await bash.exec("rg -n 世界");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello 世界\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match emoji", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -200,12 +212,13 @@ describe("rg unicode", () => {
         "/home/user/file.txt": "hello 🎉\nfoo bar\n",
       },
     });
-    const result = await bash.exec("rg 🎉");
+    const result = await bash.exec("rg -n 🎉");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello 🎉\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle case-insensitive unicode with -i", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -213,7 +226,7 @@ describe("rg unicode", () => {
         "/home/user/file.txt": "CAFÉ\ncafé\n",
       },
     });
-    const result = await bash.exec("rg -i café");
+    const result = await bash.exec("rg -n -i café");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:CAFÉ\nfile.txt:2:café\n");
     expect(result.stderr).toBe("");
@@ -221,6 +234,7 @@ describe("rg unicode", () => {
 });
 
 describe("rg multiple files ordering", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should output files in sorted order", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -230,12 +244,13 @@ describe("rg multiple files ordering", () => {
         "/home/user/m.txt": "hello\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a.txt:1:hello\nm.txt:1:hello\nz.txt:1:hello\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle nested directories in sorted order", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -244,7 +259,7 @@ describe("rg multiple files ordering", () => {
         "/home/user/a/file.txt": "hello\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a/file.txt:1:hello\nz/file.txt:1:hello\n");
     expect(result.stderr).toBe("");
@@ -300,6 +315,7 @@ describe("rg exit codes", () => {
 });
 
 describe("rg word boundaries", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match word at start of line with -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -307,12 +323,13 @@ describe("rg word boundaries", () => {
         "/home/user/file.txt": "hello world\n",
       },
     });
-    const result = await bash.exec("rg -w hello");
+    const result = await bash.exec("rg -n -w hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello world\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match word at end of line with -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -320,12 +337,13 @@ describe("rg word boundaries", () => {
         "/home/user/file.txt": "hello world\n",
       },
     });
-    const result = await bash.exec("rg -w world");
+    const result = await bash.exec("rg -n -w world");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:1:hello world\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should not match word within word with -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -333,12 +351,13 @@ describe("rg word boundaries", () => {
         "/home/user/file.txt": "helloworld\nhello world\n",
       },
     });
-    const result = await bash.exec("rg -w hello");
+    const result = await bash.exec("rg -n -w hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("file.txt:2:hello world\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should match word with punctuation boundary with -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -346,7 +365,7 @@ describe("rg word boundaries", () => {
         "/home/user/file.txt": "hello, world\nhello.world\n",
       },
     });
-    const result = await bash.exec("rg -w hello");
+    const result = await bash.exec("rg -n -w hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       "file.txt:1:hello, world\nfile.txt:2:hello.world\n",
@@ -356,6 +375,7 @@ describe("rg word boundaries", () => {
 });
 
 describe("rg inverted context", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should show context around non-matching lines with -v", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -365,7 +385,7 @@ describe("rg inverted context", () => {
     });
     // With -v, lines NOT containing 'c' match (a, b, d, e)
     // Context includes the 'c' line as context for surrounding matches
-    const result = await bash.exec("rg -v -C1 c");
+    const result = await bash.exec("rg -n -v -C1 c");
     expect(result.exitCode).toBe(0);
     // (1ctx) a selected line is printed as one inside another's context
     expect(result.stdout).toBe(
@@ -376,6 +396,7 @@ describe("rg inverted context", () => {
 });
 
 describe("rg gitignore edge cases", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle comments in gitignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -385,12 +406,13 @@ describe("rg gitignore edge cases", () => {
         "/home/user/debug.log": "hello\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("app.ts:1:hello\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle blank lines in gitignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -401,7 +423,7 @@ describe("rg gitignore edge cases", () => {
         "/home/user/cache.tmp": "hello\n",
       },
     });
-    const result = await bash.exec("rg hello");
+    const result = await bash.exec("rg -n hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("app.ts:1:hello\n");
     expect(result.stderr).toBe("");
@@ -411,6 +433,7 @@ describe("rg gitignore edge cases", () => {
 });
 
 describe("rg glob edge cases", () => {
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle glob with path separator", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -419,12 +442,13 @@ describe("rg glob edge cases", () => {
         "/home/user/test/app.ts": "hello\n",
       },
     });
-    const result = await bash.exec("rg -g 'src/*.ts' hello");
+    const result = await bash.exec("rg -n -g 'src/*.ts' hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("src/app.ts:1:hello\n");
     expect(result.stderr).toBe("");
   });
 
+  // (1ctx) ripgrep numbers lines only with -n when piped
   it("should handle multiple globs", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -434,7 +458,7 @@ describe("rg glob edge cases", () => {
         "/home/user/c.py": "hello\n",
       },
     });
-    const result = await bash.exec("rg -g '*.ts' -g '*.js' hello");
+    const result = await bash.exec("rg -n -g '*.ts' -g '*.js' hello");
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a.ts:1:hello\nb.js:1:hello\n");
     expect(result.stderr).toBe("");

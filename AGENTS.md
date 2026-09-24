@@ -93,7 +93,9 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 test/fixtures/just-bash/yq-mikefarah.json with what
                 mikefarah's yq v4 answers, jq-record.ts jq-1.8.json from
                 jq 1.8, grep-record.ts grep-gnu.json from GNU grep 3.12
-                (Homebrew's ggrep); the suite never runs these binaries.
+                (Homebrew's ggrep), rg-record.ts rg-ripgrep.json from
+                ripgrep 15 and, from its --type-list, rg's
+                file-types-data.ts; the suite never runs these binaries.
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched

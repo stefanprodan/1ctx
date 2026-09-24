@@ -93,6 +93,13 @@ without a file of their own.
 | `src/commands/search-engine/gnu-regex.ts` (new), `regex.ts` | grep's BRE and ERE are translated as GNU grep 3.12 reads them: `\+`, `\?`, `\\|`, `\{n,m\}`, `\<`, `\>`, `\b`, `\B`, `\w`, `\W`, `\s`, `\S`, `` \` `` and `\'`, `{,n}`, a leading `*` or `{1}` repeating nothing with GNU's warning, a lone `)`, `a**`, a stray backslash warned about, GNU's error words and exit 2; a backreference is refused naming it | the translation missed most of GNU's escapes and answered errors as matches |
 | `src/commands/grep/grep.ts`, upstream's grep tests | GNU's option parser: a value in the same argument or the next, a value-taking option ending a cluster, `-NUM`, options after operands, long-option prefixes, conflicting matchers refused; `-e` and `-f` accumulate; `-r` with no operand searches `.` without `./`, dotfiles included, a directory without `-r` is an error, `-s` silences and still exits 2, `-d`; and the options it refused: `-b`, `-H`, `-a`, `-I`, `--binary-files`, `-T` (padded as GNU pads to the file's size), `-Z`, `-z`, `-y`, `--no-ignore-case`, `--exclude-from`, `--label`, `--group-separator`, `--no-group-separator`, `-V`, `--color` (`always` refused), with `--line-buffered`, `-U`, `--binary` and `-D` accepted; the upstream tests that pinned the old answers now pin GNU's | models write GNU grep's forms, and the last `-e` won, `-C1` was refused, `-r` without a path read stdin and `-b`, `-H` and `-Z` were unknown |
 | `src/commands/search-engine/pcre.ts` (new), `regex.ts` | grep `-P` on RE2: a leading lookbehind is a prefix and a trailing lookahead a suffix the reported match leaves out, the next `-o` match starting where the kept part ends; `\K` is moved out of groups that neither repeat nor have alternatives; with `-x` the anchors sit around the kept part; `\h`, `\v`, `\R`, `\s`, `\w` and the POSIX classes are PCRE2's Unicode sets, the caseless categories spelled as ranges since RE2JS throws on `\p{N}` under `-i`; `\Q...\E`, `(?#...)`, `(?P<n>)` and `(?'n')` are read; lookaheads right after a leading `^`, negative ones included, are separate patterns the line must match there or must not; `{,n}` is `{0,n}`; backreferences, other negative lookaround, possessive quantifiers, atomic groups, recursion, conditionals, branch resets and verbs are refused naming them, exit 2 | `(?<=id=)\d+` and `\d+(?=\.)` failed to compile, and no pattern may run on a backtracking engine |
+| `src/commands/rg/rg-options.ts`, `rg.ts`, upstream's rg tests | case-sensitive unless `-i`, `-S` or `--smart-case`, line numbers only with `-n`, `--column` or `--vimgrep`, file names only for a directory or several paths; the upstream tests that assumed the old defaults ask for `-n` or `-S` | ripgrep turns on smart case and numbers only on a terminal, and a model's shell never is one, so it expects what ripgrep prints when piped |
+| `src/commands/rg/rg-parser.ts`, `rg-options.ts`, `rg.ts` | ripgrep's parser: `--` ends the options, a value-taking option ends a cluster or takes the next argument, long options take `=VALUE`, `--passthrough`, `--maxdepth` and `-.` are aliases, every refusal exits 2 in ripgrep's words; and the options it refused: `-M`, `--max-columns-preview`, `--trim`, `-E` (UTF-8 and `none`; another encoding refused), `-V`, `--version`, `-p`, `--no-heading`, `--color` (`always` refused), `--colors`, `--sort` and `--sortr` with every key, `--sort-files`, `--no-ignore-parent`, `--no-ignore-files`, `--require-git`, `--crlf`, `--binary`, `--no-messages`, `--null-data`, `--path-separator`, `--no-unicode`, `-P`, `--pcre2` and `--engine`, `-h` as the help, with `--no-config`, `--one-file-system`, `--line-buffered`, `--no-require-git`, `--auto-hybrid-regex`, `--no-pcre2-unicode` and `--debug` accepted | forty options were unknown, and every refusal exited 1, which a script reads as no match |
+| `src/commands/rg/globs.ts` (new), `gitignore.ts`, `rg-files.ts` (new, moved out of `rg-search.ts`) | one glob compiler for `-g`, `--iglob`, `--type-add` and the ignore files: braces, a glob without a slash at any depth and pruning a directory, a leading `/` anchoring, the last match deciding, `-g` over the ignore files, types and hidden names; `.rgignore` over `.ignore` over `.gitignore`, the deepest first; a path given by name searched whatever the filters say; `--require-git` honours `.gitignore` only under a `.git`; `--sort` by time orders by mtime | `-g '*.{ts,go}'` found nothing, `-g '!src'` searched `src`, and a glob never overrode a `.gitignore` |
+| `src/commands/rg/rg-search.ts`, `rg-patterns.ts`, `rg-read.ts`, `rg-json.ts` (the last three new, moved out of `rg-search.ts`), `rg-output.ts` (new) | a missing path is reported and the others searched before exit 2, `-q` and `--json` included; a search whose filters left no file is ripgrep's `No files were searched`; a newline in a pattern without `-U` is ripgrep's error; `-` is stdin, named `<stdin>`; a blank line in a pattern file is the empty pattern; binary files in a walk are searched under `--binary` and `-uuu`; `--heading` puts a blank line between files and no heading over one; `--vimgrep` always names the file; `-0` follows every name; `--path-separator`; `-M` and `--max-columns-preview` in ripgrep's words, counting the line's end, `--trim`, `--crlf`; `-o -v` prints the selected lines; `--json` gives way to `-c`, `-l` and `--files` | a missing file was silent with exit 0 beside a match, stdin was never `-`, and the heading and vimgrep shapes were not ripgrep's |
+| `src/commands/rg/replace.ts` (new), `src/commands/search-engine/matcher.ts` | ripgrep's replacement: `$N`, `${N}`, `$name`, `${name}` and `$$`, a bare name running as far as letters, digits and `_` go; applied with context, `--passthru`, `--vimgrep`, to empty matches, and under `-U` across the lines a match spans; `-U` separates groups only with context | `-r '${1}x'` was printed as written, `$$1` was the group, and a multiline replacement printed the lines unchanged |
+| `src/commands/search-engine/rust-regex.ts` (new), `unicode-sets.ts` (new, moved out of `pcre.ts`), `regex.ts`, `matcher.ts` | rg's own syntax: `\w`, `\d` and `\s` are Unicode unless `--no-unicode`; `\<`, `\>`, `\b{start}` and `\b{end}` at a pattern's start or end are word edges checked in code, elsewhere RE2's `\b`; `-P` goes through grep's `-P` layer, its rewrites and its refusals, and refuses groups nested past 250 deep, as PCRE2 does | `-o '\w+'` cut `café` to `caf`, `\<foo\>` matched nothing, and `-P` was refused though ripgrep has PCRE2 |
+| `src/commands/rg/file-types.ts`, `file-types-data.ts` (new) | ripgrep 15's whole type table, written from `rg --type-list` by `scripts/rg-record.ts`, aliases included, each glob matched case-sensitively against the file's name; `--type-add` with `include:` and ripgrep's `invalid definition`, `--type-clear` in order with it, `--type-list` showing both, `-t all`, and `unrecognized file type` for an unknown `-t` or `-T` | 38 types of 224 with their own globs, `-t typescript` found nothing, `--type-add` was ignored and an unknown type searched nothing silently |
 
 ### The jq and yq dialects
 
@@ -227,6 +234,32 @@ with `accept` pins ours. Where they part:
 - `--color=always` is refused.
 - `-T` pads numbers on standard input to 19 places, as GNU does on a
   pipe, also when the shell redirected a file there.
+
+### Where our rg still differs from ripgrep
+
+`test/fixtures/just-bash/rg-ripgrep.json` holds what ripgrep 15.2.0
+answered when piped, with `--no-require-git` in its config file, recorded
+by `scripts/rg-record.ts`, and `test/vendor/just-bash/rg-ripgrep.test.ts`
+holds our rg to it; a case with `accept` pins ours. Where they part:
+
+- `\b` and `\B` are ASCII, so `\bcole` matches in `école`. `\<` and
+  `\>` are exact only at the pattern's start and end; anywhere else
+  they are RE2's ASCII `\b` too.
+- Under `-P`, backreferences, negative lookaround, possessive quantifiers,
+  atomic groups, recursion and conditionals are refused, as for grep,
+  and a lookbehind is a prefix the match consumes.
+- `.gitignore` is honoured outside a git repository unless
+  `--require-git` is given, as ripgrep's `--no-require-git` has it.
+- `node_modules`, `.venv`, `__pycache__` and the other names in
+  `GitignoreManager.isCommonIgnored` are skipped in a walk unless
+  `--no-ignore`, with no ignore file saying so.
+- A file that is not valid UTF-8 is searched as text with its bad bytes
+  replaced, where ripgrep prints them as they are. `-E` takes UTF-8 and
+  `none` only.
+- `-p` and `--color=always` print no colour, the second refused.
+- The `accessed` and `created` sort keys order by mtime, the one time a
+  stat gives. `--json` reports `elapsed` as zero, `--debug` prints
+  nothing, and `--version` names no SIMD features.
 
 ### Where our yq still differs from mikefarah's
 

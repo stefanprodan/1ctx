@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records what a reference binary answers for each case of a fixture under
-// test/fixtures/just-bash/, for yq-record.ts, jq-record.ts and
-// grep-record.ts. Run by hand;
+// test/fixtures/just-bash/, for yq-record.ts, jq-record.ts, grep-record.ts
+// and rg-record.ts. Run by hand;
 // the suite reads the fixture and never needs the binary.
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -59,6 +59,12 @@ export async function record(
   binary: string,
   fixturePath: string,
   expectVersion: RegExp,
+  options: {
+    /** given to the binary alone, never written into the fixture */
+    env?: Record<string, string>;
+    /** a case without stdin gets /dev/null, never an empty pipe */
+    nullStdin?: boolean;
+  } = {},
 ): Promise<void> {
   const version = Bun.spawnSync([binary, "--version"], {
     stdout: "pipe",
@@ -92,8 +98,12 @@ export async function record(
           HOME: dir,
           ...fixture.env,
           ...c.env,
+          ...options.env,
         },
-        stdin: new TextEncoder().encode(c.stdin ?? ""),
+        stdin:
+          c.stdin === undefined && options.nullStdin
+            ? "ignore"
+            : new TextEncoder().encode(c.stdin ?? ""),
         stdout: "pipe",
         stderr: "pipe",
       });

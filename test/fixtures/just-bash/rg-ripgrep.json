@@ -1,0 +1,6077 @@
+{
+  "recordedWith": "ripgrep 15.2.0\n\nfeatures:+pcre2\nsimd(compile):+NEON\nsimd(runtime):+NEON\n\nPCRE2 10.45 is available (JIT is available)",
+  "files": {
+    "a.txt": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+    "b.txt": "version 1.2.3\nid=42 name=alpha\nid=7 name=beta\n-v is a flag\narray[x] = 1\nx*y product\ncount{1} times\npath C:\\temp\\file\nphone 555-1234\n2026-09-24 date\nurl http://example.com/a/b\n",
+    "conf": "# global settings\nname=web\nport=8080\n  # indented comment\n\t# tab comment\nhost = example.com\nempty=\ndebug=true\n",
+    "pats.txt": "foo\nbar\n",
+    "empty.pat": "",
+    "blank.pat": "foo\n\nbar\n",
+    "ctx.txt": "match a\nmatch b\nother 1\nmatch c\nother 2\nother 3\nother 4\nother 5\nmatch d\nother 6\nother 7\n",
+    "rep.txt": "abab\nthe the cat\nword words sword\nababab\naa\nfoo_bar foo\nx foo-bar y\n",
+    "utf.txt": "café au lait\nÉcole normale\nstraße\n日本語のテキスト\nemoji 🎉 party\nnaïve idea\nCAFÉ\nécole\n",
+    "crlf.txt": "foo\r\nbar\r\nbaz foo\r\n",
+    "nonl.txt": "first line\nlast foo",
+    "empty.txt": "",
+    "bin.dat": "abc\u0000def\nfoo bar\nmore foo\n",
+    "page.html": "<!doctype html><html><head><title>Models</title></head><body><div id=\"app\"></div><script>window.__DATA__=[{\"id\":1,\"name\":\"model-1\",\"price\":0.25,\"discount\":false},{\"id\":2,\"name\":\"model-2\",\"price\":0.50,\"discount\":false},{\"id\":3,\"name\":\"model-3\",\"price\":0.75,\"discount\":false},{\"id\":4,\"name\":\"model-4\",\"price\":1.00,\"discount\":false},{\"id\":5,\"name\":\"model-5\",\"price\":1.25,\"discount\":false},{\"id\":6,\"name\":\"model-6\",\"price\":1.50,\"discount\":false},{\"id\":7,\"name\":\"model-7\",\"price\":1.75,\"discount\":true},{\"id\":8,\"name\":\"model-8\",\"price\":2.00,\"discount\":false},{\"id\":9,\"name\":\"model-9\",\"price\":2.25,\"discount\":false},{\"id\":10,\"name\":\"model-10\",\"price\":2.50,\"discount\":false},{\"id\":11,\"name\":\"model-11\",\"price\":2.75,\"discount\":false},{\"id\":12,\"name\":\"model-12\",\"price\":3.00,\"discount\":false},{\"id\":13,\"name\":\"model-13\",\"price\":3.25,\"discount\":false},{\"id\":14,\"name\":\"model-14\",\"price\":3.50,\"discount\":true},{\"id\":15,\"name\":\"model-15\",\"price\":3.75,\"discount\":false},{\"id\":16,\"name\":\"model-16\",\"price\":4.00,\"discount\":false},{\"id\":17,\"name\":\"model-17\",\"price\":4.25,\"discount\":false},{\"id\":18,\"name\":\"model-18\",\"price\":4.50,\"discount\":false},{\"id\":19,\"name\":\"model-19\",\"price\":4.75,\"discount\":false},{\"id\":20,\"name\":\"model-20\",\"price\":5.00,\"discount\":false},{\"id\":21,\"name\":\"model-21\",\"price\":5.25,\"discount\":true},{\"id\":22,\"name\":\"model-22\",\"price\":5.50,\"discount\":false},{\"id\":23,\"name\":\"model-23\",\"price\":5.75,\"discount\":false},{\"id\":24,\"name\":\"model-24\",\"price\":6.00,\"discount\":false},{\"id\":25,\"name\":\"model-25\",\"price\":6.25,\"discount\":false},{\"id\":26,\"name\":\"model-26\",\"price\":6.50,\"discount\":false},{\"id\":27,\"name\":\"model-27\",\"price\":6.75,\"discount\":false},{\"id\":28,\"name\":\"model-28\",\"price\":7.00,\"discount\":true},{\"id\":29,\"name\":\"model-29\",\"price\":7.25,\"discount\":false},{\"id\":30,\"name\":\"model-30\",\"price\":7.50,\"discount\":false},{\"id\":31,\"name\":\"model-31\",\"price\":7.75,\"discount\":false},{\"id\":32,\"name\":\"model-32\",\"price\":8.00,\"discount\":false},{\"id\":33,\"name\":\"model-33\",\"price\":8.25,\"discount\":false},{\"id\":34,\"name\":\"model-34\",\"price\":8.50,\"discount\":false},{\"id\":35,\"name\":\"model-35\",\"price\":8.75,\"discount\":true},{\"id\":36,\"name\":\"model-36\",\"price\":9.00,\"discount\":false},{\"id\":37,\"name\":\"model-37\",\"price\":9.25,\"discount\":false},{\"id\":38,\"name\":\"model-38\",\"price\":9.50,\"discount\":false},{\"id\":39,\"name\":\"model-39\",\"price\":9.75,\"discount\":false},{\"id\":40,\"name\":\"model-40\",\"price\":10.00,\"discount\":false},{\"id\":41,\"name\":\"model-41\",\"price\":10.25,\"discount\":false},{\"id\":42,\"name\":\"model-42\",\"price\":10.50,\"discount\":true},{\"id\":43,\"name\":\"model-43\",\"price\":10.75,\"discount\":false},{\"id\":44,\"name\":\"model-44\",\"price\":11.00,\"discount\":false},{\"id\":45,\"name\":\"model-45\",\"price\":11.25,\"discount\":false},{\"id\":46,\"name\":\"model-46\",\"price\":11.50,\"discount\":false},{\"id\":47,\"name\":\"model-47\",\"price\":11.75,\"discount\":false},{\"id\":48,\"name\":\"model-48\",\"price\":12.00,\"discount\":false},{\"id\":49,\"name\":\"model-49\",\"price\":12.25,\"discount\":true},{\"id\":50,\"name\":\"model-50\",\"price\":12.50,\"discount\":false},{\"id\":51,\"name\":\"model-51\",\"price\":12.75,\"discount\":false},{\"id\":52,\"name\":\"model-52\",\"price\":13.00,\"discount\":false},{\"id\":53,\"name\":\"model-53\",\"price\":13.25,\"discount\":false},{\"id\":54,\"name\":\"model-54\",\"price\":13.50,\"discount\":false},{\"id\":55,\"name\":\"model-55\",\"price\":13.75,\"discount\":false},{\"id\":56,\"name\":\"model-56\",\"price\":14.00,\"discount\":true},{\"id\":57,\"name\":\"model-57\",\"price\":14.25,\"discount\":false},{\"id\":58,\"name\":\"model-58\",\"price\":14.50,\"discount\":false},{\"id\":59,\"name\":\"model-59\",\"price\":14.75,\"discount\":false},{\"id\":60,\"name\":\"model-60\",\"price\":15.00,\"discount\":false},{\"id\":61,\"name\":\"model-61\",\"price\":15.25,\"discount\":false},{\"id\":62,\"name\":\"model-62\",\"price\":15.50,\"discount\":false},{\"id\":63,\"name\":\"model-63\",\"price\":15.75,\"discount\":true},{\"id\":64,\"name\":\"model-64\",\"price\":16.00,\"discount\":false},{\"id\":65,\"name\":\"model-65\",\"price\":16.25,\"discount\":false},{\"id\":66,\"name\":\"model-66\",\"price\":16.50,\"discount\":false},{\"id\":67,\"name\":\"model-67\",\"price\":16.75,\"discount\":false},{\"id\":68,\"name\":\"model-68\",\"price\":17.00,\"discount\":false},{\"id\":69,\"name\":\"model-69\",\"price\":17.25,\"discount\":false},{\"id\":70,\"name\":\"model-70\",\"price\":17.50,\"discount\":true},{\"id\":71,\"name\":\"model-71\",\"price\":17.75,\"discount\":false},{\"id\":72,\"name\":\"model-72\",\"price\":18.00,\"discount\":false},{\"id\":73,\"name\":\"model-73\",\"price\":18.25,\"discount\":false},{\"id\":74,\"name\":\"model-74\",\"price\":18.50,\"discount\":false},{\"id\":75,\"name\":\"model-75\",\"price\":18.75,\"discount\":false},{\"id\":76,\"name\":\"model-76\",\"price\":19.00,\"discount\":false},{\"id\":77,\"name\":\"model-77\",\"price\":19.25,\"discount\":true},{\"id\":78,\"name\":\"model-78\",\"price\":19.50,\"discount\":false},{\"id\":79,\"name\":\"model-79\",\"price\":19.75,\"discount\":false},{\"id\":80,\"name\":\"model-80\",\"price\":20.00,\"discount\":false},{\"id\":81,\"name\":\"model-81\",\"price\":20.25,\"discount\":false},{\"id\":82,\"name\":\"model-82\",\"price\":20.50,\"discount\":false},{\"id\":83,\"name\":\"model-83\",\"price\":20.75,\"discount\":false},{\"id\":84,\"name\":\"model-84\",\"price\":21.00,\"discount\":true},{\"id\":85,\"name\":\"model-85\",\"price\":21.25,\"discount\":false},{\"id\":86,\"name\":\"model-86\",\"price\":21.50,\"discount\":false},{\"id\":87,\"name\":\"model-87\",\"price\":21.75,\"discount\":false},{\"id\":88,\"name\":\"model-88\",\"price\":22.00,\"discount\":false},{\"id\":89,\"name\":\"model-89\",\"price\":22.25,\"discount\":false},{\"id\":90,\"name\":\"model-90\",\"price\":22.50,\"discount\":false},{\"id\":91,\"name\":\"model-91\",\"price\":22.75,\"discount\":true},{\"id\":92,\"name\":\"model-92\",\"price\":23.00,\"discount\":false},{\"id\":93,\"name\":\"model-93\",\"price\":23.25,\"discount\":false},{\"id\":94,\"name\":\"model-94\",\"price\":23.50,\"discount\":false},{\"id\":95,\"name\":\"model-95\",\"price\":23.75,\"discount\":false},{\"id\":96,\"name\":\"model-96\",\"price\":24.00,\"discount\":false},{\"id\":97,\"name\":\"model-97\",\"price\":24.25,\"discount\":false},{\"id\":98,\"name\":\"model-98\",\"price\":24.50,\"discount\":true},{\"id\":99,\"name\":\"model-99\",\"price\":24.75,\"discount\":false},{\"id\":100,\"name\":\"model-100\",\"price\":25.00,\"discount\":false},{\"id\":101,\"name\":\"model-101\",\"price\":25.25,\"discount\":false},{\"id\":102,\"name\":\"model-102\",\"price\":25.50,\"discount\":false},{\"id\":103,\"name\":\"model-103\",\"price\":25.75,\"discount\":false},{\"id\":104,\"name\":\"model-104\",\"price\":26.00,\"discount\":false},{\"id\":105,\"name\":\"model-105\",\"price\":26.25,\"discount\":true},{\"id\":106,\"name\":\"model-106\",\"price\":26.50,\"discount\":false},{\"id\":107,\"name\":\"model-107\",\"price\":26.75,\"discount\":false},{\"id\":108,\"name\":\"model-108\",\"price\":27.00,\"discount\":false},{\"id\":109,\"name\":\"model-109\",\"price\":27.25,\"discount\":false},{\"id\":110,\"name\":\"model-110\",\"price\":27.50,\"discount\":false},{\"id\":111,\"name\":\"model-111\",\"price\":27.75,\"discount\":false},{\"id\":112,\"name\":\"model-112\",\"price\":28.00,\"discount\":true},{\"id\":113,\"name\":\"model-113\",\"price\":28.25,\"discount\":false},{\"id\":114,\"name\":\"model-114\",\"price\":28.50,\"discount\":false},{\"id\":115,\"name\":\"model-115\",\"price\":28.75,\"discount\":false},{\"id\":116,\"name\":\"model-116\",\"price\":29.00,\"discount\":false},{\"id\":117,\"name\":\"model-117\",\"price\":29.25,\"discount\":false},{\"id\":118,\"name\":\"model-118\",\"price\":29.50,\"discount\":false},{\"id\":119,\"name\":\"model-119\",\"price\":29.75,\"discount\":true},{\"id\":120,\"name\":\"model-120\",\"price\":30.00,\"discount\":false},{\"id\":121,\"name\":\"model-121\",\"price\":30.25,\"discount\":false},{\"id\":122,\"name\":\"model-122\",\"price\":30.50,\"discount\":false},{\"id\":123,\"name\":\"model-123\",\"price\":30.75,\"discount\":false},{\"id\":124,\"name\":\"model-124\",\"price\":31.00,\"discount\":false},{\"id\":125,\"name\":\"model-125\",\"price\":31.25,\"discount\":false},{\"id\":126,\"name\":\"model-126\",\"price\":31.50,\"discount\":true},{\"id\":127,\"name\":\"model-127\",\"price\":31.75,\"discount\":false},{\"id\":128,\"name\":\"model-128\",\"price\":32.00,\"discount\":false},{\"id\":129,\"name\":\"model-129\",\"price\":32.25,\"discount\":false},{\"id\":130,\"name\":\"model-130\",\"price\":32.50,\"discount\":false},{\"id\":131,\"name\":\"model-131\",\"price\":32.75,\"discount\":false},{\"id\":132,\"name\":\"model-132\",\"price\":33.00,\"discount\":false},{\"id\":133,\"name\":\"model-133\",\"price\":33.25,\"discount\":true},{\"id\":134,\"name\":\"model-134\",\"price\":33.50,\"discount\":false},{\"id\":135,\"name\":\"model-135\",\"price\":33.75,\"discount\":false},{\"id\":136,\"name\":\"model-136\",\"price\":34.00,\"discount\":false},{\"id\":137,\"name\":\"model-137\",\"price\":34.25,\"discount\":false},{\"id\":138,\"name\":\"model-138\",\"price\":34.50,\"discount\":false},{\"id\":139,\"name\":\"model-139\",\"price\":34.75,\"discount\":false},{\"id\":140,\"name\":\"model-140\",\"price\":35.00,\"discount\":true},{\"id\":141,\"name\":\"model-141\",\"price\":35.25,\"discount\":false},{\"id\":142,\"name\":\"model-142\",\"price\":35.50,\"discount\":false},{\"id\":143,\"name\":\"model-143\",\"price\":35.75,\"discount\":false},{\"id\":144,\"name\":\"model-144\",\"price\":36.00,\"discount\":false},{\"id\":145,\"name\":\"model-145\",\"price\":36.25,\"discount\":false},{\"id\":146,\"name\":\"model-146\",\"price\":36.50,\"discount\":false},{\"id\":147,\"name\":\"model-147\",\"price\":36.75,\"discount\":true},{\"id\":148,\"name\":\"model-148\",\"price\":37.00,\"discount\":false},{\"id\":149,\"name\":\"model-149\",\"price\":37.25,\"discount\":false},{\"id\":150,\"name\":\"model-150\",\"price\":37.50,\"discount\":false},{\"id\":151,\"name\":\"model-151\",\"price\":37.75,\"discount\":false},{\"id\":152,\"name\":\"model-152\",\"price\":38.00,\"discount\":false},{\"id\":153,\"name\":\"model-153\",\"price\":38.25,\"discount\":false},{\"id\":154,\"name\":\"model-154\",\"price\":38.50,\"discount\":true},{\"id\":155,\"name\":\"model-155\",\"price\":38.75,\"discount\":false},{\"id\":156,\"name\":\"model-156\",\"price\":39.00,\"discount\":false},{\"id\":157,\"name\":\"model-157\",\"price\":39.25,\"discount\":false},{\"id\":158,\"name\":\"model-158\",\"price\":39.50,\"discount\":false},{\"id\":159,\"name\":\"model-159\",\"price\":39.75,\"discount\":false},{\"id\":160,\"name\":\"model-160\",\"price\":40.00,\"discount\":false},{\"id\":161,\"name\":\"model-161\",\"price\":40.25,\"discount\":true},{\"id\":162,\"name\":\"model-162\",\"price\":40.50,\"discount\":false},{\"id\":163,\"name\":\"model-163\",\"price\":40.75,\"discount\":false},{\"id\":164,\"name\":\"model-164\",\"price\":41.00,\"discount\":false},{\"id\":165,\"name\":\"model-165\",\"price\":41.25,\"discount\":false},{\"id\":166,\"name\":\"model-166\",\"price\":41.50,\"discount\":false},{\"id\":167,\"name\":\"model-167\",\"price\":41.75,\"discount\":false},{\"id\":168,\"name\":\"model-168\",\"price\":42.00,\"discount\":true},{\"id\":169,\"name\":\"model-169\",\"price\":42.25,\"discount\":false},{\"id\":170,\"name\":\"model-170\",\"price\":42.50,\"discount\":false},{\"id\":171,\"name\":\"model-171\",\"price\":42.75,\"discount\":false},{\"id\":172,\"name\":\"model-172\",\"price\":43.00,\"discount\":false},{\"id\":173,\"name\":\"model-173\",\"price\":43.25,\"discount\":false},{\"id\":174,\"name\":\"model-174\",\"price\":43.50,\"discount\":false},{\"id\":175,\"name\":\"model-175\",\"price\":43.75,\"discount\":true},{\"id\":176,\"name\":\"model-176\",\"price\":44.00,\"discount\":false},{\"id\":177,\"name\":\"model-177\",\"price\":44.25,\"discount\":false},{\"id\":178,\"name\":\"model-178\",\"price\":44.50,\"discount\":false},{\"id\":179,\"name\":\"model-179\",\"price\":44.75,\"discount\":false},{\"id\":180,\"name\":\"model-180\",\"price\":45.00,\"discount\":false},{\"id\":181,\"name\":\"model-181\",\"price\":45.25,\"discount\":false},{\"id\":182,\"name\":\"model-182\",\"price\":45.50,\"discount\":true},{\"id\":183,\"name\":\"model-183\",\"price\":45.75,\"discount\":false},{\"id\":184,\"name\":\"model-184\",\"price\":46.00,\"discount\":false},{\"id\":185,\"name\":\"model-185\",\"price\":46.25,\"discount\":false},{\"id\":186,\"name\":\"model-186\",\"price\":46.50,\"discount\":false},{\"id\":187,\"name\":\"model-187\",\"price\":46.75,\"discount\":false},{\"id\":188,\"name\":\"model-188\",\"price\":47.00,\"discount\":false},{\"id\":189,\"name\":\"model-189\",\"price\":47.25,\"discount\":true},{\"id\":190,\"name\":\"model-190\",\"price\":47.50,\"discount\":false},{\"id\":191,\"name\":\"model-191\",\"price\":47.75,\"discount\":false},{\"id\":192,\"name\":\"model-192\",\"price\":48.00,\"discount\":false},{\"id\":193,\"name\":\"model-193\",\"price\":48.25,\"discount\":false},{\"id\":194,\"name\":\"model-194\",\"price\":48.50,\"discount\":false},{\"id\":195,\"name\":\"model-195\",\"price\":48.75,\"discount\":false},{\"id\":196,\"name\":\"model-196\",\"price\":49.00,\"discount\":true},{\"id\":197,\"name\":\"model-197\",\"price\":49.25,\"discount\":false},{\"id\":198,\"name\":\"model-198\",\"price\":49.50,\"discount\":false},{\"id\":199,\"name\":\"model-199\",\"price\":49.75,\"discount\":false},{\"id\":200,\"name\":\"model-200\",\"price\":50.00,\"discount\":false},{\"id\":201,\"name\":\"model-201\",\"price\":50.25,\"discount\":false},{\"id\":202,\"name\":\"model-202\",\"price\":50.50,\"discount\":false},{\"id\":203,\"name\":\"model-203\",\"price\":50.75,\"discount\":true},{\"id\":204,\"name\":\"model-204\",\"price\":51.00,\"discount\":false},{\"id\":205,\"name\":\"model-205\",\"price\":51.25,\"discount\":false},{\"id\":206,\"name\":\"model-206\",\"price\":51.50,\"discount\":false},{\"id\":207,\"name\":\"model-207\",\"price\":51.75,\"discount\":false},{\"id\":208,\"name\":\"model-208\",\"price\":52.00,\"discount\":false},{\"id\":209,\"name\":\"model-209\",\"price\":52.25,\"discount\":false},{\"id\":210,\"name\":\"model-210\",\"price\":52.50,\"discount\":true},{\"id\":211,\"name\":\"model-211\",\"price\":52.75,\"discount\":false},{\"id\":212,\"name\":\"model-212\",\"price\":53.00,\"discount\":false},{\"id\":213,\"name\":\"model-213\",\"price\":53.25,\"discount\":false},{\"id\":214,\"name\":\"model-214\",\"price\":53.50,\"discount\":false},{\"id\":215,\"name\":\"model-215\",\"price\":53.75,\"discount\":false},{\"id\":216,\"name\":\"model-216\",\"price\":54.00,\"discount\":false},{\"id\":217,\"name\":\"model-217\",\"price\":54.25,\"discount\":true},{\"id\":218,\"name\":\"model-218\",\"price\":54.50,\"discount\":false},{\"id\":219,\"name\":\"model-219\",\"price\":54.75,\"discount\":false},{\"id\":220,\"name\":\"model-220\",\"price\":55.00,\"discount\":false},{\"id\":221,\"name\":\"model-221\",\"price\":55.25,\"discount\":false},{\"id\":222,\"name\":\"model-222\",\"price\":55.50,\"discount\":false},{\"id\":223,\"name\":\"model-223\",\"price\":55.75,\"discount\":false},{\"id\":224,\"name\":\"model-224\",\"price\":56.00,\"discount\":true},{\"id\":225,\"name\":\"model-225\",\"price\":56.25,\"discount\":false},{\"id\":226,\"name\":\"model-226\",\"price\":56.50,\"discount\":false},{\"id\":227,\"name\":\"model-227\",\"price\":56.75,\"discount\":false},{\"id\":228,\"name\":\"model-228\",\"price\":57.00,\"discount\":false},{\"id\":229,\"name\":\"model-229\",\"price\":57.25,\"discount\":false},{\"id\":230,\"name\":\"model-230\",\"price\":57.50,\"discount\":false},{\"id\":231,\"name\":\"model-231\",\"price\":57.75,\"discount\":true},{\"id\":232,\"name\":\"model-232\",\"price\":58.00,\"discount\":false},{\"id\":233,\"name\":\"model-233\",\"price\":58.25,\"discount\":false},{\"id\":234,\"name\":\"model-234\",\"price\":58.50,\"discount\":false},{\"id\":235,\"name\":\"model-235\",\"price\":58.75,\"discount\":false},{\"id\":236,\"name\":\"model-236\",\"price\":59.00,\"discount\":false},{\"id\":237,\"name\":\"model-237\",\"price\":59.25,\"discount\":false},{\"id\":238,\"name\":\"model-238\",\"price\":59.50,\"discount\":true},{\"id\":239,\"name\":\"model-239\",\"price\":59.75,\"discount\":false},{\"id\":240,\"name\":\"model-240\",\"price\":60.00,\"discount\":false},{\"id\":241,\"name\":\"model-241\",\"price\":60.25,\"discount\":false},{\"id\":242,\"name\":\"model-242\",\"price\":60.50,\"discount\":false},{\"id\":243,\"name\":\"model-243\",\"price\":60.75,\"discount\":false},{\"id\":244,\"name\":\"model-244\",\"price\":61.00,\"discount\":false},{\"id\":245,\"name\":\"model-245\",\"price\":61.25,\"discount\":true},{\"id\":246,\"name\":\"model-246\",\"price\":61.50,\"discount\":false},{\"id\":247,\"name\":\"model-247\",\"price\":61.75,\"discount\":false},{\"id\":248,\"name\":\"model-248\",\"price\":62.00,\"discount\":false},{\"id\":249,\"name\":\"model-249\",\"price\":62.25,\"discount\":false},{\"id\":250,\"name\":\"model-250\",\"price\":62.50,\"discount\":false},{\"id\":251,\"name\":\"model-251\",\"price\":62.75,\"discount\":false},{\"id\":252,\"name\":\"model-252\",\"price\":63.00,\"discount\":true},{\"id\":253,\"name\":\"model-253\",\"price\":63.25,\"discount\":false},{\"id\":254,\"name\":\"model-254\",\"price\":63.50,\"discount\":false},{\"id\":255,\"name\":\"model-255\",\"price\":63.75,\"discount\":false},{\"id\":256,\"name\":\"model-256\",\"price\":64.00,\"discount\":false},{\"id\":257,\"name\":\"model-257\",\"price\":64.25,\"discount\":false},{\"id\":258,\"name\":\"model-258\",\"price\":64.50,\"discount\":false},{\"id\":259,\"name\":\"model-259\",\"price\":64.75,\"discount\":true},{\"id\":260,\"name\":\"model-260\",\"price\":65.00,\"discount\":false},{\"id\":261,\"name\":\"model-261\",\"price\":65.25,\"discount\":false},{\"id\":262,\"name\":\"model-262\",\"price\":65.50,\"discount\":false},{\"id\":263,\"name\":\"model-263\",\"price\":65.75,\"discount\":false},{\"id\":264,\"name\":\"model-264\",\"price\":66.00,\"discount\":false},{\"id\":265,\"name\":\"model-265\",\"price\":66.25,\"discount\":false},{\"id\":266,\"name\":\"model-266\",\"price\":66.50,\"discount\":true},{\"id\":267,\"name\":\"model-267\",\"price\":66.75,\"discount\":false},{\"id\":268,\"name\":\"model-268\",\"price\":67.00,\"discount\":false},{\"id\":269,\"name\":\"model-269\",\"price\":67.25,\"discount\":false},{\"id\":270,\"name\":\"model-270\",\"price\":67.50,\"discount\":false},{\"id\":271,\"name\":\"model-271\",\"price\":67.75,\"discount\":false},{\"id\":272,\"name\":\"model-272\",\"price\":68.00,\"discount\":false},{\"id\":273,\"name\":\"model-273\",\"price\":68.25,\"discount\":true},{\"id\":274,\"name\":\"model-274\",\"price\":68.50,\"discount\":false},{\"id\":275,\"name\":\"model-275\",\"price\":68.75,\"discount\":false},{\"id\":276,\"name\":\"model-276\",\"price\":69.00,\"discount\":false},{\"id\":277,\"name\":\"model-277\",\"price\":69.25,\"discount\":false},{\"id\":278,\"name\":\"model-278\",\"price\":69.50,\"discount\":false},{\"id\":279,\"name\":\"model-279\",\"price\":69.75,\"discount\":false},{\"id\":280,\"name\":\"model-280\",\"price\":70.00,\"discount\":true},{\"id\":281,\"name\":\"model-281\",\"price\":70.25,\"discount\":false},{\"id\":282,\"name\":\"model-282\",\"price\":70.50,\"discount\":false},{\"id\":283,\"name\":\"model-283\",\"price\":70.75,\"discount\":false},{\"id\":284,\"name\":\"model-284\",\"price\":71.00,\"discount\":false},{\"id\":285,\"name\":\"model-285\",\"price\":71.25,\"discount\":false},{\"id\":286,\"name\":\"model-286\",\"price\":71.50,\"discount\":false},{\"id\":287,\"name\":\"model-287\",\"price\":71.75,\"discount\":true},{\"id\":288,\"name\":\"model-288\",\"price\":72.00,\"discount\":false},{\"id\":289,\"name\":\"model-289\",\"price\":72.25,\"discount\":false},{\"id\":290,\"name\":\"model-290\",\"price\":72.50,\"discount\":false},{\"id\":291,\"name\":\"model-291\",\"price\":72.75,\"discount\":false},{\"id\":292,\"name\":\"model-292\",\"price\":73.00,\"discount\":false},{\"id\":293,\"name\":\"model-293\",\"price\":73.25,\"discount\":false},{\"id\":294,\"name\":\"model-294\",\"price\":73.50,\"discount\":true},{\"id\":295,\"name\":\"model-295\",\"price\":73.75,\"discount\":false},{\"id\":296,\"name\":\"model-296\",\"price\":74.00,\"discount\":false},{\"id\":297,\"name\":\"model-297\",\"price\":74.25,\"discount\":false},{\"id\":298,\"name\":\"model-298\",\"price\":74.50,\"discount\":false},{\"id\":299,\"name\":\"model-299\",\"price\":74.75,\"discount\":false},{\"id\":300,\"name\":\"model-300\",\"price\":75.00,\"discount\":false}];</script></body></html>\n",
+    "data.json": "{\n  \"name\": \"web\",\n  \"version\": \"1.2.3\",\n  \"replicas\": 3,\n  \"image\": \"nginx:1.27\",\n  \"labels\": {\"app\": \"web\", \"tier\": \"front\"}\n}\n",
+    "-dash.txt": "foo in dash\n",
+    "sp ace.txt": "foo in space\n",
+    "src/app.ts": "import { util } from \"./util\";\nexport function foo() {\n  return util();\n}\n// TODO: remove foo\n",
+    "src/util.ts": "export function util() {\n  return 42;\n}\n",
+    "src/test.js": "test('foo', () => {});\n",
+    "src/lib/helper.go": "package lib\n\nfunc Foo() string {\n\treturn \"foo\"\n}\n",
+    "src/lib/data.py": "def foo():\n    return 1\n",
+    "web/index.js": "const foo = require('./foo');\nconsole.log(foo);\n",
+    "config/app.yaml": "name: web\nreplicas: 3\nimage: nginx:1.27\n",
+    "config/db.yml": "host: db\nport: 5432\n",
+    "Makefile": "build:\n\tgo build ./...\n\ntest:\n\tgo test ./... # foo\n",
+    ".hidden/secret.txt": "foo secret\n",
+    ".env": "FOO=bar\nTOKEN=foo\n",
+    ".gitignore": "*.log\nbuild/\n",
+    ".ignore": "*.log\nbuild/\n",
+    ".rgignore": "*.log\nbuild/\n",
+    "dir/d.txt": "foo in d\n",
+    "dir/sub/c.log": "foo in log\n",
+    "dir/sub/.gitignore": "*.tmp\n",
+    "dir/sub/x.tmp": "foo tmp\n",
+    "build/out.txt": "foo built\n",
+    "ml.txt": "hello world\nsay foo\nfoo\nnext\nlast foobar\n",
+    "num.txt": "id=42 x\nid=7 y\nno id here\nsum 10 20 30\n",
+    "o.txt": "foo\nboo\n",
+    "m.txt": "m\nm\nx\nm\n"
+  },
+  "cases": [
+    {
+      "name": "case sensitive",
+      "args": [
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "case sensitive upper",
+      "args": [
+        "Foo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case",
+      "args": [
+        "-i",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case long",
+      "args": [
+        "--ignore-case",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "smart case lower",
+      "args": [
+        "-S",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "smart case upper",
+      "args": [
+        "-S",
+        "Foo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "smart case long",
+      "args": [
+        "--smart-case",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "case sensitive flag",
+      "args": [
+        "-s",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore then sensitive",
+      "args": [
+        "-i",
+        "-s",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "sensitive then ignore",
+      "args": [
+        "-s",
+        "-i",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "smart then sensitive",
+      "args": [
+        "-S",
+        "-s",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore then smart upper",
+      "args": [
+        "-i",
+        "-S",
+        "Foo",
+        "a.txt"
+      ],
+      "stdout": "Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "no line numbers one file",
+      "args": [
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "line numbers",
+      "args": [
+        "-n",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "line numbers long",
+      "args": [
+        "--line-number",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "no line number",
+      "args": [
+        "-N",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "line numbers then off",
+      "args": [
+        "-n",
+        "-N",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "off then line numbers",
+      "args": [
+        "-N",
+        "-n",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "column",
+      "args": [
+        "--column",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:1:foo one\n3:1:foo two\n7:1:food court\n8:1:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "column no line number",
+      "args": [
+        "--column",
+        "-N",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1:foo one\n1:foo two\n1:food court\n1:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "vimgrep",
+      "args": [
+        "--vimgrep",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:2:1:foo one\na.txt:3:1:foo two\na.txt:7:1:food court\na.txt:8:1:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "vimgrep two files",
+      "args": [
+        "-j1",
+        "--vimgrep",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:2:1:foo one\na.txt:3:1:foo two\na.txt:7:1:food court\na.txt:8:1:foobar\nnonl.txt:2:6:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "two files names",
+      "args": [
+        "-j1",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\nnonl.txt:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "two files numbers",
+      "args": [
+        "-j1",
+        "-n",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:2:foo one\na.txt:3:foo two\na.txt:7:food court\na.txt:8:foobar\nnonl.txt:2:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "directory names",
+      "args": [
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "directory numbers",
+      "args": [
+        "-n",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2:export function foo() {\nsrc/app.ts:5:// TODO: remove foo\nsrc/lib/data.py:1:def foo():\nsrc/lib/helper.go:4:\treturn \"foo\"\nsrc/test.js:1:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "cwd",
+      "args": [
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "cwd numbers",
+      "args": [
+        "-n",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:1:foo in dash\nMakefile:5:\tgo test ./... # foo\na.txt:2:foo one\na.txt:3:foo two\na.txt:7:food court\na.txt:8:foobar\nblank.pat:1:foo\ncrlf.txt:1:foo\r\ncrlf.txt:3:baz foo\r\ndir/d.txt:1:foo in d\nml.txt:2:say foo\nml.txt:3:foo\nml.txt:5:last foobar\nnonl.txt:2:last foo\no.txt:1:foo\npats.txt:1:foo\nrep.txt:6:foo_bar foo\nrep.txt:7:x foo-bar y\nsp ace.txt:1:foo in space\nsrc/app.ts:2:export function foo() {\nsrc/app.ts:5:// TODO: remove foo\nsrc/lib/data.py:1:def foo():\nsrc/lib/helper.go:4:\treturn \"foo\"\nsrc/test.js:1:test('foo', () => {});\nweb/index.js:1:const foo = require('./foo');\nweb/index.js:2:console.log(foo);\n",
+      "exit": 0
+    },
+    {
+      "name": "dot",
+      "args": [
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt:foo in dash\n./Makefile:\tgo test ./... # foo\n./a.txt:foo one\n./a.txt:foo two\n./a.txt:foobar\n./a.txt:food court\n./blank.pat:foo\n./crlf.txt:baz foo\r\n./crlf.txt:foo\r\n./dir/d.txt:foo in d\n./ml.txt:foo\n./ml.txt:last foobar\n./ml.txt:say foo\n./nonl.txt:last foo\n./o.txt:foo\n./pats.txt:foo\n./rep.txt:foo_bar foo\n./rep.txt:x foo-bar y\n./sp ace.txt:foo in space\n./src/app.ts:// TODO: remove foo\n./src/app.ts:export function foo() {\n./src/lib/data.py:def foo():\n./src/lib/helper.go:\treturn \"foo\"\n./src/test.js:test('foo', () => {});\n./web/index.js:console.log(foo);\n./web/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "dot slash file",
+      "args": [
+        "foo",
+        "./a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "dot slash dir",
+      "args": [
+        "foo",
+        "./src"
+      ],
+      "unordered": true,
+      "stdout": "./src/app.ts:// TODO: remove foo\n./src/app.ts:export function foo() {\n./src/lib/data.py:def foo():\n./src/lib/helper.go:\treturn \"foo\"\n./src/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "trailing slash dir",
+      "args": [
+        "foo",
+        "src/"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "nested file",
+      "args": [
+        "foo",
+        "src/app.ts"
+      ],
+      "stdout": "export function foo() {\n// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "with filename one file",
+      "args": [
+        "-H",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "with filename long",
+      "args": [
+        "--with-filename",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "no filename dir",
+      "args": [
+        "-I",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "\treturn \"foo\"\n// TODO: remove foo\ndef foo():\nexport function foo() {\ntest('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "no filename long",
+      "args": [
+        "-j1",
+        "--no-filename",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\nlast foo\n",
+      "exit": 0
+    },
+    {
+      "name": "no filename then with",
+      "args": [
+        "-I",
+        "-H",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "count",
+      "args": [
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "count ignore case",
+      "args": [
+        "-ic",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "5\n",
+      "exit": 0
+    },
+    {
+      "name": "count two files",
+      "args": [
+        "-j1",
+        "-c",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:4\nnonl.txt:1\n",
+      "exit": 0
+    },
+    {
+      "name": "count dir",
+      "args": [
+        "-c",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2\nsrc/lib/data.py:1\nsrc/lib/helper.go:1\nsrc/test.js:1\n",
+      "exit": 0
+    },
+    {
+      "name": "count matches",
+      "args": [
+        "--count-matches",
+        "o",
+        "a.txt"
+      ],
+      "stdout": "13\n",
+      "exit": 0
+    },
+    {
+      "name": "count matches dir",
+      "args": [
+        "--count-matches",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:2\nsrc/lib/data.py:1\nsrc/lib/helper.go:1\nsrc/test.js:1\n",
+      "exit": 0
+    },
+    {
+      "name": "count include zero",
+      "args": [
+        "-j1",
+        "-c",
+        "--include-zero",
+        "foo",
+        "a.txt",
+        "b.txt"
+      ],
+      "stdout": "a.txt:4\nb.txt:0\n",
+      "exit": 0
+    },
+    {
+      "name": "invert",
+      "args": [
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nFoo three\n\nbar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "invert numbers",
+      "args": [
+        "-vn",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1:alpha\n4:Foo three\n5:\n6:bar\n9:the end\n",
+      "exit": 0
+    },
+    {
+      "name": "word",
+      "args": [
+        "-w",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "word ignore case",
+      "args": [
+        "-wi",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "line regexp",
+      "args": [
+        "-x",
+        "foobar",
+        "a.txt"
+      ],
+      "stdout": "foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "line regexp long",
+      "args": [
+        "--line-regexp",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset",
+      "args": [
+        "-b",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "6:foo one\n14:foo two\n37:food court\n48:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset numbers",
+      "args": [
+        "-nb",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:6:foo one\n3:14:foo two\n7:37:food court\n8:48:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "only matching",
+      "args": [
+        "-o",
+        "fo+",
+        "a.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "only matching numbers",
+      "args": [
+        "-on",
+        "fo+",
+        "a.txt"
+      ],
+      "stdout": "2:foo\n3:foo\n7:foo\n8:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "only matching two files",
+      "args": [
+        "-j1",
+        "-o",
+        "fo+",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:foo\na.txt:foo\na.txt:foo\na.txt:foo\nnonl.txt:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "files with matches",
+      "args": [
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "files with matches dot",
+      "args": [
+        "-l",
+        "foo",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt\n./Makefile\n./a.txt\n./blank.pat\n./crlf.txt\n./dir/d.txt\n./ml.txt\n./nonl.txt\n./o.txt\n./pats.txt\n./rep.txt\n./sp ace.txt\n./src/app.ts\n./src/lib/data.py\n./src/lib/helper.go\n./src/test.js\n./web/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "files with matches long",
+      "args": [
+        "--files-with-matches",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "files without match",
+      "args": [
+        "--files-without-match",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "files without match none",
+      "args": [
+        "--files-without-match",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "files list",
+      "args": [
+        "--files"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "files list dir",
+      "args": [
+        "--files",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "files list dot",
+      "args": [
+        "--files",
+        "."
+      ],
+      "unordered": true,
+      "stdout": "./-dash.txt\n./Makefile\n./a.txt\n./b.txt\n./bin.dat\n./blank.pat\n./conf\n./config/app.yaml\n./config/db.yml\n./crlf.txt\n./ctx.txt\n./data.json\n./dir/d.txt\n./empty.pat\n./empty.txt\n./m.txt\n./ml.txt\n./nonl.txt\n./num.txt\n./o.txt\n./page.html\n./pats.txt\n./rep.txt\n./sp ace.txt\n./src/app.ts\n./src/lib/data.py\n./src/lib/helper.go\n./src/test.js\n./src/util.ts\n./utf.txt\n./web/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "files list two",
+      "args": [
+        "--files",
+        "src",
+        "config"
+      ],
+      "unordered": true,
+      "stdout": "config/app.yaml\nconfig/db.yml\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "files file",
+      "args": [
+        "--files",
+        "a.txt"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "quiet",
+      "args": [
+        "-q",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "quiet miss",
+      "args": [
+        "-q",
+        "nothing",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "quiet long",
+      "args": [
+        "--quiet",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "no match",
+      "args": [
+        "nothing",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "no match dir",
+      "args": [
+        "nothing",
+        "src"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "empty file",
+      "args": [
+        "foo",
+        "empty.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "no final newline",
+      "args": [
+        "foo",
+        "nonl.txt"
+      ],
+      "stdout": "last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "no final newline invert",
+      "args": [
+        "-v",
+        "foo",
+        "nonl.txt"
+      ],
+      "stdout": "first line\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf",
+      "args": [
+        "foo",
+        "crlf.txt"
+      ],
+      "stdout": "foo\r\nbaz foo\r\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf anchored",
+      "args": [
+        "foo$",
+        "crlf.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "crlf only",
+      "args": [
+        "-o",
+        "ba.",
+        "crlf.txt"
+      ],
+      "stdout": "bar\nbaz\n",
+      "exit": 0
+    },
+    {
+      "name": "utf ignore case",
+      "args": [
+        "-i",
+        "café",
+        "utf.txt"
+      ],
+      "stdout": "café au lait\nCAFÉ\n",
+      "exit": 0
+    },
+    {
+      "name": "utf ignore case school",
+      "args": [
+        "-i",
+        "école",
+        "utf.txt"
+      ],
+      "stdout": "École normale\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "utf sensitive",
+      "args": [
+        "école",
+        "utf.txt"
+      ],
+      "stdout": "école\n",
+      "exit": 0
+    },
+    {
+      "name": "utf only",
+      "args": [
+        "-o",
+        "caf.",
+        "utf.txt"
+      ],
+      "stdout": "café\n",
+      "exit": 0
+    },
+    {
+      "name": "utf emoji",
+      "args": [
+        "🎉",
+        "utf.txt"
+      ],
+      "stdout": "emoji 🎉 party\n",
+      "exit": 0
+    },
+    {
+      "name": "utf cjk",
+      "args": [
+        "テキスト",
+        "utf.txt"
+      ],
+      "stdout": "日本語のテキスト\n",
+      "exit": 0
+    },
+    {
+      "name": "utf sharp s",
+      "args": [
+        "-i",
+        "STRASSE",
+        "utf.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "dash file",
+      "args": [
+        "foo",
+        "-dash.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "space file",
+      "args": [
+        "foo",
+        "sp ace.txt"
+      ],
+      "stdout": "foo in space\n",
+      "exit": 0
+    },
+    {
+      "name": "json file",
+      "args": [
+        "replicas",
+        "data.json"
+      ],
+      "stdout": "  \"replicas\": 3,\n",
+      "exit": 0
+    },
+    {
+      "name": "minified only",
+      "args": [
+        "-o",
+        "\"id\":7,[^}]*",
+        "page.html"
+      ],
+      "stdout": "\"id\":7,\"name\":\"model-7\",\"price\":1.75,\"discount\":true\n",
+      "exit": 0
+    },
+    {
+      "name": "minified count matches",
+      "args": [
+        "--count-matches",
+        "discount\":true",
+        "page.html"
+      ],
+      "stdout": "42\n",
+      "exit": 0
+    },
+    {
+      "name": "hidden skipped",
+      "args": [
+        "foo",
+        ".hidden"
+      ],
+      "unordered": true,
+      "stdout": ".hidden/secret.txt:foo secret\n",
+      "exit": 0
+    },
+    {
+      "name": "dotfile given",
+      "args": [
+        "foo",
+        ".env"
+      ],
+      "stdout": "TOKEN=foo\n",
+      "exit": 0
+    },
+    {
+      "name": "dotfile ignore case",
+      "args": [
+        "-i",
+        "foo",
+        ".env"
+      ],
+      "stdout": "FOO=bar\nTOKEN=foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin",
+      "args": [
+        "foo"
+      ],
+      "stdin": "foo\nbar\nFoo\n",
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin numbers",
+      "args": [
+        "-n",
+        "foo"
+      ],
+      "stdin": "foo\nbar\nfoo\n",
+      "stdout": "1:foo\n3:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin with filename",
+      "args": [
+        "-H",
+        "foo"
+      ],
+      "stdin": "foo\nbar\n",
+      "stdout": "<stdin>:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin files with matches",
+      "args": [
+        "-l",
+        "foo"
+      ],
+      "stdin": "foo\n",
+      "stdout": "<stdin>\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin files without match",
+      "args": [
+        "--files-without-match",
+        "foo"
+      ],
+      "stdin": "bar\n",
+      "stdout": "<stdin>\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin count",
+      "args": [
+        "-c",
+        "foo"
+      ],
+      "stdin": "foo\nfoo\nbar\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin vimgrep",
+      "args": [
+        "--vimgrep",
+        "foo"
+      ],
+      "stdin": "a foo\n",
+      "stdout": "<stdin>:1:3:a foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin column",
+      "args": [
+        "--column",
+        "foo"
+      ],
+      "stdin": "a foo\n",
+      "stdout": "1:3:a foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash",
+      "args": [
+        "foo",
+        "-"
+      ],
+      "stdin": "foo\n",
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash numbers",
+      "args": [
+        "-n",
+        "foo",
+        "-"
+      ],
+      "stdin": "x\nfoo\n",
+      "stdout": "2:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash and file",
+      "args": [
+        "-j1",
+        "foo",
+        "-",
+        "nonl.txt"
+      ],
+      "stdin": "foo\n",
+      "stdout": "<stdin>:foo\nnonl.txt:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin file and dash",
+      "args": [
+        "-j1",
+        "foo",
+        "nonl.txt",
+        "-"
+      ],
+      "stdin": "foo\n",
+      "stdout": "nonl.txt:last foo\n<stdin>:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash and file count",
+      "args": [
+        "-j1",
+        "-c",
+        "foo",
+        "-",
+        "nonl.txt"
+      ],
+      "stdin": "foo\nfoo\n",
+      "stdout": "<stdin>:2\nnonl.txt:1\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash and file list",
+      "args": [
+        "-j1",
+        "-l",
+        "foo",
+        "-",
+        "nonl.txt"
+      ],
+      "stdin": "foo\n",
+      "stdout": "<stdin>\nnonl.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash heading",
+      "args": [
+        "-j1",
+        "--heading",
+        "foo",
+        "-",
+        "nonl.txt"
+      ],
+      "stdin": "foo\n",
+      "stdout": "<stdin>\nfoo\n\nnonl.txt\nlast foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin dash quiet",
+      "args": [
+        "-q",
+        "foo",
+        "-"
+      ],
+      "stdin": "foo\n",
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "stdin with path ignores stdin",
+      "args": [
+        "foo",
+        "nonl.txt"
+      ],
+      "stdin": "foo\n",
+      "stdout": "last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin no final newline",
+      "args": [
+        "foo"
+      ],
+      "stdin": "a\nfoo",
+      "stdout": "foo\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin invert",
+      "args": [
+        "-v",
+        "foo"
+      ],
+      "stdin": "foo\nbar\n",
+      "stdout": "bar\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin only",
+      "args": [
+        "-o",
+        "[0-9]+"
+      ],
+      "stdin": "a 1 b 22\n",
+      "stdout": "1\n22\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin replace",
+      "args": [
+        "-r",
+        "X",
+        "o"
+      ],
+      "stdin": "foo\n",
+      "stdout": "fXX\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin empty pattern",
+      "args": [
+        ""
+      ],
+      "stdin": "a\n\nb\n",
+      "stdout": "a\n\nb\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin binary",
+      "args": [
+        "foo"
+      ],
+      "stdin": "a\u0000foo\n",
+      "stdout": "binary file matches (found \"\\0\" byte around offset 1)\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin binary count",
+      "args": [
+        "-c",
+        "foo"
+      ],
+      "stdin": "a\u0000foo\nfoo\n",
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin binary text",
+      "args": [
+        "-a",
+        "foo"
+      ],
+      "stdin": "foo\u0000\n",
+      "stdout": "foo\u0000\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin patterns file",
+      "args": [
+        "-j1",
+        "-f",
+        "-",
+        "a.txt"
+      ],
+      "stdin": "bar\n",
+      "stdout": "bar\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin crlf",
+      "args": [
+        "foo$"
+      ],
+      "stdin": "foo\r\n",
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "stdin utf",
+      "args": [
+        "-o",
+        "\\w+"
+      ],
+      "stdin": "café\n",
+      "stdout": "café\n",
+      "exit": 0
+    },
+    {
+      "name": "double dash pattern",
+      "args": [
+        "--",
+        "-v",
+        "b.txt"
+      ],
+      "stdout": "-v is a flag\n",
+      "exit": 0
+    },
+    {
+      "name": "double dash after pattern",
+      "args": [
+        "foo",
+        "--",
+        "-dash.txt"
+      ],
+      "stdout": "foo in dash\n",
+      "exit": 0
+    },
+    {
+      "name": "double dash after regexp",
+      "args": [
+        "-e",
+        "foo",
+        "--",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "double dash then option word",
+      "args": [
+        "--",
+        "-n",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "pattern starting with dash via regexp",
+      "args": [
+        "-e",
+        "-v",
+        "b.txt"
+      ],
+      "stdout": "-v is a flag\n",
+      "exit": 0
+    },
+    {
+      "name": "regexp long",
+      "args": [
+        "--regexp",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "regexp long equals",
+      "args": [
+        "--regexp=foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "regexp attached",
+      "args": [
+        "-efoo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "regexp two",
+      "args": [
+        "-e",
+        "foo",
+        "-e",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "regexp and file",
+      "args": [
+        "-j1",
+        "-e",
+        "the",
+        "-f",
+        "pats.txt",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "pattern file",
+      "args": [
+        "-j1",
+        "-f",
+        "pats.txt",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "pattern file long",
+      "args": [
+        "--file=pats.txt",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nbar\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "pattern file blank line",
+      "args": [
+        "-j1",
+        "-f",
+        "blank.pat",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "pattern file empty",
+      "args": [
+        "-j1",
+        "-f",
+        "empty.pat",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "pattern file missing",
+      "args": [
+        "-j1",
+        "-f",
+        "missing.pat",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "regexp fixed two",
+      "args": [
+        "-F",
+        "-e",
+        "x*y",
+        "-e",
+        "[x]",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\nx*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed",
+      "args": [
+        "-F",
+        "x*y",
+        "b.txt"
+      ],
+      "stdout": "x*y product\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed long",
+      "args": [
+        "--fixed-strings",
+        "[x]",
+        "b.txt"
+      ],
+      "stdout": "array[x] = 1\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed dot",
+      "args": [
+        "-F",
+        "1.2",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\n",
+      "exit": 0
+    },
+    {
+      "name": "fixed backslash",
+      "args": [
+        "-F",
+        "C:\\temp",
+        "b.txt"
+      ],
+      "stdout": "path C:\\temp\\file\n",
+      "exit": 0
+    },
+    {
+      "name": "regex dot",
+      "args": [
+        "1.2",
+        "b.txt"
+      ],
+      "stdout": "version 1.2.3\n",
+      "exit": 0
+    },
+    {
+      "name": "after context cluster",
+      "args": [
+        "-nA1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n4-Foo three\n--\n7:food court\n8:foobar\n9-the end\n",
+      "exit": 0
+    },
+    {
+      "name": "context cluster",
+      "args": [
+        "-nC1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "3-other 1\n4:match c\n5-other 2\n",
+      "exit": 0
+    },
+    {
+      "name": "before context cluster",
+      "args": [
+        "-nB1",
+        "match d",
+        "ctx.txt"
+      ],
+      "stdout": "8-other 5\n9:match d\n",
+      "exit": 0
+    },
+    {
+      "name": "after context attached",
+      "args": [
+        "-A1",
+        "match a",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n",
+      "exit": 0
+    },
+    {
+      "name": "after context separate",
+      "args": [
+        "-A",
+        "1",
+        "match a",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n",
+      "exit": 0
+    },
+    {
+      "name": "after context long",
+      "args": [
+        "--after-context",
+        "1",
+        "match a",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n",
+      "exit": 0
+    },
+    {
+      "name": "after context long equals",
+      "args": [
+        "--after-context=1",
+        "match a",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\n",
+      "exit": 0
+    },
+    {
+      "name": "before context long",
+      "args": [
+        "--before-context",
+        "1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "other 1\nmatch c\n",
+      "exit": 0
+    },
+    {
+      "name": "context long",
+      "args": [
+        "--context",
+        "1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "other 1\nmatch c\nother 2\n",
+      "exit": 0
+    },
+    {
+      "name": "context long equals",
+      "args": [
+        "--context=1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "other 1\nmatch c\nother 2\n",
+      "exit": 0
+    },
+    {
+      "name": "context short separate",
+      "args": [
+        "-C",
+        "1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "other 1\nmatch c\nother 2\n",
+      "exit": 0
+    },
+    {
+      "name": "context then after",
+      "args": [
+        "-C1",
+        "-A3",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "other 1\nmatch c\nother 2\nother 3\nother 4\n",
+      "exit": 0
+    },
+    {
+      "name": "after then context",
+      "args": [
+        "-A3",
+        "-C1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "other 1\nmatch c\nother 2\nother 3\nother 4\n",
+      "exit": 0
+    },
+    {
+      "name": "context word cluster",
+      "args": [
+        "-wC1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case cluster",
+      "args": [
+        "-inw",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n4:Foo three\n",
+      "exit": 0
+    },
+    {
+      "name": "max count attached",
+      "args": [
+        "-m1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "max count separate",
+      "args": [
+        "-m",
+        "1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "max count long",
+      "args": [
+        "--max-count",
+        "2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "max count long equals",
+      "args": [
+        "--max-count=2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "max count cluster",
+      "args": [
+        "-nm1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "max count bad",
+      "args": [
+        "-m",
+        "x",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "max count zero",
+      "args": [
+        "-m0",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "max count count",
+      "args": [
+        "-m1",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "max count dir",
+      "args": [
+        "-m1",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "options after operands",
+      "args": [
+        "foo",
+        "a.txt",
+        "-n"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "options after operands ignore case",
+      "args": [
+        "foo",
+        "a.txt",
+        "-i"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "options between operands",
+      "args": [
+        "foo",
+        "-n",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "glob separate",
+      "args": [
+        "-g",
+        "*.ts",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "glob long",
+      "args": [
+        "--glob",
+        "*.ts",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "glob long equals",
+      "args": [
+        "--glob=*.ts",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "glob attached",
+      "args": [
+        "-g*.ts",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "unknown long option",
+      "args": [
+        "--nosuch",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unknown short option",
+      "args": [
+        "-Y",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unknown in cluster",
+      "args": [
+        "-nY",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing regexp value",
+      "args": [
+        "a.txt",
+        "-e"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing context value",
+      "args": [
+        "foo",
+        "a.txt",
+        "-A"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "bad context value",
+      "args": [
+        "-A",
+        "x",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "negative context value",
+      "args": [
+        "-A",
+        "-1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no pattern",
+      "args": [],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "long option prefix",
+      "args": [
+        "--ignore-cas",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "passthrough alias",
+      "args": [
+        "--passthrough",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "passthru",
+      "args": [
+        "--passthru",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "passthru numbers",
+      "args": [
+        "-n",
+        "--passthru",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1-alpha\n2:foo one\n3:foo two\n4-Foo three\n5-\n6-bar\n7:food court\n8:foobar\n9-the end\n",
+      "exit": 0
+    },
+    {
+      "name": "maxdepth alias",
+      "args": [
+        "--maxdepth",
+        "1",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\n",
+      "exit": 0
+    },
+    {
+      "name": "max depth",
+      "args": [
+        "--max-depth",
+        "1",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\n",
+      "exit": 0
+    },
+    {
+      "name": "max depth short",
+      "args": [
+        "-d",
+        "2",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "max depth equals",
+      "args": [
+        "--max-depth=2",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "hidden dot alias",
+      "args": [
+        "-.",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\n.env:TOKEN=foo\n.hidden/secret.txt:foo secret\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "hidden",
+      "args": [
+        "--hidden",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\n.env:TOKEN=foo\n.hidden/secret.txt:foo secret\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "hidden files list",
+      "args": [
+        "--files",
+        "--hidden"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.env\n.gitignore\n.hidden/secret.txt\n.ignore\n.rgignore\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/.gitignore\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "no ignore",
+      "args": [
+        "--no-ignore",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\nbuild/out.txt:foo built\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "no ignore files list",
+      "args": [
+        "--files",
+        "--no-ignore"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nbuild/out.txt\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/c.log\ndir/sub/x.tmp\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "unrestricted",
+      "args": [
+        "-u",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\nbuild/out.txt:foo built\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "unrestricted twice",
+      "args": [
+        "-uu",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\n.env:TOKEN=foo\n.hidden/secret.txt:foo secret\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\nbuild/out.txt:foo built\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "unrestricted thrice",
+      "args": [
+        "-uuu",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\n.env:TOKEN=foo\n.hidden/secret.txt:foo secret\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nbin.dat: binary file matches (found \"\\0\" byte around offset 3)\nblank.pat:foo\nbuild/out.txt:foo built\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\ndir/sub/c.log:foo in log\ndir/sub/x.tmp:foo tmp\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "unrestricted separate",
+      "args": [
+        "-u",
+        "-u",
+        "--files"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.env\n.gitignore\n.hidden/secret.txt\n.ignore\n.rgignore\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nbuild/out.txt\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/.gitignore\ndir/sub/c.log\ndir/sub/x.tmp\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "threads",
+      "args": [
+        "-j1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "threads long",
+      "args": [
+        "--threads",
+        "2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "sort path",
+      "args": [
+        "--sort",
+        "path",
+        "foo"
+      ],
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\nblank.pat:foo\ncrlf.txt:foo\r\ncrlf.txt:baz foo\r\ndir/d.txt:foo in d\nml.txt:say foo\nml.txt:foo\nml.txt:last foobar\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:export function foo() {\nsrc/app.ts:// TODO: remove foo\nsrc/lib/data.py:def foo():\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/test.js:test('foo', () => {});\nweb/index.js:const foo = require('./foo');\nweb/index.js:console.log(foo);\n",
+      "exit": 0
+    },
+    {
+      "name": "sort path equals",
+      "args": [
+        "--sort=path",
+        "-l",
+        "foo"
+      ],
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "sort none",
+      "args": [
+        "--sort",
+        "none",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "sort bad",
+      "args": [
+        "--sort",
+        "size",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no require git",
+      "args": [
+        "--no-require-git",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "require git",
+      "args": [
+        "--require-git",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\ndir/sub/x.tmp\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "null files",
+      "args": [
+        "-j1",
+        "-0",
+        "-l",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\u0000nonl.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "multiline flag",
+      "args": [
+        "-U",
+        "foo$",
+        "ml.txt"
+      ],
+      "stdout": "say foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline cross",
+      "args": [
+        "-U",
+        "say foo\\nfoo",
+        "ml.txt"
+      ],
+      "stdout": "say foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline dotall inline",
+      "args": [
+        "-U",
+        "(?s)hello.*foobar",
+        "ml.txt"
+      ],
+      "stdout": "hello world\nsay foo\nfoo\nnext\nlast foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline dotall flag",
+      "args": [
+        "--multiline-dotall",
+        "-U",
+        "say.*next",
+        "ml.txt"
+      ],
+      "stdout": "say foo\nfoo\nnext\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline count",
+      "args": [
+        "-U",
+        "-c",
+        "foo",
+        "ml.txt"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline only",
+      "args": [
+        "-U",
+        "-o",
+        "foo\\nnext",
+        "ml.txt"
+      ],
+      "stdout": "foo\nnext\n",
+      "exit": 0
+    },
+    {
+      "name": "newline without multiline",
+      "args": [
+        "foo\\nbar",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "literal newline pattern",
+      "args": [
+        "foo\nbar",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "literal newline fixed",
+      "args": [
+        "-F",
+        "a\nb",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "literal newline regexp",
+      "args": [
+        "-e",
+        "foo\nbar",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "literal newline multiline",
+      "args": [
+        "-U",
+        "say foo\nfoo",
+        "ml.txt"
+      ],
+      "stdout": "say foo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "escaped newline class",
+      "args": [
+        "[\\n]",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "invalid regex",
+      "args": [
+        "(",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "invalid regex bracket",
+      "args": [
+        "[a",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "fixed paren",
+      "args": [
+        "-F",
+        "(",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "repetition",
+      "args": [
+        "o{2}",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "alternation",
+      "args": [
+        "one|two",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "anchors",
+      "args": [
+        "^foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "end anchor",
+      "args": [
+        "end$",
+        "a.txt"
+      ],
+      "stdout": "the end\n",
+      "exit": 0
+    },
+    {
+      "name": "empty pattern",
+      "args": [
+        "",
+        "a.txt"
+      ],
+      "stdout": "alpha\nfoo one\nfoo two\nFoo three\n\nbar\nfood court\nfoobar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "empty pattern count",
+      "args": [
+        "-c",
+        "",
+        "a.txt"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "inline ignore case",
+      "args": [
+        "(?i)FOO",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nFoo three\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "inline extended",
+      "args": [
+        "(?x) f o o",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "digit class",
+      "args": [
+        "-o",
+        "\\d+",
+        "num.txt"
+      ],
+      "stdout": "42\n7\n10\n20\n30\n",
+      "exit": 0
+    },
+    {
+      "name": "posix class",
+      "args": [
+        "-o",
+        "[[:digit:]]+",
+        "num.txt"
+      ],
+      "stdout": "42\n7\n10\n20\n30\n",
+      "exit": 0
+    },
+    {
+      "name": "named group",
+      "args": [
+        "-o",
+        "(?P<n>\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42\n7\n10\n20\n30\n",
+      "exit": 0
+    },
+    {
+      "name": "lazy",
+      "args": [
+        "-o",
+        "i.*?=",
+        "num.txt"
+      ],
+      "stdout": "id=\nid=\n",
+      "exit": 0
+    },
+    {
+      "name": "after context",
+      "args": [
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "before context",
+      "args": [
+        "-B1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\n--\nother 5\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "context",
+      "args": [
+        "-C1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nother 5\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context numbers",
+      "args": [
+        "-n",
+        "-C1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2:match b\n3-other 1\n4:match c\n5-other 2\n--\n8-other 5\n9:match d\n10-other 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context two",
+      "args": [
+        "-C2",
+        "match d",
+        "ctx.txt"
+      ],
+      "stdout": "other 4\nother 5\nmatch d\nother 6\nother 7\n",
+      "exit": 0
+    },
+    {
+      "name": "after zero",
+      "args": [
+        "-A0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nmatch c\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "context zero",
+      "args": [
+        "-C0",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nmatch c\nmatch d\n",
+      "exit": 0
+    },
+    {
+      "name": "adjacent matches numbers",
+      "args": [
+        "-n",
+        "-A1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:foo one\n3:foo two\n4-Foo three\n--\n7:food court\n8:foobar\n9-the end\n",
+      "exit": 0
+    },
+    {
+      "name": "context two files",
+      "args": [
+        "-j1",
+        "-C1",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt-alpha\na.txt:foo one\na.txt:foo two\na.txt-Foo three\n--\na.txt-bar\na.txt:food court\na.txt:foobar\na.txt-the end\n--\nnonl.txt-first line\nnonl.txt:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "context two files numbers",
+      "args": [
+        "-j1",
+        "-n",
+        "-A1",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:2:foo one\na.txt:3:foo two\na.txt-4-Foo three\n--\na.txt:7:food court\na.txt:8:foobar\na.txt-9-the end\n--\nnonl.txt:2:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "context dir sorted",
+      "args": [
+        "--sort",
+        "path",
+        "-C1",
+        "foo",
+        "src"
+      ],
+      "stdout": "src/app.ts-import { util } from \"./util\";\nsrc/app.ts:export function foo() {\nsrc/app.ts-  return util();\nsrc/app.ts-}\nsrc/app.ts:// TODO: remove foo\n--\nsrc/lib/data.py:def foo():\nsrc/lib/data.py-    return 1\n--\nsrc/lib/helper.go-func Foo() string {\nsrc/lib/helper.go:\treturn \"foo\"\nsrc/lib/helper.go-}\n--\nsrc/test.js:test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "context only",
+      "args": [
+        "-o",
+        "-A1",
+        "m",
+        "m.txt"
+      ],
+      "stdout": "m\nm\nx\nm\n",
+      "exit": 0
+    },
+    {
+      "name": "context invert",
+      "args": [
+        "-v",
+        "-A1",
+        "other",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n--\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context max count",
+      "args": [
+        "-m1",
+        "-A2",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\n",
+      "exit": 0
+    },
+    {
+      "name": "context separator",
+      "args": [
+        "--context-separator",
+        "XX",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nXX\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context separator equals",
+      "args": [
+        "--context-separator=##",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n##\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context separator empty",
+      "args": [
+        "--context-separator",
+        "",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\n\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "context separator escape",
+      "args": [
+        "--context-separator",
+        "a\\tb",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\na\tb\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "no context separator",
+      "args": [
+        "--no-context-separator",
+        "-A1",
+        "match",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nmatch d\nother 6\n",
+      "exit": 0
+    },
+    {
+      "name": "no context separator files",
+      "args": [
+        "-j1",
+        "--no-context-separator",
+        "-C1",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt-alpha\na.txt:foo one\na.txt:foo two\na.txt-Foo three\na.txt-bar\na.txt:food court\na.txt:foobar\na.txt-the end\nnonl.txt-first line\nnonl.txt:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "field context separator",
+      "args": [
+        "--field-context-separator",
+        "@",
+        "-n",
+        "-A1",
+        "match a",
+        "ctx.txt"
+      ],
+      "stdout": "1:match a\n2@match b\n",
+      "exit": 0
+    },
+    {
+      "name": "field context separator equals",
+      "args": [
+        "--field-context-separator=@@",
+        "-H",
+        "-B1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "ctx.txt@@other 1\nctx.txt:match c\n",
+      "exit": 0
+    },
+    {
+      "name": "field match separator",
+      "args": [
+        "--field-match-separator",
+        "@",
+        "-n",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2@foo one\n3@foo two\n7@food court\n8@foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "field match separator names",
+      "args": [
+        "-j1",
+        "--field-match-separator=|",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt|foo one\na.txt|foo two\na.txt|food court\na.txt|foobar\nnonl.txt|last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "field match separator vimgrep",
+      "args": [
+        "--field-match-separator",
+        "@",
+        "--vimgrep",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt@2@1@foo one\na.txt@3@1@foo two\na.txt@7@1@food court\na.txt@8@1@foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "field separators both",
+      "args": [
+        "--field-match-separator",
+        "=",
+        "--field-context-separator",
+        "~",
+        "-n",
+        "-C1",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "3~other 1\n4=match c\n5~other 2\n",
+      "exit": 0
+    },
+    {
+      "name": "context passthru",
+      "args": [
+        "--passthru",
+        "match c",
+        "ctx.txt"
+      ],
+      "stdout": "match a\nmatch b\nother 1\nmatch c\nother 2\nother 3\nother 4\nother 5\nmatch d\nother 6\nother 7\n",
+      "exit": 0
+    },
+    {
+      "name": "context heading",
+      "args": [
+        "-j1",
+        "--heading",
+        "-A1",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\nfoo one\nfoo two\nFoo three\n--\nfood court\nfoobar\nthe end\n\nnonl.txt\nlast foo\n",
+      "exit": 0
+    },
+    {
+      "name": "glob brace",
+      "args": [
+        "-g",
+        "*.{ts,go}",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/lib/helper.go:\treturn \"foo\"\n",
+      "exit": 0
+    },
+    {
+      "name": "glob brace files",
+      "args": [
+        "--files",
+        "-g",
+        "*.{ts,go}"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/helper.go\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated dir",
+      "args": [
+        "-g",
+        "!src",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated dir slash",
+      "args": [
+        "-g",
+        "!src/",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated nested dir",
+      "args": [
+        "-g",
+        "!lib",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt:foo in dash\nMakefile:\tgo test ./... # foo\na.txt:foo one\na.txt:foo two\na.txt:foobar\na.txt:food court\nblank.pat:foo\ncrlf.txt:baz foo\r\ncrlf.txt:foo\r\ndir/d.txt:foo in d\nml.txt:foo\nml.txt:last foobar\nml.txt:say foo\nnonl.txt:last foo\no.txt:foo\npats.txt:foo\nrep.txt:foo_bar foo\nrep.txt:x foo-bar y\nsp ace.txt:foo in space\nsrc/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\nsrc/test.js:test('foo', () => {});\nweb/index.js:console.log(foo);\nweb/index.js:const foo = require('./foo');\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated nested files",
+      "args": [
+        "--files",
+        "-g",
+        "!lib"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob overrides gitignore",
+      "args": [
+        "-g",
+        "*.log",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "dir/sub/c.log:foo in log\n",
+      "exit": 0
+    },
+    {
+      "name": "glob overrides gitignore files",
+      "args": [
+        "--files",
+        "-g",
+        "*.log"
+      ],
+      "unordered": true,
+      "stdout": "dir/sub/c.log\n",
+      "exit": 0
+    },
+    {
+      "name": "glob later wins",
+      "args": [
+        "--files",
+        "-g",
+        "!*.ts",
+        "-g",
+        "*.ts"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob later wins negated",
+      "args": [
+        "--files",
+        "-g",
+        "*.ts",
+        "-g",
+        "!*.ts"
+      ],
+      "unordered": true,
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "glob overrides type",
+      "args": [
+        "--files",
+        "-t",
+        "ts",
+        "-g",
+        "*.go"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/helper.go\n",
+      "exit": 0
+    },
+    {
+      "name": "glob anchored",
+      "args": [
+        "--files",
+        "-g",
+        "/src/*.ts"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob with slash",
+      "args": [
+        "--files",
+        "-g",
+        "src/*.ts"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob double star dir",
+      "args": [
+        "--files",
+        "-g",
+        "**/lib/*"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/data.py\nsrc/lib/helper.go\n",
+      "exit": 0
+    },
+    {
+      "name": "glob double star suffix",
+      "args": [
+        "--files",
+        "-g",
+        "src/**"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob class",
+      "args": [
+        "--files",
+        "-g",
+        "*.[tj]s"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/test.js\nsrc/util.ts\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated class",
+      "args": [
+        "--files",
+        "-g",
+        "*.[!t]s"
+      ],
+      "unordered": true,
+      "stdout": "src/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob question",
+      "args": [
+        "--files",
+        "-g",
+        "?akefile"
+      ],
+      "unordered": true,
+      "stdout": "Makefile\n",
+      "exit": 0
+    },
+    {
+      "name": "glob two positive",
+      "args": [
+        "--files",
+        "-g",
+        "*.ts",
+        "-g",
+        "*.go"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/helper.go\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob positive and negative",
+      "args": [
+        "--files",
+        "-g",
+        "*.ts",
+        "-g",
+        "!util.ts"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negative only",
+      "args": [
+        "--files",
+        "-g",
+        "!*.txt"
+      ],
+      "unordered": true,
+      "stdout": "Makefile\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ndata.json\nempty.pat\npage.html\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob on path given",
+      "args": [
+        "--files",
+        "-g",
+        "*.ts",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob given file excluded",
+      "args": [
+        "foo",
+        "src/app.ts",
+        "-g",
+        "!*.ts"
+      ],
+      "stdout": "export function foo() {\n// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "glob given file not included",
+      "args": [
+        "-g",
+        "*.go",
+        "foo",
+        "src/app.ts"
+      ],
+      "stdout": "export function foo() {\n// TODO: remove foo\n",
+      "exit": 0
+    },
+    {
+      "name": "glob matches directory only",
+      "args": [
+        "-g",
+        "lib",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "glob directory contents",
+      "args": [
+        "--files",
+        "-g",
+        "lib/*"
+      ],
+      "unordered": true,
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "glob iglob",
+      "args": [
+        "--files",
+        "--iglob",
+        "*.TS"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob iglob negated",
+      "args": [
+        "--files",
+        "--iglob",
+        "!*.TS",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob case insensitive",
+      "args": [
+        "--files",
+        "--glob-case-insensitive",
+        "-g",
+        "*.TS"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob case sensitive miss",
+      "args": [
+        "--files",
+        "-g",
+        "*.TS"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "glob unclosed class",
+      "args": [
+        "--files",
+        "-g",
+        "[a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "glob unclosed brace",
+      "args": [
+        "--files",
+        "-g",
+        "{a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "glob dotfile",
+      "args": [
+        "--files",
+        "-g",
+        ".env"
+      ],
+      "unordered": true,
+      "stdout": ".env\n",
+      "exit": 0
+    },
+    {
+      "name": "glob hidden with flag",
+      "args": [
+        "--files",
+        "--hidden",
+        "-g",
+        "*.txt"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.hidden/secret.txt\na.txt\nb.txt\ncrlf.txt\nctx.txt\ndir/d.txt\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nutf.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated hidden",
+      "args": [
+        "--files",
+        "--hidden",
+        "-g",
+        "!.hidden"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.env\n.gitignore\n.ignore\n.rgignore\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/.gitignore\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob yaml",
+      "args": [
+        "--files",
+        "-g",
+        "*.{yaml,yml}"
+      ],
+      "unordered": true,
+      "stdout": "config/app.yaml\nconfig/db.yml\n",
+      "exit": 0
+    },
+    {
+      "name": "glob negated brace",
+      "args": [
+        "--files",
+        "-g",
+        "!*.{txt,ts,json}"
+      ],
+      "unordered": true,
+      "stdout": "Makefile\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\nempty.pat\npage.html\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob star everything",
+      "args": [
+        "--files",
+        "-g",
+        "*"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.env\n.gitignore\n.hidden/secret.txt\n.ignore\n.rgignore\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nbuild/out.txt\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/.gitignore\ndir/sub/c.log\ndir/sub/x.tmp\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob double star",
+      "args": [
+        "--files",
+        "-g",
+        "**"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.env\n.gitignore\n.hidden/secret.txt\n.ignore\n.rgignore\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nbuild/out.txt\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/.gitignore\ndir/sub/c.log\ndir/sub/x.tmp\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "glob given dir excluded",
+      "args": [
+        "--files",
+        "-g",
+        "!src",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "glob escaped",
+      "args": [
+        "--files",
+        "-g",
+        "\\*.ts"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "glob type not",
+      "args": [
+        "--files",
+        "-T",
+        "ts",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "type given file",
+      "args": [
+        "-t",
+        "ts",
+        "foo",
+        "src/test.js"
+      ],
+      "stdout": "test('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "type ts",
+      "args": [
+        "-t",
+        "ts",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "type go files",
+      "args": [
+        "--files",
+        "-t",
+        "go"
+      ],
+      "unordered": true,
+      "stdout": "src/lib/helper.go\n",
+      "exit": 0
+    },
+    {
+      "name": "type two",
+      "args": [
+        "--files",
+        "-t",
+        "ts",
+        "-t",
+        "py"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "type not",
+      "args": [
+        "-T",
+        "ts",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "type yaml",
+      "args": [
+        "--files",
+        "-t",
+        "yaml"
+      ],
+      "unordered": true,
+      "stdout": "config/app.yaml\nconfig/db.yml\n",
+      "exit": 0
+    },
+    {
+      "name": "type make",
+      "args": [
+        "--files",
+        "-t",
+        "make"
+      ],
+      "unordered": true,
+      "stdout": "Makefile\n",
+      "exit": 0
+    },
+    {
+      "name": "type unknown",
+      "args": [
+        "-t",
+        "nosuch",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "type alias",
+      "args": [
+        "-t",
+        "typescript",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts:// TODO: remove foo\nsrc/app.ts:export function foo() {\n",
+      "exit": 0
+    },
+    {
+      "name": "type add",
+      "args": [
+        "--type-add",
+        "web:*.{html,md}",
+        "-t",
+        "web",
+        "-l",
+        "model"
+      ],
+      "unordered": true,
+      "stdout": "page.html\n",
+      "exit": 0
+    },
+    {
+      "name": "type add simple",
+      "args": [
+        "--type-add",
+        "cfg:*.yml",
+        "--files",
+        "-t",
+        "cfg"
+      ],
+      "unordered": true,
+      "stdout": "config/db.yml\n",
+      "exit": 0
+    },
+    {
+      "name": "max filesize given file",
+      "args": [
+        "--max-filesize",
+        "1K",
+        "-c",
+        "discount",
+        "page.html"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "max filesize walk",
+      "args": [
+        "--max-filesize",
+        "1K",
+        "-l",
+        "model"
+      ],
+      "unordered": true,
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "max filesize bad",
+      "args": [
+        "--max-filesize",
+        "1Q",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ignore gitignore alone",
+      "args": [
+        "--files",
+        "--no-ignore-dot"
+      ],
+      "unordered": true,
+      "files": {
+        ".ignore": "",
+        ".rgignore": ""
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore dot alone",
+      "args": [
+        "--files",
+        "--no-ignore-vcs"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/x.tmp\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore vcs off keeps dot",
+      "args": [
+        "-l",
+        "--no-ignore-vcs",
+        "foo"
+      ],
+      "unordered": true,
+      "files": {
+        ".ignore": "*.log\n",
+        ".rgignore": ""
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\nbuild/out.txt\ncrlf.txt\ndir/d.txt\ndir/sub/x.tmp\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore dot off keeps vcs",
+      "args": [
+        "-l",
+        "--no-ignore-dot",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore rgignore alone",
+      "args": [
+        "--files"
+      ],
+      "unordered": true,
+      "files": {
+        ".gitignore": "",
+        ".ignore": "",
+        ".rgignore": "*.log\nbuild/\n"
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore negation",
+      "args": [
+        "--files"
+      ],
+      "unordered": true,
+      "files": {
+        ".gitignore": "*.log\n!c.log\nbuild/\n",
+        ".ignore": "",
+        ".rgignore": ""
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/c.log\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore nested",
+      "args": [
+        "--files",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore nested negation",
+      "args": [
+        "--files",
+        "dir"
+      ],
+      "unordered": true,
+      "files": {
+        "dir/sub/.gitignore": "*.tmp\n!c.log\n"
+      },
+      "stdout": "dir/d.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore rgignore over gitignore",
+      "args": [
+        "--files",
+        "dir"
+      ],
+      "unordered": true,
+      "files": {
+        ".rgignore": "!*.log\n",
+        ".ignore": ""
+      },
+      "stdout": "dir/d.txt\ndir/sub/c.log\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore unclosed class",
+      "args": [
+        "--files"
+      ],
+      "unordered": true,
+      "files": {
+        ".gitignore": "[abc\n*.log\nbuild/\n",
+        "[abc": "x\n"
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore nested off",
+      "args": [
+        "--files",
+        "--no-ignore",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt\ndir/sub/c.log\ndir/sub/x.tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore file flag",
+      "args": [
+        "--files",
+        "--ignore-file",
+        "ig.txt"
+      ],
+      "unordered": true,
+      "files": {
+        "ig.txt": "*.ts\n"
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\nempty.pat\nempty.txt\nig.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore anchored",
+      "args": [
+        "--files"
+      ],
+      "unordered": true,
+      "files": {
+        ".gitignore": "/src/*.ts\n",
+        ".ignore": "",
+        ".rgignore": ""
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nb.txt\nbin.dat\nblank.pat\nbuild/out.txt\nconf\nconfig/app.yaml\nconfig/db.yml\ncrlf.txt\nctx.txt\ndata.json\ndir/d.txt\ndir/sub/c.log\nempty.pat\nempty.txt\nm.txt\nml.txt\nnonl.txt\nnum.txt\no.txt\npage.html\npats.txt\nrep.txt\nsp ace.txt\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nutf.txt\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore given file",
+      "args": [
+        "foo",
+        "dir/sub/c.log"
+      ],
+      "stdout": "foo in log\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore given dir",
+      "args": [
+        "foo",
+        "build"
+      ],
+      "stdout": "build/out.txt:foo built\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore given dir files",
+      "args": [
+        "--files",
+        "build"
+      ],
+      "unordered": true,
+      "stdout": "build/out.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "missing file",
+      "args": [
+        "foo",
+        "missing.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing and found",
+      "args": [
+        "-j1",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "found and missing",
+      "args": [
+        "-j1",
+        "foo",
+        "a.txt",
+        "missing.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing count",
+      "args": [
+        "-j1",
+        "-c",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "a.txt:4\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing list",
+      "args": [
+        "-j1",
+        "-l",
+        "foo",
+        "a.txt",
+        "missing.txt"
+      ],
+      "stdout": "a.txt\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing quiet match",
+      "args": [
+        "-j1",
+        "-q",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "missing quiet no match",
+      "args": [
+        "-j1",
+        "-q",
+        "nothing",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing files list",
+      "args": [
+        "--files",
+        "missing"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing dir",
+      "args": [
+        "foo",
+        "nodir/"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no files searched glob",
+      "args": [
+        "-g",
+        "*.nothing",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no files searched type",
+      "args": [
+        "-t",
+        "cpp",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no files searched depth",
+      "args": [
+        "--max-depth",
+        "0",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no files searched files list",
+      "args": [
+        "--files",
+        "-g",
+        "*.nothing"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "no files searched dir",
+      "args": [
+        "-g",
+        "*.nothing",
+        "foo",
+        "src"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "empty dir",
+      "args": [
+        "foo",
+        "empty"
+      ],
+      "files": {
+        "empty/.keep": ""
+      },
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "binary given",
+      "args": [
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "binary file matches (found \"\\0\" byte around offset 3)\n",
+      "exit": 0
+    },
+    {
+      "name": "binary given count",
+      "args": [
+        "-c",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "binary given list",
+      "args": [
+        "-l",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "bin.dat\n",
+      "exit": 0
+    },
+    {
+      "name": "binary given text",
+      "args": [
+        "-a",
+        "foo",
+        "bin.dat"
+      ],
+      "stdout": "foo bar\nmore foo\n",
+      "exit": 0
+    },
+    {
+      "name": "binary walk",
+      "args": [
+        "-l",
+        "more"
+      ],
+      "unordered": true,
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "binary walk text",
+      "args": [
+        "-a",
+        "-l",
+        "more"
+      ],
+      "unordered": true,
+      "stdout": "bin.dat\n",
+      "exit": 0
+    },
+    {
+      "name": "replace",
+      "args": [
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\nXd court\nXbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace long",
+      "args": [
+        "--replace",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\nXd court\nXbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace long equals",
+      "args": [
+        "--replace=X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\nXd court\nXbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace attached",
+      "args": [
+        "-rX",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\nXd court\nXbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace empty",
+      "args": [
+        "-r",
+        "",
+        "foo ",
+        "a.txt"
+      ],
+      "stdout": "one\ntwo\n",
+      "exit": 0
+    },
+    {
+      "name": "replace group",
+      "args": [
+        "-r",
+        "$1",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42 x\n7 y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace group braces",
+      "args": [
+        "-r",
+        "${1}x",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42x x\n7x y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace group name run",
+      "args": [
+        "-r",
+        "$1x",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": " x\n y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace second group",
+      "args": [
+        "-r",
+        "${2}",
+        "(id)=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42 x\n7 y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace missing group",
+      "args": [
+        "-r",
+        "[$3]",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "[] x\n[] y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace dollar dollar",
+      "args": [
+        "-r",
+        "$$1",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "$1 x\n$1 y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace whole",
+      "args": [
+        "-r",
+        "<$0>",
+        "id=\\d+",
+        "num.txt"
+      ],
+      "stdout": "<id=42> x\n<id=7> y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace whole braces",
+      "args": [
+        "-r",
+        "<${0}>",
+        "id=\\d+",
+        "num.txt"
+      ],
+      "stdout": "<id=42> x\n<id=7> y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace named",
+      "args": [
+        "-r",
+        "$n!",
+        "id=(?P<n>\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42! x\n7! y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace named braces",
+      "args": [
+        "-r",
+        "${n}!",
+        "id=(?P<n>\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42! x\n7! y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace named angle",
+      "args": [
+        "-r",
+        "${n}!",
+        "id=(?<n>\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42! x\n7! y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace unknown name",
+      "args": [
+        "-r",
+        "[$nope]",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "[] x\n[] y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace lone dollar",
+      "args": [
+        "-r",
+        "a$",
+        "id",
+        "num.txt"
+      ],
+      "stdout": "a$=42 x\na$=7 y\nno a$ here\n",
+      "exit": 0
+    },
+    {
+      "name": "replace dollar space",
+      "args": [
+        "-r",
+        "$ x",
+        "id",
+        "num.txt"
+      ],
+      "stdout": "$ x=42 x\n$ x=7 y\nno $ x here\n",
+      "exit": 0
+    },
+    {
+      "name": "replace dollar brace open",
+      "args": [
+        "-r",
+        "${1",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "${1 x\n${1 y\n",
+      "exit": 0
+    },
+    {
+      "name": "replace ampersand",
+      "args": [
+        "-r",
+        "&",
+        "id",
+        "num.txt"
+      ],
+      "stdout": "&=42 x\n&=7 y\nno & here\n",
+      "exit": 0
+    },
+    {
+      "name": "replace backslash n",
+      "args": [
+        "-r",
+        "a\\nb",
+        "id",
+        "num.txt"
+      ],
+      "stdout": "a\\nb=42 x\na\\nb=7 y\nno a\\nb here\n",
+      "exit": 0
+    },
+    {
+      "name": "replace only",
+      "args": [
+        "-o",
+        "-r",
+        "$1",
+        "id=(\\d+)",
+        "num.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "replace only numbers",
+      "args": [
+        "-on",
+        "-r",
+        "<$0>",
+        "\\d+",
+        "num.txt"
+      ],
+      "stdout": "1:<42>\n2:<7>\n4:<10>\n4:<20>\n4:<30>\n",
+      "exit": 0
+    },
+    {
+      "name": "replace context",
+      "args": [
+        "-r",
+        "X",
+        "-A1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\nFoo three\n--\nXd court\nXbar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "replace before context",
+      "args": [
+        "-r",
+        "X",
+        "-B1",
+        "bar",
+        "a.txt"
+      ],
+      "stdout": "\nX\nfood court\nfooX\n",
+      "exit": 0
+    },
+    {
+      "name": "replace passthru",
+      "args": [
+        "--passthru",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nX one\nX two\nFoo three\n\nbar\nXd court\nXbar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "replace empty matches",
+      "args": [
+        "-r",
+        "X",
+        "o*",
+        "o.txt"
+      ],
+      "stdout": "XfX\nXbX\n",
+      "exit": 0
+    },
+    {
+      "name": "replace empty pattern",
+      "args": [
+        "-r",
+        "X",
+        "",
+        "o.txt"
+      ],
+      "stdout": "XfXoXoX\nXbXoXoX\n",
+      "exit": 0
+    },
+    {
+      "name": "replace ignore case",
+      "args": [
+        "-i",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\nX three\nXd court\nXbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace word",
+      "args": [
+        "-w",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\nX two\n",
+      "exit": 0
+    },
+    {
+      "name": "replace count",
+      "args": [
+        "-c",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "replace invert",
+      "args": [
+        "-v",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "alpha\nFoo three\n\nbar\nthe end\n",
+      "exit": 0
+    },
+    {
+      "name": "replace two files",
+      "args": [
+        "-j1",
+        "-r",
+        "X",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:X one\na.txt:X two\na.txt:Xd court\na.txt:Xbar\nnonl.txt:last X\n",
+      "exit": 0
+    },
+    {
+      "name": "replace stdin groups",
+      "args": [
+        "-r",
+        "$2 $1",
+        "(\\w+) (\\w+)"
+      ],
+      "stdin": "hello world\n",
+      "stdout": "world hello\n",
+      "exit": 0
+    },
+    {
+      "name": "replace vimgrep",
+      "args": [
+        "--vimgrep",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "a.txt:2:1:X one\na.txt:3:1:X two\na.txt:7:1:Xd court\na.txt:8:1:Xbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace column",
+      "args": [
+        "--column",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:1:X one\n3:1:X two\n7:1:Xd court\n8:1:Xbar\n",
+      "exit": 0
+    },
+    {
+      "name": "replace multiline",
+      "args": [
+        "-U",
+        "-r",
+        "X",
+        "foo\\nnext",
+        "ml.txt"
+      ],
+      "stdout": "X\n",
+      "exit": 0
+    },
+    {
+      "name": "replace utf",
+      "args": [
+        "-r",
+        "X",
+        "é",
+        "utf.txt"
+      ],
+      "stdout": "cafX au lait\nXcole\n",
+      "exit": 0
+    },
+    {
+      "name": "replace fixed",
+      "args": [
+        "-F",
+        "-r",
+        "[$1]",
+        "x*y",
+        "b.txt"
+      ],
+      "stdout": "[] product\n",
+      "exit": 0
+    },
+    {
+      "name": "replace max count",
+      "args": [
+        "-m1",
+        "-r",
+        "X",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "X one\n",
+      "exit": 0
+    },
+    {
+      "name": "heading",
+      "args": [
+        "-j1",
+        "--heading",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\nfoo one\nfoo two\nfood court\nfoobar\n\nnonl.txt\nlast foo\n",
+      "exit": 0
+    },
+    {
+      "name": "heading numbers",
+      "args": [
+        "-j1",
+        "--heading",
+        "-n",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\n2:foo one\n3:foo two\n7:food court\n8:foobar\n\nnonl.txt\n2:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "heading one file",
+      "args": [
+        "--heading",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "no heading",
+      "args": [
+        "-j1",
+        "--no-heading",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\nnonl.txt:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns",
+      "args": [
+        "-M",
+        "20",
+        "model",
+        "page.html"
+      ],
+      "stdout": "[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns long",
+      "args": [
+        "--max-columns=20",
+        "discount",
+        "page.html"
+      ],
+      "stdout": "[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns preview",
+      "args": [
+        "-M",
+        "30",
+        "--max-columns-preview",
+        "model-1\"",
+        "page.html"
+      ],
+      "stdout": "<!doctype html><html><head><ti [... omitted end of long line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns short line",
+      "args": [
+        "-M",
+        "20",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns only",
+      "args": [
+        "-o",
+        "-M",
+        "5",
+        "model-1[0-9]",
+        "page.html"
+      ],
+      "stdout": "[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "trim",
+      "args": [
+        "--trim",
+        "comment",
+        "conf"
+      ],
+      "stdout": "# indented comment\n# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "encoding",
+      "args": [
+        "-E",
+        "utf8",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "encoding bad",
+      "args": [
+        "--encoding",
+        "nosuch",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "color never",
+      "args": [
+        "--color",
+        "never",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color never equals",
+      "args": [
+        "--color=never",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "colors",
+      "args": [
+        "--colors",
+        "match:fg:red",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "sort files",
+      "args": [
+        "--sort-files",
+        "-l",
+        "foo"
+      ],
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "sortr path",
+      "args": [
+        "--sortr",
+        "path",
+        "-l",
+        "foo"
+      ],
+      "stdout": "web/index.js\nsrc/test.js\nsrc/lib/helper.go\nsrc/lib/data.py\nsrc/app.ts\nsp ace.txt\nrep.txt\npats.txt\no.txt\nnonl.txt\nml.txt\ndir/d.txt\ncrlf.txt\nblank.pat\na.txt\nMakefile\n-dash.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf flag",
+      "args": [
+        "--crlf",
+        "foo$",
+        "crlf.txt"
+      ],
+      "stdout": "foo\r\nbaz foo\r\n",
+      "exit": 0
+    },
+    {
+      "name": "no messages",
+      "args": [
+        "-j1",
+        "--no-messages",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\n",
+      "exit": 2
+    },
+    {
+      "name": "null names",
+      "args": [
+        "-j1",
+        "-0",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\u0000foo one\na.txt\u0000foo two\na.txt\u0000food court\na.txt\u0000foobar\nnonl.txt\u0000last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "null count",
+      "args": [
+        "-j1",
+        "-0",
+        "-c",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\u00004\nnonl.txt\u00001\n",
+      "exit": 0
+    },
+    {
+      "name": "path separator",
+      "args": [
+        "--path-separator",
+        "\\",
+        "-l",
+        "foo",
+        "src/lib"
+      ],
+      "unordered": true,
+      "stdout": "src\\lib\\data.py\nsrc\\lib\\helper.go\n",
+      "exit": 0
+    },
+    {
+      "name": "no ignore parent",
+      "args": [
+        "--no-ignore-parent",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "no config",
+      "args": [
+        "--no-config",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "one file system",
+      "args": [
+        "--one-file-system",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "line buffered",
+      "args": [
+        "--line-buffered",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "engine default",
+      "args": [
+        "--engine",
+        "default",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2",
+      "args": [
+        "-P",
+        "foo(?=bar)",
+        "a.txt"
+      ],
+      "stdout": "foobar\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 long",
+      "args": [
+        "--pcre2",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 lookbehind",
+      "args": [
+        "-oP",
+        "(?<=id=)\\d+",
+        "num.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 backreference",
+      "args": [
+        "-P",
+        "(ab)\\1",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "backreferences are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "unicode word",
+      "args": [
+        "-o",
+        "\\w+",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "unicode word boundary",
+      "args": [
+        "\\<école\\>",
+        "utf.txt"
+      ],
+      "stdout": "école\n",
+      "exit": 0
+    },
+    {
+      "name": "word boundary",
+      "args": [
+        "\\<foo\\>",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n",
+      "exit": 0
+    },
+    {
+      "name": "word utf",
+      "args": [
+        "-w",
+        "café",
+        "utf.txt"
+      ],
+      "stdout": "café au lait\n",
+      "exit": 0
+    },
+    {
+      "name": "word equals",
+      "args": [
+        "-w",
+        "=42",
+        "b.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "word empty",
+      "args": [
+        "-w",
+        "",
+        "conf"
+      ],
+      "stdout": "# global settings\n  # indented comment\n\t# tab comment\nhost = example.com\nempty=\n",
+      "exit": 0
+    },
+    {
+      "name": "byte offset utf only",
+      "args": [
+        "-bo",
+        "au",
+        "utf.txt"
+      ],
+      "stdout": "6:au\n",
+      "exit": 0
+    },
+    {
+      "name": "column utf",
+      "args": [
+        "--column",
+        "au",
+        "utf.txt"
+      ],
+      "stdout": "1:7:café au lait\n",
+      "exit": 0
+    },
+    {
+      "name": "vimgrep utf",
+      "args": [
+        "--vimgrep",
+        "テ",
+        "utf.txt"
+      ],
+      "stdout": "utf.txt:4:13:日本語のテキスト\n",
+      "exit": 0
+    },
+    {
+      "name": "type list",
+      "args": [
+        "--type-list"
+      ],
+      "stdout": "ada: *.adb, *.ads\nagda: *.agda, *.lagda\naidl: *.aidl\nalire: alire.toml\namake: *.bp, *.mk\nasciidoc: *.adoc, *.asc, *.asciidoc\nasm: *.S, *.asm, *.s\nasp: *.ascx, *.ascx.cs, *.ascx.vb, *.asp, *.aspx, *.aspx.cs, *.aspx.vb\nats: *.ats, *.dats, *.hats, *.sats\navro: *.avdl, *.avpr, *.avsc\nawk: *.awk\nbat: *.bat\nbatch: *.bat\nbazel: *.BUILD, *.bazel, *.bazelrc, *.bzl, BUILD, MODULE.bazel, WORKSPACE, WORKSPACE.bazel, WORKSPACE.bzlmod\nbitbake: *.bb, *.bbappend, *.bbclass, *.conf, *.inc\nboxlang: *.bx, *.bxm, *.bxs\nbrotli: *.br\nbuildstream: *.bst\nbzip2: *.bz2, *.tbz2\nc: *.[chH], *.[chH].in, *.cats\ncabal: *.cabal\ncandid: *.did\ncarp: *.carp\ncbor: *.cbor\nceylon: *.ceylon\ncfml: *.cfc, *.cfm\nclojure: *.clj, *.cljc, *.cljs, *.cljx\ncmake: *.cmake, CMakeLists.txt\ncmd: *.bat, *.cmd\ncml: *.cml\ncoffeescript: *.coffee\nconfig: *.cfg, *.conf, *.config, *.ini\ncontainer: *Containerfile*, *Dockerfile*\ncoq: *.v\ncpp: *.[ChH], *.[ChH].in, *.[ch]pp, *.[ch]pp.in, *.[ch]xx, *.[ch]xx.in, *.cc, *.cc.in, *.hh, *.hh.in, *.inl\ncreole: *.creole\ncrystal: *.cr, *.ecr, Projectfile, shard.yml\ncs: *.cs\ncsharp: *.cs\ncshtml: *.cshtml\ncsproj: *.csproj\ncss: *.css, *.scss\ncsv: *.csv\ncuda: *.cu, *.cuh\ncython: *.pxd, *.pxi, *.pyx\nd: *.d\ndart: *.dart\ndevicetree: *.dts, *.dtsi, *.dtso\ndhall: *.dhall\ndiff: *.diff, *.patch\ndita: *.dita, *.ditamap, *.ditaval\ndocker: *Dockerfile*\ndockercompose: docker-compose.*.yml, docker-compose.yml\ndts: *.dts, *.dtsi\ndvc: *.dvc, Dvcfile\nebuild: *.ebuild, *.eclass\nedn: *.edn\nelisp: *.el\nelixir: *.eex, *.ex, *.exs, *.heex, *.leex, *.livemd\nelm: *.elm\nerb: *.erb\nerlang: *.erl, *.hrl\nfennel: *.fnl\nfidl: *.fidl\nfish: *.fish\nflatbuffers: *.fbs\nfortran: *.F, *.F77, *.F90, *.F95, *.f, *.f77, *.f90, *.f95, *.pfo\nfsharp: *.fs, *.fsi, *.fsx\nfut: *.fut\ngap: *.g, *.gap, *.gd, *.gi, *.tst\ngdscript: *.gd\ngleam: *.gleam\ngn: *.gn, *.gni\ngo: *.go\ngprbuild: *.gpr\ngradle: *.gradle, *.gradle.kts, gradle-wrapper.*, gradle.properties, gradlew, gradlew.bat\ngraphql: *.graphql, *.graphqls\ngroovy: *.gradle, *.groovy\ngzip: *.gz, *.tgz\nh: *.h, *.hh, *.hpp\nhaml: *.haml\nhare: *.ha\nhaskell: *.c2hs, *.cpphs, *.hs, *.hsc, *.lhs\nhbs: *.hbs\nhs: *.hs, *.lhs\nhtml: *.ejs, *.htm, *.html\nhurl: *.hurl\nhy: *.hy\nidris: *.idr, *.lidr\njanet: *.janet\njava: *.java, *.jsp, *.jspx, *.properties\njinja: *.j2, *.jinja, *.jinja2\njl: *.jl\njs: *.cjs, *.js, *.jsx, *.mjs, *.vue\njson: *.json, *.sarif, composer.lock\njsonl: *.jsonl\njulia: *.jl\njupyter: *.ipynb, *.jpynb\nk: *.k\nkconfig: Kconfig, Kconfig.*\nkotlin: *.kt, *.kts\nlean: *.lean\nless: *.less\nlicense: *[.-]LICEN[CS]E*, AGPL-*[0-9]*, APACHE-*[0-9]*, BSD-*[0-9]*, CC-BY-*, COPYING, COPYING[.-]*, COPYRIGHT, COPYRIGHT[.-]*, EULA, EULA[.-]*, GFDL-*[0-9]*, GNU-*[0-9]*, GPL-*[0-9]*, LGPL-*[0-9]*, LICEN[CS]E, LICEN[CS]E[.-]*, MIT-*[0-9]*, MPL-*[0-9]*, NOTICE, NOTICE[.-]*, OFL-*[0-9]*, PATENTS, PATENTS[.-]*, UNLICEN[CS]E, UNLICEN[CS]E[.-]*, agpl[.-]*, gpl[.-]*, lgpl[.-]*, licen[cs]e, licen[cs]e.*\nlilypond: *.ily, *.ly\nlisp: *.el, *.jl, *.lisp, *.lsp, *.sc, *.scm\nllvm: *.ll\nlock: *.lock, package-lock.json\nlog: *.log\nlua: *.lua\nlz4: *.lz4\nlzma: *.lzma\nm4: *.ac, *.m4\nmake: *.mak, *.mk, Makefile.*, [Gg][Nn][Uu]makefile, [Gg][Nn][Uu]makefile.am, [Gg][Nn][Uu]makefile.in, [Mm]akefile, [Mm]akefile.am, [Mm]akefile.in\nmako: *.mako, *.mao\nman: *.[0-9][cEFMmpSx], *.[0-9lnpx]\nmarkdown: *.markdown, *.md, *.mdown, *.mdwn, *.mdx, *.mkd, *.mkdn\nmatlab: *.m\nmd: *.markdown, *.md, *.mdown, *.mdwn, *.mdx, *.mkd, *.mkdn\nmeson: meson.build, meson.options, meson_options.txt\nminified: *.min.css, *.min.html, *.min.js\nmint: *.mint\nmk: mkfile\nml: *.ml\nmojo: *.mojo\nmotoko: *.mo\nmsbuild: *.csproj, *.fsproj, *.proj, *.props, *.sln, *.slnf, *.targets, *.vcxproj\nnim: *.nim, *.nimble, *.nimf, *.nims\nnix: *.nix\nobjc: *.h, *.m\nobjcpp: *.h, *.mm\nocaml: *.ml, *.mli, *.mll, *.mly\norg: *.org, *.org_archive\npants: BUILD\npascal: *.dpr, *.inc, *.lpr, *.pas, *.pp\npdf: *.pdf\nperl: *.PL, *.perl, *.pl, *.plh, *.plx, *.pm, *.t\nphp: *.php, *.php3, *.php4, *.php5, *.php7, *.php8, *.pht, *.phtml\npkgbuild: PKGBUILD\npo: *.po\npod: *.pod\npostscript: *.eps, *.ps\nprolog: *.P, *.pl, *.pro, *.prolog\nproto: *.proto\nprotobuf: *.proto\nps: *.cdxml, *.ps1, *.ps1xml, *.psd1, *.psm1\npuppet: *.epp, *.erb, *.pp, *.rb\npurs: *.purs\npy: *.py, *.pyi\npython: *.py, *.pyi\nqmake: *.prf, *.pri, *.pro\nqml: *.qml\nqrc: *.qrc\nqui: *.ui\nr: *.R, *.Rmd, *.Rnw, *.r, *.rmd, *.rnw\nracket: *.rkt\nraku: *.p6, *.pl6, *.pm6, *.raku, *.rakudoc, *.rakumod, *.rakutest\nrdoc: *.rdoc\nreadme: *README, README*\nreasonml: *.re, *.rei\nred: *.r, *.red, *.reds\nrescript: *.res, *.resi\nrobot: *.robot\nrocq: *.v\nrst: *.rst\nruby: *.gemspec, *.rake, *.rb, *.rbw, .irbrc, Gemfile, Rakefile, config.ru\nrust: *.rs\nsass: *.sass, *.scss\nscala: *.sbt, *.scala\nscdoc: *.scd, *.scdoc\nseed7: *.s7i, *.sd7\nsh: *.bash, *.bashrc, *.csh, *.cshrc, *.env, *.ksh, *.kshrc, *.sh, *.tcsh, *.zsh, .bash_login, .bash_logout, .bash_profile, .bashrc, .cshrc, .env, .kshrc, .login, .logout, .profile, .tcshrc, .zlogin, .zlogout, .zprofile, .zshenv, .zshrc, bash_login, bash_logout, bash_profile, bashrc, profile, zlogin, zlogout, zprofile, zshenv, zshrc\nslim: *.skim, *.slim, *.slime\nsmarty: *.tpl\nsml: *.sig, *.sml\nsolidity: *.sol\nsoy: *.soy\nspark: *.spark\nspec: *.spec\nsql: *.psql, *.sql\nssa: *.ssa\nstylus: *.styl\nsv: *.h, *.sv, *.svh, *.v, *.vg\nsvelte: *.svelte, *.svelte.ts\nsvg: *.svg\nswift: *.swift\nswig: *.def, *.i\nsystemd: *.automount, *.conf, *.device, *.link, *.mount, *.path, *.scope, *.service, *.slice, *.socket, *.swap, *.target, *.timer\ntaskpaper: *.taskpaper\ntcl: *.tcl\ntex: *.bib, *.cls, *.dtx, *.ins, *.ltx, *.sty, *.tex\ntexinfo: *.texi\ntextile: *.textile\ntf: *.terraform.lock.hcl, *.terraformrc, *.tf, *.tf.json, *.tfrc, *.tfvars, *.tfvars.json, terraform.rc\nthrift: *.thrift\ntoml: *.toml, Cargo.lock\nts: *.cts, *.mts, *.ts, *.tsx\ntwig: *.twig\ntxt: *.txt\ntypescript: *.cts, *.mts, *.ts, *.tsx\ntyposcript: *.ts, *.typoscript\ntypst: *.typ\nusd: *.usd, *.usda, *.usdc\nv: *.v, *.vsh\nvala: *.vala\nvb: *.vb\nvcl: *.vcl\nverilog: *.sv, *.svh, *.v, *.vh\nvhdl: *.vhd, *.vhdl\nvim: *.vim, .gvimrc, .vimrc, _gvimrc, _vimrc, gvimrc, vimrc\nvimscript: *.vim, .gvimrc, .vimrc, _gvimrc, _vimrc, gvimrc, vimrc\nvue: *.vue\nwebidl: *.idl, *.webidl, *.widl\nwgsl: *.wgsl\nwiki: *.mediawiki, *.wiki\nxml: *.dtd, *.rng, *.sch, *.xhtml, *.xjb, *.xml, *.xml.dist, *.xsd, *.xsl, *.xslt\nxz: *.txz, *.xz\nyacc: *.y\nyaml: *.yaml, *.yml\nyang: *.yang\nz: *.Z\nzig: *.zig\nzsh: *.zsh, .zlogin, .zlogout, .zprofile, .zshenv, .zshrc, zlogin, zlogout, zprofile, zshenv, zshrc\nzstd: *.zst, *.zstd\n",
+      "exit": 0
+    },
+    {
+      "name": "files with matches dot slash",
+      "args": [
+        "-l",
+        "foo",
+        "./src"
+      ],
+      "unordered": true,
+      "stdout": "./src/app.ts\n./src/lib/data.py\n./src/lib/helper.go\n./src/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "count dot slash",
+      "args": [
+        "-c",
+        "foo",
+        "./src"
+      ],
+      "unordered": true,
+      "stdout": "./src/app.ts:2\n./src/lib/data.py:1\n./src/lib/helper.go:1\n./src/test.js:1\n",
+      "exit": 0
+    },
+    {
+      "name": "version short",
+      "args": [
+        "-V"
+      ],
+      "stdout": "ripgrep 15.2.0\n",
+      "exit": 0
+    },
+    {
+      "name": "pretty",
+      "args": [
+        "-j1",
+        "-p",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "\u001b[0m\u001b[35ma.txt\u001b[0m\n\u001b[0m\u001b[32m2\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m one\n\u001b[0m\u001b[32m3\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m two\n\u001b[0m\u001b[32m7\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0md court\n\u001b[0m\u001b[32m8\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0mbar\n\n\u001b[0m\u001b[35mnonl.txt\u001b[0m\n\u001b[0m\u001b[32m2\u001b[0m:last \u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "a.txt\n2:foo one\n3:foo two\n7:food court\n8:foobar\n\nnonl.txt\n2:last foo\n",
+        "exit": 0,
+        "reason": "-p prints no colour: a model never wants escapes in its output"
+      }
+    },
+    {
+      "name": "pretty one file",
+      "args": [
+        "-p",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "\u001b[0m\u001b[32m2\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m one\n\u001b[0m\u001b[32m3\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m two\n\u001b[0m\u001b[32m7\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0md court\n\u001b[0m\u001b[32m8\u001b[0m:\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0mbar\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "2:foo one\n3:foo two\n7:food court\n8:foobar\n",
+        "exit": 0,
+        "reason": "-p prints no colour: a model never wants escapes in its output"
+      }
+    },
+    {
+      "name": "color always",
+      "args": [
+        "--color=always",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m one\n\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0m two\n\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0md court\n\u001b[0m\u001b[1m\u001b[31mfoo\u001b[0mbar\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "--color=always is refused: a model never wants escapes in its output"
+      }
+    },
+    {
+      "name": "color auto",
+      "args": [
+        "--color",
+        "auto",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "color bogus",
+      "args": [
+        "--color",
+        "bogus",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "encoding none",
+      "args": [
+        "--encoding",
+        "none",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "encoding utf dash",
+      "args": [
+        "-E",
+        "UTF-8",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "encoding unknown",
+      "args": [
+        "-E",
+        "xyz",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "encoding other",
+      "args": [
+        "-E",
+        "latin1",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "files are read as UTF-8: another encoding is refused rather than misread"
+      }
+    },
+    {
+      "name": "engine pcre2",
+      "args": [
+        "--engine",
+        "pcre2",
+        "-o",
+        "(?<=id=)\\d+",
+        "num.txt"
+      ],
+      "stdout": "42\n7\n",
+      "exit": 0
+    },
+    {
+      "name": "engine auto",
+      "args": [
+        "--engine=auto",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "engine bogus",
+      "args": [
+        "--engine",
+        "bogus",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "auto hybrid regex",
+      "args": [
+        "--auto-hybrid-regex",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "no pcre2 unicode",
+      "args": [
+        "-P",
+        "--no-pcre2-unicode",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 condition",
+      "args": [
+        "-P",
+        "^(?=.*foo)(?!.*bar)",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 lookahead only",
+      "args": [
+        "-oP",
+        "\\d+(?=\\.)",
+        "b.txt"
+      ],
+      "stdout": "1\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 keep",
+      "args": [
+        "-oP",
+        "name=\\K\\w+",
+        "b.txt"
+      ],
+      "stdout": "alpha\nbeta\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 negative lookahead",
+      "args": [
+        "-P",
+        "foo(?!bar)",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "negative lookaround is refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "pcre2 possessive",
+      "args": [
+        "-P",
+        "a++b",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "possessive quantifiers are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "pcre2 atomic",
+      "args": [
+        "-P",
+        "(?>ab)+",
+        "rep.txt"
+      ],
+      "stdout": "abab\nababab\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "atomic groups are refused: RE2, the linear-time engine, has none"
+      }
+    },
+    {
+      "name": "pcre2 lookbehind overlap",
+      "args": [
+        "-oP",
+        "(?<=a)a",
+        "aaa.txt"
+      ],
+      "files": {
+        "aaa.txt": "aaa\n"
+      },
+      "stdout": "a\na\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "a\n",
+        "exit": 0,
+        "reason": "a lookbehind runs as a prefix the match consumes, so a match inside the previous one's lookbehind is not found"
+      }
+    },
+    {
+      "name": "binary flag walk",
+      "args": [
+        "--binary",
+        "-l",
+        "more"
+      ],
+      "unordered": true,
+      "stdout": "bin.dat\n",
+      "exit": 0
+    },
+    {
+      "name": "binary flag lines",
+      "args": [
+        "--binary",
+        "more"
+      ],
+      "unordered": true,
+      "stdout": "bin.dat: binary file matches (found \"\\0\" byte around offset 3)\n",
+      "exit": 0
+    },
+    {
+      "name": "require git in repo",
+      "args": [
+        "--require-git",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n"
+      },
+      "stdout": "-dash.txt\nMakefile\na.txt\nblank.pat\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "require git files",
+      "args": [
+        "--require-git",
+        "--files",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt\ndir/sub/x.tmp\n",
+      "exit": 0
+    },
+    {
+      "name": "no ignore files",
+      "args": [
+        "--files",
+        "--no-ignore-files",
+        "--ignore-file",
+        "ig.txt",
+        "src"
+      ],
+      "unordered": true,
+      "files": {
+        "ig.txt": "*.ts\n"
+      },
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "no ignore global",
+      "args": [
+        "--no-ignore-global",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns zero",
+      "args": [
+        "-M",
+        "0",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns context",
+      "args": [
+        "-M",
+        "8",
+        "-C1",
+        "foo two",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\n[Omitted long context line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns context preview",
+      "args": [
+        "-M",
+        "5",
+        "--max-columns-preview",
+        "-n",
+        "-C1",
+        "foo two",
+        "a.txt"
+      ],
+      "stdout": "2-foo o [... omitted end of long line]\n3:foo t [... omitted end of long line]\n4-Foo t [... omitted end of long line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns vimgrep",
+      "args": [
+        "-M",
+        "5",
+        "--vimgrep",
+        "o",
+        "b.txt"
+      ],
+      "stdout": "b.txt:1:6:[Omitted long line with 1 matches]\nb.txt:6:7:[Omitted long line with 1 matches]\nb.txt:7:2:[Omitted long line with 1 matches]\nb.txt:9:3:[Omitted long line with 1 matches]\nb.txt:11:21:[Omitted long line with 1 matches]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns vimgrep preview",
+      "args": [
+        "-M",
+        "5",
+        "--max-columns-preview",
+        "--vimgrep",
+        "e",
+        "b.txt"
+      ],
+      "stdout": "b.txt:1:2:versi [... 0 more matches]\nb.txt:2:10:id=42 [... 1 more match]\nb.txt:3:9:id=7  [... 2 more matches]\nb.txt:3:12:id=7  [... 2 more matches]\nb.txt:7:13:count [... 1 more match]\nb.txt:8:10:path  [... 2 more matches]\nb.txt:8:17:path  [... 2 more matches]\nb.txt:9:5:phone [... 0 more matches]\nb.txt:10:15:2026- [... 1 more match]\nb.txt:11:12:url h [... 2 more matches]\nb.txt:11:18:url h [... 2 more matches]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns replace",
+      "args": [
+        "-M",
+        "4",
+        "-r",
+        "XY",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "[Omitted long line with 1 matches]\n[Omitted long line with 1 matches]\n[Omitted long line with 1 matches]\n[Omitted long line with 1 matches]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns replace preview",
+      "args": [
+        "-M",
+        "4",
+        "--max-columns-preview",
+        "-r",
+        "XY",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "XY o [... 0 more matches]\nXY t [... 0 more matches]\nXYd  [... 0 more matches]\nXYba [... 0 more matches]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns only preview",
+      "args": [
+        "-M",
+        "2",
+        "--max-columns-preview",
+        "-o",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "fo [... 0 more matches]\nfo [... 0 more matches]\nfo [... 0 more matches]\nfo [... 0 more matches]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns column",
+      "args": [
+        "-M",
+        "3",
+        "--column",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "2:1:[Omitted long line with 1 matches]\n3:1:[Omitted long line with 1 matches]\n7:1:[Omitted long line with 1 matches]\n8:1:[Omitted long line with 1 matches]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns utf preview",
+      "args": [
+        "-M",
+        "4",
+        "--max-columns-preview",
+        "é",
+        "utf.txt"
+      ],
+      "stdout": "café [... omitted end of long line]\nécol [... omitted end of long line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns bytes",
+      "args": [
+        "-M",
+        "12",
+        "au",
+        "utf.txt"
+      ],
+      "stdout": "[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns invert",
+      "args": [
+        "-M",
+        "4",
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "[Omitted long matching line]\n[Omitted long matching line]\n\nbar\n[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "no max columns preview",
+      "args": [
+        "-M",
+        "4",
+        "--max-columns-preview",
+        "--no-max-columns-preview",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "trim only",
+      "args": [
+        "--trim",
+        "-o",
+        "indented",
+        "conf"
+      ],
+      "stdout": "indented\n",
+      "exit": 0
+    },
+    {
+      "name": "trim context",
+      "args": [
+        "--trim",
+        "-n",
+        "-B1",
+        "tab comment",
+        "conf"
+      ],
+      "stdout": "4-# indented comment\n5:# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "trim offsets",
+      "args": [
+        "--trim",
+        "-b",
+        "comment",
+        "conf"
+      ],
+      "stdout": "37:# indented comment\n58:# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "trim max columns",
+      "args": [
+        "--trim",
+        "-M",
+        "18",
+        "comment",
+        "conf"
+      ],
+      "stdout": "[Omitted long matching line]\n# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "no trim",
+      "args": [
+        "--trim",
+        "--no-trim",
+        "comment",
+        "conf"
+      ],
+      "stdout": "  # indented comment\n\t# tab comment\n",
+      "exit": 0
+    },
+    {
+      "name": "null heading",
+      "args": [
+        "-j1",
+        "--heading",
+        "-0",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\u0000foo one\nfoo two\nfood court\nfoobar\n\nnonl.txt\u0000last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "null context",
+      "args": [
+        "-j1",
+        "-0",
+        "-n",
+        "-A1",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\u00002:foo one\na.txt\u00003:foo two\na.txt\u00004-Foo three\n--\na.txt\u00007:food court\na.txt\u00008:foobar\na.txt\u00009-the end\n--\nnonl.txt\u00002:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "null list",
+      "args": [
+        "-j1",
+        "-0",
+        "-l",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\u0000nonl.txt\u0000",
+      "exit": 0
+    },
+    {
+      "name": "path separator long",
+      "args": [
+        "--path-separator",
+        "ab",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "path separator files",
+      "args": [
+        "--path-separator",
+        "\\",
+        "--files",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src\\app.ts\nsrc\\lib\\data.py\nsrc\\lib\\helper.go\nsrc\\test.js\nsrc\\util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "path separator lines",
+      "args": [
+        "--path-separator",
+        "+",
+        "foo",
+        "src/lib"
+      ],
+      "unordered": true,
+      "stdout": "src+lib+data.py:def foo():\nsrc+lib+helper.go:\treturn \"foo\"\n",
+      "exit": 0
+    },
+    {
+      "name": "heading count",
+      "args": [
+        "-j1",
+        "--heading",
+        "-c",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:4\nnonl.txt:1\n",
+      "exit": 0
+    },
+    {
+      "name": "heading list",
+      "args": [
+        "-j1",
+        "--heading",
+        "-l",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\nnonl.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "heading vimgrep",
+      "args": [
+        "-j1",
+        "--heading",
+        "--vimgrep",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:2:1:foo one\na.txt:3:1:foo two\na.txt:7:1:food court\na.txt:8:1:foobar\nnonl.txt:2:6:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "heading only",
+      "args": [
+        "-j1",
+        "--heading",
+        "-o",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\nfoo\nfoo\nfoo\nfoo\n\nnonl.txt\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "heading directory",
+      "args": [
+        "--heading",
+        "--sort",
+        "path",
+        "foo",
+        "src"
+      ],
+      "stdout": "src/app.ts\nexport function foo() {\n// TODO: remove foo\n\nsrc/lib/data.py\ndef foo():\n\nsrc/lib/helper.go\n\treturn \"foo\"\n\nsrc/test.js\ntest('foo', () => {});\n",
+      "exit": 0
+    },
+    {
+      "name": "no heading after heading",
+      "args": [
+        "-j1",
+        "--heading",
+        "--no-heading",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt:foo one\na.txt:foo two\na.txt:food court\na.txt:foobar\nnonl.txt:last foo\n",
+      "exit": 0
+    },
+    {
+      "name": "vimgrep only",
+      "args": [
+        "--vimgrep",
+        "-o",
+        "fo+",
+        "a.txt"
+      ],
+      "stdout": "a.txt:2:1:foo\na.txt:3:1:foo\na.txt:7:1:foo\na.txt:8:1:foo\n",
+      "exit": 0
+    },
+    {
+      "name": "vimgrep stdin dash",
+      "args": [
+        "--vimgrep",
+        "foo",
+        "-"
+      ],
+      "stdin": "a foo foo\n",
+      "stdout": "<stdin>:1:3:a foo foo\n<stdin>:1:7:a foo foo\n",
+      "exit": 0
+    },
+    {
+      "name": "sortr path files",
+      "args": [
+        "--sortr",
+        "path",
+        "--files",
+        "src"
+      ],
+      "stdout": "src/util.ts\nsrc/test.js\nsrc/lib/helper.go\nsrc/lib/data.py\nsrc/app.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "sortr none",
+      "args": [
+        "--sortr",
+        "none",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf flag only",
+      "args": [
+        "--crlf",
+        "-o",
+        "foo$",
+        "crlf.txt"
+      ],
+      "stdout": "foo\r\nfoo\r\n",
+      "exit": 0
+    },
+    {
+      "name": "crlf count",
+      "args": [
+        "--crlf",
+        "-c",
+        "o$",
+        "crlf.txt"
+      ],
+      "stdout": "2\r\n",
+      "exit": 0
+    },
+    {
+      "name": "no crlf",
+      "args": [
+        "--crlf",
+        "--no-crlf",
+        "foo$",
+        "crlf.txt"
+      ],
+      "stdout": "",
+      "exit": 1
+    },
+    {
+      "name": "no messages quiet",
+      "args": [
+        "--no-messages",
+        "-q",
+        "foo",
+        "missing.txt",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "messages",
+      "args": [
+        "--no-messages",
+        "--messages",
+        "foo",
+        "missing.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "one file system dir",
+      "args": [
+        "--one-file-system",
+        "-l",
+        "foo",
+        "src"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\n",
+      "exit": 0
+    },
+    {
+      "name": "block buffered",
+      "args": [
+        "--block-buffered",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "unicode digit",
+      "args": [
+        "-o",
+        "\\d+"
+      ],
+      "stdin": "12٣ z\n",
+      "stdout": "12٣\n",
+      "exit": 0
+    },
+    {
+      "name": "unicode not word",
+      "args": [
+        "-o",
+        "\\W+",
+        "utf.txt"
+      ],
+      "stdout": " \n \n \n 🎉 \n \n",
+      "exit": 0
+    },
+    {
+      "name": "unicode class in bracket",
+      "args": [
+        "-o",
+        "[\\w-]+",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "unicode ignore case",
+      "args": [
+        "-io",
+        "\\w+",
+        "utf.txt"
+      ],
+      "stdout": "café\nau\nlait\nÉcole\nnormale\nstraße\n日本語のテキスト\nemoji\nparty\nnaïve\nidea\nCAFÉ\nécole\n",
+      "exit": 0
+    },
+    {
+      "name": "no unicode",
+      "args": [
+        "--no-unicode",
+        "-o",
+        "\\w+",
+        "utf.txt"
+      ],
+      "stdout": "caf\nau\nlait\ncole\nnormale\nstra\ne\nemoji\nparty\nna\nve\nidea\nCAF\ncole\n",
+      "exit": 0
+    },
+    {
+      "name": "posix class ascii",
+      "args": [
+        "-o",
+        "[[:alpha:]]+",
+        "utf.txt"
+      ],
+      "stdout": "caf\nau\nlait\ncole\nnormale\nstra\ne\nemoji\nparty\nna\nve\nidea\nCAF\ncole\n",
+      "exit": 0
+    },
+    {
+      "name": "word start only",
+      "args": [
+        "-o",
+        "\\<fo+",
+        "rep.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "word end only",
+      "args": [
+        "-o",
+        "o\\>",
+        "rep.txt"
+      ],
+      "stdout": "o\no\n",
+      "exit": 0
+    },
+    {
+      "name": "word start brace",
+      "args": [
+        "\\b{start}école",
+        "utf.txt"
+      ],
+      "stdout": "école\n",
+      "exit": 0
+    },
+    {
+      "name": "word end brace",
+      "args": [
+        "-o",
+        "fé\\b{end}",
+        "utf.txt"
+      ],
+      "stdout": "fé\n",
+      "exit": 0
+    },
+    {
+      "name": "word edges alternation",
+      "args": [
+        "-o",
+        "\\<ab|ba\\>",
+        "rep.txt"
+      ],
+      "stdout": "ab\nab\n",
+      "exit": 0
+    },
+    {
+      "name": "word edge middle",
+      "args": [
+        "-o",
+        "a \\<é\\w+",
+        "w.txt"
+      ],
+      "files": {
+        "w.txt": "a école\n"
+      },
+      "stdout": "a école\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "\\< and \\> are checked in code only at the pattern's start and end; elsewhere they are RE2's ASCII \\b"
+      }
+    },
+    {
+      "name": "word boundary unicode",
+      "args": [
+        "\\bcole",
+        "utf.txt"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "accept": {
+        "stdout": "École normale\nécole\n",
+        "exit": 0,
+        "reason": "\\b and \\B are ASCII: RE2, the linear-time engine, has no Unicode word boundary"
+      }
+    },
+    {
+      "name": "not word boundary unicode",
+      "args": [
+        "-o",
+        "caf\\B",
+        "utf.txt"
+      ],
+      "stdout": "caf\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "\\b and \\B are ASCII: RE2, the linear-time engine, has no Unicode word boundary"
+      }
+    },
+    {
+      "name": "word start multiline",
+      "args": [
+        "-U",
+        "-o",
+        "\\<foo",
+        "ml.txt"
+      ],
+      "stdout": "foo\nfoo\nfoo\n",
+      "exit": 0
+    },
+    {
+      "name": "type all",
+      "args": [
+        "-t",
+        "all",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "-dash.txt\n.env\nMakefile\na.txt\ncrlf.txt\ndir/d.txt\nml.txt\nnonl.txt\no.txt\npats.txt\nrep.txt\nsp ace.txt\nsrc/app.ts\nsrc/lib/data.py\nsrc/lib/helper.go\nsrc/test.js\nweb/index.js\n",
+      "exit": 0
+    },
+    {
+      "name": "type not all",
+      "args": [
+        "-T",
+        "all",
+        "-l",
+        "foo"
+      ],
+      "unordered": true,
+      "stdout": "blank.pat\n",
+      "exit": 0
+    },
+    {
+      "name": "type add include",
+      "args": [
+        "--type-add",
+        "mine:include:ts,go",
+        "--files",
+        "-t",
+        "mine"
+      ],
+      "unordered": true,
+      "stdout": "src/app.ts\nsrc/lib/helper.go\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "type add include unknown",
+      "args": [
+        "--type-add",
+        "mine:include:nosuch",
+        "--files"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "type add bad",
+      "args": [
+        "--type-add",
+        "bad",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "type add bad name",
+      "args": [
+        "--type-add",
+        "a_b:*.txt",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "type add list",
+      "args": [
+        "--type-add",
+        "zzweb:*.{html,md}",
+        "--type-add",
+        "zzweb:*.txt",
+        "--type-list"
+      ],
+      "stdout": "ada: *.adb, *.ads\nagda: *.agda, *.lagda\naidl: *.aidl\nalire: alire.toml\namake: *.bp, *.mk\nasciidoc: *.adoc, *.asc, *.asciidoc\nasm: *.S, *.asm, *.s\nasp: *.ascx, *.ascx.cs, *.ascx.vb, *.asp, *.aspx, *.aspx.cs, *.aspx.vb\nats: *.ats, *.dats, *.hats, *.sats\navro: *.avdl, *.avpr, *.avsc\nawk: *.awk\nbat: *.bat\nbatch: *.bat\nbazel: *.BUILD, *.bazel, *.bazelrc, *.bzl, BUILD, MODULE.bazel, WORKSPACE, WORKSPACE.bazel, WORKSPACE.bzlmod\nbitbake: *.bb, *.bbappend, *.bbclass, *.conf, *.inc\nboxlang: *.bx, *.bxm, *.bxs\nbrotli: *.br\nbuildstream: *.bst\nbzip2: *.bz2, *.tbz2\nc: *.[chH], *.[chH].in, *.cats\ncabal: *.cabal\ncandid: *.did\ncarp: *.carp\ncbor: *.cbor\nceylon: *.ceylon\ncfml: *.cfc, *.cfm\nclojure: *.clj, *.cljc, *.cljs, *.cljx\ncmake: *.cmake, CMakeLists.txt\ncmd: *.bat, *.cmd\ncml: *.cml\ncoffeescript: *.coffee\nconfig: *.cfg, *.conf, *.config, *.ini\ncontainer: *Containerfile*, *Dockerfile*\ncoq: *.v\ncpp: *.[ChH], *.[ChH].in, *.[ch]pp, *.[ch]pp.in, *.[ch]xx, *.[ch]xx.in, *.cc, *.cc.in, *.hh, *.hh.in, *.inl\ncreole: *.creole\ncrystal: *.cr, *.ecr, Projectfile, shard.yml\ncs: *.cs\ncsharp: *.cs\ncshtml: *.cshtml\ncsproj: *.csproj\ncss: *.css, *.scss\ncsv: *.csv\ncuda: *.cu, *.cuh\ncython: *.pxd, *.pxi, *.pyx\nd: *.d\ndart: *.dart\ndevicetree: *.dts, *.dtsi, *.dtso\ndhall: *.dhall\ndiff: *.diff, *.patch\ndita: *.dita, *.ditamap, *.ditaval\ndocker: *Dockerfile*\ndockercompose: docker-compose.*.yml, docker-compose.yml\ndts: *.dts, *.dtsi\ndvc: *.dvc, Dvcfile\nebuild: *.ebuild, *.eclass\nedn: *.edn\nelisp: *.el\nelixir: *.eex, *.ex, *.exs, *.heex, *.leex, *.livemd\nelm: *.elm\nerb: *.erb\nerlang: *.erl, *.hrl\nfennel: *.fnl\nfidl: *.fidl\nfish: *.fish\nflatbuffers: *.fbs\nfortran: *.F, *.F77, *.F90, *.F95, *.f, *.f77, *.f90, *.f95, *.pfo\nfsharp: *.fs, *.fsi, *.fsx\nfut: *.fut\ngap: *.g, *.gap, *.gd, *.gi, *.tst\ngdscript: *.gd\ngleam: *.gleam\ngn: *.gn, *.gni\ngo: *.go\ngprbuild: *.gpr\ngradle: *.gradle, *.gradle.kts, gradle-wrapper.*, gradle.properties, gradlew, gradlew.bat\ngraphql: *.graphql, *.graphqls\ngroovy: *.gradle, *.groovy\ngzip: *.gz, *.tgz\nh: *.h, *.hh, *.hpp\nhaml: *.haml\nhare: *.ha\nhaskell: *.c2hs, *.cpphs, *.hs, *.hsc, *.lhs\nhbs: *.hbs\nhs: *.hs, *.lhs\nhtml: *.ejs, *.htm, *.html\nhurl: *.hurl\nhy: *.hy\nidris: *.idr, *.lidr\njanet: *.janet\njava: *.java, *.jsp, *.jspx, *.properties\njinja: *.j2, *.jinja, *.jinja2\njl: *.jl\njs: *.cjs, *.js, *.jsx, *.mjs, *.vue\njson: *.json, *.sarif, composer.lock\njsonl: *.jsonl\njulia: *.jl\njupyter: *.ipynb, *.jpynb\nk: *.k\nkconfig: Kconfig, Kconfig.*\nkotlin: *.kt, *.kts\nlean: *.lean\nless: *.less\nlicense: *[.-]LICEN[CS]E*, AGPL-*[0-9]*, APACHE-*[0-9]*, BSD-*[0-9]*, CC-BY-*, COPYING, COPYING[.-]*, COPYRIGHT, COPYRIGHT[.-]*, EULA, EULA[.-]*, GFDL-*[0-9]*, GNU-*[0-9]*, GPL-*[0-9]*, LGPL-*[0-9]*, LICEN[CS]E, LICEN[CS]E[.-]*, MIT-*[0-9]*, MPL-*[0-9]*, NOTICE, NOTICE[.-]*, OFL-*[0-9]*, PATENTS, PATENTS[.-]*, UNLICEN[CS]E, UNLICEN[CS]E[.-]*, agpl[.-]*, gpl[.-]*, lgpl[.-]*, licen[cs]e, licen[cs]e.*\nlilypond: *.ily, *.ly\nlisp: *.el, *.jl, *.lisp, *.lsp, *.sc, *.scm\nllvm: *.ll\nlock: *.lock, package-lock.json\nlog: *.log\nlua: *.lua\nlz4: *.lz4\nlzma: *.lzma\nm4: *.ac, *.m4\nmake: *.mak, *.mk, Makefile.*, [Gg][Nn][Uu]makefile, [Gg][Nn][Uu]makefile.am, [Gg][Nn][Uu]makefile.in, [Mm]akefile, [Mm]akefile.am, [Mm]akefile.in\nmako: *.mako, *.mao\nman: *.[0-9][cEFMmpSx], *.[0-9lnpx]\nmarkdown: *.markdown, *.md, *.mdown, *.mdwn, *.mdx, *.mkd, *.mkdn\nmatlab: *.m\nmd: *.markdown, *.md, *.mdown, *.mdwn, *.mdx, *.mkd, *.mkdn\nmeson: meson.build, meson.options, meson_options.txt\nminified: *.min.css, *.min.html, *.min.js\nmint: *.mint\nmk: mkfile\nml: *.ml\nmojo: *.mojo\nmotoko: *.mo\nmsbuild: *.csproj, *.fsproj, *.proj, *.props, *.sln, *.slnf, *.targets, *.vcxproj\nnim: *.nim, *.nimble, *.nimf, *.nims\nnix: *.nix\nobjc: *.h, *.m\nobjcpp: *.h, *.mm\nocaml: *.ml, *.mli, *.mll, *.mly\norg: *.org, *.org_archive\npants: BUILD\npascal: *.dpr, *.inc, *.lpr, *.pas, *.pp\npdf: *.pdf\nperl: *.PL, *.perl, *.pl, *.plh, *.plx, *.pm, *.t\nphp: *.php, *.php3, *.php4, *.php5, *.php7, *.php8, *.pht, *.phtml\npkgbuild: PKGBUILD\npo: *.po\npod: *.pod\npostscript: *.eps, *.ps\nprolog: *.P, *.pl, *.pro, *.prolog\nproto: *.proto\nprotobuf: *.proto\nps: *.cdxml, *.ps1, *.ps1xml, *.psd1, *.psm1\npuppet: *.epp, *.erb, *.pp, *.rb\npurs: *.purs\npy: *.py, *.pyi\npython: *.py, *.pyi\nqmake: *.prf, *.pri, *.pro\nqml: *.qml\nqrc: *.qrc\nqui: *.ui\nr: *.R, *.Rmd, *.Rnw, *.r, *.rmd, *.rnw\nracket: *.rkt\nraku: *.p6, *.pl6, *.pm6, *.raku, *.rakudoc, *.rakumod, *.rakutest\nrdoc: *.rdoc\nreadme: *README, README*\nreasonml: *.re, *.rei\nred: *.r, *.red, *.reds\nrescript: *.res, *.resi\nrobot: *.robot\nrocq: *.v\nrst: *.rst\nruby: *.gemspec, *.rake, *.rb, *.rbw, .irbrc, Gemfile, Rakefile, config.ru\nrust: *.rs\nsass: *.sass, *.scss\nscala: *.sbt, *.scala\nscdoc: *.scd, *.scdoc\nseed7: *.s7i, *.sd7\nsh: *.bash, *.bashrc, *.csh, *.cshrc, *.env, *.ksh, *.kshrc, *.sh, *.tcsh, *.zsh, .bash_login, .bash_logout, .bash_profile, .bashrc, .cshrc, .env, .kshrc, .login, .logout, .profile, .tcshrc, .zlogin, .zlogout, .zprofile, .zshenv, .zshrc, bash_login, bash_logout, bash_profile, bashrc, profile, zlogin, zlogout, zprofile, zshenv, zshrc\nslim: *.skim, *.slim, *.slime\nsmarty: *.tpl\nsml: *.sig, *.sml\nsolidity: *.sol\nsoy: *.soy\nspark: *.spark\nspec: *.spec\nsql: *.psql, *.sql\nssa: *.ssa\nstylus: *.styl\nsv: *.h, *.sv, *.svh, *.v, *.vg\nsvelte: *.svelte, *.svelte.ts\nsvg: *.svg\nswift: *.swift\nswig: *.def, *.i\nsystemd: *.automount, *.conf, *.device, *.link, *.mount, *.path, *.scope, *.service, *.slice, *.socket, *.swap, *.target, *.timer\ntaskpaper: *.taskpaper\ntcl: *.tcl\ntex: *.bib, *.cls, *.dtx, *.ins, *.ltx, *.sty, *.tex\ntexinfo: *.texi\ntextile: *.textile\ntf: *.terraform.lock.hcl, *.terraformrc, *.tf, *.tf.json, *.tfrc, *.tfvars, *.tfvars.json, terraform.rc\nthrift: *.thrift\ntoml: *.toml, Cargo.lock\nts: *.cts, *.mts, *.ts, *.tsx\ntwig: *.twig\ntxt: *.txt\ntypescript: *.cts, *.mts, *.ts, *.tsx\ntyposcript: *.ts, *.typoscript\ntypst: *.typ\nusd: *.usd, *.usda, *.usdc\nv: *.v, *.vsh\nvala: *.vala\nvb: *.vb\nvcl: *.vcl\nverilog: *.sv, *.svh, *.v, *.vh\nvhdl: *.vhd, *.vhdl\nvim: *.vim, .gvimrc, .vimrc, _gvimrc, _vimrc, gvimrc, vimrc\nvimscript: *.vim, .gvimrc, .vimrc, _gvimrc, _vimrc, gvimrc, vimrc\nvue: *.vue\nwebidl: *.idl, *.webidl, *.widl\nwgsl: *.wgsl\nwiki: *.mediawiki, *.wiki\nxml: *.dtd, *.rng, *.sch, *.xhtml, *.xjb, *.xml, *.xml.dist, *.xsd, *.xsl, *.xslt\nxz: *.txz, *.xz\nyacc: *.y\nyaml: *.yaml, *.yml\nyang: *.yang\nz: *.Z\nzig: *.zig\nzsh: *.zsh, .zlogin, .zlogout, .zprofile, .zshenv, .zshrc, zlogin, zlogout, zprofile, zshenv, zshrc\nzstd: *.zst, *.zstd\nzzweb: *.txt, *.{html,md}\n",
+      "exit": 0
+    },
+    {
+      "name": "type clear then add",
+      "args": [
+        "--type-clear",
+        "go",
+        "--type-add",
+        "go:*.txt",
+        "--files",
+        "-t",
+        "go",
+        "dir"
+      ],
+      "unordered": true,
+      "stdout": "dir/d.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "type clear unknown",
+      "args": [
+        "--type-clear",
+        "nosuch",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "foo one\nfoo two\nfood court\nfoobar\n",
+      "exit": 0
+    },
+    {
+      "name": "type not unknown",
+      "args": [
+        "-T",
+        "nosuch",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "type case",
+      "args": [
+        "-t",
+        "TS",
+        "foo"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "type make globs",
+      "args": [
+        "--files",
+        "-t",
+        "make"
+      ],
+      "unordered": true,
+      "files": {
+        "GNUmakefile": "x\n",
+        "Makefile.am": "x\n",
+        "gnumakefile.in": "x\n"
+      },
+      "stdout": "GNUmakefile\nMakefile\nMakefile.am\ngnumakefile.in\n",
+      "exit": 0
+    },
+    {
+      "name": "type sh names",
+      "args": [
+        "--files",
+        "-t",
+        "sh",
+        "--hidden"
+      ],
+      "unordered": true,
+      "files": {
+        ".bashrc": "x\n",
+        "run.sh": "x\n",
+        "zshrc": "x\n"
+      },
+      "stdout": ".bashrc\n.env\nrun.sh\nzshrc\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline replace numbers",
+      "args": [
+        "-n",
+        "-U",
+        "-r",
+        "<$0>",
+        "o\\n",
+        "ml.txt"
+      ],
+      "stdout": "2:say fo<o\n3:>fo<o\n4:>\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline replace group",
+      "args": [
+        "-U",
+        "-r",
+        "$1+",
+        "(o)\\nn",
+        "ml.txt"
+      ],
+      "stdout": "foo+ext\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline only numbers",
+      "args": [
+        "-n",
+        "-U",
+        "-o",
+        "foo\\nn",
+        "ml.txt"
+      ],
+      "stdout": "3:foo\n4:n\n",
+      "exit": 0
+    },
+    {
+      "name": "multiline only replace",
+      "args": [
+        "-U",
+        "-o",
+        "-r",
+        "[$0]",
+        "foo\\nn",
+        "ml.txt"
+      ],
+      "stdout": "[foo\nn]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns at the limit",
+      "args": [
+        "-M",
+        "7",
+        "one",
+        "a.txt"
+      ],
+      "stdout": "[Omitted long matching line]\n",
+      "exit": 0
+    },
+    {
+      "name": "max columns past the limit",
+      "args": [
+        "-M",
+        "8",
+        "one",
+        "a.txt"
+      ],
+      "stdout": "foo one\n",
+      "exit": 0
+    },
+    {
+      "name": "only matching inverted",
+      "args": [
+        "-o",
+        "-n",
+        "-v",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "1:alpha\n4:Foo three\n5:\n6:bar\n9:the end\n",
+      "exit": 0
+    },
+    {
+      "name": "glob globstar in braces",
+      "args": [
+        "--files",
+        "-g",
+        "{src/**/*.ts,config/**}"
+      ],
+      "unordered": true,
+      "stdout": "config/app.yaml\nconfig/db.yml\nsrc/app.ts\nsrc/util.ts\n",
+      "exit": 0
+    },
+    {
+      "name": "pcre2 nested too deep",
+      "args": [
+        "-P",
+        "((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((a))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+        "a.txt"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "json count",
+      "args": [
+        "--json",
+        "-c",
+        "foo",
+        "a.txt"
+      ],
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "json list",
+      "args": [
+        "-j1",
+        "--json",
+        "-l",
+        "foo",
+        "a.txt",
+        "nonl.txt"
+      ],
+      "stdout": "a.txt\nnonl.txt\n",
+      "exit": 0
+    },
+    {
+      "name": "null data",
+      "args": [
+        "--null-data",
+        "foo"
+      ],
+      "stdin": "foo\u0000bar\u0000",
+      "stdout": "foo\u0000",
+      "exit": 0
+    }
+  ]
+}
