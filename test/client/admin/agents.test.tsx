@@ -127,7 +127,7 @@ describe("the words", () => {
   });
 
   test.serial("window, price and key", () => {
-    expect(windowLine(128000)).toBe("128k");
+    expect(windowLine(128000)).toBe("128K");
     expect(windowLine(1048576)).toBe("1M");
     expect(windowLine(null)).toBe("");
     expect(priceLine(0.14, 0.28)).toBe("$0.14 / $0.28");
@@ -241,9 +241,9 @@ describe("the words", () => {
       },
     ];
     expect(reserveOf(rows)).toBe(20_000);
-    expect(compactLine(128000, 20_000)).toBe("auto compaction at 108k");
+    expect(compactLine(128000, 20_000)).toBe("auto compaction at 108K");
     // a small window keeps a quarter, not the whole reserve
-    expect(compactLine(16000, 20_000)).toBe("auto compaction at 12k");
+    expect(compactLine(16000, 20_000)).toBe("auto compaction at 12K");
     expect(compactLine(null, 20_000)).toBe("no auto compaction");
     expect(compactLine(128000, null)).toBe("");
   });
@@ -334,7 +334,7 @@ describe("a model its catalog does not describe", () => {
     );
     expect(html).toContain("Context window");
     expect(html).toMatch(/name="contextLength"[^>]*value="262144"/);
-    expect(html).toContain("262k · tools");
+    expect(html).toContain("262K · tools");
     expect(html).toContain(">Default<");
     expect(html).not.toContain("Default (off)");
     const described = render(
@@ -535,12 +535,12 @@ describe("the page", () => {
       expect(html).toContain("deepseek/deepseek-v4-flash");
       expect(html).not.toContain("DeepSeek: V4 Flash");
       expect(html).toContain(
-        "router · 128k · $0.14 / $0.28 · tools · reasoning",
+        "router · 128K · $0.14 / $0.28 · tools · reasoning",
       );
       expect(html).toContain("provider-router.key missing");
       // a phone shows the window and the price alone
       expect(html).toContain(
-        '<span class="rows-meta-short">128k · $0.14 / $0.28</span>',
+        '<span class="rows-meta-short">128K · $0.14 / $0.28</span>',
       );
       agents.value = [
         {
@@ -552,7 +552,7 @@ describe("the page", () => {
         },
       ];
       expect(render(<Agents />)).toContain(
-        "router · 128k · $0.14 / $0.28 · tools · reasoning · 2 MCPs",
+        "router · 128K · $0.14 / $0.28 · tools · reasoning · 2 MCPs",
       );
       agents.value = [
         { ...coder, servers: [{ serverId: "s1", read: true, write: false }] },

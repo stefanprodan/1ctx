@@ -163,12 +163,12 @@ describe("the last 30 days", () => {
 
   test("tokens say the cached share of the input", () => {
     expect(tokensTile(totals(), null)).toEqual({
-      figure: "1.2k",
+      figure: "1.2K",
       sub: "38% cached",
     });
-    expect(tokensTile(totals(), day()).sub).toBe("13 Sep · 1.1k");
+    expect(tokensTile(totals(), day()).sub).toBe("13 Sep · 1.1K");
     expect(cachedLine(totals({ promptTokens: 0 }))).toBe("none yet");
-    expect(dayTokensHint(day())).toBe("13 Sep · 1.1k tokens · 42% cached");
+    expect(dayTokensHint(day())).toBe("13 Sep · 1.1K tokens · 42% cached");
   });
 
   test("cost is never $0 when no round was priced", () => {
@@ -256,7 +256,7 @@ describe("all time", () => {
     expect(allCells(all()).map((c) => [c.label, c.figure, c.sub])).toEqual([
       ["Chats", "100", "4% failed"],
       ["Automations", "20", "none failed"],
-      ["Tokens", "1.2k", "38% cached"],
+      ["Tokens", "1.2K", "38% cached"],
       ["Cost", "$4.12", "12 of 30 priced"],
     ]);
     expect(sinceWords(all().since)).toBe("since 12 Sep");

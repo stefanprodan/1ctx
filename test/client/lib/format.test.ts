@@ -31,7 +31,7 @@ describe("time formatting", () => {
 
   test.each([
     ["units", 637, "637"],
-    ["thousands", 12_400, "12.4k"],
+    ["thousands", 12_400, "12.4K"],
     ["millions", 2_130_000, "2.13M"],
   ])("counts in %s", (_name, n, expected) => {
     expect(count(n)).toBe(expected);

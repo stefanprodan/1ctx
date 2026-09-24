@@ -164,7 +164,7 @@ afterEach(() => {
 describe("the knowledge words", () => {
   test("the totals read as files and tokens", () => {
     expect(knowledgeWords({ files: 6, tokens: 6600 })).toBe(
-      "6 files · 6.6k tokens",
+      "6 files · 6.6K tokens",
     );
     expect(knowledgeWords({ files: 1, tokens: 1 })).toBe("1 file · 1 token");
   });

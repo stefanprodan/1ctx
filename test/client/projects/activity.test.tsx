@@ -47,7 +47,7 @@ describe("the Activity card", () => {
     expect(html).not.toContain(`data-index="${27 * 7 - 1}"`);
     // a part of the window sums its days rather than the whole total
     expect(html).toContain(`aria-label="${sends} turns in 26 weeks"`);
-    expect(html).toContain(`>${sends} turns · ${sends}k tokens<`);
+    expect(html).toContain(`>${sends} turns · ${sends}K tokens<`);
     expect(html).toContain('aria-live="polite"');
     expect(html).not.toContain("activity-today");
     expect(html).toContain(">Mon<");
@@ -110,7 +110,7 @@ describe("the Activity card", () => {
     expect(html).not.toContain("activity-weekday");
     // this project's turns, not the answer's total over every project
     expect(html).toContain('aria-label="8 turns in 16 weeks"');
-    expect(html).toContain(">8 turns · 400k tokens<");
+    expect(html).toContain(">8 turns · 400K tokens<");
     // its busiest day is its own top level
     expect(html).toContain(
       'data-index="0" class="activity-cell activity-level-4"',

@@ -244,7 +244,7 @@ describe("People.model", () => {
 
   test("a token count reads in thousands", () => {
     expect(tokensText(1)).toBe("1 token");
-    expect(tokensText(2716)).toBe("2.72k tokens");
+    expect(tokensText(2716)).toBe("2.72K tokens");
   });
 
   test("an MCP server's line: refreshed, or the failure since, in red", () => {
@@ -345,14 +345,14 @@ describe("the pages", () => {
       const html = render(<Agent params={{ name: "coder" }} />);
       expect(html).toContain("deepseek/deepseek-v4-flash");
       expect(html).toContain(
-        "router · 128k · $0.14 / $0.28 · tools · reasoning",
+        "router · 128K · $0.14 / $0.28 · tools · reasoning",
       );
       expect(html).toContain(
         'class="people-prompt clamp">You write code.\nSmall diffs.<',
       );
       expect(html).toContain('>Prompt</span><span class="rows-hint">7 tokens<');
       expect(html).toContain(
-        '>Skills</span><span class="rows-hint">2k tokens<',
+        '>Skills</span><span class="rows-hint">2K tokens<',
       );
       expect(html).toContain(
         '>Tools</span><span class="rows-hint">300 tokens<',

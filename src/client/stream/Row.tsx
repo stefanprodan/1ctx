@@ -10,6 +10,7 @@
 
 import { type ComponentChild, Fragment } from "preact";
 import type { StreamRow } from "../../shared/api/sessions.ts";
+import { count } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { iconOf, stateLine, whenText } from "./Row.model.ts";
 
@@ -58,7 +59,7 @@ export function Row({
             ),
             row.runs !== null && (
               <span class="stream-runs">
-                {row.runs}{" "}
+                {count(row.runs)}{" "}
                 <Icon name="bolt" class="stream-runs-icon" size={12} />
               </span>
             ),

@@ -100,10 +100,10 @@ export function until(ms: number, now: number): string {
   return `in ${span(Math.max(0, ms - now))}`;
 }
 
-// a count the eye can take in: "637", "12.4k", "2.1M"
+// a count the eye can take in: "637", "12.4K", "2.1M"
 export function count(n: number): string {
   if (n < 1000) return String(n);
-  if (n < 1_000_000) return `${Number((n / 1000).toPrecision(3))}k`;
+  if (n < 1_000_000) return `${Number((n / 1000).toPrecision(3))}K`;
   return `${Number((n / 1_000_000).toPrecision(3))}M`;
 }
 
@@ -118,7 +118,7 @@ export function firstSentence(text: string): string {
   return end === -1 ? text : text.slice(0, end + 1);
 }
 
-// a count the server made in OpenAI's encoding: "1 token", "2.72k tokens"
+// a count the server made in OpenAI's encoding: "1 token", "2.72K tokens"
 export function tokensText(n: number): string {
   return `${count(n)} token${n === 1 ? "" : "s"}`;
 }

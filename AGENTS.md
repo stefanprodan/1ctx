@@ -1169,7 +1169,7 @@ violation, and every rule has a rejected fixture under
   shows the short form of a text (the model without its org) when the
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
-  ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
+  ago`), then the date; counts are `count()` (`12.4K`, `2.1M`).
 - **Every user and every agent has a page.** `/users/:username` and
   `/agents/:name` (`views/people/`, addresses from `lib/hrefs.ts`) are
   open to every signed-in user, read from `GET

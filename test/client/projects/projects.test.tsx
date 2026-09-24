@@ -629,7 +629,7 @@ describe("the pages", () => {
     expect(html).toContain("deepseek/deepseek-v4-flash");
     // no provider name for a member, and no form to open
     expect(html).toContain(
-      'class="rows-meta-long">128k · $0.14 / $0.28 · tools · reasoning<',
+      'class="rows-meta-long">128K · $0.14 / $0.28 · tools · reasoning<',
     );
     expect(html).not.toContain("rows-toggle");
     expect(html).toContain('class="rows-line rows-go" href="/agents/coder"');

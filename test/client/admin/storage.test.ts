@@ -115,7 +115,7 @@ describe("storage words", () => {
 
   test("the database size counts rows, and a day the rows it added", () => {
     expect(rowsTile([chats, usage])).toEqual({
-      figure: "1.2k",
+      figure: "1.2K",
       unit: "rows",
       sub: "3 tables",
     });
