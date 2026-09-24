@@ -19,6 +19,8 @@ export interface UserRegexLimits {
   maxResults?: number;
   maxOutputBytes?: number;
   signal?: AbortSignal;
+  /** (1ctx) POSIX leftmost-longest matching, as grep's BRE and ERE */
+  longest?: boolean;
 }
 
 /**
@@ -205,7 +207,8 @@ export class UserRegex implements RegexLike {
 
     try {
       const translatedPattern = translatePattern(pattern);
-      const re2Flags = convertFlags(flags);
+      const re2Flags =
+        convertFlags(flags) | (limits.longest ? RE2JS.LONGEST_MATCH : 0);
       this._re2 = RE2JS.compile(translatedPattern, re2Flags);
     } catch (e) {
       if (e instanceof RE2JSSyntaxException) {

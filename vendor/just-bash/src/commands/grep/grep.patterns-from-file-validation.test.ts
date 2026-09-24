@@ -4,9 +4,8 @@ import { Bash } from "../../Bash.js";
 /**
  * Multi-pattern validation for `grep -f`. Alternatives are concatenated
  * textually, so a malformed pattern must be rejected rather than allowed to
- * absorb its neighbour. Expectations verified against GNU grep 3.12 (which
- * reports its own wording, e.g. "Trailing backslash"; just-bash keeps its
- * existing `invalid regular expression` phrasing).
+ * absorb its neighbour. Expectations verified against GNU grep 3.12.
+ * (1ctx) The words are GNU's, with the file and line of the pattern.
  */
 describe("grep -f invalid patterns", () => {
   const hay = { "/hay.txt": "apple pie\ncherry\nbanana split\n" };
@@ -17,7 +16,7 @@ describe("grep -f invalid patterns", () => {
     });
     const result = await env.exec("grep -f /bad.txt /hay.txt");
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("grep: invalid regular expression: a\\\n");
+    expect(result.stderr).toBe("grep: /bad.txt:1: Trailing backslash\n");
     expect(result.exitCode).toBe(2);
   });
 
@@ -27,7 +26,7 @@ describe("grep -f invalid patterns", () => {
     });
     const result = await env.exec("grep -v -f /bad.txt /hay.txt");
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("grep: invalid regular expression: a\\\n");
+    expect(result.stderr).toBe("grep: /bad.txt:1: Trailing backslash\n");
     expect(result.exitCode).toBe(2);
   });
 
@@ -37,7 +36,9 @@ describe("grep -f invalid patterns", () => {
     });
     const result = await env.exec("grep -f /bad.txt /hay.txt");
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("grep: invalid regular expression: [a\n");
+    expect(result.stderr).toBe(
+      "grep: /bad.txt:1: Unmatched [, [^, [:, [., or [=\n",
+    );
     expect(result.exitCode).toBe(2);
   });
 
@@ -47,7 +48,7 @@ describe("grep -f invalid patterns", () => {
     });
     const result = await env.exec("grep -E -f /bad.txt /hay.txt");
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("grep: invalid regular expression: (a\n");
+    expect(result.stderr).toBe("grep: /bad.txt:1: Unmatched ( or \\(\n");
     expect(result.exitCode).toBe(2);
   });
 
@@ -155,7 +156,12 @@ describe("grep -f argument handling", () => {
     const env = new Bash({ files: hay });
     const result = await env.exec("grep --file");
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("grep: option '--file' requires an argument\n");
+    // (1ctx) GNU's usage lines follow
+    expect(result.stderr).toBe(
+      "grep: option '--file' requires an argument\n" +
+        "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +
+        "Try 'grep --help' for more information.\n",
+    );
     expect(result.exitCode).toBe(2);
   });
 
@@ -163,7 +169,12 @@ describe("grep -f argument handling", () => {
     const env = new Bash({ files: hay });
     const result = await env.exec("grep -f");
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("grep: option requires an argument -- 'f'\n");
+    // (1ctx) GNU's usage lines follow
+    expect(result.stderr).toBe(
+      "grep: option requires an argument -- 'f'\n" +
+        "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +
+        "Try 'grep --help' for more information.\n",
+    );
     expect(result.exitCode).toBe(2);
   });
 });

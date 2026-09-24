@@ -14,6 +14,7 @@ export {
   searchContent,
 } from "./matcher.js";
 export {
+  buildPatterns,
   buildRegex,
   convertReplacement,
   type RegexMode,

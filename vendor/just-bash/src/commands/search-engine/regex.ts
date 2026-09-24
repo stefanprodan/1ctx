@@ -3,6 +3,7 @@
  */
 
 import { createUserRegex, type UserRegex } from "../../regex/index.js";
+import { GnuPatternError, translateGnu } from "./gnu-regex.js";
 
 /** POSIX character class to JavaScript regex character range mapping (Map prevents prototype pollution) */
 const POSIX_CLASS_MAP = new Map<string, string>([
@@ -49,6 +50,8 @@ export interface RegexResult {
    * optionally wrapped in \b...\b for -w mode). Null for anything more complex.
    */
   preFilter?: PreFilter;
+  /** (1ctx) GNU grep's warnings about the pattern, each once */
+  warnings?: string[];
 }
 
 export interface PreFilter {
@@ -172,24 +175,47 @@ export function buildRegex(
   pattern: string,
   options: RegexOptions,
 ): RegexResult {
-  let regexPattern: string;
+  return buildPatterns([pattern], options);
+}
+
+/**
+ * (1ctx) Build one regex from several patterns, any of which selects a
+ * line, as grep's -e and -f give them. `basic` and `extended` are GNU
+ * grep's dialects, matched leftmost-longest as POSIX has it; `fixed` is
+ * matched the same way; `perl` is leftmost-first.
+ */
+export function buildPatterns(
+  patterns: string[],
+  options: RegexOptions,
+): RegexResult {
+  const warnings: string[] = [];
   let kResetGroup: number | undefined;
+  const sources = patterns.map((pattern, index) => {
+    switch (options.mode) {
+      case "fixed":
+        // Escape all regex special characters for literal match
+        return pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      case "basic":
+      case "extended": {
+        let translated: ReturnType<typeof translateGnu>;
+        try {
+          translated = translateGnu(pattern, options.mode);
+        } catch (error) {
+          if (error instanceof GnuPatternError) error.index = index;
+          throw error;
+        }
+        for (const warning of translated.warnings) {
+          if (!warnings.includes(warning)) warnings.push(warning);
+        }
+        return translated.source;
+      }
+      default: {
+        // Transform POSIX character classes first
+        let regexPattern = transformPosixCharacterClasses(pattern);
 
-  switch (options.mode) {
-    case "fixed":
-      // Escape all regex special characters for literal match
-      regexPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      break;
-    case "extended":
-    case "perl": {
-      // Transform POSIX character classes first
-      regexPattern = transformPosixCharacterClasses(pattern);
+        // Convert (?P<name>...) to JavaScript's (?<name>...) syntax
+        regexPattern = regexPattern.replace(/\(\?P<([^>]+)>/g, "(?<$1>");
 
-      // Convert (?P<name>...) to JavaScript's (?<name>...) syntax
-      regexPattern = regexPattern.replace(/\(\?P<([^>]+)>/g, "(?<$1>");
-
-      // Handle Perl-specific features only in perl mode
-      if (options.mode === "perl") {
         // Handle \Q...\E (quote metacharacters)
         regexPattern = handleQuoteMetachars(regexPattern);
 
@@ -201,17 +227,15 @@ export function buildRegex(
 
         // Handle \K (Perl regex reset match start)
         const kResult = handlePerlKReset(regexPattern);
-        regexPattern = kResult.pattern;
-        kResetGroup = kResult.kResetGroup;
+        if (patterns.length === 1) kResetGroup = kResult.kResetGroup;
+        return kResult.pattern;
       }
-      break;
     }
-    default:
-      // BRE mode: transform POSIX classes first, then convert BRE to JS regex
-      regexPattern = transformPosixCharacterClasses(pattern);
-      regexPattern = escapeRegexForBasicGrep(regexPattern);
-      break;
-  }
+  });
+  let regexPattern =
+    sources.length === 1
+      ? sources[0]
+      : sources.map((source) => `(?:${source})`).join("|");
 
   if (options.wholeWord && options.multiline) {
     // (1ctx) a multiline search cannot check words in code
@@ -239,9 +263,12 @@ export function buildRegex(
     (needsUnicode ? "u" : "");
   const preFilter = extractPreFilter(regexPattern, options.ignoreCase ?? false);
   return {
-    regex: createUserRegex(regexPattern, flags),
+    regex: createUserRegex(regexPattern, flags, {
+      longest: options.mode !== "perl",
+    }),
     kResetGroup,
     preFilter: preFilter ?? undefined,
+    warnings,
   };
 }
 
@@ -665,188 +692,6 @@ export function convertReplacement(replacement: string): string {
   // Convert $name to $<name> for non-numeric names (not followed by > which would already be converted)
   // Match $name where name starts with letter or underscore and contains word chars
   result = result.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)(?![>0-9])/g, "$$<$1>");
-
-  return result;
-}
-
-/**
- * Convert Basic Regular Expression (BRE) to JavaScript regex
- *
- * In BRE:
- * - \| is alternation (becomes | in JS)
- * - \( \) are groups (become ( ) in JS)
- * - \{n\}, \{n,\}, \{n,m\} are interval expressions (become {n}, {n,}, {n,m} in JS)
- * - \{,n\} and \{,\} are literal (invalid POSIX interval)
- * - + ? | ( ) { } are literal (must be escaped in JS)
- * - * at pattern start or after ^ is literal
- * - ^ is anchor at start of pattern or start of \(...\) group; literal elsewhere
- * - $ is anchor at end of pattern or end of \(...\) group; literal elsewhere
- */
-function escapeRegexForBasicGrep(str: string): string {
-  let result = "";
-  let i = 0;
-  // Track if we're at a position where * would be literal
-  // (at start of pattern/group, or right after ^ anchor)
-  let atPatternStart = true;
-  // Track nesting depth for \( \) groups
-  let groupDepth = 0;
-
-  while (i < str.length) {
-    const char = str[i];
-
-    // Handle bracket expressions - copy them through without modification
-    // Bracket expressions have already been processed by transformPosixCharacterClasses
-    if (char === "[") {
-      result += char;
-      i++;
-      // Handle negation or first ] in bracket expression
-      if (i < str.length && (str[i] === "^" || str[i] === "!")) {
-        result += str[i];
-        i++;
-      }
-      // Handle ] as first char (literal ])
-      if (i < str.length && str[i] === "]") {
-        result += str[i];
-        i++;
-      }
-      // Copy everything until closing ]
-      while (i < str.length && str[i] !== "]") {
-        if (str[i] === "\\" && i + 1 < str.length) {
-          result += str[i] + str[i + 1];
-          i += 2;
-        } else {
-          result += str[i];
-          i++;
-        }
-      }
-      // Copy closing ]
-      if (i < str.length && str[i] === "]") {
-        result += str[i];
-        i++;
-      }
-      atPatternStart = false;
-      continue;
-    }
-
-    if (char === "\\" && i + 1 < str.length) {
-      const nextChar = str[i + 1];
-      // BRE: \| becomes | (alternation)
-      if (nextChar === "|") {
-        result += "|";
-        i += 2;
-        atPatternStart = true; // After alternation, ^ and * rules apply at start of alternative
-        continue;
-      }
-      // BRE: \( starts a group
-      if (nextChar === "(") {
-        result += "(";
-        i += 2;
-        groupDepth++;
-        atPatternStart = true; // ^ and * rules apply at group start
-        continue;
-      }
-      // BRE: \) ends a group
-      if (nextChar === ")") {
-        result += ")";
-        i += 2;
-        groupDepth = Math.max(0, groupDepth - 1);
-        atPatternStart = false;
-        continue;
-      }
-      if (nextChar === "{") {
-        // Check for BRE interval expression: \{n\}, \{n,\}, \{n,m\}
-        // Valid intervals start with a digit (not comma)
-        const remaining = str.slice(i);
-        const intervalMatch = remaining.match(/^\\{(\d+)(,(\d*)?)?\\}/);
-        if (intervalMatch) {
-          const min = intervalMatch[1];
-          const hasComma = intervalMatch[2] !== undefined;
-          const max = intervalMatch[3] || "";
-          // Convert to JavaScript interval syntax
-          if (hasComma) {
-            result += `{${min},${max}}`;
-          } else {
-            result += `{${min}}`;
-          }
-          i += intervalMatch[0].length;
-          atPatternStart = false;
-          continue;
-        }
-        // Not a valid interval - treat \{ as literal {
-        result += `\\{`;
-        i += 2;
-        atPatternStart = false;
-        continue;
-      }
-      if (nextChar === "}") {
-        // \} outside of interval - literal }
-        result += `\\}`;
-        i += 2;
-        atPatternStart = false;
-        continue;
-      }
-      // Any other escape - pass through
-      result += char + nextChar;
-      i += 2;
-      atPatternStart = false;
-      continue;
-    }
-
-    // Handle * - literal at pattern/group start or after ^
-    if (char === "*" && atPatternStart) {
-      result += "\\*";
-      i++;
-      // Stay at pattern start so consecutive *'s are also escaped
-      continue;
-    }
-
-    // Handle ^ - anchor at pattern/group start, literal elsewhere
-    if (char === "^") {
-      if (atPatternStart) {
-        result += "^";
-        i++;
-        // After ^, we're still at a position where * would be literal
-        continue;
-      }
-      // ^ in middle - literal
-      result += "\\^";
-      i++;
-      continue;
-    }
-
-    // Handle $ - anchor at pattern end or before \), literal elsewhere
-    if (char === "$") {
-      // Check if this is at end of pattern or followed by \)
-      const isAtEnd = i === str.length - 1;
-      const isBeforeGroupEnd =
-        i + 2 < str.length && str[i + 1] === "\\" && str[i + 2] === ")";
-      if (isAtEnd || isBeforeGroupEnd) {
-        result += "$";
-      } else {
-        result += "\\$";
-      }
-      i++;
-      atPatternStart = false;
-      continue;
-    }
-
-    // Escape characters that are special in JavaScript regex but not in BRE
-    if (
-      char === "+" ||
-      char === "?" ||
-      char === "|" ||
-      char === "(" ||
-      char === ")" ||
-      char === "{" ||
-      char === "}"
-    ) {
-      result += `\\${char}`;
-    } else {
-      result += char;
-    }
-    i++;
-    atPatternStart = false;
-  }
 
   return result;
 }
