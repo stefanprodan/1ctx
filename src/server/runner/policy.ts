@@ -122,6 +122,8 @@ const NONE: Offered = {
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
   memory: null,
+  credentials: [],
+  credentialsOff: [],
   web: null,
 };
 

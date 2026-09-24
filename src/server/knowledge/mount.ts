@@ -4,20 +4,15 @@
 // A disposable mount keeps shared text and session scratch atomic without
 // holding a database transaction while the shell runs.
 
-import {
-  Bash,
-  decodeBytesToUtf8,
-  InMemoryFs,
-  type NetworkConfig,
-  stdoutAsBytes,
-} from "just-bash";
+import { Bash, decodeBytesToUtf8, InMemoryFs, stdoutAsBytes } from "just-bash";
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
-import { urlPrefixes, type WebSnapshot } from "../../shared/web.ts";
+import type { WebSnapshot } from "../../shared/web.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkFile, checkNames } from "./check.ts";
 import { type Change, commit, type ScratchCommit } from "./commit.ts";
+import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { type KeptEntry, listKept, readKept } from "./kept.ts";
 import { KNOWLEDGE_COMMANDS } from "./limits.ts";
 import { makeOpenCommand, type OpenedRecord, openedReceipt } from "./open.ts";
@@ -35,7 +30,13 @@ export type CommandCaps = {
   visuals: boolean;
 } & (
   | { web?: null }
-  | { web: WebSnapshot; fetchDeadlineMs: number; fetchBodyBytes: number }
+  | {
+      web: WebSnapshot;
+      fetchDeadlineMs: number;
+      fetchBodyBytes: number;
+      // the send's credentials, their keys read for this command
+      credentials?: CommandCredential[];
+    }
 );
 export type CommandResult = {
   content: string;
@@ -297,25 +298,10 @@ export async function run(
       defenseInDepth: true,
       ...(caps.web
         ? {
-            network: {
-              ...(caps.web.mode === "all"
-                ? { dangerouslyAllowFullInternetAccess: true }
-                : {
-                    allowedUrlPrefixes: urlPrefixes(caps.web.domains),
-                    allowedMethods: [
-                      "GET",
-                      "HEAD",
-                      "POST",
-                      "PUT",
-                      "DELETE",
-                      "PATCH",
-                      "OPTIONS",
-                    ],
-                  }),
-              denyPrivateRanges: false,
+            fetch: commandFetch(caps.web, caps.credentials ?? [], {
               timeoutMs: caps.fetchDeadlineMs,
               maxResponseSize: caps.fetchBodyBytes,
-            } satisfies NetworkConfig,
+            }),
           }
         : {}),
       executionLimits: {

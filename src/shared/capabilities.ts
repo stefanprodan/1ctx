@@ -7,18 +7,22 @@
 // never touched a switch. A key is a kind, or a kind and a name after a
 // colon. Web access is a kind alone, and so is the visualize tool. An
 // MCP server is `mcp:<server id>`: the id, since the name is not what an
-// agent's links hold. A skill is `skill:<skill id>`, by the same rule.
+// agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
+// HTTP credential is `credential:<credential id>`.
 
 export const WEB = "web";
 export const VISUALIZE = "visualize";
 export const MCP = "mcp";
 export const SKILL = "skill";
+export const CREDENTIAL = "credential";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
 
 export const mcpKey = (serverId: string) => `${MCP}:${serverId}`;
 export const skillKey = (skillId: string) => `${SKILL}:${skillId}`;
+export const credentialKey = (credentialId: string) =>
+  `${CREDENTIAL}:${credentialId}`;
 
 function idOf(kind: string, key: string): string | null {
   if (!key.startsWith(`${kind}:`)) return null;
@@ -31,6 +35,9 @@ export const serverOf = (key: string) => idOf(MCP, key);
 
 // the skill a key names, null for any other key
 export const skillOf = (key: string) => idOf(SKILL, key);
+
+// the credential a key names, null for any other key
+export const credentialOf = (key: string) => idOf(CREDENTIAL, key);
 
 export const MAX_CAPABILITY_KEY = 64;
 export const MAX_DISABLED_CAPABILITIES = 64;
@@ -45,7 +52,8 @@ export function isCapabilityKey(value: unknown): value is string {
     (value === WEB ||
       value === VISUALIZE ||
       serverOf(value) !== null ||
-      skillOf(value) !== null)
+      skillOf(value) !== null ||
+      credentialOf(value) !== null)
   );
 }
 

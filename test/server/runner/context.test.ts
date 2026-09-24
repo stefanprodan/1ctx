@@ -53,6 +53,8 @@ const NONE: Offered = {
   mcpPrompt: { text: "", digest: {} },
   mcpCatalog: "",
   memory: null,
+  credentials: [],
+  credentialsOff: [],
   web: null,
 };
 
@@ -933,6 +935,8 @@ describe("history", () => {
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        credentials: [],
+        credentialsOff: [],
       },
     };
     const req = summaryRequest(withTools, "s1", [
@@ -989,6 +993,8 @@ describe("history", () => {
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        credentials: [],
+        credentialsOff: [],
       },
     };
     const req = request(withTools, "s1", []);
@@ -1040,6 +1046,8 @@ describe("skills after a summary", () => {
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
       memory: null,
+      credentials: [],
+      credentialsOff: [],
     },
   };
   const work = (id: string, name: string, sendId: string) =>

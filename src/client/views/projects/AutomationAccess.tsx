@@ -5,14 +5,15 @@
 // while everything is on.
 
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import { servers, skills } from "../../data/capabilities.ts";
-import { accessOf } from "./Automations.model.ts";
+import { credentials, servers, skills } from "../../data/capabilities.ts";
+import { accessOf } from "./Access.model.ts";
 
 export function AccessLines({ row }: { row: AutomationSummary }) {
   const access = accessOf(
     row,
     servers.value[row.agentId] ?? [],
     skills.value[row.agentId] ?? [],
+    credentials.value,
   );
   return (
     <>
@@ -20,6 +21,12 @@ export function AccessLines({ row }: { row: AutomationSummary }) {
         <div class="split-line">
           Web access
           <span class="split-strong">Off</span>
+        </div>
+      )}
+      {access.credentialsOff.length > 0 && (
+        <div class="split-line">
+          Credentials off
+          <span class="split-strong">{access.credentialsOff.join(", ")}</span>
         </div>
       )}
       {!access.visuals && (

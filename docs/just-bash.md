@@ -98,6 +98,7 @@ without a file of their own.
 | `src/commands/rg/globs.ts` (new), `gitignore.ts`, `rg-files.ts` (new, moved out of `rg-search.ts`) | one glob compiler for `-g`, `--iglob`, `--type-add` and the ignore files: braces, a glob without a slash at any depth and pruning a directory, a leading `/` anchoring, the last match deciding, `-g` over the ignore files, types and hidden names; `.rgignore` over `.ignore` over `.gitignore`, the deepest first; a path given by name searched whatever the filters say; `--require-git` honours `.gitignore` only under a `.git`; `--sort` by time orders by mtime | `-g '*.{ts,go}'` found nothing, `-g '!src'` searched `src`, and a glob never overrode a `.gitignore` |
 | `src/commands/rg/rg-search.ts`, `rg-patterns.ts`, `rg-read.ts`, `rg-json.ts` (the last three new, moved out of `rg-search.ts`), `rg-output.ts` (new) | a missing path is reported and the others searched before exit 2, `-q` and `--json` included; a search whose filters left no file is ripgrep's `No files were searched`; a newline in a pattern without `-U` is ripgrep's error; `-` is stdin, named `<stdin>`; a blank line in a pattern file is the empty pattern; binary files in a walk are searched under `--binary` and `-uuu`; `--heading` puts a blank line between files and no heading over one; `--vimgrep` always names the file; `-0` follows every name; `--path-separator`; `-M` and `--max-columns-preview` in ripgrep's words, counting the line's end, `--trim`, `--crlf`; `-o -v` prints the selected lines; `--json` gives way to `-c`, `-l` and `--files` | a missing file was silent with exit 0 beside a match, stdin was never `-`, and the heading and vimgrep shapes were not ripgrep's |
 | `src/commands/rg/replace.ts` (new), `src/commands/search-engine/matcher.ts` | ripgrep's replacement: `$N`, `${N}`, `$name`, `${name}` and `$$`, a bare name running as far as letters, digits and `_` go; applied with context, `--passthru`, `--vimgrep`, to empty matches, and under `-U` across the lines a match spans; `-U` separates groups only with context | `-r '${1}x'` was printed as written, `$$1` was the group, and a multiline replacement printed the lines unchanged |
+| `src/network/index.ts`, `src/index.ts` | the package exports `validateAllowList`, `matchesAllowListEntry`, `createSecureFetch` and the `FetchResult` and `SecureFetchOptions` types | a credential's URL prefix is checked and matched by the rules curl's allow-list uses, and the mount builds curl's fetch itself (see below) |
 | `src/commands/search-engine/rust-regex.ts` (new), `unicode-sets.ts` (new, moved out of `pcre.ts`), `regex.ts`, `matcher.ts` | rg's own syntax: `\w`, `\d` and `\s` are Unicode unless `--no-unicode`; `\<`, `\>`, `\b{start}` and `\b{end}` at a pattern's start or end are word edges checked in code, elsewhere RE2's `\b`; `-P` goes through grep's `-P` layer, its rewrites and its refusals, and refuses groups nested past 250 deep, as PCRE2 does | `-o '\w+'` cut `café` to `caf`, `\<foo\>` matched nothing, and `-P` was refused though ripgrep has PCRE2 |
 | `src/commands/rg/file-types.ts`, `file-types-data.ts` (new) | ripgrep 15's whole type table, written from `rg --type-list` by `scripts/rg-record.ts`, aliases included, each glob matched case-sensitively against the file's name; `--type-add` with `include:` and ripgrep's `invalid definition`, `--type-clear` in order with it, `--type-list` showing both, `-t all`, and `unrecognized file type` for an unknown `-t` or `-T` | 38 types of 224 with their own globs, `-t typescript` found nothing, `--type-add` was ignored and an unknown type searched nothing silently |
 
@@ -346,6 +347,23 @@ for one of the reasons below. Where they part:
 - `-s` is slurp, not mikefarah's split into files; a missing file exits
   2 where every other error exits 1 as his does; `--version` names
   just-bash and the syntax.
+
+### How the mount gives curl its network
+
+The mount passes `fetch`, never `network`: `commandFetch()` in
+`src/server/knowledge/credentials.ts` wraps one `createSecureFetch` for
+the web snapshot and one per project credential, and picks between them
+once, from the URL curl asked for. A credential's own fetch has its
+prefix as the only allow-list entry, carrying the header as a
+`transform`, and its methods as `allowedMethods`. The transforms alone,
+all credentials as entries of one fetch, are not enough: the fetch
+chooses them again at each redirect hop, so an unsigned request could
+redirect into a prefix and gain its key; it checks the method once,
+before the redirects, and not at all under full internet access; and a
+credential left out for a missing key would let a matching request go
+out unsigned. The wrapper also replaces the keys in every result and
+error before curl sees them. Nothing in the vendored fetch changed for
+it.
 
 ## Its tests
 

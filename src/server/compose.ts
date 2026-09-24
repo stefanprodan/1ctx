@@ -12,6 +12,7 @@ import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
+import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
@@ -34,7 +35,12 @@ import {
   type Providers,
   providersArea,
 } from "./providers/index.ts";
-import { type Provision, provisionArea } from "./provision/index.ts";
+import {
+  inventoryOf,
+  type Provision,
+  projectDocsOf,
+  provisionArea,
+} from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
 import {
   type Registry,
@@ -117,14 +123,15 @@ export type App = {
   shutdown(): Promise<ShutdownResult>;
 };
 
-const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-"];
+const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
 
 function scrubbedLogs(options: ComposeOptions): LogFactory {
+  const { scrubbed } = httpKeys(options);
   return (area) =>
     scrubErrors(options.log(area), () =>
       SCRUB_KINDS.flatMap((kind) =>
         (options.secretNames?.(kind) ?? []).flatMap((name) => {
-          const value = options.secret(kind, name);
+          const value = scrubbed(kind, name);
           return value === null ? [] : [value];
         }),
       ),
@@ -217,6 +224,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     knowledge: { counts: (projectId) => knowledge.counts(projectId) },
   });
+  const credentials = credentialsArea({
+    db,
+    clock,
+    projects: projects.store,
+    key: httpKeys(options),
+    capabilities,
+  });
   const access: Access = accessArea({
     db,
     clock,
@@ -238,6 +252,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     skills,
     mcp,
+    credentials,
     tools: {
       capabilities: () => tools.capabilities(),
       offered: (now, agentId, agentServers, mode, scope) =>
@@ -283,6 +298,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     mcp,
     memory,
     knowledge,
+    credentials,
     sessions: {
       memorySnapshot: (projectId, sessionId) =>
         sessions.memorySnapshot(projectId, sessionId),
@@ -379,6 +395,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...mcp.routes,
     ...skills.routes,
     ...projects.routes,
+    ...credentials.routes,
     ...access.routes,
     ...agents.routes,
     ...memory.routes,
@@ -402,29 +419,22 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret,
     webAccess: () => configuredTools.webAccess(),
     bootstrap: async () => (await users.bootstrap()) !== null,
-    projectDocs: (name) => {
-      const id = projects.store
-        .teamProjectIds()
-        .find((id) => projects.store.byId(id)?.name === name);
-      return {
-        caps: limits.current(),
-        live: id === undefined ? [] : knowledge.store.list(id),
-      };
-    },
-    inventory: () => {
-      const names = users.list().map((row) => row.username);
-      return {
-        User: names.length ? names : ["admin"],
-        Project: projects.store
-          .teamProjectIds()
-          .map((id) => projects.store.byId(id)!.name),
-        Provider: providers.store.list().map((row) => row.name),
-        Skill: skills.store.summaries(() => []).map((row) => row.name),
-        McpServer: mcp.store.list().map((row) => row.name),
-        Agent: agents.store.list().map((row) => row.name),
-        Tool: ["web", "websearch", "visualize"],
-      };
-    },
+    projectDocs: projectDocsOf({
+      projects: projects.store,
+      limits,
+      docs: knowledge.store,
+    }),
+    credentials: { key: credentials.keyState, list: credentials.bindings },
+    inventory: () =>
+      inventoryOf({
+        users,
+        projects: projects.store,
+        credentials: credentials.store,
+        providers: providers.store,
+        skills: skills.store,
+        mcp: mcp.store,
+        agents: agents.store,
+      }),
   });
   const sweepLog = log("sweep");
   return {

@@ -184,9 +184,16 @@ export function isMcpMode(value: unknown): value is McpMode {
 
 // a secret file is named <kind>-<name>.key, so the directory says what
 // it holds and a form offers the files of its own kind and no others
-export const SECRET_KINDS = ["user-", "provider-", "search-", "mcp-"] as const;
+export const SECRET_KINDS = [
+  "user-",
+  "provider-",
+  "search-",
+  "mcp-",
+  "http-",
+] as const;
 export type SecretKind = (typeof SECRET_KINDS)[number];
 export const MCP_KEY_PREFIX = "mcp-" satisfies SecretKind;
+export const HTTP_KEY_PREFIX = "http-" satisfies SecretKind;
 
 export function isSecretName(kind: string, value: unknown): value is string {
   return (

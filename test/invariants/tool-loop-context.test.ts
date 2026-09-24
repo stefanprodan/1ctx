@@ -208,6 +208,8 @@ test("stopping a buffered round settles its calls without writing late results",
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        credentials: [],
+        credentialsOff: [],
         web: null,
       }),
       run: async (_offered, call, ctx) => {

@@ -1,6 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  KEY_BYTES,
+  type KeyState,
+  MAX_CREDENTIALS_PER_PROJECT,
+} from "../../shared/contracts/credential.ts";
 import type { WebAccess } from "../../shared/web.ts";
 import {
   isName,
@@ -13,6 +18,7 @@ import {
   type SecretKind,
 } from "../../shared/words.ts";
 import { parseUserPassword } from "../access/index.ts";
+import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { object } from "./fields.ts";
@@ -21,6 +27,7 @@ import * as spec from "./spec.ts";
 export const KINDS = [
   "User",
   "Project",
+  "Credential",
   "Provider",
   "Skill",
   "McpServer",
@@ -37,6 +44,13 @@ export type ProjectDocs = (project: string) => {
   caps: KnowledgeCaps;
   live: { name: string; bytes: number }[];
 };
+// the credentials the database holds, and what a key file's value is
+// now, for the checks that span objects
+export type CredentialsView = {
+  key(name: string): KeyState;
+  list(): { name: string; prefix: string; projects: string[] }[];
+};
+
 // a project doc read from the folder spec.knowledge names; bytes are
 // the text's UTF-8 length, as the store counts them
 export type KnowledgeDoc = { name: string; text: string; bytes: number };
@@ -51,6 +65,7 @@ export type Document = {
 
 export type {
   AgentSpec,
+  CredentialSpec,
   McpServerSpec,
   ProjectSpec,
   ProviderSpec,
@@ -81,6 +96,7 @@ function document(value: unknown, source: string): Document {
     const guard = {
       User: isUsername,
       Project: isName,
+      Credential: isName,
       Provider: isName,
       Skill: isSkillName,
       McpServer: isServerName,
@@ -101,6 +117,8 @@ function document(value: unknown, source: string): Document {
         return { ...base, kind, spec: spec.user(b.spec) };
       case "Project":
         return { ...base, kind, spec: spec.project(b.spec) };
+      case "Credential":
+        return { ...base, kind, spec: spec.credential(b.spec) };
       case "Provider":
         return { ...base, kind, spec: spec.provider(b.spec) };
       case "Skill":
@@ -182,6 +200,7 @@ export function preflight(
   secret: (kind: SecretKind, name: string) => string | null,
   web: Pick<WebAccess, "mode" | "domains">,
   projectDocs: ProjectDocs,
+  credentials: CredentialsView,
 ): void {
   duplicate(documents);
   const known = Object.fromEntries(
@@ -271,6 +290,28 @@ export function preflight(
           }
         }
         break;
+      case "Credential": {
+        if (!exists) required(["keyFrom", "url", "header", "value"]);
+        const keyFrom = doc.spec.keyFrom;
+        if (keyFrom !== undefined) {
+          const state = credentials.key(keyFrom);
+          if (state === "missing")
+            fail("keyFrom", `secret ${keyFrom}.key is missing`);
+          if (state === "unusable") {
+            fail(
+              "keyFrom",
+              `secret ${keyFrom}.key must hold ${KEY_BYTES.min} to ${KEY_BYTES.max} visible ASCII characters`,
+            );
+          }
+        }
+        for (const name of doc.spec.projects ?? []) {
+          if (name === PERSONAL_PROJECT_NAME) {
+            fail("projects", "cannot name a personal project");
+          }
+          reference("projects", "Project", name);
+        }
+        break;
+      }
       case "Provider":
         if (!exists) required(["wire", "baseUrl"]);
         if (doc.spec.keyFrom)
@@ -301,6 +342,57 @@ export function preflight(
           fail("domains", "list at least one host");
         }
         break;
+    }
+  }
+  bindings(documents, credentials);
+}
+
+// the credentials each project would hold once applied: no more than the
+// cap, and no two whose prefixes overlap
+type Binding = { name: string; prefix: string; projects: string[] };
+
+function bindings(documents: Document[], credentials: CredentialsView): void {
+  const final = new Map<string, Binding & { source?: string }>(
+    credentials.list().map((row) => [row.name, row]),
+  );
+  for (const doc of documents) {
+    if (doc.kind !== "Credential") continue;
+    const held = final.get(doc.name);
+    final.set(doc.name, {
+      name: doc.name,
+      prefix: doc.spec.url ?? held?.prefix ?? "",
+      projects: doc.spec.projects ?? held?.projects ?? [],
+      source: doc.source,
+    });
+  }
+  // documents last, so the one blamed is one the input names
+  const rows = [...final.values()].sort(
+    (a, b) =>
+      Number(a.source !== undefined) - Number(b.source !== undefined) ||
+      a.name.localeCompare(b.name),
+  );
+  const byProject = new Map<string, Binding[]>();
+  for (const row of rows) {
+    const fail = (message: string): never => {
+      throw new Error(
+        `${row.source}: Credential/${row.name}: spec.projects ${message}`,
+      );
+    };
+    for (const project of row.projects) {
+      const list = byProject.get(project) ?? [];
+      const overlap = list.find((other) =>
+        prefixesOverlap(other.prefix, row.prefix),
+      );
+      if (overlap !== undefined) {
+        fail(`${project}: the prefix overlaps Credential/${overlap.name}`);
+      }
+      if (list.length >= MAX_CREDENTIALS_PER_PROJECT) {
+        fail(
+          `${project}: a project holds at most ${MAX_CREDENTIALS_PER_PROJECT} credentials`,
+        );
+      }
+      list.push(row);
+      byProject.set(project, list);
     }
   }
 }

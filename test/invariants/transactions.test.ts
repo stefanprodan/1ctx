@@ -321,6 +321,8 @@ describe("finishTool rollback", () => {
           mcpPrompt: { text: "", digest: {} },
           mcpCatalog: "",
           memory: null,
+          credentials: [],
+          credentialsOff: [],
           web: null,
           tools: [
             {
@@ -438,6 +440,8 @@ describe("finalizeSend rollback", () => {
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        credentials: [],
+        credentialsOff: [],
         web: null,
         tools: [
           {

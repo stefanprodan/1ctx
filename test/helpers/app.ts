@@ -248,20 +248,24 @@ export async function testApp(
       ? "hunter2-test"
       : options.adminPassword;
   const fake = fakeFetch();
-  const values: Record<string, string> = { ...options.secrets };
-  if (adminPassword !== null) values[ADMIN_SECRET] = adminPassword;
+  // read at each call, so a test may replace or delete a key it passed
+  const given = options.secrets ?? {};
+  const values = (): Record<string, string> => ({
+    ...(adminPassword === null ? {} : { [ADMIN_SECRET]: adminPassword }),
+    ...given,
+  });
   const app = await compose({
     db,
     passwordCost: TEST_PASSWORD_COST,
     secret: (kind, name) => {
       if (!isSecretName(kind, name)) throw new Error("bad secret name");
-      return values[name]?.trim() || null;
+      return values()[name]?.trim() || null;
     },
     secretNames: (kind) => {
       if (!SECRET_KINDS.some((known) => known === kind)) {
         throw new Error("bad secret kind");
       }
-      return Object.keys(values)
+      return Object.keys(values())
         .filter((name) => isSecretName(kind, name))
         .sort();
     },

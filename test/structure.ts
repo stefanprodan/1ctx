@@ -25,6 +25,7 @@ export const LAYERS = [
   "mcp",
   "skills",
   "projects",
+  "credentials",
   "access",
   "agents",
   "memory",

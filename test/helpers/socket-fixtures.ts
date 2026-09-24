@@ -153,6 +153,8 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
         mcpPrompt: { text: "", digest: {} },
         mcpCatalog: "",
         memory: null,
+        credentials: [],
+        credentialsOff: [],
         web: null,
       }),
       async run(_offered, c, ctx) {

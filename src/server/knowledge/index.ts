@@ -340,6 +340,11 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
 
 export { checkFile, checkNames, checkTotals } from "./check.ts";
 export {
+  type CommandCredential,
+  type Refusal,
+  scrubKeys,
+} from "./credentials.ts";
+export {
   copyKeptFiles,
   type KeptFile,
   keptPath,

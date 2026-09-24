@@ -11,13 +11,13 @@
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import type {
   StreamRow,
+  SwitchableCredential,
   SwitchableServer,
   SwitchableSkill,
 } from "../../../shared/api/sessions.ts";
 import {
-  mcpKey,
+  credentialOf,
   serverOf,
-  skillKey,
   skillOf,
   VISUALIZE,
   WEB,
@@ -28,6 +28,7 @@ import {
 } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
+import { disabledOf } from "./Access.model.ts";
 import { daysOf, fieldsOf, fireLabel, WEEK } from "./Schedule.model.ts";
 
 const whole = (field: string, max: number): number | null => {
@@ -296,6 +297,8 @@ export type Draft = {
   mcpOff: string[];
   // the keys of the skills its runs go without
   skillsOff: string[];
+  // the keys of the project's credentials its runs go without
+  credentialsOff: string[];
 };
 
 export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -324,6 +327,7 @@ export function draftOf(
       visuals: true,
       mcpOff: [],
       skillsOff: [],
+      credentialsOff: [],
     };
   }
   return {
@@ -340,6 +344,9 @@ export function draftOf(
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     mcpOff: a.disabledCapabilities.filter((key) => serverOf(key) !== null),
     skillsOff: a.disabledCapabilities.filter((key) => skillOf(key) !== null),
+    credentialsOff: a.disabledCapabilities.filter(
+      (key) => credentialOf(key) !== null,
+    ),
   };
 }
 
@@ -391,13 +398,14 @@ export function automationFieldOf(
 export const toggled = (keys: readonly string[], key: string): string[] =>
   keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key];
 
-// `servers` and `skills` are the picked agent's: a key for any other is
-// not shown, so it is not saved
+// `servers` and `skills` are the picked agent's and `credentials` the
+// project's: a key for any other is not shown, so it is not saved
 export function requestOf(
   d: Draft,
   limitMs: number,
   servers: readonly SwitchableServer[] = [],
   skills: readonly SwitchableSkill[] = [],
+  credentials: readonly SwitchableCredential[] = [],
 ):
   | { body: SaveAutomationRequest }
   | { problem: string; field: AutomationField } {
@@ -438,38 +446,8 @@ export function requestOf(
       projectMemory: d.memory === "project",
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
-      disabledCapabilities: [
-        ...(d.web ? [] : [WEB]),
-        ...(d.visuals ? [] : [VISUALIZE]),
-        ...servers
-          .map((server) => mcpKey(server.id))
-          .filter((key) => d.mcpOff.includes(key)),
-        ...skills
-          .map((skill) => skillKey(skill.id))
-          .filter((key) => d.skillsOff.includes(key)),
-      ].sort(),
+      disabledCapabilities: disabledOf(d, servers, skills, credentials),
     },
-  };
-}
-
-// what the row keeps its runs from, for the page's aside: the names of
-// its agent's servers and skills that are off, in name order
-export function accessOf(
-  a: Pick<AutomationSummary, "disabledCapabilities">,
-  servers: readonly SwitchableServer[],
-  skills: readonly SwitchableSkill[] = [],
-): { web: boolean; visuals: boolean; mcpOff: string[]; skillsOff: string[] } {
-  return {
-    web: !a.disabledCapabilities.includes(WEB),
-    visuals: !a.disabledCapabilities.includes(VISUALIZE),
-    mcpOff: servers
-      .filter((server) => a.disabledCapabilities.includes(mcpKey(server.id)))
-      .map((server) => server.name)
-      .sort(),
-    skillsOff: skills
-      .filter((skill) => a.disabledCapabilities.includes(skillKey(skill.id)))
-      .map((skill) => skill.name)
-      .sort(),
   };
 }
 

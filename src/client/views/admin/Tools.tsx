@@ -5,7 +5,8 @@
 // itself, webfetch and websearch included, read-only, each with its
 // tokens. Web: web access for the instance, the search provider, None
 // first, one row per provider with whether its key file is there, and
-// visualize with its own switch, apart from web access. Limits: the caps a send and a call
+// visualize with its own switch, apart from web access, and the HTTP
+// credentials bash's curl signs with. Limits: the caps a send and a call
 // run under. The tab is the address, and the three routes name this one
 // view, so a tab change keeps the page and its load. A change applies to
 // the next send.
@@ -20,6 +21,7 @@ import {
   type SearchProvider,
 } from "../../../shared/words.ts";
 import { path } from "../../app/router.ts";
+import { credentialsError } from "../../data/credentials.ts";
 import { limits, patchTool, tools, toolsError } from "../../data/tools.ts";
 import { says } from "../../lib/format.ts";
 import { Page } from "../../ui/Page.tsx";
@@ -33,6 +35,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { CredentialsCard } from "./CredentialsCard.tsx";
 import { LimitsCard } from "./LimitsCard.tsx";
 import { ToolRow } from "./ToolRow.tsx";
 import {
@@ -128,8 +131,11 @@ function SearchCard() {
 export function Tools() {
   const state = tools.value;
   const rows = limits.value;
-  const error = toolsError.value;
   const tab = toolsTab(path.value);
+  // the Web tab fails with the credentials too; their card waits alone,
+  // so a tab change never blanks the page
+  const error =
+    toolsError.value ?? (tab === "web" ? credentialsError.value : null);
   const href = TOOLS_TABS.find((t) => t.tab === tab)!.href;
   return (
     <Page
@@ -151,6 +157,7 @@ export function Tools() {
             <WebAccessCard />
             <SearchCard />
             <ToolsCard label="Visuals" rows={[state.visualize]} />
+            <CredentialsCard />
           </>
         )}
         {tab === "limits" && rows && (

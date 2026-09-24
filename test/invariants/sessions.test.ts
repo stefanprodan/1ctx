@@ -80,6 +80,8 @@ function fixedTools(content: string): Tools {
       mcpPrompt: { text: "", digest: {} },
       mcpCatalog: "",
       memory: null,
+      credentials: [],
+      credentialsOff: [],
       web: null,
     }),
     run: () => Promise.resolve({ content, error: false }),
@@ -647,6 +649,7 @@ describe("GET /api/projects/:id/agents", () => {
       capabilities: ["web", "visualize"],
       servers: {},
       skills: {},
+      credentials: [],
     });
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
     expect(

@@ -4,6 +4,11 @@
  * Provides secure network access with URL allow-list enforcement.
  */
 
+// the allow-list rules, for 1ctx's credential prefixes (1ctx)
+export {
+  matchesAllowListEntry,
+  validateAllowList,
+} from "./allow-list.js";
 export {
   createSecureFetch,
   type SecureFetch,

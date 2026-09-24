@@ -12,11 +12,18 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import { MCP, SKILL, VISUALIZE, WEB } from "../../shared/capabilities.ts";
+import {
+  CREDENTIAL,
+  MCP,
+  SKILL,
+  VISUALIZE,
+  WEB,
+} from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import {
+  credentials,
   dropFlips,
   dropKind,
   flip,
@@ -44,6 +51,7 @@ import {
   skillsItem,
   visualsItem,
   webItem,
+  webPaneItem,
 } from "./Add.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
@@ -202,6 +210,20 @@ export function Composer({
     switchable: switchable.value,
     off: isOff(chat, off, WEB),
   });
+  // the credentials are the project's, so another agent keeps their
+  // flips and another project, on Home, drops them
+  const webPane = webPaneItem({
+    web,
+    credentials: credentials.value,
+    isOff: (key) => isOff(chat, off, key),
+  });
+  const lastProject = useRef<string | null>(null);
+  useEffect(() => {
+    if (agentMoved(lastProject.current, filesProjectId)) {
+      dropKind(chat, CREDENTIAL);
+    }
+    lastProject.current = filesProjectId;
+  }, [chat, filesProjectId]);
   const visuals = visualsItem({
     tools: readable,
     switchable: switchable.value,
@@ -396,6 +418,7 @@ export function Composer({
           onFiles={attach}
           web={web}
           onWeb={() => flip(chat, off, WEB)}
+          webPane={webPane}
           visuals={visuals}
           onVisuals={() => flip(chat, off, VISUALIZE)}
           servers={mcp}

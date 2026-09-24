@@ -12,6 +12,7 @@
 import { effect, signal } from "@preact/signals";
 import type {
   ProjectAgentsResponse,
+  SwitchableCredential,
   SwitchableServer,
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
@@ -29,11 +30,15 @@ export const servers = signal<Readonly<Record<string, SwitchableServer[]>>>({});
 // by agent id, the skills the agent carries, from the same answer
 export const skills = signal<Readonly<Record<string, SwitchableSkill[]>>>({});
 
+// the project's credentials, for any agent, from the same answer
+export const credentials = signal<readonly SwitchableCredential[]>([]);
+
 // the project's agents answered: what can be switched there now
 export function answered(body: ProjectAgentsResponse): void {
   switchable.value = body.capabilities;
   servers.value = body.servers;
   skills.value = body.skills;
+  credentials.value = body.credentials;
 }
 
 // the chat a flip belongs to, "" for one not made yet; key to off
@@ -57,6 +62,7 @@ effect(() => {
   switchable.value = null;
   servers.value = {};
   skills.value = {};
+  credentials.value = [];
   pending.value = { scope: NEW, flips: new Map() };
   carried = { scope: NEW, flips: new Map() };
 });
@@ -159,7 +165,8 @@ export async function carry<T>(
 }
 
 // another agent was picked in a chat not made yet: the flips of one kind
-// named the other agent's servers or skills
+// named the other agent's servers or skills; or another project, whose
+// credentials are others
 export function dropKind(sessionId: string | null, kind: string): void {
   if (pending.value.scope !== scopeOf(sessionId)) return;
   const flips = new Map(pending.value.flips);

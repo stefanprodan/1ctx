@@ -5,11 +5,13 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   agentMoved,
+  onWords,
   panelessOf,
   serversItem,
   skillsItem,
   visualsItem,
   webItem,
+  webPaneItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
 import { VISUALIZE, WEB } from "../../../src/shared/capabilities.ts";
@@ -96,7 +98,7 @@ describe("the MCP servers item", () => {
     ).toBeNull();
   });
 
-  test("lists a switch per server and counts the ones off", () => {
+  test("lists a switch per server and counts the ones on", () => {
     const item = serversItem({
       tools: true,
       servers,
@@ -105,19 +107,34 @@ describe("the MCP servers item", () => {
     expect(item).toEqual({
       live: true,
       reason: null,
-      off: 1,
+      on: 1,
       rows: [
-        { key: "mcp:a1", name: "flux", note: "18 tools", on: false },
-        { key: "mcp:b2", name: "github", note: "42 tools", on: true },
+        {
+          key: "mcp:a1",
+          name: "flux",
+          note: "18 tools",
+          on: false,
+          live: true,
+          reason: null,
+        },
+        {
+          key: "mcp:b2",
+          name: "github",
+          note: "42 tools",
+          on: true,
+          live: true,
+          reason: null,
+        },
       ],
     });
+    expect(onWords(item!)).toBe("1 on");
   });
 
   test("an agent without tools shows it off and says why", () => {
     expect(serversItem({ tools: false, servers, isOff: () => false })).toEqual({
       live: false,
       reason: "Agent cannot use tools",
-      off: 0,
+      on: 0,
       rows: [],
     });
   });
@@ -130,8 +147,22 @@ describe("the MCP servers pane", () => {
         title="MCP servers"
         icon="mcp"
         rows={[
-          { key: "mcp:a1", name: "<flux>", note: "18 tools", on: false },
-          { key: "mcp:b2", name: "github", note: "42 tools", on: true },
+          {
+            key: "mcp:a1",
+            name: "<flux>",
+            note: "18 tools",
+            on: false,
+            live: true,
+            reason: null,
+          },
+          {
+            key: "mcp:b2",
+            name: "github",
+            note: "42 tools",
+            on: true,
+            live: true,
+            reason: null,
+          },
         ]}
         onBack={() => {}}
         onFlip={() => {}}
@@ -159,25 +190,41 @@ describe("the Skills item", () => {
     ).toBeNull();
   });
 
-  test("lists a switch per skill, with nothing to count, and the ones off", () => {
+  test("lists a switch per skill, with nothing to count, and the ones on", () => {
     expect(
       skillsItem({ tools: true, skills, isOff: (key) => key === "skill:s2" }),
     ).toEqual({
       live: true,
       reason: null,
-      off: 1,
+      on: 1,
       rows: [
-        { key: "skill:s1", name: "gitops", note: "", on: true },
-        { key: "skill:s2", name: "visualize", note: "", on: false },
+        {
+          key: "skill:s1",
+          name: "gitops",
+          note: "",
+          on: true,
+          live: true,
+          reason: null,
+        },
+        {
+          key: "skill:s2",
+          name: "visualize",
+          note: "",
+          on: false,
+          live: true,
+          reason: null,
+        },
       ],
     });
+    const none = skillsItem({ tools: true, skills, isOff: () => true });
+    expect(onWords(none!)).toBe("0 on");
   });
 
   test("an agent without tools shows it off and says why", () => {
     expect(skillsItem({ tools: false, skills, isOff: () => false })).toEqual({
       live: false,
       reason: "Agent cannot use tools",
-      off: 0,
+      on: 0,
       rows: [],
     });
   });
@@ -186,7 +233,7 @@ describe("the Skills item", () => {
 // bug: back at the menu counted as a pane gone, so the reset queued there
 // undid a pane picked before it ran
 describe("the plus falling back to its menu", () => {
-  const live = { live: true, reason: null, off: 0, rows: [] };
+  const live = { live: true, reason: null, on: 0, rows: [] };
 
   test("never from the menu itself while open", () => {
     expect(panelessOf(true, "menu", null)).toBe(false);
@@ -208,5 +255,97 @@ describe("another agent picked", () => {
     expect(agentMoved("alpha", null)).toBe(false);
     expect(agentMoved("alpha", "alpha")).toBe(false);
     expect(agentMoved("alpha", "beta")).toBe(true);
+  });
+});
+
+describe("the Web access item with credentials", () => {
+  const credentials = [
+    { id: "c1", name: "finnhub" },
+    { id: "c2", name: "github" },
+  ];
+  const on = { live: true, on: true, reason: null };
+
+  test("stays the plain switch while the project has none", () => {
+    expect(
+      webPaneItem({ web: on, credentials: [], isOff: () => false }),
+    ).toBeNull();
+  });
+
+  test("is Web access, then a switch per credential, counting those on", () => {
+    const item = webPaneItem({
+      web: on,
+      credentials,
+      isOff: (key) => key === "credential:c2",
+    })!;
+    expect(item.live).toBe(true);
+    expect(item.on).toBe(1);
+    expect(onWords(item)).toBe("1 on");
+    expect(item.rows.map((row) => [row.key, row.on, row.live])).toEqual([
+      [WEB, true, true],
+      ["credential:c1", true, true],
+      ["credential:c2", false, true],
+    ]);
+    expect(item.rows[0]!.plain).toBe(true);
+  });
+
+  test("with the web off, every credential is faint and off, saying why", () => {
+    const item = webPaneItem({
+      web: { live: true, on: false, reason: null },
+      credentials,
+      isOff: () => false,
+    })!;
+    expect(onWords(item)).toBe("0 on");
+    expect(item.rows[0]).toMatchObject({ key: WEB, on: false, live: true });
+    for (const row of item.rows.slice(1)) {
+      expect(row).toMatchObject({
+        on: false,
+        live: false,
+        reason: "Web access is off",
+      });
+    }
+  });
+
+  test("when the web cannot be switched, the credentials take its reason", () => {
+    const web = webItem({ tools: true, switchable: [], off: false });
+    const item = webPaneItem({ web, credentials, isOff: () => false })!;
+    expect(item.live).toBe(true);
+    expect(item.reason).toBe("Turned off by an admin");
+    expect(item.rows.map((row) => row.reason)).toEqual([
+      "Turned off by an admin",
+      "Turned off by an admin",
+      "Turned off by an admin",
+    ]);
+    expect(item.rows.every((row) => !row.live && !row.on)).toBe(true);
+    const tools = webItem({ tools: false, switchable: [WEB], off: false });
+    expect(
+      webPaneItem({ web: tools, credentials, isOff: () => false })!.rows[1]!
+        .reason,
+    ).toBe("Agent cannot use tools");
+  });
+
+  test("waits for the project's agents to answer", () => {
+    const web = webItem({ tools: true, switchable: null, off: false });
+    const item = webPaneItem({ web, credentials, isOff: () => false })!;
+    expect(item.live).toBe(false);
+  });
+
+  test("the pane draws a credential off with its reason under the name", () => {
+    const item = webPaneItem({
+      web: { live: true, on: false, reason: null },
+      credentials,
+      isOff: () => false,
+    })!;
+    const html = render(
+      <AddPane
+        title="Web access"
+        icon="globe"
+        rows={item.rows}
+        onBack={() => {}}
+        onFlip={() => {}}
+      />,
+    );
+    expect(html).toContain("finnhub");
+    expect(html).toContain("Web access is off");
+    expect(html.match(/disabled/g)?.length).toBe(2);
   });
 });

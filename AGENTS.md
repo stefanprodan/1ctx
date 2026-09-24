@@ -187,7 +187,12 @@ server before provisioning. Omitted fields stay, supplied membership
 lists replace, passwords and their change flag are creation-only, and
 objects not named are never deleted. Tool objects configure `web` with
 mode and domains, `websearch` with a nullable provider, and `visualize`
-with its switch and hosts; webfetch is read-only. A `Project`'s
+with its switch and hosts; webfetch is read-only. A `Credential`
+(`keyFrom`, `url`, `header`, `value`, `methods`, `projects` by team
+name) is applied after `Project`; its preflight checks the key file by
+`readKey()`, refuses a personal or missing project, and checks the
+per-project cap and prefix overlaps over the held rows with the input
+laid on them. A `Project`'s
 `knowledge` names a folder relative to its YAML file, never from stdin:
 `loadKnowledge()` in `provision/knowledge.ts` reads it before
 validation, each file a doc named by its path, the uploader's metadata
@@ -395,9 +400,12 @@ violation, and every rule has a rejected fixture under
   as `OpenedFileResponse` (`sessions/opened.ts`). The client draws them
   in the reply with the visual cards, in call order: a visual through
   `Visual.tsx`, Markdown and code as `transcript/FileCard.tsx`.
-  `knowledge/mount.ts` alone imports just-bash, with pinned commands, no
+  `knowledge/mount.ts` alone runs just-bash (`credentials/check.ts`
+  imports only its allow-list rules, `knowledge/credentials.ts` its
+  fetch), with pinned commands, no
   host filesystem and `defenseInDepth: true`. The send's web snapshot
-  alone enables network and curl, never wget: all mode allows full
+  alone enables network and curl, through `commandFetch()` as the
+  `fetch` option, never wget: all mode allows full
   internet access, listed mode uses `urlPrefixes()` and all seven HTTP
   methods. Both set `denyPrivateRanges: false` explicitly, since Bun
   cannot pin DNS, and use the fetch deadline and body caps. No snapshot
@@ -472,14 +480,79 @@ violation, and every rule has a rejected fixture under
   times do not. Mount budgets include existing uploads even over lowered
   caps, and the largest uploaded file sets an I/O budget floor.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
-  secrets directory. The closed kinds are `user-`, `provider-`, `search-`
-  and `mcp-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
+  secrets directory. The closed kinds are `user-`, `provider-`, `search-`,
+  `mcp-` and `http-`, from `SECRET_KINDS` in `shared/words.ts`; `isSecretName`
   requires 1 to 48 lowercase ASCII letters, digits and dashes after the
   prefix, starting with a letter or digit. The secrets port checks the
   caller's kind on read, existence checks and listing; `compose.ts` binds
   each area's reader to its kind. `has()` checks existence; `read()`
-  returns null for an absent or empty file. Values are never logged,
-  returned by a route or stored in the database.
+  returns null for an absent or empty file, one that is not a regular
+  file after links are followed, and one past its `maxBytes`, sized
+  before it is read: `main.ts` reads an `http-` file
+  only up to `MAX_KEY_FILE_BYTES`. Values are never logged, returned by
+  a route or stored in the database; `http-` joins `provider-`, `search-`
+  and `mcp-` in both scrub lists (`SCRUB_KINDS` and `main.ts`), a key
+  failing its rule left out since it is never sent.
+- **An HTTP credential is a row, its key an `http-` file.**
+  `credentials/` is the area after `projects/`: the tables `credentials`
+  and `credential_projects` (links cascading with both sides), the
+  store, the routes, the parsers and the pure rules in `check.ts`. The
+  prefix is `normalizePrefix()`: https, no userinfo, query or fragment,
+  at most `MAX_PREFIX`, stored as origin and path with the host's
+  trailing dot dropped, and passing just-bash's `validateAllowList`.
+  The header is an RFC token, never a transport header or `proxy-*`
+  (case folded); the template is printable ASCII, at most
+  `MAX_TEMPLATE`, with `{key}` exactly once. The key is `isUsableKey`,
+  16 to 4,096 visible ASCII characters, read at the moment by
+  `readKey()`: `missing` with no file, `unusable` when empty, too large
+  or failing the rule. Methods default to GET and HEAD. A credential
+  binds team projects only (a personal or unknown id is a 400), at most
+  `MAX_CREDENTIALS_PER_PROJECT` to a project and never two whose
+  prefixes overlap by `prefixesOverlap()`, both checked after the write
+  in the transaction that writes the links (a 409 rolls it back).
+  `GET`, `POST /api/credentials` and `PATCH`, `DELETE
+  /api/credentials/:id` are `admin`; the list answers the `http-` key
+  names with `usable` and each row's `key` state, never a value; PATCH
+  takes any field but the name, a supplied `projectIds` replacing; a
+  delete forgets `credential:<id>` in sessions and automations in the
+  same transaction.
+- **A send signs bash's curl with its project's credentials.** The tools
+  area's `offered()` takes the project's rows through a port to
+  `credentials/`, in name order, as `credentials` (id, name, key name,
+  prefix, header, template, methods), and those whose `credential:<id>`
+  the send's set holds as `credentialsOff` (id, name, prefix); both are
+  empty without network (the admin's mode or the chat's `web` off),
+  outside a project, for a personal project and in the memory phase.
+  The bash tool, at each command with network, checks each row by id
+  (gone or unbound is `deleted`; a key name, prefix, header, template or
+  methods differing from the send's is `changed`) and reads its key by
+  the key name through `readKey()` (`missing`, `unusable`), so a
+  replaced file applies to the next command; the keys ride in the command caps as
+  `CommandCredential`s and nowhere else, and the tool scrubs its result
+  of them again, the tail kept apart. `knowledge/credentials.ts` builds
+  the `SecureFetch` the mount passes as just-bash's `fetch`:
+  `commandFetch()` picks once, by `matchesAllowListEntry` on the URL curl
+  asked for over every offered and off prefix, the web fetch
+  (`webNetwork()`, all or listed as before, never a transform) or that
+  credential's own `createSecureFetch`, its prefix the one allow-list
+  entry carrying the header, its methods the allowed ones. So a signed
+  redirect off the prefix, to http or to another credential is refused,
+  an unsigned request redirected into a prefix stays unsigned, and a
+  prefix is reached in listed mode without its host. An off, keyless,
+  unusable, removed or changed credential, a method it lacks and a
+  routing header the command sets (`ROUTING_HEADERS`: host, forwarded,
+  the `x-forwarded-*`, URL rewrite and method override headers) are
+  refused by its name before anything is sent, never the key file; the
+  web fetch refuses `host`, `forwarded` and `x-forwarded-host`. Each fetch is
+  made on first use. Every key the command read, and its JSON-escaped
+  forms (`escapedForms()`: `\/`, `\u` in either case), is replaced by
+  `[credential <name>]` in the result as bytes (body, header values,
+  status text, final URL), a header whose name holds one is dropped,
+  `content-length` follows a changed body and a body grown past the cap
+  is refused; an error is rebuilt from its first line, keys replaced,
+  its name kept. The bash description adds `curl to <prefix, cut at 80>
+  (<name>) is signed in; send no key.` per offered credential; the Tools
+  catalog and the agent page count bash without any.
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
   first three answer `GET /models` under the base URL; `gemini` is
@@ -598,6 +671,8 @@ violation, and every rule has a rejected fixture under
   `GET /api/projects/:id/agents` also answers `skills`, keyed by agent
   id, with `{id, name}` in name order from `skills/switchable.ts`, one
   read. Agents without skills have no entry.
+  It also answers `credentials`, the project's `{id, name}` in name
+  order, for any agent, the same for members and admins.
 - **An MCP server is rows, discovered through the official SDK.** The
   wire is `@modelcontextprotocol/client` v2 over Streamable HTTP in
   `auto` negotiation (the modern stateless era, or the legacy
@@ -762,10 +837,11 @@ violation, and every rule has a rejected fixture under
   staged `uploads` ids.
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys: `web`, `mcp:<server id>` and
-  `skill:<skill id>`. The parser checks only an id's shape, 1 to 32
-  lowercase ASCII letters or digits; unknown or unassigned server and
-  skill keys are kept and ignored.
+  change with `disable` and `enable` keys: `web`, `mcp:<server id>`,
+  `skill:<skill id>` and `credential:<credential id>`. The parser
+  checks only an id's shape, 1 to 32 lowercase ASCII letters or digits;
+  unknown or unassigned server, skill and credential keys are kept and
+  ignored.
   The policy resolves it before schemas are built; `startSend` applies
   it again to the current row in its transaction, with the message's
   revision and envelope. A refused start writes nothing; a later failure
@@ -1046,14 +1122,23 @@ violation, and every rule has a rejected fixture under
   provider and key presence), and `visualize` (its switch and hosts).
   The one `PATCH /api/tools/:name` descriptor accepts web mode/domains,
   websearch provider, or visualize enabled/hosts, never webfetch.
-  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
+  On the page Web is four cards. Web access (`WebAccessCard.tsx`) has
   its modes, Off, All domains and Listed domains, in the card's head as
   `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
   and All domains save on the click, Listed domains opens the hosts box,
   checked through `parseDomains()` in `shared/web.ts`, and saves the mode
   with the list. Web search is the providers as radio rows with None
   first. Visuals is the visualize row with its switch and its hosts with
-  Add, Remove and Reset, apart from web access.
+  Add, Remove and Reset, apart from web access. Credentials
+  (`CredentialsCard.tsx`, its words and bodies in
+  `CredentialsCard.model.ts`, the rows and `http-` keys in
+  `data/credentials.ts`, loaded by the Web route) is `Rows`: the name
+  over the prefix and its projects, the key file as `RowsMeta`, `bad`
+  when missing or unusable; New credential and an open row are one
+  form, the key a `Select` marking unusable and missing files, the
+  methods as boxes (GET and HEAD new), the rail's team projects as
+  `RowsCheck` lines, a PATCH sending only the fields changed, and
+  Delete asked once.
   The hosts field warns that loaded URLs can send the visual's data;
   each card's head has its total. Limits is a form per scope (Per send,
   Per call, Knowledge, Scheduled tasks), each saving the full set with
@@ -1317,13 +1402,17 @@ violation, and every rule has a rejected fixture under
   its counted rounds, summed from `usage` by the send queries).
   The editor's Access section (`AccessSection.tsx`) is the Web access
   switch, on for a new task and off with the composer's reasons when it
-  cannot be switched, the Visuals switch by the same rule, then a `RowsList` with a switch per MCP server of
-  the picked agent and another per skill. The row's whole
-  `disabledCapabilities` is saved: `web` and the keys of the shown
-  servers and skills that are off, so a key for one the picked agent
-  lacks is dropped. The automation page's Setup aside
-  (`AutomationAccess.tsx`) says Web access Off, Visuals Off, and names the servers
-  and the skills off, and nothing while all is on.
+  cannot be switched, a switch per credential of the project under it
+  (off and faint, with the reason, while web access is off), the
+  Visuals switch by the same rule, then a `RowsList` with a switch per
+  MCP server of the picked agent and another per skill. The row's whole
+  `disabledCapabilities` is saved by `disabledOf()` in `Access.model.ts`:
+  `web` and the keys of the shown servers, skills and credentials that
+  are off, so a key for one the picked agent or the project lacks is
+  dropped. The automation page's Setup aside (`AutomationAccess.tsx`,
+  `accessOf()`) says Web access Off, Visuals Off, and names the
+  credentials (only while the web is on), the servers and the skills
+  off, and nothing while all is on.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -1378,9 +1467,17 @@ violation, and every rule has a rejected fixture under
   still holds is kept. Leaving
   the chat and a reload forget them, a slash command carries none. Nothing
   outside the menu says web access is off.
+  When the answer's `credentials` (the project's, held as `credentials`
+  beside `switchable`) are not empty, Web access is a pane item instead
+  (`webPaneItem()`): the pane's first switch is Web access, then one per
+  credential, off and faint with the web's reason, or "Web access is
+  off", while the web is not on. Picking another agent keeps pending
+  `credential:` flips; Home's composer moving to another project drops
+  them.
   The fourth item, MCP servers, is there when the picked agent has an
   entry in `servers` of the same answer, held beside `switchable`. It
-  says how many are off and swaps the menu's rows, inside the same
+  says how many are on (`2 on`, `0 on`, `onWords()`, as every pane item
+  does) and swaps the menu's rows, inside the same
   `.menu` box, for `composer/AddPane.tsx`: a back row, then a
   `role="switch"` item per server with its tool count. The fifth item,
   Skills, is the same pane over the agent's entry in `skills`, a switch

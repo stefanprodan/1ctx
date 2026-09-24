@@ -190,7 +190,8 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
   projectMemory: "Sent in a run that reads the project's chats for its memory.",
   memory:
     "Sent in a run that updates the project's memory, and in the step after a run that updates its own memory.",
-  knowledge: "Sent in every chat and run, over the project's knowledge base.",
+  knowledge:
+    "Sent in every chat and run, over the project's knowledge base. Its tokens leave out the project's credentials.",
   web: "Sent while web access is on for the chat or the run.",
   webSearch: "Sent while web access is on and a search provider is chosen.",
 };

@@ -60,6 +60,11 @@ export type CapabilitiesPort = {
   capabilities(): string[];
 };
 
+// the credentials bound to a project, in name order
+export type CredentialsPort = {
+  forProject(projectId: string): { id: string; name: string }[];
+};
+
 export type RoutesDeps = {
   db: Db;
   store: AgentStore;
@@ -67,6 +72,7 @@ export type RoutesDeps = {
   skills: SkillsPort;
   mcp: McpPort;
   tools: CapabilitiesPort;
+  credentials: CredentialsPort;
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
@@ -218,13 +224,16 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/projects/:id/agents",
       policy: "authenticated",
       handle(_req, ctx) {
-        deps.access.project(ctx.principal!, ctx.params.id);
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
         const agents = deps.store.list().map(summary);
         const body: ProjectAgentsResponse = {
           agents,
           capabilities: deps.tools.capabilities(),
           servers: deps.mcp.switchableBy(agents),
           skills: deps.skills.switchable(),
+          credentials: deps.credentials
+            .forProject(project.id)
+            .map(({ id, name }) => ({ id, name })),
         };
         return json(body);
       },
