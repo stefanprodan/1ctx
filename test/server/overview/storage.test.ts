@@ -136,6 +136,8 @@ describe("the storage scan", () => {
     const result = scan(app.db, { now, since: 0 });
     const added = result.slots.reduce((sum, [, bytes]) => sum + bytes, 0);
     expect(added).toBe(10 + 3 * 5);
+    const rows = result.slots.reduce((sum, [, , count]) => sum + count, 0);
+    expect(rows).toBe(1 + 3);
   });
 });
 
@@ -376,6 +378,12 @@ describe("the storage answer", () => {
     expect(byDay["2026-10-31"]).toBe(bytesOf(rows[0]!.id));
     expect(byDay["2026-11-01"]).toBe(bytesOf(rows[1]!.id));
     expect(byDay["2026-11-02"]).toBe(0);
+    const rowsByDay = Object.fromEntries(
+      body.days.map((day) => [day.day, day.rows]),
+    );
+    expect(rowsByDay["2026-10-31"]).toBe(1);
+    expect(rowsByDay["2026-11-01"]).toBe(1);
+    expect(rowsByDay["2026-11-02"]).toBe(0);
     expect(body.before).toBe(0);
     // the same rows in UTC land a day later
     const utc = await storage(chat, "UTC");
@@ -410,6 +418,11 @@ describe("the storage answer", () => {
     // version on the day of the write
     expect(byDay["2026-06-10"]).toBe(3);
     expect(byDay["2026-06-15"]).toBe(11 + 11);
+    const rowsByDay = Object.fromEntries(
+      body.days.map((day) => [day.day, day.rows]),
+    );
+    expect(rowsByDay["2026-06-10"]).toBe(1);
+    expect(rowsByDay["2026-06-15"]).toBe(2);
   });
 
   test("counts the days before the window", async () => {
@@ -422,7 +435,9 @@ describe("the storage answer", () => {
       .run(Date.parse("2026-05-01T12:00:00Z"), sessionId);
     const body = await storage(chat);
     expect(body.before).toBe(messageBytes(chat, sessionId));
-    expect(body.days.every((day) => day.bytes === 0)).toBe(true);
+    expect(body.days.every((day) => day.bytes === 0 && day.rows === 0)).toBe(
+      true,
+    );
   });
 
   test("never names a personal project, its chats or its tasks", async () => {

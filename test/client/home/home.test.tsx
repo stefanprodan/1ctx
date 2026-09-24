@@ -132,7 +132,7 @@ describe("Home", () => {
       completionTokens: 12_400,
     };
     const again = render(<Home />);
-    expect(again).toContain('class="split-value">1.28k<');
+    expect(again).toContain('class="split-value">1.28K<');
     expect(again).toContain('class="split-value">637<');
     // prompt and completion tokens as one number
     expect(again).toContain('class="split-value">2.14M<');
@@ -180,6 +180,10 @@ describe("Home", () => {
     expect(html).toMatch(
       /#personal<\/span><span> · <\/span><span class="stream-runs">24 <svg.*?<\/svg><\/span><span> · <\/span><span class="stream-author">@assistant <\/span>nine pods/,
     );
+    // a count in the thousands reads as the rest of the app writes it
+    const [line] = list.value.rows;
+    list.value = { ...list.value, rows: [{ ...line!, runs: 1240 }] };
+    expect(render(<Home />)).toContain('class="stream-runs">1.24K <svg');
   });
 
   test("the search box carries the address's query and the empty line says so", () => {

@@ -126,7 +126,7 @@ export function reserveOf(rows: LimitRow[] | null): number | null {
 }
 
 // where the runner compacts a chat on this model, by the formula it
-// uses: "auto compaction at 236k", or that a model with no window is
+// uses: "auto compaction at 236K", or that a model with no window is
 // never compacted on its own
 export function compactLine(
   contextLength: number | null,

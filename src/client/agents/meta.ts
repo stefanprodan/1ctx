@@ -7,13 +7,13 @@
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 
-// "128k", "1M"; empty when the catalog did not say
+// "128K", "1M"; empty when the catalog did not say
 export function windowLine(contextLength: number | null): string {
   if (contextLength === null) return "";
   if (contextLength >= 1_000_000) {
     return `${Math.round(contextLength / 100_000) / 10}M`;
   }
-  return `${Math.round(contextLength / 1000)}k`;
+  return `${Math.round(contextLength / 1000)}K`;
 }
 
 const money = (n: number) => `$${Number(n.toPrecision(3))}`;

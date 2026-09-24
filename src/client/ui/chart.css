@@ -139,67 +139,52 @@
     height: 10px;
     border-radius: var(--radius-cell);
   }
-  .chart-meter-fill {
+  /* a stack of parts over days, its key above it */
+  .chart-days {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-3) var(--space-2) var(--space-2);
+  }
+  .chart-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    padding-left: var(--space-2);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  .chart-key-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* the key's swatches as Plot.tsx stacks the parts, bottom first */
+  .chart-key-1 {
     background: var(--heat-3);
   }
-
-  /* bones where the figures and marks go, at their size, so nothing
-     moves when the answer lands */
-  .chart-bone {
-    display: block;
-    height: 0.7em;
-    border-radius: var(--radius-cell);
-    background: var(--line);
-    animation: pulse 1.6s ease-in-out infinite;
-    animation-delay: calc(var(--ghost) * 0.05s);
+  .chart-key-2 {
+    background: var(--heat-2);
   }
-  .chart-bone-label {
-    width: 72px;
-    height: 14px;
+  .chart-key-3 {
+    background: var(--brand);
   }
-  .chart-bone-figure {
-    width: 96px;
-    height: calc(var(--text-figure) * 1.1);
-    margin-top: var(--space-1);
+  .chart-plot {
+    position: relative;
+    height: 200px;
   }
-  .chart-bone-sub {
-    width: 62%;
-    height: 16px;
+  /* the numbers of a plot for a screen reader, drawn for no one */
+  .chart-table {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
-  .chart-bone-trend {
-    width: 100%;
-    height: 36px;
-    margin-top: auto;
-  }
-  .chart-bone-name {
-    width: 72%;
-  }
-  .chart-bone-fill {
-    height: 12px;
-  }
-  .chart-bone-value {
-    width: 52px;
-    justify-self: end;
-  }
-  .chart-bone-icon {
-    width: 14px;
-    height: 14px;
-  }
-  .chart-bone-title {
-    width: 46%;
-  }
-  .chart-bone-meter {
-    width: 100%;
-    height: 3px;
-  }
-  .chart-bone-stack {
-    width: 100%;
-    height: 12px;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .chart-bone {
-      animation: none;
-    }
+  .chart-meter-fill {
+    background: var(--heat-3);
   }
 
   @media (max-width: 719px) {
@@ -234,12 +219,15 @@
 
 /* uPlot's own sheet is unlayered, and an unlayered rule beats every
    layered one, so its overrides are unlayered too */
-.chart-spark .uplot {
+.chart-spark .uplot,
+.chart-plot .uplot {
   font-family: var(--mono);
 }
-.chart-spark .u-legend {
+.chart-spark .u-legend,
+.chart-plot .u-legend {
   display: none;
 }
-.chart-spark .u-hz .u-cursor-x {
+.chart-spark .u-hz .u-cursor-x,
+.chart-plot .u-hz .u-cursor-x {
   border-right: 1px solid var(--line-strong);
 }

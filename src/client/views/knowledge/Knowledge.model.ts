@@ -18,12 +18,12 @@ import { ago, count } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { matches } from "../../lib/search.ts";
 
-// "1 file", "6.6k tokens"
+// "1 file", "6.6K tokens"
 export function plural(n: number, word: string): string {
   return `${count(n)} ${word}${n === 1 ? "" : "s"}`;
 }
 
-// the card's hint and the aside's line: "6 files · 6.6k tokens"
+// the card's hint and the aside's line: "6 files · 6.6K tokens"
 export function knowledgeWords(counts: KnowledgeCounts | KnowledgeTotals) {
   return `${plural(counts.files, "file")} · ${plural(counts.tokens, "token")}`;
 }

@@ -9,12 +9,18 @@ import {
   cleanedLine,
   factsLine,
   freeWords,
+  growthDay,
+  growthWords,
   largestLine,
+  logHeights,
   perDay,
   pickedArea,
+  rowsDay,
+  rowsTile,
   share,
   size,
   tableBars,
+  walWords,
 } from "../../../src/client/views/admin/Storage.model.ts";
 import type {
   LargestRow,
@@ -77,10 +83,8 @@ describe("storage words", () => {
       ["Chats", "30 MB", "75%"],
       ["Usage", "10 MB", "25%"],
     ]);
-    expect(bars[1].hint).toBe("Usage · 10 MB on disk · 1 row");
-    expect(areasFoot([chats, usage])).toBe(
-      "40 MB on disk in 2 areas · 1,201 rows",
-    );
+    expect(bars[1].hint).toBe("Usage · 10 MB · 1 row");
+    expect(areasFoot([chats, usage])).toBe("40 MB in 2 areas · 1,201 rows");
   });
 
   test("an area's indexes are one faint line, never named", () => {
@@ -90,7 +94,7 @@ describe("storage words", () => {
       ["sessions", false],
       ["5 indexes", true],
     ]);
-    expect(bars[2].hint).toBe("5 indexes · 8 MB on disk");
+    expect(bars[2].hint).toBe("5 indexes · 8 MB");
     expect(tableBars(usage).some((b) => b.faint)).toBe(false);
   });
 
@@ -102,16 +106,43 @@ describe("storage words", () => {
 
   test("the sparkline sums what each day added", () => {
     const days = [
-      { day: "2026-09-22", start: 1, bytes: 10 },
-      { day: "2026-09-23", start: 2, bytes: 20 },
-      { day: "2026-09-24", start: 3, bytes: 5 },
+      { day: "2026-09-22", start: 1, bytes: 10, rows: 1 },
+      { day: "2026-09-23", start: 2, bytes: 20, rows: 2 },
+      { day: "2026-09-24", start: 3, bytes: 5, rows: 1 },
     ];
     expect(addedByDay(days)).toEqual([10, 30, 35]);
+  });
+
+  test("the database size counts rows, and a day the rows it added", () => {
+    expect(rowsTile([chats, usage])).toEqual({
+      figure: "1.2K",
+      unit: "rows",
+      sub: "3 tables",
+    });
+    expect(rowsTile([])).toEqual({
+      figure: "0",
+      unit: "rows",
+      sub: "0 tables",
+    });
+    const day = (rows: number) => ({
+      day: "2026-09-22",
+      start: Date.UTC(2026, 8, 22, 12),
+      bytes: 0,
+      rows,
+    });
+    expect(rowsDay(day(1))).toBe("22 Sep · 1 row");
+    expect(logHeights([0, 9, 999])).toEqual([0, 1, 3]);
+    expect(rowsDay(day(1204))).toBe("22 Sep · 1,204 rows");
   });
 
   test("growth is an average a day", () => {
     expect(perDay(30 * MB, 30)).toEqual({ figure: "+1", unit: "MB a day" });
     expect(perDay(0, 0)).toEqual({ figure: "+0", unit: "B a day" });
+    expect(growthWords(0, 30)).toBe("last 30 days");
+    expect(growthDay(Date.UTC(2026, 8, 22, 12), 12 * MB)).toBe(
+      "22 Sep · +12 MB",
+    );
+    expect(growthWords(3 * MB, 30)).toBe("last 30 days · was 102 KB");
   });
 
   const file: StorageFile = {
@@ -128,10 +159,11 @@ describe("storage words", () => {
     lastMigration: "0020-mcp-kept",
   };
 
-  test("free space and the file facts", () => {
-    expect(freeWords(file)).toBe("10% of the file · auto vacuum off");
+  test("reusable space and the file facts", () => {
+    expect(freeWords(file)).toBe("10% reusable");
+    expect(walWords(file)).toBe("4%");
     expect(factsLine(file)).toBe(
-      "1ctx.sqlite · 25,600 pages of 4 KB · WAL journal · shared memory 32 KB · SQLite 3.51.0 · last migration 0020-mcp-kept",
+      "1ctx.sqlite · 25,600 pages of 4 KB · WAL journal · auto vacuum off · shared memory 32 KB · SQLite 3.51.0 · last migration 0020-mcp-kept",
     );
   });
 

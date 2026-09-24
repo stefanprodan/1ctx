@@ -19,7 +19,7 @@ import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadMcp } from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
-import { loadStorage } from "../data/overview.ts";
+import { loadOverview, loadStorage } from "../data/overview.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -308,6 +308,16 @@ export const ROUTES: Route[] = [
           : loadAutomations(projectId),
       ]);
     },
+  },
+  {
+    path: "/admin",
+    view: lazy(() =>
+      import("../views/admin/Overview.tsx").then((m) => m.Overview),
+    ),
+    title: () => "Overview",
+    role: "admin",
+    load: () => loadOverview(),
+    nav: { label: "Overview", icon: "visual", order: 6, group: "Admin" },
   },
   {
     path: "/admin/storage",

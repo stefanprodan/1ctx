@@ -251,7 +251,7 @@ describe("selection and words", () => {
 
   test("formats the selected day, totals, and accessible labels", () => {
     expect(dayHint({ day: "2026-09-12", sends: 23, tokens: 48_200 })).toBe(
-      "12 Sep · 23 turns · 48.2k tokens",
+      "12 Sep · 23 turns · 48.2K tokens",
     );
     expect(totalHint({ sends: 1_284, tokens: 2_100_000 })).toBe(
       "1,284 turns · 2.1M tokens",

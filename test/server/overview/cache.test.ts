@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { KEEP_MS, scanCache } from "../../../src/server/overview/cache.ts";
+import {
+  KEEP_MS,
+  MAX_KEPT,
+  scanCache,
+} from "../../../src/server/overview/cache.ts";
 
 function controlled() {
   let now = 1_000;
@@ -55,6 +59,47 @@ describe("the scan cache", () => {
     expect(c.runs).toBe(2);
     c.pending[1]!.resolve(2);
     expect(await again).toBe(2);
+  });
+
+  test("keeps an answer per key and drops one past its minute", async () => {
+    const keys: string[] = [];
+    let now = 1_000;
+    const cache = scanCache<string>({
+      clock: () => now,
+      run: (key) => {
+        keys.push(key);
+        return Promise.resolve(`${key}!`);
+      },
+    });
+    expect(await cache.get("UTC\n7")).toBe("UTC\n7!");
+    expect(await cache.get("UTC\n7")).toBe("UTC\n7!");
+    expect(await cache.get("UTC\n30")).toBe("UTC\n30!");
+    expect(keys).toEqual(["UTC\n7", "UTC\n30"]);
+    now += KEEP_MS;
+    await cache.get("UTC\n30");
+    await cache.get("UTC\n7");
+    expect(keys).toEqual(["UTC\n7", "UTC\n30", "UTC\n30", "UTC\n7"]);
+  });
+
+  test("keeps at most MAX_KEPT answers, the oldest out", async () => {
+    const keys: string[] = [];
+    let now = 1_000;
+    const cache = scanCache<string>({
+      clock: () => {
+        now += 1;
+        return now;
+      },
+      run: (key) => {
+        keys.push(key);
+        return Promise.resolve(key);
+      },
+    });
+    for (let i = 0; i < MAX_KEPT + 1; i++) await cache.get(`k${i}`);
+    expect(keys).toHaveLength(MAX_KEPT + 1);
+    await cache.get("k1");
+    expect(keys).toHaveLength(MAX_KEPT + 1);
+    await cache.get("k0");
+    expect(keys).toHaveLength(MAX_KEPT + 2);
   });
 
   test("keeps nothing from a failed scan", async () => {

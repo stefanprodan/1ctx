@@ -438,6 +438,7 @@ describe("the page", () => {
     const labels =
       group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
     expect(labels).toEqual([
+      "Overview",
       "Storage",
       "Projects",
       "Users",
@@ -509,8 +510,8 @@ describe("the page", () => {
       html.indexOf('value="exa"'),
     );
     // the total in the head, never a row's
-    expect(html.match(/2\.72k tokens/g)).toHaveLength(1);
-    expect(html).toMatch(/rows-hint[^>]*>2\.72k tokens/);
+    expect(html.match(/2\.72K tokens/g)).toHaveLength(1);
+    expect(html).toMatch(/rows-hint[^>]*>2\.72K tokens/);
     expect(html).not.toMatch(/rows-meta">[^<]*tokens/);
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');

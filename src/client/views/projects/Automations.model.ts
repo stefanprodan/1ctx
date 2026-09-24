@@ -22,7 +22,10 @@ import {
   VISUALIZE,
   WEB,
 } from "../../../shared/capabilities.ts";
-import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  WAIT_GRACE_MS,
+} from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, until } from "../../lib/format.ts";
 import { daysOf, fieldsOf, fireLabel, WEEK } from "./Schedule.model.ts";
@@ -100,10 +103,6 @@ export function scheduleTitle(schedule: string): string {
     ? schedule
     : `${words[0].toUpperCase()}${words.slice(1)}`;
 }
-
-// a fire starts within milliseconds; the grace covers that and a clock
-// a little ahead
-export const WAIT_GRACE_MS = 10_000;
 
 // a fire the server left due waits for a run slot
 export function waitingSince(

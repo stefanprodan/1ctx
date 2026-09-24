@@ -52,3 +52,7 @@ export type AutomationSummary = {
   createdAt: number;
   updatedAt: number;
 };
+
+// a fire starts within milliseconds; the grace covers that and a clock
+// a little ahead. A row due longer than this waits for a run slot
+export const WAIT_GRACE_MS = 10_000;

@@ -9,9 +9,10 @@ One continuous context for agents. Domain: 1ctx.dev.
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
   change: `docs/just-bash.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
-  and `modern-tar`, and `src/client/ui/Chart.tsx` alone imports `uplot`; the vendored tar command uses modern-tar too. The
-  modern-tar patch retains the raw header `typeflag` to distinguish GNU
-  sparse and unknown types from regular files.
+  and `modern-tar`, and `src/client/ui/Plot.tsx` alone imports `uplot`;
+  the vendored tar command uses modern-tar too. The modern-tar patch
+  retains the raw header `typeflag` to distinguish GNU sparse and
+  unknown types from regular files.
 - **Status:** alpha. No backwards compatibility and no shims for the API
   and the socket, which may change freely. Stored data is kept: every
   schema change is an appended migration and no database is wiped.
@@ -123,8 +124,9 @@ and pragmas, every table on disk from `dbstat` grouped by
 `STORAGE_TABLES` in `storage.ts` (each table the migrations create in
 exactly one area, `sqlite_schema` and `migrations` under config; a
 test checks the map against the schema both ways), the indexes of an
-area together and never named, the stored bytes added a day over the
-zone's last 30 days and the 30 before, the ten largest projects, chats
+area together and never named, the stored bytes and the rows of the
+tables with a creation time added a day over the zone's last 30 days
+(the bytes of the 30 before too), the ten largest projects, chats
 and tasks, and the retention lists. Stored is a table's `bytes`, or
 `octet_length` of the text columns of `messages` (`MESSAGE_BYTES`);
 usage, logins and the rest are their table's pages, and a living
@@ -135,14 +137,40 @@ its owner. `scan.ts` is the queries, pure over a `Db` inside one read
 transaction; it sums what
 was added by quarter hour of UTC, which every zone's midnight falls
 on, so one scan serves any zone. `bun:sqlite` is synchronous, so the
-scan runs in `scan.worker.ts`, a `Worker` per scan over its own
+scan runs in `scan.worker.ts`, a `Worker` per job over its own
 read-only connection to the file, ended when it answers, after
 `SCAN_DEADLINE_MS` or at shutdown; a memory database runs it inline. The worker is the second
 entry point of `bun build --compile`, where a relative URL resolves
 against the compile root, `src/server`, so `compose.ts` builds the URL
-and passes it in. `cache.ts` keeps one scan in flight and its answer a
-minute on the clock port; a failed scan keeps nothing, is a warning
-`storage scan failed` and the router's 500.
+and passes it in. `cache.ts` keeps one read in flight per key and its
+answer a minute on the clock port; a failed read keeps nothing, is a
+warning (`storage scan failed`, `overview read failed`) and the
+router's 500.
+`GET /api/admin/overview?tz=` (`admin`, one `tz`) answers
+`OverviewResponse`: the zone's last `OVERVIEW_DAYS` days, today last,
+and their totals, a chat's sends counted as turns and a task's as runs
+apart, the ten largest projects and agents, the ten models with the
+most turns and their median and slowest ended turn, all time with the
+first send's start, and the instance. `range.ts` is the worker's second
+job, one read transaction over the same connection: sends by
+`started_at` and tokens, rounds and cost by `usage.created_at`, summed
+by quarter hour and laid on the zone's days in `overview.ts`; a
+breakdown sums tokens from `usage` and sends from `sends` apart and
+joins them by key, so a send of many rounds counts once. The answer is
+kept a minute per zone. A personal project is counted and never named:
+`id` and `name` null, `owner` its owner.
+`GET /api/admin/load` (`admin`, no parameter) is read from memory at
+every request, never kept: the pools from `runner.registry.running()`
+and `chatsCap`, `runsCap` the current `runsRunning`, `online` the users
+with a socket through a port to `web/`, the automations and those due
+past `WAIT_GRACE_MS` through a port to their store, and `load.ts`'s
+ring of `LOAD_SAMPLES` samples taken every `LOAD_SAMPLE_MS` from start:
+the process's CPU over `availableParallelism()` cores and its `rss`
+against `process.constrainedMemory()`, `contained` when that is below
+the host's memory, sampled only once `compose()` activates the app.
+While the Overview is on screen and the tab is seen, `watchOverview()`
+in `data/overview.ts` polls it one request at a time and reads the
+overview again once a minute; the page has no Refresh.
 
 `provision/` is the CLI-only area after `automations/` and before
 `web/`. `1ctx provision -f <file|dir|->` combines YAML inputs, validates
@@ -1141,7 +1169,7 @@ violation, and every rule has a rejected fixture under
   shows the short form of a text (the model without its org) when the
   long one overflows its line. Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
-  ago`), then the date; counts are `count()` (`12.4k`, `2.1M`).
+  ago`), then the date; counts are `count()` (`12.4K`, `2.1M`).
 - **Every user and every agent has a page.** `/users/:username` and
   `/agents/:name` (`views/people/`, addresses from `lib/hrefs.ts`) are
   open to every signed-in user, read from `GET
@@ -1366,17 +1394,23 @@ violation, and every rule has a rejected fixture under
   `lib/format.ts` for a page's error signal and `status` on a form's
   problem, drawn as the small mono `.code-tag` (`HTTP 409`) after the
   words, and left out when the server did not answer.
-- **A dashboard is a board, not rows.** The admin's Storage page
-  (`/admin/storage`, the Admin group's first entry) is `ui/Tiles.tsx`
-  (stat tiles, the figure at `--text-figure`) over `ui/Chart.tsx`
-  panels in a grid: `ChartPanel` wears the Rows card head, `Bars` rank
-  from one baseline in CSS, `Stack` splits a whole, and `Spark` is a
-  uPlot sparkline over days, made on mount, fed by a second effect,
-  its colours tokens read at every draw, sharing its cursor by sync
-  key. Its first load draws the board in `Bone`s at the loaded sizes,
-  never a Loading line; Refresh keeps the last answer faded until the
-  next lands. `data/overview.ts` loads it on arrival and on Refresh,
-  never polled.
+- **A dashboard is a board, not rows.** The admin's Overview
+  (`/admin`, the Admin group's first entry: rows Now, Last 30 days and
+  All time) and Storage (`/admin/storage`) are
+  `ui/Tiles.tsx` (stat tiles, the figure at `--text-figure`) over
+  `ui/Chart.tsx` panels in a grid: `ChartPanel` wears the Rows card
+  head, `Bars` rank from one baseline in CSS, `Stack` splits a whole,
+  and `ui/Plot.tsx` has uPlot draw what runs over days, `Spark` in a
+  tile and `DayBars` stacked with a key and a table for a screen
+  reader; a plot is made on mount, fed by a second effect,
+  its colours tokens read at every draw, and tiles share their cursor
+  by sync key. Storage's head is `ui/Loaded.tsx` (when the answer was
+  read, Refresh). A first load draws the board in `ui/Bones.tsx` bones
+  at the loaded sizes, never a Loading line; a later Storage load keeps
+  the last answer faded until the next lands. `data/overview.ts` loads
+  Storage on arrival and on Refresh. The Overview keeps itself current
+  and has no head actions: a failed read keeps a row's last answer
+  faded, its head saying since when in the failed colour.
 - **One shell, two widths, no header.** `app/shell.ts` holds the
   state: from 720 up the rail is a column the user can hide, and the
   choice is kept in `localStorage`; below 720 the rail covers the

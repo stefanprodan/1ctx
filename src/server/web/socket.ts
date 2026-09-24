@@ -75,6 +75,8 @@ export type Socket = {
   closeAll(code: number, reason: string): void;
   // the connections open, for a test and a log line
   size(): number;
+  // the users with a connection open
+  online(): number;
   // stop listening to the bus
   dispose(): void;
 };
@@ -403,6 +405,9 @@ export function socketArea(deps: SocketDeps): Socket {
       let n = 0;
       for (const set of byUser.values()) n += set.size;
       return n;
+    },
+    online() {
+      return byUser.size;
     },
     dispose() {
       unsubscribe();

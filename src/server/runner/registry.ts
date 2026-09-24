@@ -70,6 +70,23 @@ export class Registry {
     return this.sends.size;
   }
 
+  // the chat pool's process cap, for the overview
+  get chatsCap(): number {
+    return this.caps.running;
+  }
+
+  // the sends holding a slot now, by pool; a terminated send holds its
+  // slot until its stream has let go
+  running(): { chats: number; runs: number } {
+    let chats = 0;
+    let runs = 0;
+    for (const send of this.sends.values()) {
+      if (poolOf(send) === "run") runs++;
+      else chats++;
+    }
+    return { chats, runs };
+  }
+
   // throws the refusal, or returns; the caller reserves with set() in
   // the same turn, with no await between
   admit(sessionId: string, userId: string, pool: Pool): void {

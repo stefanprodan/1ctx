@@ -7,7 +7,7 @@
 // bones where the words go.
 
 import type { ComponentChildren } from "preact";
-import { Bone } from "./Chart.tsx";
+import { Bone } from "./Bones.tsx";
 import "./tiles.css";
 
 export function Tiles({ children }: { children: ComponentChildren }) {
@@ -58,12 +58,16 @@ export function TilePlot({
   );
 }
 
-// a share of a whole, 0 to 1
-export function TileMeter({ share }: { share: number }) {
+// a share of a whole, 0 to 1; full when a cap is reached, in the
+// failed colour
+export function TileMeter({ share, full }: { share: number; full?: boolean }) {
   const width = `${Math.min(100, Math.max(0, share * 100)).toFixed(1)}%`;
   return (
     <span class="meter tiles-meter" aria-hidden="true">
-      <span class="meter-fill tiles-meter-fill" style={{ width }} />
+      <span
+        class={`meter-fill tiles-meter-fill${full ? " tiles-meter-full" : ""}`}
+        style={{ width }}
+      />
     </span>
   );
 }
