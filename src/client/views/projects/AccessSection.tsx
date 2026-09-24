@@ -1,16 +1,21 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's Access step: whether runs reach the web and may
+// The task editor's Access step: whether runs reach the web, with a
+// switch per credential of the project under it, and whether they may
 // draw visuals, then a switch per MCP server and per skill of the picked
-// agent. A switch that
-// cannot be flipped is off and says why.
+// agent. A switch that cannot be flipped is off and says why.
 
 import type {
+  SwitchableCredential,
   SwitchableServer,
   SwitchableSkill,
 } from "../../../shared/api/sessions.ts";
-import { mcpKey, skillKey } from "../../../shared/capabilities.ts";
+import {
+  credentialKey,
+  mcpKey,
+  skillKey,
+} from "../../../shared/capabilities.ts";
 import type { WebItem } from "../../composer/Add.model.ts";
 import { Icon, type IconName } from "../../lib/icons.tsx";
 import {
@@ -23,7 +28,8 @@ import {
 } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
 
-// one labelled list of switches, on unless its key is in `off`
+// one labelled list of switches, on unless its key is in `off`; while
+// `blocked` says why, every one is off and faint
 function Switches({
   label,
   icon,
@@ -31,6 +37,7 @@ function Switches({
   off,
   onFlip,
   disabled,
+  blocked = null,
 }: {
   label: string;
   icon: IconName;
@@ -38,6 +45,7 @@ function Switches({
   off: readonly string[];
   onFlip: (key: string) => void;
   disabled: boolean;
+  blocked?: string | null;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -45,21 +53,22 @@ function Switches({
       <span class="label">{label}</span>
       <RowsList>
         {rows.map((row) => (
-          <RowsLine key={row.key} flush>
+          <RowsLine key={row.key} flush off={blocked !== null}>
             <RowsAvatar>
               <Icon name={icon} size={14} />
             </RowsAvatar>
             <RowsTitle name={row.name} mono />
             {row.meta !== null && <RowsMeta>{row.meta}</RowsMeta>}
             <RowsSwitch
-              on={!off.includes(row.key)}
+              on={blocked === null && !off.includes(row.key)}
               label={row.name}
-              disabled={disabled}
+              disabled={disabled || blocked !== null}
               onClick={() => onFlip(row.key)}
             />
           </RowsLine>
         ))}
       </RowsList>
+      {blocked !== null && <span class="hint">{blocked}</span>}
     </div>
   );
 }
@@ -88,6 +97,9 @@ export function AccessSection({
   skills,
   skillsOff,
   onSkill,
+  credentials,
+  credentialsOff,
+  onCredential,
   disabled,
 }: {
   web: WebItem;
@@ -106,6 +118,10 @@ export function AccessSection({
   skills: readonly SwitchableSkill[];
   skillsOff: readonly string[];
   onSkill: (key: string) => void;
+  // the project's, whatever the agent
+  credentials: readonly SwitchableCredential[];
+  credentialsOff: readonly string[];
+  onCredential: (key: string) => void;
   disabled: boolean;
 }) {
   const on = web.on && webOn;
@@ -127,6 +143,19 @@ export function AccessSection({
           </div>
           {web.reason !== null && <span class="hint">{web.reason}</span>}
         </div>
+        <Switches
+          label="Credentials"
+          icon="key"
+          rows={credentials.map((credential) => ({
+            key: credentialKey(credential.id),
+            name: credential.name,
+            meta: null,
+          }))}
+          off={credentialsOff}
+          onFlip={onCredential}
+          disabled={disabled}
+          blocked={on ? null : (web.reason ?? "Web access is off")}
+        />
         <div class="field">
           <div class="automations-web">
             <RowsSwitch

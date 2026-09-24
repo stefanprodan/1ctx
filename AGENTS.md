@@ -1396,13 +1396,17 @@ violation, and every rule has a rejected fixture under
   its counted rounds, summed from `usage` by the send queries).
   The editor's Access section (`AccessSection.tsx`) is the Web access
   switch, on for a new task and off with the composer's reasons when it
-  cannot be switched, the Visuals switch by the same rule, then a `RowsList` with a switch per MCP server of
-  the picked agent and another per skill. The row's whole
-  `disabledCapabilities` is saved: `web` and the keys of the shown
-  servers and skills that are off, so a key for one the picked agent
-  lacks is dropped. The automation page's Setup aside
-  (`AutomationAccess.tsx`) says Web access Off, Visuals Off, and names the servers
-  and the skills off, and nothing while all is on.
+  cannot be switched, a switch per credential of the project under it
+  (off and faint, with the reason, while web access is off), the
+  Visuals switch by the same rule, then a `RowsList` with a switch per
+  MCP server of the picked agent and another per skill. The row's whole
+  `disabledCapabilities` is saved by `disabledOf()` in `Access.model.ts`:
+  `web` and the keys of the shown servers, skills and credentials that
+  are off, so a key for one the picked agent or the project lacks is
+  dropped. The automation page's Setup aside (`AutomationAccess.tsx`,
+  `accessOf()`) says Web access Off, Visuals Off, and names the
+  credentials (only while the web is on), the servers and the skills
+  off, and nothing while all is on.
   A settings page (the profile, a project's Settings) stacks
   `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
   the right. The profile's aside is the account (email, role, joined),
@@ -1457,9 +1461,17 @@ violation, and every rule has a rejected fixture under
   still holds is kept. Leaving
   the chat and a reload forget them, a slash command carries none. Nothing
   outside the menu says web access is off.
+  When the answer's `credentials` (the project's, held as `credentials`
+  beside `switchable`) are not empty, Web access is a pane item instead
+  (`webPaneItem()`): the pane's first switch is Web access, then one per
+  credential, off and faint with the web's reason, or "Web access is
+  off", while the web is not on. Picking another agent keeps pending
+  `credential:` flips; Home's composer moving to another project drops
+  them.
   The fourth item, MCP servers, is there when the picked agent has an
   entry in `servers` of the same answer, held beside `switchable`. It
-  says how many are off and swaps the menu's rows, inside the same
+  says how many are on (`2 on`, `0 on`, `onWords()`, as every pane item
+  does) and swaps the menu's rows, inside the same
   `.menu` box, for `composer/AddPane.tsx`: a back row, then a
   `role="switch"` item per server with its tool count. The fifth item,
   Skills, is the same pane over the agent's entry in `skills`, a switch

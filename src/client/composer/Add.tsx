@@ -5,20 +5,27 @@
 // the agent list is. Add files opens the file picker. Web access and
 // Visuals are switches, drawn as the rail's theme switch is, and
 // flipping one leaves the menu open. MCP servers and Skills each swap
-// the menu's rows for a switch per server or skill, and Escape or the
-// pane's first row swaps them back. An item that cannot be used is off and says why on a line
-// of its own.
+// the menu's rows for a switch per server or skill, and so does Web
+// access when the project has credentials, and Escape or the pane's
+// first row swaps them back. A pane's item says how many are on. An
+// item that cannot be used is off and says why on a line of its own.
 
 import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { Icon, type IconName } from "../lib/icons.tsx";
-import { type PaneItem, panelessOf, type WebItem } from "./Add.model.ts";
+import {
+  onWords,
+  type PaneItem,
+  panelessOf,
+  type WebItem,
+} from "./Add.model.ts";
 import { AddPane } from "./AddPane.tsx";
 import { useMenu } from "./menu.ts";
 
-type Pane = "servers" | "skills";
+type Pane = "web" | "servers" | "skills";
 const PANES: Record<Pane, { title: string; icon: IconName }> = {
+  web: { title: "Web access", icon: "globe" },
   servers: { title: "MCP servers", icon: "mcp" },
   skills: { title: "Skills", icon: "skill" },
 };
@@ -93,7 +100,7 @@ function PaneLink({
         )}
       </span>
       <span class="composer-add-more">
-        {item.off > 0 && <span>{item.off} off</span>}
+        <span>{onWords(item)}</span>
         <Icon name="chevron-right" size={14} />
       </span>
     </button>
@@ -105,6 +112,7 @@ export function Add({
   onFiles,
   web,
   onWeb,
+  webPane,
   visuals,
   onVisuals,
   servers,
@@ -116,13 +124,15 @@ export function Add({
   onFiles: (files: File[]) => void;
   web: WebItem;
   onWeb: () => void;
+  // Web access with the project's credentials, null without any
+  webPane: PaneItem | null;
   visuals: WebItem;
   onVisuals: () => void;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
   skills: PaneItem | null;
-  // a server's or a skill's switch, by its key
+  // a switch of a pane, by its key
   onFlip: (key: string) => void;
 }) {
   const pane = useSignal<"menu" | Pane>("menu");
@@ -131,7 +141,7 @@ export function Add({
     pane.value = "menu";
     return true;
   });
-  const items = { servers, skills };
+  const items = { web: webPane, servers, skills };
   const shown = pane.value === "menu" ? null : items[pane.value];
   const paneless = panelessOf(open.value, pane.value, shown);
   useEffect(() => {
@@ -140,6 +150,7 @@ export function Add({
   const picker = useRef<HTMLInputElement>(null);
   // back from a pane, the focus returns to the row that led there
   const rows = {
+    web: useRef<HTMLButtonElement>(null),
     servers: useRef<HTMLButtonElement>(null),
     skills: useRef<HTMLButtonElement>(null),
   };
@@ -152,7 +163,7 @@ export function Add({
       (row === null || row.disabled ? plus.current : row)?.focus();
     }
     was.current = pane.value;
-  }, [pane.value, rows.servers, rows.skills]);
+  }, [pane.value, rows.web, rows.servers, rows.skills]);
   return (
     <div class="composer-agent" ref={root}>
       <button
@@ -212,12 +223,23 @@ export function Add({
               )}
             </span>
           </button>
-          <SwitchItem
-            name="Web access"
-            icon="globe"
-            item={web}
-            onFlip={onWeb}
-          />
+          {webPane === null ? (
+            <SwitchItem
+              name="Web access"
+              icon="globe"
+              item={web}
+              onFlip={onWeb}
+            />
+          ) : (
+            <PaneLink
+              pane="web"
+              item={webPane}
+              row={rows.web}
+              onOpen={() => {
+                pane.value = "web";
+              }}
+            />
+          )}
           <SwitchItem
             name="Visuals"
             icon="visual"

@@ -25,8 +25,8 @@ import { IDLE } from "../../../src/client/data/stream.ts";
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
+import { accessOf } from "../../../src/client/views/projects/Access.model.ts";
 import {
-  accessOf,
   automationFieldOf,
   canChange,
   type Draft,
@@ -322,6 +322,7 @@ describe("the form", () => {
       visuals: true,
       mcpOff: [],
       skillsOff: [],
+      credentialsOff: [],
     });
   });
 
@@ -478,6 +479,7 @@ describe("the form", () => {
       visuals: true,
       mcpOff: [],
       skillsOff: [],
+      credentialsOff: [],
     });
     const row = automation({
       disabledCapabilities: [
@@ -496,7 +498,53 @@ describe("the form", () => {
       visuals: false,
       mcpOff: ["flux", "github"],
       skillsOff: ["gitops", "visualize"],
+      credentialsOff: [],
     });
+  });
+
+  test("credentials off follow the row and save only for the project's", () => {
+    const row = automation({
+      disabledCapabilities: ["credential:c1", "credential:gone"],
+    });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.credentialsOff).toEqual(["credential:c1", "credential:gone"]);
+    expect(shown.mcpOff).toEqual([]);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, credentialsOff: [] }, row, LIMIT)).toBe(true);
+    const credentials = [
+      { id: "c1", name: "finnhub" },
+      { id: "c2", name: "github" },
+    ];
+    const request = requestOf(
+      filled({ credentialsOff: ["credential:gone", "credential:c1"] }),
+      LIMIT,
+      [],
+      [],
+      credentials,
+    );
+    expect("body" in request && request.body.disabledCapabilities).toEqual([
+      "credential:c1",
+    ]);
+  });
+
+  test("the aside names the credentials off, none while the web is off", () => {
+    const credentials = [
+      { id: "c2", name: "github" },
+      { id: "c1", name: "finnhub" },
+    ];
+    const keys = ["credential:c1", "credential:c2", "credential:gone"];
+    expect(
+      accessOf(automation({ disabledCapabilities: keys }), [], [], credentials)
+        .credentialsOff,
+    ).toEqual(["finnhub", "github"]);
+    const off = accessOf(
+      automation({ disabledCapabilities: [...keys, "web"] }),
+      [],
+      [],
+      credentials,
+    );
+    expect(off.web).toBe(false);
+    expect(off.credentialsOff).toEqual([]);
   });
 
   test("memory is one of none, own and project, never both notes", () => {
