@@ -16,7 +16,7 @@ import { HELP, parseCli } from "./lib/cli.ts";
 import { wallClock } from "./lib/clock.ts";
 import { logger, scrubErrors, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
-import { parse, readSources } from "./provision/index.ts";
+import { loadKnowledge, parse, readSources } from "./provision/index.ts";
 import { defaultDir, secrets } from "./secrets/index.ts";
 import { runService, ServiceError } from "./service/index.ts";
 import { serve } from "./web/serve.ts";
@@ -65,7 +65,7 @@ if (cli.kind === "provision") {
         `another process has ${dbPath} open; stop the server before provisioning`,
       );
     }
-    const documents = parse(await readSources(files));
+    const documents = await loadKnowledge(parse(await readSources(files)));
     const store = secrets(
       secretsDir ?? defaultDir(Bun.main, process.execPath),
       "local",

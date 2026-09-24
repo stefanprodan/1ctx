@@ -90,6 +90,29 @@ provision() {
   fi
   ssh_ 'test -x ~/.1ctx/bin/1ctx' || fail "no binary there yet; deploy first"
 
+  # a project's docs come from a folder the YAML names beside it; only
+  # knowledge/ travels with the YAML, so a folder elsewhere would be
+  # missing on the box
+  local base yamls outside
+  if [ -d "$source" ]; then
+    base=$source
+    yamls=("$source"/*.y*ml)
+  else
+    base=$(dirname "$source")
+    yamls=("$source")
+  fi
+  outside=$(grep -hE '^[[:space:]]*knowledge:' "${yamls[@]}" |
+    sed -E "s/^[[:space:]]*knowledge:[[:space:]]*//; s/[[:space:]]+#.*$//; s/^[\"']//; s/[\"']$//; s#^\./##" |
+    grep -vE '^knowledge(/|$)' || true)
+  [ -z "$outside" ] || fail "staging copies only knowledge/ beside the YAML, not: $outside"
+  # scp follows a symlink and would copy what it points at; provision
+  # refuses one, so it is refused before the copy too
+  if [ -d "$base/knowledge" ]; then
+    local link
+    link=$(find "$base/knowledge" -type l | head -1)
+    [ -z "$link" ] || fail "$link is a symlink"
+  fi
+
   if [ -n "$keys" ]; then
     [ -d "$keys" ] || fail "$keys is not a directory"
     ssh_ 'mkdir -p ~/.1ctx/secrets && chmod 700 ~/.1ctx/secrets'
@@ -102,6 +125,9 @@ provision() {
     scp -q "$source"/*.y*ml "$HOST:~/.1ctx/provision.tmp/"
   else
     scp -q "$source" "$HOST:~/.1ctx/provision.tmp/"
+  fi
+  if [ -d "$base/knowledge" ]; then
+    scp -q -r "$base/knowledge" "$HOST:~/.1ctx/provision.tmp/"
   fi
 
   # Applying needs the database to itself. The service is started again

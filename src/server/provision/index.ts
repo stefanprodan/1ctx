@@ -5,14 +5,21 @@ import type { WebAccess } from "../../shared/web.ts";
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD } from "../../shared/words.ts";
 import { type Action, apply, type Counts, type Secret } from "./apply.ts";
 import { client, type Handle } from "./client.ts";
-import { type Document, type Inventory, preflight } from "./parse.ts";
+import {
+  type Document,
+  type Inventory,
+  type ProjectDocs,
+  preflight,
+} from "./parse.ts";
 
 export { readSources } from "./input.ts";
+export { loadKnowledge } from "./knowledge.ts";
 export { type Document, type Inventory, parse } from "./parse.ts";
 
 export type ProvisionDeps = {
   handle: Handle;
   inventory(): Inventory;
+  projectDocs: ProjectDocs;
   webAccess(): Pick<WebAccess, "mode" | "domains">;
   bootstrap(): Promise<boolean>;
   secret: Secret;
@@ -22,7 +29,13 @@ export type Provision = ReturnType<typeof provisionArea>;
 
 export function provisionArea(deps: ProvisionDeps) {
   const validate = (documents: Document[], secret: Secret = deps.secret) => {
-    preflight(documents, deps.inventory(), secret, deps.webAccess());
+    preflight(
+      documents,
+      deps.inventory(),
+      secret,
+      deps.webAccess(),
+      deps.projectDocs,
+    );
     const password = secret("user-", "user-admin");
     if (
       password === null ||

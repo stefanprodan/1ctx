@@ -60,7 +60,28 @@ export type UserSpec = {
 export type ProjectSpec = {
   description?: string;
   members?: string[];
+  // a folder relative to the file that holds the document
+  knowledge?: string;
 };
+
+const MAX_FOLDER_PATH = 1024;
+
+// relative and without "..", so the folder stays under the file's own
+// directory, the one staging copies
+export function folderPath(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    value === "" ||
+    value.length > MAX_FOLDER_PATH ||
+    value.includes("\\") ||
+    value.includes("\0") ||
+    value.startsWith("/") ||
+    value.split("/").includes("..")
+  ) {
+    throw new BadRequest("must be a relative folder path without ..");
+  }
+  return value;
+}
 
 export type ProviderSpec = {
   wire?: Wire;
@@ -154,13 +175,14 @@ export function user(value: unknown): UserSpec {
 
 export function project(value: unknown): ProjectSpec {
   return optional<ProjectSpec>(
-    object(value, ["description", "members"], "spec"),
+    object(value, ["description", "members", "knowledge"], "spec"),
     {
       description: guarded(
         isDescription,
         `must be one trimmed line of at most ${MAX_DESCRIPTION} characters`,
       ),
       members: (v) => names(v, isUsername),
+      knowledge: folderPath,
     },
   );
 }

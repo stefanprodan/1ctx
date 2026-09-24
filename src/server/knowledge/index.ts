@@ -338,6 +338,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   };
 }
 
+export { checkFile, checkNames, checkTotals } from "./check.ts";
 export {
   copyKeptFiles,
   type KeptFile,
