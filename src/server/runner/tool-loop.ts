@@ -111,7 +111,7 @@ export async function toolLoop(
           }
         : finish();
     }
-    send.budget.tokens += round.tokens;
+    send.budget.tokens += round.spent;
 
     // an answer round can open the one final summary round, the capped
     // answer round included: it is the request the tool results filled

@@ -6,6 +6,7 @@ import { tokens } from "../../src/server/lib/tokens.ts";
 import { wireTools } from "../../src/server/providers/index.ts";
 import { EXHAUSTED_LINE } from "../../src/server/runner/context.ts";
 import { buildRequest } from "../../src/server/runner/round.ts";
+import { collectLogs } from "../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -20,8 +21,9 @@ const time = (id: string) => ({
   arguments: '{"timezone":"UTC"}',
 });
 
-test("tool work counts final usage once, including cached tokens, and keeps the answer's length", async () => {
-  const chat = await chatApp();
+test("tool work weighs cached tokens at a tenth, counts final usage once and keeps the answer's length", async () => {
+  const logs = collectLogs();
+  const chat = await chatApp({ logFactory: logs.logFactory });
   try {
     await setLimits(chat, { toolWorkTokens: 10_000 });
     const { script, sessionId } = await startChat(chat);
@@ -30,22 +32,24 @@ test("tool work counts final usage once, including cached tokens, and keeps the 
     script.end();
     const second = await waitScript(chat.scripted, 2);
     expect(send.budget.tokens).toBe(5000);
-    second.toolCall(time("crossing"));
+    second.toolCall({
+      ...time("second"),
+      arguments: '{"timezone":"Europe/Paris"}',
+    });
     second.finish("tool_calls");
+    // the last usage frame of a round is the one that counts
     second.usage({ prompt: 100, completion: 10 });
-    second.sse(
-      `data: ${JSON.stringify({
-        choices: [],
-        usage: {
-          prompt_tokens: 4000,
-          completion_tokens: 1000,
-          prompt_tokens_details: { cached_tokens: 3900 },
-        },
-      })}\n\n`,
-    );
+    second.usage({ prompt: 4000, completion: 1000, cached: 3900 });
     second.end();
-    const answer = await waitScript(chat.scripted, 3);
-    expect(send.budget.tokens).toBe(10_000);
+    const third = await waitScript(chat.scripted, 3);
+    expect(send.budget.tokens).toBe(6490);
+    third.toolRound(
+      [{ ...time("crossing"), arguments: '{"timezone":"Asia/Tokyo"}' }],
+      { prompt: 6000, completion: 1000 },
+    );
+    third.end();
+    const answer = await waitScript(chat.scripted, 4);
+    expect(send.budget.tokens).toBe(13_490);
     expect(asksAnswer(answer.body)).toBe(true);
     expect(JSON.stringify(answer.body.messages)).toContain(EXHAUSTED_LINE);
     answer.content("The partial answer.");
@@ -53,10 +57,13 @@ test("tool work counts final usage once, including cached tokens, and keeps the 
     answer.usage({ prompt: 3000, completion: 1000 });
     answer.end();
     expect((await settleRun(chat, sessionId))?.status).toBe("done");
-    expect(send.budget.tokens).toBe(14_000);
+    expect(send.budget.tokens).toBe(17_490);
     const rows = chat.app.sessions.messages(sessionId);
+    expect(rows.find((row) => row.toolCallId === "second")).toMatchObject({
+      status: "done",
+    });
     expect(
-      rows.find((row) => row.round === 2 && row.kind === "reply"),
+      rows.find((row) => row.round === 3 && row.kind === "reply"),
     ).toMatchObject({
       slot: "work",
       finishReason: "token_limit",
@@ -70,8 +77,15 @@ test("tool work counts final usage once, including cached tokens, and keeps the 
       finishReason: "length",
     });
     expect(chat.app.sessions.lastSend(sessionId)).toMatchObject({
-      toolCalls: 1,
-      tokens: 14_000,
+      toolCalls: 2,
+      tokens: 21_000,
+    });
+    expect(
+      logs.events.find((event) => event.msg === "send end")?.fields,
+    ).toMatchObject({
+      prompt_tokens: 17_000,
+      completion_tokens: 4000,
+      spent_tokens: 17_490,
     });
     const markdown = await chat.member.call(
       "GET",

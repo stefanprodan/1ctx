@@ -91,6 +91,7 @@ export async function endSend(
     tools: send.budget.calls,
     prompt_tokens: send.promptTokens,
     completion_tokens: send.completionTokens,
+    spent_tokens: send.budget.tokens,
     duration: deps.phase.clock() - send.startedAt,
     ...(send.error === null ? {} : errorFields(send.error, false)),
   });

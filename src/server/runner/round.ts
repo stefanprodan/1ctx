@@ -18,6 +18,7 @@ import {
   type ChatRequest,
   mergeReasoningDetail,
   requestTokens,
+  type Usage,
 } from "../providers/index.ts";
 import {
   type ContextLookups,
@@ -29,6 +30,10 @@ import {
 import { RoundVisuals } from "./round-visuals.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { Writer } from "./writer.ts";
+
+// a cached read costs about a tenth of a fresh one on the wires that
+// report it, and the history is re-read from the cache every round
+export const CACHED_DIVISOR = 10;
 
 export type RoundDeps = {
   chat(
@@ -242,10 +247,32 @@ export async function runRound(
     throw new Error("the stream ended early");
   }
   visuals?.flush();
-  round.tokens =
-    round.usage === null
-      ? requestTokens(req)
-      : round.usage.promptTokens + round.usage.completionTokens;
+  if (round.usage === null) {
+    round.tokens = requestTokens(req);
+    round.spent = round.tokens;
+  } else {
+    round.tokens = round.usage.promptTokens + round.usage.completionTokens;
+    round.spent = spentTokens(round.usage);
+  }
+}
+
+export function spentTokens(
+  usage: Pick<Usage, "promptTokens" | "completionTokens" | "cachedTokens">,
+): number {
+  const prompt = whole(usage.promptTokens);
+  const cached = Math.min(whole(usage.cachedTokens ?? 0), prompt);
+  return (
+    prompt -
+    cached +
+    Math.ceil(cached / CACHED_DIVISOR) +
+    whole(usage.completionTokens)
+  );
+}
+
+// a provider's count is untrusted: a negative or broken one would give
+// the budget back
+function whole(count: number): number {
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 }
 
 // the first tool call delta of a round marks it work, once; the round
