@@ -17,7 +17,7 @@ import type {
   AwkStmt,
   AwkVariable,
 } from "./ast.js";
-import { isBuiltinFunction } from "./check.js";
+import { isGawkBuiltin } from "./check.js";
 import { AwkLexer, type Token, TokenType } from "./lexer.js";
 import { parsePrintfStatement, parsePrintStatement } from "./parser2-print.js";
 
@@ -772,7 +772,7 @@ export class AwkParser {
   private isCall(token: Token): boolean {
     return (
       this.check(TokenType.LPAREN) &&
-      (token.call === true || isBuiltinFunction(token.value as string))
+      (token.call === true || isGawkBuiltin(token.value as string))
     );
   }
 

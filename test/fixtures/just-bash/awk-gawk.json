@@ -4056,6 +4056,92 @@
       "stdout": "",
       "exit": 1,
       "stderr": true
+    },
+    {
+      "name": "parse: > takes a concatenation with a spaced paren",
+      "args": [
+        "BEGIN { x = \"a\"; y = \"b\"; print \"ok\" > x (y); close(x y); getline l < \"ab\"; print l }"
+      ],
+      "stdin": "",
+      "stdout": "ok\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: >> takes a concatenation",
+      "args": [
+        "BEGIN { x = \"a\"; print \"one\" >> x \".txt\"; print \"two\" >> x \".txt\"; close(x \".txt\"); while ((getline l < \"a.txt\") > 0) print l }"
+      ],
+      "stdin": "",
+      "stdout": "one\ntwo\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: printf > takes a concatenation",
+      "args": [
+        "{ printf \"%s\\n\", $1 > $2 \".out\"; close($2 \".out\"); getline l < ($2 \".out\"); print l }"
+      ],
+      "stdin": "hi f\n",
+      "stdout": "hi\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: a parameter named after its function",
+      "args": [
+        "function f(f) { return 7 } BEGIN { print f(1) }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: -v names a function",
+      "args": [
+        "-v",
+        "f=9",
+        "function f(x) { return x } BEGIN { print f(1) }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: an operand names a function",
+      "args": [
+        "function f(x) { return x } BEGIN { print f(1) } { print \"rec\" } END { print \"end\" }",
+        "f=9",
+        "-"
+      ],
+      "stdin": "r\n",
+      "stdout": "1\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "parse: a gawk builtin we lack cannot be redefined",
+      "args": [
+        "function strtonum(a) { return 1 } BEGIN { print 2 }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: a gawk builtin we lack is no -v name",
+      "args": [
+        "-v",
+        "typeof=1",
+        "BEGIN { print 2 }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
     }
   ]
 }

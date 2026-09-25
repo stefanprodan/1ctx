@@ -61,9 +61,30 @@ const CHANGEABLE = new Set([
   "number",
 ]);
 
-/** The builtins a program may call, and so may not define. */
-export function isBuiltinFunction(name: string): boolean {
-  return ARGUMENT_COUNTS.has(name);
+/** gawk 5.4.1's builtins we do not register; a call to one is refused. */
+const GAWK_ONLY = new Set([
+  "and",
+  "or",
+  "xor",
+  "compl",
+  "lshift",
+  "rshift",
+  "strtonum",
+  "typeof",
+  "isarray",
+  "mkbool",
+  "patsplit",
+  "bindtextdomain",
+  "dcgettext",
+  "dcngettext",
+]);
+
+/**
+ * Every gawk builtin, ours or not: `name (` calls it, and a program may not
+ * define it or assign it.
+ */
+export function isGawkBuiltin(name: string): boolean {
+  return ARGUMENT_COUNTS.has(name) || GAWK_ONLY.has(name);
 }
 
 /** gawk names we do not honour; a program that uses one is refused. */
@@ -84,16 +105,31 @@ export function unsupported(name: string): AwkRefusal {
   return new AwkRefusal(`${name} is not supported`, 2);
 }
 
-export function checkProgram(program: AwkProgram): void {
+/** `assigned` holds the names `-v` sets before the program runs. */
+export function checkProgram(
+  program: AwkProgram,
+  assigned: readonly string[] = [],
+): void {
+  const functions = new Set(program.functions.map((fn) => fn.name));
   for (const fn of program.functions) {
-    if (isBuiltinFunction(fn.name)) {
+    if (isGawkBuiltin(fn.name)) {
       throw new AwkRefusal(
         `'${fn.name}' is a built-in function, it cannot be redefined`,
         1,
       );
     }
+    if (fn.params.includes(fn.name)) {
+      throw new AwkRefusal(
+        `function '${fn.name}': cannot use function name as parameter name`,
+        1,
+      );
+    }
   }
-  const functions = new Set(program.functions.map((fn) => fn.name));
+  for (const name of assigned) {
+    if (functions.has(name)) {
+      throw new AwkRefusal(`function name '${name}' previously defined`, 1);
+    }
+  }
   const refuseFunction = (name: unknown): void => {
     if (typeof name === "string" && functions.has(name)) {
       throw new AwkRefusal(
@@ -105,6 +141,9 @@ export function checkProgram(program: AwkProgram): void {
   walk(program, (node) => {
     switch (node.type) {
       case "call": {
+        if (GAWK_ONLY.has(node.name as string)) {
+          throw unsupported(node.name as string);
+        }
         const bounds = ARGUMENT_COUNTS.get(node.name as string);
         const count = (node.args as unknown[]).length;
         if (bounds && (count < bounds[0] || count > bounds[1])) {
