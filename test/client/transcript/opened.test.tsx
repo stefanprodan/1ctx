@@ -127,8 +127,13 @@ test.serial("a short code file carries its language and no fold", () => {
   ]);
   const html = render(<FileCard card={code} />);
   expect(html).toContain('<span class="tag">yaml</span>');
-  expect(html).toContain("filecard-pre");
-  expect(html).toContain('class="hljs-string"');
+  // the code is Source's numbered lines, one per line of the text,
+  // numbers no link in a chat
+  expect(html).toContain('class="source"');
+  expect(html).toContain(
+    '<span class="source-num" aria-hidden="true">1</span><span class="source-text"><span class="hljs-string">on</span>: true</span>',
+  );
+  expect(html).not.toContain(">2</span>");
   // the cut is on the body, so the measure can see what it hides; a
   // file shorter than the fold offers nothing to open
   expect(html).toContain("filecard-clip");

@@ -18,12 +18,12 @@ import {
 } from "../../../shared/memory.ts";
 import { loadMemory, saveMemory, undoMemory } from "../../data/memory.ts";
 import { type Failure, sentence } from "../../lib/format.ts";
-import { chatHref, userHref } from "../../lib/hrefs.ts";
+import { agentHref, chatHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
-import { Rows, RowsCard } from "../../ui/Rows.tsx";
+import { Rows, RowsCard, RowsHandle } from "../../ui/Rows.tsx";
 import {
   countLine,
   draftDirty,
@@ -45,33 +45,46 @@ function Writer({ memory, now }: { memory: Memory; now: number }) {
       <span>
         Written {writer.when} by{" "}
         <a class="note-head-link" href={userHref(writer.username)}>
-          @{writer.username}
+          <RowsHandle name={writer.username} />
         </a>
-        {writer.chat !== null && (
-          <>
-            {" "}
-            in{" "}
-            <a class="note-head-link" href={chatHref(writer.chat.id)}>
-              {writer.chat.title}
-            </a>
-          </>
-        )}
       </span>
     );
   }
+  const { session } = writer;
   return (
     <span>
       Written {writer.when} by{" "}
-      <a class="note-head-link" href={chatHref(writer.sessionId)}>
-        a run
+      <a class="note-head-link" href={agentHref(writer.agentName)}>
+        <RowsHandle name={writer.agentName} />
       </a>{" "}
-      of{" "}
-      {writer.automationId === null ? (
-        "a deleted automation"
-      ) : (
-        <a class="note-head-link" href={`/automations/${writer.automationId}`}>
-          {writer.automationName}
+      in{" "}
+      {session === null ? (
+        writer.run ? (
+          "a run since deleted"
+        ) : (
+          "a chat since deleted"
+        )
+      ) : session.chat !== null ? (
+        <a class="note-head-link" href={chatHref(session.id)}>
+          {session.chat}
         </a>
+      ) : (
+        <>
+          <a class="note-head-link" href={chatHref(session.id)}>
+            a run
+          </a>{" "}
+          of{" "}
+          {session.automationId === null ? (
+            "a deleted automation"
+          ) : (
+            <a
+              class="note-head-link"
+              href={`/automations/${session.automationId}`}
+            >
+              {session.automationName}
+            </a>
+          )}
+        </>
       )}
     </span>
   );

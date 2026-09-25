@@ -37,6 +37,7 @@ import {
   pathProblem,
   sourceLine,
   submitLabel,
+  textBox,
   urlProblem,
 } from "../../../src/client/views/admin/Skills.model.ts";
 import { Skills } from "../../../src/client/views/admin/Skills.tsx";
@@ -145,6 +146,21 @@ describe("the form", () => {
 });
 
 describe("the row's words", () => {
+  test("the text folds at twelve lines and says how many there are", () => {
+    const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
+    const folded = textBox(long, false);
+    expect(folded.cut).toBe(true);
+    expect(folded.text.split("\n")).toHaveLength(12);
+    expect(folded.label).toBe("Show all 20 lines");
+    const open = textBox(long, true);
+    expect(open.text).toBe(long);
+    // open stays open: the row folds it again
+    expect(open.label).toBe("Show all 20 lines");
+    const short = textBox("one\ntwo\n", false);
+    expect(short.cut).toBe(false);
+    expect(short.text).toBe("one\ntwo\n");
+  });
+
   test("the head: the files, SKILL.md counted, and the fetch, or the failure", () => {
     expect(metaLine(timoni, now)).toEqual({
       text: "1 file · fetched 2h ago",

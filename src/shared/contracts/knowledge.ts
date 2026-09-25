@@ -33,7 +33,20 @@ export type KnowledgeFile = {
   updatedAt: number;
 };
 
+// how the page draws a text: Markdown rendered by the server's
+// renderer, null for any other name; the source highlighted as one HTML
+// string when its language is known and it is within the highlighter's
+// size, null otherwise, when the page escapes the text itself
+export type KnowledgeRendered = {
+  language: string | null;
+  html: string | null;
+  code: string | null;
+};
+
 export type KnowledgeFileDetail = KnowledgeFile & { text: string };
+
+// the detail as the file's page reads it
+export type KnowledgeFileView = KnowledgeFileDetail & KnowledgeRendered;
 
 export type KnowledgeVersion = {
   id: string;
@@ -49,6 +62,8 @@ export type KnowledgeVersion = {
 };
 
 export type KnowledgeVersionDetail = KnowledgeVersion & { text: string };
+
+export type KnowledgeVersionView = KnowledgeVersionDetail & KnowledgeRendered;
 
 export type KnowledgeTotals = { files: number; bytes: number; tokens: number };
 
@@ -71,6 +86,22 @@ export type KnowledgeList = {
   deleted: KnowledgeDeleted[];
   totals: KnowledgeTotals;
   limits: KnowledgeLimits;
+};
+
+// a line of a file that holds the query: its number from 1 and its
+// text cut round the first match, with where it was cut
+export type KnowledgeSearchLine = {
+  line: number;
+  text: string;
+  cutStart: boolean;
+  cutEnd: boolean;
+};
+
+// a file whose text holds the query: how many lines do, and the first
+export type KnowledgeSearchHit = {
+  file: KnowledgeFile;
+  count: number;
+  lines: KnowledgeSearchLine[];
 };
 
 // the aside's and the tab's count

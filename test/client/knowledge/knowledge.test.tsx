@@ -1,13 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Knowledge tab: the words and the checks of its model, the HTML of
-// the card, an open row and the Deleted card, and the entity applying a
-// knowledge frame to the list it holds.
+// The Knowledge tab: the words and the checks of its model, the tree it
+// lays out, the HTML of the card in each list and in a search, and the
+// entity applying a knowledge frame to the list it holds.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { options } from "preact";
 import { render } from "preact-render-to-string";
+import { query } from "../../../src/client/app/router.ts";
 import {
   applyKnowledge,
   emptyBin,
@@ -19,22 +20,30 @@ import {
   onKnowledgeSocket,
   versionTexts,
 } from "../../../src/client/data/knowledge.ts";
+import { searches } from "../../../src/client/data/knowledge-search.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { project } from "../../../src/client/data/projects.ts";
+import { treeOf } from "../../../src/client/lib/tree.ts";
+import type { RowsTreeNode } from "../../../src/client/ui/Rows.tsx";
 import {
   authorOf,
-  deletedHint,
   deletedLine,
-  headLine,
+  emptyAsk,
+  fileHref,
+  fileIcon,
+  folderParam,
+  fresh,
+  keptWords,
   knowledgeWords,
-  lastLiveVersion,
-  shownFiles,
+  listHref,
+  listOf,
+  marked,
+  namesWords,
+  pathParts,
   sizeWords,
-  textBox,
-  versionLine,
+  treeNodes,
 } from "../../../src/client/views/knowledge/Knowledge.model.ts";
 import { Knowledge } from "../../../src/client/views/knowledge/Knowledge.tsx";
-import { KnowledgeRow } from "../../../src/client/views/knowledge/KnowledgeRow.tsx";
 import { KnowledgeUpload } from "../../../src/client/views/knowledge/KnowledgeUpload.tsx";
 import type {
   KnowledgeAuthor,
@@ -169,85 +178,177 @@ describe("the knowledge words", () => {
     expect(knowledgeWords({ files: 1, tokens: 1 })).toBe("1 file · 1 token");
   });
 
-  test("the head line names the kind, the lines, the author and when", () => {
-    const head = headLine(file(), NOW);
-    expect(head.kind).toBe("md");
-    expect(head.lines).toBe("84 lines");
-    expect(head.author.name).toBe("sre");
-    expect(head.when).toBe("2h ago");
-    // a name without an extension is still text
-    expect(headLine(file({ kind: "", lines: 1 }), NOW).kind).toBe("text");
-    expect(headLine(file({ lines: 1 }), NOW).lines).toBe("1 line");
-  });
-
   test("an author is their page, and the write is its chat or its run", () => {
     const agent = authorOf(byAgent);
     expect(agent).toEqual({
       name: "sre",
       href: "/agents/sre",
-      handle: false,
       where: "in a run",
       sessionId: "s1",
     });
     expect(authorOf({ ...byAgent, origin: "chat" }).where).toBe("in a chat");
     const user = authorOf(byUser);
     expect(user.href).toBe("/users/casey");
-    expect(user.handle).toBe(true);
     // a write from the page belongs to no session
     expect(user.where).toBeNull();
-  });
-
-  test("the text folds at twelve lines and says how many there are", () => {
-    const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
-    const folded = textBox(long, false);
-    expect(folded.cut).toBe(true);
-    expect(folded.text.split("\n")).toHaveLength(12);
-    expect(folded.label).toBe("Show all 20 lines");
-    const open = textBox(long, true);
-    expect(open.text).toBe(long);
-    // open stays open: the row folds it again
-    expect(open.label).toBe("Show all 20 lines");
-    const short = textBox("one\ntwo\n", false);
-    expect(short.cut).toBe(false);
-    expect(short.text).toBe("one\ntwo\n");
-  });
-
-  test("a version line says the revision, who wrote it and which is current", () => {
-    const line = versionLine(version(), true, NOW);
-    expect(line.label).toBe("Revision 3");
-    expect(line.current).toBe(true);
-    expect(line.when).toBe("2h ago");
-    expect(versionLine(version({ revision: 2 }), false, NOW).current).toBe(
-      false,
-    );
-    expect(versionLine(version({ deleted: true }), false, NOW).deleted).toBe(
-      true,
-    );
-  });
-
-  test("Restore takes the newest version that still holds a text", () => {
-    const versions = [
-      version({ id: "v4", revision: 4, deleted: true }),
-      version({ id: "v3", revision: 3 }),
-    ];
-    expect(lastLiveVersion(versions)?.id).toBe("v3");
-    expect(lastLiveVersion([version({ deleted: true })])).toBeNull();
   });
 
   test("a deleted row says who deleted it and when", () => {
     const line = deletedLine(deleted(), NOW);
     expect(line.author.name).toBe("sre");
     expect(line.when).toBe("4d ago");
-    expect(deletedHint(90)).toBe("kept 90 days");
-    expect(deletedHint(1)).toBe("kept 1 day");
+    expect(keptWords(90)).toBe("A deleted file's text is kept up to 90 days.");
+    expect(emptyAsk(1)).toBe(
+      "Are you sure you want to permanently erase 1 file?",
+    );
   });
 
-  test("the search keeps the rows whose name holds it", () => {
-    const rows = [file(), file({ id: "f2", name: "values.yaml" })];
-    expect(shownFiles(rows, "yaml").map((row) => row.name)).toEqual([
-      "values.yaml",
+  test("the lists and a folder are addresses", () => {
+    expect(listOf("")).toBe("files");
+    expect(listOf("?list=recent")).toBe("recent");
+    expect(listOf("?list=deleted")).toBe("deleted");
+    expect(listOf("?list=other")).toBe("files");
+    expect(listHref("p1", "files")).toBe("/projects/p1/knowledge");
+    expect(listHref("p1", "recent")).toBe("/projects/p1/knowledge?list=recent");
+    expect(folderParam("?folder=plans%2Fx")).toBe("plans/x");
+    expect(folderParam("?folder=")).toBeNull();
+    expect(folderParam("")).toBeNull();
+    expect(fileHref("p1", "f1")).toBe("/projects/p1/knowledge/files/f1");
+    expect(fileHref("p1", "f1", 42)).toBe(
+      "/projects/p1/knowledge/files/f1?line=42",
+    );
+  });
+
+  test("an agent's write lights the row for three days", () => {
+    expect(fresh(file({ updatedAt: NOW - 86_400_000 }), NOW)).toBe(true);
+    expect(fresh(file({ updatedAt: NOW - 4 * 86_400_000 }), NOW)).toBe(false);
+    expect(fresh(file({ author: byUser }), NOW)).toBe(false);
+  });
+
+  test("a search marks every place the text holds it, in any case", () => {
+    expect(marked("Compaction runs a compaction", "compaction")).toEqual([
+      { text: "Compaction", mark: true },
+      { text: " runs a ", mark: false },
+      { text: "compaction", mark: true },
     ]);
-    expect(shownFiles(rows, "")).toHaveLength(2);
+    expect(marked("nothing here", "zz")).toEqual([
+      { text: "nothing here", mark: false },
+    ]);
+    expect(marked("aaa", "aa")).toEqual([
+      { text: "aa", mark: true },
+      { text: "a", mark: false },
+    ]);
+    expect(pathParts("plans/x/y.md")).toEqual({
+      dir: "plans/x/",
+      base: "y.md",
+    });
+    expect(pathParts("y.md")).toEqual({ dir: "", base: "y.md" });
+  });
+
+  test("the names past those answered are said, not listed", () => {
+    expect(namesWords(5, 5)).toEqual({ label: "Names · 5", beyond: null });
+    expect(namesWords(50, 72).beyond).toBe(
+      "22 more names. Type more to narrow them.",
+    );
+  });
+});
+
+describe("the tree", () => {
+  const view = (open: string[], all: string[] = []) => ({
+    open: new Set(open),
+    all: new Set(all),
+    now: NOW,
+    href: (row: KnowledgeFile) => `/f/${row.id}`,
+    toggle: () => {},
+    showAll: () => {},
+  });
+  const names = (nodes: RowsTreeNode[]): unknown[] =>
+    nodes.map((node) =>
+      node.kind === "folder"
+        ? { [node.name]: names(node.children), open: node.open }
+        : node.kind === "file"
+          ? node.name
+          : node.label,
+    );
+
+  test("folders come first and open only when asked", () => {
+    const rows = [
+      file({ id: "a", name: "readme.md" }),
+      file({ id: "b", name: "plans/x/deep.md" }),
+      file({ id: "c", name: "plans/top.md" }),
+    ];
+    expect(names(treeNodes(treeOf(rows), view([])))).toEqual([
+      { plans: [], open: false },
+      "readme.md",
+    ]);
+    expect(names(treeNodes(treeOf(rows), view(["plans"])))).toEqual([
+      { plans: [{ x: [], open: false }, "top.md"], open: true },
+      "readme.md",
+    ]);
+    const [folder] = treeNodes(treeOf(rows), view([]));
+    expect(folder?.kind === "folder" && folder.count).toBe(2);
+  });
+
+  test("a folder alone at its level opens by itself, down a chain", () => {
+    const rows = [
+      file({ id: "a", name: "docs/v1/a.md" }),
+      file({ id: "b", name: "docs/v1/b.md" }),
+    ];
+    expect(names(treeNodes(treeOf(rows), view([])))).toEqual([
+      { docs: [{ v1: ["a.md", "b.md"], open: true }], open: true },
+    ]);
+    // closed by hand, it is kept as its path marked with !
+    const toggled: string[] = [];
+    const [docs] = treeNodes(treeOf(rows), {
+      ...view(["!docs/v1"]),
+      toggle: (path: string) => toggled.push(path),
+    });
+    expect(names([docs!])).toEqual([
+      { docs: [{ v1: [], open: false }], open: true },
+    ]);
+    if (docs?.kind === "folder") docs.onToggle();
+    expect(toggled).toEqual(["!docs"]);
+  });
+
+  test("a file's icon says prose, code, data, a visual, or a page", () => {
+    expect(fileIcon("plans/a.md")).toBe("file-text");
+    expect(fileIcon("NOTES")).toBe("file-text");
+    expect(fileIcon("src/app.TS")).toBe("code");
+    expect(fileIcon("infra/Dockerfile")).toBe("code");
+    expect(fileIcon("apps/podinfo.yaml")).toBe("braces");
+    expect(fileIcon("report.html")).toBe("visual");
+    expect(fileIcon("archive.bin")).toBe("file");
+  });
+
+  test("a file row says when it changed, lit for an agent's recent write", () => {
+    const nodes = treeNodes(
+      treeOf([file({ id: "a", name: "a.md" })]),
+      view([]),
+    );
+    expect(nodes[0]).toMatchObject({
+      kind: "file",
+      href: "/f/a",
+      meta: "2h ago",
+      lit: true,
+      title: "a.md",
+    });
+  });
+
+  test("a folder past fifty files ends in a row that shows the rest", () => {
+    const rows = Array.from({ length: 53 }, (_, i) =>
+      file({ id: `f${i}`, name: `logs/${String(i).padStart(2, "0")}.md` }),
+    );
+    const folded = treeNodes(treeOf(rows), view(["logs"]));
+    const logs = folded[0];
+    if (logs?.kind !== "folder") throw new Error("no folder");
+    expect(logs.children).toHaveLength(51);
+    expect(logs.children[50]).toMatchObject({
+      kind: "more",
+      label: "Show 3 more in logs",
+    });
+    const whole = treeNodes(treeOf(rows), view(["logs"], ["logs"]));
+    if (whole[0]?.kind !== "folder") throw new Error("no folder");
+    expect(whole[0].children).toHaveLength(53);
   });
 });
 
@@ -308,27 +409,33 @@ describe("the page", () => {
     },
   );
 
-  test.serial("the card heads with the search, the totals and Upload", () => {
-    lists.value = new Map([["p1", list()]]);
-    const html = render(<Knowledge params={{ id: "p1" }} />);
-    expect(html).toContain('placeholder="Search files"');
-    expect(html).toContain("1 file · 620 tokens");
-    expect(html).toContain("Upload");
-    expect(html).not.toContain("Add file");
-    expect(html).toContain("docs/runbook.md");
-    // the head is a button, so it carries no link
-    expect(html).not.toContain('href="/agents/sre"');
-    expect(html).toContain("84 lines");
-    expect(html).toContain("620 tokens");
-    expect(html).toContain("Every agent in this project sees this list");
-  });
+  test.serial(
+    "the card heads with the search, the lists and the buttons",
+    () => {
+      lists.value = new Map([["p1", list({ deleted: [deleted()] })]]);
+      const html = render(<Knowledge params={{ id: "p1" }} />);
+      expect(html).toContain('placeholder="Search in files"');
+      expect(html).toContain(">All<");
+      expect(html).toContain(">Recent<");
+      expect(html).toContain(">Deleted 1<");
+      // + opens New file and Upload; the bin empties the Deleted list
+      expect(html).toContain('aria-label="Add"');
+      expect(html).toContain('aria-haspopup="menu"');
+      expect(html).toContain('aria-label="Empty bin"');
+      // the files are a tree; a folder alone at the top opens by itself
+      expect(html).toContain('class="rows-tree"');
+      expect(html).toContain(">docs<");
+      expect(html).toContain(">runbook.md<");
+    },
+  );
 
-  test.serial("an empty base says how a file gets there", () => {
+  test.serial("an empty base is the drop target", () => {
     lists.value = new Map([["p1", list({ files: [] })]]);
     const html = render(<Knowledge params={{ id: "p1" }} />);
-    expect(html).toContain("No files yet.");
-    expect(html).toContain("bash tool");
-    expect(html).not.toContain(">Deleted<");
+    expect(html).toContain("No files yet");
+    expect(html).toContain("choose them");
+    expect(html).toContain('type="file"');
+    expect(html).not.toContain(">Deleted");
   });
 
   test.serial("a failed load is the card's note", () => {
@@ -340,39 +447,95 @@ describe("the page", () => {
     );
   });
 
-  test.serial("the Deleted card says who deleted each file", () => {
-    lists.value = new Map([["p1", list({ deleted: [deleted()] })]]);
-    const html = render(<Knowledge params={{ id: "p1" }} />);
-    expect(html).toContain(">Deleted<");
-    expect(html).toContain("kept 90 days");
-    expect(html).toContain("notes/old.md");
-    expect(html).toContain("deleted by ");
-    expect(html).toContain("4d ago");
-    expect(html).toContain("Restore");
+  test.serial("Recent lists every file by its last change", () => {
+    lists.value = new Map([
+      [
+        "p1",
+        list({
+          files: [
+            file(),
+            file({ id: "f2", name: "values.yaml", updatedAt: NOW - 60_000 }),
+          ],
+        }),
+      ],
+    ]);
+    query.value = "?list=recent";
+    try {
+      const html = render(<Knowledge params={{ id: "p1" }} />);
+      expect(html.indexOf("values.yaml")).toBeLessThan(html.indexOf("runbook"));
+      expect(html).toContain('<span class="knowledge-dir">docs/</span>');
+      expect(html).toContain("Revision 3 · ");
+      expect(html.replace(/<[^>]*>/g, "")).toContain("@sre in a run");
+      expect(html).toContain('href="/projects/p1/knowledge/files/f2"');
+      expect(html).not.toContain("Show more");
+    } finally {
+      query.value = "";
+    }
   });
 
-  test.serial("an open row links the author, the run and its history", () => {
-    fileTexts.value = { f1: "# Runbook\nStep one\n" };
-    fileVersions.value = {
-      f1: [version(), version({ id: "v2", revision: 2, author: byUser })],
-    };
-    const html = render(
-      <KnowledgeRow
-        projectId="p1"
-        file={file()}
-        now={NOW}
-        open
-        onToggle={() => {}}
-      />,
-    );
-    expect(html).toContain('href="/agents/sre"');
-    expect(html).toContain('href="/chat/s1"');
-    expect(html).toContain("# Runbook");
-    expect(html).toContain(">History<");
-    expect(html).toContain("Revision 3");
-    expect(html).toContain("current");
-    expect(html).toContain("Restore");
-    expect(html).toContain("btn-danger");
+  test.serial("Deleted says who deleted each file and offers Restore", () => {
+    lists.value = new Map([["p1", list({ deleted: [deleted()] })]]);
+    query.value = "?list=deleted";
+    try {
+      const html = render(<Knowledge params={{ id: "p1" }} />);
+      expect(html).toContain("kept up to 90 days");
+      expect(html).toContain("Empty bin");
+      expect(html).toContain("old.md");
+      expect(html).toContain("deleted by ");
+      expect(html).toContain("4d ago");
+      expect(html).toContain("Restore");
+      expect(html).toContain('href="/projects/p1/knowledge/files/f9"');
+    } finally {
+      query.value = "";
+    }
+  });
+
+  test.serial("a search draws names, then files with their lines", () => {
+    lists.value = new Map([["p1", list()]]);
+    searches.value = new Map([
+      [
+        "p1",
+        {
+          q: "run",
+          state: "done",
+          names: [file({ id: "f3", name: "run/notes.md" })],
+          namesTotal: 1,
+          files: [
+            {
+              file: file(),
+              count: 4,
+              lines: [
+                {
+                  line: 12,
+                  text: "Run it, then run it again",
+                  cutStart: true,
+                  cutEnd: false,
+                },
+              ],
+            },
+          ],
+          next: "docs/runbook.md",
+          failure: null,
+          more: { loading: false, failure: null },
+        },
+      ],
+    ]);
+    try {
+      // the box holds what the search asked
+      const html = render(<Knowledge params={{ id: "p1" }} />);
+      expect(html).toContain('value="run"');
+      expect(html).not.toContain('class="rows-tree"');
+      expect(html).toContain("Names · 1");
+      expect(html).toContain("In files");
+      expect(html).toContain("4 lines");
+      expect(html).toContain('href="/projects/p1/knowledge/files/f1?line=12"');
+      expect(html).toContain('<mark class="knowledge-mark">Run</mark>');
+      expect(html).toContain('<mark class="knowledge-mark">run</mark>');
+      expect(html).toContain("…");
+      expect(html).toContain("Show more");
+    } finally {
+      searches.value = new Map();
+    }
   });
 
   test.serial(

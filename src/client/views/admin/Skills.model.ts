@@ -12,7 +12,7 @@ import type {
 } from "../../../shared/contracts/skill.ts";
 import { sourceForm } from "../../../shared/skills.ts";
 import type { SkillSource } from "../../../shared/words.ts";
-import { ago, longDate } from "../../lib/format.ts";
+import { ago, count, longDate } from "../../lib/format.ts";
 
 export { firstSentence } from "../../lib/format.ts";
 
@@ -149,4 +149,22 @@ export function metadataLines(metadata: Record<string, string>): string[] {
   return Object.keys(metadata)
     .sort()
     .map((key) => `${key}: ${metadata[key]}`);
+}
+
+// a body folded to its first lines; a text of TEXT_LINES or fewer has
+// no button
+export const TEXT_LINES = 12;
+
+export function textBox(
+  text: string,
+  expanded: boolean,
+): { text: string; cut: boolean; label: string } {
+  const lines = text.replace(/\n$/, "").split("\n");
+  const cut = lines.length > TEXT_LINES;
+  const n = lines.length;
+  return {
+    text: cut && !expanded ? lines.slice(0, TEXT_LINES).join("\n") : text,
+    cut,
+    label: `Show all ${count(n)} line${n === 1 ? "" : "s"}`,
+  };
 }

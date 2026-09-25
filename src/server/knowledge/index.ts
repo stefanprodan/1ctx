@@ -18,7 +18,7 @@ import {
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { Conflict, NotFound } from "../lib/errors.ts";
+import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
@@ -31,8 +31,10 @@ import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
 import { heldSessions } from "./queue.ts";
+import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { ScratchStore } from "./scratch.ts";
+import { oneAtATime, search } from "./search.ts";
 import { stage } from "./stage.ts";
 import { KnowledgeStore, summary } from "./store.ts";
 import {
@@ -101,6 +103,8 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
   const scratch = new ScratchStore(deps.db);
   const uploads = new UploadStore(deps.db);
+  const searching = new Set<string>();
+  const views = new RenderCache();
   const required = (projectId: string, fileId: string) => {
     const row = store.byId(projectId, fileId);
     if (row === null) throw new NotFound();
@@ -219,7 +223,12 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     },
     read(projectId, fileId) {
       const { digest: _, ...file } = required(projectId, fileId);
-      return file;
+      return {
+        ...file,
+        ...views.view(`file:${file.id}:${file.revision}`, () =>
+          rendered(file.name, file.text),
+        ),
+      };
     },
     versions(projectId, fileId) {
       const versions = store.versions(projectId, fileId);
@@ -231,7 +240,12 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     version(projectId, versionId) {
       const version = store.version(projectId, versionId);
       if (version === null) throw new NotFound();
-      return version;
+      return {
+        ...version,
+        ...views.view(`version:${version.id}`, () =>
+          rendered(version.name, version.text, version.deleted),
+        ),
+      };
     },
     create(projectId, author, name, text) {
       name = parseName(name);
@@ -284,6 +298,47 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         };
       });
     },
+    rename(projectId, author, fileId, name, revision) {
+      name = parseName(name);
+      return write(projectId, () => {
+        const current = required(projectId, fileId);
+        if (current.revision !== revision) {
+          throw new Conflict(
+            `${current.name} is at revision ${current.revision}`,
+          );
+        }
+        if (name === current.name) {
+          throw new BadRequest(`the file is named ${name} already`);
+        }
+        if (store.byName(projectId, name) !== null) {
+          throw new Conflict(`a file named ${name} exists`);
+        }
+        // the size is unchanged, so only the tree's shape is checked
+        checkNames([
+          ...store
+            .list(projectId)
+            .filter((file) => file.id !== current.id)
+            .map((file) => file.name),
+          name,
+        ]);
+        return {
+          file: store.rename(current, author, name, deps.clock()),
+          deleted: false,
+        };
+      });
+    },
+    search: (projectId, userId, q, after) =>
+      oneAtATime(searching, userId, () =>
+        search(
+          {
+            files: (from) => store.after(projectId, from),
+            named: (from, query) => store.named(projectId, from, query),
+            text: (fileId) => store.text(projectId, fileId),
+          },
+          q,
+          after,
+        ),
+      ),
     remove(projectId, author, fileId) {
       return write(projectId, () => ({
         file: store.remove(

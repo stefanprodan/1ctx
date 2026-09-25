@@ -29,6 +29,8 @@ export type MemoryRow = MemoryTarget & {
   updatedAt: number | null;
   updatedBy: string | null;
   sessionId: string | null;
+  // the agent of the chat or run that saved, kept past its deletion
+  agentName: string | null;
 };
 
 export type MemoryOperation =
@@ -64,7 +66,12 @@ type Raw = {
   updated_at: number;
   updated_by: string | null;
   session_id: string | null;
+  agent_name: string | null;
 };
+
+// the name of a saving session's agent, null for a hand edit
+const AGENT_OF = `(select agents.name from sessions
+  join agents on agents.id = sessions.agent_id where sessions.id = ?)`;
 
 function entries(value: string): MemoryEntry[] {
   const parsed: unknown = JSON.parse(value);
@@ -94,6 +101,7 @@ function row(raw: Raw): MemoryRow {
     updatedAt: raw.updated_at,
     updatedBy: raw.updated_by,
     sessionId: raw.session_id,
+    agentName: raw.agent_name,
   };
 }
 
@@ -175,6 +183,7 @@ export class MemoryStore {
           updatedAt: null,
           updatedBy: null,
           sessionId: null,
+          agentName: null,
         };
   }
 
@@ -326,8 +335,8 @@ export class MemoryStore {
         .query(
           `insert into memory_notes
             (project_id, automation_id, entries, previous_entries, revision,
-             updated_at, updated_by, session_id)
-           values (?, ?, ?, '[]', 1, ?, ?, ?)`,
+             updated_at, updated_by, session_id, agent_name)
+           values (?, ?, ?, '[]', 1, ?, ?, ?, ${AGENT_OF})`,
         )
         .run(
           target.projectId,
@@ -336,6 +345,7 @@ export class MemoryStore {
           now,
           userId,
           sessionId,
+          sessionId,
         );
       return;
     }
@@ -343,7 +353,7 @@ export class MemoryStore {
       .query(
         `update memory_notes set entries = ?, previous_entries = ?,
            revision = revision + 1, updated_at = ?, updated_by = ?,
-           session_id = ?
+           session_id = ?, agent_name = ${AGENT_OF}
          where project_id = ? and automation_id is ? and revision = ?`,
       )
       .run(
@@ -351,6 +361,7 @@ export class MemoryStore {
         JSON.stringify(current.entries),
         now,
         userId,
+        sessionId,
         sessionId,
         target.projectId,
         target.automationId,

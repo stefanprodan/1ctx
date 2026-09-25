@@ -15,6 +15,11 @@
     max-width: 68ch;
     margin: 0 0 10px;
   }
+  /* a document that is the page fills its card; a chat answer keeps
+     the reading width */
+  .md-wide .md-p {
+    max-width: none;
+  }
 
   .md-h1,
   .md-h2,
@@ -193,8 +198,12 @@
     border-collapse: collapse;
   }
 
+  /* a cell breaks a word only when it is wider than the table can get;
+     anywhere would count every letter a break and squeeze a column of
+     short words to one letter a line */
   .md-th,
   .md-td {
+    overflow-wrap: break-word;
     padding: 6px var(--space-2);
     border: 1px solid var(--line);
     text-align: left;

@@ -2,69 +2,91 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A project's Knowledge tab: the text files its members seed and its
-// agents keep with the bash tool. One card of rows, searched by name,
-// with Upload at its head, and a second card of the files that were
-// deleted and can still be brought back, or dropped for good.
+// agents keep with the bash tool. One card: its head holds the search,
+// the switch between Files (a folder tree), Recent and Deleted, New file
+// and Upload; its body is the list picked, or the search's results
+// while the box asks for something. A file opens on its own page.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
+import { navigate, query } from "../../app/router.ts";
+import { knowledgeOf, listErrors } from "../../data/knowledge.ts";
 import {
-  addFile,
-  emptyBin,
-  knowledgeOf,
-  listErrors,
-  loadVersions,
-  readVersion,
-} from "../../data/knowledge.ts";
+  openFolder,
+  openFoldersOf,
+  toggleFolder,
+} from "../../data/knowledge-local.ts";
+import { deletedByName } from "../../data/knowledge-rows.ts";
+import {
+  clearSearch,
+  searchKnowledge,
+  searchOf,
+  searchQuery,
+} from "../../data/knowledge-search.ts";
 import { sentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { noticeOf, useSave } from "../../lib/save.ts";
+import { treeOf } from "../../lib/tree.ts";
 import {
   Rows,
-  RowsAdd,
   RowsCard,
-  RowsEnd,
-  RowsLine,
+  RowsFilters,
   RowsNew,
   RowsNote,
-  RowsTitle,
+  RowsTree,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { Frame } from "../projects/Frame.tsx";
+import { MoreMenu } from "./file/DocMenus.tsx";
 import {
-  deletedHint,
-  deletedLine,
-  knowledgeWords,
-  lastLiveVersion,
-  shownFiles,
+  fileHref,
+  folderParam,
+  type KnowledgeListName,
+  listHref,
+  listOf,
+  newFileHref,
+  treeNodes,
 } from "./Knowledge.model.ts";
-import { Author, KnowledgeRow } from "./KnowledgeRow.tsx";
+import {
+  DeletedList,
+  EmptyBin,
+  RecentList,
+  useBin,
+} from "./KnowledgeLists.tsx";
+import { SearchResults } from "./KnowledgeSearch.tsx";
 import { KnowledgeUpload } from "./KnowledgeUpload.tsx";
 import "./knowledge.css";
 
-const EMPTY =
-  "No files yet. Upload files, or ask an agent to create one with the bash tool.";
-const ABOUT =
-  "Every agent in this project sees this list and reads a file when it needs it. Ask an agent to add or change a file.";
+const LISTS: { value: KnowledgeListName; label: string }[] = [
+  { value: "files", label: "All" },
+  { value: "recent", label: "Recent" },
+  { value: "deleted", label: "Deleted" },
+];
 
 function Base({ projectId }: { projectId: string }) {
   const list = knowledgeOf(projectId);
   const error = listErrors.value.get(projectId) ?? null;
-  const open = useSignal<string | null>(null);
+  // the box's own text, trailing space and all; the search trims it
+  const q = useSignal(searchOf(projectId).q);
   const adding = useSignal(false);
-  const q = useSignal("");
-  const acting = useSignal<string | null>(null);
-  const emptying = useSignal(false);
-  const save = useSave(async () => {});
+  // files dropped on the empty base, for the uploader to pick
+  const dropped = useSignal<File[]>([]);
+  const over = useSignal(false);
+  // the folders past FOLDER_ROWS whose every file is shown
+  const all = useSignal<ReadonlySet<string>>(new Set());
   // the ago words move by the minute
   const now = useSignal(Date.now());
+  const bin = useBin();
   useEffect(() => {
     const timer = setInterval(() => {
       now.value = Date.now();
     }, 60_000);
     return () => clearInterval(timer);
   }, []);
+  const folder = folderParam(query.value);
+  useEffect(() => {
+    if (folder !== null) openFolder(projectId, folder);
+  }, [projectId, folder]);
   if (error !== null) {
     return (
       <Rows>
@@ -83,42 +105,163 @@ function Base({ projectId }: { projectId: string }) {
       </Rows>
     );
   }
-  const shown = shownFiles(list.files, q.value);
-  const notice = save.notice();
-  // a deleted file comes back as a new file under its name, from the
-  // newest version that still holds a text
-  const restore = (fileId: string, name: string) => {
-    acting.value = fileId;
-    return save.act("restore", async () => {
-      const versions = await loadVersions(projectId, fileId);
-      const version = lastLiveVersion(versions);
-      if (version === null) throw new Error("this file kept no text");
-      const text = await readVersion(projectId, version.id);
-      await addFile(projectId, { name, text });
-    });
+  const picked = listOf(query.value);
+  const searching = searchQuery(q.value) !== null;
+  const deleted = deletedByName(list.deleted);
+  const empty = list.files.length === 0 && deleted.length === 0;
+  const upload = (files: File[]) => {
+    dropped.value = files;
+    adding.value = true;
   };
+  // while Empty bin asks, its words and answers are the whole head, at
+  // its right as a row's ask is
+  const binAsks = deleted.length > 0 && bin.asking.value;
+  const head = (
+    <div class="knowledge-head">
+      <span class="knowledge-search">
+        <Search
+          value={q.value}
+          onChange={(next) => {
+            q.value = next;
+            searchKnowledge(projectId, next);
+          }}
+          placeholder="Search in files"
+        />
+      </span>
+      {!empty && (
+        // its own box, so the filters' push to the right stays inside it
+        <span class="knowledge-lists">
+          <RowsFilters
+            label="Lists"
+            filters={LISTS.map((choice) => ({
+              label:
+                choice.value === "deleted" && deleted.length > 0
+                  ? `Deleted ${deleted.length}`
+                  : choice.label,
+              on: !searching && picked === choice.value,
+              onPick: () => {
+                // a list picked while searching drops the search
+                q.value = "";
+                clearSearch(projectId);
+                navigate(listHref(projectId, choice.value));
+              },
+            }))}
+          />
+        </span>
+      )}
+      {/* two icons whatever the list, so the filters never move: + for
+          what adds a file, the bin, off while it is empty */}
+      <span class="knowledge-acts">
+        <MoreMenu
+          label="Add"
+          icon="plus"
+          button="btn btn-small"
+          actions={[
+            { label: "New file", icon: "plus", href: newFileHref(projectId) },
+            { label: "Upload", icon: "upload", onPick: () => upload([]) },
+          ]}
+        />
+        <EmptyBin projectId={projectId} files={deleted.length} bin={bin} />
+      </span>
+    </div>
+  );
+  let body = null;
+  if (searching) {
+    body = (
+      <SearchResults
+        key={searchOf(projectId).q}
+        projectId={projectId}
+        now={now.value}
+      />
+    );
+  } else if (picked === "recent" && !empty) {
+    body = (
+      <RecentList projectId={projectId} files={list.files} now={now.value} />
+    );
+  } else if (picked === "deleted" && !empty) {
+    body = (
+      <DeletedList
+        projectId={projectId}
+        deleted={deleted}
+        historyDays={list.limits.historyDays}
+        now={now.value}
+        bin={bin}
+      />
+    );
+  } else if (list.files.length === 0) {
+    body = !adding.value && (
+      // choose them is the keyboard way to what a drop does
+      // biome-ignore lint/a11y/noStaticElementInteractions: drop target
+      <div
+        class={`knowledge-drop knowledge-empty${over.value ? " knowledge-drop-over" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          over.value = true;
+        }}
+        onDragLeave={() => {
+          over.value = false;
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          over.value = false;
+          upload(Array.from(e.dataTransfer?.files ?? []));
+        }}
+      >
+        <Icon name="upload" size={20} class="knowledge-drop-icon" />
+        <span class="knowledge-drop-main">No files yet</span>
+        <span>
+          Drop files or archives here, or{" "}
+          <label class="knowledge-choose knowledge-choose-link">
+            choose them
+            <input
+              class="knowledge-file"
+              type="file"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.currentTarget.files ?? []);
+                e.currentTarget.value = "";
+                if (files.length > 0) upload(files);
+              }}
+            />
+          </label>
+          . Agents in this project can read and change these files.
+        </span>
+      </div>
+    );
+  } else {
+    const open = openFoldersOf(projectId);
+    body = (
+      <RowsTree
+        label="Files"
+        nodes={treeNodes(treeOf(list.files), {
+          open,
+          all: all.value,
+          now: now.value,
+          href: (file) => fileHref(projectId, file.id),
+          toggle: (path) => toggleFolder(projectId, path),
+          showAll: (path) => {
+            all.value = new Set([...all.value, path]);
+          },
+        })}
+      />
+    );
+  }
   return (
     <Rows>
       <RowsCard
         label="Knowledge"
-        hint={knowledgeWords(list.totals)}
         search={
-          <Search
-            value={q.value}
-            onChange={(next) => {
-              q.value = next;
-            }}
-            placeholder="Search files"
-          />
-        }
-        action={
-          <RowsAdd
-            label="Upload"
-            disabled={adding.value}
-            onClick={() => {
-              adding.value = true;
-            }}
-          />
+          binAsks ? (
+            <div class="knowledge-head knowledge-head-ask">
+              <EmptyBin
+                projectId={projectId}
+                files={deleted.length}
+                bin={bin}
+              />
+            </div>
+          ) : (
+            head
+          )
         }
       >
         {adding.value && (
@@ -128,117 +271,16 @@ function Base({ projectId }: { projectId: string }) {
               projectId={projectId}
               names={list.files.map((file) => file.name)}
               limits={list.limits}
+              files={dropped.value}
               onDone={() => {
                 adding.value = false;
+                dropped.value = [];
               }}
             />
           </RowsNew>
         )}
-        {list.files.length === 0 && !adding.value && (
-          <RowsNote>{EMPTY}</RowsNote>
-        )}
-        {shown.map((file) => (
-          <KnowledgeRow
-            key={file.id}
-            projectId={projectId}
-            file={file}
-            now={now.value}
-            open={open.value === file.id}
-            onToggle={() => {
-              open.value = open.value === file.id ? null : file.id;
-            }}
-          />
-        ))}
-        {q.value.trim() !== "" && shown.length === 0 && (
-          <RowsNote>No files found</RowsNote>
-        )}
-        {list.files.length > 0 && <RowsNote>{ABOUT}</RowsNote>}
+        {body}
       </RowsCard>
-      {list.deleted.length > 0 && (
-        <RowsCard
-          label="Deleted"
-          hint={deletedHint(list.limits.historyDays)}
-          action={
-            emptying.value ? (
-              <>
-                <button
-                  type="button"
-                  class="btn btn-small"
-                  disabled={save.busy}
-                  onClick={() => {
-                    emptying.value = false;
-                  }}
-                >
-                  Keep
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-small btn-danger"
-                  disabled={save.busy}
-                  onClick={() => {
-                    acting.value = null;
-                    void save.act("empty", async () => {
-                      await emptyBin(projectId);
-                      emptying.value = false;
-                    });
-                  }}
-                >
-                  {save.pending.value === "empty"
-                    ? "Emptying"
-                    : "Delete for good"}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                class="btn btn-small rows-add"
-                disabled={save.busy}
-                onClick={() => {
-                  emptying.value = true;
-                }}
-              >
-                <Icon name="trash" size={12} />
-                Empty bin
-              </button>
-            )
-          }
-        >
-          {notice !== null && acting.value === null && (
-            <RowsNote>{sentence(noticeOf(notice))}</RowsNote>
-          )}
-          {list.deleted.map((file) => {
-            const line = deletedLine(file, now.value);
-            const failed =
-              notice !== null && acting.value === file.id
-                ? noticeOf(notice)
-                : undefined;
-            return (
-              <RowsLine key={file.id} flush>
-                <RowsTitle
-                  name={file.name}
-                  mono
-                  sub={
-                    <>
-                      deleted by <Author words={line.author} />
-                      {` · ${line.when}`}
-                    </>
-                  }
-                />
-                <RowsEnd error={failed}>
-                  <button
-                    type="button"
-                    class="btn btn-small"
-                    disabled={save.busy}
-                    onClick={() => void restore(file.id, file.name)}
-                  >
-                    Restore
-                  </button>
-                </RowsEnd>
-              </RowsLine>
-            );
-          })}
-        </RowsCard>
-      )}
     </Rows>
   );
 }
@@ -247,7 +289,7 @@ export function Knowledge({ params }: { params: Params }) {
   const id = params.id ?? "";
   return (
     <Frame id={id} tab="knowledge">
-      {(shown) => <Base projectId={shown.id} />}
+      {(shown) => <Base key={shown.id} projectId={shown.id} />}
     </Frame>
   );
 }

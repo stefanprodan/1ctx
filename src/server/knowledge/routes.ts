@@ -10,6 +10,7 @@ import type {
   KnowledgeFileDetailResponse,
   KnowledgeFileResponse,
   KnowledgeListResponse,
+  KnowledgeSearchResponse,
   KnowledgeUploadResult,
   KnowledgeVersionDetailResponse,
   KnowledgeVersionsResponse,
@@ -17,11 +18,17 @@ import type {
   StagedUploadsResponse,
 } from "../../shared/api/knowledge.ts";
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
-import { jsonBody } from "../lib/body.ts";
+import { jsonBody, MAX_BODY } from "../lib/body.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { MAX_KNOWLEDGE_BODY } from "./limits.ts";
-import { parseCreate, parseId, parseReplace } from "./parse.ts";
+import {
+  parseCreate,
+  parseId,
+  parseRename,
+  parseReplace,
+  parseSearch,
+} from "./parse.ts";
 
 export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
@@ -63,6 +70,19 @@ export type KnowledgePort = {
     text: string,
     revision: number,
   ): KnowledgeFileResponse["file"];
+  rename(
+    projectId: string,
+    author: KnowledgeAuthor,
+    fileId: string,
+    name: string,
+    revision: number,
+  ): KnowledgeFileResponse["file"];
+  search(
+    projectId: string,
+    userId: string,
+    q: string,
+    after: string | null,
+  ): KnowledgeSearchResponse;
   remove(
     projectId: string,
     author: KnowledgeAuthor,
@@ -200,6 +220,42 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             request.revision,
           ),
         };
+        return json(body);
+      },
+    },
+    {
+      method: "PATCH",
+      path: "/api/projects/:id/knowledge/files/:fileId",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const fileId = parseId(ctx.params.fileId, "fileId");
+        const request = parseRename(await jsonBody(req, MAX_BODY));
+        const body: KnowledgeFileResponse = {
+          file: deps.knowledge.rename(
+            project.id,
+            author(ctx.principal!),
+            fileId,
+            request.name,
+            request.revision,
+          ),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/projects/:id/knowledge/search",
+      policy: "authenticated",
+      handle(req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const query = parseSearch(new URL(req.url));
+        const body: KnowledgeSearchResponse = deps.knowledge.search(
+          project.id,
+          ctx.principal!.userId,
+          query.q,
+          query.after,
+        );
         return json(body);
       },
     },

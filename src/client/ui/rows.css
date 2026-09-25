@@ -469,7 +469,96 @@
     opacity: 0.5;
   }
 
+  /* RowsTree: a folder tree as rows of one line, a folder opening in
+     place, each level indented by its depth */
+  .rows-tree {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rows-tree-node {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 34px;
+    padding: 0 var(--space-4) 0
+      calc(var(--space-4) + var(--rows-depth, 0) * 18px);
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-family: var(--sans);
+    font-size: var(--text-ui);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .rows-tree-node:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .rows-tree-node:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+  }
+  .rows-tree-chevron {
+    flex-shrink: 0;
+    color: var(--faint);
+    transform: rotate(-90deg);
+    transition: transform 0.12s;
+  }
+  .rows-tree-chevron-open {
+    transform: none;
+  }
+  /* a file's room for the chevron, so its icon lines up with a
+     folder's */
+  .rows-tree-gap {
+    flex-shrink: 0;
+    width: 14px;
+  }
+  .rows-tree-icon {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .rows-tree-name {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    color: var(--fg);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .rows-tree-folder .rows-tree-name {
+    color: var(--dim);
+  }
+  .rows-tree-folder:hover .rows-tree-name {
+    color: var(--fg);
+  }
+  .rows-tree-meta {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: var(--space-3);
+    font-size: var(--text-small);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .rows-tree-lit {
+    color: var(--brand);
+  }
+  .rows-tree-more {
+    color: var(--faint);
+    font-size: var(--text-small);
+  }
+
   @media (max-width: 719px) {
+    /* a level indents less, and a file's name has the whole line */
+    .rows-tree-node {
+      padding-left: calc(var(--space-4) + var(--rows-depth, 0) * 12px);
+    }
+    .rows-tree-file .rows-tree-meta {
+      display: none;
+    }
     .rows-line {
       padding-block: var(--space-3);
       row-gap: var(--space-1);

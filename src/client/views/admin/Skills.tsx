@@ -40,7 +40,6 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { textBox } from "../knowledge/Knowledge.model.ts";
 import { SkillForm } from "./SkillForm.tsx";
 import {
   bytesWord,
@@ -49,6 +48,7 @@ import {
   metadataLines,
   metaLine,
   sourceLine,
+  textBox,
 } from "./Skills.model.ts";
 import "./skills.css";
 

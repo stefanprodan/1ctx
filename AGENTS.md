@@ -361,15 +361,37 @@ violation, and every rule has a rejected fixture under
   that stop nothing. The command prints nothing; its receipts follow
   the knowledge receipts in the reserved tail and are discarded with
   the trees on an abort, 124, 126 or a throw.
-  The nine authenticated routes under `/api/projects/:id/knowledge`
-  use `access.project()`: list and create, read/replace/delete by
-  `/files/:fileId`, that file's `/versions`, `/versions/:versionId`,
-  `POST /upload?folder=&name=` for one archive or text file, and
+  The eleven authenticated routes under `/api/projects/:id/knowledge`
+  use `access.project()`: list and create, read/replace/rename/delete
+  by `/files/:fileId`, that file's `/versions`, `/versions/:versionId`,
+  `GET /search?q=&after=`, `POST /upload?folder=&name=` for one archive
+  or text file, and
   `DELETE /deleted`, which drops the history of every deleted file in
   the project, answers how many went and reaches the project's
   connections as a `knowledgeEmptied` frame. The Knowledge tab's
   Deleted card empties it behind Empty bin, which asks once.
   Replacements check the revision; deleted-name restores create new ids.
+  A rename (`PATCH {name, revision}`) keeps the id and the text and
+  writes one version under the new name, with a create's name and
+  prefix rules and no size check; the same name is a 400. The file and
+  version details are rendered at each read (`knowledge/render.ts`),
+  never stored: `language` from the extension map in `languages.ts`,
+  which `open` shares, `html` from `renderMarkdown()` for Markdown
+  within `MAX_RENDER_BYTES`, `code` from `highlight()` within its
+  `MAX_BYTES`; a delete's version renders nothing. The area's
+  `RenderCache` keeps views by file id and revision or by version id,
+  bounded by entries and characters. Search (`knowledge/search.ts`)
+  takes `q` of `SEARCH_MIN` to `SEARCH_MAX` characters after trim, one
+  line, and streams the live rows in name order through the store's
+  `after()` and `named()`, each its own statement finalized at the end,
+  reading a text by id only once it fits the budget, lowercased `includes` per line, no regex or index: per file the line
+  count and the first `SEARCH_LINES` cut to `SEARCH_LINE_CHARS` round
+  the match, `SEARCH_PAGE` files a page with `next` the last name; on
+  the first page only, up to `SEARCH_NAMES` files whose name alone
+  holds `q` and their total. A request reads at most
+  `SEARCH_SCAN_BYTES` of text, one file a page whatever its size: past
+  it the page ends early with `next` set, and names not yet read are
+  listed on the name alone. One scan per user at a time, else a 429.
   Uploads normalize paths through `shared/knowledge.ts`: both separators,
   Unicode normalization and Latin transliteration, lowercase with dashes,
   never raw `..`; stored names from bash and Restore keep their case.
@@ -399,7 +421,8 @@ violation, and every rule has a rejected fixture under
   `GET /api/sessions/:id/messages/:messageId/files/:index` answers whole
   as `OpenedFileResponse` (`sessions/opened.ts`). The client draws them
   in the reply with the visual cards, in call order: a visual through
-  `Visual.tsx`, Markdown and code as `transcript/FileCard.tsx`.
+  `Visual.tsx`, Markdown and code as `transcript/FileCard.tsx`, code
+  by its numbered lines through `ui/Source.tsx`.
   `knowledge/mount.ts` alone runs just-bash (`credentials/check.ts`
   imports only its allow-list rules, `knowledge/credentials.ts` its
   fetch), with pinned commands, no
@@ -972,8 +995,13 @@ violation, and every rule has a rejected fixture under
   read, save and undo. `Memory.session` names the chat or run that
   saved last (id, title, origin, the automation for a run), from the
   memory area's session info port, null for a hand edit or once the
-  session is deleted; the note card's writer line reads "@user in
-  <chat>", "a run of <automation>" or "@user" (`Note.model.ts`).
+  session is deleted. `Memory.agentName` is that session's agent,
+  written with the note (`agent_name`) so it outlives the session, null
+  for a hand edit or an undo; a chat's save also records the chat's
+  user in `updatedBy`. The note card's writer line names the agent for
+  any save from a session, "@agent in <chat>", "@agent in a run of
+  <automation>" or "in a chat since deleted", and "@user" only for a
+  hand edit (`Note.model.ts`).
   Entries are `{topic, text}`;
   `shared/memory.ts` owns sanitizing, topic equality, diff and the
   rendered count (60 characters per topic, 500 per text, 2,200 per note).
@@ -1360,7 +1388,14 @@ violation, and every rule has a rejected fixture under
   in a label row. A card's head holds `RowsAdd`, `RowsLink` or
   `RowsFilters`; `RowsNote` says why a list is empty, `RowsBlock` is a
   row of text. The controls live in `ui/RowsControls.tsx`, exported
-  through `Rows.tsx`. Compact outcome logs use `RowsLog`,
+  through `Rows.tsx`. `RowsTree` (`ui/RowsTree.tsx`, exported the same
+  way) is a folder tree inside a `RowsCard`, a `ul` of `li` of one-line
+  rows the view gives as nodes: a folder a disclosure button with its
+  count of files, its rows drawn only while open and indented a level
+  (12px on a phone), a file a link with its meta at the right (`lit` in
+  the accent; a phone shows the name alone), and a `more` row, Show
+  more, where a folder is cut at `FOLDER_ROWS`. `treeOf()` in
+  `lib/tree.ts` lays names into folders, folders first, in name order. Compact outcome logs use `RowsLog`,
   `RowsLogGroup`, `RowsLogLine` (name, note, failure and status tag)
   and `RowsLogMore`; names ellipsize and notes wrap only when needed.
   `RowsLog` is `bare` inside a box that has its own frame, and `ends`
@@ -1388,11 +1423,31 @@ violation, and every rule has a rejected fixture under
   strip, headed by `ui/Search.tsx` (the stream's box too) narrowing the
   rows by name in place. A project's tabs are Feed, Automations, Memory,
   Knowledge, then Members for a team or Settings for a personal one.
-  The Knowledge tab is one card of the base's files, searched by name,
-  with the totals as its hint and Upload at its head: a row opens to
-  who wrote it and from where, its text folded at twelve lines with
-  Show all, History with Restore on every past version, and Delete; a
-  second card lists the deleted files whose text is still kept. Upload
+  The Knowledge tab is one card. Its head holds the search (names and
+  text, `data/knowledge-search.ts`), the switch All, Recent and
+  Deleted (with the count of deleted names) as `RowsFilters`, and two
+  icons whatever the list, so the filters never move: + (`MoreMenu`
+  from `file/DocMenus.tsx`) opening New file and Upload, and the bin,
+  Empty bin, off while it is empty; on a phone they sit under the
+  search. All
+  is `RowsTree` from `treeOf()`: folders open in place and stay open
+  per project in this browser (`data/knowledge-local.ts`), a folder
+  alone at its level opens by itself (closing it is kept as its path
+  marked `!`), `?folder=` opens one and its parents, a file row is its
+  kind's icon (`fileIcon()`: prose, code, data, a visual or a page),
+  its name and when it last changed (lit for an agent's write in the
+  last three days), and a
+  folder past `FOLDER_ROWS` files ends in a row that shows the rest.
+  `?list=recent` is every file by its last change, 12 at a time;
+  `?list=deleted` is one `RowsGo` row per name (`deletedByName()`) with
+  Restore at its end; Empty bin asks once, its words taking the head.
+  While the box holds
+  two characters or more the body is the search: the names first (5,
+  then Show more), then a `RowsGo` row per file with its count of
+  matching lines and up to three of them under it (`under`), numbered,
+  every match marked, each a link to the file at `?line=`; Show more
+  pages while `next` is set, dropping a file already shown. An empty
+  base is the drop target. A file opens on its own page. Upload
   takes a Folder and multiple text files or archives, judged at pick
   with the shared name, archive and text rules. Items send sequentially
   under a byte progress bar; outcomes and skips are compact Rows logs,
@@ -1401,9 +1456,8 @@ violation, and every rule has a rejected fixture under
   user, unmount or a folder refusal stops the run. The list reloads
   once at the end, including Stop; changed or removed revisions drop
   cached text and History even without socket frames.
-  `data/knowledge.ts` holds the list per project, a file's text and its
-  versions once read, and applies a `knowledge` frame by revision, so a
-  run's write lands on the open tab. A team project's Members tab is the
+  `data/knowledge.ts` holds the list per project and applies a
+  `knowledge` frame by revision, so a run's write lands on the open tab. A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`. The Automations tab
   is one card of `RowsGo` rows titled Scheduled tasks, the schedule in
@@ -1542,6 +1596,47 @@ violation, and every rule has a rejected fixture under
   reads it as one outside; the pane takes the focus and gives it back.
   The `mcp` icon is the Model Context Protocol mark, drawn at a stroke
   of 1 (`THIN` in `lib/icons.tsx`), wherever MCP servers are listed.
+- **A knowledge file has a page, by id.**
+  `/projects/:id/knowledge/files/:fileId` (`views/knowledge/file/`,
+  loaded by `loadDocPage` in `data/knowledge-file.ts`) has no project
+  tabs and a crumb of `Page` steps: the project, Knowledge, each folder
+  in mono linking to the tab's `?folder=`, the name, a link to the
+  file as it is from any of its views (`titleHref`). The head holds
+  Edit and More (History, copy the text or the path, Download,
+  Rename or move, New file in the folder, Delete); the card's band is
+  one line, the revision as a link to History, who with a link to the
+  chat or run and when (a long name cut at its end, both left out on a
+  phone), and Outline (Markdown with three headings or more) and
+  Preview or Source; under 1100 a foot under the text holds the aside's
+  facts, and on a phone who changed the file last and when. The body is the whole file:
+  Markdown from the server's renderer, an HTML file as a visual through
+  `/api/visual` only while `visualize` is switchable and within
+  `VISUAL_FRAME_BYTES`, anything else `ui/Source.tsx`, `?line=N` lit.
+  The aside is facts only. `?history` lists the revisions ten at a time,
+  with a note when the history's limits dropped older ones;
+  `?revision=N` has the ‹ › steps (the newest leading to the file) and
+  Changes (`ui/Diff.tsx` against the revision before, left out when too
+  large) or its text, Markdown as Preview or Source, the head swapping
+  Edit for Restore, in words on a phone too.
+  Restore asks nothing: it saves the text as a new revision, and the
+  file's head then says which revision came back and that the one it
+  replaced is in History. A Restore from the bin opens the new file at
+  `?restored`, whose head says it came back from the bin. Edit makes the body
+  a text box as tall as its lines, the band counting +/− and the size
+  against `fileBytes`; the edit is kept per file in this browser and
+  offered back with Resume or Discard, so leaving never asks. The file
+  held on the page never changes under the reader: another writer's
+  revision (a frame, or a 409 on Save) is a notice with Show the latest,
+  and while editing Show their change and Save anyway. The page's
+  notices sit in the head (`PageNotice`): refusals, Delete's ask (Keep,
+  Delete, then `?list=deleted`), another writer, a delete while open,
+  a kept edit. Rename is one path field in the band, its refusal at the
+  field; the file keeps its id and history. An id the list holds as
+  deleted is a read-only page of its last text with Restore (its crumb
+  links a folder only while a live file keeps it, `liveFolders()`; a live name
+  is refused with Open it); any other missing id says no file is there.
+  `/projects/:id/knowledge/new?folder=` is the path field starting in
+  the folder and the text box; Create opens the new file's page.
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
   ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
@@ -1558,8 +1653,12 @@ violation, and every rule has a rejected fixture under
   field's, and a run refusal such as a picked-file read failure is
   the `Foot`'s. The composer's files are the same exception: an item's
   refusal is its Skipped line, a refusal of the whole pick is under the
-  box, and the panel's X stays enabled while it uploads. No other form
-  shows a refusal elsewhere. A page whose
+  box, and the panel's X stays enabled while it uploads. A page that
+  saves from its head (its buttons in `Page`'s actions) shows a refusal,
+  or an ask, in the head's notice row, `Page`'s `notice` holding a
+  `PageNotice` (`failed` for a refusal, read out at once); a refusal
+  that names a field stays at the field. No other form shows a refusal
+  elsewhere. A page whose
   load failed is `Page`'s `error`: a card saying the page did not load,
   the words and Try again. A failure is words first: `api()` passes the server's own
   words and gives an answer without them the words of `statusWords()`,
@@ -1608,6 +1707,24 @@ violation, and every rule has a rejected fixture under
   the lines (`showAll()` in `lib/format.ts`) where the cut is by lines,
   and is bare where lines wrap (a tool value, a prompt, an automation's
   instructions); pressed, it goes and the focus moves to the block.
+  `Page` takes a `crumb` and its `crumbHref`, or `steps`, several links
+  back before the title (`mono` for a path's step, in its own case, cut
+  at 24 characters and giving way before the title; a phone keeps the
+  nearest step and the title). A file's crumb past two folders folds
+  the middle ones into `…`, which leads to the deepest of them. A page whose content is
+  a `Split` passes `split`, so the head's row, its actions and notice
+  included, ends where the main column does and nothing sits over the
+  aside. A text by its lines is
+  `ui/Source.tsx`: the server's highlighted HTML cut at newlines by
+  `splitLines()` in `lib/lines.ts`, each line's spans balanced, or the
+  plain text; a number links to its line when the view gives
+  `lineHref`, and the `lit` line is marked and scrolled to. A change
+  between two texts is `ui/Diff.tsx` over `diffLines()` in
+  `lib/diff.ts` (Myers, deletions first in a change, three lines of
+  context, each longer unchanged run a fold that opens in place), with
+  `DiffStat` for its counts; past `MAX_DIFF_LINES` or `MAX_DIFF_EDITS`
+  the answer is `tooLarge` and `Diff` draws nothing. Both wrap long
+  lines rather than scroll.
 - **Two themes, one set of names.** `tokens.css` defines every colour
   twice: dark on `:root`, light on `:root[data-theme="light"]`; no
   other stylesheet knows the theme. `app/theme.ts` sets `data-theme`

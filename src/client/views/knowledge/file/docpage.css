@@ -1,0 +1,241 @@
+/* A knowledge file's page: the card's band of who and when over the
+   whole text, the editor, the path field, the menus and the visual. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the card clips its band and its body to its corners */
+  .docpage-card {
+    overflow: clip;
+  }
+
+  .docpage-band {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    min-height: 44px;
+    margin: 0;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--line);
+    background: var(--inset);
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  /* the buttons under a note, the card's last line */
+  .docpage-band-foot {
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+  }
+  .docpage-band-words {
+    flex: 1;
+    min-width: 0;
+  }
+  .docpage-strong {
+    color: var(--fg);
+  }
+  .docpage-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .docpage-link:hover {
+    color: var(--fg);
+  }
+  .docpage-failed {
+    color: var(--failed);
+  }
+  /* a reader's band is one line: a long name gives way at its end */
+  .docpage-band-line {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  /* the aside's facts under the text, where the aside is hidden */
+  .docpage-foot {
+    display: none;
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--line);
+    font-size: var(--text-small);
+    line-height: 1.6;
+    color: var(--faint);
+    overflow-wrap: anywhere;
+  }
+  .docpage-phone {
+    display: none;
+  }
+
+  /* a past revision's steps */
+  .docpage-steps {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: calc(-1 * var(--space-2));
+  }
+  .docpage-off {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* the rendered Markdown, the transcript's md- rules inside */
+  .docpage-md {
+    padding: var(--space-4) var(--space-5) var(--space-3);
+    min-width: 0;
+  }
+  /* a heading that opens the file sits on the padding, not below it */
+  .docpage-md > :first-child {
+    margin-top: 0;
+  }
+
+  .docpage-state {
+    margin: 0;
+    padding: var(--space-4);
+    color: var(--faint);
+    font-size: var(--text-ui);
+  }
+
+  /* the head's and the band's menus hang under their button */
+  .docpage-more {
+    position: relative;
+  }
+  .docpage-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 3;
+    min-width: 220px;
+    max-width: min(360px, calc(100vw - 32px));
+  }
+  .docpage-outline {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .docpage-menu-words {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .docpage-menu-danger {
+    color: var(--failed);
+  }
+  .docpage-menu-sub {
+    padding-left: var(--space-5);
+  }
+
+  /* an HTML file drawn as a chat's visual: the card keeps the frame
+     680 wide and scrolls it on a narrow screen */
+  .docpage-visual {
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 var(--space-4);
+  }
+
+  /* the editor: the text as tall as its lines, never a box that
+     scrolls on its own */
+  .docpage-editor {
+    display: block;
+    width: 100%;
+    min-height: 420px;
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: 0;
+    background: var(--card);
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    line-height: 1.6;
+    color: var(--fg);
+    resize: none;
+    overflow: hidden;
+  }
+  /* the ring drawn inside, since the card clips what is outside */
+  .docpage-editor:focus-visible {
+    outline-offset: -2px;
+  }
+  .docpage-editor::placeholder {
+    color: var(--faint);
+  }
+  .docpage-fact {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .docpage-fact-over {
+    color: var(--failed);
+  }
+
+  /* a path field in the band: New file and Rename */
+  .docpage-name {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    flex: 1;
+    min-width: 0;
+  }
+  /* the label sits on the field's line, a refusal under the field */
+  .docpage-name > .label {
+    line-height: 36px;
+  }
+  .docpage-name-box {
+    flex: 1;
+    min-width: 0;
+  }
+  .docpage-path {
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 1099px) {
+    .docpage-foot {
+      display: block;
+    }
+  }
+
+  @media (max-width: 719px) {
+    .docpage-word,
+    .docpage-wide {
+      display: none;
+    }
+    .docpage-md {
+      padding: var(--space-3) var(--space-4);
+    }
+    /* the words take the first line, the controls the next */
+    .docpage-band .docpage-band-words {
+      flex-basis: 100%;
+    }
+    .docpage-band .docpage-band-line {
+      flex-basis: auto;
+    }
+    .docpage-phone {
+      display: inline;
+    }
+    /* a finger's size for the steps between revisions */
+    .docpage-steps .btn-icon {
+      width: 40px;
+      height: 40px;
+    }
+    /* a past revision's steps and switch share the first line */
+    .docpage-band-rev .docpage-band-words {
+      order: 3;
+    }
+    .docpage-band-rev .seg {
+      margin-left: auto;
+    }
+    /* a band's menu spans the band, since its button sits mid-line and
+       the card clips what hangs past its edge */
+    .docpage-band .docpage-more {
+      position: static;
+    }
+    .docpage-band .docpage-menu {
+      left: var(--space-3);
+      right: var(--space-3);
+      max-width: none;
+    }
+    .docpage-visual {
+      padding: 0 var(--space-3);
+    }
+  }
+}

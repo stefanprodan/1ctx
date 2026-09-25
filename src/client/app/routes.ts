@@ -18,6 +18,7 @@ import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
 import { loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
+import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadMcp } from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
 import { loadOverview, loadStorage } from "../data/overview.ts";
@@ -68,6 +69,11 @@ export const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
 // page mounted instead of drawing it again
 const automationView = lazy(() =>
   import("../views/projects/Automation.tsx").then((m) => m.Automation),
+);
+
+// a file's page, its history and its past revisions are one view
+const docView = lazy(() =>
+  import("../views/knowledge/file/DocPage.tsx").then((m) => m.DocPage),
 );
 
 // the tools page's three tabs share one view the same way
@@ -204,6 +210,36 @@ export const ROUTES: Route[] = [
         loadRecentDays(),
         loadKnowledge(params.id),
       ]);
+    },
+  },
+  {
+    // ?line= lights a line, ?revision= opens a past one, ?history lists
+    // them
+    path: "/projects/:id/knowledge/files/:fileId",
+    view: docView,
+    title: () => "Knowledge",
+    role: "authenticated",
+    // the agents answer says whether visuals are on, for an HTML file
+    load: async (params, query) => {
+      // a click on a line number reads nothing again
+      if (onlyLineMoved(params.id, params.fileId, query)) return;
+      await Promise.all([
+        loadProject(params.id),
+        loadProjectAgents(params.id),
+        loadDocPage(params.id, params.fileId, query),
+      ]);
+    },
+  },
+  {
+    // ?folder= is where the path starts
+    path: "/projects/:id/knowledge/new",
+    view: lazy(() =>
+      import("../views/knowledge/file/DocPage.tsx").then((m) => m.NewDoc),
+    ),
+    title: () => "New file",
+    role: "authenticated",
+    load: async (params) => {
+      await Promise.all([loadProject(params.id), loadKnowledge(params.id)]);
     },
   },
   {

@@ -27,29 +27,22 @@
     min-width: 0;
     line-height: 1.65;
   }
+  /* the frame round Source's lines; its line box is Source's, so the
+     clip's lines are the text's */
   .filecard-body-code {
-    padding: 10px var(--space-3);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background-color: var(--inset);
-    line-height: 1.5;
+    font-size: var(--text-mono);
+    line-height: 1.6;
   }
   .filecard-clip {
     max-height: 12lh;
     overflow: clip;
   }
-  .filecard-pre {
-    margin: 0;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    line-height: inherit;
-    color: var(--dim);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  .filecard-code {
-    font-family: var(--mono);
-    font-size: var(--text-mono);
+  /* Source's own top padding sits above the first line */
+  .filecard-body-code.filecard-clip {
+    max-height: calc(12lh + var(--space-3));
   }
   .filecard-state {
     color: var(--faint);

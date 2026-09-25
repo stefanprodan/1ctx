@@ -1,0 +1,77 @@
+/* What a change did to a text: the lines around each change and a fold
+   for each unchanged run. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .diff {
+    display: grid;
+    grid-template-columns: auto auto auto minmax(0, 1fr);
+    min-width: 0;
+    padding: 0 0 var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    line-height: 1.6;
+  }
+  .diff-num {
+    padding: 0 var(--space-2);
+    color: var(--faint);
+    text-align: right;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .diff-sign {
+    width: 2ch;
+    color: var(--faint);
+    text-align: center;
+    user-select: none;
+  }
+  /* a long line wraps rather than scrolling the block on its own */
+  .diff-text {
+    padding-right: var(--space-4);
+    color: var(--dim);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .diff-add {
+    background: var(--done-wash);
+  }
+  .diff-add.diff-sign {
+    color: var(--done);
+  }
+  .diff-add.diff-text,
+  .diff-del.diff-text {
+    color: var(--fg);
+  }
+  .diff-del {
+    background: var(--failed-wash);
+  }
+  .diff-del.diff-sign {
+    color: var(--failed);
+  }
+  .diff-fold {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: var(--space-1) var(--space-4);
+    border: 0;
+    background: var(--inset);
+    color: var(--faint);
+    font-family: var(--sans);
+    font-size: var(--text-small);
+    text-align: left;
+    cursor: pointer;
+  }
+  .diff-fold:hover {
+    color: var(--fg);
+  }
+  .diff-stat {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .diff-stat-add {
+    color: var(--done);
+  }
+  .diff-stat-del {
+    color: var(--failed);
+  }
+}

@@ -39,11 +39,14 @@ export function KnowledgeUpload({
   projectId,
   names,
   limits,
+  files,
   onDone,
 }: {
   projectId: string;
   names: readonly string[];
   limits: KnowledgeLimits;
+  // dropped on the empty base or chosen there, picked as it opens
+  files?: readonly File[];
   onDone: () => void;
 }) {
   const rules = useRef({ names, fileBytes: limits.fileBytes });
@@ -72,6 +75,9 @@ export function KnowledgeUpload({
       stopWatching();
       state.dispose();
     };
+  }, [state]);
+  useEffect(() => {
+    if (files !== undefined && files.length > 0) void state.pick(files);
   }, [state]);
   const phase = state.phase.value;
   const busy = state.busy;
@@ -146,7 +152,8 @@ export function KnowledgeUpload({
         )}
       </label>
       {picking && (
-        // biome-ignore lint/a11y/noStaticElementInteractions: Choose files is the keyboard alternative to dropping files.
+        // Choose files is the keyboard way to what a drop does
+        // biome-ignore lint/a11y/noStaticElementInteractions: drop target
         <div
           class={`knowledge-drop${over.value ? " knowledge-drop-over" : ""}`}
           onDragOver={(e) => {
