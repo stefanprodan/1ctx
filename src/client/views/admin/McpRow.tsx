@@ -10,7 +10,7 @@
 // text; the parameters are the one HTML, rendered on the server.
 
 import { useSignal } from "@preact/signals";
-import { useRef } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type {
   McpChange,
   McpServerSummary,
@@ -24,10 +24,17 @@ import {
   patchServer,
   refreshServer,
 } from "../../data/mcp.ts";
-import { ago, firstSentence, reason, sentence } from "../../lib/format.ts";
+import {
+  ago,
+  firstSentence,
+  reason,
+  sentence,
+  showAll,
+} from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
+import { Fold } from "../../ui/Fold.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import {
   RowsBad,
@@ -272,6 +279,9 @@ export function ServerRow({
   const writeText = useSignal(patternText(server.writePatterns));
   const excludedText = useSignal(patternText(server.excludedPatterns));
   const expanded = useSignal(false);
+  useEffect(() => {
+    if (!open) expanded.value = false;
+  }, [open]);
   const asking = useSignal(false);
   const refreshing = useSignal(false);
   const refreshFailure = useSignal<{ words: string; at: number } | null>(null);
@@ -428,20 +438,16 @@ export function ServerRow({
             ) : server.instructions === "" ? (
               <span class="hint">Server sent no instructions</span>
             ) : (
-              <>
+              <Fold
+                cut={box.cut && !expanded.value}
+                onOpen={() => {
+                  expanded.value = true;
+                }}
+                label={showAll(box.lines)}
+                framed
+              >
                 <pre class="textbox">{box.text}</pre>
-                {box.canToggle && (
-                  <button
-                    type="button"
-                    class="btn btn-small mcp-toggle"
-                    onClick={() => {
-                      expanded.value = !expanded.value;
-                    }}
-                  >
-                    {expanded.value ? "Show less" : "Show all"}
-                  </button>
-                )}
-              </>
+              </Fold>
             )}
           </div>
           <Foot

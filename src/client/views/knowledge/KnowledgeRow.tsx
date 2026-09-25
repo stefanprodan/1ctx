@@ -20,6 +20,7 @@ import {
 } from "../../data/knowledge.ts";
 import { says } from "../../lib/format.ts";
 import { noticeOf, useSave } from "../../lib/save.ts";
+import { Fold } from "../../ui/Fold.tsx";
 import {
   RowsEnd,
   RowsHandle,
@@ -84,6 +85,10 @@ export function KnowledgeRow({
 }) {
   const expanded = useSignal(false);
   const failure = useSignal<string | null>(null);
+  // the row stays mounted while closed, so closing it folds the text
+  useEffect(() => {
+    if (!open) expanded.value = false;
+  }, [open]);
   const save = useSave(async () => {});
   const text = fileTexts.value[file.id];
   const versions = fileVersions.value[file.id];
@@ -148,20 +153,16 @@ export function KnowledgeRow({
         ) : text === undefined ? (
           <div class="hint">Loading</div>
         ) : (
-          <>
+          <Fold
+            cut={box.cut && !expanded.value}
+            onOpen={() => {
+              expanded.value = true;
+            }}
+            label={box.label}
+            framed
+          >
             <pre class="textbox">{box.text}</pre>
-            {box.canToggle && (
-              <button
-                type="button"
-                class="btn btn-small knowledge-toggle"
-                onClick={() => {
-                  expanded.value = !expanded.value;
-                }}
-              >
-                {box.label}
-              </button>
-            )}
-          </>
+          </Fold>
         )}
         <RowsListHead
           label="History"

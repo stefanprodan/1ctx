@@ -96,7 +96,7 @@ export function WebAccessCard() {
       </RowsNote>
       {mode === "listed" && (
         <form
-          class="tools-web"
+          class="tools-lines"
           ref={form}
           onSubmit={(event) => {
             event.preventDefault();
@@ -111,7 +111,7 @@ export function WebAccessCard() {
           <label class="field">
             <textarea
               name="domains"
-              class="tools-web-domains"
+              class="tools-lines-box"
               aria-label="Allowed hosts"
               rows={6}
               spellcheck={false}

@@ -24,7 +24,7 @@ export function onResize(node: Element, measure: () => void): () => void {
   };
 }
 
-// a text cut to a height or a count of lines, with Show more only while
+// a text cut to a height or a count of lines, with Show all only while
 // the cut hides something: `open` lifts the cut, `long` says it hides
 // anything. The measure runs again when the node resizes or a dep moves.
 export function useCut<T extends Element>(

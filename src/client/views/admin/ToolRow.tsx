@@ -2,39 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A tool's row, built like every admin row: the name over the first
-// sentence of its description, for a built-in the tokens its schema
-// costs as the row's meta, and for a web tool its switch. It opens in place to when a send
-// carries it, the text and the parameters the model gets. The hosts
-// form keeps the server's list rather than normalizing a second copy.
+// sentence of its description, the tokens its schema costs as the
+// row's meta, and for a web tool its switch, the name and the switch
+// alone on a phone, and from 720 up Off in place of the tokens while it
+// is off. It opens in place to when a send
+// carries it, the text and the parameters the model gets.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import type {
   BuiltinToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import { patchTool } from "../../data/tools.ts";
-import { says } from "../../lib/format.ts";
+import { says, showAll } from "../../lib/format.ts";
 import { useCut } from "../../lib/resize.ts";
-import { useFocusField, useSave } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
-import { FieldError } from "../../ui/FieldError.tsx";
-import { Foot } from "../../ui/Foot.tsx";
+import { Fold } from "../../ui/Fold.tsx";
 import {
   RowsEnd,
-  RowsLine,
-  RowsList,
-  RowsListHead,
   RowsMeta,
-  RowsNote,
   RowsOpen,
   RowsSwitch,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import {
-  editHosts,
   firstSentence,
-  hostsFieldOf,
+  jsonLines,
   NAMES_WORDS,
   tokensText,
   VARIANT_WHEN_WORDS,
@@ -69,117 +63,6 @@ function Switch({ tool }: { tool: WebToolSummary }) {
   );
 }
 
-function Hosts({ tool }: { tool: WebToolSummary }) {
-  const host = useSignal("");
-  const form = useRef<HTMLFormElement>(null);
-  const latest = useRef(tool);
-  latest.current = tool;
-  const save = useSave(async () => {
-    await patchTool("visualize", {
-      hosts: editHosts(latest.current.hosts, {
-        type: "add",
-        host: host.value,
-      }),
-    });
-    host.value = "";
-  }, hostsFieldOf);
-  useFocusField(save, form);
-  const busy = save.busy;
-  const invalid = save.fieldError("hosts") !== null;
-  return (
-    <form
-      class="tools-hosts"
-      ref={form}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (host.value.trim() !== "") void save.run(null);
-      }}
-    >
-      <div>
-        <RowsListHead label="Allowed hosts" />
-        <RowsList>
-          {tool.hosts.length === 0 ? (
-            <RowsNote>No hosts allowed. Visuals use inline code only.</RowsNote>
-          ) : (
-            tool.hosts.map((origin) => {
-              const action = `remove ${origin}`;
-              return (
-                <RowsLine key={origin} flush>
-                  <RowsTitle name={origin} mono />
-                  <RowsEnd>
-                    <button
-                      type="button"
-                      class="btn btn-small"
-                      aria-label={`Remove ${origin}`}
-                      disabled={busy}
-                      onClick={() =>
-                        void save.act(action, () =>
-                          patchTool("visualize", {
-                            hosts: editHosts(latest.current.hosts, {
-                              type: "remove",
-                              host: origin,
-                            }),
-                          }),
-                        )
-                      }
-                    >
-                      {save.pending.value === action ? "Removing" : "Remove"}
-                    </button>
-                  </RowsEnd>
-                </RowsLine>
-              );
-            })
-          )}
-        </RowsList>
-      </div>
-      <label class="field">
-        <span class="label">Host</span>
-        <input
-          name="hosts"
-          autocomplete="off"
-          spellcheck={false}
-          placeholder="https://cdn.example.com"
-          value={host.value}
-          disabled={busy}
-          aria-invalid={invalid || undefined}
-          onInput={(event) => {
-            host.value = (event.currentTarget as HTMLInputElement).value;
-            save.touch();
-          }}
-        />
-        {invalid ? (
-          <FieldError save={save} field="hosts" />
-        ) : (
-          <span class="hint">
-            Allowed hosts receive whatever a visual puts in its URLs.
-          </span>
-        )}
-      </label>
-      <Foot
-        save={save}
-        dirty={host.value.trim() !== ""}
-        label="Add"
-        start={
-          <button
-            type="button"
-            class="btn"
-            disabled={busy}
-            onClick={() =>
-              void save.act("reset the hosts", () =>
-                patchTool("visualize", {
-                  hosts: editHosts(latest.current.hosts, { type: "reset" }),
-                }),
-              )
-            }
-          >
-            {save.pending.value === "reset the hosts" ? "Resetting" : "Reset"}
-          </button>
-        }
-      />
-    </form>
-  );
-}
-
 export function ToolRow({
   tool,
   open,
@@ -191,14 +74,18 @@ export function ToolRow({
 }) {
   // the block's Copy is a button inside rendered HTML, so the click is
   // delegated the way the transcript does it
-  // the parameters are cut to a height with Show all, since a box that
-  // scrolls on its own inside the page's scroll leaves the page's
-  // sticky head behind
+  // the parameters are cut to a height, Show all at the block's foot,
+  // since a box that scrolls on its own inside the page's scroll leaves
+  // the page's sticky head behind; once open the block stays whole
+  // until the row folds
   const {
     el: json,
     open: all,
     long,
   } = useCut<HTMLDivElement>([open, tool.parametersHtml]);
+  useEffect(() => {
+    if (!open) all.value = false;
+  }, [open]);
   useEffect(() => {
     const el = json.current;
     if (!el) return;
@@ -212,29 +99,34 @@ export function ToolRow({
       open={open}
       onToggle={onToggle}
       indent="chevron"
+      off={"enabled" in tool && !tool.enabled}
       head={
         <>
           <RowsTitle
             name={tool.name}
             sub={firstSentence(tool.description)}
             mono
+            subWide={builtin === null}
           />
-          {builtin && <RowsMeta>{tokensText(tool.tokens)}</RowsMeta>}
+          {builtin ? (
+            <RowsMeta>{tokensText(tool.tokens)}</RowsMeta>
+          ) : "enabled" in tool && tool.enabled ? (
+            <RowsMeta short="">{tokensText(tool.tokens)}</RowsMeta>
+          ) : (
+            <RowsMeta short="">Off</RowsMeta>
+          )}
         </>
       }
       end={"enabled" in tool ? <Switch tool={tool} /> : undefined}
     >
       <div class="tools-schema">
-        {"enabled" in tool && tool.name === "visualize" && (
-          <Hosts tool={tool} />
-        )}
         {builtin && (
           <>
             <div class="label">When</div>
             <div class="tools-text">{WHEN_WORDS[builtin.when]}</div>
           </>
         )}
-        <div class="label">Description for agents</div>
+        <div class="label">Description</div>
         <div class="tools-text">{tool.description}</div>
         {builtin?.variant && (
           <>
@@ -249,23 +141,20 @@ export function ToolRow({
         <div class="label">Parameters</div>
         {builtin?.names && <div class="hint">{NAMES_WORDS}</div>}
         {/* Server rendering keeps the Markdown parser out of the browser. */}
-        <div
-          class={all.value ? undefined : "tools-json-cut"}
-          ref={json}
-          dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
-        />
-        {long.value && (
-          <button
-            type="button"
-            class="btn btn-small tools-toggle"
-            aria-expanded={all.value}
-            onClick={() => {
-              all.value = !all.value;
-            }}
-          >
-            {all.value ? "Show less" : "Show all"}
-          </button>
-        )}
+        <Fold
+          cut={long.value && !all.value}
+          onOpen={() => {
+            all.value = true;
+          }}
+          label={showAll(jsonLines(tool.parameters))}
+          framed
+        >
+          <div
+            class={all.value ? undefined : "tools-json-cut"}
+            ref={json}
+            dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
+          />
+        </Fold>
       </div>
     </RowsOpen>
   );

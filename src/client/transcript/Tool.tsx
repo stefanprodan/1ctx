@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { loadToolResult, toolResults } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import { onResize } from "../lib/resize.ts";
+import { Fold } from "../ui/Fold.tsx";
 import type { CallNode } from "./rows.ts";
 import {
   displayResult,
@@ -18,9 +19,8 @@ import {
 
 const opened = signal<ReadonlySet<string>>(new Set());
 
-// a value is cut to a few lines with Show all under it, never a scroll
-// box of its own: a scroll box that comes and goes inside the shell's
-// scroll box leaves Chrome's stuck head and foot riding with the rows
+// a value is cut to a few lines, Show all in its fade, never a scroll box
+// of its own; once open it stays whole until the fold closes
 function Value({ text, failed }: { text: string; failed?: boolean }) {
   const open = useSignal(false);
   const long = useSignal(false);
@@ -35,7 +35,13 @@ function Value({ text, failed }: { text: string; failed?: boolean }) {
     return onResize(node, measure);
   }, [text, open, long]);
   return (
-    <>
+    <Fold
+      cut={long.value && !open.value}
+      onOpen={() => {
+        open.value = true;
+      }}
+      label="Show all"
+    >
       <div
         ref={el}
         class={`transcript-tool-value${
@@ -44,19 +50,7 @@ function Value({ text, failed }: { text: string; failed?: boolean }) {
       >
         {text}
       </div>
-      {long.value && (
-        <button
-          type="button"
-          class="btn-text transcript-tool-more"
-          aria-expanded={open.value}
-          onClick={() => {
-            open.value = !open.value;
-          }}
-        >
-          {open.value ? "Show less" : "Show all"}
-        </button>
-      )}
-    </>
+    </Fold>
   );
 }
 

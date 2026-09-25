@@ -242,11 +242,11 @@ describe("the model", () => {
       expect(short.text).toBe(
         '  <server name="flux">\n    one\n    two\n  </server>',
       );
-      expect(short.canToggle).toBe(false);
+      expect(short.cut).toBe(false);
       expect(short.count).toBe(short.text.length);
       const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
       const folded = instructionsBox("flux", long, false);
-      expect(folded.canToggle).toBe(true);
+      expect(folded.cut).toBe(true);
       expect(folded.text.split("\n")).toHaveLength(12);
       expect(instructionsBox("flux", long, true).text.split("\n")).toHaveLength(
         22,
@@ -516,6 +516,9 @@ describe("the page", () => {
         />,
       );
       expect(long).toContain("Show all");
+      // inside the box's fade, the box framed round its foot
+      expect(long).toContain('class="fold fold-inset fold-framed"');
+      expect(long).toMatch(/fold-more">[^<]*<button[^>]*>Show all \d+ lines</);
       const off = render(
         <ServerRow
           server={server({ instructionsOn: false, instructions: "" })}

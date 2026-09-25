@@ -104,15 +104,21 @@ test("a visual file with no title of its own is named by its file", () => {
 test.serial("a file card asks for its text once and folds a long file", () => {
   openedFiles.value = new Map([
     [markdown.key, { status: "done" as const, ...openedAnswer(opens[1]!) }],
+    [code.key, { status: "done" as const, ...openedAnswer(opens[2]!) }],
   ]);
   const html = render(<FileCard card={markdown} />);
   expect(html).toContain("/knowledge/plans/open.md");
   expect(html).toContain('<p class="md-p">the plan</p>');
   expect(html).toContain("filecard-clip");
-  expect(html).toContain('aria-expanded="false"');
-  expect(html).toContain("Show all");
+  // Markdown's blank lines collapse, so only the measure cuts it
+  expect(html).not.toContain("Show all");
   // Copy carries the source, never the rendering
   expect(html).toContain('title="Copy"');
+  // code draws a line per source line: its count cuts it at once
+  const long = render(
+    <FileCard card={{ ...code, file: { ...code.file, lines: 40 } }} />,
+  );
+  expect(long).toContain("Show all 40 lines");
 });
 
 test.serial("a short code file carries its language and no fold", () => {
@@ -127,7 +133,6 @@ test.serial("a short code file carries its language and no fold", () => {
   // file shorter than the fold offers nothing to open
   expect(html).toContain("filecard-clip");
   expect(html).not.toContain("Show all");
-  expect(html).not.toContain("aria-expanded");
 });
 
 test.serial(

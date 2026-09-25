@@ -61,8 +61,7 @@ function LimitField({
           class={`tools-input${error ? " tools-input-invalid" : ""}`}
           name={row.name}
           aria-invalid={error ? true : undefined}
-          type="number"
-          step="any"
+          type="text"
           inputMode="decimal"
           autocomplete="off"
           spellcheck={false}
@@ -85,15 +84,7 @@ function LimitField({
 // stays. The route takes the full set, so a save or a reset sends the
 // other scope's latest saved values beside this one's; the save is
 // built once, so it reads the rows through a ref.
-export function LimitsCard({
-  rows,
-  scope,
-  title,
-}: {
-  rows: LimitRow[];
-  scope: LimitScope;
-  title: string;
-}) {
+export function useLimitsForm(rows: LimitRow[], scope: LimitScope) {
   const own = rows.filter((row) => row.scope === scope);
   const latest = useRef(rows);
   latest.current = rows;
@@ -123,8 +114,26 @@ export function LimitsCard({
         values: withSaved(latest.current, scope, defaultsOf(ownNow())),
       }),
     );
-  const busy = save.busy;
   const changed = own.some((row) => row.changedAt !== null);
+  const type = (name: string, text: string) => {
+    draft.value = { ...draft.value, [name]: text };
+    save.touch();
+  };
+  return { own, draft, form, save, submit, reset, changed, type };
+}
+
+export function LimitsCard({
+  rows,
+  scope,
+  title,
+}: {
+  rows: LimitRow[];
+  scope: LimitScope;
+  title: string;
+}) {
+  const { own, draft, form, save, submit, reset, changed, type } =
+    useLimitsForm(rows, scope);
+  const busy = save.busy;
   return (
     <RowsCard label={title}>
       <form ref={form} onSubmit={submit}>
@@ -136,10 +145,7 @@ export function LimitsCard({
               text={draft.value[row.name] ?? ""}
               busy={busy}
               error={save.fieldError(row.name)}
-              onInput={(text) => {
-                draft.value = { ...draft.value, [row.name]: text };
-                save.touch();
-              }}
+              onInput={(text) => type(row.name, text)}
             />
           ))}
         </div>

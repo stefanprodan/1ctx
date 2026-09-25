@@ -280,6 +280,16 @@
   .rows-list .rows-item-open {
     background: var(--card);
   }
+  /* a list of one row is a field, not a list: it keeps its ground on
+     hover and open, and the chevron and the words light instead */
+  .rows-list > .rows-item:only-child,
+  .rows-list > .rows-item:only-child .rows-line-end:hover {
+    background: transparent;
+  }
+  .rows-list > .rows-item:only-child .rows-toggle:hover .rows-chevron,
+  .rows-list > .rows-item:only-child .rows-toggle:hover .rows-sub {
+    color: var(--fg);
+  }
   .rows-list .rows-note {
     padding: var(--space-3);
   }
@@ -498,9 +508,11 @@
       order: 6;
       white-space: normal;
     }
-    /* a meta with a short form shows only that on a phone */
+    /* a meta with a short form shows only that on a phone, and a sub
+       line marked wide none */
     .rows-meta-long,
-    .rows-meta-wide {
+    .rows-meta-wide,
+    .rows-sub-wide {
       display: none;
     }
     .rows-meta-short {

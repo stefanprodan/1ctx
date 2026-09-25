@@ -4,8 +4,9 @@
 // What the tools page shows and checks without a DOM: the words of
 // each limit, the unit each row is typed in (seconds for a
 // millisecond cap, KB or MB for a byte cap) and the conversion both
-// ways, the range check the server applies, and the lines of the
-// search section, the tabs and when a send carries a built-in.
+// ways, the range check the server applies, the lines of the search
+// section, the visual hosts box, the tabs and when a send carries a
+// built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import {
@@ -13,6 +14,7 @@ import {
   type SearchState,
   type ToolWhen,
 } from "../../../shared/contracts/tool.ts";
+import { parseVisualHosts } from "../../../shared/visual.ts";
 import { parseDomains, type WebAccessMode } from "../../../shared/web.ts";
 import type {
   LimitName,
@@ -25,27 +27,27 @@ import { sentence } from "../../lib/format.ts";
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   rounds: {
     label: "Rounds",
-    text: "Provider turns a send may take, the answer round included.",
+    text: "Provider requests a turn may make, the answer round included.",
   },
   callsPerRound: {
     label: "Calls per round",
     text: "Tool calls one round may launch, in parallel.",
   },
   callsPerSend: {
-    label: "Calls per send",
-    text: "Tool calls a send may launch across its rounds.",
+    label: "Calls per turn",
+    text: "Tool calls a turn may launch across its rounds.",
   },
   toolMs: {
     label: "Tool time",
-    text: "Wall clock spent in tools over a send, every round summed.",
+    text: "Wall clock spent in tools over a turn, every round summed.",
   },
   resultBytes: {
     label: "Result bytes",
-    text: "Stored tool results over a send, weighed before a round launches.",
+    text: "Stored tool results over a turn, weighed before a round launches.",
   },
   toolWorkTokens: {
     label: "Tool-work tokens",
-    text: "Tokens a send may spend on tools before it must answer. Cached input counts as a tenth.",
+    text: "Tokens a turn may spend on tools before it must answer. Cached input counts as a tenth.",
   },
   callTimeoutMs: {
     label: "Call timeout",
@@ -56,16 +58,16 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     text: "Characters a result is cut to before the model reads it.",
   },
   maxBashCalls: {
-    label: "Bash calls per send",
-    text: "bash calls a send may make.",
+    label: "Bash calls per turn",
+    text: "bash calls a turn may make.",
   },
   maxFetches: {
-    label: "Fetches per send",
-    text: "webfetch calls a send may make. Zero keeps the tool but spends nothing.",
+    label: "Fetches per turn",
+    text: "webfetch calls a turn may make. Zero keeps the tool but spends nothing.",
   },
   maxSearches: {
-    label: "Searches per send",
-    text: "websearch calls a send may make. Zero keeps the tool but spends nothing.",
+    label: "Searches per turn",
+    text: "websearch calls a turn may make. Zero keeps the tool but spends nothing.",
   },
   fetchBodyBytes: {
     label: "Fetch body",
@@ -77,15 +79,15 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   visualBytes: {
     label: "Visual size",
-    text: "Bytes one visual's HTML may contain.",
+    text: "The size one visual may reach.",
   },
   visualSendBytes: {
-    label: "Visual bytes per send",
-    text: "Bytes of HTML a send may accept across its visuals.",
+    label: "Visual bytes per turn",
+    text: "The size of all visuals in a turn.",
   },
   maxVisuals: {
-    label: "Visuals per send",
-    text: "visualize calls a send may draw.",
+    label: "Visuals per turn",
+    text: "Tool calls a turn may draw.",
   },
   fetchDeadlineMs: {
     label: "Fetch deadline",
@@ -109,7 +111,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   memoryPhaseRounds: {
     label: "Memory rounds",
-    text: "Provider turns an automation may spend updating its memory.",
+    text: "Provider requests an automation may make updating its memory.",
   },
   runDeadlineMs: {
     label: "Run deadline",
@@ -200,7 +202,17 @@ export const VARIANT_WHEN_WORDS =
   "Sent in the step after a run that updates its own memory.";
 
 export const NAMES_WORDS =
-  "Shown without names. Each skill or tool name a send lists adds tokens.";
+  "Shown without names. Each skill or tool name listed adds tokens.";
+
+// the lines of a schema as the server renders it, for Show all
+export function jsonLines(parameters: unknown): number {
+  return JSON.stringify(parameters, null, 2).split("\n").length;
+}
+
+// the lines of the hosts box that hold something, for its count
+export function hostsCount(text: string): number {
+  return text.split("\n").filter((line) => line.trim() !== "").length;
+}
 
 // a card's tokens: every schema in it together
 export function totalTokens(rows: { tokens: number }[]): number {
@@ -208,11 +220,12 @@ export function totalTokens(rows: { tokens: number }[]): number {
 }
 
 // the page's tabs, each an address
-export type ToolsTab = "builtin" | "web" | "limits";
+export type ToolsTab = "builtin" | "web" | "visuals" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
   { tab: "builtin", label: "Built-in", href: "/admin/tools" },
   { tab: "web", label: "Web", href: "/admin/tools/web" },
+  { tab: "visuals", label: "Visuals", href: "/admin/tools/visuals" },
   { tab: "limits", label: "Limits", href: "/admin/tools/limits" },
 ];
 
@@ -360,20 +373,33 @@ export function searchLine(state: SearchState, mode: WebAccessMode): string {
   return `${line}.`;
 }
 
-export type HostEdit =
-  | { type: "add"; host: string }
-  | { type: "remove"; host: string }
-  | { type: "reset" };
+// what the section says beside the box
+export function hostsLine(hosts: readonly string[]): string {
+  return hosts.length === 0
+    ? "No CDNs. Visuals use inline code only."
+    : "Visuals load scripts, styles and fonts only from these CDNs.";
+}
 
-export function editHosts(hosts: readonly string[], edit: HostEdit): string[] {
-  switch (edit.type) {
-    case "add":
-      return [...hosts, edit.host.trim()];
-    case "remove":
-      return hosts.filter((host) => host !== edit.host);
-    case "reset":
-      return [...DEFAULT_VISUAL_HOSTS];
+// whether the list is the one a fresh instance starts with
+export function defaultHosts(hosts: readonly string[]): boolean {
+  return (
+    hosts.length === DEFAULT_VISUAL_HOSTS.length &&
+    DEFAULT_VISUAL_HOSTS.every((host, i) => hosts[i] === host)
+  );
+}
+
+// the box as typed to the list a save sends, or the words for its field
+export function hostsOf(text: string): { hosts: string[] } | { error: string } {
+  const result = parseVisualHosts(text.split("\n"));
+  if (!result.ok) {
+    return {
+      error:
+        result.value === ""
+          ? sentence(result.error)
+          : `Line ${result.line}, ${result.value}, ${result.error}.`,
+    };
   }
+  return { hosts: result.hosts };
 }
 
 export function hostsFieldOf(message: string): "hosts" | undefined {

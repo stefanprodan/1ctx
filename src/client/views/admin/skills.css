@@ -56,10 +56,6 @@
     flex-direction: column;
     gap: var(--space-3);
   }
-  .skills-toggle {
-    align-self: flex-start;
-  }
-
   .skills-actions {
     display: flex;
     align-items: center;

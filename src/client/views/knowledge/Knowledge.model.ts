@@ -88,13 +88,13 @@ export const TEXT_LINES = 12;
 export function textBox(
   text: string,
   expanded: boolean,
-): { text: string; canToggle: boolean; label: string } {
+): { text: string; cut: boolean; label: string } {
   const lines = text.replace(/\n$/, "").split("\n");
-  const canToggle = lines.length > TEXT_LINES;
+  const cut = lines.length > TEXT_LINES;
   return {
-    text: canToggle && !expanded ? lines.slice(0, TEXT_LINES).join("\n") : text,
-    canToggle,
-    label: expanded ? "Show less" : `Show all ${plural(lines.length, "line")}`,
+    text: cut && !expanded ? lines.slice(0, TEXT_LINES).join("\n") : text,
+    cut,
+    label: `Show all ${plural(lines.length, "line")}`,
   };
 }
 

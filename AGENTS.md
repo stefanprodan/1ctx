@@ -1137,8 +1137,8 @@ violation, and every rule has a rejected fixture under
   phase offers the own-note `memory_edit` alone.
   Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
-  a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
-  `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
+  a key. The Tools page has four tabs, one view over `/admin/tools` (Built-in),
+  `/admin/tools/web`, `/admin/tools/visuals` and `/admin/tools/limits`: Built-in lists every
   built-in schema, including `bash`, `webfetch` and `websearch`, by name from
   `tools/catalog.ts`, built by the send's own factories with sample
   inputs (name enums empty, `memory_edit` the chat's with the own-note
@@ -1149,14 +1149,13 @@ violation, and every rule has a rejected fixture under
   provider and key presence), and `visualize` (its switch and hosts).
   The one `PATCH /api/tools/:name` descriptor accepts web mode/domains,
   websearch provider, or visualize enabled/hosts, never webfetch.
-  On the page Web is four cards. Web access (`WebAccessCard.tsx`) has
+  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
   its modes, Off, All domains and Listed domains, in the card's head as
   `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
   and All domains save on the click, Listed domains opens the hosts box,
   checked through `parseDomains()` in `shared/web.ts`, and saves the mode
   with the list. Web search is the providers as radio rows with None
-  first. Visuals is the visualize row with its switch and its hosts with
-  Add, Remove and Reset, apart from web access. Credentials
+  first. Credentials
   (`CredentialsCard.tsx`, its words and bodies in
   `CredentialsCard.model.ts`, the rows and `http-` keys in
   `data/credentials.ts`, loaded by the Web route) is `Rows`: the name
@@ -1166,10 +1165,21 @@ violation, and every rule has a rejected fixture under
   methods as boxes (GET and HEAD new), the rail's team projects as
   `RowsCheck` lines, a PATCH sending only the fields changed, and
   Delete asked once.
-  The hosts field warns that loaded URLs can send the visual's data;
-  each card's head has its total. Limits is a form per scope (Per send,
-  Per call, Knowledge, Scheduled tasks), each saving the full set with
-  the other scopes' saved values. A change on the Tools page applies to
+  The Visuals tab is settings sections, apart from web access: Tools,
+  the visualize row in a `RowsList` with its tokens and its switch
+  (name and switch alone on a phone); CDNs (`VisualHosts.tsx`), a box
+  of origins one per line checked through `parseVisualHosts()` in
+  `shared/visual.ts` (the rule the server's `parseHosts()` runs per
+  entry), saved whole, Reset to defaults beside Save and the count of
+  the box's lines at the line's end; and Limits (`LimitsSection.tsx`,
+  the `visuals` scope over `useLimitsForm()` from `LimitsCard.tsx`),
+  the fields side by side. While visualize is off its row is `off`
+  with Off in place of its tokens, and both sections are `Section`'s `off`, faded with every field and
+  button disabled, the saved values kept. Limit fields are text boxes with
+  `inputmode="decimal"`, never number inputs. An open tool row's
+  parameters are cut by `ui/Fold.tsx`, framed. Limits is a form per scope (Per turn, Per call,
+  Knowledge, Scheduled tasks), each saving the full set with the other
+  scopes' saved values. A change on the Tools page applies to
   the next send, a run cap to the next admission; a send in flight
   keeps the caps and the set it started on. A round's calls run in
   parallel under the call timeout and the send's signal. A tool row is
@@ -1335,12 +1345,15 @@ violation, and every rule has a rejected fixture under
   itself a link (a stream row's author, an automation row's agent).
 - **Every list is `ui/Rows.tsx`.** Cards of rows in a 960px column
   on a page, and `RowsList` (under `RowsListHead`) for the same rows
-  inset in a form or an open row. A row is `RowsOpen` (opens in
+  inset in a form or an open row; a `RowsList` of one row keeps its
+  ground on hover and open, the chevron and the words lighting instead.
+  A row is `RowsOpen` (opens in
   place), `RowsGo` (a link, `end` for a button outside it),
   `RowsButton` (an action) or `RowsLine` (neither; `as="label"` for a
   pick, `off` when it cannot be picked). Its head is only
   `RowsAvatar`, `RowsTitle` (mono for an identifier, `bad` for a
-  failed line) and `RowsMeta` (centred at the right; `short` is all a phone shows), with
+  failed line, `subWide` for a sub line a phone leaves out) and
+  `RowsMeta` (centred at the right; `short` is all a phone shows), with
   `RowsTag`, `RowsHandle` and `RowsBad` inside a line; its end is
   `RowsEnd` (buttons, after the words that ask or the failure),
   `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first
@@ -1397,8 +1410,8 @@ violation, and every rule has a rejected fixture under
   words from `Automations.model.ts` (the expression when the shape is
   unknown), each leading to the automation's page, `/automations/:id`,
   where the rail marks its project through `automationProject`: the
-  brief (schedule, zone, agent, the instructions cut to four lines with
-  Show more, and at its foot the next run, or "Waiting for a free slot
+  brief (schedule, zone, agent, the instructions cut to six lines with
+  Show all, and at its foot the next run, or "Waiting for a free slot
   since 09:00" while the row is not suspended and its `nextAt` is past
   the page's clock by `WAIT_GRACE_MS`, which the Automations tab's row says first as
   waiting for a slot; no field carries it), then Suspend or Resume,
@@ -1441,9 +1454,16 @@ violation, and every rule has a rejected fixture under
   `accessOf()`) says Web access Off, Visuals Off, and names the
   credentials (only while the web is on), the servers and the skills
   off, and nothing while all is on.
-  A settings page (the profile, a project's Settings) stacks
-  `ui/Section.tsx`: a title and a line at the left, a `SectionForm` at
-  the right. The profile's aside is the account (email, role, joined),
+  A settings page (the profile, a project's Settings, the Tools
+  page's Visuals tab) stacks `ui/Section.tsx`: a title and a line at
+  the left, a `SectionForm` at the right. `section.css` holds the parts
+  a form puts there: `.section-label` with a `.section-fact` (a
+  changed value's default), `.section-grid` of short fields,
+  `.section-number` (a value with its unit inside the box) and
+  `.section-lines` (a box of entries); `Foot`'s `after` puts Reset
+  beside Save and a count (`.section-fact-end`) at the line's end.
+  `off` fades a section whose setting does nothing now; the view
+  disables its fields. The profile's aside is the account (email, role, joined),
   its head the name and the handle, and the email where the aside is
   hidden. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
@@ -1580,7 +1600,14 @@ violation, and every rule has a rejected fixture under
   No box that comes and goes inside the shell's scroll box scrolls on
   its own: one that does (a tool value under a fold) leaves Chrome's
   stuck head and foot riding with the rows until a reload, so a long
-  value is cut with `overflow: clip` and opens with Show all.
+  value is cut with `overflow: clip` and opens with Show all. Every cut
+  block goes through `ui/Fold.tsx`: its foot fades into the ground it
+  sits on (`ground`: inset, card or page) with Show all inside the fade,
+  `framed` drawing a boxed block's border round the foot; once open it
+  stays whole until the row or fold around it closes. Show all names
+  the lines (`showAll()` in `lib/format.ts`) where the cut is by lines,
+  and is bare where lines wrap (a tool value, a prompt, an automation's
+  instructions); pressed, it goes and the focus moves to the block.
 - **Two themes, one set of names.** `tokens.css` defines every colour
   twice: dark on `:root`, light on `:root[data-theme="light"]`; no
   other stylesheet knows the theme. `app/theme.ts` sets `data-theme`
@@ -1626,7 +1653,8 @@ violation, and every rule has a rejected fixture under
   `test.serial`.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
-- UI copy is short and plain. No em-dashes anywhere. `perl -i -pe` for
+- UI copy is short and plain. No em-dashes anywhere. A send is a turn
+  in a chat and a run in a task; the page never says send. `perl -i -pe` for
   global replaces, `uv run` for ad hoc Python, never pip.
 - Do not edit the brand SVGs and PNGs in `site/` by hand; change
   `scripts/brand.py` or the numbers in `site/README.md` and regenerate.

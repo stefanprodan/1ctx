@@ -200,14 +200,15 @@ describe("the knowledge words", () => {
   test("the text folds at twelve lines and says how many there are", () => {
     const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
     const folded = textBox(long, false);
-    expect(folded.canToggle).toBe(true);
+    expect(folded.cut).toBe(true);
     expect(folded.text.split("\n")).toHaveLength(12);
     expect(folded.label).toBe("Show all 20 lines");
     const open = textBox(long, true);
     expect(open.text).toBe(long);
-    expect(open.label).toBe("Show less");
+    // open stays open: the row folds it again
+    expect(open.label).toBe("Show all 20 lines");
     const short = textBox("one\ntwo\n", false);
-    expect(short.canToggle).toBe(false);
+    expect(short.cut).toBe(false);
     expect(short.text).toBe("one\ntwo\n");
   });
 

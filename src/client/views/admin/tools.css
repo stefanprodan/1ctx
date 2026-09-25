@@ -1,4 +1,5 @@
-/* Tools: the schema an open row shows, and the limits form. */
+/* Tools: the schema an open row shows, the boxes of hosts and the
+   limits form. */
 
 @layer tokens, base, owners;
 
@@ -20,9 +21,6 @@
     max-height: 320px;
     overflow: clip;
   }
-  .tools-toggle {
-    align-self: flex-start;
-  }
 
   .tools-form {
     display: flex;
@@ -31,22 +29,15 @@
     padding: var(--space-4);
   }
 
-  .tools-hosts {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
-  }
-
-  /* the hosts of Listed domains, under the card's note, so the form
-     gives up its top room */
-  .tools-web {
+  /* a box of lines under the card's note, the hosts of Listed domains
+     and the visual hosts, so the form gives up its top room */
+  .tools-lines {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
     padding: 0 var(--space-4) var(--space-4);
   }
-  .tools-web-domains {
+  .tools-lines-box {
     min-height: 120px;
     font-family: var(--mono);
     font-size: var(--text-label);
@@ -102,12 +93,6 @@
     font-size: var(--text-mono);
     color: var(--fg);
     text-align: right;
-    appearance: textfield;
-  }
-  .tools-input::-webkit-inner-spin-button,
-  .tools-input::-webkit-outer-spin-button {
-    appearance: none;
-    margin: 0;
   }
   .tools-input:focus {
     border-color: var(--line-strong);

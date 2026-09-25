@@ -1,5 +1,7 @@
 /* A settings section: the head at the left, the form at the right, a
-   rule above; one column below 720. */
+   rule above; one column below 720. The parts a form puts in it: a
+   label with a fact, a grid of short fields, a number with its unit, a
+   box of lines. */
 
 @layer tokens, base, owners;
 
@@ -40,8 +42,80 @@
     gap: var(--space-4);
     min-width: 0;
   }
+  .section-off .section-form {
+    opacity: 0.5;
+  }
+
+  /* a field's label with a fact at its right: the default of a
+     changed value */
+  .section-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .section-fact {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  /* a count on the buttons' line, at its end */
+  .section-fact-end {
+    margin-left: auto;
+  }
+
+  /* short fields side by side, one under the other on a phone */
+  .section-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+
+  /* a number with its unit inside the box */
+  .section-number {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    padding-right: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+    border: 1px solid var(--line);
+  }
+  .section-number:focus-within {
+    border-color: var(--line-strong);
+  }
+  .section-number .section-number-input {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    border: 0;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+  }
+  .section-number .section-number-input:focus-visible {
+    outline: 0;
+  }
+  .section-number-unit {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .section-number-invalid {
+    border-color: var(--failed);
+  }
+
+  /* a box of lines, one entry each */
+  .section-lines {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
 
   @media (max-width: 719px) {
+    .section-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
     .section {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--space-4);

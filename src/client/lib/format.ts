@@ -154,3 +154,8 @@ export function failure(err: unknown): Failure {
       : null;
   return { words: reason(err), status: status === 0 ? null : status };
 }
+
+// what a cut block's Show all says: the lines the whole block holds
+export function showAll(lines: number): string {
+  return `Show all ${lines} ${lines === 1 ? "line" : "lines"}`;
+}

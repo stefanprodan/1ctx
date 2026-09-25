@@ -15,14 +15,18 @@ import {
 import { Save } from "../../../src/client/lib/save.ts";
 import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
-  editHosts,
+  defaultHosts,
+  hostsCount,
   hostsFieldOf,
+  hostsOf,
 } from "../../../src/client/views/admin/Tools.model.ts";
+import { VisualHosts } from "../../../src/client/views/admin/VisualHosts.tsx";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import {
   DEFAULT_VISUAL_HOSTS,
   type WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
+import { parseVisualHosts } from "../../../src/shared/visual.ts";
 
 const visual: WebToolSummary = {
   name: "visualize",
@@ -45,53 +49,55 @@ const response = (hosts: string[]): ToolsResponse => ({
   },
 });
 
-describe("visual host edits", () => {
-  test("adds a host without changing the saved list", () => {
-    const hosts = ["https://cdn.example.com"];
+describe("the visual hosts box", () => {
+  test("reads lines as origins, trimmed, deduped and sorted", () => {
     expect(
-      editHosts(hosts, { type: "add", host: " HTTPS://CDN.EXAMPLE.COM/ " }),
-    ).toEqual(["https://cdn.example.com", "HTTPS://CDN.EXAMPLE.COM/"]);
-    expect(hosts).toEqual(["https://cdn.example.com"]);
+      hostsOf(" HTTPS://Z.TEST/ \n\nhttps://a.test\nhttps://z.test:443\n"),
+    ).toEqual({ hosts: ["https://a.test", "https://z.test"] });
+    expect(hostsOf("")).toEqual({ hosts: [] });
+    expect(hostsOf("\n  \n")).toEqual({ hosts: [] });
   });
 
-  test("leaves origin validation and normalization to the server", () => {
-    for (const host of [
-      "http://cdn.example.com",
-      "https://cdn.example.com/path",
-      "https://cdn.example.com?q=1",
-      "https://cdn.example.com:8443",
-      "https://*.example.com",
+  test("names the first line that is not an origin", () => {
+    expect(hostsOf("https://a.test\nhttp://b.test")).toEqual({
+      error: "Line 2, http://b.test, is not an HTTPS origin.",
+    });
+    for (const line of [
+      "https://a.test/path",
+      "https://a.test:8443",
+      "https://*.test",
+      "https://user@a.test",
+      "cdn.example.com",
     ]) {
-      expect(editHosts([], { type: "add", host })).toEqual([host]);
+      expect(hostsOf(line)).toEqual({
+        error: `Line 1, ${line}, is not an HTTPS origin.`,
+      });
     }
-    const hosts = Array.from(
-      { length: 16 },
-      (_, index) => `https://cdn${index}.example.com`,
-    );
-    expect(
-      editHosts(hosts, { type: "add", host: "https://extra.example.com" }),
-    ).toHaveLength(17);
   });
 
-  test("removes from the current list, including its last host", () => {
-    const hosts = ["https://cdn.example.com", "https://mirror.example.com"];
-    expect(
-      editHosts(hosts, { type: "remove", host: "https://cdn.example.com" }),
-    ).toEqual(["https://mirror.example.com"]);
-    expect(editHosts([hosts[0]!], { type: "remove", host: hosts[0]! })).toEqual(
-      [],
-    );
-    expect(hosts).toHaveLength(2);
+  test("caps the list the server caps", () => {
+    const lines = Array.from({ length: 17 }, (_, i) => `https://h${i}.test`);
+    expect(hostsOf(lines.slice(0, 16).join("\n"))).toMatchObject({
+      hosts: expect.any(Array),
+    });
+    expect(hostsOf(lines.join("\n"))).toEqual({ error: "At most 16 hosts." });
+    // a repeat counts once
+    expect(parseVisualHosts([...lines.slice(0, 16), lines[0]!])).toMatchObject({
+      ok: true,
+    });
   });
 
-  test("reset takes a fresh copy of the shared defaults", () => {
-    const reset = editHosts([], { type: "reset" });
-    expect(reset).toEqual([...DEFAULT_VISUAL_HOSTS]);
-    expect(reset).not.toBe(DEFAULT_VISUAL_HOSTS);
-    reset.pop();
-    expect(editHosts(visual.hosts, { type: "reset" })).toEqual([
-      ...DEFAULT_VISUAL_HOSTS,
-    ]);
+  test("counts the lines that hold something", () => {
+    expect(hostsCount("")).toBe(0);
+    expect(hostsCount("https://a.test\n\n  \nhttps://b.test\n")).toBe(2);
+    expect(hostsCount("not an origin")).toBe(1);
+  });
+
+  test("knows the defaults, in the stored order", () => {
+    expect(defaultHosts([...DEFAULT_VISUAL_HOSTS])).toBe(true);
+    expect(defaultHosts([...DEFAULT_VISUAL_HOSTS].reverse())).toBe(false);
+    expect(defaultHosts(DEFAULT_VISUAL_HOSTS.slice(1))).toBe(false);
+    expect(defaultHosts([])).toBe(false);
   });
 
   test("the server's host refusals name the host field", async () => {
@@ -121,12 +127,9 @@ describe("visual host edits", () => {
     expect(hostsFieldOf("the server could not save")).toBeUndefined();
   });
 
-  test("a failed Remove or Reset uses the shared form's notice", async () => {
+  test("a failed Reset uses the shared form's notice", async () => {
     const save = new Save(async () => {}, 0, hostsFieldOf);
-    for (const action of [
-      "remove https://cdn.example.com",
-      "reset the hosts",
-    ]) {
+    for (const action of ["reset the hosts"]) {
       await save.act(action, async () => {
         throw new ApiError(500, "the server could not save");
       });
@@ -194,22 +197,14 @@ describe("the visual hosts entity", () => {
       }) as unknown as typeof fetch;
 
       await patchTool("visualize", {
-        hosts: editHosts(visual.hosts, {
-          type: "add",
-          host: "HTTPS://MIRROR.EXAMPLE.COM/",
-        }),
+        hosts: ["https://cdn.example.com", "HTTPS://MIRROR.EXAMPLE.COM/"],
       });
       expect(tools.value?.visualize.hosts).toEqual(canonical);
-      await patchTool("visualize", {
-        hosts: editHosts(tools.value!.visualize.hosts, {
-          type: "remove",
-          host: canonical[0]!,
-        }),
-      });
+      await patchTool("visualize", { hosts: [canonical[1]!] });
       expect(tools.value?.visualize.hosts).toEqual([canonical[1]!]);
       await patchTool("visualize", { hosts: [] });
       expect(tools.value?.visualize.hosts).toEqual([]);
-      await patchTool("visualize", { hosts: editHosts([], { type: "reset" }) });
+      await patchTool("visualize", { hosts: [...DEFAULT_VISUAL_HOSTS] });
       expect(tools.value?.visualize.hosts).toEqual([...DEFAULT_VISUAL_HOSTS]);
       expect(bodies).toEqual([
         { hosts: ["https://cdn.example.com", "HTTPS://MIRROR.EXAMPLE.COM/"] },
@@ -255,56 +250,78 @@ describe("the visual hosts entity", () => {
   });
 });
 
-describe("the visual hosts row", () => {
-  test("opens one form with the list, add, remove, reset and disclosure", () => {
-    const html = render(<ToolRow tool={visual} open onToggle={() => {}} />);
+describe("the CDNs section", () => {
+  let held: typeof tools.value;
+  beforeEach(() => {
+    held = tools.value;
+  });
+  afterEach(() => {
+    tools.value = held;
+  });
+
+  test.serial("one form: the box, Save, Reset to defaults, the count", () => {
+    tools.value = response(["https://a.example.com", "https://b.example.com"]);
+    const html = render(<VisualHosts off={false} />);
     expect(html.match(/<form/g)).toHaveLength(1);
-    expect(html).toContain('class="rows-list"');
-    expect(html).toContain("Allowed hosts");
-    expect(html).toContain("https://cdn.example.com");
-    expect(html).toContain('aria-label="Remove https://cdn.example.com"');
-    expect(html).toContain('name="hosts"');
-    expect(html).toContain(">Add</span>");
-    expect(html).toContain(">Reset</button>");
+    expect(html).toContain('<h2 class="section-title">CDNs</h2>');
+    expect(html).toContain('aria-label="CDNs"');
+    expect(html).toMatch(/section-fact-end">2 of 16</);
+    expect(html).toMatch(
+      /<textarea name="hosts"[^>]*>https:\/\/a\.example\.com\nhttps:\/\/b\.example\.com</,
+    );
     expect(html).toContain(
-      "Allowed hosts receive whatever a visual puts in its URLs.",
+      "Visuals load scripts, styles and fonts only from these CDNs.",
     );
-    expect(html).toContain("Description for agents");
-    expect(html).toContain('role="switch"');
-    expect(html).not.toContain('type="url"');
+    expect(html).not.toContain('class="hint"');
+    expect(html).toMatch(/foot-label-on">Save</);
+    // nothing to save until the box is edited, Save first, Reset beside it
+    expect(html).toMatch(/type="submit"[^>]*disabled/);
+    expect(html).toMatch(/<button type="button" class="btn">Reset to defaults/);
+    expect(html.indexOf('type="submit"')).toBeLessThan(
+      html.indexOf("Reset to defaults"),
+    );
+    expect(html).not.toContain('role="switch"');
   });
 
-  test("an empty list explains inline visuals and still allows Add or Reset", () => {
-    const html = render(
-      <ToolRow tool={{ ...visual, hosts: [] }} open onToggle={() => {}} />,
-    );
-    expect(html).toContain("No hosts allowed. Visuals use inline code only.");
-    expect(html).toContain(">Add</span>");
-    expect(html).toContain(">Reset</button>");
-    expect(html).not.toContain(">Remove</button>");
+  test.serial("an empty list says visuals use inline code", () => {
+    tools.value = response([]);
+    const html = render(<VisualHosts off={false} />);
+    expect(html).toContain("No CDNs. Visuals use inline code only.");
+    expect(html).toMatch(/section-fact-end">0 of 16</);
+    expect(html).toContain('placeholder="https://cdn.example.com"');
   });
 
-  test("the host form is only on an open visualize row", () => {
+  test.serial("Reset waits while the list is the defaults", () => {
+    tools.value = response([...DEFAULT_VISUAL_HOSTS]);
+    expect(render(<VisualHosts off={false} />)).toMatch(
+      /<button type="button" class="btn" disabled>Reset to defaults/,
+    );
+  });
+
+  test.serial("off with visualize: faded, locked, the list kept", () => {
+    tools.value = response(["https://a.example.com"]);
+    const html = render(<VisualHosts off />);
+    expect(html).toContain('class="section section-off"');
+    expect(html).toMatch(/<textarea name="hosts"[^>]*disabled/);
+    expect(html).toMatch(/type="submit"[^>]*disabled/);
+    expect(html).toMatch(/<button type="button" class="btn" disabled>Reset/);
+    expect(html).toContain("https://a.example.com");
+    // the row says it is off, the word in place of its tokens
+    const row = render(
+      <ToolRow
+        tool={{ ...visual, enabled: false }}
+        open={false}
+        onToggle={() => {}}
+      />,
+    );
+    expect(row).toContain("rows-item-off");
+    expect(row).toContain('rows-meta-long">Off<');
+    expect(row).not.toContain("tokens");
+  });
+
+  test("the visualize row carries no hosts form", () => {
     expect(
-      render(<ToolRow tool={visual} open={false} onToggle={() => {}} />),
-    ).not.toContain("<form");
-    expect(
-      render(
-        <ToolRow
-          tool={{
-            name: "webfetch",
-            description: visual.description,
-            parameters: visual.parameters,
-            parametersHtml: visual.parametersHtml,
-            tokens: visual.tokens,
-            when: "web",
-            names: false,
-            variant: null,
-          }}
-          open
-          onToggle={() => {}}
-        />,
-      ),
+      render(<ToolRow tool={visual} open onToggle={() => {}} />),
     ).not.toContain("<form");
   });
 });

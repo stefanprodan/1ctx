@@ -217,24 +217,23 @@ export function isModeValue(value: string): value is McpMode {
 }
 
 // the instructions box: the block as the prompt carries it, its first
-// lines when folded; a block of INSTRUCTIONS_LINES or fewer has no toggle
+// lines when folded; a block of INSTRUCTIONS_LINES or fewer is never cut
 export const INSTRUCTIONS_LINES = 12;
 
 export function instructionsBox(
   name: string,
   instructions: string,
   expanded: boolean,
-): { text: string; canToggle: boolean; count: number } {
+): { text: string; cut: boolean; count: number; lines: number } {
   const block = serverBlock(name, instructions).replace(/\n$/, "");
   const lines = block.split("\n");
-  const canToggle = lines.length > INSTRUCTIONS_LINES;
+  const cut = lines.length > INSTRUCTIONS_LINES;
   return {
     text:
-      canToggle && !expanded
-        ? lines.slice(0, INSTRUCTIONS_LINES).join("\n")
-        : block,
-    canToggle,
+      cut && !expanded ? lines.slice(0, INSTRUCTIONS_LINES).join("\n") : block,
+    cut,
     count: block.length,
+    lines: lines.length,
   };
 }
 

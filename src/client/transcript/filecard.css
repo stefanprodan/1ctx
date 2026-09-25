@@ -60,8 +60,4 @@
     font-size: var(--text-ui);
     overflow-wrap: anywhere;
   }
-  .filecard-more {
-    align-self: flex-start;
-    padding-block-start: var(--space-2);
-  }
 }
