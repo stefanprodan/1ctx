@@ -6,8 +6,9 @@
 // RowsOpen (opens in place), RowsGo (a link), RowsButton (an action) or
 // RowsLine (neither); its head is only the parts below: RowsAvatar,
 // RowsTitle, RowsMeta, and at its end RowsEnd, RowsSwitch, RowsCheck or
-// a small button. A view fills the rows and styles only what an open
-// row's body holds; a new list never draws a row of its own.
+// a small button. RowsTree is the rows of a folder tree. A view fills
+// the rows and styles only what an open row's body holds; a new list
+// never draws a row of its own.
 
 import type { ComponentChildren } from "preact";
 import { useId } from "preact/hooks";
@@ -22,6 +23,7 @@ export {
   RowsRadio,
   RowsSwitch,
 } from "./RowsControls.tsx";
+export { RowsTree, type RowsTreeNode } from "./RowsTree.tsx";
 
 // the page's column of cards
 export function Rows({ children }: { children: ComponentChildren }) {
@@ -194,14 +196,18 @@ export function RowsLine({
 }
 
 // a row that leads to its page: the line is the link, with the arrow
-// at its end; `end`, a button, sits outside the link after the arrow
+// at its end; `end`, a button, sits outside the link after the arrow;
+// `under` is what belongs to the row below its line, links of its own
+// (a search hit's lines), inside the row's rule
 export function RowsGo({
   href,
   end,
+  under,
   children,
 }: {
   href: string;
   end?: ComponentChildren;
+  under?: ComponentChildren;
   children: ComponentChildren;
 }) {
   // the arrow marks the line's end; a row with a button there leaves it
@@ -222,6 +228,7 @@ export function RowsGo({
           {end}
         </div>
       )}
+      {under}
     </div>
   );
 }

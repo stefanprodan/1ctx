@@ -15,7 +15,15 @@ import { readTheme, VisualPlayer, type VisualStatus } from "./Visual.model.ts";
 import type { VisualCard } from "./visuals.ts";
 import "./visual.css";
 
-export function Visual({ card }: { card: VisualCard }) {
+export function Visual({
+  card,
+  text,
+}: {
+  card: VisualCard;
+  // a stored text drawn as it is, a knowledge file's page: no load, no
+  // head, the page names it
+  text?: { title: string; html: string };
+}) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const port = useRef<MessagePort | null>(null);
   const player = useRef<VisualPlayer | null>(null);
@@ -24,7 +32,10 @@ export function Visual({ card }: { card: VisualCard }) {
     height: 80,
     error: null,
   });
-  const stored = toolVisuals.value.get(card.key);
+  const stored =
+    text === undefined
+      ? toolVisuals.value.get(card.key)
+      : { status: "done" as const, ...text };
   const result = card.result;
   // an opened visual is stored bytes: the bash row's own end says
   // nothing about it, so the card never draws the row's failure
@@ -141,16 +152,18 @@ export function Visual({ card }: { card: VisualCard }) {
       data-visual={card.key}
       data-state={current.state}
     >
-      <div class="visual-head">
-        <span class="visual-title">
-          {stored?.status === "done" ? stored.title : card.title}
-        </span>
-        {drawing && (
-          <span class="visual-state">
-            {failed ? "Loading failure" : "Drawing"}
+      {text === undefined && (
+        <div class="visual-head">
+          <span class="visual-title">
+            {stored?.status === "done" ? stored.title : card.title}
           </span>
-        )}
-      </div>
+          {drawing && (
+            <span class="visual-state">
+              {failed ? "Loading failure" : "Drawing"}
+            </span>
+          )}
+        </div>
+      )}
       <div class="visual-scroll">
         {current.state !== "navigated" && (
           <iframe

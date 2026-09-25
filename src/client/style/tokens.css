@@ -38,6 +38,8 @@
     /* the mark's sparkle, the brand book's amber for each ground */
     --sparkle: #f2c14e;
     --brand-hover: #f7d27a;
+    /* a search's match, on the pointer's fill: 4.5:1 in small text */
+    --mark: #f2c14e;
     --running: #60a5fa;
     --done: #4ade80;
     --failed: #f87171;
@@ -111,6 +113,7 @@
        ground */
     --brand: #a06800;
     --brand-hover: #7e5200;
+    --mark: #855700;
     --sparkle: #d9a53a;
     --running: #1d5fd6;
     --done: #1b7a3d;

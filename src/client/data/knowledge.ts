@@ -18,6 +18,7 @@ import type {
   KnowledgeListResponse,
   KnowledgeVersionDetailResponse,
   KnowledgeVersionsResponse,
+  RenameKnowledgeFileRequest,
   ReplaceKnowledgeFileRequest,
 } from "../../shared/api/knowledge.ts";
 import type {
@@ -31,9 +32,13 @@ import type {
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api, upload } from "./api.ts";
+import { capped } from "./knowledge-rows.ts";
 import { me } from "./me.ts";
 import { project } from "./projects.ts";
 import { onSocketEvent } from "./socket.ts";
+
+// the projects whose lists are held, the least recent dropped past it
+const HELD_LISTS = 16;
 
 // the list by project id, the texts and the versions by file id, and a
 // version's text by version id
@@ -123,14 +128,32 @@ function put(projectId: string, list: KnowledgeList): void {
         if (revisions.get(file.id) !== file.revision) dropCached(file.id);
       }
     }
-    const next = new Map(lists.value);
-    next.set(projectId, shaped);
+    const next = capped(lists.value, projectId, shaped, HELD_LISTS);
+    for (const [id, list] of lists.value) {
+      if (!next.has(id)) dropFilesOf(list);
+    }
     lists.value = next;
     if (listErrors.value.has(projectId)) {
       const errors = new Map(listErrors.value);
       errors.delete(projectId);
       listErrors.value = errors;
     }
+  });
+}
+
+function dropFilesOf(list: KnowledgeList): void {
+  for (const file of [...list.files, ...list.deleted]) dropCached(file.id);
+}
+
+// a project gone from view, or a load of it failed: nothing of it stays
+function dropList(projectId: string): void {
+  const held = lists.value.get(projectId);
+  if (held === undefined) return;
+  batch(() => {
+    dropFilesOf(held);
+    const next = new Map(lists.value);
+    next.delete(projectId);
+    lists.value = next;
   });
 }
 
@@ -173,17 +196,25 @@ export async function loadKnowledge(projectId: string): Promise<void> {
     }
   } catch (err) {
     if (owner === forUser && turns.get(projectId) === mine) {
-      const errors = new Map(listErrors.value);
-      errors.set(projectId, failure(err));
-      listErrors.value = errors;
+      batch(() => {
+        dropList(projectId);
+        const errors = new Map(listErrors.value);
+        errors.set(projectId, failure(err));
+        listErrors.value = errors;
+      });
     }
   }
 }
 
-// the row the server answered, into the list held
+// the row the server answered, into the list held, unless a frame
+// already brought a later revision of it, a delete included
 function keepFile(projectId: string, file: KnowledgeFile): void {
   const held = lists.value.get(projectId);
   if (held === undefined) return;
+  const seen =
+    held.files.find((row) => row.id === file.id) ??
+    held.deleted.find((row) => row.id === file.id);
+  if (seen !== undefined && seen.revision >= file.revision) return;
   put(projectId, {
     ...held,
     files: [...held.files.filter((row) => row.id !== file.id), file],
@@ -267,8 +298,10 @@ export async function addFile(
     "POST",
     body,
   );
-  bump(projectId);
-  if (owner === forUser) keepFile(projectId, answer.file);
+  if (owner === forUser) {
+    bump(projectId);
+    keepFile(projectId, answer.file);
+  }
   return answer.file;
 }
 
@@ -300,10 +333,33 @@ export async function replaceFile(
     "PUT",
     body,
   );
-  bump(projectId);
-  dropCached(fileId);
-  if (owner === forUser) keepFile(projectId, answer.file);
+  wrote(projectId, answer.file, forUser);
   return answer.file;
+}
+
+// a rename is a write like a replace: the row keeps its id and moves to
+// its new name in the list
+export async function renameKnowledgeFile(
+  projectId: string,
+  fileId: string,
+  body: RenameKnowledgeFileRequest,
+): Promise<KnowledgeFile> {
+  const forUser = owner;
+  const answer = await api<KnowledgeFileResponse>(
+    filePath(projectId, fileId),
+    "PATCH",
+    body,
+  );
+  wrote(projectId, answer.file, forUser);
+  return answer.file;
+}
+
+// an answer for a user no longer signed in touches nothing of the next
+function wrote(projectId: string, file: KnowledgeFile, forUser: string | null) {
+  if (owner !== forUser) return;
+  bump(projectId);
+  dropCached(file.id);
+  keepFile(projectId, file);
 }
 
 // the row goes from the list at once; who deleted it and when come with
@@ -314,10 +370,11 @@ export async function removeFile(
 ): Promise<void> {
   const forUser = owner;
   await api(filePath(projectId, fileId), "DELETE");
+  if (owner !== forUser) return;
   bump(projectId);
   dropCached(fileId);
   const held = lists.value.get(projectId);
-  if (owner !== forUser || held === undefined) return;
+  if (held === undefined) return;
   put(projectId, {
     ...held,
     files: held.files.filter((row) => row.id !== fileId),
@@ -375,6 +432,18 @@ export function applyKnowledge(
 }
 
 export function onKnowledgeSocket(ev: SocketEvent): void {
+  if (ev.type === "revoked") {
+    bump(ev.projectId);
+    batch(() => {
+      dropList(ev.projectId);
+      if (listErrors.value.has(ev.projectId)) {
+        const errors = new Map(listErrors.value);
+        errors.delete(ev.projectId);
+        listErrors.value = errors;
+      }
+    });
+    return;
+  }
   if (ev.type === "knowledgeEmptied") {
     forgetDeleted(ev.projectId);
     return;

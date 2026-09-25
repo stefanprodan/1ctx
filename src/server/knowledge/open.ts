@@ -10,61 +10,11 @@ import {
   VISUAL_FRAME_BYTES,
 } from "../../shared/words.ts";
 import { bytesWords } from "../lib/bytes.ts";
+import { languageOf } from "./languages.ts";
 import { MAX_OPENS_PER_COMMAND } from "./limits.ts";
 import { lineCount, textFromBytes } from "./text.ts";
 
 export type OpenedRecord = OpenedFile & { text: string };
-
-const LANGUAGES: Record<string, string> = {
-  bash: "bash",
-  c: "c",
-  cjs: "javascript",
-  cpp: "cpp",
-  cs: "csharp",
-  css: "css",
-  dart: "dart",
-  diff: "diff",
-  dockerfile: "dockerfile",
-  ex: "elixir",
-  exs: "elixir",
-  go: "go",
-  graphql: "graphql",
-  h: "c",
-  hpp: "cpp",
-  hs: "haskell",
-  html: "xml",
-  ini: "ini",
-  java: "java",
-  js: "javascript",
-  json: "json",
-  jsx: "javascript",
-  kt: "kotlin",
-  lua: "lua",
-  makefile: "makefile",
-  mjs: "javascript",
-  nix: "nix",
-  patch: "diff",
-  php: "php",
-  pl: "perl",
-  proto: "protobuf",
-  py: "python",
-  r: "r",
-  rb: "ruby",
-  rs: "rust",
-  scala: "scala",
-  scss: "scss",
-  sh: "bash",
-  sql: "sql",
-  svg: "xml",
-  swift: "swift",
-  toml: "ini",
-  ts: "typescript",
-  tsx: "typescript",
-  xml: "xml",
-  yaml: "yaml",
-  yml: "yaml",
-  zsh: "bash",
-};
 
 function entity(value: string): string {
   return value.replace(
@@ -196,7 +146,7 @@ export function makeOpenCommand(
       const record: OpenedRecord = {
         path,
         kind,
-        language: kind === "code" ? (LANGUAGES[extension] ?? null) : null,
+        language: kind === "code" ? languageOf(path) : null,
         bytes: Buffer.byteLength(text, "utf8"),
         lines: lineCount(text),
         title: kind === "visual" ? visualTitle(text, path) : null,

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The words of the Knowledge tab and every check it makes, apart from
-// the view so both are read without a DOM: the totals, a row's head
-// line, who wrote it and from where, the text cut to its first lines,
-// the history lines and the Deleted card.
+// the view so both are read without a DOM: the totals, the tree's
+// nodes, who wrote a file and from where, the lists the head switches
+// between, and the marks a search puts on a name or a line.
 
 import type {
   KnowledgeAuthor,
@@ -12,28 +12,59 @@ import type {
   KnowledgeDeleted,
   KnowledgeFile,
   KnowledgeTotals,
-  KnowledgeVersion,
 } from "../../../shared/contracts/knowledge.ts";
 import { ago, count } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
-import { matches } from "../../lib/search.ts";
+import type { IconName } from "../../lib/icons.tsx";
+import { FOLDER_ROWS, type TreeFolder } from "../../lib/tree.ts";
+import type { RowsTreeNode } from "../../ui/Rows.tsx";
 
 // "1 file", "6.6K tokens"
 export function plural(n: number, word: string): string {
   return `${count(n)} ${word}${n === 1 ? "" : "s"}`;
 }
 
-// the card's hint and the aside's line: "6 files · 6.6K tokens"
+// the aside's line: "6 files · 6.6K tokens"
 export function knowledgeWords(counts: KnowledgeCounts | KnowledgeTotals) {
   return `${plural(counts.files, "file")} · ${plural(counts.tokens, "token")}`;
 }
 
-// the rows the search leaves, by name
-export function shownFiles<T extends { name: string }>(
-  files: readonly T[],
-  q: string,
-): T[] {
-  return files.filter((file) => matches(q, [file.name]));
+const project = (projectId: string) =>
+  `/projects/${encodeURIComponent(projectId)}/knowledge`;
+
+// a file's page, at a line when a search hit names one
+export function fileHref(
+  projectId: string,
+  fileId: string,
+  line?: number,
+): string {
+  const at = line === undefined ? "" : `?line=${line}`;
+  return `${project(projectId)}/files/${encodeURIComponent(fileId)}${at}`;
+}
+
+export function newFileHref(projectId: string): string {
+  return `${project(projectId)}/new`;
+}
+
+// the head's three lists, each an address so back and a shared link
+// keep the pick
+export type KnowledgeListName = "files" | "recent" | "deleted";
+
+export function listOf(query: string): KnowledgeListName {
+  const list = new URLSearchParams(query).get("list");
+  return list === "recent" || list === "deleted" ? list : "files";
+}
+
+export function listHref(projectId: string, list: KnowledgeListName): string {
+  return list === "files"
+    ? project(projectId)
+    : `${project(projectId)}?list=${list}`;
+}
+
+// ?folder= opens that folder and its parents; null when absent
+export function folderParam(query: string): string | null {
+  const folder = new URLSearchParams(query).get("folder");
+  return folder === null || folder.trim() === "" ? null : folder;
 }
 
 // who wrote a file and from where: the name as it was at the write, its
@@ -41,8 +72,6 @@ export function shownFiles<T extends { name: string }>(
 export type AuthorWords = {
   name: string;
   href: string;
-  // a user is a handle, an agent is its name
-  handle: boolean;
   where: string | null;
   sessionId: string | null;
 };
@@ -52,7 +81,6 @@ export function authorOf(author: KnowledgeAuthor): AuthorWords {
     name: author.name,
     href:
       author.kind === "user" ? userHref(author.name) : agentHref(author.name),
-    handle: author.kind === "user",
     where:
       author.sessionId === null
         ? null
@@ -63,74 +91,203 @@ export function authorOf(author: KnowledgeAuthor): AuthorWords {
   };
 }
 
-// the faint line under a file's name: "md · 84 lines · sre in a run ·
-// 2h ago"; a name without an extension reads "text"
-export type HeadLine = {
-  kind: string;
-  lines: string;
-  author: AuthorWords;
-  when: string;
-};
+// an agent's write stands out in the tree for this long
+export const FRESH_MS = 3 * 86_400_000;
 
-export function headLine(file: KnowledgeFile, now: number): HeadLine {
+export function fresh(file: KnowledgeFile, now: number): boolean {
+  return file.author.kind === "agent" && now - file.updatedAt < FRESH_MS;
+}
+
+const PROSE = new Set([
+  "",
+  "md",
+  "markdown",
+  "txt",
+  "text",
+  "rst",
+  "adoc",
+  "log",
+]);
+const DATA = new Set([
+  "yaml",
+  "yml",
+  "json",
+  "jsonl",
+  "toml",
+  "csv",
+  "tsv",
+  "ini",
+  "conf",
+  "cfg",
+  "env",
+  "xml",
+  "properties",
+  "lock",
+]);
+const VISUAL = new Set(["html", "htm", "svg"]);
+const CODE = new Set([
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "go",
+  "rs",
+  "rb",
+  "java",
+  "kt",
+  "swift",
+  "c",
+  "h",
+  "cc",
+  "cpp",
+  "hpp",
+  "cs",
+  "php",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "ps1",
+  "lua",
+  "sql",
+  "css",
+  "scss",
+  "dockerfile",
+  "makefile",
+  "mk",
+  "nix",
+  "pl",
+  "r",
+  "scala",
+  "dart",
+  "ex",
+  "exs",
+  "hs",
+  "proto",
+  "graphql",
+  "tf",
+  "patch",
+  "diff",
+]);
+
+// a file's icon by its kind: prose, code, data, a visual, or a page. A
+// name without a dot is known by itself (Dockerfile, Makefile)
+export function fileIcon(name: string): IconName {
+  const base = (name.split("/").at(-1) ?? "").toLowerCase();
+  const dot = base.lastIndexOf(".");
+  const k = dot > 0 ? base.slice(dot + 1) : CODE.has(base) ? base : "";
+  if (PROSE.has(k)) return "file-text";
+  if (CODE.has(k)) return "code";
+  if (DATA.has(k)) return "braces";
+  if (VISUAL.has(k)) return "visual";
+  return "file";
+}
+
+// a lone folder the user closed, in the open folders' set
+export const CLOSED = "!";
+
+// the tree's rows: each folder's folders, then its files, a folder past
+// FOLDER_ROWS files ending in a row that shows the rest
+export function treeNodes(
+  folder: TreeFolder<KnowledgeFile>,
+  view: {
+    open: ReadonlySet<string>;
+    // the folders whose every file is shown
+    all: ReadonlySet<string>;
+    now: number;
+    href: (file: KnowledgeFile) => string;
+    toggle: (path: string) => void;
+    showAll: (path: string) => void;
+  },
+): RowsTreeNode[] {
+  // a folder alone at its level opens by itself, as there is nothing
+  // else to pick there; closing it is kept as its path marked with !
+  const lone = folder.folders.length === 1 && folder.items.length === 0;
+  const nodes: RowsTreeNode[] = folder.folders.map((sub) => {
+    const key = lone ? `${CLOSED}${sub.path}` : sub.path;
+    const open = lone ? !view.open.has(key) : view.open.has(key);
+    return {
+      kind: "folder",
+      key: `d:${sub.path}`,
+      name: sub.name,
+      count: sub.count,
+      open,
+      onToggle: () => view.toggle(key),
+      children: open ? treeNodes(sub, view) : [],
+    };
+  });
+  const whole = view.all.has(folder.path) || folder.items.length <= FOLDER_ROWS;
+  const items = whole ? folder.items : folder.items.slice(0, FOLDER_ROWS);
+  for (const file of items) {
+    nodes.push({
+      kind: "file",
+      key: file.id,
+      name: file.name.slice(folder.path === "" ? 0 : folder.path.length + 1),
+      href: view.href(file),
+      meta: ago(file.updatedAt, view.now),
+      lit: fresh(file, view.now),
+      title: file.name,
+      icon: fileIcon(file.name),
+    });
+  }
+  if (!whole) {
+    const rest = folder.items.length - FOLDER_ROWS;
+    nodes.push({
+      kind: "more",
+      key: `m:${folder.path}`,
+      label: `Show ${count(rest)} more in ${folder.name || "this folder"}`,
+      onPick: () => view.showAll(folder.path),
+    });
+  }
+  return nodes;
+}
+
+// a name split where its folder ends, the folder drawn faint
+export function pathParts(name: string): { dir: string; base: string } {
+  const at = name.lastIndexOf("/") + 1;
+  return { dir: name.slice(0, at), base: name.slice(at) };
+}
+
+// a text in runs, every place it holds q marked, not case-sensitive
+export type Marked = { text: string; mark: boolean }[];
+
+export function marked(text: string, q: string): Marked {
+  const needle = q.toLowerCase();
+  if (needle === "") return text === "" ? [] : [{ text, mark: false }];
+  const hay = text.toLowerCase();
+  const out: Marked = [];
+  let from = 0;
+  for (;;) {
+    const at = hay.indexOf(needle, from);
+    if (at < 0) break;
+    if (at > from) out.push({ text: text.slice(from, at), mark: false });
+    out.push({ text: text.slice(at, at + needle.length), mark: true });
+    from = at + needle.length;
+  }
+  if (from < text.length) out.push({ text: text.slice(from), mark: false });
+  return out;
+}
+
+// the Names group's label and what is left past the names answered
+export const NAME_ROWS = 5;
+
+export function namesWords(
+  shown: number,
+  total: number,
+): { label: string; beyond: string | null } {
   return {
-    kind: file.kind === "" ? "text" : file.kind,
-    lines: plural(file.lines, "line"),
-    author: authorOf(file.author),
-    when: ago(file.updatedAt, now),
+    label: `Names · ${count(total)}`,
+    beyond:
+      total > shown
+        ? `${plural(total - shown, "more name")}. Type more to narrow them.`
+        : null,
   };
 }
 
-// the file's text folded to its first lines; a text of TEXT_LINES or
-// fewer has no button
-export const TEXT_LINES = 12;
-
-export function textBox(
-  text: string,
-  expanded: boolean,
-): { text: string; cut: boolean; label: string } {
-  const lines = text.replace(/\n$/, "").split("\n");
-  const cut = lines.length > TEXT_LINES;
-  return {
-    text: cut && !expanded ? lines.slice(0, TEXT_LINES).join("\n") : text,
-    cut,
-    label: `Show all ${plural(lines.length, "line")}`,
-  };
-}
-
-// a row of History: "Revision 3" over who wrote it, when, and whether
-// it is the file as it stands
-export type VersionLine = {
-  label: string;
-  author: AuthorWords;
-  when: string;
-  current: boolean;
-  deleted: boolean;
-};
-
-export function versionLine(
-  version: KnowledgeVersion,
-  current: boolean,
-  now: number,
-): VersionLine {
-  return {
-    label: `Revision ${version.revision}`,
-    author: authorOf(version.author),
-    when: ago(version.writtenAt, now),
-    current,
-    deleted: version.deleted,
-  };
-}
-
-// the version Restore brings back: the newest that holds a text, since
-// a delete writes an empty one
-export function lastLiveVersion(
-  versions: readonly KnowledgeVersion[],
-): KnowledgeVersion | null {
-  return versions.find((version) => !version.deleted) ?? null;
-}
-
-// a row of the Deleted card: "deleted by sre in a run · 4d ago"
+// a row of the Deleted list: "deleted by sre in a run · 4d ago"
 export function deletedLine(
   file: KnowledgeDeleted,
   now: number,
@@ -138,9 +295,14 @@ export function deletedLine(
   return { author: authorOf(file.deletedBy), when: ago(file.deletedAt, now) };
 }
 
-// the Deleted card's hint: how long a deleted file's text is kept
-export function deletedHint(historyDays: number): string {
-  return `kept ${plural(historyDays, "day")}`;
+// the Deleted list's band: how long a deleted file's text is kept, and
+// what Empty bin asks
+export function keptWords(historyDays: number): string {
+  return `A deleted file's text is kept up to ${plural(historyDays, "day")}.`;
+}
+
+export function emptyAsk(files: number): string {
+  return `Are you sure you want to permanently erase ${plural(files, "file")}?`;
 }
 
 // a size as a field says it: "256 KB", "4 MB"

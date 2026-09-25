@@ -114,7 +114,13 @@ describe("knowledge routes", () => {
         });
         const path = filePath(projectId, file.id);
         expect(await (await s.client.call("GET", path)).json()).toEqual({
-          file: { ...file, text: "one\n" },
+          file: {
+            ...file,
+            text: "one\n",
+            language: "markdown",
+            html: `<p class="md-p">one</p>`,
+            code: null,
+          },
         });
         const second = await s.client.call("PUT", path, {
           body: { text: "two\n", revision: 1 },

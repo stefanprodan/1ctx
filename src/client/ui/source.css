@@ -1,0 +1,47 @@
+/* A text by its numbered lines, a number a link to its line and the
+   line it names lit. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the number column is as wide as the largest number */
+  .source {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+    padding: var(--space-3) 0;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+    line-height: 1.6;
+  }
+  .source-num {
+    padding: 0 var(--space-3) 0 var(--space-4);
+    color: var(--faint);
+    text-align: right;
+    text-decoration: none;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .source-num:hover {
+    color: var(--fg);
+  }
+  /* a long line wraps rather than scrolling the block on its own */
+  .source-text {
+    padding: 0 var(--space-4) 0 var(--space-2);
+    color: var(--fg);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .source-lit {
+    background: var(--hover);
+  }
+  .source-num.source-lit {
+    color: var(--brand);
+  }
+
+  @media (max-width: 719px) {
+    .source-num {
+      padding-left: var(--space-3);
+    }
+  }
+}

@@ -57,6 +57,51 @@ export class KnowledgeStore extends KnowledgeVersions {
       }));
   }
 
+  // the rows past after, in name order, without their text
+  after(projectId: string, after: string | null): Generator<KnowledgeFile> {
+    return this.stream(
+      `select ${FILE_COLUMNS} from knowledge_files
+       where project_id = ? and name > ? order by name`,
+      [projectId, after ?? ""],
+    );
+  }
+
+  // names are ASCII, so SQLite's lower() folds them as JavaScript does
+  named(
+    projectId: string,
+    after: string | null,
+    query: string,
+  ): Generator<KnowledgeFile> {
+    return this.stream(
+      `select ${FILE_COLUMNS} from knowledge_files
+       where project_id = ? and name > ? and instr(lower(name), ?) > 0
+       order by name`,
+      [projectId, after ?? "", query],
+    );
+  }
+
+  // empty for a file gone
+  text(projectId: string, id: string): string {
+    return (
+      this.filesDb
+        .query<{ text: string }, [string, string]>(
+          "select text from knowledge_files where project_id = ? and id = ?",
+        )
+        .get(projectId, id)?.text ?? ""
+    );
+  }
+
+  // its own statement, finalized at the end, since a cached one left
+  // mid-step by a caller that stops early refuses its next use
+  private *stream(sql: string, params: string[]): Generator<KnowledgeFile> {
+    const statement = this.filesDb.prepare<FileRaw, string[]>(sql);
+    try {
+      for (const raw of statement.iterate(...params)) yield fileOf(raw);
+    } finally {
+      statement.finalize();
+    }
+  }
+
   byId(projectId: string, id: string): KnowledgeRow | null {
     const raw = this.filesDb
       .query<FullRaw, [string, string]>(
@@ -181,6 +226,37 @@ export class KnowledgeStore extends KnowledgeVersions {
       );
     const file = summary(this.byId(current.projectId, current.id)!);
     this.insert(file, text, false);
+    return file;
+  }
+
+  // the same text under a new name, a version like any write
+  rename(
+    current: KnowledgeRow,
+    author: KnowledgeAuthor,
+    name: string,
+    now: number,
+  ): KnowledgeFile {
+    this.filesDb
+      .query(
+        `update knowledge_files set name = ?, kind = ?,
+       revision = revision + 1, author_kind = ?, author_id = ?,
+       author_name = ?, session_id = ?, origin = ?, updated_at = ?
+       where project_id = ? and id = ?`,
+      )
+      .run(
+        name,
+        kindOf(name),
+        author.kind,
+        author.id,
+        author.name,
+        author.sessionId,
+        author.origin,
+        now,
+        current.projectId,
+        current.id,
+      );
+    const file = summary(this.byId(current.projectId, current.id)!);
+    this.insert(file, current.text, false);
     return file;
   }
 

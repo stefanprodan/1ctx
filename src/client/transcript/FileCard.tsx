@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A file a bash command opened onto the page, Markdown rendered or code
-// highlighted. The head carries the path and Copy, which takes the
+// highlighted by its numbered lines (ui/Source.tsx). The head carries the path and Copy, which takes the
 // source; the body is cut to its first lines, Show all in its fade
 // (ui/Fold.tsx), and stays whole once open.
 
@@ -11,6 +11,7 @@ import { loadOpened, openedFiles } from "../data/session-values.ts";
 import { showAll } from "../lib/format.ts";
 import { useCut } from "../lib/resize.ts";
 import { Fold } from "../ui/Fold.tsx";
+import { Source } from "../ui/Source.tsx";
 import { CopyButton } from "./Copy.tsx";
 import type { FileCard as Card } from "./visuals.ts";
 import "./filecard.css";
@@ -62,14 +63,9 @@ export function FileCard({ card }: { card: Card }) {
             }`}
           >
             {code ? (
-              // the server highlights or escapes the text; the pre and
-              // the code element are the client's
-              <pre class="filecard-pre">
-                <code
-                  class="filecard-code"
-                  dangerouslySetInnerHTML={{ __html: stored.html }}
-                />
-              </pre>
+              // the server highlights or escapes the text; Source cuts it
+              // into the lines the text counts
+              <Source text={stored.text} html={stored.html} />
             ) : (
               // the server renders the markdown with raw HTML off:
               // render/ is the safety boundary
