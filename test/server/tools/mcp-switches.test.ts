@@ -53,6 +53,8 @@ function setup(
         operations: [],
         failedRounds: 0,
       }),
+      edit: () => ({ error: false, content: "" }),
+      refuse: (_projectId, _sessionId, reason) => reason,
     },
   });
   return { db, mcp, tools, flux, docs, links };
@@ -191,7 +193,7 @@ test("memory phase offers only memory_edit and never reads MCP or the set", asyn
   try {
     const scope = {
       projectId: "project",
-      automation: { id: "task", projectMemory: false, ownMemory: true },
+      automation: { id: "task", ownMemory: true },
       phase: "memory" as const,
     };
     mcp.offered = () => {
@@ -204,9 +206,7 @@ test("memory phase offers only memory_edit and never reads MCP or the set", asyn
     ]);
     expect({ ...off, memory: null }).toEqual({ ...on, memory: null });
     expect(off.memory).toMatchObject({
-      note: "automation",
       work: on.memory!.work,
-      read: null,
       stopped: false,
     });
     expect(off.tools.map((tool) => tool.name)).toEqual(["memory_edit"]);

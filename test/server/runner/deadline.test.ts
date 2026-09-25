@@ -145,7 +145,6 @@ describe("send deadlines", () => {
             id: "auto",
             name: "rolled-back",
             tz: "UTC",
-            projectMemory: false,
             ownMemory: false,
             memoryGuidance: "",
             disabledCapabilities: [],

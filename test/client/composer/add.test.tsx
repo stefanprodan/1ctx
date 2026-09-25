@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   agentMoved,
+  memoryItem,
   onWords,
   panelessOf,
   serversItem,
@@ -14,7 +15,7 @@ import {
   webPaneItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
-import { VISUALIZE, WEB } from "../../../src/shared/capabilities.ts";
+import { MEMORY, VISUALIZE, WEB } from "../../../src/shared/capabilities.ts";
 
 describe("the Web access item", () => {
   test("is live and on when the instance allows it and the chat left it", () => {
@@ -83,6 +84,27 @@ describe("the Visuals item", () => {
       on: false,
       reason: null,
     });
+  });
+});
+
+describe("the Memory item", () => {
+  test("is on unless the chat turned it off, off for an agent without tools", () => {
+    expect(
+      memoryItem({ tools: true, switchable: [MEMORY], off: false }),
+    ).toEqual({ live: true, on: true, reason: null });
+    expect(
+      memoryItem({ tools: true, switchable: [MEMORY], off: true }),
+    ).toEqual({ live: true, on: false, reason: null });
+    expect(
+      memoryItem({ tools: false, switchable: [MEMORY], off: false }),
+    ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
+    // web access off on the instance leaves memory alone
+    expect(
+      memoryItem({ tools: true, switchable: [MEMORY], off: false }).live,
+    ).toBe(true);
+    expect(
+      webItem({ tools: true, switchable: [MEMORY], off: false }).reason,
+    ).toBe("Turned off by an admin");
   });
 });
 

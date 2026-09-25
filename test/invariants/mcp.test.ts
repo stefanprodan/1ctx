@@ -482,6 +482,7 @@ describe("MCP tools in a send", () => {
       "webfetch",
       "visualize",
       "bash",
+      "memory_edit",
     ]);
     expect(directory.tokens.tools).toBe(
       tokens(JSON.stringify(started.script.body.tools ?? [])),
@@ -578,6 +579,7 @@ describe("MCP tools in a send", () => {
       "webfetch",
       "visualize",
       "bash",
+      "memory_edit",
     ]);
     expect(directory.tokens.tools).toBe(
       tokens(JSON.stringify(started.script.body.tools ?? [])),

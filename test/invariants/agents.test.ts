@@ -64,7 +64,9 @@ test("project agents report the admin's capabilities through the tools port", as
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.capabilities).toEqual(
-        mode === "off" ? ["visualize"] : ["web", "visualize"],
+        mode === "off"
+          ? ["visualize", "memory"]
+          : ["web", "visualize", "memory"],
       );
       expect(body.agents.map((agent: { id: string }) => agent.id)).toContain(
         chat.agentId,

@@ -28,6 +28,7 @@ import { m0019 } from "./0019-open.ts";
 import { m0020 } from "./0020-mcp-kept.ts";
 import { m0021 } from "./0021-served-by.ts";
 import { m0022 } from "./0022-credentials.ts";
+import { m0023 } from "./0023-chat-memory.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -52,4 +53,5 @@ export const MIGRATIONS: Migration[] = [
   m0020,
   m0021,
   m0022,
+  m0023,
 ];

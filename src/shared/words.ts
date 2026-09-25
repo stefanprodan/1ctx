@@ -362,8 +362,6 @@ export const BUILTIN_TOOLS = [
   "mcp_call",
   "mcp_describe",
   "memory_edit",
-  "session_read",
-  "sessions_list",
   "skill",
   "skill_file",
 ] as const;

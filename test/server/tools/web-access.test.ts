@@ -76,7 +76,9 @@ for (const mode of ["off", "all", "listed"] as const) {
             on ? { mode, domains: ["docs.test"] } : null,
           );
           expect(tools.capabilities()).toEqual(
-            mode === "off" ? ["visualize"] : ["web", "visualize"],
+            mode === "off"
+              ? ["visualize", "memory"]
+              : ["web", "visualize", "memory"],
           );
           const bash = offered.tools.find((tool) => tool.name === "bash")!;
           expect(bash.description.endsWith("No network.")).toBe(!on);

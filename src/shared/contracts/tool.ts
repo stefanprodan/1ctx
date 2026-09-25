@@ -31,16 +31,15 @@ export type ToolCall = {
 };
 
 // when a send carries a built-in: always, when the agent has skills,
-// when one of them has files, when MCP runs as a catalog, in a project
-// memory task, in a project memory task and an own-note phase, or in
-// every send of a project for the knowledge base
+// when one of them has files, when MCP runs as a catalog, in every chat
+// for the project's memory, or in every send of a project for the
+// knowledge base
 export type ToolWhen =
   | "always"
   | "knowledge"
   | "skills"
   | "skillFiles"
   | "mcpCatalog"
-  | "projectMemory"
   | "memory"
   // while the send has web access, and for websearch a provider too
   | "web"
@@ -58,7 +57,7 @@ type ToolSchema = {
 };
 
 // a built-in, never switched: a schema naming skills or MCP tools is
-// counted with no names, and memory_edit's own-note text is the variant
+// counted with no names; a variant is a second text the tool may carry
 export type BuiltinToolSummary = ToolSchema & {
   name: BuiltinTool | "webfetch" | "websearch";
   when: ToolWhen;

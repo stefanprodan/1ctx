@@ -120,7 +120,6 @@ export function scheduler(deps: Deps): Scheduler {
       id: row.id,
       name: row.name,
       tz: row.tz,
-      projectMemory: row.projectMemory,
       ownMemory: row.ownMemory,
       memoryGuidance: row.memoryGuidance,
       disabledCapabilities: row.disabledCapabilities,

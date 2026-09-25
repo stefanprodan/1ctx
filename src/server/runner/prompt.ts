@@ -11,6 +11,8 @@
 // send so a tool's writes cannot move the prefix between rounds.
 
 import {
+  MEMORY,
+  MEMORY_OFF_LINE,
   mcpOffLine,
   skillsOffLine,
   VISUALIZE,
@@ -134,6 +136,14 @@ export function systemPrompt(
     policy.offered.tools.length > 0
   ) {
     parts.push(VISUALIZE_OFF_LINE);
+  }
+  // a run is never offered the tool, so the key means nothing there
+  if (
+    policy.disabledCapabilities.includes(MEMORY) &&
+    policy.offered.tools.length > 0 &&
+    policy.automation === null
+  ) {
+    parts.push(MEMORY_OFF_LINE);
   }
   if (policy.mcpOff.length > 0) parts.push(mcpOffLine(policy.mcpOff));
   if (policy.skillsOff.length > 0) {

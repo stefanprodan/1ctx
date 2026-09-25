@@ -269,7 +269,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     access,
     users,
-    runs: { runInfo: (sessionId) => sessions.runInfo(sessionId) },
+    sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
   const knowledge = knowledgeArea({ db, clock, limits, access });
   sessions = sessionsArea({
@@ -284,7 +284,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
       copyUploads: (sourceId, targetId, restage, messageIds) =>
         knowledge.copyUploads(sourceId, targetId, restage, messageIds),
     },
-    isWrite: (name) => mcp.isWrite(name),
   });
   const configuredTools = toolsArea({
     db,
@@ -299,14 +298,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     memory,
     knowledge,
     credentials,
-    sessions: {
-      memorySnapshot: (projectId, sessionId) =>
-        sessions.memorySnapshot(projectId, sessionId),
-    },
-    markers: {
-      unread: (automationId, projectId, cap, exclude) =>
-        automations.unread(automationId, projectId, cap, exclude),
-    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
@@ -338,9 +329,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     memory: {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),
-    },
-    markers: {
-      mark: (automationId, marks) => automations.mark(automationId, marks),
+      view: (sessionId) => memory.view(sessionId),
+      startView: (sessionId, snapshot) => memory.startView(sessionId, snapshot),
+      endView: (sessionId) => memory.endView(sessionId),
+      resetSeen: (sessionId) => memory.resetSeen(sessionId),
     },
     limits,
     usage,

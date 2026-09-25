@@ -21,6 +21,7 @@ import {
   tools,
   toolsError,
 } from "../../../src/client/data/tools.ts";
+import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
   ACCESS_WORDS,
   collect,
@@ -463,6 +464,27 @@ describe("the page", () => {
     expect(onPage("/admin/tools", "/admin/tools")).toBe(true);
     expect(onPage("/admin/toolsx", "/admin/tools")).toBe(false);
     expect(WHEN_WORDS.always).not.toBe("");
+  });
+
+  test("memory_edit says when each of its two texts is sent", () => {
+    const edit: BuiltinToolSummary = {
+      ...time,
+      name: "memory_edit",
+      description: "Save to the project's memory.",
+      when: "memory",
+      variant: { description: "Update this automation's note.", tokens: 40 },
+    };
+    const html = render(<ToolRow tool={edit} open onToggle={() => {}} />);
+    expect(html).toContain("Sent in every chat, over the project's memory.");
+    expect(html).toContain(
+      "Description for an automation's own memory, 40 tokens",
+    );
+    expect(html).toContain(
+      "Sent in the step after a run that updates its own memory.",
+    );
+    expect(html.indexOf("Save to the project")).toBeLessThan(
+      html.indexOf("Update this automation"),
+    );
   });
 
   test.serial("Built-in renders the rows with tokens and no switch", () => {

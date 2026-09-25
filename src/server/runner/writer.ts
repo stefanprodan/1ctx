@@ -24,6 +24,7 @@ import { envelope, lastLine } from "./envelope.ts";
 import type { ToolResult } from "./policy.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import {
+  type StartDeps,
   type Started,
   type StartFields,
   startSend as startSendRows,
@@ -63,7 +64,10 @@ export type WriterDeps = {
     record(fields: UsageFields): unknown;
     deleteSend(sendId: string): boolean;
   };
-  commitMemory(send: ActiveSend, cause: SendCause): number | null;
+  commitMemory(send: ActiveSend): number | null;
+  // a chat's snapshot of the project's note, started with its first send
+  // and dropped by a summary, inside the caller's transaction
+  views: StartDeps["views"] & { end(sessionId: string): void };
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
@@ -438,7 +442,7 @@ export class Writer {
     const now = this.deps.clock();
     const status = statusOf(cause);
     const result = transact(this.deps.db, () => {
-      const memorySkipped = this.deps.commitMemory(send, cause);
+      const memorySkipped = this.deps.commitMemory(send);
       // a work reply is never finalized twice: finalizeRound runs only
       // when a round is streaming
       const reply =
@@ -471,6 +475,10 @@ export class Writer {
         status,
         now,
       })!;
+      // the send after a summary takes the note as it is then
+      if (reply?.kind === "summary" && reply.status === "done") {
+        this.deps.views.end(send.sessionId);
+      }
       const changed = [...(reply ? [reply] : []), ...stopped];
       const last =
         reply?.status === "done" && reply.slot === "answer"

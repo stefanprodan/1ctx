@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The plus at the start of the composer's row and its menu, placed as
-// the agent list is. Add files opens the file picker. Web access and
-// Visuals are switches, drawn as the rail's theme switch is, and
+// the agent list is. Add files opens the file picker. Web access,
+// Visuals and Memory are switches, drawn as the rail's theme switch is, and
 // flipping one leaves the menu open. MCP servers and Skills each swap
 // the menu's rows for a switch per server or skill, and so does Web
 // access when the project has credentials, and Escape or the pane's
@@ -115,6 +115,8 @@ export function Add({
   webPane,
   visuals,
   onVisuals,
+  memory,
+  onMemory,
   servers,
   skills,
   onFlip,
@@ -128,6 +130,8 @@ export function Add({
   webPane: PaneItem | null;
   visuals: WebItem;
   onVisuals: () => void;
+  memory: WebItem;
+  onMemory: () => void;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
@@ -245,6 +249,12 @@ export function Add({
             icon="visual"
             item={visuals}
             onFlip={onVisuals}
+          />
+          <SwitchItem
+            name="Memory"
+            icon="memory"
+            item={memory}
+            onFlip={onMemory}
           />
           {(["servers", "skills"] as const).map((name) => {
             const item = items[name];

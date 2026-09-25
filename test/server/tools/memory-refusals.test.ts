@@ -18,7 +18,7 @@ describe("memory tool refusals", () => {
       { topic: "Fourth", text: `Fourth\n${"d".repeat(336)}` },
     ];
     expect(memoryChars(entries)).toBe(1741);
-    handle.work.entries = [...entries];
+    handle.work!.entries = [...entries];
     const call = (args: string) =>
       tools.run(
         offered,
@@ -43,18 +43,18 @@ describe("memory tool refusals", () => {
       `Error: The text of Last snapshot is 612 characters, the limit is 500, cut 112. Split it into several topics, one set call each, or cut it.\n${currentNote}\n1,741 of 2,200 characters.`,
     );
     expect(oversized.content).not.toContain("x".repeat(612));
-    handle.work.entries = [
+    handle.work!.entries = [
       { topic: "First", text: "a".repeat(500) },
       { topic: "Second", text: "b".repeat(500) },
       { topic: "Third", text: "c".repeat(500) },
       { topic: "Fourth", text: "d".repeat(406) },
     ];
-    expect(memoryChars(handle.work.entries)).toBe(1950);
+    expect(memoryChars(handle.work!.entries)).toBe(1950);
     const full = await call(
       JSON.stringify({ action: "set", topic: "Fifth", text: "e".repeat(489) }),
     );
-    const fullNote = handle.work.entries
-      .map(
+    const fullNote = handle
+      .work!.entries.map(
         (entry, index) =>
           `${index + 1}. ${entry.topic} [${entry.text.length}/500]\n${entry.text}`,
       )
@@ -65,7 +65,7 @@ describe("memory tool refusals", () => {
     expect(full.content).not.toContain("retry");
     expect(full.error).toBe(true);
     expect(full.content).not.toContain("e".repeat(489));
-    handle.work.entries = [...entries];
+    handle.work!.entries = [...entries];
     for (const args of [
       "{",
       "[]",
@@ -82,14 +82,14 @@ describe("memory tool refusals", () => {
         `\n${currentNote}\n1,741 of 2,200 characters.`,
       );
       expect(result.content.length).toBeLessThanOrEqual(TOOL_CAPS.resultCut);
-      expect(handle.work.entries).toEqual(entries);
-      expect(handle.work.operations).toEqual([]);
+      expect(handle.work!.entries).toEqual(entries);
+      expect(handle.work!.operations).toEqual([]);
     }
     const saved = await call('{"action":"none"}');
     expect(saved).toEqual({
       error: false,
       content:
-        "Saved for the end of the run in the project's memory. 1,741 of 2,200 characters.",
+        "Saved for the end of the run in this automation's own memory. 1,741 of 2,200 characters.",
     });
   });
 
@@ -131,15 +131,15 @@ describe("memory tool refusals", () => {
         error: true,
         content: `Error: ${fixture.reason}\n0 of 2,200 characters.`,
       });
-      expect(offered.memory!.work.entries).toEqual([]);
-      expect(offered.memory!.work.operations).toEqual([]);
+      expect(offered.memory!.work!.entries).toEqual([]);
+      expect(offered.memory!.work!.operations).toEqual([]);
     }
   });
 
   test("an absent topic returns the working texts and the whole refusal stays under the result cut", async () => {
     const tools = area();
     const offered = tools.offered(now, "agent", [], "auto", task);
-    offered.memory!.work.entries = [
+    offered.memory!.work!.entries = [
       { topic: "Sources", text: "Use the feed." },
     ];
     const call = {

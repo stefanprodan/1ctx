@@ -7,8 +7,9 @@
 // with their descriptions and when they were fetched, the built-in tools
 // a send would offer it now with websearch's provider, and token counts.
 // The tools are the tools area's answer at this moment, none when the
-// model does not accept tools. The list is built-ins alone; skill and
-// MCP schemas still count because the provider request carries them.
+// model does not accept tools. The list is built-ins alone, memory_edit
+// as a chat is offered it; skill and MCP schemas still count because the
+// provider request carries them.
 
 import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
@@ -25,7 +26,12 @@ import { type AgentRow, type AgentStore, summary } from "./store.ts";
 
 // the tools the page lists; the skill and MCP tools are shown as what
 // they carry
-const LISTED = new Set<string>(["datetime", ...WEB_TOOLS, "bash"]);
+const LISTED = new Set<string>([
+  "datetime",
+  ...WEB_TOOLS,
+  "bash",
+  "memory_edit",
+]);
 
 // the lean MCP schemas as the wire carries them in all mode, the count
 // the token cap reads whatever mode the send resolved to
@@ -60,6 +66,7 @@ export type ToolsPort = {
       projectId: string | null;
       automation: null;
       phase: "main";
+      chat: { sessionId: string; userId: string };
     },
   ): {
     tools: ChatTool[];
@@ -110,7 +117,14 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               agent.id,
               agent.servers,
               agent.mcpMode,
-              { projectId: null, automation: null, phase: "main" },
+              // a chat's send, with no chat: the schema is counted and
+              // never run
+              {
+                projectId: null,
+                automation: null,
+                phase: "main",
+                chat: { sessionId: "", userId: "" },
+              },
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };
         const versions = deps.skills.versions(agent.id);

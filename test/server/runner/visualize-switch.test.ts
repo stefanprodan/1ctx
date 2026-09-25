@@ -88,7 +88,11 @@ describe("the chat's visualize switch", () => {
         "GET",
         `/api/projects/${chat.projectId}/agents`,
       );
-      expect((await before.json()).capabilities).toEqual(["web", "visualize"]);
+      expect((await before.json()).capabilities).toEqual([
+        "web",
+        "visualize",
+        "memory",
+      ]);
       const off = await chat.admin.call("PATCH", "/api/tools/visualize", {
         body: { enabled: false },
       });
@@ -97,7 +101,7 @@ describe("the chat's visualize switch", () => {
         "GET",
         `/api/projects/${chat.projectId}/agents`,
       );
-      expect((await after.json()).capabilities).toEqual(["web"]);
+      expect((await after.json()).capabilities).toEqual(["web", "memory"]);
       const detail = await create(chat, { disable: [VISUALIZE] });
       const script = await waitScript(chat.scripted, 1);
       expect(detail.session.disabledCapabilities).toEqual(["visualize"]);

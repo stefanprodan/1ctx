@@ -15,8 +15,6 @@ export const MEMORY_CHARS = 2200;
 export const MEMORY_TOPIC_CHARS = 60;
 // one entry never fills the budget alone
 export const MEMORY_ENTRY_CHARS = 500;
-// unread chats a memory task lists per run
-export const MEMORY_SESSIONS_PER_RUN = 20;
 // consecutive edit rounds without a success before the tools stop
 export const MEMORY_EDIT_FAILED_ROUNDS = 2;
 
@@ -227,7 +225,7 @@ export function memoryBlock(
   const body = renderEntries(normalize(entries)).slice(0, MEMORY_CHARS);
   const words =
     tag === "project-memory"
-      ? "Project memory, notes a memory task keeps from past chats."
+      ? "Project memory, notes this project's chats saved."
       : "Automation memory, notes kept from past runs.";
   const step =
     tag === "automation-memory"

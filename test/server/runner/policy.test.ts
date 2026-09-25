@@ -101,7 +101,6 @@ describe("send policy thinking", () => {
       source: "manual",
       dueAt: 1,
       tz: "UTC",
-      projectMemory: false,
       ownMemory: true,
       memoryGuidance: "Sources: failed hosts",
     };

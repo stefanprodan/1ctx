@@ -13,7 +13,11 @@ import type { SkillBody } from "../../../src/server/skills/index.ts";
 import { formatDatetime } from "../../../src/server/tools/builtin/datetime.ts";
 import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
 import type { SkillsPort } from "../../../src/server/tools/index.ts";
-import { type ToolsArea, toolsArea } from "../../../src/server/tools/index.ts";
+import {
+  CHAT_MEMORY_DESCRIPTION,
+  type ToolsArea,
+  toolsArea,
+} from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type {
   ToolBudget,
@@ -242,7 +246,7 @@ describe("the built-in catalog", () => {
     }
   });
 
-  test("says when a send carries each, and memory_edit's own-note text", () => {
+  test("says when a send carries each, and memory_edit's two texts", () => {
     expect(Object.fromEntries(catalog.map((t) => [t.name, t.when]))).toEqual({
       bash: "knowledge",
       datetime: "always",
@@ -250,18 +254,20 @@ describe("the built-in catalog", () => {
       skill_file: "skillFiles",
       mcp_describe: "mcpCatalog",
       mcp_call: "mcpCatalog",
-      sessions_list: "projectMemory",
-      session_read: "projectMemory",
       memory_edit: "memory",
       webfetch: "web",
       websearch: "webSearch",
     });
     const edit = catalog.find((tool) => tool.name === "memory_edit")!;
-    expect(edit.description).toContain("the project's memory");
+    expect(edit.description).toBe(CHAT_MEMORY_DESCRIPTION);
+    expect(
+      (edit.parameters as { properties: { action: { enum: string[] } } })
+        .properties.action.enum,
+    ).toEqual(["set", "remove"]);
     expect(edit.variant?.description).toContain("this automation's own memory");
     expect(edit.variant?.tokens).toBeGreaterThan(0);
     expect(
-      catalog.filter((tool) => tool.variant !== null).map((t) => t.name),
+      catalog.filter((tool) => tool.variant !== null).map((tool) => tool.name),
     ).toEqual(["memory_edit"]);
   });
 });

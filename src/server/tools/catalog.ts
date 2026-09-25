@@ -4,8 +4,8 @@
 // The built-ins as the tools page lists them. Each schema comes from the
 // factory a send uses, called with sample inputs, so the page never
 // restates a schema. A schema that lists skill or MCP tool names is shown
-// with none, since the names are the send's; memory_edit's own-note text
-// rides as the variant of its project text.
+// with none, since the names are the send's; memory_edit is the chat's,
+// with the own-note phase's text as its variant.
 
 import type {
   BuiltinToolSummary,
@@ -23,7 +23,7 @@ import {
 } from "./builtin/datetime.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
 import {
-  type MemorySessionsPort,
+  makeChatMemoryHandle,
   makeMemoryHandle,
   makeMemoryTools,
 } from "./builtin/memory.ts";
@@ -64,28 +64,30 @@ const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
   skill_file: "skillFiles",
   mcp_describe: "mcpCatalog",
   mcp_call: "mcpCatalog",
-  sessions_list: "projectMemory",
-  session_read: "projectMemory",
   memory_edit: "memory",
   webfetch: "web",
   websearch: "webSearch",
 };
 
-// the schemas are built, never run, so the ports answer nothing
-const noSessions: MemorySessionsPort = {
-  snapshot: () => null,
-  unread: () => ({ chats: [], remaining: 0 }),
-};
-
-function memoryTools(automationId: string | null): Tool[] {
+// the schemas are built, never run
+function ownMemoryTools(): Tool<string | ToolResult>[] {
   const work: MemoryWork = {
-    target: { projectId: "", automationId },
+    target: { projectId: "", automationId: "" },
     baseRevision: 0,
     entries: [],
     operations: [],
     failedRounds: 0,
   };
-  return makeMemoryTools(makeMemoryHandle(work, ""), noSessions);
+  return makeMemoryTools(makeMemoryHandle(work));
+}
+
+function chatMemoryTools(): Tool<string | ToolResult>[] {
+  return makeMemoryTools(
+    makeChatMemoryHandle({
+      edit: () => ({ error: true, content: "" }),
+      refuse: () => "",
+    }),
+  );
 }
 
 // the name enum a send fills, emptied
@@ -116,8 +118,6 @@ export function builtinCatalog(
     refreshFailedAt: null,
   };
   const skill = { id: "", name: "", description: "", hasFiles: true };
-  const project = memoryTools(null);
-  const own = fillYear(memoryTools("").map(schema), now);
   const tools = fillYear(
     [
       makeBashTool(undefined, { mode: "all", domains: [] }, true),
@@ -129,10 +129,11 @@ export function builtinCatalog(
         file: () => null,
       }).map(withoutNames),
       ...makeMcpCatalogTools([server]),
-      ...project,
+      ...chatMemoryTools(),
     ].map(schema),
     now,
   );
+  const own = fillYear(ownMemoryTools().map(schema), now);
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
   const names: BuiltinToolSummary["name"][] = [
     ...BUILTIN_TOOLS,
@@ -142,7 +143,6 @@ export function builtinCatalog(
   return names.sort().map((name) => {
     const tool = byName.get(name);
     if (tool === undefined) throw new Error(`no schema for ${name}`);
-    const variant = own.find((other) => other.name === name);
     return {
       name,
       description: tool.description,
@@ -154,10 +154,12 @@ export function builtinCatalog(
         "enum" in
         ((tool.parameters as { properties?: { name?: object } }).properties
           ?.name ?? {}),
-      variant:
-        variant === undefined || variant.description === tool.description
+      variant: (() => {
+        const other = own.find((held) => held.name === name);
+        return other === undefined
           ? null
-          : { description: variant.description, tokens: wireTokens([variant]) },
+          : { description: other.description, tokens: wireTokens([other]) };
+      })(),
     };
   });
 }

@@ -759,7 +759,6 @@ describe("provision through the composed app", () => {
             deadlineMs: null,
             retentionDays: 30,
             ownMemory: false,
-            projectMemory: false,
           },
         },
       );

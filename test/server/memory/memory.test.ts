@@ -245,7 +245,6 @@ describe("memory routes", () => {
           tz: "UTC",
           deadlineMs: null,
           retentionDays: 30,
-          projectMemory: false,
           ownMemory: true,
         },
       },
@@ -282,7 +281,7 @@ describe("memory routes", () => {
         previous: [],
         revision: 1,
         updatedBy: { id: chat.memberId },
-        run: null,
+        session: null,
       });
       expect(
         (
@@ -353,8 +352,10 @@ describe("memory routes", () => {
     const note = await (
       await chat.member.call("GET", `/api/projects/${chat.projectId}/memory`)
     ).json();
-    expect(note.memory.run).toEqual({
-      sessionId: run.id,
+    expect(note.memory.session).toEqual({
+      id: run.id,
+      title: automation.name,
+      origin: "automation",
       automationId: null,
       automationName: null,
     });

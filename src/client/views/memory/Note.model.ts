@@ -16,7 +16,14 @@ import { ago } from "../../lib/format.ts";
 
 export type Writer =
   | { kind: "none" }
-  | { kind: "user"; username: string; when: string }
+  | {
+      kind: "user";
+      username: string;
+      // the chat the save came from, null for a hand edit or a chat
+      // since deleted
+      chat: { id: string; title: string } | null;
+      when: string;
+    }
   | {
       kind: "run";
       sessionId: string;
@@ -29,10 +36,23 @@ export type Writer =
 export function writerOf(memory: Memory, now: number): Writer {
   if (memory.updatedAt === null) return { kind: "none" };
   const when = ago(memory.updatedAt, now);
+  const session = memory.session;
   if (memory.updatedBy !== null) {
-    return { kind: "user", username: memory.updatedBy.username, when };
+    const chat =
+      session !== null && session.origin === "chat"
+        ? { id: session.id, title: session.title }
+        : null;
+    return { kind: "user", username: memory.updatedBy.username, chat, when };
   }
-  if (memory.run !== null) return { kind: "run", ...memory.run, when };
+  if (session !== null && session.origin === "automation") {
+    return {
+      kind: "run",
+      sessionId: session.id,
+      automationId: session.automationId,
+      automationName: session.automationName,
+      when,
+    };
+  }
   return { kind: "none" };
 }
 

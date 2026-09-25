@@ -354,7 +354,6 @@ export const AUTH_CASES: AuthCase[] = [
       tz: "UTC",
       deadlineMs: null,
       retentionDays: 30,
-      projectMemory: false,
       ownMemory: false,
     },
     expect: { anonymous: 401, member: 404, admin: 404 },

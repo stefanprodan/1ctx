@@ -38,7 +38,6 @@ const KEYS = [
   "tz",
   "deadlineMs",
   "retentionDays",
-  "projectMemory",
   "ownMemory",
 ];
 
@@ -93,12 +92,6 @@ function parseValues(
       );
     }
     out.retentionDays = value as number;
-  }
-  if (take("projectMemory")) {
-    if (typeof body.projectMemory !== "boolean") {
-      throw new BadRequest("projectMemory must be boolean");
-    }
-    out.projectMemory = body.projectMemory;
   }
   if (take("ownMemory")) {
     if (typeof body.ownMemory !== "boolean") {

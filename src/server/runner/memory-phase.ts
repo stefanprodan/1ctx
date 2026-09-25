@@ -5,7 +5,6 @@ import type {
   Message,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
-import type { SendCause } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -25,44 +24,16 @@ import type { SessionsPort } from "./writer-port.ts";
 
 export type MemoryCommitDeps = {
   memory: Pick<MemoryCapability, "commit">;
-  markers: {
-    mark(
-      automationId: string,
-      marks: readonly { sessionId: string; readActivityAt: number }[],
-    ): number;
-  };
 };
 
+// an edited own note is committed on any cause once its phase started
 export function commitMemory(
   deps: MemoryCommitDeps,
   send: ActiveSend,
-  cause: SendCause,
 ): number | null {
-  let skipped = 0;
-  const project = send.policy.offered.memory;
-  if (cause === "finish" && project?.note === "project") {
-    const committed = deps.memory.commit(project.work, send.sessionId);
-    skipped += committed.skipped;
-    const dropped = new Set(committed.skippedOperations);
-    if (project.read !== null) {
-      deps.markers.mark(
-        project.read.automationId,
-        [...project.read.marks]
-          .filter(([, mark]) => !dropped.has(mark.operation))
-          .map(([sessionId, mark]) => ({
-            sessionId,
-            readActivityAt: mark.readActivityAt,
-          })),
-      );
-    }
-  }
-  const automation = send.policy.memoryOffered?.memory ?? null;
-  if (
-    automation?.note === "automation" &&
-    automation.work.operations.length > 0
-  ) {
-    skipped += deps.memory.commit(automation.work, send.sessionId).skipped;
-  }
+  const work = send.policy.memoryOffered?.memory?.work ?? null;
+  if (work === null || work.operations.length === 0) return null;
+  const skipped = deps.memory.commit(work, send.sessionId).skipped;
   return skipped === 0 ? null : skipped;
 }
 
@@ -179,7 +150,7 @@ function memoryRequest(
       error: send.error,
       rows,
       guidance: send.policy.automation?.memoryGuidance ?? "",
-      entries: offered.memory?.work.entries ?? [],
+      entries: offered.memory?.work?.entries ?? [],
     },
     {
       phase: historyMessages(

@@ -13,7 +13,6 @@ import type { Clock } from "../lib/clock.ts";
 import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import type { MemorySnapshot } from "./memory.ts";
 import {
   type AccessPort,
   detail,
@@ -35,7 +34,6 @@ export {
   type ExportRow,
   markdownFilename,
 } from "./markdown.ts";
-export { type MemorySnapshot, memorySnapshot } from "./memory.ts";
 export {
   lineFrom,
   MAX_REGENERATE_BODY,
@@ -75,7 +73,6 @@ export type SessionsDeps = {
   live: LivePort;
   usage: UsagePort;
   uploads: UploadsPort;
-  isWrite: (name: string) => boolean;
 };
 
 export type Sessions = {
@@ -86,8 +83,7 @@ export type Sessions = {
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
   usesAgent(agentId: string): boolean;
-  runInfo(sessionId: string): Memory["run"];
-  memorySnapshot(projectId: string, sessionId: string): MemorySnapshot | null;
+  sessionInfo(sessionId: string): Memory["session"];
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -119,17 +115,11 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     usesAgent: (agentId) => store.usesAgent(agentId),
-    runInfo(sessionId) {
+    sessionInfo(sessionId) {
       const row = deps.db
-        .query<
-          {
-            sessionId: string;
-            automationId: string | null;
-            automationName: string | null;
-          },
-          [string]
-        >(
-          `select sessions.id as sessionId,
+        .query<NonNullable<Memory["session"]>, [string]>(
+          `select sessions.id as id, sessions.title as title,
+             sessions.origin as origin,
              automations.id as automationId,
              automations.name as automationName
            from sessions
@@ -139,8 +129,6 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         .get(sessionId);
       return row ?? null;
     },
-    memorySnapshot: (projectId, sessionId) =>
-      store.memorySnapshot(projectId, sessionId, deps.isWrite),
     repair() {
       const touched = transact(deps.db, () => {
         const rows = store.repair(deps.clock(), RESTART_ERROR);

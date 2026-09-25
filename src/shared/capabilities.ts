@@ -5,13 +5,15 @@
 // what is off, since on is the default: a thing added to an agent later
 // is on everywhere without a write, and the empty set is every chat that
 // never touched a switch. A key is a kind, or a kind and a name after a
-// colon. Web access is a kind alone, and so is the visualize tool. An
+// colon. Web access is a kind alone, and so are the visualize tool and
+// saving to the project's memory, which only a chat is offered. An
 // MCP server is `mcp:<server id>`: the id, since the name is not what an
 // agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
 // HTTP credential is `credential:<credential id>`.
 
 export const WEB = "web";
 export const VISUALIZE = "visualize";
+export const MEMORY = "memory";
 export const MCP = "mcp";
 export const SKILL = "skill";
 export const CREDENTIAL = "credential";
@@ -51,6 +53,7 @@ export function isCapabilityKey(value: unknown): value is string {
     // still sends
     (value === WEB ||
       value === VISUALIZE ||
+      value === MEMORY ||
       serverOf(value) !== null ||
       skillOf(value) !== null ||
       credentialOf(value) !== null)
@@ -144,6 +147,11 @@ export const WEB_OFF_LINE =
 // tool again and get an unknown tool
 export const VISUALIZE_OFF_LINE =
   "The user turned the visualize tool off for this chat. Do not call visualize.";
+
+// the line after it while a chat has saving to the project's memory
+// off: a save made before the flip is in the history
+export const MEMORY_OFF_LINE =
+  "The user turned saving to project memory off for this chat. Do not call memory_edit.";
 
 // the line after it while a chat has servers off that its agent would
 // otherwise be offered: names sorted, so it is constant between flips

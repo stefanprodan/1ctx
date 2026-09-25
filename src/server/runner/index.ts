@@ -42,13 +42,14 @@ import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
-import { buildPolicy, type ToolsPort } from "./policy.ts";
+import type { ToolsPort } from "./policy.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { regenerateUser } from "./regenerate.ts";
 import { CHAT_POOL, Registry, runPool } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
+import { sendPolicy } from "./send-policy.ts";
 import { type ShutdownResult, shutdownRunner } from "./shutdown.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { Writer, type WriterDeps } from "./writer.ts";
@@ -84,7 +85,10 @@ export type RunnerDeps = {
     byId(id: string): { name: string; wire: Wire } | null;
   };
   tools: ToolsPort;
-  memory: Pick<MemoryCapability, "read" | "commit">;
+  memory: Pick<
+    MemoryCapability,
+    "read" | "commit" | "view" | "startView" | "endView" | "resetSeen"
+  >;
   knowledge: Pick<KnowledgeCapability, "snapshot" | "startKept">;
   uploads: WriterDeps["uploads"] & {
     checkUploads(
@@ -92,12 +96,6 @@ export type RunnerDeps = {
       projectId: string,
       ids: readonly string[],
     ): void;
-  };
-  markers: {
-    mark(
-      automationId: string,
-      marks: readonly { sessionId: string; readActivityAt: number }[],
-    ): number;
   };
   limits: { current(): Limits };
   usage: WriterDeps["usage"];
@@ -139,8 +137,13 @@ export function runnerArea(deps: RunnerDeps): Runner {
     sessions: deps.sessions,
     uploads: deps.uploads,
     usage: deps.usage,
-    commitMemory: (send, cause) =>
-      commitMemory({ memory: deps.memory, markers: deps.markers }, send, cause),
+    commitMemory: (send) => commitMemory({ memory: deps.memory }, send),
+    views: {
+      start: (sessionId, snapshot) =>
+        deps.memory.startView(sessionId, snapshot),
+      end: (sessionId) => deps.memory.endView(sessionId),
+      resetSeen: (sessionId) => deps.memory.resetSeen(sessionId),
+    },
     render: deps.render,
     stream: deps.stream,
   });
@@ -231,49 +234,23 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
 
   const policyFor = (
+    sessionId: string,
     project: ProjectRow,
     user: UserRow,
     agent: AgentRow,
     event: Event | null = null,
     offerTools = true,
     disabledCapabilities: readonly string[] = [],
-  ) => {
-    const limits = deps.limits.current();
-    const automation =
-      event === null
-        ? null
-        : {
-            ...event.automation,
-            source: event.source,
-            dueAt: event.dueAt,
-          };
-    const provider = deps.providers.byId(agent.providerId);
-    return buildPolicy({
+  ) =>
+    sendPolicy(deps, {
+      sessionId,
       project,
       user,
       agent,
-      providerName: provider?.name,
-      wire: provider?.wire ?? null,
-      now: deps.clock(),
-      tools: offerTools && agent.model.tools ? deps.tools : null,
+      event,
+      offerTools,
       disabledCapabilities,
-      limits,
-      automation,
-      knowledge: deps.knowledge.snapshot(project.id),
-      projectMemory: deps.memory.read(project.id, null).entries,
-      automationMemory:
-        automation?.ownMemory === true
-          ? deps.memory.read(project.id, automation.id).entries
-          : [],
-      deadlineMs:
-        event === null
-          ? limits.sendDeadlineMs
-          : Math.min(
-              event.deadlineMs ?? limits.runDeadlineMs,
-              limits.runDeadlineMs,
-            ),
     });
-  };
 
   const author = (principal: Principal): UserRow => {
     const user = deps.users.byId(principal.userId);
@@ -318,7 +295,15 @@ export function runnerArea(deps: RunnerDeps): Runner {
       run: (send) => void run(send),
       sessionId,
       session,
-      policy: policyFor(project, user, agent, event, true, changed.set),
+      policy: policyFor(
+        sessionId,
+        project,
+        user,
+        agent,
+        event,
+        true,
+        changed.set,
+      ),
       op,
       text,
       title,
@@ -451,6 +436,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const user = author(principal);
       const agent = agentOf(session.agentId);
       const policy = policyFor(
+        session.id,
         project,
         user,
         agent,

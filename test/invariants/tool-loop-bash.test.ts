@@ -34,7 +34,14 @@ describe("bash in the tool loop", () => {
           (script.body.tools as { function: { name: string } }[]).map(
             (tool) => tool.function.name,
           ),
-        ).toEqual(["datetime", "webfetch", "visualize", "bash"]);
+        ).toEqual([
+          "datetime",
+          "webfetch",
+          "visualize",
+          "bash",
+          // a run never saves to the project's memory
+          ...(origin === "chat" ? ["memory_edit"] : []),
+        ]);
         const prompt = (script.body.messages as { content: string }[])[0]!
           .content;
         const bash = (id: string, command: string) => ({

@@ -15,6 +15,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import {
   CREDENTIAL,
   MCP,
+  MEMORY,
   SKILL,
   VISUALIZE,
   WEB,
@@ -47,6 +48,7 @@ import {
 import { Icon } from "../lib/icons.tsx";
 import {
   agentMoved,
+  memoryItem,
   serversItem,
   skillsItem,
   visualsItem,
@@ -228,6 +230,11 @@ export function Composer({
     tools: readable,
     switchable: switchable.value,
     off: isOff(chat, off, VISUALIZE),
+  });
+  const memory = memoryItem({
+    tools: readable,
+    switchable: switchable.value,
+    off: isOff(chat, off, MEMORY),
   });
   // another agent's servers and skills are other keys, so its flips go
   // with it
@@ -421,6 +428,8 @@ export function Composer({
           webPane={webPane}
           visuals={visuals}
           onVisuals={() => flip(chat, off, VISUALIZE)}
+          memory={memory}
+          onMemory={() => flip(chat, off, MEMORY)}
           servers={mcp}
           skills={skill}
           onFlip={(key) => flip(chat, off, key)}

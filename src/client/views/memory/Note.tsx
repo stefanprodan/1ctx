@@ -18,7 +18,7 @@ import {
 } from "../../../shared/memory.ts";
 import { loadMemory, saveMemory, undoMemory } from "../../data/memory.ts";
 import { type Failure, sentence } from "../../lib/format.ts";
-import { userHref } from "../../lib/hrefs.ts";
+import { chatHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -47,13 +47,22 @@ function Writer({ memory, now }: { memory: Memory; now: number }) {
         <a class="note-head-link" href={userHref(writer.username)}>
           @{writer.username}
         </a>
+        {writer.chat !== null && (
+          <>
+            {" "}
+            in{" "}
+            <a class="note-head-link" href={chatHref(writer.chat.id)}>
+              {writer.chat.title}
+            </a>
+          </>
+        )}
       </span>
     );
   }
   return (
     <span>
       Written {writer.when} by{" "}
-      <a class="note-head-link" href={`/chat/${writer.sessionId}`}>
+      <a class="note-head-link" href={chatHref(writer.sessionId)}>
         a run
       </a>{" "}
       of{" "}
