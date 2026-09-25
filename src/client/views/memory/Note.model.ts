@@ -16,19 +16,22 @@ import { ago } from "../../lib/format.ts";
 
 export type Writer =
   | { kind: "none" }
+  // a hand edit or an undo
+  | { kind: "user"; username: string; when: string }
+  // a chat's or a run's save: the agent wrote it
   | {
-      kind: "user";
-      username: string;
-      // the chat the save came from, null for a hand edit or a chat
-      // since deleted
-      chat: { id: string; title: string } | null;
-      when: string;
-    }
-  | {
-      kind: "run";
-      sessionId: string;
-      automationId: string | null;
-      automationName: string | null;
+      kind: "agent";
+      agentName: string;
+      // the chat or the run, null once it is deleted
+      session: {
+        id: string;
+        // the chat's title, null for a run
+        chat: string | null;
+        automationId: string | null;
+        automationName: string | null;
+      } | null;
+      // a deleted session was a run for a task's own note
+      run: boolean;
       when: string;
     };
 
@@ -37,21 +40,28 @@ export function writerOf(memory: Memory, now: number): Writer {
   if (memory.updatedAt === null) return { kind: "none" };
   const when = ago(memory.updatedAt, now);
   const session = memory.session;
-  if (memory.updatedBy !== null) {
-    const chat =
-      session !== null && session.origin === "chat"
-        ? { id: session.id, title: session.title }
-        : null;
-    return { kind: "user", username: memory.updatedBy.username, chat, when };
-  }
-  if (session !== null && session.origin === "automation") {
+  if (memory.agentName !== null) {
     return {
-      kind: "run",
-      sessionId: session.id,
-      automationId: session.automationId,
-      automationName: session.automationName,
+      kind: "agent",
+      agentName: memory.agentName,
+      session:
+        session === null
+          ? null
+          : {
+              id: session.id,
+              chat: session.origin === "chat" ? session.title : null,
+              automationId: session.automationId,
+              automationName: session.automationName,
+            },
+      run:
+        session === null
+          ? memory.automationId !== null
+          : session.origin === "automation",
       when,
     };
+  }
+  if (memory.updatedBy !== null) {
+    return { kind: "user", username: memory.updatedBy.username, when };
   }
   return { kind: "none" };
 }

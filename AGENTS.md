@@ -995,8 +995,13 @@ violation, and every rule has a rejected fixture under
   read, save and undo. `Memory.session` names the chat or run that
   saved last (id, title, origin, the automation for a run), from the
   memory area's session info port, null for a hand edit or once the
-  session is deleted; the note card's writer line reads "@user in
-  <chat>", "a run of <automation>" or "@user" (`Note.model.ts`).
+  session is deleted. `Memory.agentName` is that session's agent,
+  written with the note (`agent_name`) so it outlives the session, null
+  for a hand edit or an undo; a chat's save also records the chat's
+  user in `updatedBy`. The note card's writer line names the agent for
+  any save from a session, "@agent in <chat>", "@agent in a run of
+  <automation>" or "in a chat since deleted", and "@user" only for a
+  hand edit (`Note.model.ts`).
   Entries are `{topic, text}`;
   `shared/memory.ts` owns sanitizing, topic equality, diff and the
   rendered count (60 characters per topic, 500 per text, 2,200 per note).

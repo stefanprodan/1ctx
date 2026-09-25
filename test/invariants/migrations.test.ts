@@ -561,6 +561,7 @@ describe("the schema", () => {
         "0021-served-by",
         "0022-credentials",
         "0023-chat-memory",
+        "0024-memory-agent",
       ]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
@@ -679,7 +680,9 @@ describe("the schema", () => {
       const before = db
         .query<Record<string, unknown>, []>("select * from automations")
         .all();
-      expect(migrate(db)).toEqual(["0023-chat-memory"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 23))).toEqual([
+        "0023-chat-memory",
+      ]);
       expect(MIGRATIONS[22]?.rebuild).toBeUndefined();
       expect(columns()).not.toContain("project_memory");
       expect(
@@ -707,6 +710,41 @@ describe("the schema", () => {
           .map(({ table, on_delete }) => ({ table, on_delete })),
       ).toEqual([{ table: "sessions", on_delete: "CASCADE" }]);
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0024 keeps the saving agent's name on a note, a hand edit none", () => {
+    const db = seed(MIGRATIONS.slice(0, 23));
+    try {
+      db.exec(`
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('t', 'team', 'team', 'u', 0);
+        insert into memory_notes
+          (project_id, automation_id, entries, previous_entries, revision,
+           updated_at, updated_by, session_id)
+          values ('p', null, '[]', '[]', 1, 0, 'u', 'sess'),
+                 ('t', null, '[]', '[]', 1, 0, 'u', null);
+      `);
+      expect(migrate(db)).toEqual(["0024-memory-agent"]);
+      expect(
+        db
+          .query("select project_id, agent_name from memory_notes order by 1")
+          .all(),
+      ).toEqual([
+        { project_id: "p", agent_name: "agent" },
+        { project_id: "t", agent_name: null },
+      ]);
+      // the name outlives the chat
+      db.query("delete from sessions where id = 'sess'").run();
+      expect(
+        db
+          .query(
+            "select session_id, agent_name from memory_notes where project_id = 'p'",
+          )
+          .get(),
+      ).toEqual({ session_id: null, agent_name: "agent" });
     } finally {
       db.close();
     }
@@ -949,6 +987,7 @@ describe("additive migrations", () => {
       "0021-served-by",
       "0022-credentials",
       "0023-chat-memory",
+      "0024-memory-agent",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -1008,6 +1047,7 @@ describe("0005", () => {
       "0021-served-by",
       "0022-credentials",
       "0023-chat-memory",
+      "0024-memory-agent",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -1076,6 +1116,7 @@ describe("rebuild migrations", () => {
       "0021-served-by",
       "0022-credentials",
       "0023-chat-memory",
+      "0024-memory-agent",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1177,6 +1218,7 @@ describe("0006 skills migration", () => {
       "0021-served-by",
       "0022-credentials",
       "0023-chat-memory",
+      "0024-memory-agent",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1237,6 +1279,7 @@ describe("0007 user tz migration", () => {
       "0021-served-by",
       "0022-credentials",
       "0023-chat-memory",
+      "0024-memory-agent",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1276,6 +1319,7 @@ describe("0009 mcp migration", () => {
       "0021-served-by",
       "0022-credentials",
       "0023-chat-memory",
+      "0024-memory-agent",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1531,6 +1575,7 @@ describe("0008 search tavily migration", () => {
           "0021-served-by",
           "0022-credentials",
           "0023-chat-memory",
+          "0024-memory-agent",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

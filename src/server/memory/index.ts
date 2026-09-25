@@ -118,6 +118,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
             const user = deps.users.byId(row.updatedBy);
             return user === null ? null : summary(user);
           })(),
+    agentName: row.agentName,
     session:
       row.sessionId === null ? null : deps.sessions.sessionInfo(row.sessionId),
   });

@@ -206,6 +206,7 @@ describe("the note card", () => {
       automationId: "au1",
       automationName: "digest",
     },
+    agentName: "sre",
     ...changes,
   });
 
@@ -216,61 +217,62 @@ describe("the note card", () => {
     role: "member" as const,
   };
 
-  test("names the run, the chat, the user, or nobody", () => {
-    expect(writerOf(memory(), now)).toMatchObject({
-      kind: "run",
-      sessionId: "s1",
-      automationId: "au1",
-      automationName: "digest",
+  test("names the agent and its chat or run, the user, or nobody", () => {
+    expect(writerOf(memory(), now)).toEqual({
+      kind: "agent",
+      agentName: "sre",
+      session: {
+        id: "s1",
+        chat: null,
+        automationId: "au1",
+        automationName: "digest",
+      },
+      run: true,
       when: "1m ago",
     });
-    // a run whose automation is gone
+    // a chat's save is the agent's, though the chat's user is recorded
+    const chat = {
+      id: "c1",
+      title: "Pricing check",
+      origin: "chat" as const,
+      automationId: null,
+      automationName: null,
+    };
+    expect(
+      writerOf(memory({ updatedBy: user, session: chat }), now),
+    ).toMatchObject({
+      kind: "agent",
+      agentName: "sre",
+      session: { id: "c1", chat: "Pricing check" },
+      run: false,
+    });
+    // the chat deleted: still the agent, in a chat since deleted
     expect(
       writerOf(
-        memory({
-          session: {
-            id: "s1",
-            title: "digest",
-            origin: "automation",
-            automationId: null,
-            automationName: null,
-          },
-        }),
+        memory({ updatedBy: user, session: null, automationId: null }),
         now,
       ),
-    ).toMatchObject({ kind: "run", automationId: null });
-    // a chat's save names the chat
+    ).toMatchObject({
+      kind: "agent",
+      agentName: "sre",
+      session: null,
+      run: false,
+    });
+    // a task's own note whose run is deleted
+    expect(
+      writerOf(memory({ session: null, automationId: "au1" }), now),
+    ).toMatchObject({ kind: "agent", session: null, run: true });
+    // a hand edit or an undo
     expect(
       writerOf(
-        memory({
-          updatedBy: user,
-          session: {
-            id: "c1",
-            title: "Pricing check",
-            origin: "chat",
-            automationId: null,
-            automationName: null,
-          },
-        }),
+        memory({ session: null, agentName: null, updatedBy: user }),
         now,
       ),
-    ).toEqual({
-      kind: "user",
-      username: "casey",
-      chat: { id: "c1", title: "Pricing check" },
-      when: "1m ago",
-    });
-    // a hand edit, and a chat's save once the chat is deleted
-    expect(writerOf(memory({ session: null, updatedBy: user }), now)).toEqual({
-      kind: "user",
-      username: "casey",
-      chat: null,
-      when: "1m ago",
-    });
+    ).toEqual({ kind: "user", username: "casey", when: "1m ago" });
     expect(writerOf(memory({ updatedAt: null }), now)).toEqual({
       kind: "none",
     });
-    expect(writerOf(memory({ session: null }), now)).toEqual({
+    expect(writerOf(memory({ session: null, agentName: null }), now)).toEqual({
       kind: "none",
     });
   });

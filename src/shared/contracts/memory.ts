@@ -23,8 +23,12 @@ export type Memory = {
   revision: number;
   // null before the first write
   updatedAt: number | null;
-  // a user for a hand edit, an undo or a chat's save, null for a run
+  // a user for a hand edit, an undo or a chat's save (the chat's user,
+  // while its agent wrote), null for a run
   updatedBy: UserSummary | null;
+  // the agent of the chat or run that last saved, kept once that session
+  // is deleted; null for a hand edit or an undo
+  agentName: string | null;
   // the chat or run that last saved, null for a hand edit and once that
   // session is deleted; the automation is null for a chat and once
   // deleted

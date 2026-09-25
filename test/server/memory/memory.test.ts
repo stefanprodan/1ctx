@@ -359,6 +359,8 @@ describe("memory routes", () => {
       automationId: null,
       automationName: null,
     });
+    // the run's agent is kept on the note, past its session
+    expect(note.memory.agentName).toBe("coder");
 
     const outsider = chat.app.createUser({
       username: "outsider",
