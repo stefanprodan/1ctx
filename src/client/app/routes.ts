@@ -392,6 +392,13 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/admin/tools/visuals",
+    view: toolsView,
+    title: () => "Visuals",
+    role: "admin",
+    load: () => loadTools(),
+  },
+  {
     path: "/admin/tools/limits",
     view: toolsView,
     title: () => "Limits",

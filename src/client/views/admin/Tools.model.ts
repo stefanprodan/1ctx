@@ -4,8 +4,9 @@
 // What the tools page shows and checks without a DOM: the words of
 // each limit, the unit each row is typed in (seconds for a
 // millisecond cap, KB or MB for a byte cap) and the conversion both
-// ways, the range check the server applies, and the lines of the
-// search section, the tabs and when a send carries a built-in.
+// ways, the range check the server applies, the lines of the search
+// section, the visual hosts box, the tabs and when a send carries a
+// built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import {
@@ -13,6 +14,7 @@ import {
   type SearchState,
   type ToolWhen,
 } from "../../../shared/contracts/tool.ts";
+import { parseVisualHosts } from "../../../shared/visual.ts";
 import { parseDomains, type WebAccessMode } from "../../../shared/web.ts";
 import type {
   LimitName,
@@ -208,11 +210,12 @@ export function totalTokens(rows: { tokens: number }[]): number {
 }
 
 // the page's tabs, each an address
-export type ToolsTab = "builtin" | "web" | "limits";
+export type ToolsTab = "builtin" | "web" | "visuals" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
   { tab: "builtin", label: "Built-in", href: "/admin/tools" },
   { tab: "web", label: "Web", href: "/admin/tools/web" },
+  { tab: "visuals", label: "Visuals", href: "/admin/tools/visuals" },
   { tab: "limits", label: "Limits", href: "/admin/tools/limits" },
 ];
 
@@ -360,20 +363,33 @@ export function searchLine(state: SearchState, mode: WebAccessMode): string {
   return `${line}.`;
 }
 
-export type HostEdit =
-  | { type: "add"; host: string }
-  | { type: "remove"; host: string }
-  | { type: "reset" };
+// what the card says over the box
+export function hostsLine(hosts: readonly string[]): string {
+  return hosts.length === 0
+    ? "No hosts allowed. Visuals use inline code only."
+    : "Visuals load scripts, styles and fonts only from these hosts.";
+}
 
-export function editHosts(hosts: readonly string[], edit: HostEdit): string[] {
-  switch (edit.type) {
-    case "add":
-      return [...hosts, edit.host.trim()];
-    case "remove":
-      return hosts.filter((host) => host !== edit.host);
-    case "reset":
-      return [...DEFAULT_VISUAL_HOSTS];
+// whether the list is the one a fresh instance starts with
+export function defaultHosts(hosts: readonly string[]): boolean {
+  return (
+    hosts.length === DEFAULT_VISUAL_HOSTS.length &&
+    DEFAULT_VISUAL_HOSTS.every((host, i) => hosts[i] === host)
+  );
+}
+
+// the box as typed to the list a save sends, or the words for its field
+export function hostsOf(text: string): { hosts: string[] } | { error: string } {
+  const result = parseVisualHosts(text.split("\n"));
+  if (!result.ok) {
+    return {
+      error:
+        result.value === ""
+          ? sentence(result.error)
+          : `Line ${result.line}, ${result.value}, ${result.error}.`,
+    };
   }
+  return { hosts: result.hosts };
 }
 
 export function hostsFieldOf(message: string): "hosts" | undefined {

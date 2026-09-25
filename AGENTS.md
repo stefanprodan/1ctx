@@ -1137,8 +1137,8 @@ violation, and every rule has a rejected fixture under
   phase offers the own-note `memory_edit` alone.
   Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
-  a key. The Tools page has three tabs, one view over `/admin/tools` (Built-in),
-  `/admin/tools/web` and `/admin/tools/limits`: Built-in lists every
+  a key. The Tools page has four tabs, one view over `/admin/tools` (Built-in),
+  `/admin/tools/web`, `/admin/tools/visuals` and `/admin/tools/limits`: Built-in lists every
   built-in schema, including `bash`, `webfetch` and `websearch`, by name from
   `tools/catalog.ts`, built by the send's own factories with sample
   inputs (name enums empty, `memory_edit` the chat's with the own-note
@@ -1149,14 +1149,13 @@ violation, and every rule has a rejected fixture under
   provider and key presence), and `visualize` (its switch and hosts).
   The one `PATCH /api/tools/:name` descriptor accepts web mode/domains,
   websearch provider, or visualize enabled/hosts, never webfetch.
-  On the page Web is four cards. Web access (`WebAccessCard.tsx`) has
+  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
   its modes, Off, All domains and Listed domains, in the card's head as
   `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
   and All domains save on the click, Listed domains opens the hosts box,
   checked through `parseDomains()` in `shared/web.ts`, and saves the mode
   with the list. Web search is the providers as radio rows with None
-  first. Visuals is the visualize row with its switch and its hosts with
-  Add, Remove and Reset, apart from web access. Credentials
+  first. Credentials
   (`CredentialsCard.tsx`, its words and bodies in
   `CredentialsCard.model.ts`, the rows and `http-` keys in
   `data/credentials.ts`, loaded by the Web route) is `Rows`: the name
@@ -1166,8 +1165,13 @@ violation, and every rule has a rejected fixture under
   methods as boxes (GET and HEAD new), the rail's team projects as
   `RowsCheck` lines, a PATCH sending only the fields changed, and
   Delete asked once.
-  The hosts field warns that loaded URLs can send the visual's data;
-  each card's head has its total. Limits is a form per scope (Per send,
+  The Visuals tab is two cards, apart from web access: Tools, the
+  visualize row with its switch, and Allowed hosts
+  (`VisualHostsCard.tsx`), a box of origins one per line checked
+  through `parseVisualHosts()` in `shared/visual.ts` (the rule the
+  server's `parseHosts()` runs per entry), saved whole, with Reset to
+  defaults. Each card's head has its total. Limits is a form per
+  scope (Per send,
   Per call, Knowledge, Scheduled tasks), each saving the full set with
   the other scopes' saved values. A change on the Tools page applies to
   the next send, a run cap to the next admission; a send in flight

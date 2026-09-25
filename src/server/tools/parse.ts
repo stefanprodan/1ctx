@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { PatchToolRequest } from "../../shared/api/tools.ts";
+import { MAX_VISUAL_HOSTS, visualOrigin } from "../../shared/visual.ts";
 import { isWebAccessMode, parseDomains } from "../../shared/web.ts";
 import { isSearchProvider } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
@@ -77,39 +78,19 @@ export function parseWebDomains(value: unknown): string[] {
 }
 
 export function parseHosts(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > 16) {
-    throw new BadRequest("hosts must be a list of at most 16 HTTPS origins");
+  if (!Array.isArray(value) || value.length > MAX_VISUAL_HOSTS) {
+    throw new BadRequest(
+      `hosts must be a list of at most ${MAX_VISUAL_HOSTS} HTTPS origins`,
+    );
   }
   const hosts = value.map((host: unknown) => {
-    // Check the spelling before URL can erase a path, escape or separator.
-    if (
-      typeof host !== "string" ||
-      !/^https:\/\/(?:[a-z0-9.-]+|\[[0-9a-f:.]+\])(?::443)?\/?$/i.test(host)
-    ) {
+    const origin = typeof host === "string" ? visualOrigin(host) : null;
+    if (origin === null) {
       throw new BadRequest(
         "hosts must be HTTPS origins without a path, query or custom port",
       );
     }
-    let url: URL;
-    try {
-      url = new URL(host);
-    } catch {
-      throw new BadRequest("hosts must be valid HTTPS origins");
-    }
-    if (
-      !url.hostname.startsWith("[") &&
-      !url.hostname
-        .replace(/\.$/, "")
-        .split(".")
-        .every(
-          (label) =>
-            label.length <= 63 &&
-            /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label),
-        )
-    ) {
-      throw new BadRequest("hosts must be valid HTTPS origins");
-    }
-    return url.origin;
+    return origin;
   });
   return [...new Set(hosts)].sort();
 }

@@ -1,15 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tools, in three tabs. Built-in: every tool the server writes
+// The tools, in four tabs. Built-in: every tool the server writes
 // itself, webfetch and websearch included, read-only, each with its
 // tokens. Web: web access for the instance, the search provider, None
 // first, one row per provider with whether its key file is there, and
-// visualize with its own switch, apart from web access, and the HTTP
-// credentials bash's curl signs with. Limits: the caps a send and a call
-// run under. The tab is the address, and the three routes name this one
-// view, so a tab change keeps the page and its load. A change applies to
-// the next send.
+// the HTTP credentials bash's curl signs with. Visuals: visualize with
+// its own switch, apart from web access, and the hosts a visual may
+// load from. Limits: the caps a send and a call run under. The tab is
+// the address, and the four routes name this one view, so a tab change
+// keeps the page and its load. A change applies to the next send.
 
 import { useSignal } from "@preact/signals";
 import type {
@@ -46,6 +46,7 @@ import {
   toolsTab,
   totalTokens,
 } from "./Tools.model.ts";
+import { VisualHostsCard } from "./VisualHostsCard.tsx";
 import { WebAccessCard } from "./WebAccessCard.tsx";
 import "./tools.css";
 
@@ -156,8 +157,13 @@ export function Tools() {
           <>
             <WebAccessCard />
             <SearchCard />
-            <ToolsCard label="Visuals" rows={[state.visualize]} />
             <CredentialsCard />
+          </>
+        )}
+        {tab === "visuals" && state && (
+          <>
+            <ToolsCard label="Tools" rows={[state.visualize]} />
+            <VisualHostsCard />
           </>
         )}
         {tab === "limits" && rows && (

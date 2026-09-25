@@ -454,10 +454,12 @@ describe("the page", () => {
   test.serial("the tab is the address, and Tools stays lit on it", () => {
     expect(toolsTab("/admin/tools")).toBe("builtin");
     expect(toolsTab("/admin/tools/web")).toBe("web");
+    expect(toolsTab("/admin/tools/visuals")).toBe("visuals");
     expect(toolsTab("/admin/tools/limits")).toBe("limits");
     expect(TOOLS_TABS.map((t) => t.label)).toEqual([
       "Built-in",
       "Web",
+      "Visuals",
       "Limits",
     ]);
     expect(onPage("/admin/tools/web", "/admin/tools")).toBe(true);
@@ -512,14 +514,15 @@ describe("the page", () => {
     expect(html).not.toContain("Per send");
   });
 
-  test.serial("Web renders web access, the providers and visualize", () => {
+  test.serial("Web renders web access and the providers", () => {
     tools.value = body();
     limits.value = rows;
     path.value = "/admin/tools/web";
     const html = render(<Tools />);
-    // no row and no switch for the two web tools any more
+    // no row and no switch for the web tools, visualize on its own tab
     expect(html).not.toContain("webfetch");
-    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    expect(html).not.toContain("visualize");
+    expect(html).not.toContain('role="switch"');
     // the modes in the card's head, the picked one pressed, one line under
     expect(html).toMatch(
       /Web access<\/span><nav class="seg seg-small rows-filters"/,
@@ -531,12 +534,6 @@ describe("the page", () => {
     expect(html.indexOf('value="none"')).toBeLessThan(
       html.indexOf('value="exa"'),
     );
-    // the total in the head, never a row's
-    expect(html.match(/2\.72K tokens/g)).toHaveLength(1);
-    expect(html).toMatch(/rows-hint[^>]*>2\.72K tokens/);
-    expect(html).not.toMatch(/rows-meta">[^<]*tokens/);
-    expect(html).toContain('role="switch"');
-    expect(html).toContain('aria-checked="true"');
     expect(html).not.toContain("datetime");
     expect(html).toContain("search-exa.key present");
     expect(html).toContain("search-firecrawl.key keyless");
@@ -574,7 +571,28 @@ describe("the page", () => {
     expect(html).toContain(ACCESS_WORDS.off);
     expect(html).toContain("Web access is off. websearch is not offered.");
     // visualize is apart from web access
-    expect(html).toContain('aria-label="visualize on"');
+    path.value = "/admin/tools/visuals";
+    expect(render(<Tools />)).toContain('aria-label="visualize on"');
+  });
+
+  test.serial("Visuals renders visualize and its hosts form", () => {
+    tools.value = body({ ...fetchTool, hosts: ["https://cdn.example.com"] });
+    limits.value = rows;
+    path.value = "/admin/tools/visuals";
+    const html = render(<Tools />);
+    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    expect(html).toContain('aria-checked="true"');
+    // the total in the head, never a row's
+    expect(html.match(/2\.72K tokens/g)).toHaveLength(1);
+    expect(html).toMatch(/rows-hint[^>]*>2\.72K tokens/);
+    expect(html).not.toMatch(/rows-meta">[^<]*tokens/);
+    expect(html).toMatch(/rows-hint[^>]*>1 of 16/);
+    expect(html.match(/<form/g)).toHaveLength(1);
+    expect(html).toMatch(
+      /<textarea name="hosts"[^>]*>https:\/\/cdn\.example\.com</,
+    );
+    expect(html).not.toContain("Web search");
+    expect(html).not.toContain("Per send");
   });
 
   test.serial("Limits renders the fields", () => {
