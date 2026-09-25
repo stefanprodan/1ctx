@@ -404,11 +404,15 @@ export function RowsTitle({
   sub,
   mono,
   bad,
+  subWide,
 }: {
   name: ComponentChildren;
   sub?: ComponentChildren;
   mono?: boolean;
   bad?: boolean;
+  // the sub line only from 720 up; a phone shows the name alone and the
+  // open row holds the rest
+  subWide?: boolean;
 }) {
   return (
     <span class="rows-title">
@@ -418,7 +422,11 @@ export function RowsTitle({
         {typeof name === "string" ? <span class="cut">{name}</span> : name}
       </span>
       {sub !== undefined && (
-        <span class={`rows-sub${bad ? " rows-bad" : ""}`}>{sub}</span>
+        <span
+          class={`rows-sub${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}`}
+        >
+          {sub}
+        </span>
       )}
     </span>
   );

@@ -20,6 +20,7 @@ export function Foot({
   label,
   start,
   before,
+  after,
   children,
 }: {
   save: Pick<Save, "status" | "busy" | "notice">;
@@ -30,6 +31,8 @@ export function Foot({
   start?: ComponentChildren;
   // what sits right before the submit: a Cancel
   before?: ComponentChildren;
+  // what follows the submit: a Reset beside it, a count at the end
+  after?: ComponentChildren;
 }) {
   const status = save.status.value;
   const done = status === "done";
@@ -69,6 +72,7 @@ export function Foot({
           </span>
         </button>
       )}
+      {after}
     </div>
   );
 }

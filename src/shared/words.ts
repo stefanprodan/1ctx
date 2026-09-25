@@ -435,9 +435,16 @@ export const LIMIT_UNITS = [
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
 // where a limit applies: over the whole send, to one tool call, to a
-// project's knowledge base, a storage cap read at each write, or to the
-// runs the process holds at once, read at each admission
-export const LIMIT_SCOPES = ["send", "call", "knowledge", "runs"] as const;
+// project's knowledge base, a storage cap read at each write, to the
+// runs the process holds at once, read at each admission, or to the
+// visuals a send draws
+export const LIMIT_SCOPES = [
+  "send",
+  "call",
+  "knowledge",
+  "runs",
+  "visuals",
+] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 
 // a skill's name, the Agent Skills rule: lowercase ASCII letters, digits

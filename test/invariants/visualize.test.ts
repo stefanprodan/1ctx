@@ -159,7 +159,7 @@ describe("visual tool administration", () => {
             default: 256 * 1024,
             min: 16 * 1024,
             max: 512 * 1024,
-            scope: "call",
+            scope: "visuals",
             unit: "bytes",
           }),
           expect.objectContaining({
@@ -167,7 +167,7 @@ describe("visual tool administration", () => {
             default: 1024 * 1024,
             min: 64 * 1024,
             max: 4 * 1024 * 1024,
-            scope: "send",
+            scope: "visuals",
             unit: "bytes",
           }),
           expect.objectContaining({
@@ -175,7 +175,7 @@ describe("visual tool administration", () => {
             default: 2,
             min: 1,
             max: 10,
-            scope: "call",
+            scope: "visuals",
             unit: "count",
           }),
         ]),

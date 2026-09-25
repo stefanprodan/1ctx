@@ -34,6 +34,7 @@ import {
   domainsOf,
   draftOf,
   firstSentence,
+  jsonLines,
   keyLine,
   LIMIT_WORDS,
   problem,
@@ -142,6 +143,15 @@ const runsPerUser = row({
   unit: "count",
   scope: "runs",
 });
+const maxVisuals = row({
+  name: "maxVisuals",
+  value: 2,
+  default: 2,
+  min: 1,
+  max: 10,
+  unit: "count",
+  scope: "visuals",
+});
 const rows = [
   rounds,
   toolMs,
@@ -151,6 +161,7 @@ const rows = [
   cut,
   reserve,
   runsPerUser,
+  maxVisuals,
 ];
 
 const html =
@@ -270,6 +281,7 @@ describe("the limit words and units", () => {
         resultCut: 50_000,
         contextReserve: 20_000,
         runsPerUser: 4,
+        maxVisuals: 2,
       },
     });
     const edited = { ...draft, rounds: "501" };
@@ -468,6 +480,17 @@ describe("the page", () => {
     expect(WHEN_WORDS.always).not.toBe("");
   });
 
+  test("an open row names the description and counts the schema's lines", () => {
+    const html = render(<ToolRow tool={time} open onToggle={() => {}} />);
+    expect(html).toContain('<div class="label">Description</div>');
+    expect(html).not.toContain("Description for agents");
+    // a short schema is not cut: no fade, no Show all
+    expect(html).toContain('class="fold fold-inset fold-framed"');
+    expect(html).not.toContain("fold-more");
+    expect(jsonLines({ type: "object", properties: {} })).toBe(4);
+    expect(jsonLines({})).toBe(1);
+  });
+
   test("memory_edit says when each of its two texts is sent", () => {
     const edit: BuiltinToolSummary = {
       ...time,
@@ -511,7 +534,7 @@ describe("the page", () => {
     expect(html).not.toContain('role="switch"');
     expect(html).not.toContain("webfetch");
     expect(html).not.toContain("md-pre");
-    expect(html).not.toContain("Per send");
+    expect(html).not.toContain("Per turn");
   });
 
   test.serial("Web renders web access and the providers", () => {
@@ -540,7 +563,7 @@ describe("the page", () => {
     expect(html).toContain("search-tavily.key keyless");
     expect(html).not.toContain("rows-meta-bad");
     expect(html).toContain("websearch runs on exa.");
-    expect(html).not.toContain("Per send");
+    expect(html).not.toContain("Per turn");
   });
 
   test.serial("Listed domains shows the stored hosts in the box", () => {
@@ -575,24 +598,37 @@ describe("the page", () => {
     expect(render(<Tools />)).toContain('aria-label="visualize on"');
   });
 
-  test.serial("Visuals renders visualize and its hosts form", () => {
+  test.serial("Visuals renders three sections: tools, CDNs, limits", () => {
     tools.value = body({ ...fetchTool, hosts: ["https://cdn.example.com"] });
     limits.value = rows;
     path.value = "/admin/tools/visuals";
     const html = render(<Tools />);
+    expect(html).not.toContain("rows-card");
+    expect(
+      [...html.matchAll(/section-title">([^<]+)</g)].map((m) => m[1]),
+    ).toEqual(["Tools", "CDNs", "Limits"]);
+    expect(html).toContain('section-text">Inline visualizations<');
+    // the row in an inset list, its tokens and sub line only from 720 up
+    expect(html).toContain('class="rows-list"');
     expect(html.match(/role="switch"/g)).toHaveLength(1);
     expect(html).toContain('aria-checked="true"');
-    // the total in the head, never a row's
-    expect(html.match(/2\.72K tokens/g)).toHaveLength(1);
-    expect(html).toMatch(/rows-hint[^>]*>2\.72K tokens/);
-    expect(html).not.toMatch(/rows-meta">[^<]*tokens/);
-    expect(html).toMatch(/rows-hint[^>]*>1 of 16/);
-    expect(html.match(/<form/g)).toHaveLength(1);
+    expect(html).toMatch(/rows-meta-long">2\.72K tokens/);
+    expect(html).toContain("rows-sub rows-sub-wide");
+    expect(html).toMatch(/section-fact-end">1 of 16/);
+    // the CDNs, then the visual limits as text boxes with their units
+    expect(html.match(/<form/g)).toHaveLength(2);
+    expect(html).toContain('class="section-grid"');
+    expect(html).toContain('class="section-number-input"');
+    expect(html).not.toContain('type="number"');
+    expect(html).not.toContain("section-off");
+    expect(html).toContain("Visuals per turn");
+    expect(html).toContain('name="maxVisuals"');
+    expect(html).not.toContain("Rounds");
     expect(html).toMatch(
       /<textarea name="hosts"[^>]*>https:\/\/cdn\.example\.com</,
     );
     expect(html).not.toContain("Web search");
-    expect(html).not.toContain("Per send");
+    expect(html).not.toContain("Per turn");
   });
 
   test.serial("Limits renders the fields", () => {
@@ -600,15 +636,16 @@ describe("the page", () => {
     limits.value = rows;
     path.value = "/admin/tools/limits";
     const html = render(<Tools />);
-    expect(html).toContain("Per send");
+    expect(html).toContain("Per turn");
     expect(html).toContain("Per call");
     expect(html).toContain("Knowledge");
     expect(html).toContain("Scheduled tasks");
     expect(html).toContain("Runs per user");
     expect(html.match(/<form/g)).toHaveLength(4);
+    expect(html).not.toContain("Visuals per turn");
     expect(html).not.toContain(">Limits</span>");
-    expect(html).toContain('type="number"');
-    expect(html).toContain('step="any"');
+    expect(html).toContain('inputmode="decimal"');
+    expect(html).not.toContain('type="number"');
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");
     expect(html).not.toContain("rows-hint");

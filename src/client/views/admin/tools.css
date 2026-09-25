@@ -21,9 +21,6 @@
     max-height: 320px;
     overflow: clip;
   }
-  .tools-toggle {
-    align-self: flex-start;
-  }
 
   .tools-form {
     display: flex;
@@ -96,12 +93,6 @@
     font-size: var(--text-mono);
     color: var(--fg);
     text-align: right;
-    appearance: textfield;
-  }
-  .tools-input::-webkit-inner-spin-button,
-  .tools-input::-webkit-outer-spin-button {
-    appearance: none;
-    margin: 0;
   }
   .tools-input:focus {
     border-color: var(--line-strong);

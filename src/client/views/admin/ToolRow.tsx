@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A tool's row, built like every admin row: the name over the first
-// sentence of its description, for a built-in the tokens its schema
-// costs as the row's meta, and for a web tool its switch. It opens in place to when a send
+// sentence of its description, the tokens its schema costs as the
+// row's meta, and for a web tool its switch, the name and the switch
+// alone on a phone, and from 720 up Off in place of the tokens while it
+// is off. It opens in place to when a send
 // carries it, the text and the parameters the model gets.
 
 import { useSignal } from "@preact/signals";
@@ -13,9 +15,10 @@ import type {
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import { patchTool } from "../../data/tools.ts";
-import { says } from "../../lib/format.ts";
+import { says, showAll } from "../../lib/format.ts";
 import { useCut } from "../../lib/resize.ts";
 import { copyCode } from "../../transcript/copy.ts";
+import { Fold } from "../../ui/Fold.tsx";
 import {
   RowsEnd,
   RowsMeta,
@@ -25,6 +28,7 @@ import {
 } from "../../ui/Rows.tsx";
 import {
   firstSentence,
+  jsonLines,
   NAMES_WORDS,
   tokensText,
   VARIANT_WHEN_WORDS,
@@ -70,14 +74,18 @@ export function ToolRow({
 }) {
   // the block's Copy is a button inside rendered HTML, so the click is
   // delegated the way the transcript does it
-  // the parameters are cut to a height with Show all, since a box that
-  // scrolls on its own inside the page's scroll leaves the page's
-  // sticky head behind
+  // the parameters are cut to a height, Show all at the block's foot,
+  // since a box that scrolls on its own inside the page's scroll leaves
+  // the page's sticky head behind; once open the block stays whole
+  // until the row folds
   const {
     el: json,
     open: all,
     long,
   } = useCut<HTMLDivElement>([open, tool.parametersHtml]);
+  useEffect(() => {
+    if (!open) all.value = false;
+  }, [open]);
   useEffect(() => {
     const el = json.current;
     if (!el) return;
@@ -91,14 +99,22 @@ export function ToolRow({
       open={open}
       onToggle={onToggle}
       indent="chevron"
+      off={"enabled" in tool && !tool.enabled}
       head={
         <>
           <RowsTitle
             name={tool.name}
             sub={firstSentence(tool.description)}
             mono
+            subWide={builtin === null}
           />
-          {builtin && <RowsMeta>{tokensText(tool.tokens)}</RowsMeta>}
+          {builtin ? (
+            <RowsMeta>{tokensText(tool.tokens)}</RowsMeta>
+          ) : "enabled" in tool && tool.enabled ? (
+            <RowsMeta short="">{tokensText(tool.tokens)}</RowsMeta>
+          ) : (
+            <RowsMeta short="">Off</RowsMeta>
+          )}
         </>
       }
       end={"enabled" in tool ? <Switch tool={tool} /> : undefined}
@@ -110,7 +126,7 @@ export function ToolRow({
             <div class="tools-text">{WHEN_WORDS[builtin.when]}</div>
           </>
         )}
-        <div class="label">Description for agents</div>
+        <div class="label">Description</div>
         <div class="tools-text">{tool.description}</div>
         {builtin?.variant && (
           <>
@@ -125,23 +141,20 @@ export function ToolRow({
         <div class="label">Parameters</div>
         {builtin?.names && <div class="hint">{NAMES_WORDS}</div>}
         {/* Server rendering keeps the Markdown parser out of the browser. */}
-        <div
-          class={all.value ? undefined : "tools-json-cut"}
-          ref={json}
-          dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
-        />
-        {long.value && (
-          <button
-            type="button"
-            class="btn btn-small tools-toggle"
-            aria-expanded={all.value}
-            onClick={() => {
-              all.value = !all.value;
-            }}
-          >
-            {all.value ? "Show less" : "Show all"}
-          </button>
-        )}
+        <Fold
+          cut={long.value && !all.value}
+          onOpen={() => {
+            all.value = true;
+          }}
+          label={showAll(jsonLines(tool.parameters))}
+          framed
+        >
+          <div
+            class={all.value ? undefined : "tools-json-cut"}
+            ref={json}
+            dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
+          />
+        </Fold>
       </div>
     </RowsOpen>
   );

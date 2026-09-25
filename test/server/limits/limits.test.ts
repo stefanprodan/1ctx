@@ -129,10 +129,11 @@ describe("limits area", () => {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
       expect(rows).toHaveLength(39);
       expect(new Set(rows.map((row) => row.name)).size).toBe(39);
-      expect(rows.filter((row) => row.scope === "send")).toHaveLength(13);
-      expect(rows.filter((row) => row.scope === "call")).toHaveLength(11);
+      expect(rows.filter((row) => row.scope === "send")).toHaveLength(12);
+      expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "runs")).toHaveLength(2);
+      expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 1_000_000,

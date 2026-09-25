@@ -43,7 +43,7 @@ const rows = [tokenLimit, bashLimit];
 describe("send budget fields", () => {
   test("names both limits in their own units", () => {
     expect(LIMIT_WORDS.toolWorkTokens.label).toBe("Tool-work tokens");
-    expect(LIMIT_WORDS.maxBashCalls.label).toBe("Bash calls per send");
+    expect(LIMIT_WORDS.maxBashCalls.label).toBe("Bash calls per turn");
     expect(displayOf(tokenLimit)).toEqual({ word: "tokens", factor: 1 });
     expect(displayOf(bashLimit)).toEqual({ word: "", factor: 1 });
     expect(defaultLine(tokenLimit)).toBe("default 500000 tokens");
@@ -52,7 +52,7 @@ describe("send budget fields", () => {
       "Tool-work tokens must be from 10000 to 10000000 tokens",
     );
     expect(problem(bashLimit, "1001")).toBe(
-      "Bash calls per send must be from 1 to 1000",
+      "Bash calls per turn must be from 1 to 1000",
     );
     expect(limitFieldOf("toolWorkTokens needs a number")).toBe(
       "toolWorkTokens",
@@ -118,7 +118,7 @@ describe("send budget fields", () => {
       expect(send).toContain('value="750000"');
       expect(send).toContain("default 500000 tokens");
       expect(send).not.toContain('name="maxBashCalls"');
-      expect(call).toContain("Bash calls per send");
+      expect(call).toContain("Bash calls per turn");
       expect(call).toContain('name="maxBashCalls"');
       expect(call).toContain('value="200"');
       expect(call).toContain("default 100");
