@@ -125,16 +125,16 @@ export function parsePrintStatement(p: PrintParserContext): AwkStmt {
  * (not inside ternary) as redirection rather than comparison operators.
  * Supports assignment expressions like: print 9, a=10, 11
  */
-// The output redirection after the arguments; (1ctx) "|" takes a
-// concatenation, as gawk does (`print x | "sort " flags`)
+// The output redirection after the arguments; (1ctx) each takes a
+// concatenation, as gawk does (`print x | "sort " flags`, `> dir (name)`)
 function parseOutput(p: PrintParserContext): AwkOutput | undefined {
   if (p.check(TokenTypes.GT as TokenType)) {
     p.advance();
-    return { redirect: ">", file: p.parsePrimary() };
+    return { redirect: ">", file: parsePrintConcatenation(p) };
   }
   if (p.check(TokenTypes.APPEND as TokenType)) {
     p.advance();
-    return { redirect: ">>", file: p.parsePrimary() };
+    return { redirect: ">>", file: parsePrintConcatenation(p) };
   }
   if (p.check(TokenTypes.PIPE as TokenType)) {
     p.advance();

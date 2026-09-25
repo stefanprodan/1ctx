@@ -164,6 +164,9 @@ function assignOperand(
   if (isReservedName(name)) {
     throw new Error(`cannot use gawk builtin '${name}' as variable name`);
   }
+  if (ctx.functions.has(name)) {
+    throw new Error(`cannot use function '${name}' as variable name`);
+  }
   if (isUnsupportedName(name)) throw unsupported(name);
   if (ctx.arrays[name] !== undefined) {
     throw new Error(`attempt to use array '${name}' in a scalar context`);

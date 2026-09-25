@@ -118,7 +118,10 @@ export const awkCommand2: RuntimeCommand = {
     try {
       ast = parser.parse(program);
       // (1ctx) what gawk refuses before anything runs
-      checkProgram(ast);
+      checkProgram(
+        ast,
+        options.assignments.map((a) => a.name),
+      );
     } catch (e) {
       rethrowFatalExecutionError(e);
       const msg = e instanceof Error ? e.message : String(e);

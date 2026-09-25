@@ -17,6 +17,7 @@ import type {
   AwkStmt,
   AwkVariable,
 } from "./ast.js";
+import { isGawkBuiltin } from "./check.js";
 import { AwkLexer, type Token, TokenType } from "./lexer.js";
 import { parsePrintfStatement, parsePrintStatement } from "./parser2-print.js";
 
@@ -766,6 +767,15 @@ export class AwkParser {
     return left;
   }
 
+  // (1ctx) gawk takes "name (" as a call only for a builtin; for any other
+  // name it is a concatenation, or a refusal when the name is a function
+  private isCall(token: Token): boolean {
+    return (
+      this.check(TokenType.LPAREN) &&
+      (token.call === true || isGawkBuiltin(token.value as string))
+    );
+  }
+
   private canStartExpression(): boolean {
     return this.match(
       TokenType.NUMBER,
@@ -1062,9 +1072,10 @@ export class AwkParser {
 
     // Variable or function call
     if (this.check(TokenType.IDENT)) {
-      const name = this.advance().value as string;
+      const token = this.advance();
+      const name = token.value as string;
       // Check for function call
-      if (this.check(TokenType.LPAREN)) {
+      if (this.isCall(token)) {
         this.advance();
         const args: AwkExpr[] = [];
         if (!this.check(TokenType.RPAREN)) {
@@ -1181,7 +1192,8 @@ export class AwkParser {
 
     // Identifier (variable or function call)
     if (this.check(TokenType.IDENT)) {
-      const name = this.advance().value as string;
+      const token = this.advance();
+      const name = token.value as string;
 
       // (1ctx) `length` without parentheses is length($0)
       if (name === "length" && !this.check(TokenType.LPAREN)) {
@@ -1189,7 +1201,7 @@ export class AwkParser {
       }
 
       // Function call
-      if (this.check(TokenType.LPAREN)) {
+      if (this.isCall(token)) {
         this.advance();
         const args: AwkExpr[] = [];
         // Skip newlines after opening paren (AWK allows multi-line function calls)

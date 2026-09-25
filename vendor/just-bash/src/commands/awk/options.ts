@@ -7,7 +7,7 @@
  */
 
 import { awkBuiltins } from "./builtins.js";
-import { isUnsupportedName } from "./check.js";
+import { isGawkBuiltin, isUnsupportedName } from "./check.js";
 import { KEYWORDS } from "./lexer.js";
 
 export interface AwkAssignment {
@@ -39,6 +39,7 @@ export function isReservedName(name: string): boolean {
   return (
     KEYWORDS.has(name) ||
     awkBuiltins.has(name) ||
+    isGawkBuiltin(name) ||
     name === "func" ||
     name === "BEGINFILE" ||
     name === "ENDFILE"

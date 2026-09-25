@@ -69,6 +69,7 @@ without a file of their own.
 | `src/commands/awk/builtins.ts`, `check.ts` | `sub` and `gsub` change the array element, the built-in variable or the field their third argument names, assign nothing when nothing matched, count in a string constant without changing it, and refuse any other third argument before the program runs; the replacement follows gawk's backslash rules (`\\\&` gives `\&`, `\\\\` gives `\\`, `\\&` a backslash and the match, `\&` an ampersand, any other backslash stays) | `gsub(/a/, "b", arr[k])` and `gsub(/a/, "b", "aaa")` changed `$0` instead, and `\q` lost its backslash |
 | `src/commands/awk/interpreter/expressions.ts`, `variables.ts`, `context.ts` | a comparison is numeric when both sides are a number, an uninitialized variable or element (both `""` and `0`, an element made by a reference included) or a numeric-looking string that is not a constant, a concatenation or a string function's answer; division and modulo by zero are fatal | `x == 0` and `c[$1] == 0` were false for an unset `x` and `c[$1]`, `substr(s, 1, 2) > 5` compared numbers, and `1/0` printed `0` |
 | `src/commands/awk/parser2.ts` | `$` binds tighter than `^`, and an exponent may carry a sign | `$2^2` read `$4` and `2^-1` was a parse error |
+| `src/commands/awk/lexer.ts`, `parser2.ts`, `parser2-print.ts`, `check.ts`, `options.ts`, `awk2.ts`, `interpreter/input.ts` | a name followed by `(` with a space between is a call only for a gawk builtin, ours or one we lack; for any other name it is a concatenation, `x (y)` joining `x` and `y`; a user function's name used that way, as a variable, as an array, as its own parameter or in `-v` is refused before `BEGIN`, exit 1, and as an operand assignment is fatal when reached, exit 2; the file after `>` and `>>` is a concatenation, as after `\|` | `x (1 ? "b" : "c")` was `function 'x' not defined`, a form models write to join strings, and `print > "a" ".txt"` wrote to `a` |
 | `src/commands/awk/format.ts`, `interpreter/statements.ts`, `fields.ts`, `expressions.ts`, `awk2.ts` | `printf` with fewer arguments than conversions is fatal, a negative field is fatal, a bare `exit` keeps the code an earlier `exit` set, `print > "/dev/stdout"` prints and `print > "/dev/stderr"` reaches stderr, and `getline < "-"` or `getline < "/dev/stdin"` reads standard input | a missing argument printed empty or `0`, `$(-1)` was empty, `print > "/dev/stdout"` wrote a file that name and getline from stdin answered -1 |
 | `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `input.ts`, `records.ts`, `context.ts`, `awk2.ts` | fields are capped like array elements, `ARGV` and `ENVIRON` elements count against the cap, a gap in `ARGV` is skipped whole, and the compiled record separators live with the command | `$100000000 = "x"` took gigabytes, `split(s, ARGV)` escaped the cap, `ARGC = 1e8` spun for ten seconds and a module-level cache kept each command's last input |
 | `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
@@ -178,10 +179,12 @@ they part:
   records for one are erratic.
 - `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`,
   `FIELDWIDTHS`, `@include`, `@load`, `@namespace` and `|&` are refused;
-  `strtonum`, `patsplit`, `isarray` and `typeof` are functions not
-  defined; `systime`, `mktime` and `strftime` fail when called, `system`
-  is refused, and `asort` and `asorti` refuse a user comparison
-  function.
+  a call to a gawk builtin we lack (`strtonum`, `typeof`, `isarray`,
+  `mkbool`, `patsplit`, the bitwise `and`, `or`, `xor`, `compl`,
+  `lshift`, `rshift`, and the gettext functions) is refused before
+  anything runs, exit 2; `systime`, `mktime` and `strftime` fail when
+  called, `system` is refused, and `asort` and `asorti` refuse a user
+  comparison function.
 - `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
   line saying what this is, not gawk's copyright text.
 - An output pipe's command runs once, when the pipe is closed or the

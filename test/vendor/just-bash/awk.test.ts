@@ -230,23 +230,6 @@ describe("gawk features we do not have", () => {
     expect(r.exitCode).toBe(2);
   });
 
-  for (const call of [
-    'strtonum("0x1A")',
-    'patsplit("a b", a)',
-    "isarray(a)",
-    "typeof(a)",
-  ]) {
-    const name = call.slice(0, call.indexOf("("));
-    test(`${name} is a function not defined`, async () => {
-      const r = await new Bash().exec(
-        `awk 'BEGIN { print "before"; x = ${call} }'`,
-      );
-      expect(r.stdout).toBe("before\n");
-      expect(r.stderr).toBe(`awk: function '${name}' not defined\n`);
-      expect(r.exitCode).toBe(2);
-    });
-  }
-
   test("a user comparison function for asort is refused", async () => {
     const r = await new Bash().exec(
       `awk 'function cmp(i1, v1, i2, v2) {return v2 - v1} BEGIN { print "before"; a[1] = 1; n = asort(a, d, "cmp") }'`,
@@ -267,6 +250,24 @@ describe("gawk features we do not have", () => {
     expect(r.stderr).toBe("awk: |& is not supported\n");
     expect(r.exitCode).toBe(2);
   });
+
+  for (const call of [
+    'strtonum("0x1A")',
+    'patsplit("a b", a)',
+    "isarray(a)",
+    "typeof (a)",
+    "and(1, 3)",
+  ]) {
+    const name = call.slice(0, call.search(/[ (]/));
+    test(`a gawk builtin we lack, ${name}, is refused before anything runs`, async () => {
+      const r = await new Bash().exec(
+        `awk 'BEGIN { print "before" } END { x = ${call} }'`,
+      );
+      expect(r.stdout).toBe("");
+      expect(r.stderr).toBe(`awk: ${name} is not supported\n`);
+      expect(r.exitCode).toBe(2);
+    });
+  }
 
   for (const call of [
     "systime()",

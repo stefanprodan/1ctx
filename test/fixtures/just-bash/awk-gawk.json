@@ -3966,6 +3966,182 @@
       "stdout": "-1\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates a variable",
+      "args": [
+        "BEGIN { x = \"a\"; y = x (1 ? \"b\" : \"c\"); print y }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "ab\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates variables",
+      "args": [
+        "BEGIN { a = \"x\"; b = \"y\"; print a (b) (a) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "xyx\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates a field",
+      "args": [
+        "{ print $1 (\"-\" NR) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "p-1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates an element",
+      "args": [
+        "BEGIN { x[1] = 2; print x[1] (3) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "23\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( calls a builtin",
+      "args": [
+        "BEGIN { print length (\"abc\"), substr (\"abc\", 2), toupper (\"a\") (1) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "3 bc A1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space in a function definition",
+      "args": [
+        "function f (a) { return a + 1 } BEGIN { print f(1) (f(2)) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "23\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( refuses a user function",
+      "args": [
+        "function f(a) { return a } BEGIN { print f (1) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: a function name as a variable",
+      "args": [
+        "function f(a) { return a } BEGIN { f = 1 }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: a function name as an array",
+      "args": [
+        "function f(a) { return a } BEGIN { f[1] = 1 }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: > takes a concatenation with a spaced paren",
+      "args": [
+        "BEGIN { x = \"a\"; y = \"b\"; print \"ok\" > x (y); close(x y); getline l < \"ab\"; print l }"
+      ],
+      "stdin": "",
+      "stdout": "ok\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: >> takes a concatenation",
+      "args": [
+        "BEGIN { x = \"a\"; print \"one\" >> x \".txt\"; print \"two\" >> x \".txt\"; close(x \".txt\"); while ((getline l < \"a.txt\") > 0) print l }"
+      ],
+      "stdin": "",
+      "stdout": "one\ntwo\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: printf > takes a concatenation",
+      "args": [
+        "{ printf \"%s\\n\", $1 > $2 \".out\"; close($2 \".out\"); getline l < ($2 \".out\"); print l }"
+      ],
+      "stdin": "hi f\n",
+      "stdout": "hi\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: a parameter named after its function",
+      "args": [
+        "function f(f) { return 7 } BEGIN { print f(1) }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: -v names a function",
+      "args": [
+        "-v",
+        "f=9",
+        "function f(x) { return x } BEGIN { print f(1) }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: an operand names a function",
+      "args": [
+        "function f(x) { return x } BEGIN { print f(1) } { print \"rec\" } END { print \"end\" }",
+        "f=9",
+        "-"
+      ],
+      "stdin": "r\n",
+      "stdout": "1\n",
+      "exit": 2,
+      "stderr": true
+    },
+    {
+      "name": "parse: a gawk builtin we lack cannot be redefined",
+      "args": [
+        "function strtonum(a) { return 1 } BEGIN { print 2 }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: a gawk builtin we lack is no -v name",
+      "args": [
+        "-v",
+        "typeof=1",
+        "BEGIN { print 2 }"
+      ],
+      "stdin": "",
+      "stdout": "",
+      "exit": 2,
+      "stderr": true
     }
   ]
 }

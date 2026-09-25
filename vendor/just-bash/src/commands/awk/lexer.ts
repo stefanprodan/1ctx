@@ -119,6 +119,9 @@ export interface Token {
   value: string | number;
   line: number;
   column: number;
+  // (1ctx) a name written right before "(": gawk calls only such a user
+  // function, and a space before "(" makes a user name a concatenation
+  call?: boolean;
 }
 
 /**
@@ -540,6 +543,7 @@ export class AwkLexer {
       value: name,
       line: startLine,
       column: startColumn,
+      call: this.peek() === "(",
     };
   }
 
