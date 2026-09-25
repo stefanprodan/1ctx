@@ -3,12 +3,14 @@
 //
 // A file a bash command opened onto the page, Markdown rendered or code
 // highlighted. The head carries the path and Copy, which takes the
-// source; the body is cut to its first lines with Show all, never a
-// scroll box of its own inside the shell's scroll box.
+// source; the body is cut to its first lines, Show all in its fade
+// (ui/Fold.tsx), and stays whole once open.
 
 import { useEffect } from "preact/hooks";
 import { loadOpened, openedFiles } from "../data/session-values.ts";
+import { showAll } from "../lib/format.ts";
 import { useCut } from "../lib/resize.ts";
+import { Fold } from "../ui/Fold.tsx";
 import { CopyButton } from "./Copy.tsx";
 import type { FileCard as Card } from "./visuals.ts";
 import "./filecard.css";
@@ -24,9 +26,10 @@ export function FileCard({ card }: { card: Card }) {
   }, [stored, card.messageId, card.index]);
   const code = card.file.kind !== "markdown";
   const done = stored?.status === "done" ? stored : null;
-  // the file's own lines say a cut hides something before anything is
-  // measured; the measure catches a rendering taller than its source
-  const cut = long.value || card.file.lines > FOLD_LINES;
+  // code draws a line per source line, so its count says a cut hides
+  // something before anything is measured; Markdown's blank lines
+  // collapse, so only the measure knows
+  const cut = long.value || (code && card.file.lines > FOLD_LINES);
   return (
     <div class="filecard" data-file={card.key}>
       <div class="filecard-head">
@@ -43,7 +46,15 @@ export function FileCard({ card }: { card: Card }) {
       ) : stored.status === "failed" ? (
         <div class="filecard-error">{stored.error}</div>
       ) : (
-        <>
+        <Fold
+          cut={cut && !open.value}
+          onOpen={() => {
+            open.value = true;
+          }}
+          label={showAll(card.file.lines)}
+          framed={code}
+          ground={code ? "inset" : "page"}
+        >
           <div
             ref={el}
             class={`filecard-body${code ? " filecard-body-code" : ""}${
@@ -68,19 +79,7 @@ export function FileCard({ card }: { card: Card }) {
               />
             )}
           </div>
-          {cut && (
-            <button
-              type="button"
-              class="btn-text filecard-more"
-              aria-expanded={open.value}
-              onClick={() => {
-                open.value = !open.value;
-              }}
-            >
-              {open.value ? "Show less" : "Show all"}
-            </button>
-          )}
-        </>
+        </Fold>
       )}
     </div>
   );

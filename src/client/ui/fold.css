@@ -1,0 +1,51 @@
+/* A block cut to its first lines: the foot fades into the block's
+   ground, Show all inside it. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .fold {
+    position: relative;
+    min-width: 0;
+  }
+  /* it takes the focus only from its own Show all, so no ring */
+  .fold:focus-visible {
+    outline: none;
+  }
+  .fold-inset {
+    --fold-ground: var(--inset);
+  }
+  .fold-card {
+    --fold-ground: var(--card);
+  }
+  .fold-page {
+    --fold-ground: var(--page);
+  }
+
+  .fold-more {
+    position: absolute;
+    right: 0;
+    /* past the block by a pixel: a clip on a fractional edge lets
+       the cut line's glyphs paint one row below it */
+    bottom: -1px;
+    left: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 72px;
+    padding-bottom: var(--space-2);
+    background: linear-gradient(transparent, var(--fold-ground) 70%);
+  }
+  /* the cut hides a boxed block's bottom edge, so the foot draws it.
+     The bottom line is a shadow under the foot, not a border: a border
+     sits inside the box, where its antialiased row lets the clipped
+     glyphs show through */
+  .fold-framed .fold-more {
+    border: 1px solid var(--line);
+    border-top: 0;
+    border-bottom: 0;
+    border-bottom-left-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+    box-shadow: 0 1px 0 var(--line);
+  }
+}

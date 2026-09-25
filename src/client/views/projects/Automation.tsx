@@ -37,6 +37,7 @@ import { agentHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useCut } from "../../lib/resize.ts";
 import { ShowMore } from "../../stream/Stream.tsx";
+import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
@@ -63,42 +64,36 @@ const FILTERS: { value: RunFilter | null; label: string }[] = [
   { value: "manual", label: "Manual" },
 ];
 
-// the instructions cut to a few lines, with Show more once they run
-// past them; measured again when the width moves the cut
+// the instructions cut to a few lines, Show all in the fade once they
+// run past them; measured again when the width moves the cut
 function Instructions({
   text,
   foot,
 }: {
   text: string;
-  // the state line under the box, which Show more shares
+  // the state line under the box
   foot: ComponentChildren;
 }) {
   const { el, open, long } = useCut<HTMLParagraphElement>([text]);
   return (
     <>
       <div class="automations-brief-text">
-        <p
-          ref={el}
-          class={`automations-brief-body${open.value ? "" : " clamp"}`}
+        <Fold
+          cut={long.value && !open.value}
+          onOpen={() => {
+            open.value = true;
+          }}
+          label="Show all"
         >
-          {text}
-        </p>
-      </div>
-      <div class="automations-brief-foot">
-        {foot}
-        {long.value && (
-          <button
-            type="button"
-            class="btn-text automations-more"
-            aria-expanded={open.value}
-            onClick={() => {
-              open.value = !open.value;
-            }}
+          <p
+            ref={el}
+            class={`automations-brief-body${open.value ? "" : " clamp"}`}
           >
-            {open.value ? "Show less" : "Show more"}
-          </button>
-        )}
+            {text}
+          </p>
+        </Fold>
       </div>
+      <div class="automations-brief-foot">{foot}</div>
     </>
   );
 }

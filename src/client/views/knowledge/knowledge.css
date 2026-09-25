@@ -19,9 +19,6 @@
     color: var(--fg);
   }
 
-  .knowledge-toggle {
-    align-self: flex-start;
-  }
   .knowledge-actions {
     display: flex;
     flex-wrap: wrap;

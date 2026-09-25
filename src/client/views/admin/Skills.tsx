@@ -26,6 +26,7 @@ import {
 import { says } from "../../lib/format.ts";
 import { agentHref } from "../../lib/hrefs.ts";
 import { matches } from "../../lib/search.ts";
+import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -79,18 +80,16 @@ function Text({
   const box = textBox(held, expanded.value);
   return (
     <div class="skills-text">
-      <pre class="textbox">{box.text}</pre>
-      {box.canToggle && (
-        <button
-          type="button"
-          class="btn btn-small skills-toggle"
-          onClick={() => {
-            expanded.value = !expanded.value;
-          }}
-        >
-          {box.label}
-        </button>
-      )}
+      <Fold
+        cut={box.cut && !expanded.value}
+        onOpen={() => {
+          expanded.value = true;
+        }}
+        label={box.label}
+        framed
+      >
+        <pre class="textbox">{box.text}</pre>
+      </Fold>
     </div>
   );
 }

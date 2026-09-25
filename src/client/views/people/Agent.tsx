@@ -24,6 +24,7 @@ import { ago, longDate } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useCut } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
+import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -46,29 +47,26 @@ import {
 } from "./People.model.ts";
 import "./people.css";
 
-// a prompt may run to 16,000 characters: cut to its first lines, with
-// Show more only when the cut hides something
+// a prompt may run to 16,000 characters: cut to its first lines, Show
+// all in its fade only when the cut hides something
 function Prompt({ text, tokens }: { text: string; tokens: number }) {
   const { el, open, long } = useCut<HTMLPreElement>([text]);
   return (
     <RowsCard label="Prompt" hint={tokensText(tokens)}>
       {/* the row holds the padding, so the cut ends on a whole line */}
       <RowsBlock>
-        <pre ref={el} class={`people-prompt${open.value ? "" : " clamp"}`}>
-          {text}
-        </pre>
-        {long.value && (
-          <button
-            type="button"
-            class="btn-text people-more"
-            aria-expanded={open.value}
-            onClick={() => {
-              open.value = !open.value;
-            }}
-          >
-            {open.value ? "Show less" : "Show more"}
-          </button>
-        )}
+        <Fold
+          cut={long.value && !open.value}
+          onOpen={() => {
+            open.value = true;
+          }}
+          label="Show all"
+          ground="card"
+        >
+          <pre ref={el} class={`people-prompt${open.value ? "" : " clamp"}`}>
+            {text}
+          </pre>
+        </Fold>
       </RowsBlock>
     </RowsCard>
   );

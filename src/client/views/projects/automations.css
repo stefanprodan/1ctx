@@ -61,7 +61,7 @@
     background: var(--inset);
   }
   .automations-brief-body {
-    --clamp: 4;
+    --clamp: 6;
     margin: 0;
     font-size: var(--text-input);
     line-height: 1.6;
@@ -69,15 +69,12 @@
     overflow-wrap: anywhere;
   }
 
-  /* the state line, with Show more at its end */
+  /* the state line under the instructions */
   .automations-brief-foot {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     min-height: 20px;
-  }
-  .automations-more {
-    margin-left: auto;
   }
 
   /* a run's meta: its length over its share of the deadline, then when */

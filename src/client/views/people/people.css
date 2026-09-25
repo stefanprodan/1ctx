@@ -30,7 +30,7 @@
   }
 
   /* the prompt card's one row: the text, folded at its first lines,
-     then Show more under it */
+     Show all in its fade */
   .people-prompt {
     --clamp: 12;
     margin: 0;
@@ -40,8 +40,5 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--fg);
-  }
-  .people-more {
-    align-self: flex-start;
   }
 }
