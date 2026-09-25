@@ -3966,6 +3966,96 @@
       "stdout": "-1\n",
       "exit": 0,
       "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates a variable",
+      "args": [
+        "BEGIN { x = \"a\"; y = x (1 ? \"b\" : \"c\"); print y }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "ab\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates variables",
+      "args": [
+        "BEGIN { a = \"x\"; b = \"y\"; print a (b) (a) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "xyx\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates a field",
+      "args": [
+        "{ print $1 (\"-\" NR) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "p-1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( concatenates an element",
+      "args": [
+        "BEGIN { x[1] = 2; print x[1] (3) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "23\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( calls a builtin",
+      "args": [
+        "BEGIN { print length (\"abc\"), substr (\"abc\", 2), toupper (\"a\") (1) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "3 bc A1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space in a function definition",
+      "args": [
+        "function f (a) { return a + 1 } BEGIN { print f(1) (f(2)) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "23\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "parse: space before ( refuses a user function",
+      "args": [
+        "function f(a) { return a } BEGIN { print f (1) }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: a function name as a variable",
+      "args": [
+        "function f(a) { return a } BEGIN { f = 1 }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
+    },
+    {
+      "name": "parse: a function name as an array",
+      "args": [
+        "function f(a) { return a } BEGIN { f[1] = 1 }"
+      ],
+      "stdin": "p q\n",
+      "stdout": "",
+      "exit": 1,
+      "stderr": true
     }
   ]
 }

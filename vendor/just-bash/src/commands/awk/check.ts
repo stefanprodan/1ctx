@@ -93,6 +93,15 @@ export function checkProgram(program: AwkProgram): void {
       );
     }
   }
+  const functions = new Set(program.functions.map((fn) => fn.name));
+  const refuseFunction = (name: unknown): void => {
+    if (typeof name === "string" && functions.has(name)) {
+      throw new AwkRefusal(
+        `function '${name}' called with space between name and '(', or used as a variable or an array`,
+        1,
+      );
+    }
+  };
   walk(program, (node) => {
     switch (node.type) {
       case "call": {
@@ -122,10 +131,13 @@ export function checkProgram(program: AwkProgram): void {
       case "getline":
         refuse(node.name ?? node.variable);
         refuse(node.array);
+        refuseFunction(node.name ?? node.variable);
+        refuseFunction(node.array);
         break;
       case "array_access":
       case "in":
         refuse(node.array);
+        refuseFunction(node.array);
         break;
     }
   });
