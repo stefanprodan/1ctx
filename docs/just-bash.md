@@ -389,7 +389,11 @@ need `tsx`, which we do not install.
 and the first error line of every test file that failed to load, since
 such a file runs none of its tests.
 The run fails when the set moves either way, a new failure or a listed
-one passing. After a change that fixes one, or a sync, check each
+one passing. The suite runs in one process that shares static state,
+such as `ReadWriteFs`'s mutation queue, so under load a host-disk test
+can fail for another file's leftovers: a new failure whose file passes
+when run alone is reported and let through, and one that fails there
+too fails the run. After a change that fixes one, or a sync, check each
 difference, then record it with `scripts/vendor-test.sh --update`. The
 list, as it was when vendored, matched a pristine 3.4.2 run under Bun
 (with only the descriptor fix, without which nothing runs) except for
