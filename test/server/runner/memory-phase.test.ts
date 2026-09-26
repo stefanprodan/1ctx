@@ -80,6 +80,23 @@ describe("automation memory phase", () => {
     await chat.app.shutdown();
   });
 
+  test("the answer and the phase both prefer the agent's upstream", async () => {
+    const chat = await chatApp({ wire: "openrouter" });
+    chat.app.db.run(
+      "update agents set upstream = 'deepinfra/fp4' where id = ?",
+      [chat.agentId],
+    );
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    expect(run.main.body.provider).toEqual({ order: ["deepinfra/fp4"] });
+    run.main.reply("The check passed.");
+    const phase = await waitScript(chat.scripted, 2);
+    expect(phase.body.provider).toEqual({ order: ["deepinfra/fp4"] });
+    phase.reply("No change.");
+    await settle(chat, run.sessionId);
+    await chat.app.shutdown();
+  });
+
   test("opens after an answer, keeps one answer and commits its work", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });

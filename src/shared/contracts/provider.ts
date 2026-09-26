@@ -37,3 +37,17 @@ export type CatalogMatch = {
   reasoningKnown: boolean;
   described: boolean;
 };
+
+// one provider serving a model behind OpenRouter: the tag a request
+// names in provider.order, the prices in USD per million tokens and the
+// discount as a fraction off (0.5 is half)
+export type Endpoint = {
+  tag: string;
+  name: string;
+  quantization: string | null;
+  promptPrice: number | null;
+  completionPrice: number | null;
+  discount: number;
+  tools: boolean;
+  reasoning: boolean;
+};

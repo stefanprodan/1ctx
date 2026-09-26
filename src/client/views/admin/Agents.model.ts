@@ -9,7 +9,10 @@
 import { compactsAt } from "../../../shared/compaction.ts";
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { AgentServer } from "../../../shared/contracts/mcp.ts";
-import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
+import type {
+  CatalogMatch,
+  Endpoint,
+} from "../../../shared/contracts/provider.ts";
 import { fixedThinking } from "../../../shared/thinking.ts";
 import {
   EFFORTS,
@@ -19,27 +22,36 @@ import {
   MIN_CONTEXT_LENGTH,
   type Wire,
 } from "../../../shared/words.ts";
-import { windowLine } from "../../agents/meta.ts";
+import { priceLine, windowLine } from "../../agents/meta.ts";
+import type { Option } from "../../ui/Select.model.ts";
 
 // what New provider offers: a server speaking the OpenAI chat shape with
 // the local servers' extra fields, or one that refuses anything outside
-// the spec, whose addresses are typed, then OpenRouter and Google AI
-// Studio, whose addresses are known
+// the spec, whose addresses are typed, then OpenRouter, whose address
+// is filled in and may move to its EU one, and Google AI Studio
 type Preset = {
   wire: Wire;
   label: string;
   text: string;
-  // the fixed base URL, or null when the admin types it
+  // the base URL filled in, or null when the admin types it
   baseUrl: string | null;
+  // the address cannot be changed
+  fixed: boolean;
+  // said under the address field
+  hint: string | null;
   // the name suggested when the field is empty
   name: string;
 };
+const OPENROUTER_EU = "https://eu.openrouter.ai/api/v1";
+
 export const PRESETS: Preset[] = [
   {
     wire: "openai-compatible",
     label: "OpenAI-compatible",
     text: "mlx-serve, oMLX, llama-server, Ollama",
     baseUrl: null,
+    fixed: false,
+    hint: null,
     name: "",
   },
   {
@@ -47,6 +59,8 @@ export const PRESETS: Preset[] = [
     label: "OpenAI-strict",
     text: "GPT, Nvidia NIM, vLLM, Groq",
     baseUrl: null,
+    fixed: false,
+    hint: null,
     name: "",
   },
   {
@@ -54,6 +68,8 @@ export const PRESETS: Preset[] = [
     label: "OpenRouter",
     text: "Every model on openrouter.ai, priced from its catalog.",
     baseUrl: "https://openrouter.ai/api/v1",
+    fixed: false,
+    hint: `${OPENROUTER_EU} keeps requests in the EU. It needs an OpenRouter Business account.`,
     name: "openrouter",
   },
   {
@@ -61,11 +77,21 @@ export const PRESETS: Preset[] = [
     label: "Google AI Studio",
     text: "Gemini, with the key from aistudio.google.com.",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    fixed: true,
+    hint: null,
     name: "gemini",
   },
 ];
 export const preset = (wire: Wire): Preset =>
   PRESETS.find((p) => p.wire === wire) ?? PRESETS[0];
+
+// the address a preset change leaves in the field: what the admin typed
+// stays, a preset's own address (OpenRouter's EU one too) is replaced
+export function presetBaseUrl(current: string, next: Wire): string {
+  const known = [...PRESETS.map((p) => p.baseUrl), OPENROUTER_EU];
+  const typed = current.trim() !== "" && !known.includes(current.trim());
+  return typed ? current : (preset(next).baseUrl ?? "");
+}
 
 export function baseUrlProblem(value: string): string | null {
   const v = value.trim();
@@ -85,6 +111,7 @@ export function baseUrlProblem(value: string): string | null {
 // which field of the agent form a refusal names; a chat or an automation
 // running on the agent is the form's
 export function agentFieldOf(message: string): string | undefined {
+  if (message.startsWith("upstream")) return "upstream";
   if (message.startsWith("name") || message.startsWith("an agent named"))
     return "name";
   if (message.startsWith("providerId") || message === "no such provider")
@@ -300,4 +327,48 @@ export function statedProblem(
 ): string | null {
   if (model === null || model.described) return null;
   return contextProblem(contextLength, tools);
+}
+
+// the Preferred provider choices: any provider first, then the endpoints as the
+// server sorted them, "InferenceNet fp4" over "$0.05 / $0.14 · 50% off".
+// One without tools never serves a turn of a model that takes them, so
+// it is left out. A saved tag stays a choice, said to be gone or without
+// tools only when the list loaded, since a list that failed says nothing
+export function upstreamOptions(
+  endpoints: Endpoint[] | null,
+  takesTools: boolean,
+  saved: string | null,
+): Option[] {
+  const shown = (endpoints ?? []).filter((e) => !takesTools || e.tools);
+  const label = (e: Endpoint) =>
+    e.quantization === null ? e.name : `${e.name} ${e.quantization}`;
+  const twice = (e: Endpoint) =>
+    shown.filter((other) => label(other) === label(e)).length > 1;
+  const options: Option[] = [
+    { value: "", label: "Any provider", detail: "OpenRouter picks" },
+    ...shown.map((e) => ({
+      value: e.tag,
+      label: twice(e) ? e.tag : label(e),
+      detail: [
+        priceLine(e.promptPrice, e.completionPrice),
+        e.discount > 0 ? `${Math.round(e.discount * 100)}% off` : "",
+      ]
+        .filter((part) => part !== "")
+        .join(" · "),
+      keywords: e.tag,
+    })),
+  ];
+  if (saved !== null && !shown.some((e) => e.tag === saved)) {
+    const listed = endpoints?.some((e) => e.tag === saved);
+    options.push(
+      endpoints === null
+        ? { value: saved, label: saved }
+        : {
+            value: saved,
+            label: saved,
+            detail: listed ? "no tools" : "not listed now",
+          },
+    );
+  }
+  return options;
 }

@@ -3,9 +3,10 @@
 //
 // One agent as the parts of a row: the avatar, the name over the model
 // id, and the faint meta with the model's window and prices, the
-// thinking level and the skill and MCP counts; a phone shows
-// only the window and the price. The admin page puts them in the button that opens
-// the form; the project's members tab in a line. They are the row's
+// provider OpenRouter tries first, the thinking level and the skill and
+// MCP counts; a phone shows only the window and the price. The admin
+// page puts them in the button that opens the form; the project's
+// members tab in a line. They are the row's
 // own parts, so a phone wraps them as it wraps a user's. The
 // provider's name leads the meta when the caller knows it, since only
 // an admin lists providers.
@@ -35,6 +36,7 @@ export function AgentRow({
   const meta = [
     providerName ?? "",
     modelMeta(agent.model),
+    agent.upstream === null ? "" : `via ${agent.upstream}`,
     thinkingLine(agent),
     skillsLine(agent),
     serversLine(agent),

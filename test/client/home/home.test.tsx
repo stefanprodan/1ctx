@@ -103,6 +103,7 @@ describe("Home", () => {
         skills: [],
         servers: [],
         mcpMode: "auto",
+        upstream: null,
         createdAt: 1_756_684_800_000,
       },
     ];

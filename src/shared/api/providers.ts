@@ -3,7 +3,11 @@
 //
 // Request and response bodies of the provider routes, all for admins.
 
-import type { CatalogMatch, ProviderSummary } from "../contracts/provider.ts";
+import type {
+  CatalogMatch,
+  Endpoint,
+  ProviderSummary,
+} from "../contracts/provider.ts";
 import type { Wire } from "../words.ts";
 
 // GET /api/providers
@@ -23,3 +27,7 @@ export type CreateProviderRequest = {
 
 // GET /api/providers/:id/catalog?q=: the matches for what was typed
 export type CatalogResponse = { matches: CatalogMatch[] };
+
+// GET /api/providers/:id/endpoints?model=: who serves the model behind
+// an OpenRouter provider, cheapest first
+export type EndpointsResponse = { endpoints: Endpoint[] };

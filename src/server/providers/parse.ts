@@ -1,7 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The provider request parsers: a new provider, and the catalog query.
+// The provider request parsers: a new provider, the catalog query and
+// the model whose endpoints are asked for.
 
 import type { CreateProviderRequest } from "../../shared/api/providers.ts";
 import {
@@ -17,6 +18,8 @@ import { BadRequest } from "../lib/errors.ts";
 
 export const MAX_BASE_URL = 256;
 export const MAX_QUERY = 100;
+// an agent's model id is capped the same
+export const MAX_MODEL_ID = 200;
 
 export function parseName(value: unknown): string {
   if (!isName(value)) {
@@ -83,4 +86,14 @@ export function parseQuery(url: URL): string {
   const q = url.searchParams.get("q") ?? "";
   if (q.length > MAX_QUERY) throw new BadRequest("q is too long");
   return q.trim();
+}
+
+// ?model=: an OpenRouter id, author/slug with an optional :variant
+export function parseModelQuery(url: URL): string {
+  const model = url.searchParams.get("model") ?? "";
+  // a segment never starts with a dot, so none walks up the path
+  if (model.length > MAX_MODEL_ID || !/^~?\w[\w.-]*\/\w[\w.:-]*$/.test(model)) {
+    throw new BadRequest("model must be an OpenRouter model id");
+  }
+  return model;
 }

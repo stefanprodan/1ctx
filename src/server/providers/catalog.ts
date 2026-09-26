@@ -22,7 +22,7 @@ export const MAX_CATALOG_BYTES = 8 * 1024 * 1024;
 
 // OpenRouter prices are USD per token as a string; the wire carries
 // USD per million tokens, or null when the catalog did not say
-const perMillion = (value: unknown): number | null => {
+export const perMillion = (value: unknown): number | null => {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
@@ -73,7 +73,7 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
 
 // the body read chunk by chunk and refused past the cap, so a provider
 // cannot fill the process however long it talks
-async function readCapped(res: Response, max: number): Promise<string> {
+export async function readCapped(res: Response, max: number): Promise<string> {
   if (res.body === null) return "";
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];

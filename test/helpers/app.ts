@@ -114,6 +114,16 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
         headers: { "content-type": "application/json" },
       });
     }
+    // one model's upstreams, recorded; any other model is not listed
+    if (url.startsWith(`${PROVIDER_URL}/models/`)) {
+      return url === `${PROVIDER_URL}/models/z-ai/glm-5.3-flash/endpoints`
+        ? new Response(fixture("providers", "openrouter", "endpoints.json"), {
+            headers: { "content-type": "application/json" },
+          })
+        : new Response('{"error":{"message":"not found","code":404}}', {
+            status: 404,
+          });
+    }
     if (url === `${PROVIDER_URL}/chat/completions`) {
       return new Response(chatBody(body), {
         headers: { "content-type": "text/event-stream" },

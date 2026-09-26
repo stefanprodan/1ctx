@@ -5,13 +5,17 @@
 // URL and a key file; its catalog is read from the wire and cached, and
 // a chat request goes out over the wire as one event stream.
 
-import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import type {
+  CatalogMatch,
+  Endpoint,
+} from "../../shared/contracts/provider.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadGateway, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { CatalogError, Catalogs, type Fetcher } from "./catalog.ts";
+import { fetchEndpoints } from "./endpoints.ts";
 import { providerFor } from "./provider.ts";
 import { type AgentsPort, routes } from "./routes.ts";
 import { type ProviderRow, ProviderStore } from "./store.ts";
@@ -25,6 +29,7 @@ export {
   parseCatalog,
   search,
 } from "./catalog.ts";
+export { fetchEndpoints, parseEndpoints } from "./endpoints.ts";
 export {
   buildChatBody as buildGeminiChatBody,
   FOREIGN_SIGNATURE,
@@ -69,6 +74,9 @@ export type Providers = {
   // catalog that does not answer is the 502 the caller would send anyway,
   // so the catalog's own error stays inside this area
   model(provider: ProviderRow, id: string): Promise<CatalogMatch | null>;
+  // who serves a model behind an OpenRouter provider, cheapest first; a
+  // provider that does not answer is a 502 like the catalog's
+  endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
   // one request over the provider's wire. A provider deleted since the
   // caller named it is the 404 the caller would send, thrown before the
   // stream starts; everything after that is an event, never a throw
@@ -82,6 +90,16 @@ export type Providers = {
 
 export function providersArea(deps: ProvidersDeps): Providers {
   const store = new ProviderStore(deps.db);
+  const endpoints = async (provider: ProviderRow, model: string) => {
+    const key =
+      provider.keyName === null ? null : deps.secret(provider.keyName);
+    try {
+      return await fetchEndpoints(deps.fetcher, provider, key, model);
+    } catch (err) {
+      if (err instanceof CatalogError) throw new BadGateway(err.message);
+      throw err;
+    }
+  };
   const catalogs = new Catalogs({
     fetcher: deps.fetcher,
     clock: deps.clock,
@@ -100,6 +118,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
         throw err;
       }
     },
+    endpoints,
     chat: (providerId, req, signal) => {
       const row = store.byId(providerId);
       if (row === null) throw new NotFound("no such provider");
@@ -108,6 +127,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
     routes: routes({
       store,
       catalogs,
+      endpoints,
       hasSecret: (name) => deps.secret(name) !== null,
       keys: deps.keys,
       agents: deps.agents,

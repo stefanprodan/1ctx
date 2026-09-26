@@ -137,6 +137,14 @@ describe("OpenRouter chat body", () => {
     ).toBeUndefined();
   });
 
+  test("a preferred upstream goes first with fallbacks allowed", () => {
+    expect(buildChatBody(request)).not.toHaveProperty("provider");
+    expect(
+      (buildChatBody({ ...request, upstream: "inference-net/fp4" }) as any)
+        .provider,
+    ).toEqual({ order: ["inference-net/fp4"] });
+  });
+
   test("marks the system prompt and the last two turns as cache breakpoints on Claude", () => {
     const CLAUDE = "anthropic/claude-sonnet-4.5";
     const body = buildChatBody({ ...request, model: CLAUDE }) as any;

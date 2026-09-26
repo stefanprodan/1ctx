@@ -279,6 +279,25 @@ describe("provision through the composed app", () => {
     }
   });
 
+  test("passes an agent's upstream to the API, which holds its rule", async () => {
+    const { app } = await instance();
+    try {
+      await app.provision.apply(await fullDocuments(), ignore);
+      await expect(
+        app.provision.apply(
+          documents(object("Agent", "guide", { upstream: "deepinfra/fp4" })),
+          ignore,
+        ),
+      ).rejects.toThrow("upstream is only for an OpenRouter provider");
+      expect(app.agents.byName("guide")!.upstream).toBeNull();
+      expect(() =>
+        documents(object("Agent", "guide", { upstream: 7 })),
+      ).toThrow("spec.upstream");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test.each([
     ["baseUrl", "http://other-models.test/v1"],
     ["wire", "openrouter"],

@@ -105,8 +105,8 @@ export function mergeReasoningDetail(
 // The request body: the shared wire, reasoning as OpenRouter's object,
 // usage asked for on the last frame, the session id as session_id (the
 // sticky routing key: every turn goes to the upstream that holds the
-// cached prefix; prompt_cache_key is only its fallback) and the
-// per-family message rules above.
+// cached prefix; prompt_cache_key is only its fallback), the preferred
+// upstream as provider.order and the per-family message rules above.
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   const body = buildOpenAiChatBody(req, {
     reasoningField: "reasoning",
@@ -116,6 +116,9 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   delete body.reasoning_effort;
   delete body.stream_options;
   if (req.cacheKey) body.session_id = req.cacheKey;
+  // order, never only: a tag that stopped serving is skipped, so the
+  // preference costs a discount and never the turn
+  if (req.upstream) body.provider = { order: [req.upstream] };
   body.usage = { include: true };
   // no middle-out: OpenRouter would cut a long prompt to the window on
   // its own, silently, and the runner compacts from the usage it counts

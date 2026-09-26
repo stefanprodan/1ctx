@@ -2,20 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The providers, all for admins: the list, a new one, its deletion and
-// the catalog search. A provider an agent runs on cannot go; whether
+// the catalog search, and who serves a model behind OpenRouter. A provider an agent runs on cannot go; whether
 // one does is the agents port's answer.
 
 import type {
   CatalogResponse,
+  EndpointsResponse,
   ProviderResponse,
   ProvidersResponse,
 } from "../../shared/api/providers.ts";
+import type { Endpoint } from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadGateway, Conflict, NotFound } from "../lib/errors.ts";
+import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { CatalogError, type Catalogs } from "./catalog.ts";
-import { parseProvider, parseQuery } from "./parse.ts";
+import { parseModelQuery, parseProvider, parseQuery } from "./parse.ts";
 import { type ProviderRow, type ProviderStore, summary } from "./store.ts";
 
 export type AgentsPort = {
@@ -25,6 +27,7 @@ export type AgentsPort = {
 export type RoutesDeps = {
   store: ProviderStore;
   catalogs: Catalogs;
+  endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
   // the secrets port: whether the key file is there
   hasSecret: (name: string) => boolean;
   keys: () => string[];
@@ -98,6 +101,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           }
         }
         const body: CatalogResponse = { matches };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/providers/:id/endpoints",
+      policy: "admin",
+      async handle(_req, ctx) {
+        const provider = find(ctx.params.id);
+        if (provider.wire !== "openrouter") {
+          throw new BadRequest("only an OpenRouter provider lists endpoints");
+        }
+        const model = parseModelQuery(ctx.url);
+        const body: EndpointsResponse = {
+          endpoints: await deps.endpoints(provider, model),
+        };
         return json(body);
       },
     },

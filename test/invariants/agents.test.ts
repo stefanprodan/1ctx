@@ -235,6 +235,7 @@ describe("the agents", () => {
       skills: [],
       servers: [],
       mcpMode: "auto",
+      upstream: null,
       createdAt: app.now.value,
     });
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({
@@ -640,4 +641,129 @@ describe("a model its catalog does not describe", () => {
     })),
     parseAgent,
   );
+});
+
+describe("a preferred upstream", () => {
+  const GLM = "z-ai/glm-5.3-flash";
+  const strict = async (client: Awaited<ReturnType<typeof setup>>["client"]) =>
+    (
+      await (
+        await client.call("POST", "/api/providers", {
+          body: {
+            name: "nim",
+            wire: "openai-compatible",
+            baseUrl: NIM_URL,
+            keyName: null,
+          },
+        })
+      ).json()
+    ).provider;
+
+  test("the endpoints route lists who serves an OpenRouter model", async () => {
+    const { client, provider } = await setup();
+    const res = await client.call(
+      "GET",
+      `/api/providers/${provider.id}/endpoints?model=${GLM}`,
+    );
+    expect(res.status).toBe(200);
+    const { endpoints } = await res.json();
+    expect(endpoints.map((e: { tag: string }) => e.tag)).toEqual([
+      "inference-net/fp4",
+      "deepinfra/fp4",
+      "relace",
+      "baseten/fp8",
+      "cloudflare",
+    ]);
+    const unlisted = await client.call(
+      "GET",
+      `/api/providers/${provider.id}/endpoints?model=nobody/nothing`,
+    );
+    expect(unlisted.status).toBe(502);
+    for (const model of [
+      "",
+      "bare",
+      "a/b?c",
+      "../..",
+      "a/..",
+      "x".repeat(201),
+    ]) {
+      const bad = await client.call(
+        "GET",
+        `/api/providers/${provider.id}/endpoints?model=${encodeURIComponent(model)}`,
+      );
+      expect(bad.status).toBe(400);
+    }
+    const other = await strict(client);
+    const refused = await client.call(
+      "GET",
+      `/api/providers/${other.id}/endpoints?model=${GLM}`,
+    );
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({
+      error: "only an OpenRouter provider lists endpoints",
+    });
+  });
+
+  test("is saved when it serves the model and refused otherwise", async () => {
+    const { app, client, provider } = await setup();
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: GLM,
+    };
+    const made = await client.call("POST", "/api/agents", {
+      body: { ...body, upstream: "deepinfra/fp4" },
+    });
+    expect(made.status).toBe(201);
+    const { agent } = await made.json();
+    expect(agent.upstream).toBe("deepinfra/fp4");
+    const unknown = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, upstream: "nobody" },
+    });
+    expect(unknown.status).toBe(400);
+    expect(await unknown.json()).toEqual({
+      error: `upstream nobody does not serve ${GLM} on router`,
+    });
+    for (const upstream of ["a b", "../x", "a/.."]) {
+      const malformed = await client.call("PATCH", `/api/agents/${agent.id}`, {
+        body: { ...body, upstream },
+      });
+      expect(malformed.status).toBe(400);
+    }
+    // a provider that does not answer for the model is the 502 it is
+    const unanswered = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, model: "z-ai/glm-5.3", upstream: "relace" },
+    });
+    expect(unanswered.status).toBe(502);
+    // a tag that stopped serving stays while the model and the tag do
+    app.db.run("update agents set upstream = 'gone' where id = ?", [agent.id]);
+    const kept = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, prompt: "edited", upstream: "gone" },
+    });
+    expect(kept.status).toBe(200);
+    // left out is any upstream
+    const cleared = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body,
+    });
+    expect((await cleared.json()).agent.upstream).toBeNull();
+  });
+
+  test("is refused on another wire", async () => {
+    const { client } = await setup();
+    const other = await strict(client);
+    const res = await client.call("POST", "/api/agents", {
+      body: {
+        ...defaults,
+        name: "coder",
+        providerId: other.id,
+        model: "meta/llama-3.3-70b-instruct",
+        upstream: "deepinfra/fp4",
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "upstream is only for an OpenRouter provider",
+    });
+  });
 });

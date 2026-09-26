@@ -5,12 +5,13 @@
 // model, found by typing part of its name or id into that provider's
 // catalog, and the system prompt. The pick shows its window and prices
 // when the catalog has them; a catalog that lists only ids leaves the
-// window and the tools flag to the admin, asked under the pick. Then
-// thinking and effort: the default is the provider's, and the levels
-// are the wire's. After the prompt, the skills: one line per skill on
-// the server, the checked ones go with the agent into every send, at
-// most the cap; then the MCP servers with their read and write sides
-// and the mode. Delete asks once in place.
+// window and the tools flag to the admin, asked under the pick. On
+// OpenRouter, the provider tried first. Then thinking and effort: the
+// default is the provider's, and the levels are the wire's. After the
+// prompt, the skills: one line per skill on the server, the checked
+// ones go with the agent into every send, at most the cap; then the MCP
+// servers with their read and write sides and the mode. Delete asks
+// once in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -74,6 +75,7 @@ import { McpPicker } from "./McpPicker.tsx";
 import { ModelFacts } from "./ModelFacts.tsx";
 import { Picks } from "./Picks.tsx";
 import { SkillPicker } from "./SkillPicker.tsx";
+import { UpstreamField } from "./UpstreamField.tsx";
 import "./agents.css";
 
 export function AgentForm({
@@ -95,6 +97,9 @@ export function AgentForm({
   const pickedSkills = useSignal<string[]>(agent?.skills ?? []);
   const pickedServers = useSignal<AgentServer[]>(agent?.servers ?? []);
   const mcpMode = useSignal<McpMode>(agent?.mcpMode ?? "auto");
+  const upstream = useSignal<string | null>(agent?.upstream ?? null);
+  // the model the upstream was chosen for: a tag names a provider of it
+  const upstreamOf = useRef(agent?.model.id ?? null);
   // the window and tools an admin states when the catalog is silent
   const windowText = useSignal(agent?.model.contextLength?.toString() ?? "");
   const takesTools = useSignal(agent?.model.tools ?? false);
@@ -158,6 +163,8 @@ export function AgentForm({
       // a new agent has no server and lets the token threshold choose.
       servers: chosenServers(),
       mcpMode: mcpMode.value,
+      upstream:
+        wireOf(providerId.value) === "openrouter" ? upstream.value : null,
       ...statedFields(model.value, windowText.value, takesTools.value),
     };
     if (agent) await updateAgent(agent.id, body);
@@ -169,6 +176,8 @@ export function AgentForm({
   const invalid = (field: string) => save.fieldError(field) !== null;
   const pick = (m: CatalogMatch) => {
     model.value = m;
+    if (m.id !== upstreamOf.current) upstream.value = null;
+    upstreamOf.current = m.id;
     // a model that always or never thinks has one choice, the default
     if (fixedThinking(m) !== null) thinking.value = null;
     windowText.value = "";
@@ -183,6 +192,7 @@ export function AgentForm({
     providerId.value = id;
     model.value = null;
     effort.value = null;
+    upstream.value = null;
     s.clear();
     save.touch();
   };
@@ -204,6 +214,7 @@ export function AgentForm({
     effortSent !== agent.effort ||
     !sameIds(pickedSkills.value, agent.skills) ||
     mcpMode.value !== agent.mcpMode ||
+    upstream.value !== agent.upstream ||
     !sameServers(pickedServers.value, agent.servers) ||
     picked?.contextLength !== agent.model.contextLength ||
     picked?.tools !== agent.model.tools;
@@ -369,6 +380,19 @@ export function AgentForm({
             }}
             onTools={(value) => {
               takesTools.value = value;
+              save.touch();
+            }}
+          />
+        )}
+        {picked && wire === "openrouter" && (
+          <UpstreamField
+            providerId={providerId.value}
+            model={picked}
+            value={upstream.value}
+            busy={busy}
+            save={save}
+            onChange={(value) => {
+              upstream.value = value;
               save.touch();
             }}
           />

@@ -28,5 +28,7 @@ export type AgentSummary = {
   servers: AgentServer[];
   // how its MCP tools reach the model; auto flips on the token cap
   mcpMode: McpMode;
+  // the OpenRouter endpoint tag tried first; null lets OpenRouter route
+  upstream: string | null;
   createdAt: number;
 };

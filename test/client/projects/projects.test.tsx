@@ -622,6 +622,7 @@ describe("the pages", () => {
         skills: [],
         servers: [],
         mcpMode: "auto",
+        upstream: null,
         createdAt: 0,
       } as never,
     ];

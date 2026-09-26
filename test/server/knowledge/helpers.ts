@@ -78,6 +78,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     skills: [],
     servers: [],
     mcpMode: "auto",
+    upstream: null,
     now: now.value,
   });
   const sessions = new SessionStore(db, {

@@ -24,11 +24,13 @@ import { BadRequest } from "../lib/errors.ts";
 export const MAX_MODEL = 200;
 export const MAX_PROMPT = 16_000;
 export const MAX_SERVERS_PER_AGENT = 50;
+export const MAX_UPSTREAM = 100;
 
 export type ParsedAgent = Omit<
   SaveAgentRequest,
-  "effort" | "servers" | "mcpMode" | "contextLength" | "tools"
+  "effort" | "servers" | "mcpMode" | "contextLength" | "tools" | "upstream"
 > & {
+  upstream: string | null;
   effort: string | null;
   servers: AgentServer[];
   mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
@@ -93,6 +95,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "mcpMode",
     "contextLength",
     "tools",
+    "upstream",
   ]);
   const name = parseAgentName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
@@ -154,6 +157,16 @@ export function parseAgent(body: unknown): ParsedAgent {
   if (b.tools !== undefined && typeof b.tools !== "boolean") {
     throw new BadRequest("tools must be true or false");
   }
+  // an OpenRouter endpoint tag: a provider slug, maybe a quantization
+  const upstream = b.upstream ?? null;
+  if (
+    upstream !== null &&
+    (typeof upstream !== "string" ||
+      upstream.length > MAX_UPSTREAM ||
+      !/^\w[\w.-]*(\/\w[\w.-]*)*$/.test(upstream))
+  ) {
+    throw new BadRequest("upstream must be an endpoint tag or null");
+  }
   const stated =
     contextLength === null && b.tools === undefined
       ? null
@@ -169,6 +182,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     skills,
     servers,
     mcpMode,
+    upstream,
     stated,
   };
 }
