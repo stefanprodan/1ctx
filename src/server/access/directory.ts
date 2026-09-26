@@ -3,9 +3,9 @@
 //
 // A user's page, for every signed-in user: one server is one team, so
 // anyone may see who a teammate is, their email and their zone. The
-// projects listed are the team projects both are members of; an admin's
-// view of every team does not count, and a personal project is never
-// listed. Their days are their actions in every project as one series,
+// projects listed are the team projects both may open: an admin opens
+// every team, a member the teams they belong to. A personal project is
+// never listed, so no one learns a name they could not open. Their days are their actions in every project as one series,
 // whoever asks: posts, chats, manual runs and a signed-in day. The days
 // are the person's own, in their zone: a caller who could move the day
 // boundary would read, from the differences, what they did each hour.
@@ -54,10 +54,16 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const user = deps.users.byUsername(parseUsername(ctx.params.username));
         if (user === null) throw new NotFound("no such user");
-        const theirs = new Set(deps.projects.memberProjectIds(user.id));
+        const principal = ctx.principal!;
+        const theirs =
+          user.role === "admin"
+            ? null
+            : new Set(deps.projects.memberProjectIds(user.id));
         const projects = deps.projects
-          .visibleFor(ctx.principal!.userId, false)
-          .filter((p) => p.kind === "team" && theirs.has(p.id))
+          .visibleFor(principal.userId, principal.role === "admin")
+          .filter(
+            (p) => p.kind === "team" && (theirs === null || theirs.has(p.id)),
+          )
           .sort((a, b) => a.name.localeCompare(b.name));
         const body: DirectoryUserResponse = {
           user: {

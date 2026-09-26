@@ -184,6 +184,27 @@ describe("the user page's activity", () => {
   });
 });
 
+describe("the user page's About", () => {
+  test.serial("ends on the time where the user is", () => {
+    person.value = {
+      ...bogdan,
+      user: { ...bogdan.user, tz: "Europe/Bucharest", about: "Head of SRE." },
+    };
+    const html = render(<User params={{ username: "bogdan" }} />);
+    expect(html).toContain(">Head of SRE.<");
+    expect(html).toMatch(
+      /class="people-time">.*Local time \d\d:\d\d · GMT\+[23]</,
+    );
+  });
+
+  test.serial("drops the time for a zone the browser does not know", () => {
+    person.value = { ...bogdan, user: { ...bogdan.user, tz: "Nowhere/Land" } };
+    const html = render(<User params={{ username: "bogdan" }} />);
+    expect(html).toContain("Nothing written yet.");
+    expect(html).not.toContain("people-time");
+  });
+});
+
 describe("the user page's words", () => {
   test("a tab is found by its address, About for any other", () => {
     expect(userTab("/users/bogdan", "bogdan")).toBe(0);

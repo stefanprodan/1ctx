@@ -82,7 +82,18 @@ function UserActivity({
   );
 }
 
-function AboutTab({ about }: { about: string }) {
+// the text they wrote, then the time where they are, so a reader can
+// tell whether they are likely at work now
+function AboutTab({
+  about,
+  tz,
+  now,
+}: {
+  about: string;
+  tz: string;
+  now: number;
+}) {
+  const time = localTime(tz, now);
   return (
     <Rows>
       <RowsCard label="About">
@@ -91,6 +102,14 @@ function AboutTab({ about }: { about: string }) {
         ) : (
           <RowsBlock>
             <p class="people-about">{about}</p>
+          </RowsBlock>
+        )}
+        {time !== "" && (
+          <RowsBlock>
+            <p class="people-time">
+              <Icon name="clock" size={14} />
+              Local time {time}
+            </p>
           </RowsBlock>
         )}
       </RowsCard>
@@ -179,7 +198,13 @@ export function User({ params }: { params: Params }) {
             <UserActivity username={username} userId={shown.user.id} />
             <div class="people-tabs">
               <Tabs tabs={tabs} active={tabs[tab].href} />
-              {tab === 0 && <AboutTab about={shown.user.about} />}
+              {tab === 0 && (
+                <AboutTab
+                  about={shown.user.about}
+                  tz={shown.user.tz}
+                  now={now}
+                />
+              )}
               {tab === 1 && <ProjectsTab shown={shown} self={self} />}
             </div>
           </div>

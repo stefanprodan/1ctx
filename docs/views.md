@@ -161,9 +161,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   /api/directory/agents/:name` (`agents/directory.ts`), held in
   `data/directory.ts`; the name in the path goes through the name
   parser, so a malformed one is a 400. A user's page carries the email,
-  the zone, the about text and the team projects both users are
-  members of (an admin's view of every team does not count, a personal
-  project never shows). Its head is over the Activity card of the
+  the zone, the about text with the user's local time at its foot, and
+  the team projects both users may open (an admin opens every team, a
+  member the teams they belong to; a personal project never shows). Its head is over the Activity card of the
   user's actions in every project as one number a day, no tokens
   (`GET /api/directory/users/:username/days`, loaded, ghosted and left
   out as the agent's is, `ACTION_WORDS` for its hint), in the user's

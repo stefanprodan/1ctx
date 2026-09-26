@@ -99,7 +99,7 @@ describe("the directory", () => {
     ).toBe(404);
   });
 
-  test("projects in common are team projects both are members of", async () => {
+  test("projects in common are team projects both may open", async () => {
     const chat = await chatApp();
     const other = chat.app.createUser({
       username: "bogdan",
@@ -122,8 +122,24 @@ describe("the directory", () => {
       return body.projects.map((p) => p.name);
     };
     expect(await names(chat.member, "bogdan")).toEqual(["also", "shared"]);
-    // an admin sees every team, but shares none with bogdan
-    expect(await names(chat.admin, "bogdan")).toEqual([]);
+    // an admin opens every team, so shares all of bogdan's
+    expect(await names(chat.admin, "bogdan")).toEqual([
+      "also",
+      "shared",
+      "theirs",
+    ]);
+    // and a member shares all of theirs with an admin, none of the rest
+    expect(await names(chat.member, "admin")).toEqual([
+      "also",
+      "mine",
+      "shared",
+    ]);
+    expect(await names(chat.admin, "admin")).toEqual([
+      "also",
+      "mine",
+      "shared",
+      "theirs",
+    ]);
     // your own page is your team projects, never the personal one
     expect(await names(chat.member, "casey")).toEqual([
       "also",
