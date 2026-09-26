@@ -24,9 +24,13 @@ export const projectAgents = signal<AgentSummary[] | null>(null);
 // the agent a new chat starts on for this user: the one they last
 // picked, else the default, as the server resolved it with the agents
 export const startsOn = signal<string | null>(null);
-// bumped by a pick, so an agents answer asked before it never puts the
-// old start back
+// bumped by a pick and again when its write settles, so an agents
+// answer the server may have made before it had the pick never puts
+// the old start back
 let pickTurn = 0;
+let writing = 0;
+// a pick the server did not take stays this tab's start until the next
+let unsaved = false;
 // the project Home's composer starts a chat in, as the user picked it
 // for the life of the tab; null for the personal project
 export const homeProjectId = signal<string | null>(null);
@@ -47,6 +51,8 @@ effect(() => {
   shownTurn = turn;
   projectAgents.value = null;
   startsOn.value = null;
+  writing = 0;
+  unsaved = false;
   shownFor = null;
   kept.clear();
   homeProjectId.value = null;
@@ -63,14 +69,22 @@ export function startingAgent(list: AgentSummary[]): string | null {
 // the composer's pick is the user's next start, in this tab at once and
 // on the server for the next; a failed write costs only the latter
 export async function rememberAgent(agentId: string): Promise<void> {
+  const forUser = owner;
   pickTurn++;
+  writing++;
   startsOn.value = agentId;
   const body: PickAgentRequest = { agentId };
+  let saved = true;
   try {
     await api("/api/profile/agent", "PUT", body);
   } catch {
-    // the pick stands in this tab
+    saved = false;
   }
+  if (owner !== forUser) return;
+  // a sign-out and back while it was out already set it to 0
+  writing = Math.max(0, writing - 1);
+  pickTurn++;
+  unsaved = !saved;
 }
 
 export function projectAgentCount(projectId: string): number | null {
@@ -101,7 +115,9 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
     shownTurn = mine;
     kept.set(projectId, body);
     projectAgents.value = body.agents;
-    if (picks === pickTurn) startsOn.value = body.startsOn;
+    if (picks === pickTurn && writing === 0 && !unsaved) {
+      startsOn.value = body.startsOn;
+    }
     answered(body);
   } catch {
     if (current()) projectAgents.value = null;

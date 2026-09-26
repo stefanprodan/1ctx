@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A new chat starts on the agent the user last picked in the composer,
-// else the default an admin marked, else the first created. Deleting an agent hands either
-// on with no write.
+// else the default an admin marked, else the first created. Deleting an
+// agent hands either on with no write.
 
 import { describe, expect, test } from "bun:test";
 import type { PickAgentResponse } from "../../src/shared/api/agents.ts";
