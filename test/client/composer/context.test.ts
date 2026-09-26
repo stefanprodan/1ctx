@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { k, readout } from "../../../src/client/composer/context.ts";
+import { readout } from "../../../src/client/composer/context.ts";
 
 const usage = {
   promptTokens: 11_800,
@@ -14,13 +14,6 @@ const usage = {
 };
 
 describe("context readout", () => {
-  test("rounds to thousands", () => {
-    expect(k(850)).toBe("850");
-    expect(k(12_500)).toBe("13K");
-    expect(k(131_072)).toBe("131K");
-    expect(k(1_250_000)).toBe("1.3M");
-  });
-
   test("shows prompt plus completion against the round's window", () => {
     const r = readout(usage)!;
     expect(r.text).toBe("13K / 131K");

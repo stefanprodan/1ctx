@@ -8,11 +8,11 @@
 import { useSignal } from "@preact/signals";
 import type { KnowledgeFileView } from "../../../../shared/contracts/knowledge.ts";
 import type { DocHistory } from "../../../data/knowledge-history.ts";
-import { ago, sentence } from "../../../lib/format.ts";
+import { ago, plural, sentence } from "../../../lib/format.ts";
 import { ShowMore } from "../../../stream/Stream.tsx";
 import { RowsGo, RowsMeta, RowsNote, RowsTitle } from "../../../ui/Rows.tsx";
 import { AuthorText } from "../Author.tsx";
-import { authorOf, fileHref, plural } from "../Knowledge.model.ts";
+import { authorOf, revisionHref } from "../Knowledge.model.ts";
 import {
   droppedBefore,
   droppedWords,
@@ -30,7 +30,6 @@ export function History({
   now: number;
 }) {
   const pages = useSignal(1);
-  const href = fileHref(file.projectId, file.id);
   const versions =
     history.state === "done" ? liveVersions(history.versions) : [];
   const shown = versions.slice(0, pages.value * HISTORY_PAGE);
@@ -49,7 +48,7 @@ export function History({
         <RowsNote>Loading</RowsNote>
       ) : history.state === "failed" ? (
         <RowsNote>
-          <span class="docpage-failed">
+          <span class="error">
             The history did not load. {sentence(history.failure.words)}
           </span>
         </RowsNote>
@@ -60,11 +59,12 @@ export function History({
           {shown.map((version) => (
             <RowsGo
               key={version.id}
-              href={
-                version.revision === file.revision
-                  ? href
-                  : `${href}?revision=${version.revision}`
-              }
+              href={revisionHref(
+                file.projectId,
+                file.id,
+                version.revision,
+                file.revision,
+              )}
             >
               <RowsTitle
                 mono

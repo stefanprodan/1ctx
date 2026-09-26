@@ -7,7 +7,15 @@ import {
   clock,
   count,
   elapsed,
+  k,
+  plural,
+  pluralCommas,
+  share,
+  sinceLine,
+  size,
+  sizeWords,
   stamp,
+  uploadNote,
 } from "../../../src/client/lib/format.ts";
 
 describe("time formatting", () => {
@@ -56,5 +64,75 @@ describe("time formatting", () => {
     const time = new Date(2026, 8, 13, 16, 23).getTime();
 
     expect(stamp(time)).toBe("Sep 13, 16:23");
+  });
+});
+
+describe("counts", () => {
+  test("a plural takes the count the eye can take in", () => {
+    expect(plural(1, "member")).toBe("1 member");
+    expect(plural(2, "member")).toBe("2 members");
+    expect(plural(0, "file")).toBe("0 files");
+    expect(plural(2, "index", "indexes")).toBe("2 indexes");
+    expect(plural(12_400, "token")).toBe("12.4K tokens");
+  });
+
+  test("a dashboard's plural keeps every digit", () => {
+    expect(pluralCommas(1, "row", "rows")).toBe("1 row");
+    expect(pluralCommas(48_210, "row", "rows")).toBe("48,210 rows");
+  });
+
+  test("tokens round to thousands", () => {
+    expect(k(850)).toBe("850");
+    expect(k(12_500)).toBe("13K");
+    expect(k(131_072)).toBe("131K");
+    expect(k(1_250_000)).toBe("1.3M");
+  });
+
+  test("since when a row was made", () => {
+    const at = new Date(2026, 8, 14, 12).getTime();
+    expect(sinceLine({ createdAt: at })).toBe("since 14 September 2026");
+  });
+});
+
+describe("sizes", () => {
+  const MB = 1024 * 1024;
+
+  test("sizes keep three figures in binary units", () => {
+    expect(size(0)).toBe("0 B");
+    expect(size(612)).toBe("612 B");
+    expect(size(1023)).toBe("1023 B");
+    expect(size(1536)).toBe("1.5 KB");
+    expect(size(37_000)).toBe("36.1 KB");
+    expect(size(2 * MB)).toBe("2 MB");
+    expect(size(212.4 * MB)).toBe("212 MB");
+    expect(size(3 * 1024 * MB)).toBe("3 GB");
+  });
+
+  test("a share says a sliver is there", () => {
+    expect(share(0, 100)).toBe("0%");
+    expect(share(1, 1000)).toBe("<1%");
+    expect(share(1, 4)).toBe("25%");
+    expect(share(1, 0)).toBe("0%");
+  });
+
+  test("file sizes keep their units", () => {
+    expect(sizeWords(262_144)).toBe("256 KB");
+    expect(sizeWords(4 * MB)).toBe("4 MB");
+    expect(sizeWords(1023)).toBe("1023 B");
+    expect(sizeWords(5.78 * MB)).toBe("5.78 MB");
+    expect(sizeWords(812 * 1024)).toBe("812 KB");
+    // never a rounded thousand: the next unit takes over
+    expect(sizeWords(1023.5 * MB)).toBe("1 GB");
+    expect(sizeWords(1024 ** 3)).toBe("1 GB");
+    expect(sizeWords(1.5 * 1024 ** 3)).toBe("1.5 GB");
+  });
+
+  test("an upload's note is an archive's files or a file's size", () => {
+    expect(uploadNote({ archive: true, files: 3, bytes: 4 * MB })).toBe(
+      "3 files",
+    );
+    expect(uploadNote({ archive: false, files: 1, bytes: 812 * 1024 })).toBe(
+      "812 KB",
+    );
   });
 });

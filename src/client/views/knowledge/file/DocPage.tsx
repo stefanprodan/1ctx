@@ -6,14 +6,14 @@
 // crumb leads back. What the page is follows from what the file's load
 // said: the file (FileView.tsx), a deleted file's last text, or no file.
 
-import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useRef } from "preact/hooks";
 import type { KnowledgeDeleted } from "../../../../shared/contracts/knowledge.ts";
 import type { Params } from "../../../app/params.ts";
 import { query } from "../../../app/router.ts";
 import { knowledgeOf, listErrors } from "../../../data/knowledge.ts";
 import { docFileOf } from "../../../data/knowledge-file.ts";
 import { project, projectError } from "../../../data/projects.ts";
+import { useNow } from "../../../lib/now.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
 import { DeletedDoc, NotFound } from "./Deleted.tsx";
@@ -21,25 +21,13 @@ import { crumbSteps, liveFolders } from "./DocPage.model.ts";
 import { FileView } from "./FileView.tsx";
 import { NewFile } from "./NewFile.tsx";
 
-// the clock the page's "2d ago" words read, moved on a while
-function useNow(): number {
-  const now = useSignal(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, [now]);
-  return now.value;
-}
-
 function projectNameOf(projectId: string): string | null {
   const held = project.value;
   return held !== null && held.id === projectId ? held.name : null;
 }
 
 function DocView({ projectId, fileId }: { projectId: string; fileId: string }) {
-  const now = useNow();
+  const now = useNow(30_000);
   // a deleted file stays this page's while it is open, even once its
   // name is taken again and the list stops listing it
   const seen = useRef<KnowledgeDeleted | null>(null);

@@ -27,17 +27,16 @@ import {
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
-import { ago, elapsed, until } from "../../lib/format.ts";
+import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
 import { disabledOf } from "./Access.model.ts";
-import { daysOf, fieldsOf, fireLabel, WEEK } from "./Schedule.model.ts";
-
-const whole = (field: string, max: number): number | null => {
-  if (!/^\d{1,2}$/.test(field)) return null;
-  const n = Number(field);
-  return n <= max ? n : null;
-};
-
-const pad = (n: number) => String(n).padStart(2, "0");
+import {
+  daysOf,
+  fieldsOf,
+  fireLabel,
+  pad,
+  WEEK,
+  whole,
+} from "./Schedule.model.ts";
 
 const ordinal = (n: number) => {
   const tens = n % 100;
@@ -71,12 +70,12 @@ export function scheduleWords(schedule: string): string | null {
     const n = Number(step[1]);
     return n === 1 ? "every minute" : `every ${n} minutes`;
   }
-  const m = whole(min, 59);
+  const m = whole(min, 0, 59);
   if (m === null) return null;
   if (hour === "*" && dom === "*" && dow === "*") {
     return m === 0 ? "every hour" : `every hour at :${pad(m)}`;
   }
-  const h = whole(hour, 23);
+  const h = whole(hour, 0, 23);
   if (h === null) return null;
   const at = `at ${pad(h)}:${pad(m)}`;
   if (dom === "*") {
@@ -89,7 +88,7 @@ export function scheduleWords(schedule: string): string | null {
     return `every ${dayList(days)} ${at}`;
   }
   if (dow === "*") {
-    const d = whole(dom, 31);
+    const d = whole(dom, 0, 31);
     return d === null || d === 0
       ? null
       : `on the ${ordinal(d)} of each month ${at}`;
@@ -117,6 +116,10 @@ export function waitingSince(
     : null;
 }
 
+// "Next run tomorrow 09:00, in 14h", the brief's and the editor's
+export const nextRunWords = (fire: number, now: number, tz: string) =>
+  `Next run ${fireLabel(fire, now, tz, true)}, ${until(fire, now)}`;
+
 // the brief's foot: "Waiting for a free slot since 09:00", the day
 // named when not today, or the next run and how far off it is
 export function nextLine(
@@ -124,10 +127,9 @@ export function nextLine(
   now: number,
 ): string {
   if (a.nextAt === null) return "";
+  if (waitingSince(a, now) === null) return nextRunWords(a.nextAt, now, a.tz);
   const at = fireLabel(a.nextAt, now, a.tz, true);
-  return waitingSince(a, now) === null
-    ? `Next run ${at}, ${until(a.nextAt, now)}`
-    : `Waiting for a free slot since ${at.replace(/^today /, "")}`;
+  return `Waiting for a free slot since ${at.replace(/^today /, "")}`;
 }
 
 // the row's meta: the last failure, red on its own, then running,
@@ -232,8 +234,35 @@ export function canChange(
   return a.ownerId === user.id || (kind === "team" && user.role === "admin");
 }
 
+// The automation page and its editor: the row, the project it was found
+// in, and the failure, a deleted row once the list is in without it.
+export function automationPageOf<P extends { id: string }>(input: {
+  id: string;
+  rows: readonly AutomationSummary[] | null;
+  found: { id: string; projectId: string } | null;
+  project: P | null;
+  agentsIn: boolean;
+  failure: Failure | null;
+}): {
+  row: AutomationSummary | null;
+  projectId: string | null;
+  shown: P | null;
+  error: Failure | string | null;
+} {
+  const row = input.rows?.find((a) => a.id === input.id) ?? null;
+  const projectId = input.found?.id === input.id ? input.found.projectId : null;
+  const shown =
+    input.project !== null && input.project.id === projectId
+      ? input.project
+      : null;
+  const gone =
+    row === null && projectId !== null && input.rows !== null && input.agentsIn;
+  const error = input.failure ?? (gone ? "This automation was deleted." : null);
+  return { row, projectId, shown, error };
+}
+
 // A task keeps no memory or its own note.
-export type MemoryMode = "none" | "own";
+type MemoryMode = "none" | "own";
 
 export const MEMORY_MODES: { value: MemoryMode; label: string }[] = [
   { value: "none", label: "None" },
@@ -289,7 +318,7 @@ export type Draft = {
   credentialsOff: string[];
 };
 
-export const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
+const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
 
 // minutes as the field shows them: whole when they are, else exact
 const minutesOf = (ms: number) => String(ms / 60_000);
@@ -351,10 +380,8 @@ export function followDeadlineLimit(
   return d.deadline === deadline ? d : { ...d, deadline };
 }
 
-// the body a save sends, or the first problem. Only emptiness and the
-// numbers' shape are checked here; every rule is the server's
 // the editor's fields, by the name each control carries
-export type AutomationField =
+type AutomationField =
   | "name"
   | "agent"
   | "instructions"
@@ -382,10 +409,8 @@ export function automationFieldOf(
   return undefined;
 }
 
-// a switch flipped: the key joins the list or leaves it
-export const toggled = (keys: readonly string[], key: string): string[] =>
-  keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key];
-
+// the body a save sends, or the first problem. Only emptiness and the
+// numbers' shape are checked here; every rule is the server's.
 // `servers` and `skills` are the picked agent's and `credentials` the
 // project's: a key for any other is not shown, so it is not saved
 export function requestOf(
@@ -457,7 +482,3 @@ export function dirtyOf(
       : left !== right;
   });
 }
-
-// the viewer's zone, where a new automation starts
-export const browserZone = (): string =>
-  Intl.DateTimeFormat().resolvedOptions().timeZone;

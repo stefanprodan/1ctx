@@ -42,15 +42,6 @@
   .docpage-link:hover {
     color: var(--fg);
   }
-  .docpage-failed {
-    color: var(--failed);
-  }
-  /* a reader's band is one line: a long name gives way at its end */
-  .docpage-band-line {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
   /* the aside's facts under the text, where the aside is hidden */
   .docpage-foot {
     display: none;
@@ -111,12 +102,6 @@
     max-height: 60vh;
     overflow-y: auto;
   }
-  .docpage-menu-words {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
   .docpage-menu-danger {
     color: var(--failed);
   }
@@ -154,9 +139,6 @@
   /* the ring drawn inside, since the card clips what is outside */
   .docpage-editor:focus-visible {
     outline-offset: -2px;
-  }
-  .docpage-editor::placeholder {
-    color: var(--faint);
   }
   .docpage-fact {
     font-family: var(--mono);
@@ -206,6 +188,7 @@
     .docpage-band .docpage-band-words {
       flex-basis: 100%;
     }
+    /* a reader's band stays one line; its name is cut by `.cut` */
     .docpage-band .docpage-band-line {
       flex-basis: auto;
     }

@@ -172,35 +172,31 @@ export function RowsCheck({
       {checked && <Icon name="check" size={12} />}
     </span>
   );
+  const input = (
+    <input
+      type="checkbox"
+      class="rows-check-input"
+      name={name}
+      value={value}
+      checked={checked}
+      disabled={disabled}
+      onChange={onChange}
+    />
+  );
   if (children === undefined) {
     return (
       <span class="rows-check">
-        <input
-          type="checkbox"
-          class="rows-check-input"
-          name={name}
-          value={value}
-          checked={checked}
-          disabled={disabled}
-          onChange={onChange}
-        />
+        {input}
         {box}
       </span>
     );
   }
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the input is inside, built once above
     <label
       class={`rows-check rows-check-words${faint ? " rows-check-faint" : ""}`}
     >
-      <input
-        type="checkbox"
-        class="rows-check-input"
-        name={name}
-        value={value}
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-      />
+      {input}
       {box}
       {children}
       {note && <span class="rows-check-note">{note}</span>}

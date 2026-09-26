@@ -46,6 +46,8 @@
   .automations-brief-next {
     margin: 0;
     font-size: var(--text-ui);
+  }
+  .automations-brief-line {
     color: var(--dim);
   }
   .automations-brief-next {

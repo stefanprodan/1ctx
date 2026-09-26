@@ -12,8 +12,7 @@ import {
   liveOfSnapshot,
   secs,
   tail,
-  thinkLabel,
-  thinkParts,
+  thinkTime,
 } from "../../../src/client/transcript/stream.ts";
 import type {
   LiveSend,
@@ -206,40 +205,16 @@ describe("unslotted lead-in", () => {
 });
 
 describe("thinking labels", () => {
-  test("formats each clock state", () => {
-    expect(thinkLabel(live(), false, 3_200)).toBe("thinking");
-    expect(thinkLabel(live(), true, 3_200)).toBe("thinking");
-    expect(thinkLabel(live({ thinkStart: 0 }), false, 3_200)).toBe(
-      "thinking for 3.2 s",
-    );
+  test("gives the time of each clock state", () => {
+    expect(thinkTime(live(), false, 3_200)).toBeNull();
+    expect(thinkTime(live({ thinkStart: 0 }), false, 3_200)).toBe("3.2 s");
     expect(
-      thinkLabel(live({ thinkStart: 0, thinkEnd: 12_000 }), false, 20_000),
-    ).toBe("thinking for 12 s");
-    expect(thinkLabel(live({ thinkMs: 65_000 }), true, 100_000)).toBe(
-      "thinking for 1 min 5 s",
+      thinkTime(live({ thinkStart: 0, thinkEnd: 12_000 }), false, 20_000),
+    ).toBe("12 s");
+    expect(thinkTime(live({ thinkMs: 65_000 }), true, 100_000)).toBe(
+      "1 min 5 s",
     );
-  });
-
-  test("returns each clock state as separate parts", () => {
-    expect(thinkParts(live(), false, 3_200)).toEqual({
-      word: "thinking",
-      time: null,
-    });
-    expect(thinkParts(live({ thinkStart: 0 }), false, 3_200)).toEqual({
-      word: "thinking",
-      time: "3.2 s",
-    });
-    expect(
-      thinkParts(live({ thinkStart: 0, thinkEnd: 12_000 }), false, 20_000),
-    ).toEqual({ word: "thinking", time: "12 s" });
-    expect(thinkParts(live({ thinkMs: 65_000 }), true, 100_000)).toEqual({
-      word: "thinking",
-      time: "1 min 5 s",
-    });
-    expect(thinkParts(live(), true, 3_200)).toEqual({
-      word: "thinking",
-      time: null,
-    });
+    expect(thinkTime(live(), true, 3_200)).toBeNull();
   });
 
   test("formats seconds and minutes", () => {

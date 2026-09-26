@@ -8,15 +8,14 @@
 // with the streaming tail after it. Whether it is open is kept per row
 // for the life of the page.
 
-import { signal } from "@preact/signals";
-import { useEffect, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
+import { folds, useTick } from "./fold.ts";
 import { summaryLabel, summaryRunning } from "./Summary.model.ts";
 import type { Live } from "./stream.ts";
 import { tail } from "./stream.ts";
 
-const opened = signal<ReadonlySet<string>>(new Set());
+const { useFoldOpen } = folds();
 
 export function Summary({
   message,
@@ -27,14 +26,9 @@ export function Summary({
 }) {
   const running = summaryRunning(message, live);
   const current = running ? (live.get(message.id) ?? null) : null;
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => tick((n) => n + 1), 250);
-    return () => clearInterval(timer);
-  }, [running]);
+  useTick(running);
   const label = summaryLabel(message, running, Date.now());
-  const open = opened.value.has(message.id);
+  const { open, onToggle } = useFoldOpen(message.id);
   const html = current?.html ?? message.html;
   return (
     <details
@@ -42,12 +36,7 @@ export function Summary({
         running ? " transcript-fold-live" : ""
       }${open ? " transcript-fold-open" : ""}`}
       open={open}
-      onToggle={(event) => {
-        const next = new Set(opened.value);
-        if (event.currentTarget.open) next.add(message.id);
-        else next.delete(message.id);
-        opened.value = next;
-      }}
+      onToggle={onToggle}
     >
       <summary class="transcript-fold-head">
         <Icon name="spinner" size={13} class="transcript-fold-spin" />

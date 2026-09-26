@@ -4,8 +4,8 @@
 // The Activity card: turns per day over up to 53 weeks, a cell's shade its
 // level, and the head's hint the total or the selected day. The weeks
 // fill the card's width: a wider card shows more of the year, never
-// bigger cells. The grid and its selection are exported for Home's
-// aside, which draws the recent weeks without labels.
+// bigger cells. The grid and its selection are exported for the
+// project page's aside, which draws the recent weeks without labels.
 
 import { type Signal, useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
@@ -56,7 +56,7 @@ function indexOf(event: Event): number | null {
 // selected day and whose value text is the hint, so a screen reader
 // reads the day as it moves. The pointer is handled here too, off the
 // cells, which stay plain shapes. Without labels it is the compact grid
-// of Home's aside: no months, no weekdays.
+// of the project page's aside: no months, no weekdays.
 export function ActivityGrid({
   columns,
   offset,

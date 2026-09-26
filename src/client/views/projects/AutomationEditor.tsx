@@ -10,12 +10,13 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { VISUALIZE, WEB } from "../../../shared/capabilities.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import { RETENTION_DAYS } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
-import { visualsItem, webItem } from "../../composer/Add.model.ts";
+import { switchItem } from "../../composer/Add.model.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import {
   automationError,
@@ -36,16 +37,20 @@ import {
 import { me } from "../../data/me.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
+import { automationHref } from "../../lib/hrefs.ts";
+import { toggledId } from "../../lib/ids.ts";
 import { useFocusField, useSave } from "../../lib/save.ts";
+import { browserZone } from "../../lib/zone.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section } from "../../ui/Section.tsx";
+import { Seg } from "../../ui/Seg.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { AccessSection } from "./AccessSection.tsx";
 import {
   automationFieldOf,
-  browserZone,
+  automationPageOf,
   canChange,
   type Draft,
   dirtyOf,
@@ -54,7 +59,6 @@ import {
   MEMORY_MODES,
   pickMemory,
   requestOf,
-  toggled,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";
@@ -102,7 +106,7 @@ function Editor({
   const back =
     automation === null
       ? `/projects/${projectId}/automations`
-      : `/automations/${automation.id}`;
+      : automationHref(automation.id);
   // the call is kept from the first render, so it reads the draft's
   // signal when it runs rather than this render's request
   const save = useSave(async () => {
@@ -112,7 +116,7 @@ function Editor({
       automation === null
         ? await createAutomation(projectId, current.body)
         : await updateAutomation(automation.id, current.body);
-    navigate(`/automations/${saved.id}`);
+    navigate(automationHref(saved.id));
   }, automationFieldOf);
   useFocusField(save, form);
   const invalid = (field: string) => save.fieldError(field) !== null;
@@ -142,12 +146,12 @@ function Editor({
   const d = draft.value;
   const takesTools =
     agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
-  const web = webItem({
+  const web = switchItem(WEB, {
     tools: takesTools,
     switchable: switchable.value,
     off: false,
   });
-  const visuals = visualsItem({
+  const visuals = switchItem(VISUALIZE, {
     tools: takesTools,
     switchable: switchable.value,
     off: false,
@@ -201,24 +205,17 @@ function Editor({
       </Section>
       <Section title="Memory" text="What a run remembers">
         <div class="field">
-          <fieldset
-            class={`seg${invalid("memory") ? " seg-invalid" : ""}`}
-            aria-label="Memory"
-          >
-            {MEMORY_MODES.map((mode) => (
-              <button
-                key={mode.value}
-                type="button"
-                name={mode.value === d.memory ? "memory" : undefined}
-                class={`seg-option${d.memory === mode.value ? " seg-on" : ""}`}
-                aria-pressed={d.memory === mode.value}
-                disabled={off || (!takesTools && mode.value !== "none")}
-                onClick={() => set(pickMemory(d, mode.value))}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </fieldset>
+          <Seg
+            label="Memory"
+            invalid={invalid("memory")}
+            name="memory"
+            options={MEMORY_MODES.map((mode) => ({
+              ...mode,
+              disabled: off || (!takesTools && mode.value !== "none"),
+            }))}
+            value={d.memory}
+            onPick={(value) => set(pickMemory(d, value))}
+          />
           <FieldError save={save} field="memory" />
           {/* a refusal of the guidance keeps it in sight, or the save
               fails with nothing to show */}
@@ -254,14 +251,14 @@ function Editor({
         onVisuals={() => set({ visuals: !d.visuals })}
         servers={takesTools ? serversOf() : []}
         mcpOff={d.mcpOff}
-        onServer={(key) => set({ mcpOff: toggled(d.mcpOff, key) })}
+        onServer={(key) => set({ mcpOff: toggledId(d.mcpOff, key) })}
         skills={takesTools ? skillsOf() : []}
         skillsOff={d.skillsOff}
-        onSkill={(key) => set({ skillsOff: toggled(d.skillsOff, key) })}
+        onSkill={(key) => set({ skillsOff: toggledId(d.skillsOff, key) })}
         credentials={credentials.value}
         credentialsOff={d.credentialsOff}
         onCredential={(key) =>
-          set({ credentialsOff: toggled(d.credentialsOff, key) })
+          set({ credentialsOff: toggledId(d.credentialsOff, key) })
         }
         disabled={off}
       />
@@ -449,31 +446,23 @@ export function NewAutomation({ params }: { params: Params }) {
 
 export function EditAutomation({ params }: { params: Params }) {
   const id = params.id ?? "";
-  const row = automations.value?.find((a) => a.id === id) ?? null;
-  const found = automationProject.value;
-  const projectId = found?.id === id ? found.projectId : null;
-  const shown =
-    project.value !== null && project.value.id === projectId
-      ? project.value
-      : null;
+  const { row, shown, error } = automationPageOf({
+    id,
+    rows: automations.value,
+    found: automationProject.value,
+    project: project.value,
+    agentsIn: projectAgents.value !== null,
+    failure:
+      automationError.value ?? automationsError.value ?? projectError.value,
+  });
   const agents = projectAgents.value;
   const limit = runDeadlineMs.value;
-  const gone =
-    row === null &&
-    projectId !== null &&
-    automations.value !== null &&
-    agents !== null;
-  const error =
-    automationError.value ??
-    automationsError.value ??
-    projectError.value ??
-    (gone ? "This automation was deleted." : null);
   const ready =
     row !== null && shown !== null && agents !== null && limit !== null;
   return (
     <Page
       crumb={row?.name ?? "Automation"}
-      crumbHref={`/automations/${id}`}
+      crumbHref={automationHref(id)}
       title="Edit"
       loading={!ready && error === null}
       error={error}

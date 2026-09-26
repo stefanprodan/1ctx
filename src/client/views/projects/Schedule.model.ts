@@ -67,9 +67,13 @@ const NICKNAMES: Record<string, string> = {
 
 const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-const pad = (n: number) => String(n).padStart(2, "0");
+export const pad = (n: number) => String(n).padStart(2, "0");
 
-const whole = (field: string, min: number, max: number): number | null => {
+export const whole = (
+  field: string,
+  min: number,
+  max: number,
+): number | null => {
   if (!/^\d{1,2}$/.test(field)) return null;
   const n = Number(field);
   return n >= min && n <= max ? n : null;

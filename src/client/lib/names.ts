@@ -11,3 +11,9 @@ export function shapedInput(event: Event): string {
   box.value = shapeName(box.value);
   return box.value;
 }
+
+// the field shapes the name as it is typed and the server holds the
+// rule, so the one slip worth catching here is an empty field
+export function nameProblem(value: string): string | null {
+  return value.trim() === "" ? "Enter a name" : null;
+}

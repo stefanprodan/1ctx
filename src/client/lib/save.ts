@@ -11,12 +11,10 @@
 // disposed with it, so a call that answers after the form is gone
 // changes nothing.
 
-import { signal } from "@preact/signals";
+import { signal, useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { failure, sentence } from "./format.ts";
-
-export { sentence };
+import { failure, says, sentence } from "./format.ts";
 
 // the words of a refusal; the field to blame, when there is one; the
 // action other than the submit that was refused; and the HTTP status
@@ -47,7 +45,7 @@ export function noticeOf(problem: Problem): string {
     : `Could not ${problem.action}. ${why}`;
 }
 
-export const DONE_MS = 2000;
+const DONE_MS = 2000;
 
 export class Save {
   readonly status = signal<Status>("idle");
@@ -134,6 +132,12 @@ export class Save {
     return true;
   }
 
+  // a text field's input: the new value, and the edit clears the refusal
+  bind = (s: { value: string }) => (e: Event) => {
+    s.value = (e.currentTarget as HTMLInputElement).value;
+    this.touch();
+  };
+
   dispose(): void {
     this.live = false;
     this.clear();
@@ -166,6 +170,24 @@ export function useSave(call: () => Promise<void>, fieldOf?: FieldOf): Save {
   if (ref.current === null) ref.current = new Save(call, DONE_MS, fieldOf);
   useEffect(() => () => ref.current?.dispose(), []);
   return ref.current;
+}
+
+// an action in place outside a form: a switch or a pick that writes at
+// once, busy while it runs and its refusal in words until the next try
+export function useAction() {
+  const busy = useSignal(false);
+  const failed = useSignal<string | null>(null);
+  const run = async (call: () => Promise<unknown>) => {
+    busy.value = true;
+    failed.value = null;
+    try {
+      await call();
+    } catch (err) {
+      failed.value = says(err);
+    }
+    busy.value = false;
+  };
+  return { busy, failure: failed, run };
 }
 
 // a refusal at a field takes the focus there, so the fix is one keystroke

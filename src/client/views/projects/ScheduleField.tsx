@@ -11,18 +11,18 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { MAX_SCHEDULE } from "../../../shared/words.ts";
 import { loadPreview, preview, previewKey } from "../../data/automations.ts";
-import { sentence, until } from "../../lib/format.ts";
+import { sentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
-import { scheduleTitle } from "./Automations.model.ts";
+import { nextRunWords, scheduleTitle } from "./Automations.model.ts";
 import {
   type Builder,
   builderOf,
   EVERY,
   EVERY_LABELS,
   expressionOf,
-  fireLabel,
   STEPS,
   switchEvery,
   WEEK,
@@ -97,20 +97,16 @@ export function ScheduleField({
   );
   return (
     <div class="automations-schedule">
-      <fieldset class="seg" aria-label="Repeats">
-        {EVERY.map((every) => (
-          <button
-            key={every}
-            type="button"
-            class={`seg-option${b.every === every ? " seg-on" : ""}`}
-            aria-pressed={b.every === every}
-            disabled={disabled}
-            onClick={() => set(switchEvery(b, every))}
-          >
-            {EVERY_LABELS[every]}
-          </button>
-        ))}
-      </fieldset>
+      <Seg
+        label="Repeats"
+        options={EVERY.map((every) => ({
+          value: every,
+          label: EVERY_LABELS[every],
+          disabled,
+        }))}
+        value={b.every}
+        onPick={(every) => set(switchEvery(b, every))}
+      />
       <div class="automations-when">
         {b.every === "minutes" && (
           <div class="field automations-step">
@@ -248,8 +244,7 @@ export function ScheduleField({
         ) : fires !== null && fires.length > 0 ? (
           <span class="automations-next">
             <Icon name="arrow-right" size={14} />
-            Next run {fireLabel(fires[0], now, tz, true)},{" "}
-            {until(fires[0], now)}
+            {nextRunWords(fires[0], now, tz)}
           </span>
         ) : (
           // holds the line's room while the reading is on its way, so

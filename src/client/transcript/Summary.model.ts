@@ -8,20 +8,14 @@
 // summary is skipped by the next request.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import { k } from "../composer/context.ts";
-import { secs } from "./stream.ts";
+import { k } from "../lib/format.ts";
+import { clock } from "./stream.ts";
 
 export type SummaryLabel = {
   live: boolean;
   text: string;
   err: boolean;
 };
-
-// the live clock in whole seconds, as the work fold's
-function clock(ms: number): string {
-  if (ms >= 60_000) return secs(ms);
-  return `${Math.floor(ms / 1000)} s`;
-}
 
 export function summaryRunning(
   message: Message,

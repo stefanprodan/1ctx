@@ -33,20 +33,23 @@ import { project, projectError } from "../../data/projects.ts";
 import { closeRunsOf, loadMoreRuns, runs } from "../../data/runs.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { longDate, sentence, until } from "../../lib/format.ts";
-import { agentHref, userHref } from "../../lib/hrefs.ts";
+import { agentHref, automationHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
+import { browserZone } from "../../lib/zone.ts";
+import { tickMs } from "../../stream/Row.model.ts";
 import { ShowMore } from "../../stream/Stream.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
 import { AccessLines } from "./AutomationAccess.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
-  browserZone,
+  automationPageOf,
   canChange,
   deadlineText,
   eventNote,
@@ -141,35 +144,28 @@ function NextRuns({
 // content changes.
 export function Automation({ params }: { params: Params }) {
   const id = params.id ?? "";
-  const row = automations.value?.find((a) => a.id === id) ?? null;
+  const { row, projectId, shown, error } = automationPageOf({
+    id,
+    rows: automations.value,
+    found: automationProject.value,
+    project: project.value,
+    agentsIn: projectAgents.value !== null,
+    failure:
+      automationError.value ?? automationsError.value ?? projectError.value,
+  });
   // the Memory tab is there only while the automation keeps its own note
   const memoryPath = path.value.endsWith("/memory");
   const tab = memoryPath && row?.ownMemory ? "memory" : "runs";
   useEffect(() => {
     if (memoryPath && row !== null && !row.ownMemory) {
-      navigate(`/automations/${id}`, true);
+      navigate(automationHref(id), true);
     }
   }, [memoryPath, row?.ownMemory, id]);
-  const found = automationProject.value;
-  const projectId = found?.id === id ? found.projectId : null;
-  const shown =
-    project.value !== null && project.value.id === projectId
-      ? project.value
-      : null;
   const agents = projectAgents.value;
   const limit = runDeadlineMs.value;
   const held = runs.value?.id === id ? runs.value : null;
   const failure = useSignal<string | null>(null);
-  const now = useSignal(Date.now());
-  const tick = held?.rows?.some((r) => r.session.status === "running")
-    ? 1000
-    : 30_000;
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, tick);
-    return () => clearInterval(timer);
-  }, [tick, now]);
+  const now = useNow(tickMs(held?.rows ?? null));
   // the runs are this page's; once it goes, no frame moves them
   useEffect(() => () => closeRunsOf(id), [id]);
   const noteKey = keyOf(projectId ?? "", id);
@@ -180,17 +176,6 @@ export function Automation({ params }: { params: Params }) {
     void loadPreview(row.projectId, row.schedule, row.tz);
   }, [row?.projectId, row?.schedule, row?.tz, row?.nextAt, row?.suspendedAt]);
 
-  // the list is in and the row is not: deleted since the page opened
-  const gone =
-    row === null &&
-    projectId !== null &&
-    automations.value !== null &&
-    agents !== null;
-  const error =
-    automationError.value ??
-    automationsError.value ??
-    projectError.value ??
-    (gone ? "This automation was deleted." : null);
   const ready = row !== null && shown !== null && agents !== null;
   const agent = agents?.find((a) => a.id === row?.agentId) ?? null;
   const deadlineMs = row?.deadlineMs ?? limit ?? 0;
@@ -200,7 +185,7 @@ export function Automation({ params }: { params: Params }) {
     tally === null
       ? 0
       : tally.done + tally.failed + tally.stopped + tally.running;
-  const note = row === null ? null : eventNote(row, now.value);
+  const note = row === null ? null : eventNote(row, now);
   const editable =
     row !== null &&
     shown !== null &&
@@ -220,7 +205,7 @@ export function Automation({ params }: { params: Params }) {
           aside={
             <>
               <AsideSection label="Next runs">
-                <NextRuns automation={row} now={now.value} />
+                <NextRuns automation={row} now={now} />
               </AsideSection>
               <AsideSection label="History">
                 {tally === null ? (
@@ -246,21 +231,14 @@ export function Automation({ params }: { params: Params }) {
                 )}
               </AsideSection>
               <AsideSection label="Setup">
-                <div class="split-line">
-                  Deadline
-                  <span class="split-strong">{deadlineText(deadlineMs)}</span>
-                </div>
+                <AsideLine label="Deadline">
+                  {deadlineText(deadlineMs)}
+                </AsideLine>
                 <AccessLines row={row} />
-                <div class="split-line">
-                  Owner
-                  <a class="split-strong" href={userHref(row.ownerName)}>
-                    @{row.ownerName}
-                  </a>
-                </div>
-                <div class="split-line">
-                  Created
-                  <span class="split-strong">{longDate(row.createdAt)}</span>
-                </div>
+                <AsideLine label="Owner" href={userHref(row.ownerName)}>
+                  @{row.ownerName}
+                </AsideLine>
+                <AsideLine label="Created">{longDate(row.createdAt)}</AsideLine>
               </AsideSection>
             </>
           }
@@ -286,12 +264,12 @@ export function Automation({ params }: { params: Params }) {
                 row.suspendedAt !== null ? (
                   <p class="automations-brief-next">
                     <Icon name="pause" size={14} />
-                    {suspendedText(row, now.value)}
+                    {suspendedText(row, now)}
                   </p>
                 ) : row.nextAt !== null ? (
                   <p class="automations-brief-next">
                     <Icon name="arrow-right" size={14} />
-                    {nextLine(row, now.value)}
+                    {nextLine(row, now)}
                   </p>
                 ) : null
               }
@@ -314,14 +292,14 @@ export function Automation({ params }: { params: Params }) {
             tabs={[
               {
                 label: "Runs",
-                href: `/automations/${id}`,
+                href: automationHref(id),
                 ...(tally === null ? {} : { count: total }),
               },
               ...(row.ownMemory
                 ? [
                     {
                       label: "Memory",
-                      href: `/automations/${id}/memory`,
+                      href: `${automationHref(id)}/memory`,
                       ...(memoryNote === null
                         ? {}
                         : { count: memoryNote.entries.length }),
@@ -331,8 +309,8 @@ export function Automation({ params }: { params: Params }) {
             ]}
             active={
               tab === "runs"
-                ? `/automations/${id}`
-                : `/automations/${id}/memory`
+                ? automationHref(id)
+                : `${automationHref(id)}/memory`
             }
           />
           {tab === "memory" ? (
@@ -351,7 +329,7 @@ export function Automation({ params }: { params: Params }) {
                   filters={FILTERS.map((f) => ({
                     label: f.label,
                     on: f.value === filter,
-                    href: `/automations/${id}${
+                    href: `${automationHref(id)}${
                       f.value === null ? "" : `?runs=${f.value}`
                     }`,
                   }))}
@@ -375,7 +353,7 @@ export function Automation({ params }: { params: Params }) {
                       key={r.session.id}
                       row={r}
                       deadlineMs={deadlineMs}
-                      now={now.value}
+                      now={now}
                     />
                   ))}
                   <ShowMore

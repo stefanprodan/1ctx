@@ -20,7 +20,11 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { candidateNote, candidates, step } from "./AdminProjects.model.ts";
+import {
+  candidateNote,
+  candidates,
+  stepMember,
+} from "./AdminProjects.model.ts";
 import "./admin-projects.css";
 
 export function MemberPicker({
@@ -106,10 +110,10 @@ export function MemberPicker({
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      highlight.value = step(
+      highlight.value = stepMember(
         active,
-        event.key === "ArrowDown" ? 1 : -1,
         list.length,
+        event.key === "ArrowDown" ? 1 : -1,
       );
     } else if (event.key === "Enter") {
       // the name's form must never see this Enter

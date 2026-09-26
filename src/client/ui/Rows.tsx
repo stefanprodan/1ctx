@@ -12,7 +12,9 @@
 
 import type { ComponentChildren } from "preact";
 import { useId } from "preact/hooks";
+import { type Failure, sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
+import { CodeTag } from "./CodeTag.tsx";
 import "./rows.css";
 
 export {
@@ -36,6 +38,7 @@ export function RowsCard({
   action,
   hint,
   live,
+  class: extra,
   children,
 }: {
   label: string;
@@ -47,12 +50,14 @@ export function RowsCard({
   // the hint follows a selection in the card, so a screen reader hears
   // each change
   live?: boolean;
+  // the owner's class beside the card's: a board's panel
+  class?: string;
   children?: ComponentChildren;
 }) {
   const id = useId();
   return (
     <section
-      class="card rows-card"
+      class={`card rows-card${extra ? ` ${extra}` : ""}`}
       aria-label={search ? label : undefined}
       aria-labelledby={search ? undefined : id}
     >
@@ -63,7 +68,7 @@ export function RowsCard({
           </span>
         )}
         {hint && (
-          <span class="rows-hint" aria-live={live ? "polite" : undefined}>
+          <span class="rows-hint cut" aria-live={live ? "polite" : undefined}>
             {hint}
           </span>
         )}
@@ -313,12 +318,7 @@ export function RowsLogLine({
       </span>
       <span class={`rows-log-note${running ? " rows-log-running" : ""}`}>
         {note}
-        {status != null && (
-          <>
-            {" "}
-            <span class="code-tag">HTTP {status}</span>
-          </>
-        )}
+        <CodeTag status={status} spaced />
       </span>
       {onRemove && (
         <button
@@ -337,19 +337,12 @@ export function RowsLogLine({
 export function RowsLogMore({
   children,
   onClick,
-  disabled,
 }: {
   children: ComponentChildren;
   onClick: () => void;
-  disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      class="btn-text rows-log-more"
-      onClick={onClick}
-      disabled={disabled}
-    >
+    <button type="button" class="btn-text rows-log-more" onClick={onClick}>
       {children}
     </button>
   );
@@ -358,16 +351,14 @@ export function RowsLogMore({
 // the label over an inset list, and a faint count or word at its right
 export function RowsListHead({
   label,
-  required,
   hint,
 }: {
   label: string;
-  required?: boolean;
   hint?: ComponentChildren;
 }) {
   return (
     <span class="rows-list-head">
-      <span class={`label${required ? " label-required" : ""}`}>{label}</span>
+      <span class="label">{label}</span>
       {hint !== undefined && <span class="rows-list-hint">{hint}</span>}
     </span>
   );
@@ -376,6 +367,18 @@ export function RowsListHead({
 // a row of text, not a thing: a prompt, cut by the view
 export function RowsBlock({ children }: { children: ComponentChildren }) {
   return <div class="rows-item rows-block">{children}</div>;
+}
+
+// a list's failed load under its rows: the words, then the status
+export function RowsFailed({ failure }: { failure: Failure }) {
+  return (
+    <RowsBlock>
+      <p class="notice-failed" role="alert">
+        {sentence(failure.words)}
+        <CodeTag status={failure.status} spaced />
+      </p>
+    </RowsBlock>
+  );
 }
 
 // the form of a new row, open at the top of the card
@@ -470,23 +473,19 @@ export function RowsMeta({
   short?: string;
   children: ComponentChildren;
 }) {
-  if (short === undefined) {
-    return (
-      <span
-        class={`rows-meta${bad ? " rows-meta-bad" : ""}${keep ? " rows-meta-keep" : ""}`}
-      >
-        {children}
-      </span>
-    );
-  }
+  const cls = `rows-meta${bad ? " rows-meta-bad" : ""}${keep ? " rows-meta-keep" : ""}${
+    short === "" ? " rows-meta-wide" : ""
+  }`;
   return (
-    <span
-      class={`rows-meta${bad ? " rows-meta-bad" : ""}${
-        short === "" ? " rows-meta-wide" : ""
-      }`}
-    >
-      <span class="rows-meta-long">{children}</span>
-      <span class="rows-meta-short">{short}</span>
+    <span class={cls}>
+      {short === undefined ? (
+        children
+      ) : (
+        <>
+          <span class="rows-meta-long">{children}</span>
+          <span class="rows-meta-short">{short}</span>
+        </>
+      )}
     </span>
   );
 }

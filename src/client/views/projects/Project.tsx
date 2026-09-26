@@ -5,42 +5,14 @@
 // its sessions as the stream, searched like Home's. The rows drop the
 // project name, since the page is the project.
 
-import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
-import { navigate, query } from "../../app/router.ts";
 import { Composer } from "../../composer/Composer.tsx";
-import {
-  createSession,
-  list,
-  loadMore,
-  projectAgents,
-  sending,
-} from "../../data/sessions.ts";
-import { tickMs } from "../../stream/Row.model.ts";
-import { Stream } from "../../stream/Stream.tsx";
-import {
-  emptyLine,
-  originOf,
-  searchHref,
-  searchOf,
-} from "../home/Home.model.ts";
+import { projectAgents, sending } from "../../data/sessions.ts";
+import { Feed, startChat } from "../home/Feed.tsx";
 import { Frame } from "./Frame.tsx";
 
 export function Project({ params }: { params: Params }) {
   const id = params.id ?? "";
-  const held = list.value;
-  const rows = held?.rows ?? null;
-  const now = useSignal(Date.now());
-  const tick = tickMs(rows);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, tick);
-    return () => clearInterval(timer);
-  }, [tick, now]);
-  const q = searchOf(query.value);
-  const origin = originOf(query.value);
   return (
     <Frame id={id} tab="feed">
       {(shown) => (
@@ -53,41 +25,10 @@ export function Project({ params }: { params: Params }) {
             placeholder={`Start a chat in ${shown.name}`}
             running={false}
             busy={sending.value}
-            onSend={async (message, agentId, uploads) => {
-              await createSession({
-                projectId: shown.id,
-                agentId,
-                message,
-                ...(uploads.length === 0 ? {} : { uploads }),
-              });
-            }}
+            onSend={startChat(shown.id)}
             onStop={async () => {}}
           />
-          <Stream
-            rows={rows}
-            projectName={() => null}
-            search={{
-              value: q,
-              onChange: (next) =>
-                navigate(
-                  searchHref(`/projects/${shown.id}`, next, origin),
-                  true,
-                ),
-            }}
-            filter={{
-              value: origin,
-              onPick: (next) =>
-                navigate(searchHref(`/projects/${shown.id}`, q, next), true),
-            }}
-            empty={emptyLine(q, origin)}
-            now={now.value}
-            more={{
-              next: (held?.next ?? null) !== null,
-              loading: held?.more.loading ?? false,
-              error: held?.more.error ?? null,
-            }}
-            onMore={() => void loadMore()}
-          />
+          <Feed path={`/projects/${shown.id}`} projectName={() => null} />
         </>
       )}
     </Frame>

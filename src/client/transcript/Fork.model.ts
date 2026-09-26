@@ -16,9 +16,9 @@ export function forkChoices(
 
 // the menu's height: a row per agent plus its padding, or the one line
 // it shows with no agents
-export const FORK_ROW_PX = 38;
-export const FORK_PAD_PX = 12;
-export const forkMenuHeight = (rows: number): number =>
+const FORK_ROW_PX = 38;
+const FORK_PAD_PX = 12;
+const forkMenuHeight = (rows: number): number =>
   Math.max(rows, 1) * FORK_ROW_PX + FORK_PAD_PX;
 
 // whether the menu rises over its button: when it would reach past the

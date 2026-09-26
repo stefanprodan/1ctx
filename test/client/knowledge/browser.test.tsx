@@ -118,7 +118,7 @@ describe("the search results", () => {
     const html = draw(
       search({ names: [file("n1", "ops/Deploy.md")], namesTotal: 1 }),
     );
-    expect(html).toContain('<span class="knowledge-dir">ops/</span>');
+    expect(html).toContain('<span class="knowledge-dir cut">ops/</span>');
     expect(html).toContain('<mark class="knowledge-mark">Deploy</mark>');
     expect(html).not.toContain("Show more");
   });
@@ -199,7 +199,7 @@ describe("the Deleted list", () => {
       />,
     );
     expect(html).toContain(
-      '<span class="knowledge-dir">old/</span><span class="knowledge-base">notes.md</span>',
+      '<span class="knowledge-dir cut">old/</span><span class="cut">notes.md</span>',
     );
     expect(html).toContain("deleted by ");
     expect(html.replace(/<[^>]*>/g, "")).toContain("@sre in a chat");

@@ -164,6 +164,16 @@ test.serial(
   },
 );
 
+test.serial("a new file's crumb leads to each folder it sits in", () => {
+  lists.value = new Map([["p1", list()]]);
+  const html = render(
+    <NewFile projectId="p1" projectName="personal" folder="plans/deploy" />,
+  );
+  expect(html).toContain('href="/projects/p1/knowledge?folder=plans"');
+  expect(html).toContain('href="/projects/p1/knowledge?folder=plans%2Fdeploy"');
+  expect(html).not.toContain("?folder=deploy");
+});
+
 test.serial(
   "a deleted file: its last text, Restore, how long it is kept",
   () => {

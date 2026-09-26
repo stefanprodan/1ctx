@@ -457,6 +457,9 @@
   .status-failed {
     color: var(--failed);
   }
+  .status-stopped {
+    color: var(--faint);
+  }
 
   /* the faint line under a field */
   .hint {

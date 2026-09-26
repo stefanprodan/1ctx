@@ -18,6 +18,7 @@ import {
   type HttpMethod,
   type KeyState,
 } from "../../../shared/contracts/credential.ts";
+import { sameIds } from "../../lib/ids.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 export type CredentialDraft = {
@@ -109,10 +110,7 @@ export function toggledMethod(
   return HTTP_METHODS.filter((m) => next.includes(m));
 }
 
-export const toggledId = (ids: readonly string[], id: string): string[] =>
-  ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id];
-
-export type CredentialField =
+type CredentialField =
   | "name"
   | "keyName"
   | "prefix"
@@ -184,9 +182,6 @@ export function createBody(d: CredentialDraft): CreateCredentialRequest {
   };
 }
 
-const sameList = (a: readonly string[], b: readonly string[]) =>
-  [...a].sort().join() === [...b].sort().join();
-
 // only what changed, so a save never replaces a list it did not touch
 export function patchBody(
   d: CredentialDraft,
@@ -197,9 +192,9 @@ export function patchBody(
   if (d.prefix.trim() !== c.prefix) body.prefix = d.prefix.trim();
   if (d.header.trim() !== c.header) body.header = d.header.trim();
   if (d.template.trim() !== c.template) body.template = d.template.trim();
-  if (!sameList(d.methods, c.methods)) body.methods = d.methods;
+  if (!sameIds(d.methods, c.methods)) body.methods = d.methods;
   const ids = c.projects.map((p) => p.id);
-  if (!sameList(d.projectIds, ids)) body.projectIds = d.projectIds;
+  if (!sameIds(d.projectIds, ids)) body.projectIds = d.projectIds;
   return body;
 }
 

@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Storage page's words and numbers, pure: sizes, shares, the bars
-// of the areas and of one area's tables, the size over the days, and
-// what each large row and each retention line says.
+// The Storage page's words and numbers, pure: the bars of the areas
+// and of one area's tables, the size over the days, and what each
+// large row and each retention line says.
 
 import type {
   LargestRow,
@@ -15,38 +15,15 @@ import type {
   StorageFile,
   StoredPart,
 } from "../../../shared/api/admin.ts";
-import { count, dayMonth, weekdayDayMonth } from "../../lib/format.ts";
-
-const KB = 1024;
-const MB = KB * 1024;
-const GB = MB * 1024;
-
-// a size as its number and its unit, three figures at most: "212", "MB"
-export function sizeParts(bytes: number): { figure: string; unit: string } {
-  const n = Math.max(0, bytes);
-  const three = (v: number) => String(Number(v.toPrecision(3)));
-  if (n < KB) return { figure: String(Math.round(n)), unit: "B" };
-  if (n < MB) return { figure: three(n / KB), unit: "KB" };
-  if (n < GB) return { figure: three(n / MB), unit: "MB" };
-  return { figure: three(n / GB), unit: "GB" };
-}
-
-// "212 MB"
-export function size(bytes: number): string {
-  const { figure, unit } = sizeParts(bytes);
-  return `${figure} ${unit}`;
-}
-
-// "12%", "<1%" for a sliver that is there, "0%" for none
-export function share(part: number, whole: number): string {
-  if (whole <= 0 || part <= 0) return "0%";
-  const p = part / whole;
-  if (p < 0.01) return "<1%";
-  return `${Math.round(p * 100)}%`;
-}
-
-// "48,210"
-export const commas = (n: number): string => n.toLocaleString("en-GB");
+import {
+  count,
+  dayMonth,
+  pluralCommas,
+  share,
+  size,
+  sizeParts,
+} from "../../lib/format.ts";
+import { automationHref, chatHref } from "../../lib/hrefs.ts";
 
 export const AREA_NAMES: Record<StorageAreaKey, string> = {
   chats: "Chats",
@@ -60,9 +37,6 @@ export const AREA_NAMES: Record<StorageAreaKey, string> = {
   config: "Config",
 };
 
-const plural = (n: number, one: string, many: string) =>
-  `${commas(n)} ${n === 1 ? one : many}`;
-
 // what the file holds in areas: the bytes, the share of the areas'
 // sum, and the words while one is under the pointer
 export function areaBars(areas: StorageArea[]) {
@@ -73,7 +47,7 @@ export function areaBars(areas: StorageArea[]) {
     value: a.bytes,
     size: size(a.bytes),
     share: share(a.bytes, total),
-    hint: `${AREA_NAMES[a.key]} · ${size(a.bytes)} · ${plural(a.rows, "row", "rows")}`,
+    hint: `${AREA_NAMES[a.key]} · ${size(a.bytes)} · ${pluralCommas(a.rows, "row", "rows")}`,
   }));
 }
 
@@ -81,7 +55,7 @@ export function areaBars(areas: StorageArea[]) {
 export function areasFoot(areas: StorageArea[]): string {
   const total = areas.reduce((sum, a) => sum + a.bytes, 0);
   const rows = areas.reduce((sum, a) => sum + a.rows, 0);
-  return `${size(total)} in ${areas.length} areas · ${plural(rows, "row", "rows")}`;
+  return `${size(total)} in ${areas.length} areas · ${pluralCommas(rows, "row", "rows")}`;
 }
 
 // one area's tables, largest first, then its indexes as one faint line
@@ -91,12 +65,12 @@ export function tableBars(area: StorageArea) {
     name: t.name,
     value: t.bytes,
     size: size(t.bytes),
-    hint: `${t.name} · ${plural(t.rows, "row", "rows")} · ${size(t.bytes)}`,
+    hint: `${t.name} · ${pluralCommas(t.rows, "row", "rows")} · ${size(t.bytes)}`,
     faint: false,
   }));
   const { count, bytes } = area.indexes;
   if (count > 0) {
-    const name = plural(count, "index", "indexes");
+    const name = pluralCommas(count, "index", "indexes");
     bars.push({
       key: "indexes",
       name,
@@ -131,9 +105,6 @@ export function addedByDay(days: StorageDay[]): number[] {
 export const added = (days: StorageDay[]): number =>
   days.reduce((sum, d) => sum + d.bytes, 0);
 
-// "Tue 23 Sep"
-export const dayWord = weekdayDayMonth;
-
 // the database tile: the rows in every area, and the tables they sit in
 export function rowsTile(areas: StorageArea[]) {
   const rows = areas.reduce((sum, a) => sum + a.rows, 0);
@@ -141,7 +112,7 @@ export function rowsTile(areas: StorageArea[]) {
   return {
     figure: count(rows),
     unit: rows === 1 ? "row" : "rows",
-    sub: plural(tables, "table", "tables"),
+    sub: pluralCommas(tables, "table", "tables"),
   };
 }
 
@@ -152,7 +123,7 @@ export const logHeights = (values: number[]): number[] =>
 
 // the rows a day under the cursor added, short enough for a phone's tile
 export const rowsDay = (day: StorageDay): string =>
-  `${dayMonth(day.start)} · ${plural(day.rows, "row", "rows")}`;
+  `${dayMonth(day.start)} · ${pluralCommas(day.rows, "row", "rows")}`;
 
 // the average a day, as the growth tile's figure: "+4.1", "MB a day"
 export function perDay(bytes: number, days: number) {
@@ -192,7 +163,7 @@ export function factsLine(file: StorageFile): string {
     file.journalMode === "wal" ? "WAL" : file.journalMode.toLowerCase();
   const parts = [
     file.name,
-    `${plural(file.pages, "page", "pages")} of ${size(file.pageSize)}`,
+    `${pluralCommas(file.pages, "page", "pages")} of ${size(file.pageSize)}`,
     `${journal} journal`,
     `auto vacuum ${file.autoVacuum === "none" ? "off" : file.autoVacuum}`,
   ];
@@ -248,7 +219,7 @@ export function largestLine(kind: LargestKind, row: LargestRow) {
     const top = row.parts[0];
     const why =
       top === undefined || top.part === "chats"
-        ? plural(row.messages ?? 0, "message", "messages")
+        ? pluralCommas(row.messages ?? 0, "message", "messages")
         : partWords(row, 1)[0];
     return {
       name: personal
@@ -256,19 +227,19 @@ export function largestLine(kind: LargestKind, row: LargestRow) {
         : row.name || "Untitled chat",
       mono: false,
       sub: [where(row), why].filter(Boolean).join(" · "),
-      href: personal ? null : `/chat/${encodeURIComponent(row.id ?? "")}`,
+      href: personal ? null : chatHref(row.id ?? ""),
     };
   }
   const runs = row.runs ?? 0;
   const kept =
     row.retentionDays === null
-      ? plural(runs, "run", "runs")
-      : `${plural(runs, "run", "runs")} kept ${plural(row.retentionDays, "day", "days")}`;
+      ? pluralCommas(runs, "run", "runs")
+      : `${pluralCommas(runs, "run", "runs")} kept ${pluralCommas(row.retentionDays, "day", "days")}`;
   return {
     name: personal ? "A task in a personal project" : (row.name ?? ""),
     mono: !personal,
     sub: [where(row), kept].filter(Boolean).join(" · "),
-    href: personal ? null : `/automations/${encodeURIComponent(row.id ?? "")}`,
+    href: personal ? null : automationHref(row.id ?? ""),
   };
 }
 
@@ -287,7 +258,7 @@ export function keptLine(key: RetentionKept) {
 }
 
 export function cleanedLine(key: RetentionCleaned, days: number | null) {
-  const d = days === null ? null : plural(days, "day", "days");
+  const d = days === null ? null : pluralCommas(days, "day", "days");
   switch (key) {
     case "runs":
       return {

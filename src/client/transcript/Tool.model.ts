@@ -32,7 +32,7 @@ export function ranCall(call: ToolCall, result: Message | null): ToolCall {
 }
 
 // Keep MCP folds readable by naming the server before the tool.
-export const MAX_MCP_ARGUMENT = 60;
+const MAX_MCP_ARGUMENT = 60;
 export function toolLabel(name: string): {
   server: string | null;
   tool: string;

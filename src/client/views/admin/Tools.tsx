@@ -7,7 +7,8 @@
 // first, one row per provider with whether its key file is there, and
 // the HTTP credentials bash's curl signs with. Visuals, as settings
 // sections: visualize with its own switch, apart from web access, the
-// CDNs a visual may load from and its limits. Limits: the caps a send and a call run under. The tab is
+// CDNs a visual may load from and its limits. Limits: the caps a turn,
+// a call, the knowledge base and scheduled tasks run under. The tab is
 // the address, and the four routes name this one view, so a tab change
 // keeps the page and its load. A change applies to the next send.
 
@@ -23,7 +24,8 @@ import {
 import { path } from "../../app/router.ts";
 import { credentialsError } from "../../data/credentials.ts";
 import { limits, patchTool, tools, toolsError } from "../../data/tools.ts";
-import { says } from "../../lib/format.ts";
+import { tokensText } from "../../lib/format.ts";
+import { useAction } from "../../lib/save.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -45,7 +47,6 @@ import {
   keyLine,
   searchLine,
   TOOLS_TABS,
-  tokensText,
   toolsTab,
   totalTokens,
 } from "./Tools.model.ts";
@@ -101,19 +102,11 @@ function VisualTool({ tool }: { tool: WebToolSummary }) {
 // the providers as radio rows; a pick writes at once
 function SearchCard() {
   const state = tools.value?.search;
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
+  const { busy, failure, run } = useAction();
   if (!state) return null;
   const choose = async (provider: SearchProvider | null) => {
     if (provider === state.provider || busy.value) return;
-    busy.value = true;
-    failure.value = null;
-    try {
-      await patchTool("websearch", { provider });
-    } catch (err) {
-      failure.value = says(err);
-    }
-    busy.value = false;
+    await run(() => patchTool("websearch", { provider }));
   };
   return (
     <RowsCard label="Web search">

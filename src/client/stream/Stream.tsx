@@ -4,18 +4,18 @@
 // The stream's card, a Rows card: the search and the filters in its
 // head, then the session rows, or the note that says why there are
 // none, and Show more while a later page is left. The session row is
-// the one row outside Rows: a denser feed line, as the Home plan draws
-// it. Home and the project page both draw it over the entity's list;
-// the clock that moves the times is the page's.
+// the one row outside Rows: a denser feed line. Home and the project
+// page both draw it over the entity's list; the clock that moves the
+// times is the page's.
 
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
-import { type Failure, sentence } from "../lib/format.ts";
+import type { Failure } from "../lib/format.ts";
 import type { IconName } from "../lib/icons.tsx";
 import {
-  RowsBlock,
   RowsButton,
   RowsCard,
+  RowsFailed,
   RowsFilters,
   RowsNote,
 } from "../ui/Rows.tsx";
@@ -124,26 +124,14 @@ export function ShowMore({
   return (
     <>
       <RowsButton onClick={onMore}>Show more</RowsButton>
-      {more.error !== null && (
-        <RowsBlock>
-          <p class="notice-failed" role="alert">
-            {sentence(more.error.words)}
-            {more.error.status !== null && (
-              <>
-                {" "}
-                <span class="code-tag">HTTP {more.error.status}</span>
-              </>
-            )}
-          </p>
-        </RowsBlock>
-      )}
+      {more.error !== null && <RowsFailed failure={more.error} />}
     </>
   );
 }
 
 // placeholder rows in the shape of the real ones while rows load, so
 // the rows land where the shapes were
-export function Ghosts({ count }: { count: number }) {
+function Ghosts({ count }: { count: number }) {
   return (
     <div class="stream-ghosts" role="status" aria-label="Loading sessions">
       {Array.from({ length: count }, (_, i) => (

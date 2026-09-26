@@ -4,10 +4,8 @@
 // The words on a user's page and an agent's page.
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import type { Role } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
-
-export { tokensText } from "../../lib/format.ts";
-
 import { offsetOf } from "../../ui/Zone.model.ts";
 
 // "16:34 · GMT+3": the time where the user is, and how far that is from
@@ -27,6 +25,9 @@ export function localTime(tz: string, now: number): string {
   return offset === "" ? time : `${time} · ${offset}`;
 }
 
+export const roleWords = (role: Role) =>
+  role === "admin" ? "Admin" : "Member";
+
 // "on", "off", or what the provider does by default
 export function thinkingText(agent: Pick<AgentSummary, "thinking">): string {
   return agent.thinking ?? "model default";
@@ -39,8 +40,6 @@ export function effortText(
   return agent.effort ?? "provider default";
 }
 
-// the MCP card's hint: what a send resolves the mode to now, and the
-// lean schemas' count against the cap that flips auto
 // under a server's name: when its list was last discovered, or the
 // failure since, in red, as the MCP page's row head says it
 export function serverLine(

@@ -7,9 +7,9 @@
 
 import { useSignal } from "@preact/signals";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
-import type { SessionStatus } from "../../../shared/words.ts";
 import { stopSession } from "../../data/sessions.ts";
 import { says, stamp } from "../../lib/format.ts";
+import { chatHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import {
@@ -29,12 +29,6 @@ import {
 } from "./Automations.model.ts";
 import "./automations.css";
 
-// a run's clock is lit by its status, as the feed's is; a stopped run
-// stays faint
-function runIcon(status: SessionStatus): string {
-  return status === "stopped" ? "automations-faint" : `status-${status}`;
-}
-
 export function RunRow({
   row,
   deadlineMs,
@@ -52,7 +46,7 @@ export function RunRow({
   const share = took === null ? 0 : deadlineShare(took, deadlineMs);
   return (
     <RowsGo
-      href={`/chat/${session.id}`}
+      href={chatHref(session.id)}
       end={
         running ? (
           <RowsEnd>
@@ -79,7 +73,7 @@ export function RunRow({
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
           size={15}
-          class={runIcon(session.status)}
+          class={`status-${session.status}`}
         />
       </RowsAvatar>
       <RowsTitle

@@ -9,8 +9,9 @@
 // the notice; another action of the form holds every button and its
 // refusal is the notice, naming the action.
 
-import { describe, expect, test } from "bun:test";
-import { at, noticeOf, Save, sentence } from "../../../src/client/lib/save.ts";
+import { describe, expect, jest, test } from "bun:test";
+import { sentence } from "../../../src/client/lib/format.ts";
+import { at, noticeOf, Save } from "../../../src/client/lib/save.ts";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -35,16 +36,23 @@ describe("Save", () => {
     expect(save.status.value).toBe("idle");
   });
 
-  test("busy, then done, then idle after the moment", async () => {
-    const call = deferred();
-    const save = new Save(() => call.promise, 5);
-    const run = save.run(null);
-    expect(save.status.value).toBe("busy");
-    call.resolve();
-    await run;
-    expect(save.status.value).toBe("done");
-    await new Promise((r) => setTimeout(r, 20));
-    expect(save.status.value).toBe("idle");
+  // serial: fake timers are the process's, and the other tests wait on
+  // real ones
+  test.serial("busy, then done, then idle after the moment", async () => {
+    jest.useFakeTimers();
+    try {
+      const call = deferred();
+      const save = new Save(() => call.promise, 5);
+      const run = save.run(null);
+      expect(save.status.value).toBe("busy");
+      call.resolve();
+      await run;
+      expect(save.status.value).toBe("done");
+      jest.advanceTimersByTime(5);
+      expect(save.status.value).toBe("idle");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test("a failure is its reason until the next edit", async () => {

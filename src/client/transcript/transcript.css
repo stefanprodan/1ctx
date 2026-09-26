@@ -213,14 +213,15 @@
   .transcript-fork-failure,
   .transcript-fork-none {
     padding: var(--space-1) var(--space-2);
+  }
+  .transcript-fork-none {
     color: var(--faint);
   }
   .transcript-fork-failure {
     color: var(--failed);
   }
 
-  /* the arrow above the composer, see-through so the text under it
-     still reads */
+  /* the arrow above the composer */
   .transcript-jump {
     position: absolute;
     bottom: calc(100% + var(--space-2));
@@ -233,9 +234,9 @@
     line-height: 0;
     border-radius: 50%;
     border: 1px solid var(--line-strong);
+    /* solid, so the text scrolling under it never shows through */
     background: var(--card);
     box-shadow: var(--shadow-pop);
-    /* solid, so the text scrolling under it never shows through */
     color: var(--dim);
     cursor: pointer;
   }

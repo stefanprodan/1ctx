@@ -1,13 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The admin project words, entity, page, rail entry, and the socket
-// frames that keep an open tab's project rail current.
+// The admin project words, entity, page, and the socket frames that
+// keep an open tab's project rail current.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
-import { railRows } from "../../../src/client/app/routes.ts";
 import {
   addProjectMember,
   adminProject,
@@ -25,19 +24,17 @@ import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import { startSocket, type Wire } from "../../../src/client/data/socket.ts";
 import { users, usersError } from "../../../src/client/data/users.ts";
+import { nameProblem } from "../../../src/client/lib/names.ts";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
   candidateNote,
   candidates,
   countLine,
   deleteLabel,
-  plural,
-  sinceLine,
-  step,
+  stepMember,
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectForm } from "../../../src/client/views/admin/ProjectForm.tsx";
-import { nameProblem } from "../../../src/client/views/projects/Project.model.ts";
 import type {
   ProjectDetail,
   ProjectSummary,
@@ -119,20 +116,8 @@ const rail = (rows: ProjectSummary[]) => Response.json({ projects: rows });
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("the words", () => {
-  test("leaves the name rule to the server and catches an empty name", () => {
-    expect(nameProblem("platform")).toBeNull();
-    expect(nameProblem(" platform ")).toBeNull();
-    expect(nameProblem("a")).toBeNull();
-    expect(nameProblem("platform.team")).toBeNull();
-    expect(nameProblem("")).toBe("Enter a name");
-    expect(nameProblem("  ")).toBe("Enter a name");
-  });
-
   test("writes the member, date, and delete counts", () => {
-    expect(plural(1, "member")).toBe("1 member");
-    expect(plural(2, "member")).toBe("2 members");
     expect(countLine(detail)).toBe("1 member");
-    expect(sinceLine(detail)).toBe("since 14 September 2026");
     expect(deleteLabel(3)).toBe("Delete with 3 chats");
     expect(deleteLabel(1)).toBe("Delete with 1 chat");
     expect(deleteLabel(0)).toBe("Delete");
@@ -163,46 +148,45 @@ describe("the words", () => {
     expect(candidateNote(root)).toBe("admin");
     expect(candidateNote(casey)).toBe("");
   });
-
-  test("the arrows wrap at either end of the list", () => {
-    expect(step(0, 1, 3)).toBe(1);
-    expect(step(2, 1, 3)).toBe(0);
-    expect(step(0, -1, 3)).toBe(2);
-    expect(step(0, 1, 0)).toBe(0);
-  });
 });
 
 describe("the entity", () => {
-  test("loads only team projects and loads one detail when opened", async () => {
-    answer = (url) =>
-      url === "/api/projects"
-        ? rail([personal, team])
-        : Response.json({ project: detail });
+  test.serial(
+    "loads only team projects and loads one detail when opened",
+    async () => {
+      answer = (url) =>
+        url === "/api/projects"
+          ? rail([personal, team])
+          : Response.json({ project: detail });
 
-    await loadAdminProjects();
-    expect(adminProjects.value).toEqual([team]);
-    expect(adminProject.value).toBeNull();
+      await loadAdminProjects();
+      expect(adminProjects.value).toEqual([team]);
+      expect(adminProject.value).toBeNull();
 
-    await loadAdminProject("p2");
-    expect(adminProject.value).toEqual(detail);
-  });
+      await loadAdminProject("p2");
+      expect(adminProject.value).toEqual(detail);
+    },
+  );
 
-  test("create puts the detail in place and reloads the rail", async () => {
-    let sent: unknown;
-    answer = (_url, init) => {
-      if (init?.method === "POST") {
-        sent = JSON.parse(String(init.body));
-        return Response.json({ project: detail }, { status: 201 });
-      }
-      return rail([personal, team]);
-    };
+  test.serial(
+    "create puts the detail in place and reloads the rail",
+    async () => {
+      let sent: unknown;
+      answer = (_url, init) => {
+        if (init?.method === "POST") {
+          sent = JSON.parse(String(init.body));
+          return Response.json({ project: detail }, { status: 201 });
+        }
+        return rail([personal, team]);
+      };
 
-    expect(await createProject({ name: "platform" })).toEqual(detail);
-    expect(sent).toEqual({ name: "platform" });
-    expect(adminProject.value).toEqual(detail);
-    expect(adminProjects.value).toEqual([team]);
-    expect(projects.value).toEqual([personal, team]);
-  });
+      expect(await createProject({ name: "platform" })).toEqual(detail);
+      expect(sent).toEqual({ name: "platform" });
+      expect(adminProject.value).toEqual(detail);
+      expect(adminProjects.value).toEqual([team]);
+      expect(projects.value).toEqual([personal, team]);
+    },
+  );
 
   test.serial("a refused name shows the server's words on save", async () => {
     for (const [status, error] of [
@@ -223,29 +207,32 @@ describe("the entity", () => {
     expect(adminProject.value).toBeNull();
   });
 
-  test("update puts the detail in place and reloads the rail", async () => {
-    const renamed = { ...detail, name: "applications" };
-    adminProjects.value = [team];
-    answer = (_url, init) =>
-      init?.method === "PATCH"
-        ? Response.json({ project: renamed })
-        : rail([personal, renamed]);
+  test.serial(
+    "update puts the detail in place and reloads the rail",
+    async () => {
+      const renamed = { ...detail, name: "applications" };
+      adminProjects.value = [team];
+      answer = (_url, init) =>
+        init?.method === "PATCH"
+          ? Response.json({ project: renamed })
+          : rail([personal, renamed]);
 
-    await updateProject("p2", { name: "applications" });
-    expect(adminProject.value).toEqual(renamed);
-    expect(adminProjects.value).toEqual([
-      {
-        id: "p2",
-        kind: "team",
-        name: "applications",
-        createdAt: team.createdAt,
-        memberCount: 1,
-      },
-    ]);
-    expect(projects.value).toEqual([personal, renamed]);
-  });
+      await updateProject("p2", { name: "applications" });
+      expect(adminProject.value).toEqual(renamed);
+      expect(adminProjects.value).toEqual([
+        {
+          id: "p2",
+          kind: "team",
+          name: "applications",
+          createdAt: team.createdAt,
+          memberCount: 1,
+        },
+      ]);
+      expect(projects.value).toEqual([personal, renamed]);
+    },
+  );
 
-  test("add and remove put each answered detail in place", async () => {
+  test.serial("add and remove put each answered detail in place", async () => {
     const empty = { ...detail, members: [] };
     let adding = true;
     answer = (_url, init) => {
@@ -269,7 +256,7 @@ describe("the entity", () => {
     expect(projects.value).toEqual([personal, team]);
   });
 
-  test("delete removes the row and reloads the rail", async () => {
+  test.serial("delete removes the row and reloads the rail", async () => {
     adminProjects.value = [team];
     adminProject.value = detail;
     answer = (_url, init) =>
@@ -283,48 +270,57 @@ describe("the entity", () => {
     expect(projects.value).toEqual([personal]);
   });
 
-  test("a previous user's write does not cancel the current loads", async () => {
-    let answerRename!: () => void;
-    let answerList!: () => void;
-    let answerDetail!: () => void;
-    const current = { ...detail, id: "p3", name: "current" };
-    answer = (url, init) =>
-      new Promise<Response>((resolve) => {
-        if (init?.method === "PATCH") {
-          answerRename = () => resolve(Response.json({ project: detail }));
-        } else if (url === "/api/projects") {
-          answerList = () =>
-            resolve(
-              rail([
-                personal,
-                {
-                  id: "p3",
-                  kind: "team",
-                  name: "current",
-                  createdAt: 0,
-                  memberCount: 1,
-                },
-              ]),
-            );
-        } else {
-          answerDetail = () => resolve(Response.json({ project: current }));
-        }
-      });
+  test.serial(
+    "a previous user's write does not cancel the current loads",
+    async () => {
+      let answerRename!: () => void;
+      let answerList!: () => void;
+      let answerDetail!: () => void;
+      const current = { ...detail, id: "p3", name: "current" };
+      answer = (url, init) =>
+        new Promise<Response>((resolve) => {
+          if (init?.method === "PATCH") {
+            answerRename = () => resolve(Response.json({ project: detail }));
+          } else if (url === "/api/projects") {
+            answerList = () =>
+              resolve(
+                rail([
+                  personal,
+                  {
+                    id: "p3",
+                    kind: "team",
+                    name: "current",
+                    createdAt: 0,
+                    memberCount: 1,
+                  },
+                ]),
+              );
+          } else {
+            answerDetail = () => resolve(Response.json({ project: current }));
+          }
+        });
 
-    const stale = updateProject("p2", { name: "platform" });
-    me.value = { ...admin, id: "u3", username: "next" };
-    const list = loadAdminProjects();
-    const one = loadAdminProject("p3");
-    answerRename();
-    await stale;
-    answerList();
-    answerDetail();
-    await Promise.all([list, one]);
-    expect(adminProjects.value).toEqual([
-      { id: "p3", kind: "team", name: "current", createdAt: 0, memberCount: 1 },
-    ]);
-    expect(adminProject.value).toEqual(current);
-  });
+      const stale = updateProject("p2", { name: "platform" });
+      me.value = { ...admin, id: "u3", username: "next" };
+      const list = loadAdminProjects();
+      const one = loadAdminProject("p3");
+      answerRename();
+      await stale;
+      answerList();
+      answerDetail();
+      await Promise.all([list, one]);
+      expect(adminProjects.value).toEqual([
+        {
+          id: "p3",
+          kind: "team",
+          name: "current",
+          createdAt: 0,
+          memberCount: 1,
+        },
+      ]);
+      expect(adminProject.value).toEqual(current);
+    },
+  );
 });
 
 describe("the page", () => {
@@ -371,58 +367,50 @@ describe("the page", () => {
   });
 });
 
+test("an arrow in the member list keeps 0 on an empty list", () => {
+  expect(stepMember(0, 0, 1)).toBe(0);
+  expect(stepMember(0, 0, -1)).toBe(0);
+  expect(stepMember(0, 3, 1)).toBe(1);
+  expect(stepMember(0, 3, -1)).toBe(2);
+});
+
 describe("the rail", () => {
-  test("Projects follows Overview and Storage in the Admin group", () => {
-    const group = railRows("admin").find((row) => row.kind === "group");
-    const entries =
-      group?.kind === "group"
-        ? group.routes.map((route) => route.nav!.label)
-        : [];
-    expect(entries).toEqual([
-      "Overview",
-      "Storage",
-      "Projects",
-      "Users",
-      "Agents",
-      "Tools",
-      "Skills",
-      "MCP",
-    ]);
-  });
-
-  test("granted and revoked refresh the rail and admin list", async () => {
-    class FakeWire implements Wire {
-      readyState = 1;
-      onopen: ((event: unknown) => void) | null = null;
-      onmessage: ((event: { data: unknown }) => void) | null = null;
-      onclose: ((event: { code: number }) => void) | null = null;
-      onerror: ((event: unknown) => void) | null = null;
-      send(): void {}
-      close(): void {
-        this.readyState = 3;
+  test.serial(
+    "granted and revoked refresh the rail and admin list",
+    async () => {
+      class FakeWire implements Wire {
+        readyState = 1;
+        onopen: ((event: unknown) => void) | null = null;
+        onmessage: ((event: { data: unknown }) => void) | null = null;
+        onclose: ((event: { code: number }) => void) | null = null;
+        onerror: ((event: unknown) => void) | null = null;
+        send(): void {}
+        close(): void {
+          this.readyState = 3;
+        }
+        message(value: unknown): void {
+          this.onmessage?.({ data: JSON.stringify(value) });
+        }
       }
-      message(value: unknown): void {
-        this.onmessage?.({ data: JSON.stringify(value) });
-      }
-    }
 
-    const wire = new FakeWire();
-    stopSocket = startSocket({ connect: () => wire });
-    projects.value = [personal];
-    adminProjects.value = [];
-    answer = () => rail([personal, team]);
+      const wire = new FakeWire();
+      stopSocket = startSocket({ connect: () => wire });
+      projects.value = [personal];
+      adminProjects.value = [];
+      answer = () => rail([personal, team]);
 
-    wire.message({ type: "granted", projectId: "p2" });
-    await settle();
-    expect(projects.value).toEqual([personal, team]);
-    expect(adminProjects.value).toEqual([team]);
+      wire.message({ type: "granted", projectId: "p2" });
+      await settle();
+      expect(projects.value).toEqual([personal, team]);
+      expect(adminProjects.value).toEqual([team]);
 
-    adminProject.value = detail;
-    answer = () => rail([personal]);
-    wire.message({ type: "revoked", projectId: "p2" });
-    await settle();
-    expect(projects.value).toEqual([personal]);
-    expect(adminProjects.value).toEqual([]);
-    expect(adminProject.value).toBeNull();
-  });
+      adminProject.value = detail;
+      answer = () => rail([personal]);
+      wire.message({ type: "revoked", projectId: "p2" });
+      await settle();
+      expect(projects.value).toEqual([personal]);
+      expect(adminProjects.value).toEqual([]);
+      expect(adminProject.value).toBeNull();
+    },
+  );
 });

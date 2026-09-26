@@ -14,6 +14,24 @@ import { textFromBytes } from "../../shared/knowledge.ts";
 export type PickKind = "zip" | "gzip" | "tar" | "text";
 export type PickSkip = KnowledgeUploadReason | "upload-size";
 
+// a skipped name's reason, as a log line says it
+export function skipWords(reason: PickSkip): string {
+  const words: Record<PickSkip, string> = {
+    "not-regular": "not a regular file",
+    outside: "outside the folder",
+    "no-letters": "no letters or digits",
+    "too-long": "name too long",
+    "bad-name": "bad name",
+    duplicate: "duplicate name",
+    "too-big": "over the file limit",
+    "not-text": "not text",
+    clash: "clashes with another",
+    "clash-live": "clashes with a file",
+    "upload-size": "over the 32 MB upload limit",
+  };
+  return words[reason];
+}
+
 export type PickRules = {
   // the most one upload carries
   itemBytes: number;

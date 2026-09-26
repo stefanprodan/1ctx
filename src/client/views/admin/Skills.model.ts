@@ -3,8 +3,7 @@
 //
 // What the skills page shows and checks without a DOM: which form the
 // pasted URL takes and what its button says, the words on a row's
-// head and inside it, the bytes and change words, and the cut a long
-// body gets.
+// head and inside it, the change words, and the cut a long body gets.
 
 import type {
   SkillChange,
@@ -12,9 +11,14 @@ import type {
 } from "../../../shared/contracts/skill.ts";
 import { sourceForm } from "../../../shared/skills.ts";
 import type { SkillSource } from "../../../shared/words.ts";
-import { ago, count, longDate } from "../../lib/format.ts";
-
-export { firstSentence } from "../../lib/format.ts";
+import {
+  ago,
+  count,
+  longDate,
+  plural,
+  pluralCommas,
+} from "../../lib/format.ts";
+import { cutLines } from "../../lib/lines.ts";
 
 export const URL_HINT =
   "A site with skills, a GitHub directory, a raw SKILL.md, or a zip or tar archive.";
@@ -43,15 +47,6 @@ export function pathProblem(path: string): string | null {
   if (p.split("/").some((s) => s === "..")) return "A path inside the archive";
   return null;
 }
-
-// "1.2 KB", "37 KB", "612 B"
-export function bytesWord(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Number((n / 1024).toPrecision(3))} KB`;
-  return `${Number((n / (1024 * 1024)).toPrecision(3))} MB`;
-}
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // the faint line under the name: the files and the fetch, or the
 // failure in red
@@ -141,7 +136,7 @@ export function droppedLine(
   const total = skill.dropped.length + skill.droppedMore;
   const list = skill.dropped.map((d) => `${d.path} (${d.reason})`).join(", ");
   const more = skill.droppedMore > 0 ? ` and ${skill.droppedMore} more` : "";
-  return `${plural(total, "file")} not kept: ${list}${more}`;
+  return `${pluralCommas(total, "file", "files")} not kept: ${list}${more}`;
 }
 
 // the metadata as "key: value" lines, in key order
@@ -153,18 +148,18 @@ export function metadataLines(metadata: Record<string, string>): string[] {
 
 // a body folded to its first lines; a text of TEXT_LINES or fewer has
 // no button
-export const TEXT_LINES = 12;
+const TEXT_LINES = 12;
 
 export function textBox(
   text: string,
   expanded: boolean,
 ): { text: string; cut: boolean; label: string } {
-  const lines = text.replace(/\n$/, "").split("\n");
-  const cut = lines.length > TEXT_LINES;
-  const n = lines.length;
+  const box = cutLines(text, TEXT_LINES, expanded);
+  const n = box.lines;
   return {
-    text: cut && !expanded ? lines.slice(0, TEXT_LINES).join("\n") : text,
-    cut,
+    text: box.text,
+    cut: box.cut,
+    // a body may pass 999 lines, which count() shortens
     label: `Show all ${count(n)} line${n === 1 ? "" : "s"}`,
   };
 }

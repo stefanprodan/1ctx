@@ -71,16 +71,6 @@ export function commandOf(
   return { command, arg };
 }
 
-// the highlight moves and wraps; an empty list has no highlight
-export function moveHighlight(
-  index: number,
-  count: number,
-  step: 1 | -1,
-): number {
-  if (count === 0) return 0;
-  return (index + step + count) % count;
-}
-
 export type CommandHandlers = {
   onCompact?: () => Promise<void>;
   onRename?: (title: string) => Promise<void>;

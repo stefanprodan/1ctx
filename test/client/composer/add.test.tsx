@@ -5,81 +5,86 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   agentMoved,
-  memoryItem,
   onWords,
   panelessOf,
   serversItem,
   skillsItem,
-  visualsItem,
-  webItem,
+  switchItem,
   webPaneItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
 import { MEMORY, VISUALIZE, WEB } from "../../../src/shared/capabilities.ts";
 
 describe("the Web access item", () => {
-  test("is live and on when the instance allows it and the chat left it", () => {
-    expect(webItem({ tools: true, switchable: [WEB], off: false })).toEqual({
-      live: true,
-      on: true,
-      reason: null,
-    });
-  });
-
-  test("is live and off once the chat turned it off", () => {
-    expect(webItem({ tools: true, switchable: [WEB], off: true })).toEqual({
-      live: true,
-      on: false,
-      reason: null,
-    });
-  });
-
-  test("cannot be switched while an admin has it off, and says so", () => {
-    expect(webItem({ tools: true, switchable: [], off: false })).toEqual({
-      live: false,
-      on: false,
-      reason: "Turned off by an admin",
-    });
-  });
-
-  test("an agent without tools comes before the admin's word", () => {
-    expect(webItem({ tools: false, switchable: [WEB], off: false })).toEqual({
-      live: false,
-      on: false,
-      reason: "Agent cannot use tools",
-    });
-    expect(webItem({ tools: false, switchable: [], off: false }).reason).toBe(
-      "Agent cannot use tools",
-    );
-  });
-
-  test("waits without a reason until the project's agents answered", () => {
-    expect(webItem({ tools: true, switchable: null, off: false })).toEqual({
-      live: false,
-      on: false,
-      reason: null,
-    });
+  const cannot = { live: false, on: false };
+  test.each([
+    [
+      "is live and on when the instance allows it and the chat left it",
+      { tools: true, switchable: [WEB], off: false },
+      { live: true, on: true, reason: null },
+    ],
+    [
+      "is live and off once the chat turned it off",
+      { tools: true, switchable: [WEB], off: true },
+      { live: true, on: false, reason: null },
+    ],
+    [
+      "cannot be switched while an admin has it off, and says so",
+      { tools: true, switchable: [], off: false },
+      { ...cannot, reason: "Turned off by an admin" },
+    ],
+    [
+      "says an agent without tools cannot use it",
+      { tools: false, switchable: [WEB], off: false },
+      { ...cannot, reason: "Agent cannot use tools" },
+    ],
+    [
+      "says an agent without tools before the admin's word",
+      { tools: false, switchable: [], off: false },
+      { ...cannot, reason: "Agent cannot use tools" },
+    ],
+    [
+      "waits without a reason until the project's agents answered",
+      { tools: true, switchable: null, off: false },
+      { ...cannot, reason: null },
+    ],
+  ])("%s", (_name, input, item) => {
+    expect(switchItem(WEB, input)).toEqual(item);
   });
 });
 
 describe("the Visuals item", () => {
   test("follows its own key, apart from web access", () => {
     expect(
-      visualsItem({ tools: true, switchable: [WEB, VISUALIZE], off: false }),
+      switchItem(VISUALIZE, {
+        tools: true,
+        switchable: [WEB, VISUALIZE],
+        off: false,
+      }),
     ).toEqual({ live: true, on: true, reason: null });
     expect(
-      visualsItem({ tools: true, switchable: [WEB, VISUALIZE], off: true }),
+      switchItem(VISUALIZE, {
+        tools: true,
+        switchable: [WEB, VISUALIZE],
+        off: true,
+      }),
     ).toEqual({ live: true, on: false, reason: null });
-    expect(visualsItem({ tools: true, switchable: [WEB], off: false })).toEqual(
-      { live: false, on: false, reason: "Turned off by an admin" },
-    );
     expect(
-      webItem({ tools: true, switchable: [VISUALIZE], off: false }),
+      switchItem(VISUALIZE, { tools: true, switchable: [WEB], off: false }),
     ).toEqual({ live: false, on: false, reason: "Turned off by an admin" });
     expect(
-      visualsItem({ tools: false, switchable: [VISUALIZE], off: false }).reason,
+      switchItem(WEB, { tools: true, switchable: [VISUALIZE], off: false }),
+    ).toEqual({ live: false, on: false, reason: "Turned off by an admin" });
+    expect(
+      switchItem(VISUALIZE, {
+        tools: false,
+        switchable: [VISUALIZE],
+        off: false,
+      }).reason,
     ).toBe("Agent cannot use tools");
-    expect(visualsItem({ tools: true, switchable: null, off: false })).toEqual({
+    expect(
+      switchItem(VISUALIZE, { tools: true, switchable: null, off: false }),
+    ).toEqual({
       live: false,
       on: false,
       reason: null,
@@ -90,20 +95,18 @@ describe("the Visuals item", () => {
 describe("the Memory item", () => {
   test("is on unless the chat turned it off, off for an agent without tools", () => {
     expect(
-      memoryItem({ tools: true, switchable: [MEMORY], off: false }),
+      switchItem(MEMORY, { tools: true, switchable: [MEMORY], off: false }),
     ).toEqual({ live: true, on: true, reason: null });
     expect(
-      memoryItem({ tools: true, switchable: [MEMORY], off: true }),
+      switchItem(MEMORY, { tools: true, switchable: [MEMORY], off: true }),
     ).toEqual({ live: true, on: false, reason: null });
     expect(
-      memoryItem({ tools: false, switchable: [MEMORY], off: false }),
+      switchItem(MEMORY, { tools: false, switchable: [MEMORY], off: false }),
     ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
-    // web access off on the instance leaves memory alone
+    // the first case has web access off on the instance, which leaves
+    // memory live while web is refused
     expect(
-      memoryItem({ tools: true, switchable: [MEMORY], off: false }).live,
-    ).toBe(true);
-    expect(
-      webItem({ tools: true, switchable: [MEMORY], off: false }).reason,
+      switchItem(WEB, { tools: true, switchable: [MEMORY], off: false }).reason,
     ).toBe("Turned off by an admin");
   });
 });
@@ -328,7 +331,7 @@ describe("the Web access item with credentials", () => {
   });
 
   test("when the web cannot be switched, the credentials take its reason", () => {
-    const web = webItem({ tools: true, switchable: [], off: false });
+    const web = switchItem(WEB, { tools: true, switchable: [], off: false });
     const item = webPaneItem({ web, credentials, isOff: () => false })!;
     expect(item.live).toBe(true);
     expect(item.reason).toBe("Turned off by an admin");
@@ -338,7 +341,11 @@ describe("the Web access item with credentials", () => {
       "Turned off by an admin",
     ]);
     expect(item.rows.every((row) => !row.live && !row.on)).toBe(true);
-    const tools = webItem({ tools: false, switchable: [WEB], off: false });
+    const tools = switchItem(WEB, {
+      tools: false,
+      switchable: [WEB],
+      off: false,
+    });
     expect(
       webPaneItem({ web: tools, credentials, isOff: () => false })!.rows[1]!
         .reason,
@@ -346,7 +353,7 @@ describe("the Web access item with credentials", () => {
   });
 
   test("waits for the project's agents to answer", () => {
-    const web = webItem({ tools: true, switchable: null, off: false });
+    const web = switchItem(WEB, { tools: true, switchable: null, off: false });
     const item = webPaneItem({ web, credentials, isOff: () => false })!;
     expect(item.live).toBe(false);
   });

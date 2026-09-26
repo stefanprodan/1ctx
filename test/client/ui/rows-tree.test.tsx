@@ -50,7 +50,7 @@ test("a closed folder is a button with its count and no rows under it", () => {
   expect(html).not.toContain("a.md");
   // a file with no meta draws none
   expect(html).toContain(
-    '<span class="rows-tree-name">readme.md</span></a></li></ul>',
+    '<span class="rows-tree-name cut">readme.md</span></a></li></ul>',
   );
 });
 

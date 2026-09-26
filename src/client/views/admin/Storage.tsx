@@ -19,6 +19,7 @@ import {
   storageError,
   storageLoading,
 } from "../../data/overview.ts";
+import { pluralCommas, share, size, sizeParts } from "../../lib/format.ts";
 import { Icon, type IconName } from "../../lib/icons.tsx";
 import { BarsGhost, Bone } from "../../ui/Bones.tsx";
 import {
@@ -35,10 +36,10 @@ import { Spark } from "../../ui/Plot.tsx";
 import { RowsFilters } from "../../ui/Rows.tsx";
 import {
   Tile,
-  TileGhost,
   TileMeter,
   TilePlot,
   Tiles,
+  TilesGhost,
 } from "../../ui/Tiles.tsx";
 import {
   AREA_NAMES,
@@ -47,7 +48,6 @@ import {
   areaBars,
   areasFoot,
   cleanedLine,
-  commas,
   factsLine,
   freeWords,
   growthDay,
@@ -60,9 +60,6 @@ import {
   pickedArea,
   rowsDay,
   rowsTile,
-  share,
-  size,
-  sizeParts,
   tableBars,
   walWords,
 } from "./Storage.model.ts";
@@ -197,9 +194,7 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
         label={area ? `Tables in ${AREA_NAMES[area.key]}` : "Tables"}
         hint={
           hintOf(tables, tableOver.value) ??
-          (area
-            ? `${commas(area.rows)} ${area.rows === 1 ? "row" : "rows"}`
-            : "")
+          (area ? pluralCommas(area.rows, "row", "rows") : "")
         }
       >
         {area && (
@@ -248,7 +243,7 @@ function LargestPanel({ answer }: { answer: StorageResponse }) {
       action={<RowsFilters label="Largest" filters={filters} />}
     >
       {rows.length === 0 ? (
-        <p class="storage-none">Nothing stored yet</p>
+        <p class="chart-none">Nothing stored yet</p>
       ) : (
         <div class="storage-tops">
           {rows.map((row, i) => {
@@ -345,12 +340,12 @@ function Board({ answer }: { answer: StorageResponse }) {
   return (
     <>
       <StorageTiles answer={answer} />
-      <div class="storage-grid">
+      <div class="chart-grid">
         <AreasPanels answer={answer} />
         <LargestPanel answer={answer} />
         <RetentionPanel answer={answer} />
       </div>
-      <p class="storage-facts">{factsLine(answer.file)}</p>
+      <p class="chart-facts">{factsLine(answer.file)}</p>
     </>
   );
 }
@@ -372,13 +367,9 @@ function BoardGhost() {
     </div>
   );
   return (
-    <div class="storage-ghost" aria-hidden="true">
-      <Tiles>
-        {[0, 4, 8, 12].map((at) => (
-          <TileGhost key={at} at={at} />
-        ))}
-      </Tiles>
-      <div class="storage-grid">
+    <div class="chart-board-ghost" aria-hidden="true">
+      <TilesGhost at={0} />
+      <div class="chart-grid">
         <ChartPanel label="Areas">
           <BarsGhost widths={AREA_WIDTHS} at={16} />
           <ChartFoot>
@@ -439,7 +430,7 @@ export function Storage() {
       error={answer === null && !busy ? error : null}
     >
       <div
-        class={`storage${busy && answer ? " storage-stale" : ""}`}
+        class={`chart-board${busy && answer ? " storage-stale" : ""}`}
         aria-busy={busy}
       >
         {answer ? <Board answer={answer} /> : <BoardGhost />}

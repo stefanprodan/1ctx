@@ -14,9 +14,9 @@ import {
   knowledgeFolder,
   normalizeKnowledgePath,
 } from "../../../shared/knowledge.ts";
-import { failure } from "../../lib/format.ts";
+import { failure, sentence } from "../../lib/format.ts";
 import { judgePick, type PickKind, type PickSkip } from "../../lib/pick.ts";
-import { type Problem, type Status, sentence } from "../../lib/save.ts";
+import type { Problem, Status } from "../../lib/save.ts";
 
 export const UPLOAD_BYTES = 32 * 1024 * 1024;
 type Kind = PickKind;

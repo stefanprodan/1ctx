@@ -10,9 +10,9 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { Icon } from "../lib/icons.tsx";
+import { useMenu } from "../lib/menu.ts";
 import { Fit } from "../ui/Fit.tsx";
 import { AgentOption } from "./AgentOption.tsx";
-import { useMenu } from "./menu.ts";
 
 export function AgentPicker({
   agents,
@@ -51,12 +51,12 @@ export function AgentPicker({
         >
           <AvatarIcon name={picked?.avatar ?? "bot"} size={12} />
         </span>
-        <span class="composer-chip-name">
+        <span class="composer-chip-name cut">
           {picked?.name ?? (agents === null ? "" : "no agent")}
         </span>
         {picked && (
           <Fit
-            class="composer-chip-model"
+            class="composer-chip-model cut"
             long={picked.model.id}
             short={shortModel(picked.model.id)}
           />

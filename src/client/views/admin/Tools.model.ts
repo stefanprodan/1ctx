@@ -220,7 +220,7 @@ export function totalTokens(rows: { tokens: number }[]): number {
 }
 
 // the page's tabs, each an address
-export type ToolsTab = "builtin" | "web" | "visuals" | "limits";
+type ToolsTab = "builtin" | "web" | "visuals" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
   { tab: "builtin", label: "Built-in", href: "/admin/tools" },
@@ -234,7 +234,7 @@ export function toolsTab(pathname: string): ToolsTab {
 }
 
 // the unit a row is typed in and how many of the runner's units it is
-export type Display = { word: string; factor: number };
+type Display = { word: string; factor: number };
 
 const KB = 1024;
 const MB = 1024 * KB;
@@ -388,16 +388,23 @@ export function defaultHosts(hosts: readonly string[]): boolean {
   );
 }
 
+// a list's refusal: the line and its entry, or the words alone when the
+// list as a whole is refused
+function lineError(result: {
+  line: number;
+  value: string;
+  error: string;
+}): string {
+  return result.value === ""
+    ? sentence(result.error)
+    : `Line ${result.line}, ${result.value}, ${result.error}.`;
+}
+
 // the box as typed to the list a save sends, or the words for its field
 export function hostsOf(text: string): { hosts: string[] } | { error: string } {
   const result = parseVisualHosts(text.split("\n"));
   if (!result.ok) {
-    return {
-      error:
-        result.value === ""
-          ? sentence(result.error)
-          : `Line ${result.line}, ${result.value}, ${result.error}.`,
-    };
+    return { error: lineError(result) };
   }
   return { hosts: result.hosts };
 }
@@ -405,9 +412,6 @@ export function hostsOf(text: string): { hosts: string[] } | { error: string } {
 export function hostsFieldOf(message: string): "hosts" | undefined {
   return message.startsWith("hosts ") ? "hosts" : undefined;
 }
-
-// the first sentence of a description, for the row
-export { firstSentence, tokensText } from "../../lib/format.ts";
 
 // web access: the three modes in the card's head, and what each means
 export const ACCESS_MODES: { value: WebAccessMode; label: string }[] = [
@@ -431,12 +435,7 @@ export function domainsOf(
 ): { domains: string[] } | { error: string } {
   const result = parseDomains(text.split("\n"));
   if (!result.ok) {
-    return {
-      error:
-        result.value === ""
-          ? sentence(result.error)
-          : `Line ${result.line}, ${result.value}, ${result.error}.`,
-    };
+    return { error: lineError(result) };
   }
   if (result.domains.length === 0) return { error: "List at least one host." };
   return { domains: result.domains };

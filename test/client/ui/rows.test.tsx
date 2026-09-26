@@ -112,7 +112,7 @@ describe("RowsOpen", () => {
 describe("the parts", () => {
   test("the card head carries a hint, a static row a label", () => {
     expect(render(<RowsCard label="Limits" hint="next send" />)).toContain(
-      '<span class="rows-hint">next send</span>',
+      '<span class="rows-hint cut">next send</span>',
     );
     expect(render(<RowsLine as="label">exa</RowsLine>)).toContain(
       '<label class="rows-line rows-line-static rows-line-pick">exa</label>',

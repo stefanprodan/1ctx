@@ -33,6 +33,7 @@ import {
   fileIcon,
   folderParam,
   fresh,
+  historyHref,
   keptWords,
   knowledgeWords,
   listHref,
@@ -40,7 +41,8 @@ import {
   marked,
   namesWords,
   pathParts,
-  sizeWords,
+  restoredHref,
+  revisionHref,
   treeNodes,
 } from "../../../src/client/views/knowledge/Knowledge.model.ts";
 import { Knowledge } from "../../../src/client/views/knowledge/Knowledge.tsx";
@@ -217,6 +219,18 @@ describe("the knowledge words", () => {
     expect(fileHref("p1", "f1", 42)).toBe(
       "/projects/p1/knowledge/files/f1?line=42",
     );
+    expect(revisionHref("p1", "f1", 2)).toBe(
+      "/projects/p1/knowledge/files/f1?revision=2",
+    );
+    expect(revisionHref("p1", "f1", 3, 3)).toBe(
+      "/projects/p1/knowledge/files/f1",
+    );
+    expect(historyHref("p1", "f1")).toBe(
+      "/projects/p1/knowledge/files/f1?history",
+    );
+    expect(restoredHref("p1", "f1")).toBe(
+      "/projects/p1/knowledge/files/f1?restored",
+    );
   });
 
   test("an agent's write lights the row for three days", () => {
@@ -352,18 +366,6 @@ describe("the tree", () => {
   });
 });
 
-test("file sizes keep their units", () => {
-  expect(sizeWords(262_144)).toBe("256 KB");
-  expect(sizeWords(4 * 1024 * 1024)).toBe("4 MB");
-  expect(sizeWords(1023)).toBe("1023 B");
-  expect(sizeWords(5.78 * 1024 * 1024)).toBe("5.78 MB");
-  expect(sizeWords(812 * 1024)).toBe("812 KB");
-  // never a rounded thousand: the next unit takes over
-  expect(sizeWords(1023.5 * 1024 * 1024)).toBe("1 GB");
-  expect(sizeWords(1024 ** 3)).toBe("1 GB");
-  expect(sizeWords(1.5 * 1024 ** 3)).toBe("1.5 GB");
-});
-
 describe("the page", () => {
   test.serial(
     "the form prevents file-drop navigation even without a drop target",
@@ -463,7 +465,7 @@ describe("the page", () => {
     try {
       const html = render(<Knowledge params={{ id: "p1" }} />);
       expect(html.indexOf("values.yaml")).toBeLessThan(html.indexOf("runbook"));
-      expect(html).toContain('<span class="knowledge-dir">docs/</span>');
+      expect(html).toContain('<span class="knowledge-dir cut">docs/</span>');
       expect(html).toContain("Revision 3 · ");
       expect(html.replace(/<[^>]*>/g, "")).toContain("@sre in a run");
       expect(html).toContain('href="/projects/p1/knowledge/files/f2"');

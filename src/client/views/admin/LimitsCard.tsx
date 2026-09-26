@@ -11,7 +11,8 @@ import { useEffect, useRef } from "preact/hooks";
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { LimitScope } from "../../../shared/words.ts";
 import { saveLimits } from "../../data/tools.ts";
-import { useFocusField, useSave } from "../../lib/save.ts";
+import { type Save, useFocusField, useSave } from "../../lib/save.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import {
@@ -32,26 +33,25 @@ function LimitField({
   row,
   text,
   busy,
-  error,
+  save,
   onInput,
 }: {
   row: LimitRow;
   text: string;
   busy: boolean;
-  // a refusal that names this limit, drawn in place of its hint
-  error: string | null;
+  // a refusal that names this limit is drawn in place of its hint
+  save: Pick<Save, "fieldError">;
   onInput: (text: string) => void;
 }) {
   const { word } = displayOf(row);
   const words = LIMIT_WORDS[row.name];
+  const error = save.fieldError(row.name);
   return (
     <label class="tools-limit">
       <span class="tools-limit-words">
         <span class="tools-limit-label">{words.label}</span>
         {error ? (
-          <span class="field-error" role="alert">
-            {error}
-          </span>
+          <FieldError save={save} field={row.name} />
         ) : (
           <span class="tools-limit-text">{words.text}</span>
         )}
@@ -144,7 +144,7 @@ export function LimitsCard({
               row={row}
               text={draft.value[row.name] ?? ""}
               busy={busy}
-              error={save.fieldError(row.name)}
+              save={save}
               onInput={(text) => type(row.name, text)}
             />
           ))}

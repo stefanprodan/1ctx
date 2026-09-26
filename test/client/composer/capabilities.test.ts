@@ -24,6 +24,8 @@ describe("pending capability flips", () => {
   test.serial(
     "nothing touched shows the chat's set and sends no change",
     () => {
+      // so another member's envelope moves a key left alone: what shows
+      // follows the session's set as it moves
       expect(isOff("s1", [], WEB)).toBe(false);
       expect(isOff("s1", [WEB], WEB)).toBe(true);
       expect(changeOf("s1")).toEqual({});
@@ -55,13 +57,6 @@ describe("pending capability flips", () => {
     flip("s1", [], WEB);
     flip("s1", [], WEB);
     expect(isOff("s1", [], WEB)).toBe(false);
-    expect(changeOf("s1")).toEqual({});
-  });
-
-  test.serial("another member's envelope moves a key left alone", () => {
-    // untouched here: what shows follows the session's set as it moves
-    expect(isOff("s1", [], WEB)).toBe(false);
-    expect(isOff("s1", [WEB], WEB)).toBe(true);
     expect(changeOf("s1")).toEqual({});
   });
 

@@ -18,12 +18,18 @@ import {
 } from "../../../shared/memory.ts";
 import { loadMemory, saveMemory, undoMemory } from "../../data/memory.ts";
 import { type Failure, sentence } from "../../lib/format.ts";
-import { agentHref, chatHref, userHref } from "../../lib/hrefs.ts";
+import {
+  agentHref,
+  automationHref,
+  chatHref,
+  userHref,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Rows, RowsCard, RowsHandle } from "../../ui/Rows.tsx";
+import { Seg } from "../../ui/Seg.tsx";
 import {
   countLine,
   draftDirty,
@@ -79,7 +85,7 @@ function Writer({ memory, now }: { memory: Memory; now: number }) {
           ) : (
             <a
               class="note-head-link"
-              href={`/automations/${session.automationId}`}
+              href={automationHref(session.automationId)}
             >
               {session.automationName}
             </a>
@@ -282,23 +288,21 @@ export function Note({
         hint={countLine(memory.entries)}
         action={
           !editing.value && (
-            <span class="seg seg-small note-switch">
-              <button
-                type="button"
-                class={`seg-option${view === "current" ? " seg-on" : ""}`}
-                onClick={() => setView("current")}
-              >
-                Current
-              </button>
-              <button
-                type="button"
-                class={`seg-option${view === "changes" ? " seg-on" : ""}`}
-                disabled={memory.previous === null}
-                onClick={() => setView("changes")}
-              >
-                Changes
-              </button>
-            </span>
+            <Seg
+              label="Show"
+              small
+              class="note-switch"
+              options={[
+                { value: "current", label: "Current" },
+                {
+                  value: "changes",
+                  label: "Changes",
+                  disabled: memory.previous === null,
+                },
+              ]}
+              value={view}
+              onPick={setView}
+            />
           )
         }
       >

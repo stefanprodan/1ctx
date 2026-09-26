@@ -23,8 +23,9 @@ import {
   skills,
   skillsError,
 } from "../../data/skills.ts";
-import { says } from "../../lib/format.ts";
+import { says, size } from "../../lib/format.ts";
 import { agentHref } from "../../lib/hrefs.ts";
+import { useNow } from "../../lib/now.ts";
 import { matches } from "../../lib/search.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -42,7 +43,6 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { SkillForm } from "./SkillForm.tsx";
 import {
-  bytesWord,
   changeLine,
   droppedLine,
   metadataLines,
@@ -113,7 +113,7 @@ function FileRow({
       head={
         <>
           <RowsTitle name={file.path} mono />
-          <RowsMeta>{bytesWord(file.bytes)}</RowsMeta>
+          <RowsMeta>{size(file.bytes)}</RowsMeta>
         </>
       }
     >
@@ -329,13 +329,7 @@ export function Skills() {
     matches(q.value, [skill.name, skill.description]),
   );
   // the fetched-ago words move by the minute
-  const now = useSignal(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, 60_000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow(60_000);
   return (
     <Page
       crumb="Admin"
@@ -388,7 +382,7 @@ export function Skills() {
             <SkillRow
               key={skill.id}
               skill={skill}
-              now={now.value}
+              now={now}
               open={open.value === skill.id}
               onToggle={() => {
                 open.value = open.value === skill.id ? null : skill.id;

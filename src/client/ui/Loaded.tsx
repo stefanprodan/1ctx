@@ -8,6 +8,7 @@ import type { Failure } from "../lib/format.ts";
 import { clock } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import "./loaded.css";
+import { CodeTag } from "./CodeTag.tsx";
 
 export function Loaded({
   readAt,
@@ -39,9 +40,7 @@ export function Loaded({
         aria-live="polite"
       >
         {status}
-        {failed && error.status !== null && (
-          <span class="code-tag">HTTP {error.status}</span>
-        )}
+        {failed && <CodeTag status={error.status} />}
       </span>
       <button
         type="button"

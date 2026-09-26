@@ -91,10 +91,6 @@
   }
   .split-faint {
     display: block;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);

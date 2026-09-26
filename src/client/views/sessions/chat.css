@@ -42,12 +42,9 @@
     padding: var(--space-2) 14px;
     color: var(--dim);
   }
-  /* the colour is the status's, from base; a stopped run has none */
+  /* the colour is the status's, from base */
   .chat-run-icon {
     flex-shrink: 0;
-  }
-  .chat-run-icon-stopped {
-    color: var(--faint);
   }
   .chat-run-state {
     flex-grow: 1;
@@ -75,13 +72,10 @@
       margin-left: 0;
     }
   }
-}
-
-@layer owners {
   /* the title as the button, the chevron after it, the card hanging
-     under it from the title's left edge, as wide as its items */
-  /* the menu takes the crumb's remaining room, so the title box can
-     fill it; the title button itself keeps its content's width */
+     under it from the title's left edge, as wide as its items; the menu
+     takes the crumb's remaining room, so the title box can fill it, and
+     the title button itself keeps its content's width */
   .chat-menu {
     position: relative;
     display: flex;

@@ -14,10 +14,8 @@ import {
   MIN_PASSWORD,
   type Role,
 } from "../../../shared/words.ts";
-import { longDate } from "../../lib/format.ts";
+import { sinceLine } from "../../lib/format.ts";
 import type { Problem } from "../../lib/save.ts";
-
-export { fullNameProblem } from "../profile/Profile.model.ts";
 
 export const ROLE_CHOICES: { value: Role; label: string; text: string }[] = [
   {
@@ -75,13 +73,7 @@ export function newPasswordFieldProblem(
 }
 
 // the fields of the user form, by the name each control carries
-export type UserField =
-  | "username"
-  | "fullName"
-  | "email"
-  | "tz"
-  | "role"
-  | "password";
+type UserField = "username" | "fullName" | "email" | "tz" | "role" | "password";
 
 // which field a server refusal of the user routes names; the words are
 // the parsers' and the conflicts' in access/
@@ -99,11 +91,6 @@ export function userFieldOf(message: string): UserField | undefined {
 // "@casey · casey@example.com"
 export function metaLine(user: UserAccount): string {
   return `@${user.username} · ${user.email}`;
-}
-
-// "since 12 September 2026"
-export function sinceLine(user: UserAccount): string {
-  return `since ${longDate(user.createdAt)}`;
 }
 
 // the row's right side: the role, then the states worth a word, then
@@ -140,12 +127,6 @@ export function disableLock(
   if (user.role === "admin" && !user.disabled && admins <= 1)
     return "The last admin stays enabled.";
   return null;
-}
-
-// the admin's own password changes on the profile page, with the
-// current one
-export function canReset(user: UserAccount, meId: string): boolean {
-  return user.id !== meId;
 }
 
 // the admins who can sign in: a disabled one holds nothing up

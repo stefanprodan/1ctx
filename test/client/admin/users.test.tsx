@@ -19,7 +19,6 @@ import {
 import { UserForm } from "../../../src/client/views/admin/UserForm.tsx";
 import {
   adminCount,
-  canReset,
   disableLock,
   emailProblem,
   metaLine,
@@ -27,7 +26,6 @@ import {
   newPasswordProblem,
   patchOf,
   roleLock,
-  sinceLine,
   stateLine,
   userFieldOf,
   usernameProblem,
@@ -83,7 +81,6 @@ afterEach(() => {
 describe("the words", () => {
   test("the handle with the email, and since when", () => {
     expect(metaLine(casey)).toBe("@casey · casey@example.com");
-    expect(sinceLine(casey)).toBe("since 13 September 2026");
     expect(stateLine(root)).toBe("admin · since 12 September 2026");
     expect(stateLine(casey)).toBe(
       "member · password to change · since 13 September 2026",
@@ -110,11 +107,6 @@ describe("the words", () => {
     expect(roleLock(root, "u2", 2)).toBeNull();
     expect(roleLock(casey, "u1", 1)).toBeNull();
     expect(adminCount([root, casey])).toBe(1);
-  });
-
-  test("the reset is for everyone but the admin's own row", () => {
-    expect(canReset(casey, "u1")).toBe(true);
-    expect(canReset(root, "u1")).toBe(false);
   });
 });
 
@@ -211,7 +203,7 @@ describe("the refusals", () => {
 });
 
 describe("the entity", () => {
-  test("loads for the signed-in user and drops with them", async () => {
+  test.serial("loads for the signed-in user and drops with them", async () => {
     answer = () => Response.json({ users: [root, casey] });
     await loadUsers();
     expect(users.value).toEqual([root, casey]);
@@ -219,45 +211,51 @@ describe("the entity", () => {
     expect(users.value).toBeNull();
   });
 
-  test("a write puts the server's row in the list, by username", async () => {
-    users.value = [root];
-    answer = () => Response.json({ user: casey });
-    await createUser({
-      username: "casey",
-      fullName: "Casey Doe",
-      email: "casey@example.com",
-      role: "member",
-      tz: "Europe/Bucharest",
-      password: "longenough",
-    });
-    expect(users.value).toEqual([root, casey]);
-    const renamed = { ...casey, username: "a-casey" };
-    answer = () => Response.json({ user: renamed });
-    await updateUser("u2", { username: "a-casey" });
-    expect(users.value).toEqual([renamed, root]);
-  });
+  test.serial(
+    "a write puts the server's row in the list, by username",
+    async () => {
+      users.value = [root];
+      answer = () => Response.json({ user: casey });
+      await createUser({
+        username: "casey",
+        fullName: "Casey Doe",
+        email: "casey@example.com",
+        role: "member",
+        tz: "Europe/Bucharest",
+        password: "longenough",
+      });
+      expect(users.value).toEqual([root, casey]);
+      const renamed = { ...casey, username: "a-casey" };
+      answer = () => Response.json({ user: renamed });
+      await updateUser("u2", { username: "a-casey" });
+      expect(users.value).toEqual([renamed, root]);
+    },
+  );
 
-  test("a reset sends the password and reads the list again", async () => {
-    users.value = [root, { ...casey, mustChangePassword: false }];
-    let sent: { url: string; body: unknown } | null = null as {
-      url: string;
-      body: unknown;
-    } | null;
-    answer = (url, init) => {
-      if (init?.method !== "POST")
-        return Response.json({ users: [root, casey] });
-      sent = { url, body: JSON.parse(String(init?.body)) };
-      return new Response(null, { status: 204 });
-    };
-    await resetPassword("u2", { password: "longenough" });
-    expect(sent).toEqual({
-      url: "/api/users/u2/password",
-      body: { password: "longenough" },
-    });
-    expect(users.value).toEqual([root, casey]);
-  });
+  test.serial(
+    "a reset sends the password and reads the list again",
+    async () => {
+      users.value = [root, { ...casey, mustChangePassword: false }];
+      let sent: { url: string; body: unknown } | null = null as {
+        url: string;
+        body: unknown;
+      } | null;
+      answer = (url, init) => {
+        if (init?.method !== "POST")
+          return Response.json({ users: [root, casey] });
+        sent = { url, body: JSON.parse(String(init?.body)) };
+        return new Response(null, { status: 204 });
+      };
+      await resetPassword("u2", { password: "longenough" });
+      expect(sent).toEqual({
+        url: "/api/users/u2/password",
+        body: { password: "longenough" },
+      });
+      expect(users.value).toEqual([root, casey]);
+    },
+  );
 
-  test("a refusal is the error shown", async () => {
+  test.serial("a refusal is the error shown", async () => {
     answer = () => Response.json({ error: "forbidden" }, { status: 403 });
     await loadUsers();
     expect(usersError.value).toEqual({ words: "forbidden", status: 403 });

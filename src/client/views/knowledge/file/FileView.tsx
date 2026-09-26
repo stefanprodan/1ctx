@@ -37,7 +37,12 @@ import { touch } from "../../../lib/touch.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
 import { Split } from "../../../ui/Split.tsx";
-import { fileHref, listHref } from "../Knowledge.model.ts";
+import {
+  fileHref,
+  historyHref,
+  listHref,
+  restoredHref,
+} from "../Knowledge.model.ts";
 import { fileActions } from "./DocMenus.tsx";
 import {
   crumbSteps,
@@ -199,7 +204,7 @@ export function FileView({
         keepDraft({ fileId: row.id }, edit.text, row.revision);
         dropDraft(scope);
       }
-      navigate(`${fileHref(projectId, row.id)}?restored`);
+      navigate(restoredHref(projectId, row.id));
     });
 
   const past =
@@ -260,18 +265,24 @@ export function FileView({
     renameReady:
       pathReady(path.value.trim()) && path.value.trim() !== file.name,
     restorable: past !== null && past.revision !== file.revision,
-    more: fileActions(projectId, file.name, file.text, `${href}?history`, {
-      rename: () => {
-        save.touch();
-        path.value = file.name;
-        mode.value = "rename";
-        focusTo('input[name="path"]', true);
+    more: fileActions(
+      projectId,
+      file.name,
+      file.text,
+      historyHref(projectId, fileId),
+      {
+        rename: () => {
+          save.touch();
+          path.value = file.name;
+          mode.value = "rename";
+          focusTo('input[name="path"]', true);
+        },
+        remove: () => {
+          save.touch();
+          mode.value = "delete";
+        },
       },
-      remove: () => {
-        save.touch();
-        mode.value = "delete";
-      },
-    }),
+    ),
     on: {
       keep: () => {
         mode.value = "read";

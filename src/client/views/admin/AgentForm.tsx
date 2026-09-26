@@ -1,15 +1,16 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An agent's form: the name, the provider it runs on, the model, found
-// by typing part of its name or id into that provider's catalog, and
-// the system prompt. The pick shows its window and prices when the
-// catalog has them; a catalog that lists only ids leaves the window and
-// the tools flag to the admin, asked under the pick. Then thinking and
-// effort: the default is the provider's, and the levels are the wire's.
-// After the prompt, the skills: one line per skill on the server, the
-// checked ones go with the agent into every send, at most the cap.
-// Delete asks once in place.
+// An agent's form: the avatar, the name, the provider it runs on, the
+// model, found by typing part of its name or id into that provider's
+// catalog, and the system prompt. The pick shows its window and prices
+// when the catalog has them; a catalog that lists only ids leaves the
+// window and the tools flag to the admin, asked under the pick. Then
+// thinking and effort: the default is the provider's, and the levels
+// are the wire's. After the prompt, the skills: one line per skill on
+// the server, the checked ones go with the agent into every send, at
+// most the cap; then the MCP servers with their read and write sides
+// and the mode. Delete asks once in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -25,6 +26,7 @@ import {
   type Effort,
   type McpMode,
 } from "../../../shared/words.ts";
+import { modelMeta } from "../../agents/meta.ts";
 import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
 import {
   loadMcp,
@@ -36,18 +38,27 @@ import { skills as skillRows } from "../../data/skills.ts";
 import { limits } from "../../data/tools.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { Icon } from "../../lib/icons.tsx";
+import { sameIds, toggledId } from "../../lib/ids.ts";
+import { nameProblem, shapedInput } from "../../lib/names.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { Foot } from "../../ui/Foot.tsx";
+import { AskDelete, Foot } from "../../ui/Foot.tsx";
+import {
+  RowsBad,
+  RowsButton,
+  RowsEnd,
+  RowsLine,
+  RowsList,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import {
   agentFieldOf,
   compactLine,
   effortApplies,
-  listedServers,
-  modelMeta,
-  nameProblem,
+  listed,
   reserveOf,
-  sameIds,
   sameServers,
   sentEffort,
   statedFields,
@@ -63,17 +74,6 @@ import { ModelFacts } from "./ModelFacts.tsx";
 import { Picks } from "./Picks.tsx";
 import { SkillPicker } from "./SkillPicker.tsx";
 import "./agents.css";
-import { shapedInput } from "../../lib/names.ts";
-import {
-  RowsBad,
-  RowsButton,
-  RowsEnd,
-  RowsLine,
-  RowsList,
-  RowsMeta,
-  RowsNote,
-  RowsTitle,
-} from "../../ui/Rows.tsx";
 
 export function AgentForm({
   agent,
@@ -101,16 +101,9 @@ export function AgentForm({
   // may have changed the rows the preview is built from
   useEffect(() => void loadMcp(), []);
   const chosenServers = () =>
-    listedServers(pickedServers.value, serverRows.value);
-  // a skill deleted since the agent was saved is not a box, and it goes
-  // from the save too, since the server would refuse the id; when the
-  // list did not load, the ids are kept as they are
-  const chosenSkills = () => {
-    const rows = skillRows.value;
-    return rows === null
-      ? pickedSkills.value
-      : pickedSkills.value.filter((id) => rows.some((s) => s.id === id));
-  };
+    listed(pickedServers.value, (s) => s.serverId, serverRows.value);
+  const chosenSkills = () =>
+    listed(pickedSkills.value, (id) => id, skillRows.value);
   const asking = useSignal(false);
   const search = useRef<CatalogSearch | null>(null);
   if (search.current === null) {
@@ -229,9 +222,7 @@ export function AgentForm({
     save.touch();
   };
   const toggleSkill = (id: string) => {
-    pickedSkills.value = chosen.includes(id)
-      ? chosen.filter((s) => s !== id)
-      : [...chosen, id];
+    pickedSkills.value = toggledId(chosen, id);
     save.touch();
   };
   const compacts =
@@ -282,21 +273,13 @@ export function AgentForm({
         </div>
         <div class="field">
           <span class="label label-required">Provider</span>
-          <div class="agents-picks">
-            {providers.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                name="provider"
-                aria-pressed={providerId.value === p.id}
-                disabled={busy}
-                class={`agents-pick${providerId.value === p.id ? " agents-pick-on" : ""}`}
-                onClick={() => chooseProvider(p.id)}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
+          <Picks
+            name="provider"
+            choices={providers.map((p) => ({ value: p.id, label: p.name }))}
+            value={providerId.value}
+            busy={busy}
+            onPick={chooseProvider}
+          />
           <FieldError save={save} field="provider" />
         </div>
         <div class="field pair-wide">
@@ -452,39 +435,15 @@ export function AgentForm({
         start={
           agent === null ? (
             <span />
-          ) : asking.value ? (
-            <>
-              <span class="agents-ask-words">Delete {agent.name}?</span>
-              <button
-                type="button"
-                class="btn btn-danger"
-                disabled={busy}
-                onClick={() => void remove()}
-              >
-                {save.pending.value === "delete" ? "Deleting" : "Delete"}
-              </button>
-              <button
-                type="button"
-                class="btn"
-                disabled={busy}
-                onClick={() => {
-                  asking.value = false;
-                  save.touch();
-                }}
-              >
-                Keep
-              </button>
-            </>
           ) : (
-            <button
-              type="button"
-              class="btn"
-              onClick={() => {
-                asking.value = true;
-              }}
-            >
-              Delete
-            </button>
+            <AskDelete
+              save={save}
+              asking={asking}
+              busy={busy}
+              words={`Delete ${agent.name}?`}
+              wordsClass="agents-ask-words"
+              onDelete={() => void remove()}
+            />
           )
         }
         before={

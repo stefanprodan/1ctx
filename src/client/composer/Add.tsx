@@ -13,7 +13,9 @@
 import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
 import { useEffect, useRef } from "preact/hooks";
+import { MEMORY, VISUALIZE, WEB } from "../../shared/capabilities.ts";
 import { Icon, type IconName } from "../lib/icons.tsx";
+import { useMenu } from "../lib/menu.ts";
 import {
   onWords,
   type PaneItem,
@@ -21,7 +23,6 @@ import {
   type WebItem,
 } from "./Add.model.ts";
 import { AddPane } from "./AddPane.tsx";
-import { useMenu } from "./menu.ts";
 
 type Pane = "web" | "servers" | "skills";
 const PANES: Record<Pane, { title: string; icon: IconName }> = {
@@ -111,12 +112,9 @@ export function Add({
   readable,
   onFiles,
   web,
-  onWeb,
   webPane,
   visuals,
-  onVisuals,
   memory,
-  onMemory,
   servers,
   skills,
   onFlip,
@@ -125,18 +123,15 @@ export function Add({
   readable: boolean;
   onFiles: (files: File[]) => void;
   web: WebItem;
-  onWeb: () => void;
   // Web access with the project's credentials, null without any
   webPane: PaneItem | null;
   visuals: WebItem;
-  onVisuals: () => void;
   memory: WebItem;
-  onMemory: () => void;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
   skills: PaneItem | null;
-  // a switch of a pane, by its key
+  // a switch, of the menu or a pane, by its key
   onFlip: (key: string) => void;
 }) {
   const pane = useSignal<"menu" | Pane>("menu");
@@ -232,7 +227,7 @@ export function Add({
               name="Web access"
               icon="globe"
               item={web}
-              onFlip={onWeb}
+              onFlip={() => onFlip(WEB)}
             />
           ) : (
             <PaneLink
@@ -248,13 +243,13 @@ export function Add({
             name="Visuals"
             icon="visual"
             item={visuals}
-            onFlip={onVisuals}
+            onFlip={() => onFlip(VISUALIZE)}
           />
           <SwitchItem
             name="Memory"
             icon="memory"
             item={memory}
-            onFlip={onMemory}
+            onFlip={() => onFlip(MEMORY)}
           />
           {(["servers", "skills"] as const).map((name) => {
             const item = items[name];

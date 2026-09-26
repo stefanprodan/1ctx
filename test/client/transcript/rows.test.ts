@@ -265,6 +265,8 @@ describe("transcript rows", () => {
         .filter((name) => name.endsWith(".ndjson"))
         .sort();
       expect(names.length).toBeGreaterThan(0);
+      // an html frame is replayed in sequence with the deltas
+      let html = 0;
 
       for (const name of names) {
         leaveSession();
@@ -277,10 +279,12 @@ describe("transcript rows", () => {
         await loadSession(start.detail.session.id);
         invariant(name, 0);
         for (let index = 1; index < lines.length; index++) {
+          if (lines[index].type === "html") html++;
           onSocket(lines[index] as SocketEvent);
           invariant(name, index);
         }
       }
+      expect(html).toBeGreaterThan(0);
     },
   );
 

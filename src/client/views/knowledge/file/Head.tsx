@@ -14,7 +14,7 @@ import { ago, type Failure } from "../../../lib/format.ts";
 import { Icon } from "../../../lib/icons.tsx";
 import type { Problem } from "../../../lib/save.ts";
 import { PageNotice } from "../../../ui/Page.tsx";
-import { fileHref, listHref } from "../Knowledge.model.ts";
+import { fileHref, listHref, revisionHref } from "../Knowledge.model.ts";
 import { type MoreAction, MoreMenu } from "./DocMenus.tsx";
 import type { ActionsKind, NoticeKind } from "./FileView.model.ts";
 import { DeleteAsk, ProblemNotice, WroteNotice } from "./Notices.tsx";
@@ -135,9 +135,11 @@ export function headNotice(kind: NoticeKind, head: HeadProps) {
         >
           <a
             class="btn btn-small"
-            href={`${fileHref(head.projectId, head.file.id)}?revision=${
-              head.latest.revision
-            }`}
+            href={revisionHref(
+              head.projectId,
+              head.file.id,
+              head.latest.revision,
+            )}
           >
             Show their change
           </a>
@@ -163,9 +165,11 @@ export function headNotice(kind: NoticeKind, head: HeadProps) {
         >
           <a
             class="btn btn-small"
-            href={`${fileHref(head.projectId, head.file.id)}?revision=${
-              head.restored.replaced
-            }`}
+            href={revisionHref(
+              head.projectId,
+              head.file.id,
+              head.restored.replaced,
+            )}
           >
             Show revision {head.restored.replaced}
           </a>

@@ -21,10 +21,11 @@ import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
+import { fullNameProblem } from "../profile/Profile.model.ts";
+import { Choices } from "./Choices.tsx";
 import {
   disableLock,
   emailProblem,
-  fullNameProblem,
   newPasswordFieldProblem,
   patchOf,
   ROLE_CHOICES,
@@ -49,23 +50,14 @@ function RolePick({
   return (
     <div class="field pair-wide">
       <span class="label">Role</span>
-      <div class="choices">
-        {ROLE_CHOICES.map((choice) => (
-          <button
-            key={choice.value}
-            type="button"
-            name="role"
-            aria-pressed={value === choice.value}
-            disabled={save.busy || lock !== null}
-            title={lock ?? undefined}
-            class={`choice${value === choice.value ? " choice-on" : ""}`}
-            onClick={() => onPick(choice.value)}
-          >
-            <span class="choice-label">{choice.label}</span>
-            <span class="choice-text">{choice.text}</span>
-          </button>
-        ))}
-      </div>
+      <Choices
+        name="role"
+        options={ROLE_CHOICES}
+        value={value}
+        disabled={save.busy || lock !== null}
+        title={lock ?? undefined}
+        onPick={onPick}
+      />
       <FieldError save={save} field="role" />
       {lock !== null && <span class="hint">{lock}</span>}
     </div>
@@ -128,10 +120,6 @@ function ResetForm({ user }: { user: UserAccount }) {
     (message) => (message.startsWith("password") ? "next" : undefined),
   );
   useFocusField(save, form);
-  const bind = (s: { value: string }) => (e: Event) => {
-    s.value = (e.currentTarget as HTMLInputElement).value;
-    save.touch();
-  };
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(
@@ -159,7 +147,7 @@ function ResetForm({ user }: { user: UserAccount }) {
             aria-invalid={save.fieldError("next") !== null || undefined}
             disabled={save.busy}
             value={next.value}
-            onInput={bind(next)}
+            onInput={save.bind(next)}
           />
           <FieldError save={save} field="next" />
         </label>
@@ -172,7 +160,7 @@ function ResetForm({ user }: { user: UserAccount }) {
             aria-invalid={save.fieldError("again") !== null || undefined}
             disabled={save.busy}
             value={again.value}
-            onInput={bind(again)}
+            onInput={save.bind(again)}
           />
           <FieldError save={save} field="again" />
         </label>
@@ -234,10 +222,6 @@ export function UserForm({
     if (body !== null) await updateUser(saved.id, body);
   }, userFieldOf);
   useFocusField(save, form);
-  const bind = (s: { value: string }) => (e: Event) => {
-    s.value = (e.currentTarget as HTMLInputElement).value;
-    save.touch();
-  };
   const invalid = (field: string) => save.fieldError(field) !== null;
   const busy = save.busy;
   const dirty = user === null ? true : patchOf(user, fields()) !== null;
@@ -286,7 +270,7 @@ export function UserForm({
               autocomplete="off"
               disabled={busy}
               value={fullName.value}
-              onInput={bind(fullName)}
+              onInput={save.bind(fullName)}
             />
             <FieldError save={save} field="fullName" />
           </label>
@@ -301,7 +285,7 @@ export function UserForm({
               spellcheck={false}
               disabled={busy}
               value={email.value}
-              onInput={bind(email)}
+              onInput={save.bind(email)}
             />
             <FieldError save={save} field="email" />
           </label>
@@ -342,7 +326,7 @@ export function UserForm({
                   aria-invalid={invalid("password") || undefined}
                   disabled={busy}
                   value={password.value}
-                  onInput={bind(password)}
+                  onInput={save.bind(password)}
                 />
                 {invalid("password") ? (
                   <FieldError save={save} field="password" />
@@ -361,7 +345,7 @@ export function UserForm({
                   aria-invalid={invalid("again") || undefined}
                   disabled={busy}
                   value={again.value}
-                  onInput={bind(again)}
+                  onInput={save.bind(again)}
                 />
                 <FieldError save={save} field="again" />
               </label>

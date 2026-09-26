@@ -6,6 +6,7 @@
 
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import { credentials, servers, skills } from "../../data/capabilities.ts";
+import { AsideLine } from "../../ui/Split.tsx";
 import { accessOf } from "./Access.model.ts";
 
 export function AccessLines({ row }: { row: AutomationSummary }) {
@@ -17,35 +18,18 @@ export function AccessLines({ row }: { row: AutomationSummary }) {
   );
   return (
     <>
-      {!access.web && (
-        <div class="split-line">
-          Web access
-          <span class="split-strong">Off</span>
-        </div>
-      )}
+      {!access.web && <AsideLine label="Web access">Off</AsideLine>}
       {access.credentialsOff.length > 0 && (
-        <div class="split-line">
-          Credentials off
-          <span class="split-strong">{access.credentialsOff.join(", ")}</span>
-        </div>
+        <AsideLine label="Credentials off">
+          {access.credentialsOff.join(", ")}
+        </AsideLine>
       )}
-      {!access.visuals && (
-        <div class="split-line">
-          Visuals
-          <span class="split-strong">Off</span>
-        </div>
-      )}
+      {!access.visuals && <AsideLine label="Visuals">Off</AsideLine>}
       {access.mcpOff.length > 0 && (
-        <div class="split-line">
-          MCP off
-          <span class="split-strong">{access.mcpOff.join(", ")}</span>
-        </div>
+        <AsideLine label="MCP off">{access.mcpOff.join(", ")}</AsideLine>
       )}
       {access.skillsOff.length > 0 && (
-        <div class="split-line">
-          Skills off
-          <span class="split-strong">{access.skillsOff.join(", ")}</span>
-        </div>
+        <AsideLine label="Skills off">{access.skillsOff.join(", ")}</AsideLine>
       )}
     </>
   );

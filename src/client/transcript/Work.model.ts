@@ -7,7 +7,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { WorkNode } from "./rows.ts";
-import { secs } from "./stream.ts";
+import { clock, secs } from "./stream.ts";
 
 const count = (value: number) => `${value} tool${value === 1 ? "" : "s"}`;
 
@@ -39,13 +39,6 @@ export function capWord(rows: Message[]): string | null {
   }
   // a refused repeat the loop went on from, unless a cap ended it
   return repeat ? "repeat refused" : null;
-}
-
-// the live clock in whole seconds: a decimal ticking ten times a
-// second is noise
-function clock(ms: number): string {
-  if (ms >= 60_000) return secs(ms);
-  return `${Math.floor(ms / 1000)} s`;
 }
 
 export function workSummary(

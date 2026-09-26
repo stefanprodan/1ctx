@@ -4,7 +4,7 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  /* the schema, read-only, in the transcript's tool mono */
+  /* the schema, read-only: its labels over their text */
   .tools-schema {
     display: flex;
     flex-direction: column;
@@ -29,8 +29,8 @@
     padding: var(--space-4);
   }
 
-  /* a box of lines under the card's note, the hosts of Listed domains
-     and the visual hosts, so the form gives up its top room */
+  /* a box of lines under the card's note, the hosts of Listed
+     domains, so the form gives up its top room */
   .tools-lines {
     display: flex;
     flex-direction: column;

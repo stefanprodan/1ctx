@@ -15,15 +15,16 @@ import {
   personError,
 } from "../../../src/client/data/directory.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { tokensText } from "../../../src/client/lib/format.ts";
 import { agentHref, userHref } from "../../../src/client/lib/hrefs.ts";
 import { Agent } from "../../../src/client/views/people/Agent.tsx";
 import {
   effortText,
   localTime,
+  roleWords,
   serverLine,
   serverMeta,
   thinkingText,
-  tokensText,
 } from "../../../src/client/views/people/People.model.ts";
 import { User } from "../../../src/client/views/people/User.tsx";
 import type {
@@ -247,6 +248,11 @@ describe("People.model", () => {
     expect(tokensText(2716)).toBe("2.72K tokens");
   });
 
+  test("a role reads as a word", () => {
+    expect(roleWords("admin")).toBe("Admin");
+    expect(roleWords("member")).toBe("Member");
+  });
+
   test("an MCP server's line: refreshed, or the failure since, in red", () => {
     const now = Date.now();
     const hour = 60 * 60 * 1000;
@@ -350,12 +356,14 @@ describe("the pages", () => {
       expect(html).toContain(
         'class="people-prompt clamp">You write code.\nSmall diffs.<',
       );
-      expect(html).toContain('>Prompt</span><span class="rows-hint">7 tokens<');
       expect(html).toContain(
-        '>Skills</span><span class="rows-hint">2K tokens<',
+        '>Prompt</span><span class="rows-hint cut">7 tokens<',
       );
       expect(html).toContain(
-        '>Tools</span><span class="rows-hint">300 tokens<',
+        '>Skills</span><span class="rows-hint cut">2K tokens<',
+      );
+      expect(html).toContain(
+        '>Tools</span><span class="rows-hint cut">300 tokens<',
       );
       expect(html).toContain(">timoni<");
       // the description under the name, the fetch time at the row's end

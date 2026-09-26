@@ -4,9 +4,6 @@
 import { VISUAL_FRAME_BYTES } from "../../shared/words.ts";
 
 export const PAINT_MS = 150;
-// the frame accepts what the painter checks, the one number the server
-// and the open command read too
-export const VISUAL_BYTES = VISUAL_FRAME_BYTES;
 export const THEME_TOKENS = [
   "--fg",
   "--dim",
@@ -73,7 +70,12 @@ export function visualReply(value: unknown): value is Reply {
   );
 }
 
-export const visualHeight = (height: number): number =>
+// the frame accepts what the server and the open command check
+const fits = (html: string): boolean =>
+  html.length <= VISUAL_FRAME_BYTES &&
+  new TextEncoder().encode(html).byteLength <= VISUAL_FRAME_BYTES;
+
+const visualHeight = (height: number): number =>
   Math.min(2000, Math.max(80, Math.ceil(height)));
 
 export function readTheme(
@@ -157,10 +159,7 @@ export class VisualPlayer {
 
   draw(html: string, final = false): void {
     if (this.closed || this.final || this.status.error !== null) return;
-    if (
-      html.length > VISUAL_BYTES ||
-      new TextEncoder().encode(html).byteLength > VISUAL_BYTES
-    ) {
+    if (!fits(html)) {
       this.fail("the visual is too large");
       return;
     }
@@ -183,12 +182,7 @@ export class VisualPlayer {
     if (this.closed) return;
     this.wait();
     this.change({ state: "failed", error });
-    if (
-      preview !== undefined &&
-      !this.final &&
-      preview.length <= VISUAL_BYTES &&
-      new TextEncoder().encode(preview).byteLength <= VISUAL_BYTES
-    ) {
+    if (preview !== undefined && !this.final && fits(preview)) {
       this.pending = { type: "paint", html: preview };
       this.flush();
     }

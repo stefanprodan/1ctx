@@ -33,7 +33,7 @@ export function navigate(to: string, replace = false): void {
 
 // the click on any in-page link goes through navigate, so the page
 // never reloads
-export function onLinkClick(event: MouseEvent): void {
+function onLinkClick(event: MouseEvent): void {
   if (event.defaultPrevented || event.button !== 0) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const anchor = (event.target as HTMLElement).closest("a");

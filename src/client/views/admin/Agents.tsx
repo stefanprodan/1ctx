@@ -9,18 +9,17 @@
 // ProviderForm.tsx.
 
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
 import type { Wire } from "../../../shared/words.ts";
 import { AgentRow as Head } from "../../agents/AgentRow.tsx";
-import { query } from "../../app/router.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import {
   deleteProvider,
   providers,
   providersError,
 } from "../../data/providers.ts";
+import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { hasMark, WireMark } from "../../lib/marks.tsx";
 import { matches } from "../../lib/search.ts";
@@ -41,9 +40,9 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { AgentForm } from "./AgentForm.tsx";
 import { keyLine } from "./Agents.model.ts";
+import { useOpenParam } from "./OpenParam.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
 import "./agents.css";
-import { says } from "../../lib/format.ts";
 
 // a provider shows its service's mark, or a cloud for a server
 // without one; an agent's tile is the shared row's
@@ -149,13 +148,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 export function Agents() {
   const list = agents.value;
   const rows = providers.value;
-  // ?open=<id> is the agent page's Manage: that row starts open
-  const asked = new URLSearchParams(query.value).get("open");
-  const open = useSignal<string | null>(asked);
-  // a Manage link followed while the page is up names another row
-  useEffect(() => {
-    if (asked !== null) open.value = asked;
-  }, [asked, open]);
+  const open = useOpenParam();
   const adding = useSignal(false);
   const addingProvider = useSignal(false);
   const error = agentsError.value ?? providersError.value;

@@ -13,7 +13,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import "./search.css";
 
-export const SEARCH_DELAY = 200;
+const SEARCH_DELAY = 200;
 
 export function Search({
   value,

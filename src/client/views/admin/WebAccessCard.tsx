@@ -12,8 +12,7 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type { WebAccessMode } from "../../../shared/web.ts";
 import { patchTool, tools } from "../../data/tools.ts";
-import { says } from "../../lib/format.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, useAction, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
@@ -32,8 +31,7 @@ export function WebAccessCard() {
   // stored mode
   const listing = useSignal(false);
   const text = useSignal<string | null>(null);
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
+  const { busy, failure, run } = useAction();
   const form = useRef<HTMLFormElement>(null);
   // the box as it shows, the stored list until someone types
   const shown = useRef("");
@@ -63,13 +61,7 @@ export function WebAccessCard() {
     listing.value = false;
     text.value = null;
     if (next === access.mode) return;
-    busy.value = true;
-    try {
-      await patchTool("web", { mode: next });
-    } catch (err) {
-      failure.value = says(err);
-    }
-    busy.value = false;
+    await run(() => patchTool("web", { mode: next }));
   };
 
   const invalid = save.fieldError("domains") !== null;

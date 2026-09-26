@@ -14,6 +14,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import { finishWords } from "../../shared/finish.ts";
 import type { Avatar } from "../../shared/words.ts";
+import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { sentence, stamp } from "../lib/format.ts";
 import { agentHref } from "../lib/hrefs.ts";
@@ -57,10 +58,7 @@ export function servedBy(
   if (m === null || (m.upstream === null && m.servedModel === null)) {
     return null;
   }
-  const model =
-    m.servedModel === null
-      ? null
-      : m.servedModel.slice(m.servedModel.lastIndexOf("/") + 1);
+  const model = m.servedModel === null ? null : shortModel(m.servedModel);
   const via = m.upstream === null ? null : `via ${m.upstream}`;
   return {
     model,

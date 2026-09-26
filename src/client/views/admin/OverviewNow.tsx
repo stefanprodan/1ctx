@@ -11,14 +11,15 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { LoadResponse } from "../../../shared/api/admin.ts";
 import { serverLoad, serverLoadError } from "../../data/overview.ts";
-import type { Failure } from "../../lib/format.ts";
+import { type Failure, size } from "../../lib/format.ts";
+import { CodeTag } from "../../ui/CodeTag.tsx";
 import { Spark } from "../../ui/Plot.tsx";
 import {
   Tile,
-  TileGhost,
   TileMeter,
   TilePlot,
   Tiles,
+  TilesGhost,
 } from "../../ui/Tiles.tsx";
 import {
   automationsTile,
@@ -30,12 +31,11 @@ import {
   staleWords,
   zoomed,
 } from "./Overview.model.ts";
-import { size } from "./Storage.model.ts";
 
 const NOW_SYNC = "overview-now";
 
 // a row's head: its name and, beside it, its scope or its trouble
-export function Section({
+export function BoardRow({
   label,
   note,
   stale,
@@ -141,9 +141,7 @@ export function Trouble({
   return (
     <>
       {staleWords(at)}
-      {error.status !== null && (
-        <span class="code-tag">HTTP {error.status}</span>
-      )}
+      <CodeTag status={error.status} />
     </>
   );
 }
@@ -153,7 +151,7 @@ export function NowRow() {
   const error = serverLoadError.value;
   return (
     <>
-      <Section
+      <BoardRow
         label="Now"
         stale={error !== null}
         note={<Trouble error={error} at={load?.at ?? null} />}
@@ -163,20 +161,16 @@ export function NowRow() {
           <NowTiles load={load} />
         </div>
       ) : (
-        <TilesGhost at={0} />
+        <OverviewGhost at={0} />
       )}
     </>
   );
 }
 
-export function TilesGhost({ at }: { at: number }) {
+export function OverviewGhost({ at }: { at: number }) {
   return (
-    <div class="overview-ghost" aria-hidden="true">
-      <Tiles>
-        {[0, 4, 8, 12].map((k) => (
-          <TileGhost key={k} at={at + k} />
-        ))}
-      </Tiles>
+    <div class="chart-board-ghost" aria-hidden="true">
+      <TilesGhost at={at} />
     </div>
   );
 }

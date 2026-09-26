@@ -24,9 +24,10 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
+import { roleWords } from "../people/People.model.ts";
 import {
   aboutProblem,
   detailsFieldOf,
@@ -69,10 +70,7 @@ function DetailsForm({ user }: { user: ProfileRow }) {
             autocomplete="name"
             aria-invalid={invalid("fullName") || undefined}
             value={fullName.value}
-            onInput={(e) => {
-              fullName.value = (e.currentTarget as HTMLInputElement).value;
-              save.touch();
-            }}
+            onInput={save.bind(fullName)}
           />
           <FieldError save={save} field="fullName" />
         </label>
@@ -131,10 +129,6 @@ function PasswordForm() {
   }, passwordFieldOf);
   useFocusField(save, form);
   const invalid = (field: string) => save.fieldError(field) !== null;
-  const bind = (s: { value: string }) => (e: Event) => {
-    s.value = (e.currentTarget as HTMLInputElement).value;
-    save.touch();
-  };
   const submit = (event: Event) => {
     event.preventDefault();
     void save.run(passwordFieldProblem(current.value, next.value, again.value));
@@ -150,7 +144,7 @@ function PasswordForm() {
             autocomplete="current-password"
             aria-invalid={invalid("current") || undefined}
             value={current.value}
-            onInput={bind(current)}
+            onInput={save.bind(current)}
           />
           <FieldError save={save} field="current" />
         </label>
@@ -163,7 +157,7 @@ function PasswordForm() {
               autocomplete="new-password"
               aria-invalid={invalid("next") || undefined}
               value={next.value}
-              onInput={bind(next)}
+              onInput={save.bind(next)}
             />
             <FieldError save={save} field="next" />
           </label>
@@ -175,7 +169,7 @@ function PasswordForm() {
               autocomplete="new-password"
               aria-invalid={invalid("again") || undefined}
               value={again.value}
-              onInput={bind(again)}
+              onInput={save.bind(again)}
             />
             <FieldError save={save} field="again" />
           </label>
@@ -203,20 +197,11 @@ export function Profile() {
         <Split
           aside={
             <AsideSection label="Account">
-              <div class="split-line">
-                Email
-                <span class="split-strong cut">{user.email}</span>
-              </div>
-              <div class="split-line">
-                Role
-                <span class="split-strong">
-                  {user.role === "admin" ? "Admin" : "Member"}
-                </span>
-              </div>
-              <div class="split-line">
-                Joined
-                <span class="split-strong">{longDate(user.createdAt)}</span>
-              </div>
+              <AsideLine label="Email" cut>
+                {user.email}
+              </AsideLine>
+              <AsideLine label="Role">{roleWords(user.role)}</AsideLine>
+              <AsideLine label="Joined">{longDate(user.createdAt)}</AsideLine>
             </AsideSection>
           }
         >

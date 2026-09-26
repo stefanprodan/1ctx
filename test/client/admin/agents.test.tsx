@@ -7,7 +7,12 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { shortModel } from "../../../src/client/agents/meta.ts";
+import {
+  priceLine,
+  shortModel,
+  thinkingLine,
+  windowLine,
+} from "../../../src/client/agents/meta.ts";
 import { railRows } from "../../../src/client/app/routes.ts";
 import {
   agents,
@@ -35,9 +40,7 @@ import {
   effortApplies,
   effortChoices,
   keyLine,
-  nameProblem,
   preset,
-  priceLine,
   providerFieldOf,
   reserveOf,
   sentEffort,
@@ -45,8 +48,6 @@ import {
   statedModel,
   statedProblem,
   thinkingChoices,
-  thinkingLine,
-  windowLine,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { Agents } from "../../../src/client/views/admin/Agents.tsx";
@@ -138,9 +139,6 @@ describe("the words", () => {
     expect(keyLine("provider-router", false)).toBe(
       "provider-router.key missing",
     );
-    expect(nameProblem("")).toBe("Enter a name");
-    expect(nameProblem(" ")).toBe("Enter a name");
-    expect(nameProblem("coder")).toBeNull();
     expect(preset("openrouter").baseUrl).toContain("/api/v1");
     expect(preset("openai-compatible").baseUrl).toBeNull();
     expect(preset("gemini").baseUrl).toContain("/v1beta");
@@ -164,7 +162,7 @@ describe("the words", () => {
   test.serial(
     "the key picker keeps a missing selection and offers No key",
     () => {
-      expect(keyOptions(["provider-router"], null)).toEqual([
+      expect(keyOptions(["provider-router"], "")).toEqual([
         { value: "", label: "No key" },
         { value: "provider-router", label: "provider-router" },
       ]);
@@ -176,7 +174,7 @@ describe("the words", () => {
       expect(keyOptions(["provider-router"], "provider-router")).toHaveLength(
         2,
       );
-      expect(keyOptions([], null)).toEqual([{ value: "", label: "No key" }]);
+      expect(keyOptions([], "")).toEqual([{ value: "", label: "No key" }]);
     },
   );
 
@@ -508,6 +506,18 @@ describe("the rail", () => {
         "/admin/tools",
         "/admin/skills",
         "/admin/mcp",
+      ]);
+      expect(
+        group?.kind === "group" && group.routes.map((r) => r.nav!.label),
+      ).toEqual([
+        "Overview",
+        "Storage",
+        "Projects",
+        "Users",
+        "Agents",
+        "Tools",
+        "Skills",
+        "MCP",
       ]);
       expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
     },

@@ -22,18 +22,25 @@ export const secs = (ms: number): string =>
     ? `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`
     : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`;
 
+// thinking is timed from the first token until the text starts
+function thinking(message: Message, reasoning: string, content: string) {
+  return {
+    thinkStart:
+      reasoning !== "" && content === ""
+        ? message.createdAt + (message.ttftMs ?? 0)
+        : null,
+    thinkEnd: null,
+    thinkMs: message.thinkingMs,
+  };
+}
+
 export function liveOf(message: Message): Live {
   return {
     content: message.content,
     reasoning: message.reasoning,
     html: message.html,
     htmlAt: message.content.length,
-    thinkStart:
-      message.reasoning !== "" && message.content === ""
-        ? message.createdAt + (message.ttftMs ?? 0)
-        : null,
-    thinkEnd: null,
-    thinkMs: message.thinkingMs,
+    ...thinking(message, message.reasoning, message.content),
   };
 }
 
@@ -48,12 +55,7 @@ export function liveOfSnapshot(
     reasoning: snapshot.reasoning,
     html: snapshot.html,
     htmlAt: snapshot.htmlAt,
-    thinkStart:
-      snapshot.reasoning !== "" && snapshot.content === ""
-        ? message.createdAt + (message.ttftMs ?? 0)
-        : null,
-    thinkEnd: null,
-    thinkMs: message.thinkingMs,
+    ...thinking(message, snapshot.reasoning, snapshot.content),
   };
 }
 
@@ -113,21 +115,21 @@ export function leadIn(content: string): boolean {
   return content.length <= LEAD_CHARS && !/\n\s*\n\s*\S/.test(content);
 }
 
-// the word and the time apart: the row shows them at its two ends. The
-// word never changes, like a tool's name; the time tells the state
-export function thinkParts(
+// the fold's time, drawn after its fixed word; null before the clock
+// starts
+export function thinkTime(
   live: Live,
   done: boolean,
   now: number,
-): { word: string; time: string | null } {
-  const word = "thinking";
-  if (done && live.thinkMs !== null) return { word, time: secs(live.thinkMs) };
-  if (live.thinkStart === null) return { word, time: null };
-  const end = live.thinkEnd ?? now;
-  return { word, time: secs(end - live.thinkStart) };
+): string | null {
+  if (done && live.thinkMs !== null) return secs(live.thinkMs);
+  if (live.thinkStart === null) return null;
+  return secs((live.thinkEnd ?? now) - live.thinkStart);
 }
 
-export function thinkLabel(live: Live, done: boolean, now: number): string {
-  const { word, time } = thinkParts(live, done, now);
-  return time === null ? word : `${word} for ${time}`;
+// the live clock in whole seconds: a decimal ticking ten times a
+// second is noise
+export function clock(ms: number): string {
+  if (ms >= 60_000) return secs(ms);
+  return `${Math.floor(ms / 1000)} s`;
 }

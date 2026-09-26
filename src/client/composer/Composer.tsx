@@ -46,13 +46,12 @@ import {
   takeStamp,
 } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
+import { stepHighlight } from "../ui/Select.model.ts";
 import {
   agentMoved,
-  memoryItem,
   serversItem,
   skillsItem,
-  visualsItem,
-  webItem,
+  switchItem,
   webPaneItem,
 } from "./Add.model.ts";
 import { Add } from "./Add.tsx";
@@ -65,7 +64,6 @@ import {
   commandFill,
   commandMatches,
   commandOf,
-  moveHighlight,
   runCommand,
 } from "./commands.ts";
 import { readout } from "./context.ts";
@@ -73,6 +71,7 @@ import {
   draftKey,
   dropDraftUploads,
   readDraft,
+  type Scope,
   writeDraftText,
   writeDraftUploads,
 } from "./draft.ts";
@@ -82,9 +81,7 @@ import "./composer.css";
 import { says } from "../lib/format.ts";
 import { touch } from "../lib/touch.ts";
 
-export const MAX_HEIGHT = 160;
-
-export type Scope = { sessionId: string } | { projectId: string };
+const MAX_HEIGHT = 160;
 
 const NONE_OFF: readonly string[] = [];
 
@@ -207,17 +204,18 @@ export function Composer({
   const chat = "sessionId" in scope ? scope.sessionId : null;
   // a flip never sent does not wait for the next visit to the chat
   useEffect(() => () => dropFlips(chat), [chat]);
-  const web = webItem({
+  const offKey = (key: string) => isOff(chat, off, key);
+  const web = switchItem(WEB, {
     tools: readable,
     switchable: switchable.value,
-    off: isOff(chat, off, WEB),
+    off: offKey(WEB),
   });
   // the credentials are the project's, so another agent keeps their
   // flips and another project, on Home, drops them
   const webPane = webPaneItem({
     web,
     credentials: credentials.value,
-    isOff: (key) => isOff(chat, off, key),
+    isOff: offKey,
   });
   const lastProject = useRef<string | null>(null);
   useEffect(() => {
@@ -226,15 +224,15 @@ export function Composer({
     }
     lastProject.current = filesProjectId;
   }, [chat, filesProjectId]);
-  const visuals = visualsItem({
+  const visuals = switchItem(VISUALIZE, {
     tools: readable,
     switchable: switchable.value,
-    off: isOff(chat, off, VISUALIZE),
+    off: offKey(VISUALIZE),
   });
-  const memory = memoryItem({
+  const memory = switchItem(MEMORY, {
     tools: readable,
     switchable: switchable.value,
-    off: isOff(chat, off, MEMORY),
+    off: offKey(MEMORY),
   });
   // another agent's servers and skills are other keys, so its flips go
   // with it
@@ -249,12 +247,12 @@ export function Composer({
   const mcp = serversItem({
     tools: readable,
     servers: (agent === null ? undefined : servers.value[agent]) ?? [],
-    isOff: (key) => isOff(chat, off, key),
+    isOff: offKey,
   });
   const skill = skillsItem({
     tools: readable,
     skills: (agent === null ? undefined : skills.value[agent]) ?? [],
-    isOff: (key) => isOff(chat, off, key),
+    isOff: offKey,
   });
   const attach = (picked: File[]) => {
     failure.value = null;
@@ -284,7 +282,6 @@ export function Composer({
           onFork,
         });
       } else await onSend(content, agent, uploads);
-      // the send claimed them; the log of what was skipped goes too
       // this composer may be gone by now (a new chat navigates away), so
       // the stored draft is what loses them
       if (named === null) {
@@ -367,7 +364,7 @@ export function Composer({
               ev.key === "ArrowDown" ? 1 : ev.key === "ArrowUp" ? -1 : 0;
             if (move !== 0) {
               ev.preventDefault();
-              highlight.value = moveHighlight(chosen, matches.length, move);
+              highlight.value = stepHighlight(chosen, matches.length, move);
               return;
             }
             if (ev.key === "Escape") {
@@ -424,12 +421,9 @@ export function Composer({
           readable={readable}
           onFiles={attach}
           web={web}
-          onWeb={() => flip(chat, off, WEB)}
           webPane={webPane}
           visuals={visuals}
-          onVisuals={() => flip(chat, off, VISUALIZE)}
           memory={memory}
-          onMemory={() => flip(chat, off, MEMORY)}
           servers={mcp}
           skills={skill}
           onFlip={(key) => flip(chat, off, key)}

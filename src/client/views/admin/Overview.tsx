@@ -48,7 +48,7 @@ import {
   turnsTile,
   usageBars,
 } from "./Overview.model.ts";
-import { NowRow, Section, TilesGhost, Trouble } from "./OverviewNow.tsx";
+import { BoardRow, NowRow, OverviewGhost, Trouble } from "./OverviewNow.tsx";
 import "./overview.css";
 
 const DAYS_SYNC = "overview";
@@ -169,7 +169,7 @@ function TokensPanel({
           }}
         />
       ) : (
-        <p class="overview-none">{NO_TURNS}</p>
+        <p class="chart-none">{NO_TURNS}</p>
       )}
     </ChartPanel>
   );
@@ -194,7 +194,7 @@ function UsagePanel({ answer }: { answer: OverviewResponse }) {
       action={<RowsFilters label="Usage by" filters={filters} />}
     >
       {bars.length === 0 ? (
-        <p class="overview-none">{NO_TURNS}</p>
+        <p class="chart-none">{NO_TURNS}</p>
       ) : (
         <Bars
           wide
@@ -217,7 +217,7 @@ function LengthPanel({ answer }: { answer: OverviewResponse }) {
       hint={bars.find((b) => b.key === over.value)?.hint ?? "median"}
     >
       {bars.length === 0 ? (
-        <p class="overview-none">{NO_TURNS}</p>
+        <p class="chart-none">{NO_TURNS}</p>
       ) : (
         <Bars
           wide
@@ -234,7 +234,7 @@ function LengthPanel({ answer }: { answer: OverviewResponse }) {
 function AllTime({ answer }: { answer: OverviewResponse }) {
   return (
     <>
-      <Section label="All time" note={sinceWords(answer.all.since)} />
+      <BoardRow label="All time" note={sinceWords(answer.all.since)} />
       <section class="card overview-all" aria-label="All time">
         <div class="overview-totals">
           {allCells(answer.all).map((cell) => (
@@ -276,13 +276,13 @@ function Past({
   const day = useSignal<number | null>(null);
   return (
     <>
-      <Section
+      <BoardRow
         label="Last 30 days"
         stale={error !== null}
         note={<Trouble error={error} at={answer.readAt} />}
       />
       <DaysTiles answer={answer} day={day} />
-      <div class="overview-grid">
+      <div class="chart-grid">
         <div class="overview-wide">
           <TokensPanel answer={answer} day={day} />
         </div>
@@ -305,9 +305,9 @@ const DAY_HEIGHTS = [
 function PastGhost() {
   return (
     <>
-      <Section label="Last 30 days" />
-      <TilesGhost at={16} />
-      <div class="overview-grid overview-ghost" aria-hidden="true">
+      <BoardRow label="Last 30 days" />
+      <OverviewGhost at={16} />
+      <div class="chart-grid chart-board-ghost" aria-hidden="true">
         <div class="overview-wide">
           <ChartPanel label="Tokens per day">
             <div class="chart-days">
@@ -344,14 +344,14 @@ export function Overview() {
       title="Overview"
       error={answer === null && !busy ? error : null}
     >
-      <div class="overview" aria-busy={answer === null && busy}>
+      <div class="chart-board" aria-busy={answer === null && busy}>
         <NowRow />
         {/* a failed read keeps the last answer, faded */}
         <div class={`overview-past${answer && error ? " overview-stale" : ""}`}>
           {answer ? <Past answer={answer} error={error} /> : <PastGhost />}
         </div>
         {answer && (
-          <p class="overview-facts">
+          <p class="chart-facts">
             {/* the uptime runs on with the load; the answer is kept */}
             {buildLine(answer.instance, serverLoad.value?.at ?? answer.readAt)}
           </p>

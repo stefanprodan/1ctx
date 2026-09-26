@@ -6,7 +6,8 @@
 // meter. What runs over days is uPlot, in Plot.tsx.
 
 import type { ComponentChildren } from "preact";
-import { useId } from "preact/hooks";
+import { shareWidth } from "../lib/format.ts";
+import { RowsCard } from "./Rows.tsx";
 import "./chart.css";
 
 // A panel of a board: the card head of Rows over a chart's body, as
@@ -22,26 +23,20 @@ export function ChartPanel({
   action?: ComponentChildren;
   children: ComponentChildren;
 }) {
-  const id = useId();
   return (
-    <section class="card rows-card chart-panel" aria-labelledby={id}>
-      <div class="rows-head">
-        <span class="label" id={id}>
-          {label}
-        </span>
-        {hint && (
-          <span class="rows-hint" aria-live="polite">
-            {hint}
-          </span>
-        )}
-        {action}
-      </div>
+    <RowsCard
+      label={label}
+      hint={hint}
+      action={action}
+      live
+      class="chart-panel"
+    >
       {children}
-    </section>
+    </RowsCard>
   );
 }
 
-export type Bar = {
+type Bar = {
   key: string;
   name: string;
   value: number;
@@ -165,10 +160,12 @@ export function Swatch({ part }: { part: "first" | "second" }) {
 
 // A share as a bar under its number, a row's size against the largest.
 export function Meter({ share }: { share: number }) {
-  const width = `${Math.min(100, Math.max(0, share * 100)).toFixed(1)}%`;
   return (
     <span class="meter" aria-hidden="true">
-      <span class="meter-fill chart-meter-fill" style={{ width }} />
+      <span
+        class="meter-fill chart-meter-fill"
+        style={{ width: shareWidth(share) }}
+      />
     </span>
   );
 }

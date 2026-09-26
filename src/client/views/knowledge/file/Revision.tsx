@@ -18,10 +18,12 @@ import { diffLines, type LineDiff } from "../../../lib/diff.ts";
 import { ago, sentence } from "../../../lib/format.ts";
 import { Icon } from "../../../lib/icons.tsx";
 import { Diff, DiffStat } from "../../../ui/Diff.tsx";
+import { Seg } from "../../../ui/Seg.tsx";
 import { Source } from "../../../ui/Source.tsx";
 import { Author } from "../Author.tsx";
-import { authorOf, fileHref } from "../Knowledge.model.ts";
+import { authorOf, historyHref, revisionHref } from "../Knowledge.model.ts";
 import { revisionSteps } from "./DocPage.model.ts";
+import { MarkdownBody } from "./Reader.tsx";
 
 type Showing = "changes" | "preview" | "source" | "text";
 
@@ -79,7 +81,6 @@ export function Revision({
   now: number;
 }) {
   const mode = useSignal<Showing | null>(null);
-  const href = fileHref(file.projectId, file.id);
   const pair =
     history.state === "done"
       ? revisionPair(history.versions, revision)
@@ -102,7 +103,7 @@ export function Revision({
         {history.state === "loading" ? (
           "Loading"
         ) : (
-          <span class="docpage-failed">
+          <span class="error">
             The history did not load. {sentence(history.failure.words)}
           </span>
         )}
@@ -113,7 +114,7 @@ export function Revision({
     return (
       <p class="docpage-state">
         Revision {revision} is not kept.{" "}
-        <a class="docpage-link" href={`${href}?history`}>
+        <a class="docpage-link" href={historyHref(file.projectId, file.id)}>
           Open the history
         </a>
       </p>
@@ -144,7 +145,7 @@ export function Revision({
             href={
               steps.older === null
                 ? undefined
-                : `${href}?revision=${steps.older}`
+                : revisionHref(file.projectId, file.id, steps.older)
             }
           >
             <Icon name="chevron-left" size={14} />
@@ -159,9 +160,12 @@ export function Revision({
             href={
               steps.newer === null
                 ? undefined
-                : steps.newer === file.revision
-                  ? href
-                  : `${href}?revision=${steps.newer}`
+                : revisionHref(
+                    file.projectId,
+                    file.id,
+                    steps.newer,
+                    file.revision,
+                  )
             }
           >
             <Icon name="chevron-right" size={14} />
@@ -173,29 +177,28 @@ export function Revision({
           {tooLarge && " · Too large to compare"}
         </span>
         {options.length > 1 && (
-          <fieldset class="seg seg-small" aria-label="Show">
-            {options.map((value) => (
-              <button
-                key={value}
-                type="button"
-                class={`seg-option${showing === value ? " seg-on" : ""}`}
-                aria-pressed={showing === value}
-                onClick={() => {
-                  mode.value = value;
-                }}
-              >
-                {SHOWING[value]}
-              </button>
-            ))}
-          </fieldset>
+          <Seg
+            label="Show"
+            small
+            options={options.map((value) => ({
+              value,
+              label: SHOWING[value],
+            }))}
+            value={showing}
+            onPick={(value) => {
+              mode.value = value;
+            }}
+          />
         )}
       </div>
       {view.state === "loading" ||
       (showing === "changes" && before?.state === "loading") ? (
         <p class="docpage-state">Loading</p>
       ) : view.state === "failed" ? (
-        <p class="docpage-state docpage-failed">
-          This revision did not load. {sentence(view.failure.words)}
+        <p class="docpage-state">
+          <span class="error">
+            This revision did not load. {sentence(view.failure.words)}
+          </span>
         </p>
       ) : showing === "changes" &&
         before?.state === "done" &&
@@ -207,12 +210,7 @@ export function Revision({
           diff={diff}
         />
       ) : showing === "preview" ? (
-        // the server renders the Markdown with raw HTML off: render/ is
-        // the safety boundary
-        <div
-          class="docpage-md md-wide"
-          dangerouslySetInnerHTML={{ __html: view.version.html ?? "" }}
-        />
+        <MarkdownBody html={view.version.html ?? ""} />
       ) : (
         <Source text={view.version.text} html={view.version.code} />
       )}

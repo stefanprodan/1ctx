@@ -46,3 +46,31 @@ export function AsideSection({
     </section>
   );
 }
+
+// a fact of the aside: its label, then the value, a link with `href`;
+// `cut` keeps a long value to one line
+export function AsideLine({
+  label,
+  cut,
+  href,
+  children,
+}: {
+  label: string;
+  cut?: boolean;
+  href?: string;
+  children: ComponentChildren;
+}) {
+  const strong = `split-strong${cut ? " cut" : ""}`;
+  return (
+    <div class="split-line">
+      {label}
+      {href === undefined ? (
+        <span class={strong}>{children}</span>
+      ) : (
+        <a class={strong} href={href}>
+          {children}
+        </a>
+      )}
+    </div>
+  );
+}

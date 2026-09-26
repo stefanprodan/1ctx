@@ -9,17 +9,17 @@
 // not the reader opened it. The answer's own reasoning is in the
 // fold too, as its last item.
 
-import { signal } from "@preact/signals";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
+import { folds, useTick } from "./fold.ts";
 import type { WorkNode } from "./rows.ts";
 import { type Live, leadIn } from "./stream.ts";
 import { Think } from "./Think.tsx";
 import { Tool } from "./Tool.tsx";
 import { memorySummary, workJustEnded, workSummary } from "./Work.model.ts";
 
-const opened = signal<ReadonlySet<string>>(new Set());
+const { useFoldOpen, shut } = folds();
 
 export function Work({
   node,
@@ -37,14 +37,8 @@ export function Work({
   memory?: boolean;
 }) {
   const foldKey = memory ? `${node.sendId}:memory` : node.sendId;
-  const open = opened.value.has(foldKey);
-  // the label's clock counts this tab's time every 250 ms while it runs
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => tick((n) => n + 1), 250);
-    return () => clearInterval(timer);
-  }, [running]);
+  const { open, onToggle } = useFoldOpen(foldKey);
+  useTick(running);
   const summary = memory
     ? memorySummary(node, running, Date.now())
     : workSummary(node, running, Date.now());
@@ -55,10 +49,7 @@ export function Work({
   useEffect(() => {
     const ended = workJustEnded(wasRunning.current, running);
     wasRunning.current = running;
-    if (!ended || !opened.value.has(foldKey)) return;
-    const next = new Set(opened.value);
-    next.delete(foldKey);
-    opened.value = next;
+    if (ended) shut(foldKey);
   }, [foldKey, running]);
 
   const replyLive =
@@ -80,12 +71,7 @@ export function Work({
         running ? " transcript-fold-live" : ""
       }${open ? " transcript-fold-open" : ""}`}
       open={open}
-      onToggle={(event) => {
-        const next = new Set(opened.value);
-        if (event.currentTarget.open) next.add(foldKey);
-        else next.delete(foldKey);
-        opened.value = next;
-      }}
+      onToggle={onToggle}
     >
       <summary class="transcript-fold-head">
         <Icon name="spinner" size={13} class="transcript-fold-spin" />

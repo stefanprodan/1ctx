@@ -1,6 +1,41 @@
 @layer tokens, base, owners;
 
 @layer owners {
+  /* a board: its rows of tiles and panels, and the same in bones while
+     the first answer loads */
+  .chart-board,
+  .chart-board-ghost {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .chart-board {
+    padding-bottom: var(--space-5);
+  }
+  .chart-board-ghost {
+    pointer-events: none;
+  }
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: stretch;
+  }
+  .chart-none {
+    margin: 0;
+    padding: var(--space-5) var(--space-4);
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+  /* the board's foot: facts about what it read */
+  .chart-facts {
+    margin: 0;
+    padding: 0 2px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    overflow-wrap: anywhere;
+  }
   .chart-panel {
     display: flex;
     flex-direction: column;
@@ -185,6 +220,12 @@
   }
   .chart-meter-fill {
     background: var(--heat-3);
+  }
+
+  @media (max-width: 899px) {
+    .chart-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   @media (max-width: 719px) {

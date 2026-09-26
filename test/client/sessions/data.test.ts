@@ -199,6 +199,24 @@ function restoreGlobal(
   else Object.defineProperty(globalThis, name, descriptor);
 }
 
+// a streamed reply held, so a test that clears it has one to clear
+function seedLive(): void {
+  live.value = new Map([
+    [
+      "m1",
+      {
+        content: "x",
+        reasoning: "",
+        html: "",
+        htmlAt: 0,
+        thinkStart: null,
+        thinkEnd: null,
+        thinkMs: null,
+      },
+    ],
+  ]);
+}
+
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -806,6 +824,7 @@ describe("the sessions entity", () => {
 
   test("delete drops the row, leaves the chat and opens its project", async () => {
     session.value = liveDetail();
+    seedLive();
     list.value = page([row(), row({ id: "s2" })]);
     path.value = "/chat/s1";
     let hit = "";
@@ -1095,6 +1114,7 @@ describe("the sessions entity", () => {
 
   test("deleting the session on screen clears it and opens its project", () => {
     session.value = liveDetail();
+    seedLive();
     path.value = "/chat/s1";
 
     onSocket({ type: "deleted", projectId: "p1", sessionId: "s1" });
@@ -1111,6 +1131,7 @@ describe("the sessions entity", () => {
     let release: (r: Response) => void = () => {};
     answer = () => new Promise((r) => (release = r));
     const load = loadSession("s1");
+    seedLive();
 
     onSocket({ type: "revoked", projectId: "p1" });
 
@@ -1140,20 +1161,7 @@ describe("the sessions entity", () => {
   test("drops every session entity when the signed-in user changes", () => {
     session.value = liveDetail();
     sessionError.value = { words: "old", status: 404 };
-    live.value = new Map([
-      [
-        "m1",
-        {
-          content: "x",
-          reasoning: "",
-          html: "",
-          htmlAt: 0,
-          thinkStart: null,
-          thinkEnd: null,
-          thinkMs: null,
-        },
-      ],
-    ]);
+    seedLive();
     list.value = page([row()]);
     projectAgents.value = [];
     sending.value = true;
@@ -1878,25 +1886,20 @@ describe("the stream's pages", () => {
     expect(ids(list.value)).toEqual(["a", "b"]);
   });
 
-  test.serial("a revocation loads Home cold", async () => {
-    await twoPages();
-    answer = () => Response.json({ rows: first(), next: "after-b" });
-    onSocket({ type: "revoked", projectId: "p3" });
-    await settle();
-    expect(ids(list.value)).toEqual(["a", "b"]);
-  });
-
-  test.serial("a granted project loads Home again", async () => {
-    const urls = await twoPages();
-    answer = (url) => {
-      urls.push(url);
-      return Response.json({ rows: first(), next: "after-b" });
-    };
-    onSocket({ type: "granted", projectId: "p3" });
-    await settle();
-    expect(urls.at(-1)).toBe("/api/sessions?origin=chat");
-    expect(ids(list.value)).toEqual(["a", "b"]);
-  });
+  test.serial.each(["revoked", "granted"] as const)(
+    "a %s project loads Home cold",
+    async (type) => {
+      const urls = await twoPages();
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({ rows: first(), next: "after-b" });
+      };
+      onSocket({ type, projectId: "p3" });
+      await settle();
+      expect(urls.at(-1)).toBe("/api/sessions?origin=chat");
+      expect(ids(list.value)).toEqual(["a", "b"]);
+    },
+  );
 });
 
 describe("runs grouped in All", () => {

@@ -8,10 +8,9 @@
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
-import { patternLines } from "../../../shared/mcp.ts";
 import { shapeServerName } from "../../../shared/words.ts";
 import { addServer, callTimeoutMs, keys } from "../../data/mcp.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
@@ -20,52 +19,38 @@ import { Select } from "../../ui/Select.tsx";
 import {
   KEY_HINT,
   mcpFieldOf,
-  timeoutMs,
   timeoutProblem,
   timeoutText,
 } from "./Mcp.model.ts";
+import {
+  type McpSettings,
+  NEW_SERVER,
+  settingsBody,
+  useMcpSettings,
+} from "./McpSettings.ts";
 import "./mcp.css";
 
-export const PATTERN_HINT = "One per line: a name, or a prefix ending in *";
+const PATTERN_HINT = "One per line: a name, or a prefix ending in *";
 
 export function McpFields({
-  read,
-  write,
-  instructionsOn,
-  timeout,
-  readText,
-  writeText,
-  excludedText,
+  settings,
   busy,
-  invalid,
   save,
-  onChange,
   marks,
 }: {
-  read: boolean;
-  write: boolean;
-  instructionsOn: boolean;
-  timeout: string;
-  readText: string;
-  writeText: string;
-  excludedText: string;
+  settings: McpSettings;
   busy: boolean;
-  invalid: (field: string) => boolean;
-  save: ReturnType<typeof useSave>;
-  onChange: (
-    field:
-      | "read"
-      | "write"
-      | "instructionsOn"
-      | "timeout"
-      | "readText"
-      | "writeText"
-      | "excludedText",
-    value: string | boolean,
-  ) => void;
+  save: Save;
   // under each pattern field, the patterns matching no tool
   marks?: { read: string; write: string; excluded: string };
 }) {
+  const invalid = (field: string) => save.fieldError(field) !== null;
+  const onChange = (field: keyof McpSettings, value: string | boolean) => {
+    (settings[field] as { value: string | boolean }).value = value;
+    save.touch();
+  };
+  const { read, write, instructionsOn, timeout } = settings;
+  const { readText, writeText, excludedText } = settings;
   const switchOf = (
     field: "read" | "write" | "instructionsOn",
     on: boolean,
@@ -119,9 +104,9 @@ export function McpFields({
         <div class="field">
           <span class="label">Offered</span>
           <div class="mcp-switches">
-            {switchOf("read", read, "Read tools")}
-            {switchOf("write", write, "Write tools")}
-            {switchOf("instructionsOn", instructionsOn, "Instructions")}
+            {switchOf("read", read.value, "Read tools")}
+            {switchOf("write", write.value, "Write tools")}
+            {switchOf("instructionsOn", instructionsOn.value, "Instructions")}
           </div>
         </div>
         <label class="field">
@@ -134,7 +119,7 @@ export function McpFields({
             placeholder={timeoutText(callTimeoutMs.value)}
             aria-invalid={invalid("timeoutMs") || undefined}
             disabled={busy}
-            value={timeout}
+            value={timeout.value}
             onInput={(e) =>
               onChange("timeout", (e.currentTarget as HTMLInputElement).value)
             }
@@ -147,7 +132,7 @@ export function McpFields({
           "readText",
           "readPatterns",
           "Read",
-          readText,
+          readText.value,
           marks?.read,
           PATTERN_HINT,
         )}
@@ -155,7 +140,7 @@ export function McpFields({
           "writeText",
           "writePatterns",
           "Write",
-          writeText,
+          writeText.value,
           marks?.write,
           "Empty means everything not read or excluded",
         )}
@@ -163,7 +148,7 @@ export function McpFields({
           "excludedText",
           "excludedPatterns",
           "Excluded",
-          excludedText,
+          excludedText.value,
           marks?.excluded,
           "Never offered to any agent",
         )}
@@ -176,26 +161,14 @@ export function McpForm({ onDone }: { onDone: () => void }) {
   const name = useSignal("");
   const url = useSignal("");
   const keyName = useSignal(NO_KEY);
-  const read = useSignal(true);
-  const write = useSignal(false);
-  const instructionsOn = useSignal(true);
-  const timeout = useSignal("");
-  const readText = useSignal("");
-  const writeText = useSignal("");
-  const excludedText = useSignal("");
+  const settings = useMcpSettings(NEW_SERVER);
   const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
     await addServer({
       name: name.value.trim(),
       url: url.value.trim(),
       keyName: keyName.value === NO_KEY ? null : keyName.value,
-      read: read.value,
-      write: write.value,
-      instructionsOn: instructionsOn.value,
-      timeoutMs: timeoutMs(timeout.value),
-      readPatterns: patternLines(readText.value),
-      writePatterns: patternLines(writeText.value),
-      excludedPatterns: patternLines(excludedText.value),
+      ...settingsBody(settings),
     });
     onDone();
   }, mcpFieldOf);
@@ -206,14 +179,10 @@ export function McpForm({ onDone }: { onDone: () => void }) {
     void save.run(
       at("name", name.value.trim() === "" ? "A name is required" : null) ??
         at("url", url.value.trim() === "" ? "A URL is required" : null) ??
-        at("timeoutMs", timeoutProblem(timeout.value)),
+        at("timeoutMs", timeoutProblem(settings.timeout.value)),
     );
   };
   const busy = save.busy;
-  const set = (signal: { value: string }) => (e: Event) => {
-    signal.value = (e.currentTarget as HTMLInputElement).value;
-    save.touch();
-  };
   return (
     <form class="mcp-form" ref={form} onSubmit={submit}>
       <div class="mcp-fields">
@@ -256,7 +225,7 @@ export function McpForm({ onDone }: { onDone: () => void }) {
             aria-invalid={invalid("url") || undefined}
             disabled={busy}
             value={url.value}
-            onInput={set(url)}
+            onInput={save.bind(url)}
           />
           <FieldError save={save} field="url" />
         </label>
@@ -267,10 +236,7 @@ export function McpForm({ onDone }: { onDone: () => void }) {
             name="keyName"
             mono
             value={keyName.value}
-            options={keyOptions(
-              keys.value,
-              keyName.value === NO_KEY ? null : keyName.value,
-            )}
+            options={keyOptions(keys.value, keyName.value)}
             disabled={busy}
             invalid={invalid("keyName")}
             onChange={(value) => {
@@ -284,31 +250,7 @@ export function McpForm({ onDone }: { onDone: () => void }) {
             <span class="hint">{KEY_HINT}</span>
           )}
         </div>
-        <McpFields
-          read={read.value}
-          write={write.value}
-          instructionsOn={instructionsOn.value}
-          timeout={timeout.value}
-          readText={readText.value}
-          writeText={writeText.value}
-          excludedText={excludedText.value}
-          busy={busy}
-          invalid={invalid}
-          save={save}
-          onChange={(field, value) => {
-            const target = {
-              read,
-              write,
-              instructionsOn,
-              timeout,
-              readText,
-              writeText,
-              excludedText,
-            }[field] as { value: string | boolean };
-            target.value = value;
-            save.touch();
-          }}
-        />
+        <McpFields settings={settings} busy={busy} save={save} />
       </div>
       <Foot
         save={save}

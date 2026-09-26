@@ -28,6 +28,7 @@ import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
 import { accessOf } from "../../../src/client/views/projects/Access.model.ts";
 import {
   automationFieldOf,
+  automationPageOf,
   canChange,
   type Draft,
   deadlineShare,
@@ -39,6 +40,7 @@ import {
   eventNote,
   followDeadlineLimit,
   nextLine,
+  nextRunWords,
   OWN_MEMORY_GUIDANCE,
   pickMemory,
   requestOf,
@@ -219,6 +221,9 @@ describe("the row's words", () => {
     expect(nextLine({ ...waiting, nextAt: clock + 2 * HOUR }, clock)).toBe(
       "Next run today 13:20, in 2h",
     );
+    expect(nextRunWords(clock + 2 * HOUR, clock, "UTC")).toBe(
+      "Next run today 13:20, in 2h",
+    );
     expect(nextLine({ ...waiting, nextAt: nine - 24 * HOUR }, clock)).toBe(
       "Waiting for a free slot since Sun Sep 13 09:00",
     );
@@ -292,6 +297,39 @@ describe("the row's words", () => {
     expect(canChange(row, { id: "u2", role: "admin" }, "team")).toBe(true);
     expect(canChange(row, { id: "u2", role: "admin" }, "personal")).toBe(false);
     expect(canChange(row, null, "team")).toBe(false);
+  });
+
+  test("the page finds its row and project, or says it was deleted", () => {
+    const page = {
+      id: "au1",
+      rows: [automation()],
+      found: { id: "au1", projectId: "p1" },
+      project: { id: "p1" },
+      agentsIn: true,
+      failure: null,
+    };
+    expect(automationPageOf(page)).toEqual({
+      row: automation(),
+      projectId: "p1",
+      shown: { id: "p1" },
+      error: null,
+    });
+    // another project on screen, or one found for another automation
+    expect(automationPageOf({ ...page, project: { id: "p2" } }).shown).toBe(
+      null,
+    );
+    expect(
+      automationPageOf({ ...page, found: { id: "au2", projectId: "p1" } })
+        .projectId,
+    ).toBe(null);
+    const gone = { ...page, rows: [] };
+    expect(automationPageOf(gone).error).toBe("This automation was deleted.");
+    // still loading: no list, no agents or no project found yet
+    expect(automationPageOf({ ...gone, rows: null }).error).toBe(null);
+    expect(automationPageOf({ ...gone, agentsIn: false }).error).toBe(null);
+    expect(automationPageOf({ ...gone, found: null }).error).toBe(null);
+    const failure = { words: "not found", status: 404 };
+    expect(automationPageOf({ ...gone, failure }).error).toBe(failure);
   });
 });
 

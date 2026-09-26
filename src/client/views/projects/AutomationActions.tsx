@@ -14,6 +14,7 @@ import {
   suspendAutomation,
 } from "../../data/automations.ts";
 import { says } from "../../lib/format.ts";
+import { automationHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 
 // Run now at the left; Suspend or Resume, Edit and Delete at the right,
@@ -118,7 +119,7 @@ export function AutomationActions({
             {editable && (
               <a
                 class="btn btn-small"
-                href={`/automations/${automation.id}/edit`}
+                href={`${automationHref(automation.id)}/edit`}
               >
                 <Icon name="pencil" size={12} />
                 Edit

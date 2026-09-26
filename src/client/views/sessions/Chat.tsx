@@ -34,7 +34,7 @@ import {
   sessionError,
   stopSession,
 } from "../../data/sessions.ts";
-import { markdownHref } from "../../lib/hrefs.ts";
+import { automationHref, chatHref, markdownHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
@@ -72,6 +72,8 @@ export function Chat({ params }: { params: Params }) {
   const agentOf = (agentId: string | null) =>
     agents.find((a) => a.id === (agentId ?? shown?.session.agentId)) ?? null;
   const run = shown?.session.origin === "automation";
+  // the owner renames and deletes, and so does an admin
+  const manage = user?.id === shown?.session.ownerId || user?.role === "admin";
   // a run is forked whole from its foot, a chat at any settled turn
   const lastTurn = shown?.messages.findLast(
     (m) => m.kind === "user" || (m.kind === "reply" && m.slot === "answer"),
@@ -95,13 +97,12 @@ export function Chat({ params }: { params: Params }) {
             running={shown.session.status === "running" || sending.value}
             download={markdownHref(shown.session.id)}
             onDelete={
-              user?.id === shown.session.ownerId || user?.role === "admin"
+              manage
                 ? () => deleteSession(shown.session.id, shown.session.projectId)
                 : undefined
             }
             onRename={
-              !run &&
-              (user?.id === shown.session.ownerId || user?.role === "admin")
+              !run && manage
                 ? (title) => renameSession(shown.session.id, title)
                 : undefined
             }
@@ -123,7 +124,7 @@ export function Chat({ params }: { params: Params }) {
                   a deleted {from.origin === "automation" ? "run" : "chat"}
                 </span>
               ) : (
-                <a class="chat-run-link" href={`/chat/${from.id}`}>
+                <a class="chat-run-link" href={chatHref(from.id)}>
                   {from.title}
                 </a>
               )}
@@ -141,7 +142,7 @@ export function Chat({ params }: { params: Params }) {
                     : "an automation"}
                 </span>
               ) : (
-                <a class="chat-run-link" href={`/automations/${automation.id}`}>
+                <a class="chat-run-link" href={automationHref(automation.id)}>
                   {automation.name}
                 </a>
               )}

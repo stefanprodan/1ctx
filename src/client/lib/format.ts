@@ -159,3 +159,87 @@ export function failure(err: unknown): Failure {
 export function showAll(lines: number): string {
   return `Show all ${lines} ${lines === 1 ? "line" : "lines"}`;
 }
+
+// "1 file", "6.6K tokens"
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${count(n)} ${n === 1 ? one : many}`;
+}
+
+// "48,210"
+export const commas = (n: number): string => n.toLocaleString("en-GB");
+
+// a dashboard's count, never rounded: "48,210 rows"
+export function pluralCommas(n: number, one: string, many: string): string {
+  return `${commas(n)} ${n === 1 ? one : many}`;
+}
+
+// tokens rounded to thousands: "850", "12K", "1.2M"
+export function k(value: number): string {
+  if (value < 1000) return String(value);
+  if (value < 1_000_000) return `${Math.round(value / 1000)}K`;
+  return `${(value / 1_000_000).toFixed(1)}M`;
+}
+
+const KB = 1024;
+const MB = KB * 1024;
+const GB = MB * 1024;
+
+// a size as its number and its unit, three figures at most: "212", "MB"
+export function sizeParts(bytes: number): { figure: string; unit: string } {
+  const n = Math.max(0, bytes);
+  const three = (v: number) => String(Number(v.toPrecision(3)));
+  if (n < KB) return { figure: String(Math.round(n)), unit: "B" };
+  if (n < MB) return { figure: three(n / KB), unit: "KB" };
+  if (n < GB) return { figure: three(n / MB), unit: "MB" };
+  return { figure: three(n / GB), unit: "GB" };
+}
+
+// "212 MB"
+export function size(bytes: number): string {
+  const { figure, unit } = sizeParts(bytes);
+  return `${figure} ${unit}`;
+}
+
+// "12%", "<1%" for a sliver that is there, "0%" for none
+export function share(part: number, whole: number): string {
+  if (whole <= 0 || part <= 0) return "0%";
+  const p = part / whole;
+  if (p < 0.01) return "<1%";
+  return `${Math.round(p * 100)}%`;
+}
+
+// a size as a field says it: "256 KB", "4 MB"
+// three significant digits, but never a rounded thousand: 1,023.5 MB
+// to three digits is "1020 MB", so the next unit takes over at 1,000
+export function sizeWords(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  let value = bytes;
+  for (const unit of ["KB", "MB", "GB"]) {
+    value /= 1024;
+    if (value < 1000 || unit === "GB") {
+      const shown =
+        value < 100 ? Number(value.toPrecision(3)) : Math.round(value);
+      return `${shown} ${unit}`;
+    }
+  }
+  return `${bytes} B`;
+}
+
+// an uploaded item's note: an archive's files, else its size
+export function uploadNote(item: {
+  archive: boolean;
+  files: number;
+  bytes: number;
+}): string {
+  return item.archive ? plural(item.files, "file") : sizeWords(item.bytes);
+}
+
+// a row's right side: "since 12 September 2026"
+export function sinceLine(row: { createdAt: number }): string {
+  return `since ${longDate(row.createdAt)}`;
+}
+
+// a share, 0 to 1, as a fill's width, clamped
+export function shareWidth(share: number): string {
+  return `${Math.min(100, Math.max(0, share * 100)).toFixed(1)}%`;
+}

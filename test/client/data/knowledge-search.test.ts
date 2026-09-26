@@ -5,7 +5,7 @@
 // at a time, an answer to a query no longer wanted dropped, and Show
 // more paging the files.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import {
   answered,
   asking,
@@ -98,10 +98,15 @@ describe("the search's shapes", () => {
 const realFetch = globalThis.fetch;
 let asked: string[];
 let reply: (url: URL) => Promise<KnowledgeSearchResponse>;
-const pause = () =>
-  new Promise((resolve) => setTimeout(resolve, SEARCH_PAUSE_MS + 30));
+// The pause runs on fake time; one real turn of the event loop then
+// lets the request it starts settle.
+const pause = async () => {
+  jest.advanceTimersByTime(SEARCH_PAUSE_MS + 30);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+};
 
 beforeEach(() => {
+  jest.useFakeTimers();
   me.value = null;
   me.value = reader;
   asked = [];
@@ -114,6 +119,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   globalThis.fetch = realFetch;
 });
 

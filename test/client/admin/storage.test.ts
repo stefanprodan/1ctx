@@ -17,8 +17,6 @@ import {
   pickedArea,
   rowsDay,
   rowsTile,
-  share,
-  size,
   tableBars,
   walWords,
 } from "../../../src/client/views/admin/Storage.model.ts";
@@ -62,21 +60,6 @@ const row = (over: Partial<LargestRow>): LargestRow => ({
 });
 
 describe("storage words", () => {
-  test("sizes keep three figures in binary units", () => {
-    expect(size(0)).toBe("0 B");
-    expect(size(1023)).toBe("1023 B");
-    expect(size(1536)).toBe("1.5 KB");
-    expect(size(212.4 * MB)).toBe("212 MB");
-    expect(size(3 * 1024 * MB)).toBe("3 GB");
-  });
-
-  test("a share says a sliver is there", () => {
-    expect(share(0, 100)).toBe("0%");
-    expect(share(1, 1000)).toBe("<1%");
-    expect(share(1, 4)).toBe("25%");
-    expect(share(1, 0)).toBe("0%");
-  });
-
   test("areas carry their share of the whole and the foot sums them", () => {
     const bars = areaBars([chats, usage]);
     expect(bars.map((b) => [b.name, b.size, b.share])).toEqual([

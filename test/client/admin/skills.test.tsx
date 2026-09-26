@@ -4,12 +4,11 @@
 // The skills page's model: the form's kind from the URL and what its
 // button says, the head's words, the source and change words, the
 // bytes; the entity that loads the list and folds a write back, keeping
-// a body until a refresh; the rail entry; the page rendered over the
-// rows; and the agent form's picker.
+// a body until a refresh; the page rendered over the rows; and the
+// agent form's picker.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { railRows } from "../../../src/client/app/routes.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   addSkill,
@@ -28,7 +27,6 @@ import {
 import { SkillForm } from "../../../src/client/views/admin/SkillForm.tsx";
 import { SkillPicker } from "../../../src/client/views/admin/SkillPicker.tsx";
 import {
-  bytesWord,
   changeLine,
   droppedLine,
   formKind,
@@ -232,9 +230,6 @@ describe("the row's words", () => {
   });
 
   test("the bytes, the dropped files and the metadata", () => {
-    expect(bytesWord(612)).toBe("612 B");
-    expect(bytesWord(37_000)).toBe("36.1 KB");
-    expect(bytesWord(2 * 1024 * 1024)).toBe("2 MB");
     expect(droppedLine(timoni)).toBe("");
     expect(droppedLine(gitops)).toBe(
       "1 file not kept: assets/logo.png (binary)",
@@ -250,7 +245,7 @@ describe("the row's words", () => {
 });
 
 describe("the skills entity", () => {
-  test("loads the list in name order and keeps a failure", async () => {
+  test.serial("loads the list in name order and keeps a failure", async () => {
     answer = () => Response.json({ skills: [timoni, gitops] });
     await loadSkills();
     expect(skills.value?.map((s) => s.name)).toEqual([
@@ -262,80 +257,84 @@ describe("the skills entity", () => {
     expect(skillsError.value).toEqual({ words: "nope", status: 500 });
   });
 
-  test("a write folds the row and its body back, a refresh drops the files held", async () => {
-    skills.value = [gitops];
-    const calls: { url: string; method?: string; body?: string }[] = [];
-    answer = (url, init) => {
-      calls.push({ url, method: init?.method, body: init?.body as string });
-      if (url === "/api/skills/discover") {
-        return Response.json({
-          url: "https://timoni.sh/.well-known/agent-skills/index.json",
-          entries: [
-            {
-              name: "timoni",
-              type: "skill-md",
-              description: "x",
-              url: "https://timoni.sh/x/SKILL.md",
-              digest: "sha256:abc",
-            },
-          ],
-        });
-      }
-      if (init?.method === "DELETE") return new Response(null, { status: 204 });
-      if (url === "/api/skills/s2/file?path=evals%2Fevals.json") {
-        return Response.json({
-          path: "evals/evals.json",
-          content: "{}",
-          bytes: 2,
-        });
-      }
-      if (url === "/api/skills/s2/refresh") {
-        return Response.json({
-          skill: { ...gitops, bodyBytes: 9 },
-          body: "new",
-        });
-      }
-      return Response.json({ skill: timoni, body: "# Timoni" });
-    };
-    const entries = await discoverSkills("https://timoni.sh");
-    expect(entries[0]?.name).toBe("timoni");
-    expect(calls[0]).toMatchObject({
-      url: "/api/skills/discover",
-      method: "POST",
-      body: '{"url":"https://timoni.sh"}',
-    });
-    await addSkill({
-      url: "https://timoni.sh",
-      name: "timoni",
-      digest: "sha256:abc",
-    });
-    expect(skills.value?.map((s) => s.name)).toEqual([
-      "gitops-knowledge",
-      "timoni",
-    ]);
-    expect(bodies.value.s1).toBe("# Timoni");
-    // held, so no second call
-    expect(await readSkill("s1")).toBe("# Timoni");
-    expect(await readSkillFile("s2", "evals/evals.json")).toBe("{}");
-    expect(files.value[fileKey("s2", "evals/evals.json")]).toBe("{}");
-    await refreshSkill("s2");
-    expect(skills.value?.find((s) => s.id === "s2")?.bodyBytes).toBe(9);
-    expect(bodies.value.s2).toBe("new");
-    expect(files.value[fileKey("s2", "evals/evals.json")]).toBeUndefined();
-    await deleteSkill("s1");
-    expect(skills.value?.map((s) => s.id)).toEqual(["s2"]);
-    expect(bodies.value.s1).toBeUndefined();
-    expect(
-      Object.keys(files.value).some((key) => key.startsWith("s1\n")),
-    ).toBeFalse();
-    expect(calls.map((c) => c.method ?? "GET")).toEqual([
-      "POST",
-      "POST",
-      "GET",
-      "POST",
-      "DELETE",
-    ]);
-  });
+  test.serial(
+    "a write folds the row and its body back, a refresh drops the files held",
+    async () => {
+      skills.value = [gitops];
+      const calls: { url: string; method?: string; body?: string }[] = [];
+      answer = (url, init) => {
+        calls.push({ url, method: init?.method, body: init?.body as string });
+        if (url === "/api/skills/discover") {
+          return Response.json({
+            url: "https://timoni.sh/.well-known/agent-skills/index.json",
+            entries: [
+              {
+                name: "timoni",
+                type: "skill-md",
+                description: "x",
+                url: "https://timoni.sh/x/SKILL.md",
+                digest: "sha256:abc",
+              },
+            ],
+          });
+        }
+        if (init?.method === "DELETE")
+          return new Response(null, { status: 204 });
+        if (url === "/api/skills/s2/file?path=evals%2Fevals.json") {
+          return Response.json({
+            path: "evals/evals.json",
+            content: "{}",
+            bytes: 2,
+          });
+        }
+        if (url === "/api/skills/s2/refresh") {
+          return Response.json({
+            skill: { ...gitops, bodyBytes: 9 },
+            body: "new",
+          });
+        }
+        return Response.json({ skill: timoni, body: "# Timoni" });
+      };
+      const entries = await discoverSkills("https://timoni.sh");
+      expect(entries[0]?.name).toBe("timoni");
+      expect(calls[0]).toMatchObject({
+        url: "/api/skills/discover",
+        method: "POST",
+        body: '{"url":"https://timoni.sh"}',
+      });
+      await addSkill({
+        url: "https://timoni.sh",
+        name: "timoni",
+        digest: "sha256:abc",
+      });
+      expect(skills.value?.map((s) => s.name)).toEqual([
+        "gitops-knowledge",
+        "timoni",
+      ]);
+      expect(bodies.value.s1).toBe("# Timoni");
+      // held, so no second call
+      expect(await readSkill("s1")).toBe("# Timoni");
+      expect(await readSkillFile("s2", "evals/evals.json")).toBe("{}");
+      expect(files.value[fileKey("s2", "evals/evals.json")]).toBe("{}");
+      await refreshSkill("s2");
+      expect(skills.value?.find((s) => s.id === "s2")?.bodyBytes).toBe(9);
+      expect(bodies.value.s2).toBe("new");
+      expect(files.value[fileKey("s2", "evals/evals.json")]).toBeUndefined();
+      await deleteSkill("s1");
+      expect(skills.value?.map((s) => s.id)).toEqual(["s2"]);
+      expect(bodies.value.s1).toBeUndefined();
+      expect(
+        Object.keys(files.value).some((key) => key.startsWith("s1\n")),
+      ).toBeFalse();
+      expect(calls.map((c) => c.method ?? "GET")).toEqual([
+        "POST",
+        "POST",
+        "GET",
+        "POST",
+        "DELETE",
+      ]);
+    },
+  );
 
   test("the entities go with the signed-in user", () => {
     skills.value = [timoni];
@@ -347,22 +346,6 @@ describe("the skills entity", () => {
 });
 
 describe("the page", () => {
-  test("sits in the Admin group after Tools", () => {
-    const group = railRows("admin").find((r) => r.kind === "group");
-    const labels =
-      group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual([
-      "Overview",
-      "Storage",
-      "Projects",
-      "Users",
-      "Agents",
-      "Tools",
-      "Skills",
-      "MCP",
-    ]);
-  });
-
   test("renders the rows with their heads and the empty note", () => {
     skills.value = [gitops, timoni];
     const html = render(<Skills />);

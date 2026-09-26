@@ -7,10 +7,12 @@
 // left for the form's other actions. A view composes this, never
 // restyles it.
 
+import type { Signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { Icon } from "../lib/icons.tsx";
 import { noticeOf, type Save } from "../lib/save.ts";
 import "./foot.css";
+import { CodeTag } from "./CodeTag.tsx";
 
 // every label is laid out in the same cell, so the button keeps the
 // width of the widest one whatever it says
@@ -46,11 +48,7 @@ export function Foot({
           <Icon name="alert" size={14} class="foot-notice-icon" />
           <span class="foot-notice-words">
             {noticeOf(notice)}
-            {notice.status !== undefined && (
-              <span class="code-tag foot-notice-code">
-                HTTP {notice.status}
-              </span>
-            )}
+            <CodeTag status={notice.status} class="foot-notice-code" />
           </span>
         </p>
       )}
@@ -74,5 +72,65 @@ export function Foot({
       )}
       {after}
     </div>
+  );
+}
+
+// A foot's start for a row that can be deleted: Delete, then the words
+// that ask, the danger Delete and Keep. `wordsClass` is the owner's.
+export function AskDelete({
+  save,
+  asking,
+  busy,
+  words,
+  wordsClass,
+  label = "Delete",
+  onDelete,
+}: {
+  save: Pick<Save, "pending" | "touch">;
+  asking: Signal<boolean>;
+  busy: boolean;
+  words?: string;
+  wordsClass?: string;
+  // the danger button's word
+  label?: string;
+  onDelete: () => void;
+}) {
+  if (!asking.value) {
+    return (
+      <button
+        type="button"
+        class="btn"
+        disabled={busy}
+        onClick={() => {
+          asking.value = true;
+        }}
+      >
+        Delete
+      </button>
+    );
+  }
+  return (
+    <>
+      {words !== undefined && <span class={wordsClass}>{words}</span>}
+      <button
+        type="button"
+        class="btn btn-danger"
+        disabled={busy}
+        onClick={onDelete}
+      >
+        {save.pending.value === "delete" ? "Deleting" : label}
+      </button>
+      <button
+        type="button"
+        class="btn"
+        disabled={busy}
+        onClick={() => {
+          asking.value = false;
+          save.touch();
+        }}
+      >
+        Keep
+      </button>
+    </>
   );
 }

@@ -45,7 +45,6 @@ export function Transcript({
   // the agent a reply names, by the row's agent id; null for one no
   // longer listed, and for a turn with no row yet the session's
   agentOf: (agentId: string | null) => Agent | null;
-  // the name of a user row's author
   // the author's name, and the username for the link to their page
   authorOf: (userId: string | null) => {
     name: string;
@@ -65,6 +64,14 @@ export function Transcript({
   const jumpHidden = useSignal(true);
 
   const footEl = useRef<HTMLDivElement>(null);
+
+  const toEnd = () => {
+    const scroller = box.current;
+    if (!scroller) return;
+    scroller.scrollTop = scroller.scrollHeight;
+    lastTop.current = scroller.scrollTop;
+    lastHeight.current = scroller.scrollHeight;
+  };
 
   useEffect(() => {
     const el = rows.current;
@@ -88,11 +95,8 @@ export function Transcript({
     // view that follows the end keeps following, one that let go
     // learns whether Jump applies
     const grown = new ResizeObserver(() => {
-      if (stick.current) {
-        scroller.scrollTop = scroller.scrollHeight;
-        lastTop.current = scroller.scrollTop;
-        lastHeight.current = scroller.scrollHeight;
-      } else onScroll();
+      if (stick.current) toEnd();
+      else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
     const onClick = (ev: MouseEvent) => void copyCode(ev);
@@ -105,13 +109,6 @@ export function Transcript({
     };
   }, [jumpHidden]);
 
-  const toEnd = () => {
-    const scroller = box.current;
-    if (!scroller) return;
-    scroller.scrollTop = scroller.scrollHeight;
-    lastTop.current = scroller.scrollTop;
-    lastHeight.current = scroller.scrollHeight;
-  };
   // a chat opens at its end
   useLayoutEffect(() => {
     stick.current = true;

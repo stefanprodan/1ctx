@@ -9,14 +9,13 @@
 // model talking to itself and sits in the same fold, under the
 // reasoning.
 
-import { signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
 import type { Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
-import { type Live, liveOf, thinkParts } from "./stream.ts";
+import { folds, useTick } from "./fold.ts";
+import { type Live, liveOf, thinkTime } from "./stream.ts";
 
-const opened = signal<ReadonlySet<string>>(new Set());
+const { useFoldOpen } = folds();
 
 export function Think({
   message,
@@ -27,34 +26,24 @@ export function Think({
   live: Live | null;
   children?: ComponentChildren;
 }) {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (live === null) return;
-    const t = setInterval(() => tick((n) => n + 1), 250);
-    return () => clearInterval(t);
-  }, [live]);
+  useTick(live !== null);
   const v = live ?? liveOf(message);
   const reasoning = live?.reasoning ?? message.reasoning;
   const streaming = live !== null;
-  const open = opened.value.has(message.id);
-  const { word, time } = thinkParts(v, live === null, Date.now());
+  const { open, onToggle } = useFoldOpen(message.id);
+  const time = thinkTime(v, live === null, Date.now());
   return (
     <details
       class={`transcript-fold${streaming ? " transcript-fold-live" : ""}${
         open ? " transcript-fold-open" : ""
       }`}
       open={open}
-      onToggle={(e) => {
-        const next = new Set(opened.value);
-        if (e.currentTarget.open) next.add(message.id);
-        else next.delete(message.id);
-        opened.value = next;
-      }}
+      onToggle={onToggle}
     >
       <summary class="transcript-fold-head transcript-fold-small">
         <Icon name="spinner" size={12} class="transcript-fold-spin" />
         <Icon name="chevron-right" size={12} class="transcript-fold-chevron" />
-        <span class="transcript-think-word">{word}</span>
+        <span class="transcript-think-word">thinking</span>
         {time !== null && <span class="transcript-think-time">{time}</span>}
       </summary>
       <div class="transcript-think-body">

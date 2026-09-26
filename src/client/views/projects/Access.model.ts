@@ -19,7 +19,7 @@ import {
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 
 // the editor's switches, as its draft holds them
-export type AccessDraft = {
+type AccessDraft = {
   web: boolean;
   visuals: boolean;
   mcpOff: readonly string[];

@@ -5,7 +5,7 @@
 // revision kept as a notice while the reader reads, a delete keeping
 // the text, and the page's own writes settling without a notice.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import { path } from "../../../src/client/app/router.ts";
 import { ApiError } from "../../../src/client/data/api.ts";
 import {
@@ -605,16 +605,24 @@ describe("the page across users, projects and failures", () => {
     await open();
     answer(`GET ${base}/files/f1/versions`, { versions: [version()] });
     await loadHistory("p1", "f1");
-    searchKnowledge("p1", "deploy");
-    onDocSocketBoth({ type: "revoked", projectId: "p1" });
-    expect(knowledgeOf("p1")).toBeNull();
-    expect(docFileOf("f1")).toEqual({ state: "loading" });
-    expect(docHistories.value.has("f1")).toBe(false);
-    expect(searchOf("p1").state).toBe("idle");
-    asked = [];
-    await new Promise((resolve) => setTimeout(resolve, SEARCH_PAUSE_MS + 30));
-    // the search's timer went with it
-    expect(asked).toEqual([]);
+    // fake time for the search's pause alone, since the file's other
+    // waits are real zero-delay turns
+    jest.useFakeTimers();
+    try {
+      searchKnowledge("p1", "deploy");
+      onDocSocketBoth({ type: "revoked", projectId: "p1" });
+      expect(knowledgeOf("p1")).toBeNull();
+      expect(docFileOf("f1")).toEqual({ state: "loading" });
+      expect(docHistories.value.has("f1")).toBe(false);
+      expect(searchOf("p1").state).toBe("idle");
+      asked = [];
+      jest.advanceTimersByTime(SEARCH_PAUSE_MS + 30);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      // the search's timer went with it
+      expect(asked).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test.serial(

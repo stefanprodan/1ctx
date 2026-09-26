@@ -73,6 +73,40 @@ function Switches({
   );
 }
 
+// one switch over a kind of access, with what it means and, when it
+// cannot be flipped, why
+function MainSwitch({
+  item,
+  on,
+  label,
+  words,
+  onFlip,
+  disabled,
+}: {
+  item: WebItem;
+  on: boolean;
+  label: string;
+  // what runs may do with it on, then off
+  words: [string, string];
+  onFlip: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div class="field">
+      <div class="automations-web">
+        <RowsSwitch
+          on={on}
+          label={label}
+          disabled={disabled || !item.live}
+          onClick={onFlip}
+        />
+        <span>{on ? words[0] : words[1]}</span>
+      </div>
+      {item.reason !== null && <span class="hint">{item.reason}</span>}
+    </div>
+  );
+}
+
 // "The web and the agent's MCP servers and skills", by what is listed
 function words(servers: number, skills: number): string {
   const has = [
@@ -129,20 +163,14 @@ export function AccessSection({
   return (
     <Section title="Access" text={words(servers.length, skills.length)}>
       <div class="automations-access">
-        <div class="field">
-          <div class="automations-web">
-            <RowsSwitch
-              on={on}
-              label="Web access"
-              disabled={disabled || !web.live}
-              onClick={onWeb}
-            />
-            <span>
-              {on ? "Runs can reach the web" : "Runs cannot reach the web"}
-            </span>
-          </div>
-          {web.reason !== null && <span class="hint">{web.reason}</span>}
-        </div>
+        <MainSwitch
+          item={web}
+          on={on}
+          label="Web access"
+          words={["Runs can reach the web", "Runs cannot reach the web"]}
+          onFlip={onWeb}
+          disabled={disabled}
+        />
         <Switches
           label="Credentials"
           icon="key"
@@ -156,22 +184,14 @@ export function AccessSection({
           disabled={disabled}
           blocked={on ? null : (web.reason ?? "Web access is off")}
         />
-        <div class="field">
-          <div class="automations-web">
-            <RowsSwitch
-              on={drawing}
-              label="Visuals"
-              disabled={disabled || !visuals.live}
-              onClick={onVisuals}
-            />
-            <span>
-              {drawing ? "Runs can draw visuals" : "Runs cannot draw visuals"}
-            </span>
-          </div>
-          {visuals.reason !== null && (
-            <span class="hint">{visuals.reason}</span>
-          )}
-        </div>
+        <MainSwitch
+          item={visuals}
+          on={drawing}
+          label="Visuals"
+          words={["Runs can draw visuals", "Runs cannot draw visuals"]}
+          onFlip={onVisuals}
+          disabled={disabled}
+        />
         <Switches
           label="MCP servers"
           icon="mcp"

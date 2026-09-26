@@ -5,7 +5,7 @@
 // value to its form.
 
 import { describe, expect, test } from "bun:test";
-import { shapedInput } from "../../../src/client/lib/names.ts";
+import { nameProblem, shapedInput } from "../../../src/client/lib/names.ts";
 
 const typed = (value: string) => {
   const box = { value };
@@ -23,4 +23,17 @@ describe("shapedInput", () => {
     expect(shapedInput(event)).toBe(shaped);
     expect(box.value).toBe(shaped);
   });
+});
+
+describe("nameProblem", () => {
+  test.each(["", " ", "  "])("%p is an empty name", (value) => {
+    expect(nameProblem(value)).toBe("Enter a name");
+  });
+
+  test.each(["coder", "platform", " platform ", "a", "platform.team"])(
+    "%p is left to the server",
+    (value) => {
+      expect(nameProblem(value)).toBeNull();
+    },
+  );
 });

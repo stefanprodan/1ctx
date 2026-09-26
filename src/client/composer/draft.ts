@@ -16,10 +16,10 @@ export type Draft = { text: string; uploads: DraftUpload[] };
 
 export const EMPTY_DRAFT: Draft = { text: "", uploads: [] };
 
-export const draftKey = (
-  userId: string,
-  scope: { sessionId: string } | { projectId: string },
-) =>
+// a chat's draft, or a new chat's in a project
+export type Scope = { sessionId: string } | { projectId: string };
+
+export const draftKey = (userId: string, scope: Scope) =>
   "sessionId" in scope
     ? `draft:${userId}:chat:${scope.sessionId}`
     : `draft:${userId}:project:${scope.projectId}`;

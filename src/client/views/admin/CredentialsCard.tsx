@@ -22,9 +22,10 @@ import {
   patchCredential,
 } from "../../data/credentials.ts";
 import { projects } from "../../data/projects.ts";
+import { toggledId } from "../../lib/ids.ts";
 import { type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { Foot } from "../../ui/Foot.tsx";
+import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import {
   RowsAdd,
   RowsCard,
@@ -55,7 +56,6 @@ import {
   projectsLine,
   TEMPLATE_HINT,
   TEMPLATE_PLACEHOLDER,
-  toggledId,
   toggledMethod,
   totalLine,
 } from "./CredentialsCard.model.ts";
@@ -297,41 +297,14 @@ function CredentialForm({
           dirty={dirtyOf(d, credential)}
           label="Save"
           start={
-            asking.value ? (
-              <>
-                <span class="credentials-ask">Delete {credential.name}?</span>
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  disabled={busy}
-                  onClick={() => void remove()}
-                >
-                  {save.pending.value === "delete" ? "Deleting" : "Delete"}
-                </button>
-                <button
-                  type="button"
-                  class="btn"
-                  disabled={busy}
-                  onClick={() => {
-                    asking.value = false;
-                    save.touch();
-                  }}
-                >
-                  Keep
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                class="btn"
-                disabled={busy}
-                onClick={() => {
-                  asking.value = true;
-                }}
-              >
-                Delete
-              </button>
-            )
+            <AskDelete
+              save={save}
+              asking={asking}
+              busy={busy}
+              words={`Delete ${credential.name}?`}
+              wordsClass="credentials-ask"
+              onDelete={() => void remove()}
+            />
           }
         />
       )}

@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type { Wire } from "../../../shared/words.ts";
 import { createProvider, keys } from "../../data/providers.ts";
-import { shapedInput } from "../../lib/names.ts";
+import { nameProblem, shapedInput } from "../../lib/names.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -17,11 +17,11 @@ import { Foot } from "../../ui/Foot.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   baseUrlProblem,
-  nameProblem,
   PRESETS,
   preset,
   providerFieldOf,
 } from "./Agents.model.ts";
+import { Choices } from "./Choices.tsx";
 import "./agents.css";
 
 export function ProviderForm({ onDone }: { onDone: () => void }) {
@@ -61,10 +61,6 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
   }, providerFieldOf);
   useFocusField(save, form);
   const invalid = (field: string) => save.fieldError(field) !== null;
-  const bind = (s: { value: string }) => (e: Event) => {
-    s.value = (e.currentTarget as HTMLInputElement).value;
-    save.touch();
-  };
   const busy = save.busy;
   const submit = (event: Event) => {
     event.preventDefault();
@@ -77,21 +73,12 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
   };
   return (
     <form class="agents-form" ref={form} onSubmit={submit}>
-      <div class="choices">
-        {PRESETS.map((p) => (
-          <button
-            key={p.wire}
-            type="button"
-            aria-pressed={wire.value === p.wire}
-            disabled={busy}
-            class={`choice${wire.value === p.wire ? " choice-on" : ""}`}
-            onClick={() => choose(p.wire)}
-          >
-            <span class="choice-label">{p.label}</span>
-            <span class="choice-text">{p.text}</span>
-          </button>
-        ))}
-      </div>
+      <Choices
+        options={PRESETS.map((p) => ({ ...p, value: p.wire }))}
+        value={wire.value}
+        disabled={busy}
+        onPick={choose}
+      />
       <div class="pair">
         <label class="field">
           <span class="label label-required">Name</span>
@@ -119,10 +106,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             invalid={invalid("keyName")}
             disabled={busy}
             value={keyName.value}
-            options={keyOptions(
-              keys.value,
-              keyName.value === NO_KEY ? null : keyName.value,
-            )}
+            options={keyOptions(keys.value, keyName.value)}
             onChange={(value) => {
               keyName.value = value;
               save.touch();
@@ -148,7 +132,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
               aria-invalid={invalid("baseUrl") || undefined}
               disabled={busy}
               value={baseUrl.value}
-              onInput={bind(baseUrl)}
+              onInput={save.bind(baseUrl)}
             />
             <FieldError save={save} field="baseUrl" />
           </label>

@@ -19,7 +19,12 @@ import { RowsCard, RowsNote } from "../../../ui/Rows.tsx";
 import { Source } from "../../../ui/Source.tsx";
 import { Split } from "../../../ui/Split.tsx";
 import { Author } from "../Author.tsx";
-import { authorOf, fileHref, listHref } from "../Knowledge.model.ts";
+import {
+  authorOf,
+  fileHref,
+  listHref,
+  restoredHref,
+} from "../Knowledge.model.ts";
 import { crumbSteps, liveFolders } from "./DocPage.model.ts";
 import { keptFor, ProblemNotice } from "./Notices.tsx";
 import "./docpage.css";
@@ -46,7 +51,7 @@ export function DeletedDoc({
   const onRestore = () =>
     void save.act("restore", async () => {
       const file = await restoreFile(projectId, row.id, row.name);
-      navigate(`${fileHref(projectId, file.id)}?restored`);
+      navigate(restoredHref(projectId, file.id));
     });
   return (
     <Page
@@ -111,7 +116,7 @@ export function DeletedDoc({
               ) : last.state === "none" ? (
                 "Its text is no longer kept."
               ) : (
-                <span class="docpage-failed">
+                <span class="error">
                   Its text did not load. {sentence(last.failure.words)}
                 </span>
               )}

@@ -11,8 +11,8 @@
 // one HTML, rendered on the server.
 
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import { servers, serversError } from "../../data/mcp.ts";
+import { useNow } from "../../lib/now.ts";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import { Rows, RowsAdd, RowsCard, RowsNew, RowsNote } from "../../ui/Rows.tsx";
@@ -31,13 +31,7 @@ export function Mcp() {
     matches(q.value, [server.name, server.url, server.serverName]),
   );
   // the ago words move by the minute
-  const now = useSignal(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, 60_000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow(60_000);
   return (
     <Page
       crumb="Admin"
@@ -90,7 +84,7 @@ export function Mcp() {
             <ServerRow
               key={server.id}
               server={server}
-              now={now.value}
+              now={now}
               open={open.value === server.id}
               onToggle={() => {
                 open.value = open.value === server.id ? null : server.id;
