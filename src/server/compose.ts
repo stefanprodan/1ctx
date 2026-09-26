@@ -222,7 +222,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage: {
       deleteProject: (projectId) => usage.deleteProject(projectId),
     },
-    knowledge: { counts: (projectId) => knowledge.counts(projectId) },
+    knowledge: {
+      counts: (projectId) => knowledge.counts(projectId),
+      latest: (projectId, limit) => knowledge.latest(projectId, limit),
+    },
   });
   const credentials = credentialsArea({
     db,

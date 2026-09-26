@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What every tab of a project shares: the head with the name, the
-// tabs, and the aside: About, then the project's recent weeks. The
+// tabs, and the aside: About, the project's recent weeks, then the
+// knowledge files changed last. The
 // members and the agents are the Members tab's, and Home's. A tab's view puts its content under
 // the tabs. The name and the kind are in the rail's list before the
 // page's row arrives, so the head and the tabs are drawn at once.
@@ -19,7 +20,13 @@ import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { knowledgeWords } from "../knowledge/Knowledge.model.ts";
 import { ActivityAside } from "./ActivityAside.tsx";
-import { aboutLine, settledCounts, tabsOf } from "./Project.model.ts";
+import { LatestAside } from "./LatestAside.tsx";
+import {
+  aboutLine,
+  latestFiles,
+  settledCounts,
+  tabsOf,
+} from "./Project.model.ts";
 import "./projects.css";
 
 export function Frame({
@@ -76,6 +83,13 @@ export function Frame({
                   </AsideLine>
                 </AsideSection>
                 <ActivityAside projectId={shown.id} />
+                <LatestAside
+                  projectId={shown.id}
+                  files={latestFiles(
+                    knowledgeOf(id)?.files ?? null,
+                    shown.latestFiles,
+                  )}
+                />
               </>
             )
           }

@@ -68,6 +68,8 @@ export type KnowledgeCapability = KnowledgePort & {
   uploadsOf(sessionId: string): UploadTree;
   snapshot(projectId: string): { files: number; recent: RecentFile[] };
   counts(projectId: string): KnowledgeCounts;
+  // the files changed last, newest first
+  latest(projectId: string, limit: number): KnowledgeFile[];
   emptyBin(projectId: string): number;
   run(
     projectId: string,
@@ -359,6 +361,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       });
     },
     counts: (projectId) => store.counts(projectId),
+    latest: (projectId, limit) => store.latest(projectId, limit),
     snapshot: (projectId) => ({
       files: store.counts(projectId).files,
       recent: store.recent(projectId),

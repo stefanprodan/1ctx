@@ -128,6 +128,44 @@ describe("GET /api/projects", () => {
 });
 
 describe("GET /api/projects/:id", () => {
+  test("lists the three files changed last, newest first", async () => {
+    const app = await testApp();
+    const client = app.client();
+    await client.login("admin", "hunter2-test");
+    const admin = app.users.byUsername("admin")!;
+    const project = app.projects.personal(admin.id)!;
+    const ids: Record<string, string> = {};
+    for (const name of ["a.md", "b.md", "docs/c.md", "d.md"]) {
+      app.now.value += 1000;
+      const res = await client.call(
+        "POST",
+        `/api/projects/${project.id}/knowledge`,
+        { body: { name, text: `# ${name}` } },
+      );
+      ids[name] = (await res.json()).file.id;
+    }
+    // a write moves a file back to the top
+    app.now.value += 1000;
+    await client.call(
+      "PUT",
+      `/api/projects/${project.id}/knowledge/files/${ids["a.md"]}`,
+      { body: { text: "# a, again", revision: 1 } },
+    );
+    const { project: detail } = await (
+      await client.call("GET", `/api/projects/${project.id}`)
+    ).json();
+    expect(detail.latestFiles.map((f: { name: string }) => f.name)).toEqual([
+      "a.md",
+      "d.md",
+      "docs/c.md",
+    ]);
+    expect(detail.latestFiles[0]).toMatchObject({
+      id: ids["a.md"],
+      revision: 2,
+      author: { kind: "user", name: "admin" },
+    });
+  });
+
   test("answers the caller's own project with its members", async () => {
     const app = await testApp();
     const client = app.client();
@@ -146,6 +184,7 @@ describe("GET /api/projects/:id", () => {
         description: "",
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
         members: [
           {
             id: admin.id,

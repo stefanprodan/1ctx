@@ -184,6 +184,9 @@ export type RecentFile = {
 
 export const KNOWLEDGE_TAG = "knowledge";
 
+// how many files a project's aside lists, changed last first
+export const LATEST_FILES = 3;
+
 // "2026-09-18 14:05 UTC": a bare time was read in the user's zone
 function stamp(at: number): string {
   return `${new Date(at).toISOString().slice(0, 16).replace("T", " ")} UTC`;

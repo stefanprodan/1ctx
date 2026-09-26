@@ -6,9 +6,13 @@ import type {
   ProjectResponse,
   ProjectsResponse,
 } from "../../shared/api/projects.ts";
-import type { KnowledgeCounts } from "../../shared/contracts/knowledge.ts";
+import type {
+  KnowledgeCounts,
+  KnowledgeFile,
+} from "../../shared/contracts/knowledge.ts";
 import type { ProjectDetail } from "../../shared/contracts/project.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
+import { LATEST_FILES } from "../../shared/knowledge.ts";
 import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -44,6 +48,7 @@ export type UsagePort = {
 // the knowledge base's counts for the detail, an area built later
 export type KnowledgePort = {
   counts(projectId: string): KnowledgeCounts;
+  latest(projectId: string, limit: number): KnowledgeFile[];
 };
 
 export type RoutesDeps = {
@@ -83,6 +88,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       members,
       chats: deps.sessions.count(project.id),
       knowledge: deps.knowledge.counts(project.id),
+      latestFiles: deps.knowledge.latest(project.id, LATEST_FILES),
     };
   };
   // a reserved name reads as taken, since a personal project holds it

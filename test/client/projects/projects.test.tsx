@@ -27,6 +27,7 @@ import {
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
+  latestFiles,
   listedProjects,
   peopleLine,
   settledCounts,
@@ -76,6 +77,7 @@ describe("the projects entity", () => {
         description: "Scratch work",
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
         members: [casey],
       };
       project.value = { ...saved, description: "" };
@@ -120,6 +122,7 @@ describe("the projects entity", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
       members: [casey],
     };
     me.value = null;
@@ -205,6 +208,7 @@ describe("the projects entity", () => {
                   description: "",
                   chats: 0,
                   knowledge: { files: 0, tokens: 0 },
+                  latestFiles: [],
                   members: [],
                 },
               }),
@@ -240,6 +244,7 @@ describe("the projects entity", () => {
                     description: "",
                     chats: 0,
                     knowledge: { files: 0, tokens: 0 },
+                    latestFiles: [],
                     members: [],
                   },
                 }),
@@ -316,6 +321,42 @@ describe("the rail", () => {
 });
 
 describe("Project.model", () => {
+  test("the latest files come from the held list, else the row", () => {
+    const file = (name: string, updatedAt: number) => ({
+      id: name,
+      projectId: "p1",
+      name,
+      kind: "md",
+      bytes: 1,
+      lines: 1,
+      tokens: 1,
+      revision: 1,
+      author: {
+        kind: "user" as const,
+        id: "u1",
+        name: "casey",
+        sessionId: null,
+        origin: null,
+      },
+      createdAt: 1,
+      updatedAt,
+    });
+    const row = [file("row.md", 9)];
+    expect(latestFiles(null, row).map((f) => f.name)).toEqual(["row.md"]);
+    const held = [
+      file("a.md", 1),
+      file("b.md", 4),
+      file("c.md", 3),
+      file("d.md", 2),
+    ];
+    expect(latestFiles(held, row).map((f) => f.name)).toEqual([
+      "b.md",
+      "c.md",
+      "d.md",
+    ]);
+    expect(latestFiles([], row)).toEqual([]);
+  });
+
   test("the Projects card lists the personal first, narrowed by name", () => {
     const list = [
       { kind: "team" as const, name: "on-call" },
@@ -477,6 +518,7 @@ describe("the pages", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
       members: [casey],
     };
     projectAgents.value = [];
@@ -510,6 +552,7 @@ describe("the pages", () => {
       description: "Incidents and pages",
       chats: 12,
       knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
       members: [casey],
     };
     let html = render(<Project params={{ id: "p1" }} />);
@@ -529,6 +572,7 @@ describe("the pages", () => {
       description: "Scratch work",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
       members: [casey],
     };
     let html = render(<Settings params={{ id: "p1" }} />);
@@ -554,6 +598,7 @@ describe("the pages", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
       members: [casey],
     };
     projectAgents.value = [];
@@ -571,6 +616,7 @@ describe("the pages", () => {
         description: "",
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
         members: [casey],
       };
       projectAgents.value = [];
@@ -589,6 +635,7 @@ describe("the pages", () => {
       description: "",
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
       members: [casey],
     };
     projectAgents.value = null;

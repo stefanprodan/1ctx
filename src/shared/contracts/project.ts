@@ -5,7 +5,7 @@
 // and the page with its members.
 
 import type { ProjectKind } from "../words.ts";
-import type { KnowledgeCounts } from "./knowledge.ts";
+import type { KnowledgeCounts, KnowledgeFile } from "./knowledge.ts";
 import type { UserSummary } from "./user.ts";
 
 export type ProjectSummary = {
@@ -24,4 +24,6 @@ export type ProjectDetail = ProjectSummary & {
   chats: number;
   // the knowledge base, for the aside and the tab's count
   knowledge: KnowledgeCounts;
+  // the files changed last, newest first, LATEST_FILES at most
+  latestFiles: KnowledgeFile[];
 };

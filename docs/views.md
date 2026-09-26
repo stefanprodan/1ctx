@@ -193,6 +193,10 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`.
+  The aside under every tab (`Frame.tsx`) is About, the Activity weeks, then Latest
+  knowledge (the three knowledge files changed last, from the held
+  list once the Knowledge tab loaded it, else the project row's
+  `latestFiles`, left out while the base is empty).
 
 ## Knowledge
 
