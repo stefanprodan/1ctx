@@ -6,12 +6,14 @@
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
+  DirectoryUserDaysResponse,
+  DirectoryUserResponse,
 } from "../../../shared/api/directory.ts";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { Role } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
-import { agentHref } from "../../lib/hrefs.ts";
+import { agentHref, userHref } from "../../lib/hrefs.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 import { offsetOf } from "../../ui/Zone.model.ts";
 
@@ -110,5 +112,50 @@ export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
     { label: "Tools", href: `${base}/tools`, count: shown.tools.length },
     { label: "Skills", href: `${base}/skills`, count: shown.skills.length },
     { label: "MCP", href: `${base}/mcp`, count: shown.mcp.servers.length },
+  ];
+}
+
+// the person's actions as the heatmap's answer, one number a day in the
+// place of turns, with no tokens
+export function personAnswer(
+  body: DirectoryUserDaysResponse,
+  userId: string,
+): DaysUsageResponse {
+  return {
+    since: body.since,
+    until: body.until,
+    days: body.days,
+    total: { sends: body.total, tokens: 0 },
+    projects: [
+      {
+        projectId: userId,
+        usage: body.usage.map((n) => ({ sends: n, tokens: 0 })),
+      },
+    ],
+  };
+}
+
+const USER_TABS = ["", "/projects"] as const;
+
+// the tab an address is on: About for the page's own address or any
+// other
+export function userTab(pathname: string, username: string): number {
+  const base = userHref(username);
+  const at = USER_TABS.findIndex((tail) => pathname === `${base}${tail}`);
+  return at === -1 ? 0 : at;
+}
+
+export function userTabs(
+  username: string,
+  shown: DirectoryUserResponse,
+): Tab[] {
+  const base = userHref(username);
+  return [
+    { label: "About", href: base },
+    {
+      label: "Projects",
+      href: `${base}/projects`,
+      count: shown.projects.length,
+    },
   ];
 }

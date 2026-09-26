@@ -43,6 +43,7 @@ function build(secureCookie: boolean) {
       teamProjectIds: () => [],
       visibleFor: () => [],
     },
+    activity: { personDays: (_userId, starts) => starts.map(() => 0) },
   });
   return { db, user, users, access };
 }

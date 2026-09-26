@@ -67,6 +67,13 @@ export function parseLogin(body: unknown): LoginRequest {
   return { username: b.username, password: password(b.password, "password") };
 }
 
+// a route that takes no query answers a 400 to any parameter
+export function parseNoQuery(url: URL): void {
+  for (const name of url.searchParams.keys()) {
+    throw new BadRequest(`unknown parameter ${name}`);
+  }
+}
+
 export function parseUsername(value: unknown): string {
   if (!isUsername(value)) {
     throw new BadRequest(

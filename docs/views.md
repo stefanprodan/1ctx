@@ -163,7 +163,16 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   parser, so a malformed one is a 400. A user's page carries the email,
   the zone, the about text and the team projects both users are
   members of (an admin's view of every team does not count, a personal
-  project never shows). An
+  project never shows). Its head is over the Activity card of the
+  user's actions in every project as one number a day, no tokens
+  (`GET /api/directory/users/:username/days`, loaded, ghosted and left
+  out as the agent's is, `ACTION_WORDS` for its hint), in the user's
+  own zone whoever asks, since a caller who moved the day boundary
+  would read their hours from the differences: the
+  messages they wrote in chats (a fork's copies, older than their chat,
+  left out), the chats and manual runs they started, and one for each
+  day they were signed in. Its tabs are About and Projects at
+  `/users/:username` and `/projects`, one view for both. An
   agent's page is its head, the Activity card over its turns in every
   project as one series (`GET /api/directory/agents/:name/days?tz=`,
   loaded apart from the page, `ActivityGhost` until it lands, left out

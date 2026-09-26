@@ -16,7 +16,12 @@ import { usageWindow } from "./window.ts";
 
 export { parseZoneQuery } from "./parse.ts";
 export { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
-export { daysWindow, type UsageWindow } from "./window.ts";
+export {
+  countByDay,
+  daysWindow,
+  type UsageWindow,
+  usageWindow,
+} from "./window.ts";
 
 export type UsageDeps = { db: Db; clock: Clock; access: AccessPort };
 

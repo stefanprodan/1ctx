@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { usageWindow, weekWindow } from "../../../src/server/usage/window.ts";
+import {
+  countByDay,
+  daysWindow,
+  usageWindow,
+  weekWindow,
+} from "../../../src/server/usage/window.ts";
 
 const HOUR = 3_600_000;
 
@@ -161,5 +166,29 @@ describe("usageWindow", () => {
     );
     expect(year.starts.slice(-7)).toEqual(week.starts);
     expect(year.until).toBe(week.until);
+  });
+});
+
+describe("countByDay", () => {
+  test("counts each instant on its day, half open at both ends", () => {
+    // a DST day of 23 hours in New York, then a day of 24
+    const window = daysWindow(
+      Date.parse("2026-03-09T12:00:00Z"),
+      "America/New_York",
+      2,
+    );
+    const [first, second] = window.starts as [number, number];
+    expect(second - first).toBe(23 * 3_600_000);
+    expect(
+      countByDay(window.starts, window.until, [
+        first - 1,
+        first,
+        second - 1,
+        second,
+        window.until - 1,
+        window.until,
+      ]),
+    ).toEqual([2, 2]);
+    expect(countByDay([], 0, [0])).toEqual([]);
   });
 });

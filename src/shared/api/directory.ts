@@ -69,3 +69,17 @@ export type DirectoryAgentDaysResponse = {
   total: DayUsage;
   usage: DayUsage[];
 };
+
+// GET /api/directory/users/:username/days: the user's actions in every
+// project over the 53 ISO weeks in the user's own zone, never the
+// caller's, Monday first, today last, as one series: the messages they
+// wrote in chats, the chats and the manual runs they started, and one
+// for each day they were signed in. usage is as long as days, zeros
+// included, and total is its sum
+export type DirectoryUserDaysResponse = {
+  since: number;
+  until: number;
+  days: string[];
+  total: number;
+  usage: number[];
+};

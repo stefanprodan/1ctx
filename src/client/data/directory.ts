@@ -4,13 +4,15 @@
 // A user's page and an agent's page: one of each on screen, and the
 // pages seen before held by name so going back draws at once while
 // they load again. A load's answer is kept only while it is the latest
-// asked for, and all go when the signed-in user changes. The agent's
-// days are their own load, so the page draws before its heatmap.
+// asked for, and all go when the signed-in user changes. A person's and
+// an agent's days are their own loads, so a page draws before its
+// heatmap.
 
 import { effect, signal } from "@preact/signals";
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
+  DirectoryUserDaysResponse,
   DirectoryUserResponse,
 } from "../../shared/api/directory.ts";
 import { type Failure, failure } from "../lib/format.ts";
@@ -21,6 +23,12 @@ import { me } from "./me.ts";
 
 export const person = signal<DirectoryUserResponse | null>(null);
 export const personError = signal<Failure | null>(null);
+// the days of the user named in username; failed as the agent's are
+export const personDays = signal<{
+  username: string;
+  body: DirectoryUserDaysResponse;
+} | null>(null);
+export const personDaysFailed = signal(false);
 export const agentPage = signal<DirectoryAgentResponse | null>(null);
 export const agentPageError = signal<Failure | null>(null);
 // the days of the agent named in name; failed when their load failed
@@ -33,9 +41,11 @@ export const agentDaysFailed = signal(false);
 
 let owner: string | null = null;
 let personTurn = 0;
+let personDaysTurn = 0;
 let agentTurn = 0;
 let daysTurn = 0;
 const people = new Held<DirectoryUserResponse>();
+const peopleDays = new Held<DirectoryUserDaysResponse>();
 const agents = new Held<DirectoryAgentResponse>();
 const agentsDays = new Held<DirectoryAgentDaysResponse>();
 
@@ -44,15 +54,19 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   personTurn++;
+  personDaysTurn++;
   agentTurn++;
   daysTurn++;
   person.value = null;
   personError.value = null;
+  personDays.value = null;
+  personDaysFailed.value = false;
   agentPage.value = null;
   agentPageError.value = null;
   agentDays.value = null;
   agentDaysFailed.value = false;
   people.clear();
+  peopleDays.clear();
   agents.clear();
   agentsDays.clear();
 });
@@ -75,6 +89,30 @@ export async function loadPerson(username: string): Promise<void> {
     people.delete(username);
     person.value = null;
     personError.value = failure(err);
+  }
+}
+
+export async function loadPersonDays(username: string): Promise<void> {
+  const turn = ++personDaysTurn;
+  personDaysFailed.value = false;
+  if (personDays.value?.username !== username) {
+    const held = peopleDays.get(username);
+    personDays.value = held === undefined ? null : { username, body: held };
+  }
+  try {
+    const body = await api<DirectoryUserDaysResponse>(
+      // the person's own days, in their zone
+      `/api/directory/users/${encodeURIComponent(username)}/days`,
+    );
+    if (turn !== personDaysTurn) return;
+    peopleDays.set(username, body);
+    personDays.value = { username, body };
+  } catch {
+    if (turn !== personDaysTurn) return;
+    // a held copy goes, so a new user given the name never draws the
+    // old one's days; a refresh that fails keeps the heatmap on screen
+    peopleDays.delete(username);
+    if (personDays.value?.username !== username) personDaysFailed.value = true;
   }
 }
 

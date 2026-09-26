@@ -415,15 +415,27 @@ describe("the pages", () => {
           { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 3 },
         ],
       };
-      const html = render(<User params={{ username: "bogdan" }} />);
+      path.value = "/users/bogdan";
+      let html = render(<User params={{ username: "bogdan" }} />);
       expect(html).toContain(">Bogdan P<");
       expect(html).toContain('class="who-line who-handle">@bogdan<');
       expect(html).toContain(">Disabled<");
       expect(html).toContain('href="mailto:bogdan@example.com"');
+      expect(html).toContain("12 September 2026");
+      // About first, the projects under their own tab with their count
+      expect(html).toContain(
+        'class="tabs-tab tabs-tab-on" href="/users/bogdan" aria-current="page">About<',
+      );
+      expect(html).toContain(
+        'href="/users/bogdan/projects">Projects<span class="tabs-count">1<',
+      );
       expect(html).toContain(">Head of SRE.<");
+      expect(html).not.toContain(">Projects in common<");
+      path.value = "/users/bogdan/projects";
+      html = render(<User params={{ username: "bogdan" }} />);
       expect(html).toContain(">Projects in common<");
       expect(html).toContain('href="/projects/p2"');
-      expect(html).toContain("12 September 2026");
+      expect(html).not.toContain(">Head of SRE.<");
       // a stale answer for someone else is not drawn
       expect(render(<User params={{ username: "elena" }} />)).not.toContain(
         "Bogdan P",
@@ -446,10 +458,14 @@ describe("the pages", () => {
       },
       projects: [],
     };
+    path.value = "/users/casey";
+    expect(render(<User params={{ username: "casey" }} />)).toContain(
+      "Nothing written yet.",
+    );
+    path.value = "/users/casey/projects";
     const html = render(<User params={{ username: "casey" }} />);
     expect(html).toContain(">Your team projects<");
     expect(html).toContain("No team projects yet.");
-    expect(html).toContain("Nothing written yet.");
   });
 
   test.serial(

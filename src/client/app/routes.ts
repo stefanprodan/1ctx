@@ -16,7 +16,12 @@ import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
-import { loadAgentDays, loadAgentPage, loadPerson } from "../data/directory.ts";
+import {
+  loadAgentDays,
+  loadAgentPage,
+  loadPerson,
+  loadPersonDays,
+} from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadMcp } from "../data/mcp.ts";
@@ -91,6 +96,14 @@ const agentView = lazy<{ params: Params }>(() =>
 );
 const agentPage = async (name: string) => {
   await Promise.all([loadAgentPage(name), loadAgentDays(name)]);
+};
+
+// a user's tabs share one view the same way
+const userView = lazy<{ params: Params }>(() =>
+  import("../views/people/User.tsx").then((m) => m.User),
+);
+const userPage = async (username: string) => {
+  await Promise.all([loadPerson(username), loadPersonDays(username)]);
 };
 
 // the tools page's tabs share one view the same way
@@ -449,10 +462,17 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/users/:username",
-    view: lazy(() => import("../views/people/User.tsx").then((m) => m.User)),
+    view: userView,
     title: (params) => `@${params.username}`,
     role: "authenticated",
-    load: (params) => loadPerson(params.username),
+    load: (params) => userPage(params.username),
+  },
+  {
+    path: "/users/:username/projects",
+    view: userView,
+    title: (params) => `@${params.username} projects`,
+    role: "authenticated",
+    load: (params) => userPage(params.username),
   },
   {
     path: "/agents/:name",

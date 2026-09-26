@@ -13,6 +13,7 @@ import type { Clock } from "../lib/clock.ts";
 import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
+import { personDays } from "./activity.ts";
 import {
   type AccessPort,
   detail,
@@ -83,6 +84,9 @@ export type Sessions = {
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
   usesAgent(agentId: string): boolean;
+  // a person's posts, chats and manual runs on each day of a window,
+  // in every project
+  personDays(userId: string, starts: number[], until: number): number[];
   sessionInfo(sessionId: string): Memory["session"];
   // end what a crash left running, before the first request; how many
   // sessions were touched
@@ -115,6 +119,8 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     usesAgent: (agentId) => store.usesAgent(agentId),
+    personDays: (userId, starts, until) =>
+      personDays(deps.db, userId, starts, until),
     sessionInfo(sessionId) {
       const row = deps.db
         .query<NonNullable<Memory["session"]>, [string]>(

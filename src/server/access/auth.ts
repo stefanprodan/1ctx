@@ -13,8 +13,10 @@ import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newToken, sha256 } from "../lib/ids.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
+import { daysWindow } from "../usage/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { Login, LoginStore } from "./store.ts";
+import type { VisitStore } from "./visits.ts";
 
 export const COOKIE = "login";
 export const LOGIN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -34,6 +36,7 @@ export type ProjectsPort = {
 export type AuthDeps = {
   db: Db;
   logins: LoginStore;
+  visits: VisitStore;
   users: UsersPort;
   projects: ProjectsPort;
   clock: Clock;
@@ -87,9 +90,11 @@ export function auth(deps: AuthDeps): Auth {
   const withToken = (token: string) =>
     `${COOKIE}=${token}; ${attrs(LOGIN_TTL_MS / 1000)}`;
   const nobody: Resolution = { principal: null, setCookie: null };
-  const current = (userId: string, loginId: string): Principal | null => {
-    const user = deps.users.byId(userId);
-    return user === null || user.disabled
+  const principalOf = (
+    user: UserRow | null,
+    loginId: string,
+  ): Principal | null =>
+    user === null || user.disabled
       ? null
       : {
           userId: user.id,
@@ -99,6 +104,24 @@ export function auth(deps: AuthDeps): Auth {
           mustChangePassword: user.mustChangePassword,
           loginId,
         };
+  const current = (userId: string, loginId: string): Principal | null =>
+    principalOf(deps.users.byId(userId), loginId);
+  // by user, the zone and the next local midnight of the day a visit
+  // was last written for, so a request after the day's first neither
+  // reads nor writes the table
+  const visited = new Map<string, { tz: string; until: number }>();
+  const visit = (user: UserRow, now: number) => {
+    const held = visited.get(user.id);
+    if (held !== undefined && held.tz === user.tz && now < held.until) return;
+    let day: { days: string[]; until: number };
+    try {
+      day = daysWindow(now, user.tz, 1);
+    } catch {
+      // a zone the runtime does not know counts the day in UTC
+      day = daysWindow(now, "UTC", 1);
+    }
+    deps.visits.record(user.id, day.days[0]!, now);
+    visited.set(user.id, { tz: user.tz, until: day.until });
   };
   return {
     resolve(req) {
@@ -122,8 +145,10 @@ export function auth(deps: AuthDeps): Auth {
         });
         return nobody;
       }
-      const principal = current(login.userId, login.id);
+      const user = deps.users.byId(login.userId);
+      const principal = principalOf(user, login.id);
       if (principal === null) return nobody;
+      visit(user!, now);
       let setCookie: string | null = null;
       if (now - login.lastSeenAt >= TOUCH_AFTER_MS) {
         deps.logins.touch(login.id, now, now + LOGIN_TTL_MS);
