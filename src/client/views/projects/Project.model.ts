@@ -3,10 +3,12 @@
 //
 // The words for a project, its tabs, and the check of its name.
 
+import type { KnowledgeFile } from "../../../shared/contracts/knowledge.ts";
 import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../../shared/contracts/project.ts";
+import { LATEST_FILES } from "../../../shared/knowledge.ts";
 import type { ProjectKind } from "../../../shared/words.ts";
 import { pluralCommas } from "../../lib/format.ts";
 import { matches } from "../../lib/search.ts";
@@ -105,4 +107,16 @@ export function aboutLine(
 ): string | null {
   if (project.description !== "") return project.description;
   return project.kind === "personal" ? "Your personal project" : null;
+}
+
+// the aside's latest files: from the list once it is held, since frames
+// keep it fresh, else what the project row said
+export function latestFiles(
+  held: readonly KnowledgeFile[] | null,
+  row: readonly KnowledgeFile[],
+): KnowledgeFile[] {
+  if (held === null) return [...row];
+  return [...held]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, LATEST_FILES);
 }

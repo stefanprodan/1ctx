@@ -154,6 +154,7 @@ const shown = {
   members: [],
   chats: 2,
   knowledge: { files: 1, tokens: 620 },
+  latestFiles: [],
 };
 
 const realFetch = globalThis.fetch;

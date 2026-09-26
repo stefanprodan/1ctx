@@ -147,6 +147,17 @@ export class KnowledgeStore extends KnowledgeVersions {
     return { files, tokens };
   }
 
+  // the files changed last, newest first
+  latest(projectId: string, limit: number): KnowledgeFile[] {
+    return this.filesDb
+      .query<FileRaw, [string, number]>(
+        `select ${FILE_COLUMNS} from knowledge_files where project_id = ?
+       order by updated_at desc, rowid desc limit ?`,
+      )
+      .all(projectId, limit)
+      .map(fileOf);
+  }
+
   recent(projectId: string): RecentFile[] {
     return this.filesDb
       .query<RecentFile, [string, number]>(
