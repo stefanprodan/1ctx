@@ -1,5 +1,5 @@
-/* Tabs under a page head: labels on a hairline, the one on screen
-   underlined in the foreground. */
+/* Tabs under a page head or as a card's head: labels on a hairline,
+   the one on screen underlined in the foreground. */
 
 @layer tokens, base, owners;
 
@@ -39,6 +39,25 @@
   }
   .tabs-tab-on .tabs-count {
     color: var(--dim);
+  }
+
+  /* tabs as a card's head, on the head's line: no hairline of their
+     own, each tab as tall as the head, the one on screen underlined on
+     the card's rule. The row reaches over the rule rather than the tab,
+     so a phone's scrolling row does not clip the underline. */
+  .tabs-head {
+    align-self: stretch;
+    min-width: 0;
+    margin-bottom: -1px;
+    border-bottom: 0;
+  }
+  .tabs-head .tabs-tab {
+    height: auto;
+    margin-bottom: 0;
+  }
+  /* the card and a phone's scrolling row clip what is outside a tab */
+  .tabs-head .tabs-tab:focus-visible {
+    outline-offset: -1px;
   }
 
   /* a phone: the counts go, since the tab itself shows them, and a row

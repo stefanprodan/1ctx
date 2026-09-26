@@ -33,6 +33,7 @@ import { m0024 } from "./0024-memory-agent.ts";
 import { m0025 } from "./0025-model-thinking.ts";
 import { m0026 } from "./0026-agent-upstream.ts";
 import { m0027 } from "./0027-usage-agent.ts";
+import { m0028 } from "./0028-user-activity.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -62,4 +63,5 @@ export const MIGRATIONS: Migration[] = [
   m0025,
   m0026,
   m0027,
+  m0028,
 ];

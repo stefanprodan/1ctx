@@ -392,14 +392,20 @@ export class SkillStore {
   }
 
   // the agent's skills as its page needs them without their bodies: when
-  // each was fetched, and its digest, which moves with its content, so a
-  // count taken from the body can be kept until it does
+  // each was fetched, how many files it holds besides SKILL.md, and its
+  // digest, which moves with its content, so a count taken from the body
+  // can be kept until it does
   versions(
     agentId: string,
-  ): { id: string; digest: string; fetchedAt: number }[] {
+  ): { id: string; digest: string; fetchedAt: number; files: number }[] {
     return this.db
-      .query<{ id: string; digest: string; fetched_at: number }, [string]>(
-        `select s.id, s.digest, s.fetched_at
+      .query<
+        { id: string; digest: string; fetched_at: number; files: number },
+        [string]
+      >(
+        `select s.id, s.digest, s.fetched_at,
+                (select count(*) from skill_files f where f.skill_id = s.id)
+                  as files
            from skills s join agent_skills a on a.skill_id = s.id
           where a.agent_id = ? order by s.name`,
       )
@@ -408,6 +414,7 @@ export class SkillStore {
         id: row.id,
         digest: row.digest,
         fetchedAt: row.fetched_at,
+        files: row.files,
       }));
   }
 

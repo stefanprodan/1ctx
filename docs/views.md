@@ -161,17 +161,34 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   /api/directory/agents/:name` (`agents/directory.ts`), held in
   `data/directory.ts`; the name in the path goes through the name
   parser, so a malformed one is a 400. A user's page carries the email,
-  the zone, the about text and the team projects both users are
-  members of (an admin's view of every team does not count, a personal
-  project never shows). An
-  agent's page is its head, the Activity card over its turns in every
-  project as one series (`GET /api/directory/agents/:name/days?tz=`,
-  loaded apart from the page, `ActivityGhost` until it lands, left out
-  when its first load fails), then Prompt, Tools, Skills and MCP tabs
-  at `/agents/:name`, `/tools`, `/skills` and `/mcp`, one view for the
-  four so the card stays mounted. It carries the provider's name, the
-  skills with their
-  descriptions and fetch times, the built-in tools the tools area would
+  the zone, the about text with the user's local time at its foot, and
+  the team projects both users may open (an admin opens every team, a
+  member the teams they belong to; a personal project never shows). Its head is over the Activity card of the
+  user's actions in every project as one number a day, no tokens
+  (`GET /api/directory/users/:username/days`, loaded, ghosted and left
+  out as the agent's is, `ACTION_WORDS` for its hint), in the user's
+  own zone whoever asks, since a caller who moved the day boundary
+  would read their hours from the differences: the
+  messages they wrote in chats (a fork's copies, older than their chat,
+  left out), the chats and manual runs they started, and one for each
+  day they were signed in. Under it is one card whose head is its
+  tabs (`RowsCard`'s `tabs` slot, `Tabs` with `head`), About and
+  Projects at `/users/:username` and `/projects`, one view for both. An
+  agent's page is its head (the model, then the provider, the context
+  and the price), the Activity card over its turns in every project as
+  one series (`GET /api/directory/agents/:name/days?tz=`, loaded apart
+  from the page, `ActivityGhost` until it lands, left out when its
+  first load fails), then the same tabbed card: Instructions (the
+  prompt, its foot the model's capabilities, "text only" for a model
+  with neither tools nor reasoning), Tools, Skills and MCP at
+  `/agents/:name`, `/tools`, `/skills` and `/mcp`, one view for the
+  four so the heatmap stays mounted, the tab's tokens as the head's
+  hint. Every row there is the name, one line under it and one fact at
+  its end: a tool's first sentence and its search provider, a skill's
+  fetch time and its files (SKILL.md counted), a server's refresh and
+  its tools. It carries the provider's name, the
+  skills with their fetch times and file counts, the built-in tools
+  with their descriptions that the tools area would
   offer a send now (none when the model takes no tools, websearch with
   its search provider, `memory_edit` as a chat is offered it, the skill
   tools left out of the list), and

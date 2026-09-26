@@ -137,7 +137,9 @@ client change. What each page draws is in `docs/views.md`.
   `RowsEnd` (buttons, after the words that ask or the failure),
   `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first
   in a label row. A card's head holds `RowsAdd`, `RowsLink` or
-  `RowsFilters`; `RowsNote` says why a list is empty, `RowsBlock` is a
+  `RowsFilters`; its `search` or `tabs` (`ui/Tabs.tsx` with `head`, a
+  phone hiding the hint) takes the label's place, the label still
+  naming the card aloud. `RowsNote` says why a list is empty, `RowsBlock` is a
   row of text. The controls live in `ui/RowsControls.tsx`, exported
   through `Rows.tsx`. A list whose load failed shows `RowsFailed`
   under its rows: the words, then the `CodeTag`.

@@ -99,7 +99,7 @@ describe("the directory", () => {
     ).toBe(404);
   });
 
-  test("projects in common are team projects both are members of", async () => {
+  test("projects in common are team projects both may open", async () => {
     const chat = await chatApp();
     const other = chat.app.createUser({
       username: "bogdan",
@@ -113,17 +113,39 @@ describe("the directory", () => {
     await team(chat, "shared", [chat.memberId, other.id]);
     await team(chat, "theirs", [other.id]);
     await team(chat, "mine", [chat.memberId]);
+    // made last, listed first: the projects read by name
+    await team(chat, "also", [chat.memberId, other.id]);
     const names = async (client: ChatApp["member"], username: string) => {
       const body: DirectoryUserResponse = await (
         await client.call("GET", `/api/directory/users/${username}`)
       ).json();
       return body.projects.map((p) => p.name);
     };
-    expect(await names(chat.member, "bogdan")).toEqual(["shared"]);
-    // an admin sees every team, but shares none with bogdan
-    expect(await names(chat.admin, "bogdan")).toEqual([]);
+    expect(await names(chat.member, "bogdan")).toEqual(["also", "shared"]);
+    // an admin opens every team, so shares all of bogdan's
+    expect(await names(chat.admin, "bogdan")).toEqual([
+      "also",
+      "shared",
+      "theirs",
+    ]);
+    // and a member shares all of theirs with an admin, none of the rest
+    expect(await names(chat.member, "admin")).toEqual([
+      "also",
+      "mine",
+      "shared",
+    ]);
+    expect(await names(chat.admin, "admin")).toEqual([
+      "also",
+      "mine",
+      "shared",
+      "theirs",
+    ]);
     // your own page is your team projects, never the personal one
-    expect(await names(chat.member, "casey")).toEqual(["mine", "shared"]);
+    expect(await names(chat.member, "casey")).toEqual([
+      "also",
+      "mine",
+      "shared",
+    ]);
   });
 
   test("a disabled user's page still opens, marked disabled", async () => {
@@ -146,11 +168,12 @@ describe("the directory", () => {
     expect(
       body.tools.map(({ name, provider }) => ({ name, provider })),
     ).toEqual([
-      { name: "datetime", provider: null },
-      { name: "webfetch", provider: null },
-      { name: "visualize", provider: null },
+      // by name, not in the order a send offers them
       { name: "bash", provider: null },
+      { name: "datetime", provider: null },
       { name: "memory_edit", provider: null },
+      { name: "visualize", provider: null },
+      { name: "webfetch", provider: null },
     ]);
     // the agent has no prompt and no skills; the tool schemas cost,
     // and no MCP server is offered
@@ -162,6 +185,12 @@ describe("the directory", () => {
     const offered = chat.app.runner.registry.get(started.sessionId)!.policy
       .offered.tools;
     expect(body.tokens.tools).toBe(wireTokens(offered));
+    // each with the description the model reads
+    for (const tool of body.tools) {
+      expect(tool.description).toBe(
+        offered.find((t) => t.name === tool.name)!.description,
+      );
+    }
     const catalogResponse = await chat.admin.call("GET", "/api/tools");
     expect(catalogResponse.status).toBe(200);
     const catalog: ToolsResponse = await catalogResponse.json();
@@ -186,10 +215,10 @@ describe("the directory", () => {
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();
     expect(after.tools.map((t) => t.name)).toEqual([
-      "datetime",
-      "visualize",
       "bash",
+      "datetime",
       "memory_edit",
+      "visualize",
     ]);
     // one schema fewer on the wire, fewer tokens
     expect(after.tokens.tools).toBeLessThan(body.tokens.tools);
@@ -230,7 +259,7 @@ describe("the directory", () => {
     ).toBe(404);
   });
 
-  test("an agent's skills carry their descriptions and fetch times, and every schema counts", async () => {
+  test("an agent's skills carry their descriptions, fetch times and files, and every schema counts", async () => {
     const chat = await chatApp();
     const bare: DirectoryAgentResponse = await (
       await chat.member.call("GET", "/api/directory/agents/coder")
@@ -258,6 +287,8 @@ describe("the directory", () => {
         description: "Use filed.",
         hasFiles: true,
         fetchedAt: now + 60_000,
+        // SKILL.md and the runbook
+        files: 2,
       },
       {
         id: plain.id,
@@ -265,15 +296,16 @@ describe("the directory", () => {
         description: "Use plain.",
         hasFiles: false,
         fetchedAt: now,
+        files: 1,
       },
     ]);
     // the skill tools are left out of the list, never out of the count
     expect(body.tools.map((t) => t.name)).toEqual([
-      "datetime",
-      "webfetch",
-      "visualize",
       "bash",
+      "datetime",
       "memory_edit",
+      "visualize",
+      "webfetch",
     ]);
     expect(body.tokens.tools).toBeGreaterThan(bare.tokens.tools);
     expect(body.tokens.skills).toBe(

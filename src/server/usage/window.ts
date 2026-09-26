@@ -147,3 +147,26 @@ export function daysWindow(
 ): UsageWindow {
   return calendarWindow(now, timeZone, () => count);
 }
+
+// how many of the instants fall on each day of a window, from the
+// instant each day starts; one outside it is not counted
+export function countByDay(
+  starts: readonly number[],
+  until: number,
+  instants: readonly number[],
+): number[] {
+  const counts = starts.map(() => 0);
+  for (const at of instants) {
+    if (starts.length === 0 || at < starts[0]! || at >= until) continue;
+    // the last day starting at or before the instant
+    let low = 0;
+    let high = starts.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (starts[mid]! <= at) low = mid;
+      else high = mid - 1;
+    }
+    counts[low]!++;
+  }
+  return counts;
+}

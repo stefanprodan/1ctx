@@ -36,6 +36,20 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
+  /* tabs in the head: they stand on its rule, the hint at the right,
+     and a phone gives the head to the tabs */
+  .rows-head-tabs {
+    align-items: stretch;
+  }
+  .rows-head-tabs .rows-hint {
+    align-self: center;
+    flex-shrink: 0;
+  }
+  @media (max-width: 719px) {
+    .rows-head-tabs .rows-hint {
+      display: none;
+    }
+  }
   .rows-add {
     margin-left: auto;
     flex-shrink: 0;

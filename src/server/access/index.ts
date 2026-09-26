@@ -16,6 +16,7 @@ import {
   auth,
 } from "./auth.ts";
 import {
+  type ActivityPort,
   type ProjectsPort as DirectoryProjectsPort,
   type UsersPort as DirectoryUsersPort,
   directoryRoutes,
@@ -27,6 +28,7 @@ import {
 import { type UsersPort as LoginUsersPort, routes } from "./routes.ts";
 import { LoginStore } from "./store.ts";
 import { type UsersPort as AdminUsersPort, usersRoutes } from "./users.ts";
+import { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
 export {
   type Auth,
@@ -38,7 +40,11 @@ export {
   type Resolution,
   TOUCH_AFTER_MS,
 } from "./auth.ts";
-export { type DirectoryDeps, directoryRoutes } from "./directory.ts";
+export {
+  type ActivityPort,
+  type DirectoryDeps,
+  directoryRoutes,
+} from "./directory.ts";
 export {
   parseAbout,
   parseEmail,
@@ -55,6 +61,7 @@ export {
   type UsersRoutesDeps,
   usersRoutes,
 } from "./users.ts";
+export { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
 export type AccessDeps = {
   db: Db;
@@ -68,18 +75,25 @@ export type AccessDeps = {
     AdminUsersPort &
     DirectoryUsersPort;
   projects: AuthProjectsPort & DirectoryProjectsPort;
+  // a person's posts, chats and manual runs: a closure, since sessions
+  // is built after access
+  activity: ActivityPort;
 };
 
 export type Access = Auth & {
   store: LoginStore;
+  // drop the visits past every window; how many went
+  sweepVisits(): number;
   routes: RouteDescriptor[];
 };
 
 export function accessArea(deps: AccessDeps): Access {
   const logins = new LoginStore(deps.db);
+  const visits = new VisitStore(deps.db);
   const built = auth({
     db: deps.db,
     logins,
+    visits,
     users: deps.users,
     projects: deps.projects,
     clock: deps.clock,
@@ -88,6 +102,7 @@ export function accessArea(deps: AccessDeps): Access {
   return {
     store: logins,
     ...built,
+    sweepVisits: () => visits.deleteBefore(deps.clock() - VISIT_RETENTION_MS),
     routes: [
       ...routes({
         db: deps.db,
@@ -109,7 +124,13 @@ export function accessArea(deps: AccessDeps): Access {
         users: deps.users,
         clock: deps.clock,
       }),
-      ...directoryRoutes({ users: deps.users, projects: deps.projects }),
+      ...directoryRoutes({
+        users: deps.users,
+        projects: deps.projects,
+        activity: deps.activity,
+        visits,
+        clock: deps.clock,
+      }),
     ],
   };
 }

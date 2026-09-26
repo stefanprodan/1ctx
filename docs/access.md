@@ -13,6 +13,12 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   the same cap for `user-admin.key`. The first admin comes from
   `user-admin.key` in the secrets directory, read once when there are no
   users, with `admin@1ctx.dev` as its email.
+- **A signed-in day is a visit.** The resolver writes one `visits` row
+  (`access/visits.ts`) on a user's first signed-in request of their
+  local day, keeping its instant; a map in memory holds each user's
+  next local midnight, so later requests that day touch no visits row. The
+  hourly sweep drops visits past `VISIT_RETENTION_MS`. A user's page
+  counts each as one action.
 - **Every user has an email, a zone and flags.** The email is unique and
   lowercased; an admin sets it with the username and the role on
   `/admin/users` (the routes in `access/users.ts`, since a reset needs
@@ -51,7 +57,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   reserved: a team project named `personal` is a 409. A personal
   project is its owner's alone, an admin included, save that an
   agent's page counts the agent's turns and tokens per day in every
-  project, personal ones too, as one series naming none; its owner only
+  project, personal ones too, as one series naming none, and a user's
+  page counts the user's actions the same way; its owner only
   describes it, through `PATCH /api/profile/project`, and a username
   rename leaves it alone. The system prompt names it by its owner.
   Admins make, rename, describe, fill and delete team projects; team

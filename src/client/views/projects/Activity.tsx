@@ -1,10 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Activity card: turns per day over up to 53 weeks, a cell's shade its
-// level, and the head's hint the total or the selected day. The weeks
-// fill the card's width: a wider card shows more of the year, never
-// bigger cells. The grid and its selection are exported for the
+// The Activity card: turns per day over up to 53 weeks, or a person's
+// actions in the words it is given; a cell's shade is its level, and
+// the head's hint the total or the selected day. The weeks fill the
+// card's width: a wider card shows more of the year, never bigger
+// cells. The grid and its selection are exported for the
 // project page's aside, which draws the recent weeks without labels.
 
 import { type Signal, useSignal } from "@preact/signals";
@@ -19,14 +20,13 @@ import { RowsCard } from "../../ui/Rows.tsx";
 import {
   type ActivityCell,
   type ActivityModel,
-  dayHint,
+  type ActivityWords,
   fitWeeks,
-  gridAriaLabel,
   lastWeekColumns,
   monthLabels,
   moveSelection,
   type SelectionKey,
-  totalHint,
+  TURN_WORDS,
   type WeekColumn,
 } from "./Activity.model.ts";
 import "./activity.css";
@@ -69,6 +69,7 @@ export function ActivityGrid({
   valueText,
   selection,
   labels = true,
+  words = TURN_WORDS,
 }: {
   columns: WeekColumn[];
   // the index in the whole window of the first cell drawn
@@ -78,6 +79,7 @@ export function ActivityGrid({
   valueText: string;
   selection: Signal<Selection | null>;
   labels?: boolean;
+  words?: ActivityWords;
 }) {
   // the weekday labels take the first column and the months the first row
   const lead = labels ? 1 : 0;
@@ -100,7 +102,7 @@ export function ActivityGrid({
       class={`activity-grid${labels ? "" : " activity-grid-compact"}`}
       role="slider"
       tabIndex={0}
-      aria-label={gridAriaLabel(total, weeks)}
+      aria-label={words.grid(total, weeks)}
       aria-valuemin={offset}
       aria-valuemax={last}
       aria-valuenow={chosen ?? last}
@@ -186,6 +188,7 @@ export function useDaySelection(
   answer: DaysUsageResponse,
   model: ActivityModel,
   shown: WeekColumn[],
+  words: ActivityWords = TURN_WORDS,
 ): { selection: Signal<Selection | null>; hint: string; total: DayUsage } {
   const selection = useSignal<Selection | null>(null);
   const offset = (model.columns.length - shown.length) * 7;
@@ -235,8 +238,8 @@ export function useDaySelection(
         );
   const hint =
     chosen === null
-      ? totalHint(total)
-      : dayHint({ day: answer.days[chosen], ...model.usage[chosen] });
+      ? words.total(total)
+      : words.day({ day: answer.days[chosen], ...model.usage[chosen] });
   return { selection, hint, total };
 }
 
@@ -278,14 +281,21 @@ function Legend() {
 export function Activity({
   answer,
   model,
+  words = TURN_WORDS,
 }: {
   answer: DaysUsageResponse;
   model: ActivityModel;
+  words?: ActivityWords;
 }) {
   const { weeks, body } = useFitWeeks(model.columns.length);
   const shown = lastWeekColumns(model.columns, weeks);
   const offset = (model.columns.length - shown.length) * 7;
-  const { selection, hint, total } = useDaySelection(answer, model, shown);
+  const { selection, hint, total } = useDaySelection(
+    answer,
+    model,
+    shown,
+    words,
+  );
 
   return (
     <RowsCard label="Activity" hint={hint} live>
@@ -297,6 +307,7 @@ export function Activity({
           total={total.sends}
           valueText={hint}
           selection={selection}
+          words={words}
         />
         <Legend />
       </div>

@@ -241,6 +241,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secureCookie: options.secureCookie,
     users,
     projects,
+    activity: { personDays: (...args) => sessions.personDays(...args) },
   });
   usage = usageArea({
     db,
@@ -461,12 +462,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sweep: () => {
       try {
         const logins = access.sweep();
+        const visits = access.sweepVisits();
         const knowledgeRows = knowledge.sweep(clock());
         const digests = sessions.store.sweepDigests();
-        const removed = logins + knowledgeRows + digests;
+        const removed = logins + visits + knowledgeRows + digests;
         if (removed > 0) {
           sweepLog.info("sweep", {
             logins,
+            visits,
             knowledge: knowledgeRows,
             digests,
             removed,

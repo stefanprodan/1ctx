@@ -271,7 +271,7 @@ describe("sweep", () => {
       level: "info",
       area: "sweep",
       msg: "sweep",
-      fields: { logins: 1, knowledge: 0, digests: 0, removed: 1 },
+      fields: { logins: 1, visits: 0, knowledge: 0, digests: 0, removed: 1 },
     });
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({
       n: 1,

@@ -253,6 +253,33 @@ export function gridAriaLabel(sends: number, weeks: number): string {
   return `${turns(sends)} in ${weeks} weeks`;
 }
 
+function actions(value: number): string {
+  return `${turnNumber.format(value)} ${value === 1 ? "action" : "actions"}`;
+}
+
+// the words of a heatmap's hint and its grid's label: turns and tokens
+// for projects and agents, one number of actions for a person
+export type ActivityWords = {
+  total(total: DayUsage): string;
+  day(day: Pick<ActivityCell, "day" | "sends" | "tokens">): string;
+  grid(sends: number, weeks: number): string;
+};
+
+export const TURN_WORDS: ActivityWords = {
+  total: totalHint,
+  day: dayHint,
+  grid: gridAriaLabel,
+};
+
+export const ACTION_WORDS: ActivityWords = {
+  total: (total) => actions(total.sends),
+  day: (day) => {
+    const parts = dayParts(day.day);
+    return `${parts.day} ${MONTHS[parts.month - 1]} · ${actions(day.sends)}`;
+  },
+  grid: (sends, weeks) => `${actions(sends)} in ${weeks} weeks`,
+};
+
 export function stripAriaLabel(cells: readonly ActivityCell[]): string {
   const sends = cells.reduce((total, cell) => total + cell.sends, 0);
   return `${turns(sends)} in ${cells.length} days`;

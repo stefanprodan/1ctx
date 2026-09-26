@@ -24,9 +24,13 @@ import { agentHref, userHref } from "../../../src/client/lib/hrefs.ts";
 import { Agent } from "../../../src/client/views/people/Agent.tsx";
 import {
   agentAnswer,
+  agentHint,
+  agentLine,
   agentTab,
   agentTabs,
+  capabilities,
   effortText,
+  filesText,
   localTime,
   roleWords,
   serverLine,
@@ -84,11 +88,16 @@ const agent: DirectoryAgentResponse = {
       description: "Deploy with Timoni.",
       hasFiles: false,
       fetchedAt: Date.now() - 2 * 60 * 60 * 1000,
+      files: 1,
     },
   ],
   tools: [
-    { name: "datetime", provider: null },
-    { name: "websearch", provider: "exa" },
+    {
+      name: "datetime",
+      description: "Get the current date and time. Call it first.",
+      provider: null,
+    },
+    { name: "websearch", description: "Search the web.", provider: "exa" },
   ],
   mcp: { servers: [], tokens: 0 },
   tokens: { prompt: 7, skills: 2000, tools: 300 },
@@ -373,15 +382,62 @@ describe("People.model", () => {
         now,
       ),
     ).toEqual({ text: "refresh failed 1m ago", bad: true });
-    expect(serverMeta({ read: true, write: false, tools: 11 })).toBe(
-      "11 tools · read access",
+    expect(serverMeta({ tools: 11 })).toBe("11 tools");
+    expect(serverMeta({ tools: 1 })).toBe("1 tool");
+  });
+
+  test("a skill counts its files, SKILL.md one of them", () => {
+    expect(filesText(1)).toBe("1 file");
+    expect(filesText(8)).toBe("8 files");
+  });
+
+  test("the agent's line leaves out what the catalog did not say", () => {
+    const model = agent.agent.model;
+    expect(agentLine("router", model)).toBe("router · 128K · $0.14 / $0.28");
+    expect(
+      agentLine("local", {
+        ...model,
+        contextLength: null,
+        promptPrice: null,
+        completionPrice: null,
+      }),
+    ).toBe("local");
+    expect(
+      agentLine("router", { ...model, promptPrice: 0, completionPrice: 0 }),
+    ).toBe("router · 128K · free");
+  });
+
+  test("the capabilities say text only when the model has neither", () => {
+    expect(capabilities({ tools: true, reasoning: true })).toBe(
+      "tools · reasoning",
     );
-    expect(serverMeta({ read: true, write: true, tools: 1 })).toBe(
-      "1 tool · read and write access",
-    );
-    expect(serverMeta({ read: false, write: true, tools: 27 })).toBe(
-      "27 tools · write access",
-    );
+    expect(capabilities({ tools: true, reasoning: false })).toBe("tools");
+    expect(capabilities({ tools: false, reasoning: true })).toBe("reasoning");
+    expect(capabilities({ tools: false, reasoning: false })).toBe("text only");
+  });
+
+  test("the head's hint is the tab's tokens, none for an empty tab", () => {
+    expect(agentHint(agent, 0)).toBe("7 tokens");
+    expect(agentHint(agent, 1)).toBe("300 tokens");
+    expect(agentHint(agent, 2)).toBe("2K tokens");
+    // no servers: nothing to count
+    expect(agentHint(agent, 3)).toBeUndefined();
+    const bare = {
+      ...agent,
+      agent: { ...agent.agent, prompt: "" },
+      tools: [],
+      skills: [],
+      mcp: {
+        servers: [
+          { name: "flux", tools: 3, checkedAt: 0, refreshFailedAt: null },
+        ],
+        tokens: 90,
+      },
+    };
+    expect(agentHint(bare, 0)).toBeUndefined();
+    expect(agentHint(bare, 1)).toBeUndefined();
+    expect(agentHint(bare, 2)).toBeUndefined();
+    expect(agentHint(bare, 3)).toBe("90 tokens");
   });
 
   test("thinking and effort say the default when the agent sets none", () => {
@@ -415,15 +471,31 @@ describe("the pages", () => {
           { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 3 },
         ],
       };
-      const html = render(<User params={{ username: "bogdan" }} />);
+      path.value = "/users/bogdan";
+      let html = render(<User params={{ username: "bogdan" }} />);
       expect(html).toContain(">Bogdan P<");
       expect(html).toContain('class="who-line who-handle">@bogdan<');
       expect(html).toContain(">Disabled<");
       expect(html).toContain('href="mailto:bogdan@example.com"');
-      expect(html).toContain(">Head of SRE.<");
-      expect(html).toContain(">Projects in common<");
-      expect(html).toContain('href="/projects/p2"');
       expect(html).toContain("12 September 2026");
+      // About first, the projects under their own tab with their count
+      expect(html).toContain(
+        'class="tabs-tab tabs-tab-on" href="/users/bogdan" aria-current="page">About<',
+      );
+      expect(html).toContain(
+        'href="/users/bogdan/projects">Projects<span class="tabs-count">1<',
+      );
+      expect(html).toContain(">Head of SRE.<");
+      // one card, its head the tabs, named for a screen reader
+      expect(html).toContain('aria-label="About"');
+      expect(html).toContain(
+        'class="rows-head rows-head-tabs"><nav class="tabs tabs-head"',
+      );
+      path.value = "/users/bogdan/projects";
+      html = render(<User params={{ username: "bogdan" }} />);
+      expect(html).toContain('aria-label="Projects in common"');
+      expect(html).toContain('href="/projects/p2"');
+      expect(html).not.toContain(">Head of SRE.<");
       // a stale answer for someone else is not drawn
       expect(render(<User params={{ username: "elena" }} />)).not.toContain(
         "Bogdan P",
@@ -446,29 +518,38 @@ describe("the pages", () => {
       },
       projects: [],
     };
+    path.value = "/users/casey";
+    expect(render(<User params={{ username: "casey" }} />)).toContain(
+      "Nothing written yet.",
+    );
+    path.value = "/users/casey/projects";
     const html = render(<User params={{ username: "casey" }} />);
-    expect(html).toContain(">Your team projects<");
+    expect(html).toContain('aria-label="Your team projects"');
     expect(html).toContain("No team projects yet.");
-    expect(html).toContain("Nothing written yet.");
   });
 
   test.serial(
-    "Agent opens on the prompt under the tabs with their counts",
+    "Agent opens on its instructions in the card its tabs head",
     () => {
       agentPage.value = agent;
       const html = render(<Agent params={{ name: "coder" }} />);
       expect(html).toContain("deepseek/deepseek-v4-flash");
-      expect(html).toContain(
-        "router · 128K · $0.14 / $0.28 · tools · reasoning",
+      // the provider, context and price under the model, what it can
+      // do at the instructions' foot
+      expect(html).toContain('class="who-line">router · 128K · $0.14 / $0.28<');
+      expect(html).toMatch(
+        /class="people-foot"><svg.*<\/svg><span class="people-foot-name">Capabilities<\/span>tools · reasoning</,
       );
       expect(html).toContain(
         'class="people-prompt clamp">You write code.\nSmall diffs.<',
       );
+      expect(html).toContain('</nav><span class="rows-hint cut">7 tokens<');
+      // the card is named for the tab on screen
       expect(html).toContain(
-        '>Prompt</span><span class="rows-hint cut">7 tokens<',
+        '<section class="card rows-card" aria-label="Instructions">',
       );
       expect(html).toContain(
-        'class="tabs-tab tabs-tab-on" href="/agents/coder" aria-current="page">Prompt<',
+        'class="tabs-tab tabs-tab-on" href="/agents/coder" aria-current="page">Instructions<',
       );
       expect(html).toContain(
         'href="/agents/coder/tools">Tools<span class="tabs-count">2<',
@@ -486,31 +567,51 @@ describe("the pages", () => {
     },
   );
 
-  test.serial("Agent's Tools, Skills and MCP tabs each draw their card", () => {
+  test.serial("Agent's Tools, Skills and MCP tabs each fill the card", () => {
     agentPage.value = agent;
     path.value = "/agents/coder/tools";
     let html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain(
-      '>Tools</span><span class="rows-hint cut">300 tokens<',
-    );
+    expect(html).toContain('</nav><span class="rows-hint cut">300 tokens<');
     expect(html).toContain(">datetime<");
+    // the description's first sentence under the name
+    expect(html).toContain('class="rows-sub">Get the current date and time.<');
     expect(html).toContain(">websearch<");
     expect(html).toContain('class="rows-meta">exa<');
     expect(html).not.toContain("people-prompt");
 
     path.value = "/agents/coder/skills";
     html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain(
-      '>Skills</span><span class="rows-hint cut">2K tokens<',
-    );
+    expect(html).toContain('</nav><span class="rows-hint cut">2K tokens<');
     expect(html).toContain(">timoni<");
-    // the description under the name, the fetch time at the row's end
-    expect(html).toContain('class="rows-sub">Deploy with Timoni.<');
-    expect(html).toContain('class="rows-meta">fetched 2h ago<');
+    // the fetch time under the name, the files at the row's end
+    expect(html).toContain('class="rows-sub">fetched 2h ago<');
+    expect(html).toContain('class="rows-meta">1 file<');
+    expect(html).not.toContain("Deploy with Timoni.");
 
     path.value = "/agents/coder/mcp";
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).toContain("No MCP servers.");
+    // an empty tab has no hint
+    expect(html).not.toContain("rows-hint");
+    agentPage.value = {
+      ...agent,
+      mcp: {
+        servers: [
+          {
+            name: "flux",
+            tools: 12,
+            checkedAt: Date.now() - 60 * 60 * 1000,
+            refreshFailedAt: null,
+          },
+        ],
+        tokens: 900,
+      },
+    };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain('</nav><span class="rows-hint cut">900 tokens<');
+    // the refresh under the name, the tools at the row's end
+    expect(html).toContain('class="rows-sub">refreshed 1h ago<');
+    expect(html).toContain('class="rows-meta">12 tools<');
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/agents/coder/mcp" aria-current="page">MCP<',
     );
@@ -537,7 +638,7 @@ describe("the pages", () => {
     agentDaysFailed.value = true;
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).not.toContain(">Activity<");
-    expect(html).toContain(">Prompt<");
+    expect(html).toContain(">Instructions<");
   });
 
   test.serial("Agent without tools says why", () => {
@@ -551,8 +652,19 @@ describe("the pages", () => {
       skills: [],
       tools: [],
     };
+    const html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain("No instructions.");
+    expect(html).not.toContain("rows-hint");
+    expect(html).toContain("Capabilities</span>reasoning<");
+    agentPage.value = {
+      ...agentPage.value!,
+      agent: {
+        ...agentPage.value!.agent,
+        model: { ...agent.agent.model, tools: false, reasoning: false },
+      },
+    };
     expect(render(<Agent params={{ name: "coder" }} />)).toContain(
-      "No prompt.",
+      "Capabilities</span>text only<",
     );
     path.value = "/agents/coder/tools";
     expect(render(<Agent params={{ name: "coder" }} />)).toContain(
@@ -570,7 +682,7 @@ describe("the pages", () => {
 });
 
 describe("the agent page's words", () => {
-  test("a tab is found by its address, the prompt's for any other", () => {
+  test("a tab is found by its address, Instructions for any other", () => {
     expect(agentTab("/agents/coder", "coder")).toBe(0);
     expect(agentTab("/agents/coder/tools", "coder")).toBe(1);
     expect(agentTab("/agents/coder/skills", "coder")).toBe(2);
@@ -583,7 +695,7 @@ describe("the agent page's words", () => {
     expect(
       agentTabs("coder", agent).map((t) => [t.label, t.href, t.count]),
     ).toEqual([
-      ["Prompt", "/agents/coder", undefined],
+      ["Instructions", "/agents/coder", undefined],
       ["Tools", "/agents/coder/tools", 2],
       ["Skills", "/agents/coder/skills", 1],
       ["MCP", "/agents/coder/mcp", 0],

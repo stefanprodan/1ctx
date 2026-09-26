@@ -1,13 +1,23 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A user's page, open to every signed-in user: who they are and what
-// they say about themselves, then the team projects the viewer shares
-// with them. The aside is how to reach them and when it is for them;
-// where it is hidden, the head carries the email and the local time.
+// A user's page, open to every signed-in user: who they are, their
+// actions per day in every project, then one card whose head is tabs
+// at their own addresses: what they say about themselves, and the team
+// projects the viewer shares with them. The aside is how to reach them and when it is for
+// them; where it is hidden, the head carries the email and the local
+// time.
 
+import { useMemo } from "preact/hooks";
+import type { DirectoryUserResponse } from "../../../shared/api/directory.ts";
 import type { Params } from "../../app/params.ts";
-import { person, personError } from "../../data/directory.ts";
+import { path } from "../../app/router.ts";
+import {
+  person,
+  personDays,
+  personDaysFailed,
+  personError,
+} from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { initials, longDate } from "../../lib/format.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
@@ -16,16 +26,123 @@ import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAvatar,
+  RowsBlock,
   RowsCard,
   RowsGo,
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { Tabs } from "../../ui/Tabs.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
+import { ACTION_WORDS, activityModel } from "../projects/Activity.model.ts";
+import { Activity, ActivityGhost } from "../projects/Activity.tsx";
 import { peopleLine } from "../projects/Project.model.ts";
-import { localTime, roleWords } from "./People.model.ts";
+import {
+  localTime,
+  personAnswer,
+  roleWords,
+  userTab,
+  userTabs,
+} from "./People.model.ts";
 import "./people.css";
+
+// the person's actions per day, the Projects page's card in their
+// words; its ghost while they load, nothing when their first load
+// failed
+function UserActivity({
+  username,
+  userId,
+}: {
+  username: string;
+  userId: string;
+}) {
+  const held = personDays.value;
+  const body = held !== null && held.username === username ? held.body : null;
+  const answer = useMemo(
+    () => (body === null ? null : personAnswer(body, userId)),
+    [body, userId],
+  );
+  const model = useMemo(
+    () => (answer === null ? null : activityModel(answer)),
+    [answer],
+  );
+  if (answer !== null && model !== null) {
+    return (
+      <Rows>
+        <Activity answer={answer} model={model} words={ACTION_WORDS} />
+      </Rows>
+    );
+  }
+  // no empty wrapper when the days failed, so the head keeps one gap
+  return personDaysFailed.value ? null : (
+    <Rows>
+      <ActivityGhost />
+    </Rows>
+  );
+}
+
+// the text they wrote, then the time where they are, so a reader can
+// tell whether they are likely at work now
+function AboutTab({
+  about,
+  tz,
+  now,
+}: {
+  about: string;
+  tz: string;
+  now: number;
+}) {
+  const time = localTime(tz, now);
+  return (
+    <>
+      {about === "" ? (
+        <RowsNote>Nothing written yet.</RowsNote>
+      ) : (
+        <RowsBlock>
+          <p class="people-about">{about}</p>
+        </RowsBlock>
+      )}
+      {time !== "" && (
+        <RowsBlock>
+          <p class="people-foot">
+            <Icon name="clock" size={14} />
+            <span class="people-foot-name">Local time</span>
+            {time}
+          </p>
+        </RowsBlock>
+      )}
+    </>
+  );
+}
+
+function ProjectsTab({
+  shown,
+  self,
+}: {
+  shown: DirectoryUserResponse;
+  self: boolean;
+}) {
+  if (shown.projects.length === 0) {
+    return (
+      <RowsNote>
+        {self ? "No team projects yet." : "No team projects in common."}
+      </RowsNote>
+    );
+  }
+  return (
+    <>
+      {shown.projects.map((p) => (
+        <RowsGo key={p.id} href={`/projects/${p.id}`}>
+          <RowsAvatar>
+            <Icon name={projectIcon(p.kind)} size={14} />
+          </RowsAvatar>
+          <RowsTitle name={p.name} sub={peopleLine(p)} mono />
+        </RowsGo>
+      ))}
+    </>
+  );
+}
 
 export function User({ params }: { params: Params }) {
   const username = params.username ?? "";
@@ -35,6 +152,8 @@ export function User({ params }: { params: Params }) {
   // the local time moves on the minute
   const now = useNow(60_000);
   const self = me.value?.id === shown?.user.id;
+  const tab = userTab(path.value, username);
+  const tabs = shown === null ? [] : userTabs(username, shown);
   return (
     <Page
       crumb="People"
@@ -75,33 +194,26 @@ export function User({ params }: { params: Params }) {
                 {localTime(shown.user.tz, now)} in {shown.user.tz}
               </WhoLine>
             </Who>
-            <section class="people-section">
-              <span class="label">About</span>
-              {shown.user.about === "" ? (
-                <p class="people-empty">Nothing written yet.</p>
-              ) : (
-                <p class="people-about">{shown.user.about}</p>
-              )}
-            </section>
+            <UserActivity username={username} userId={shown.user.id} />
             <Rows>
               <RowsCard
-                label={self ? "Your team projects" : "Projects in common"}
+                label={
+                  tab === 0
+                    ? "About"
+                    : self
+                      ? "Your team projects"
+                      : "Projects in common"
+                }
+                tabs={<Tabs tabs={tabs} active={tabs[tab].href} head />}
               >
-                {shown.projects.length === 0 && (
-                  <RowsNote>
-                    {self
-                      ? "No team projects yet."
-                      : "No team projects in common."}
-                  </RowsNote>
+                {tab === 0 && (
+                  <AboutTab
+                    about={shown.user.about}
+                    tz={shown.user.tz}
+                    now={now}
+                  />
                 )}
-                {shown.projects.map((p) => (
-                  <RowsGo key={p.id} href={`/projects/${p.id}`}>
-                    <RowsAvatar>
-                      <Icon name={projectIcon(p.kind)} size={14} />
-                    </RowsAvatar>
-                    <RowsTitle name={p.name} sub={peopleLine(p)} mono />
-                  </RowsGo>
-                ))}
+                {tab === 1 && <ProjectsTab shown={shown} self={self} />}
               </RowsCard>
             </Rows>
           </div>
