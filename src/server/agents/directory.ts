@@ -38,6 +38,10 @@ const LISTED = new Set<string>([
   "memory_edit",
 ]);
 
+// the page's lists read by name, whatever order a send offers them in
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name);
+
 // the lean MCP schemas as the wire carries them in all mode, the count
 // the token cap reads whatever mode the send resolved to
 function schemaTokens(servers: OfferedServer[]): number {
@@ -143,28 +147,36 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const body: DirectoryAgentResponse = {
           agent: summary(agent),
           provider: deps.providers.byId(agent.providerId)?.name ?? "",
-          skills: deps.skills.forAgent(agent.id).map((skill) => ({
-            ...skill,
-            fetchedAt: fetched.get(skill.id) ?? 0,
-          })),
+          skills: deps.skills
+            .forAgent(agent.id)
+            .map((skill) => ({
+              ...skill,
+              fetchedAt: fetched.get(skill.id) ?? 0,
+            }))
+            .sort(byName),
           tools: offered.tools
             .filter((tool) => LISTED.has(tool.name))
             .map((tool) => ({
               name: tool.name,
               provider: tool.name === "websearch" ? offered.search : null,
-            })),
+            }))
+            .sort(byName),
           mcp: {
-            servers: offered.mcp.map((server) => {
-              const link = agent.servers.find((s) => s.serverId === server.id);
-              return {
-                name: server.name,
-                read: link?.read ?? false,
-                write: link?.write ?? false,
-                tools: server.tools.length,
-                checkedAt: server.checkedAt,
-                refreshFailedAt: server.refreshFailedAt,
-              };
-            }),
+            servers: offered.mcp
+              .map((server) => {
+                const link = agent.servers.find(
+                  (s) => s.serverId === server.id,
+                );
+                return {
+                  name: server.name,
+                  read: link?.read ?? false,
+                  write: link?.write ?? false,
+                  tools: server.tools.length,
+                  checkedAt: server.checkedAt,
+                  refreshFailedAt: server.refreshFailedAt,
+                };
+              })
+              .sort(byName),
             tokens: schemaTokens(offered.mcp),
           },
           tokens: {

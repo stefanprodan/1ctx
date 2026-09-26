@@ -57,7 +57,8 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const theirs = new Set(deps.projects.memberProjectIds(user.id));
         const projects = deps.projects
           .visibleFor(ctx.principal!.userId, false)
-          .filter((p) => p.kind === "team" && theirs.has(p.id));
+          .filter((p) => p.kind === "team" && theirs.has(p.id))
+          .sort((a, b) => a.name.localeCompare(b.name));
         const body: DirectoryUserResponse = {
           user: {
             ...summary(user),

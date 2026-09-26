@@ -113,17 +113,23 @@ describe("the directory", () => {
     await team(chat, "shared", [chat.memberId, other.id]);
     await team(chat, "theirs", [other.id]);
     await team(chat, "mine", [chat.memberId]);
+    // made last, listed first: the projects read by name
+    await team(chat, "also", [chat.memberId, other.id]);
     const names = async (client: ChatApp["member"], username: string) => {
       const body: DirectoryUserResponse = await (
         await client.call("GET", `/api/directory/users/${username}`)
       ).json();
       return body.projects.map((p) => p.name);
     };
-    expect(await names(chat.member, "bogdan")).toEqual(["shared"]);
+    expect(await names(chat.member, "bogdan")).toEqual(["also", "shared"]);
     // an admin sees every team, but shares none with bogdan
     expect(await names(chat.admin, "bogdan")).toEqual([]);
     // your own page is your team projects, never the personal one
-    expect(await names(chat.member, "casey")).toEqual(["mine", "shared"]);
+    expect(await names(chat.member, "casey")).toEqual([
+      "also",
+      "mine",
+      "shared",
+    ]);
   });
 
   test("a disabled user's page still opens, marked disabled", async () => {
@@ -146,11 +152,12 @@ describe("the directory", () => {
     expect(
       body.tools.map(({ name, provider }) => ({ name, provider })),
     ).toEqual([
-      { name: "datetime", provider: null },
-      { name: "webfetch", provider: null },
-      { name: "visualize", provider: null },
+      // by name, not in the order a send offers them
       { name: "bash", provider: null },
+      { name: "datetime", provider: null },
       { name: "memory_edit", provider: null },
+      { name: "visualize", provider: null },
+      { name: "webfetch", provider: null },
     ]);
     // the agent has no prompt and no skills; the tool schemas cost,
     // and no MCP server is offered
@@ -186,10 +193,10 @@ describe("the directory", () => {
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();
     expect(after.tools.map((t) => t.name)).toEqual([
-      "datetime",
-      "visualize",
       "bash",
+      "datetime",
       "memory_edit",
+      "visualize",
     ]);
     // one schema fewer on the wire, fewer tokens
     expect(after.tokens.tools).toBeLessThan(body.tokens.tools);
@@ -269,11 +276,11 @@ describe("the directory", () => {
     ]);
     // the skill tools are left out of the list, never out of the count
     expect(body.tools.map((t) => t.name)).toEqual([
-      "datetime",
-      "webfetch",
-      "visualize",
       "bash",
+      "datetime",
       "memory_edit",
+      "visualize",
+      "webfetch",
     ]);
     expect(body.tokens.tools).toBeGreaterThan(bare.tokens.tools);
     expect(body.tokens.skills).toBe(

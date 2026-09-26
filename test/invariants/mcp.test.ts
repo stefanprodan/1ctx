@@ -483,11 +483,11 @@ describe("MCP tools in a send", () => {
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();
     expect(directory.tools.map((tool: { name: string }) => tool.name)).toEqual([
-      "datetime",
-      "webfetch",
-      "visualize",
       "bash",
+      "datetime",
       "memory_edit",
+      "visualize",
+      "webfetch",
     ]);
     expect(directory.tokens.tools).toBe(
       tokens(JSON.stringify(started.script.body.tools ?? [])),
@@ -580,11 +580,11 @@ describe("MCP tools in a send", () => {
       await chat.member.call("GET", "/api/directory/agents/coder")
     ).json();
     expect(directory.tools.map((tool: { name: string }) => tool.name)).toEqual([
-      "datetime",
-      "webfetch",
-      "visualize",
       "bash",
+      "datetime",
       "memory_edit",
+      "visualize",
+      "webfetch",
     ]);
     expect(directory.tokens.tools).toBe(
       tokens(JSON.stringify(started.script.body.tools ?? [])),
