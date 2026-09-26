@@ -99,11 +99,21 @@ export function Transcript({
       else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
+    // rows that shrink while the view is at the top move nothing, so no
+    // scroll event tells Jump that the end is in view again
+    const resized = new ResizeObserver(() => {
+      const gap =
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+      if (gap < 40) stick.current = true;
+      jumpHidden.value = stick.current || gap < 80;
+    });
+    resized.observe(el);
     const onClick = (ev: MouseEvent) => void copyCode(ev);
     scroller.addEventListener("scroll", onScroll);
     el.addEventListener("click", onClick);
     return () => {
       grown.disconnect();
+      resized.disconnect();
       scroller.removeEventListener("scroll", onScroll);
       el.removeEventListener("click", onClick);
     };

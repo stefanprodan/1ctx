@@ -187,7 +187,7 @@ describe("live transcript buffers", () => {
 });
 
 describe("unslotted lead-in", () => {
-  test("keeps one short paragraph where a work round's words go", () => {
+  test("keeps short words where a work round's words go", () => {
     expect(leadIn("")).toBe(true);
     expect(
       leadIn(
@@ -197,9 +197,27 @@ describe("unslotted lead-in", () => {
     expect(leadIn("x".repeat(LEAD_CHARS))).toBe(true);
   });
 
-  test("gives a second paragraph or a long one to the answer", () => {
-    expect(leadIn("All data collected.\n\n## Snapshot")).toBe(false);
-    expect(leadIn("All data collected.\n \n---")).toBe(false);
+  // narration before a call spilled into the answer and jumped back
+  test("keeps paragraphs and lists said before a call", () => {
+    expect(
+      leadIn("Noted, that settles the choice.\n\nSaving the plan.\n\n"),
+    ).toBe(true);
+    const list = [
+      "All three resolve:",
+      "",
+      ...Array.from(
+        { length: 3 },
+        (_, i) =>
+          `- **Link ${i + 1}**: ${"a page that loads fine. ".repeat(4)}`,
+      ),
+      "",
+      "So no dead links. Let me check the rest of the files.",
+    ].join("\n");
+    expect(list.length).toBeGreaterThan(400);
+    expect(leadIn(list)).toBe(true);
+  });
+
+  test("gives a long text to the answer", () => {
     expect(leadIn("x".repeat(LEAD_CHARS + 1))).toBe(false);
   });
 });

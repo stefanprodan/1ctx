@@ -107,12 +107,13 @@ export const tail = (live: Live): string => live.content.slice(live.htmlAt);
 // A reply streams without a slot until its first call or its end, and
 // the words a model says before calling a tool arrive first: shown as
 // the answer, they would jump into the fold a moment later. While the
-// text is one short paragraph it is drawn where a work round's words
-// go; a second paragraph or a longer one is the answer.
-export const LEAD_CHARS = 400;
+// text is short it is drawn where a work round's words go, paragraphs
+// and lists included, since some models narrate before a call in
+// several; a longer text is the answer.
+export const LEAD_CHARS = 1000;
 
 export function leadIn(content: string): boolean {
-  return content.length <= LEAD_CHARS && !/\n\s*\n\s*\S/.test(content);
+  return content.length <= LEAD_CHARS;
 }
 
 // the fold's time, drawn after its fixed word; null before the clock
