@@ -12,7 +12,6 @@ import {
   PAINT_MS,
   readTheme,
   THEME_TOKENS,
-  VISUAL_BYTES,
   VisualPlayer,
   type VisualPost,
   visualReply,
@@ -26,6 +25,7 @@ import {
   visualCards,
 } from "../../../src/client/transcript/visuals.ts";
 import { visualMessage } from "../../../src/server/tools/visual-painter.ts";
+import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
 import {
   rejectedVisualReplies,
   visualCall,
@@ -212,7 +212,7 @@ test("a failed draft can paint inertly after ready without losing its reason", (
 test("oversized fragments fail locally and themes carry the page's tokens", () => {
   const app = player();
   app.ready();
-  app.model.draw("é".repeat(VISUAL_BYTES / 2 + 1));
+  app.model.draw("é".repeat(VISUAL_FRAME_BYTES / 2 + 1));
   expect(app.model.status.state).toBe("failed");
   expect(app.posts).toEqual([theme]);
   expect(

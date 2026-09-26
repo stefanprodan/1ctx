@@ -10,6 +10,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { KnowledgeAuthor } from "../../../../shared/contracts/knowledge.ts";
 import { ago } from "../../../lib/format.ts";
 import { noticeOf, type Problem } from "../../../lib/save.ts";
+import { CodeTag } from "../../../ui/CodeTag.tsx";
 import { PageNotice } from "../../../ui/Page.tsx";
 import { Author } from "../Author.tsx";
 import { authorOf } from "../Knowledge.model.ts";
@@ -27,12 +28,7 @@ export function ProblemNotice({
       words={
         <>
           {noticeOf(problem)}
-          {problem.status !== undefined && (
-            <>
-              {" "}
-              <span class="code-tag">HTTP {problem.status}</span>
-            </>
-          )}
+          <CodeTag status={problem.status} spaced />
         </>
       }
     >

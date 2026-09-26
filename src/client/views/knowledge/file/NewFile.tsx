@@ -16,8 +16,9 @@ import {
 } from "../../../data/knowledge-local.ts";
 import { useFocusField, useSave } from "../../../lib/save.ts";
 import { touch } from "../../../lib/touch.ts";
+import { foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
-import { AsideSection, Split } from "../../../ui/Split.tsx";
+import { AsideLine, AsideSection, Split } from "../../../ui/Split.tsx";
 import { fileHref, knowledgeWords, listHref } from "../Knowledge.model.ts";
 import {
   crumbSteps,
@@ -78,7 +79,7 @@ export function NewFile({
       steps={crumbSteps(
         projectId,
         projectName,
-        folder === "" ? [] : folder.split("/"),
+        folder === "" ? [] : foldersOf(`${folder}/`),
       )}
       title="New file"
       titleMono
@@ -103,10 +104,9 @@ export function NewFile({
         aside={
           list !== null && (
             <AsideSection label="About">
-              <div class="split-line">
-                Knowledge
-                <span class="split-strong">{knowledgeWords(list.totals)}</span>
-              </div>
+              <AsideLine label="Knowledge">
+                {knowledgeWords(list.totals)}
+              </AsideLine>
             </AsideSection>
           )
         }

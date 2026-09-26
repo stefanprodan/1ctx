@@ -121,7 +121,7 @@ describe("Home", () => {
     expect(html).toContain(
       'class="split-name split-name-link" href="/agents/assistant">assistant<',
     );
-    expect(html).toContain('class="split-faint">acme/small<');
+    expect(html).toContain('class="split-faint cut">acme/small<');
     expect(html).not.toContain("Manage");
     week.value = {
       since: 0,
@@ -215,11 +215,11 @@ describe("Home", () => {
       ];
       const html = render(<Home />);
       expect(html).toContain('placeholder="Send a message to personal"');
-      expect(html).toContain('class="composer-chip-name">personal<');
+      expect(html).toContain('class="composer-chip-name cut">personal<');
       homeProjectId.value = "p2";
       const picked = render(<Home />);
       expect(picked).toContain('placeholder="Send a message to platform"');
-      expect(picked).toContain('class="composer-chip-name">platform<');
+      expect(picked).toContain('class="composer-chip-name cut">platform<');
     },
   );
 

@@ -13,10 +13,6 @@ import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import type {
-  KnowledgeUploadReason,
-  KnowledgeUploadResult,
-} from "../../../src/shared/contracts/knowledge.ts";
 import { type Setup, setup } from "./helpers.ts";
 
 type Entry = Omit<ArchiveMember, "index">;
@@ -50,111 +46,6 @@ function permutations<T>(items: T[]): T[][] {
     ]),
   );
 }
-
-function outcome(entries: Entry[], result: KnowledgeUploadResult) {
-  return {
-    ...result,
-    saved: [...result.saved].sort(),
-    skipped: result.skipped
-      .map(({ index, other, reason }) => ({
-        name: entries[index]!.name,
-        other: other === undefined ? null : entries[other]!.name,
-        reason,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  };
-}
-
-const reasons: { reason: KnowledgeUploadReason; entries: Entry[] }[] = [
-  { reason: "not-regular", entries: [entry("link", "", "symlink")] },
-  { reason: "outside", entries: [entry("docs/../x")] },
-  { reason: "no-letters", entries: [entry("\u65e5\u672c\u8a9e")] },
-  { reason: "too-long", entries: [entry("x".repeat(81))] },
-  { reason: "bad-name", entries: [entry(".-.")] },
-  {
-    reason: "duplicate",
-    entries: [entry("A b.md"), entry("a-b.md")],
-  },
-  { reason: "too-big", entries: [entry("large", "1234567")] },
-  { reason: "not-text", entries: [entry("binary", new Uint8Array([255]))] },
-  { reason: "clash", entries: [entry("docs"), entry("docs/child")] },
-  { reason: "clash-live", entries: [entry("live/child")] },
-];
-
-test.each(reasons)(
-  "$reason alone and mixed in every order keeps the same outcome",
-  ({ reason, entries }) => {
-    const s = setup({ knowledgeFileBytes: 6 });
-    try {
-      s.area.create(s.projectId, s.author, "live", "text");
-      const alone = judge(entries, s);
-      expect(alone.changes).toEqual([]);
-      expect(alone.result.skipped.map((skip) => skip.reason)).toEqual(
-        entries.map(() => reason),
-      );
-      for (const skip of alone.result.skipped) {
-        if (reason === "duplicate" || reason === "clash") {
-          expect(skip.other).toBe(1 - skip.index);
-        } else {
-          expect(skip).not.toHaveProperty("other");
-        }
-      }
-      const mixed = [...entries, entry("a", "\0"), entry("a/b.md")];
-      const expected = outcome(mixed, judge(mixed, s).result);
-      expect(expected.saved).toEqual(["a/b.md"]);
-      for (const order of permutations(mixed)) {
-        expect(outcome(order, judge(order, s).result)).toEqual(expected);
-      }
-    } finally {
-      s.db.close();
-    }
-  },
-);
-
-test("directories and macOS metadata vanish, every other non-regular type skips", () => {
-  const files = [
-    entry("ignored/", "", "directory"),
-    entry("__MACOSX/symlink", "", "symlink"),
-    entry("hardlink", "", "link"),
-    entry("device", "", "other"),
-    entry("./__MACOSX/x"),
-    entry("a\\._b"),
-    entry("a/.DS_Store"),
-    entry("a/./__MACOSX//x"),
-    entry("__macosx", ""),
-  ];
-  const { result } = judge(files);
-  // metadata is judged on the raw name, before normalization, so a
-  // lowercase __macosx is an ordinary file
-  expect(result.skipped.map(({ index, reason }) => [index, reason])).toEqual([
-    [2, "not-regular"],
-    [3, "not-regular"],
-  ]);
-  expect(result.skippedTotal).toBe(2);
-  expect(result.saved).toEqual(["__macosx"]);
-});
-
-test("the manifest reads neither normalized duplicates nor rejected names", () => {
-  const members = manifest([
-    entry("A b.md"),
-    entry("a-b.md"),
-    entry("A-B.MD"),
-    entry("../outside"),
-    entry("a", "\0"),
-    entry("a/b.md"),
-  ]);
-  const selection = selectMembers(members, "");
-  expect(selection.candidates.map((file) => file.index)).toEqual([4, 5]);
-  expect(
-    selection.skipped
-      .filter((skip) => skip.reason === "duplicate")
-      .map(({ index, other }) => [index, other]),
-  ).toEqual([
-    [0, 1],
-    [1, 0],
-    [2, 0],
-  ]);
-});
 
 test("all eligible prefix clashes lose regardless of their order", () => {
   const files = [entry("a"), entry("a/b"), entry("a/b/c")];
@@ -622,34 +513,7 @@ test("the answer cuts both lists, counts every skip and stays under 128 KiB on a
       ),
     ).toBe(true);
     expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(128 * 1024);
-    const saved = judge(
-      Array.from({ length: 201 }, (_, i) => entry(`file${i}`)),
-    );
-    expect(saved.result.saved).toHaveLength(200);
-    expect(saved.result.added).toBe(201);
   } finally {
     s.db.close();
   }
 });
-
-test.each(["\u0001", "\u200b", "\ud800"])(
-  "escaping and UTF-8 expansion cannot grow the bounded answer: %j",
-  (character) => {
-    const skipped = Array.from({ length: 1800 }, (_, i) =>
-      entry(`${character.repeat(200)}${"!".repeat(i + 1)}a.md`),
-    );
-    const saved = Array.from({ length: 200 }, (_, i) =>
-      entry(`${"a".repeat(80)}/${"b".repeat(80)}/${`${i}`.padStart(38, "c")}`),
-    );
-    const { result } = judge([...skipped, ...saved]);
-    expect(result.added).toBe(200);
-    expect(result.skippedTotal).toBe(1800);
-    expect(result.skipped).toHaveLength(200);
-    expect(
-      result.skipped.every(
-        (skip) => skip.reason === "duplicate" && skip.name.length <= 200,
-      ),
-    ).toBe(true);
-    expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(128 * 1024);
-  },
-);

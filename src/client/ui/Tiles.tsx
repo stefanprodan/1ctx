@@ -7,6 +7,7 @@
 // bones where the words go.
 
 import type { ComponentChildren } from "preact";
+import { shareWidth } from "../lib/format.ts";
 import { Bone } from "./Bones.tsx";
 import "./tiles.css";
 
@@ -61,12 +62,11 @@ export function TilePlot({
 // a share of a whole, 0 to 1; full when a cap is reached, in the
 // failed colour
 export function TileMeter({ share, full }: { share: number; full?: boolean }) {
-  const width = `${Math.min(100, Math.max(0, share * 100)).toFixed(1)}%`;
   return (
     <span class="meter tiles-meter" aria-hidden="true">
       <span
         class={`meter-fill tiles-meter-fill${full ? " tiles-meter-full" : ""}`}
-        style={{ width }}
+        style={{ width: shareWidth(share) }}
       />
     </span>
   );
@@ -81,5 +81,16 @@ export function TileGhost({ at }: { at: number }) {
       <Bone kind="sub" at={at + 2} />
       <Bone kind="trend" at={at + 3} />
     </section>
+  );
+}
+
+// a row of four tiles while their answers load
+export function TilesGhost({ at }: { at: number }) {
+  return (
+    <Tiles>
+      {[0, 4, 8, 12].map((k) => (
+        <TileGhost key={k} at={at + k} />
+      ))}
+    </Tiles>
   );
 }

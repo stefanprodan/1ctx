@@ -162,13 +162,9 @@
     line-height: 1.5;
   }
 
+  /* the pre gives the ground and the size; the UA's code face loses */
   .md-block-code {
-    border: 0;
-    border-radius: var(--radius);
-    background-color: var(--inset);
     font-family: var(--mono);
-    font-size: var(--text-mono);
-    white-space: pre;
   }
 
   /* a block without a language has no head: the code scrolls in its

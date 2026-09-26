@@ -9,7 +9,6 @@ import {
   commandMatches,
   commandOf,
   commandQuery,
-  moveHighlight,
   runCommand,
 } from "../../../src/client/composer/commands.ts";
 
@@ -50,13 +49,6 @@ describe("slash commands", () => {
     expect(commandOf("/renamed x")).toBeNull();
     expect(commandFill(COMMANDS[0]!)).toBe("/compact");
     expect(commandFill(COMMANDS[2]!)).toBe("/rename ");
-  });
-
-  test("the highlight wraps both ways", () => {
-    expect(moveHighlight(0, 3, 1)).toBe(1);
-    expect(moveHighlight(2, 3, 1)).toBe(0);
-    expect(moveHighlight(0, 3, -1)).toBe(2);
-    expect(moveHighlight(0, 0, 1)).toBe(0);
   });
 
   test("Enter runs the handler, or refuses with the reason", async () => {

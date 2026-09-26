@@ -13,10 +13,11 @@ import { useSignal } from "@preact/signals";
 import { type ComponentChildren, Fragment } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Failure } from "../lib/format.ts";
+import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
-import { sentence } from "../lib/save.ts";
 import { scrollParent } from "../lib/scroll.ts";
 import "./page.css";
+import { CodeTag } from "./CodeTag.tsx";
 
 // a step of a crumb, a link back when it has an address; a path's step
 // is in mono and keeps its own case
@@ -37,7 +38,6 @@ export function Page({
   titleHref,
   title,
   menu,
-  aside,
   actions,
   notice,
   loading,
@@ -66,7 +66,6 @@ export function Page({
   // menu, opened by the title itself. The view renders the title text
   // and its heading, since what the control opens is no part of it
   menu?: ComponentChildren;
-  aside?: ComponentChildren;
   actions?: ComponentChildren;
   // a PageNotice under the crumb and the actions, spanning the head, so
   // it stays in view with them
@@ -179,7 +178,6 @@ export function Page({
           <h1 class="page-title">{title}</h1>
         </div>
       )}
-      {aside && <div class="page-aside">{aside}</div>}
       {actions && <div class="page-actions">{actions}</div>}
       {notice}
     </>
@@ -200,9 +198,7 @@ export function Page({
           <div class="page-failed-words">
             <p class="page-failed-title">
               This page did not load
-              {failed.status !== null && (
-                <span class="code-tag">HTTP {failed.status}</span>
-              )}
+              <CodeTag status={failed.status} />
             </p>
             <p class="page-failed-text">{sentence(failed.words)}</p>
           </div>
@@ -217,7 +213,7 @@ export function Page({
           </button>
         </div>
       ) : loading ? (
-        <p class="page-state">Loading</p>
+        <PageLoading />
       ) : empty ? (
         <p class="page-state">{empty}</p>
       ) : (

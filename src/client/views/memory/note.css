@@ -61,8 +61,7 @@
   .note-entry-added {
     background: var(--done-wash);
   }
-  .note-entry-added .note-entry-topic::before,
-  .note-entry-changed .note-entry-topic::before {
+  .note-entry-added .note-entry-topic::before {
     content: "+ ";
     color: var(--done);
     font-family: var(--mono);
@@ -78,6 +77,7 @@
   .note-entry-changed .note-entry-topic::before {
     content: "~ ";
     color: var(--dim);
+    font-family: var(--mono);
   }
   .note-entry-removed .note-entry-topic {
     color: inherit;

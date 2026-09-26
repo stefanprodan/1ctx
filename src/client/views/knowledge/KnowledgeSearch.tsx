@@ -9,58 +9,19 @@
 import { useSignal } from "@preact/signals";
 import type { KnowledgeSearchLine } from "../../../shared/contracts/knowledge.ts";
 import { loadMoreSearch, searchOf } from "../../data/knowledge-search.ts";
-import { ago, type Failure, sentence } from "../../lib/format.ts";
+import { ago, plural } from "../../lib/format.ts";
 import { ShowMore } from "../../stream/Stream.tsx";
 import {
-  RowsBlock,
   RowsButton,
+  RowsFailed,
   RowsGo,
   RowsMeta,
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import {
-  fileHref,
-  marked,
-  NAME_ROWS,
-  namesWords,
-  pathParts,
-  plural,
-} from "./Knowledge.model.ts";
+import { fileHref, NAME_ROWS, namesWords } from "./Knowledge.model.ts";
+import { Marks, PathName } from "./PathName.tsx";
 import "./knowledge.css";
-
-function Marks({ text, q }: { text: string; q: string }) {
-  return (
-    <>
-      {marked(text, q).map((part, i) =>
-        part.mark ? (
-          <mark key={i} class="knowledge-mark">
-            {part.text}
-          </mark>
-        ) : (
-          part.text
-        ),
-      )}
-    </>
-  );
-}
-
-// a path with its folder faint, both marked
-function MarkedPath({ name, q }: { name: string; q: string }) {
-  const { dir, base } = pathParts(name);
-  return (
-    <span class="knowledge-path">
-      {dir !== "" && (
-        <span class="knowledge-dir">
-          <Marks text={dir} q={q} />
-        </span>
-      )}
-      <span class="knowledge-base">
-        <Marks text={base} q={q} />
-      </span>
-    </span>
-  );
-}
 
 function HitLine({
   href,
@@ -74,28 +35,12 @@ function HitLine({
   return (
     <a class="knowledge-hit" href={href}>
       <span class="knowledge-hit-num">{hit.line}</span>
-      <span class="knowledge-hit-text">
+      <span class="knowledge-hit-text cut">
         {hit.cutStart && "…"}
         <Marks text={hit.text} q={q} />
         {hit.cutEnd && "…"}
       </span>
     </a>
-  );
-}
-
-function Failed({ failure }: { failure: Failure }) {
-  return (
-    <RowsBlock>
-      <p class="notice-failed" role="alert">
-        {sentence(failure.words)}
-        {failure.status !== null && (
-          <>
-            {" "}
-            <span class="code-tag">HTTP {failure.status}</span>
-          </>
-        )}
-      </p>
-    </RowsBlock>
   );
 }
 
@@ -111,7 +56,7 @@ export function SearchResults({
   const q = search.q;
   const held = search.names.length > 0 || search.files.length > 0;
   if (search.state === "failed" && !held && search.failure !== null) {
-    return <Failed failure={search.failure} />;
+    return <RowsFailed failure={search.failure} />;
   }
   if (!held) {
     return (
@@ -129,14 +74,14 @@ export function SearchResults({
   return (
     <>
       {search.state === "failed" && search.failure !== null && (
-        <Failed failure={search.failure} />
+        <RowsFailed failure={search.failure} />
       )}
       {search.names.length > 0 && (
         <>
           <div class="knowledge-label label">{words.label}</div>
           {names.map((file) => (
             <RowsGo key={file.id} href={fileHref(projectId, file.id)}>
-              <RowsTitle mono name={<MarkedPath name={file.name} q={q} />} />
+              <RowsTitle mono name={<PathName name={file.name} q={q} />} />
               <RowsMeta>{ago(file.updatedAt, now)}</RowsMeta>
             </RowsGo>
           ))}
@@ -174,10 +119,7 @@ export function SearchResults({
                 </div>
               }
             >
-              <RowsTitle
-                mono
-                name={<MarkedPath name={hit.file.name} q={q} />}
-              />
+              <RowsTitle mono name={<PathName name={hit.file.name} q={q} />} />
               <RowsMeta>{plural(hit.count, "line")}</RowsMeta>
             </RowsGo>
           ))}

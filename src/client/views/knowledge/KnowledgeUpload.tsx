@@ -7,7 +7,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { KnowledgeLimits } from "../../../shared/contracts/knowledge.ts";
 import { loadKnowledge, uploadFile } from "../../data/knowledge.ts";
 import { me } from "../../data/me.ts";
-import { Icon } from "../../lib/icons.tsx";
+import { plural, sizeWords } from "../../lib/format.ts";
 import { useFocusField } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
@@ -23,8 +23,8 @@ import {
   RowsLogMore,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { plural, sizeWords } from "./Knowledge.model.ts";
-import { UploadState } from "./Upload.state.ts";
+import { ChooseFiles, DropZone } from "./DropZone.tsx";
+import { UPLOAD_BYTES, UploadState } from "./Upload.state.ts";
 import {
   FOLDER_HINT,
   itemWords,
@@ -63,7 +63,6 @@ export function KnowledgeUpload({
   }
   const state = ref.current;
   const form = useRef<HTMLFormElement>(null);
-  const over = useSignal(false);
   const all = useSignal(false);
   useFocusField(state, form);
   useEffect(() => {
@@ -152,40 +151,20 @@ export function KnowledgeUpload({
         )}
       </label>
       {picking && (
-        // Choose files is the keyboard way to what a drop does
-        // biome-ignore lint/a11y/noStaticElementInteractions: drop target
-        <div
-          class={`knowledge-drop${over.value ? " knowledge-drop-over" : ""}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (!state.busy) over.value = true;
-          }}
-          onDragLeave={() => {
-            over.value = false;
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            over.value = false;
-            void state.pick(Array.from(e.dataTransfer?.files ?? []));
-          }}
+        <DropZone
+          title="Drop files or archives here"
+          disabled={busy}
+          onFiles={(files) => void state.pick(files)}
         >
-          <Icon name="upload" size={20} class="knowledge-drop-icon" />
-          <span class="knowledge-drop-main">Drop files or archives here</span>
-          <span>Text files, .zip, .tar.gz or .tar, up to 32 MB each</span>
-          <label class="btn btn-small knowledge-choose">
+          <span>{`Text files, .zip, .tar.gz or .tar, up to ${sizeWords(UPLOAD_BYTES)} each`}</span>
+          <ChooseFiles
+            class="btn btn-small"
+            disabled={busy}
+            onFiles={(files) => void state.pick(files)}
+          >
             Choose files
-            <input
-              class="knowledge-file"
-              type="file"
-              multiple
-              disabled={busy}
-              onChange={(e) => {
-                void state.pick(Array.from(e.currentTarget.files ?? []));
-                e.currentTarget.value = "";
-              }}
-            />
-          </label>
-        </div>
+          </ChooseFiles>
+        </DropZone>
       )}
       {picking && items.length > 0 && (
         <div class="field">

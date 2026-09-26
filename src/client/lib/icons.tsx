@@ -69,7 +69,7 @@ export function Logo({ height = 26 }: { height?: number }) {
   );
 }
 
-const PATHS: Record<string, string> = {
+const PATHS = {
   home: "M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5",
   projects:
     "M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z",
@@ -150,7 +150,7 @@ const PATHS: Record<string, string> = {
   // the database file: the admin's Storage page
   storage:
     "M3 4c0-1.1 2.2-2 5-2s5 .9 5 2-2.2 2-5 2-5-.9-5-2zM3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2",
-};
+} satisfies Record<string, string>;
 
 export type IconName = keyof typeof PATHS;
 

@@ -10,7 +10,7 @@ import { signal } from "@preact/signals";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import { says } from "../../lib/format.ts";
 
-export const SEARCH_DELAY_MS = 250;
+const SEARCH_DELAY_MS = 250;
 
 export class CatalogSearch {
   readonly query = signal("");

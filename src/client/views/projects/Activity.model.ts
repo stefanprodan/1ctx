@@ -10,11 +10,11 @@ import { count } from "../../lib/format.ts";
 // the fewest weeks the card shows, and the narrowest a cell may get
 // before a week is dropped: the weeks fill the card's width, so a wide
 // screen shows more of the year rather than bigger cells
-export const MIN_WEEKS = 13;
-export const MIN_CELL = 14;
-export const CELL_GAP = 3;
+const MIN_WEEKS = 13;
+const MIN_CELL = 14;
+const CELL_GAP = 3;
 // two weeks: a row has room for a few spaced squares, not a month of bars
-export const STRIP_DAYS = 14;
+const STRIP_DAYS = 14;
 
 export type ActivityLevel = 0 | 1 | 2 | 3 | 4;
 
@@ -25,7 +25,7 @@ export type ActivityCell = DayUsage & {
 
 export type WeekColumn = ActivityCell[];
 
-export type MonthLabel = {
+type MonthLabel = {
   column: number;
   label: string;
 };

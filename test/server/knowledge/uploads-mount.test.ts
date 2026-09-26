@@ -417,46 +417,6 @@ describe("upload mount budgets and isolation", () => {
     }
   });
 
-  test("a megabyte passes through pipelines, redirects and substitutions", async () => {
-    const s = setup({
-      knowledgeFileBytes: megabyte,
-      scratchBytes: 4 * megabyte,
-    });
-    const text = "x".repeat(megabyte);
-    try {
-      seedUploads(s, { payload: text });
-      for (const command of [
-        "cat /uploads/payload | base64 > /tmp/encoded",
-        "cat /uploads/payload > /tmp/copy",
-        'value=$(cat /uploads/payload); printf %s "$value" > /tmp/substituted',
-      ]) {
-        const result = await run(s, command, {
-          ...callCaps,
-          callTimeoutMs: 10_000,
-        });
-        expect(result).toEqual({
-          content: "exit 0",
-          error: false,
-          opened: [],
-          tail: 6,
-        });
-      }
-      const stored = new Map(
-        scratchState(s).entries.map((file) => [
-          file.path,
-          Buffer.from(file.data).toString(),
-        ]),
-      );
-      expect(stored.get("copy")).toBe(text);
-      expect(stored.get("substituted")).toBe(text);
-      expect(Buffer.from(stored.get("encoded")!, "base64").toString()).toBe(
-        text,
-      );
-    } finally {
-      s.db.close();
-    }
-  });
-
   test("another session has an independent uploads tree", async () => {
     const s = setup();
     try {

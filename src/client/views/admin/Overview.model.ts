@@ -15,14 +15,20 @@ import type {
   UsageBy,
   UsageRow,
 } from "../../../shared/api/admin.ts";
-import { clock, count, dayMonth, elapsed } from "../../lib/format.ts";
-import { commas, share, size, sizeParts } from "./Storage.model.ts";
-
-const plural = (n: number, one: string, many: string) =>
-  `${commas(n)} ${n === 1 ? one : many}`;
+import {
+  clock,
+  commas,
+  count,
+  dayMonth,
+  elapsed,
+  pluralCommas,
+  share,
+  size,
+  sizeParts,
+} from "../../lib/format.ts";
 
 // a container's memory past this share is marked
-export const MEMORY_FULL = 0.8;
+const MEMORY_FULL = 0.8;
 
 // "$4.12", "<$0.01" for a cost that is there but under a cent
 export function money(n: number): string {
@@ -50,7 +56,7 @@ export const chatTile = (load: LoadResponse) =>
   pool(
     load.chats,
     load.chatsCap,
-    plural(load.online, "user online", "users online"),
+    pluralCommas(load.online, "user online", "users online"),
   );
 
 export const automationsTile = (load: LoadResponse) =>
@@ -58,7 +64,7 @@ export const automationsTile = (load: LoadResponse) =>
     load.runs,
     load.runsCap,
     [
-      plural(load.automations, "automation", "automations"),
+      pluralCommas(load.automations, "automation", "automations"),
       ...(load.waiting > 0 ? [`${load.waiting} waiting`] : []),
     ].join(" · "),
   );
@@ -68,7 +74,7 @@ export const percent = (cpu: number): string => `${Math.round(cpu * 100)}%`;
 export function cpuTile(load: LoadResponse) {
   return {
     figure: percent(load.samples.cpu.at(-1) ?? 0),
-    sub: `of ${plural(load.cores, "core", "cores")}`,
+    sub: `of ${pluralCommas(load.cores, "core", "cores")}`,
   };
 }
 
@@ -121,7 +127,10 @@ export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
     figure: commas(totals.turns),
     unit: totals.turns === 1 ? "turn" : "turns",
     sub: at
-      ? onDay(at, plural(at.turns, "turn", "turns") + failedOn(at.turnsFailed))
+      ? onDay(
+          at,
+          pluralCommas(at.turns, "turn", "turns") + failedOn(at.turnsFailed),
+        )
       : failedLine(totals.turnsFailed, totals.turns),
   };
 }
@@ -131,7 +140,10 @@ export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
     figure: commas(totals.runs),
     unit: totals.runs === 1 ? "run" : "runs",
     sub: at
-      ? onDay(at, plural(at.runs, "run", "runs") + failedOn(at.runsFailed))
+      ? onDay(
+          at,
+          pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed),
+        )
       : failedLine(totals.runsFailed, totals.runs),
   };
 }
@@ -150,7 +162,7 @@ export function tokensTile(totals: OverviewTotals, at: OverviewDay | null) {
 }
 
 // the cost: never $0 where no provider priced a round
-export function costWords(t: OverviewTotals) {
+function costWords(t: OverviewTotals) {
   if (t.rounds === 0) return { figure: "None", sub: "none yet" };
   if (t.cost === null) return { figure: "None", sub: "no provider priced" };
   return {
@@ -193,9 +205,9 @@ export function usageBars(kind: UsageBy, rows: UsageRow[]) {
     const hint = [
       share(row.tokens, total),
       ...(row.turns > 0 || row.runs === 0
-        ? [plural(row.turns, "turn", "turns")]
+        ? [pluralCommas(row.turns, "turn", "turns")]
         : []),
-      ...(row.runs > 0 ? [plural(row.runs, "run", "runs")] : []),
+      ...(row.runs > 0 ? [pluralCommas(row.runs, "run", "runs")] : []),
     ].join(" · ");
     return {
       key: row.id ?? `${row.owner ?? "row"}-${i}`,
@@ -222,7 +234,7 @@ export function lengthWord(ms: number): string {
 
 // A model without its org, as the agent rows show it, unless what is
 // left is a bare word ("openrouter/free").
-export function shortModel(model: string): string {
+export function modelLabel(model: string): string {
   const rest = model.slice(model.lastIndexOf("/") + 1);
   return /[\d-]/.test(rest) ? rest : model;
 }
@@ -231,11 +243,11 @@ export function shortModel(model: string): string {
 export function lengthBars(lengths: TurnLength[]) {
   return lengths.map((m) => ({
     key: `${m.provider}/${m.model}`,
-    name: shortModel(m.model),
+    name: modelLabel(m.model),
     value: m.medianMs ?? 0,
     label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
     hint: [
-      plural(m.turns, "turn", "turns"),
+      pluralCommas(m.turns, "turn", "turns"),
       ...(m.slowestMs !== null ? [`slowest ${lengthWord(m.slowestMs)}`] : []),
     ].join(" · "),
   }));
@@ -270,10 +282,10 @@ export function instanceParts(
   instance: OverviewResponse["instance"],
 ): string[] {
   return [
-    plural(instance.users, "user", "users"),
-    plural(instance.agents, "agent", "agents"),
-    plural(instance.projects, "team project", "team projects"),
-    plural(instance.automations, "automation", "automations"),
+    pluralCommas(instance.users, "user", "users"),
+    pluralCommas(instance.agents, "agent", "agents"),
+    pluralCommas(instance.projects, "team project", "team projects"),
+    pluralCommas(instance.automations, "automation", "automations"),
   ];
 }
 

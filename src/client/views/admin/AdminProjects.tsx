@@ -5,9 +5,7 @@
 // when, all from the list. Opening a row loads the detail for its form.
 
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
-import { query } from "../../app/router.ts";
 import {
   adminProject,
   adminProjectError,
@@ -16,6 +14,7 @@ import {
   loadAdminProject,
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
+import { sinceLine } from "../../lib/format.ts";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -29,7 +28,8 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { countLine, sinceLine } from "./AdminProjects.model.ts";
+import { countLine } from "./AdminProjects.model.ts";
+import { useOpenParam } from "./OpenParam.ts";
 import { ProjectForm } from "./ProjectForm.tsx";
 import "./admin-projects.css";
 
@@ -72,12 +72,7 @@ function ProjectRow({
 
 export function AdminProjects() {
   const list = adminProjects.value;
-  const asked = new URLSearchParams(query.value).get("open");
-  const open = useSignal(asked);
-  // a Manage link followed while the page is up names another row
-  useEffect(() => {
-    if (asked !== null) open.value = asked;
-  }, [asked, open]);
+  const open = useOpenParam();
   const adding = useSignal(false);
   const error = adminProjectsError.value ?? usersError.value;
   const q = useSignal("");

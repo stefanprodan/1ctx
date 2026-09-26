@@ -3,14 +3,12 @@
 //
 // The MCP page's model: the head's words, the change and failure lines,
 // the live split and the unmatched marks, the timeout in seconds, the
-// key options, the instructions box trimmed to its lines, the agent
-// form's preview from the rows loaded; the entity that loads the list
-// with the keys and folds a write back; the rail entry; and the page
-// and the picker rendered.
+// instructions box trimmed to its lines, the agent form's preview from
+// the rows loaded; the entity that loads the list with the keys and
+// folds a write back; and the page and the picker rendered.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { railRows } from "../../../src/client/app/routes.ts";
 import {
   addServer,
   callTimeoutMs,
@@ -24,9 +22,8 @@ import {
   serversError,
 } from "../../../src/client/data/mcp.ts";
 import { me } from "../../../src/client/data/me.ts";
-import { keyOptions } from "../../../src/client/lib/secrets.ts";
 import {
-  listedServers,
+  listed,
   sameServers,
   toggleSide,
 } from "../../../src/client/views/admin/Agents.model.ts";
@@ -221,21 +218,6 @@ describe("the model", () => {
   });
 
   test.serial(
-    "the key options: No key first, the files, a missing one marked",
-    () => {
-      expect(keyOptions(["mcp-github"], null)).toEqual([
-        { value: "", label: "No key" },
-        { value: "mcp-github", label: "mcp-github" },
-      ]);
-      expect(keyOptions(["mcp-github"], "mcp-flux")).toEqual([
-        { value: "", label: "No key" },
-        { value: "mcp-github", label: "mcp-github" },
-        { value: "mcp-flux", label: "mcp-flux", detail: "missing" },
-      ]);
-    },
-  );
-
-  test.serial(
     "the instructions box shows the block, trimmed past 12 lines",
     () => {
       const short = instructionsBox("flux", "one\ntwo", false);
@@ -351,8 +333,9 @@ describe("the model", () => {
       expect(toggleSide(toggleSide(both, "m1", "read"), "m1", "write")).toEqual(
         [],
       );
-      expect(listedServers(both, null)).toBe(both);
-      expect(listedServers(both, [{ id: "m2" }])).toEqual([]);
+      expect(listed(both, (s) => s.serverId, null)).toBe(both);
+      expect(listed(both, (s) => s.serverId, [{ id: "m2" }])).toEqual([]);
+      expect(listed(["s1", "s2"], (id) => id, [{ id: "s2" }])).toEqual(["s2"]);
       expect(
         sameServers(both, [{ serverId: "m1", write: true, read: true }]),
       ).toBe(true);
@@ -457,14 +440,6 @@ describe("the entity", () => {
 });
 
 describe("the page", () => {
-  test.serial("sits in the Admin group after Skills", () => {
-    const group = railRows("admin").find((r) => r.kind === "group");
-    const labels =
-      group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels.at(-1)).toBe("MCP");
-    expect(labels.at(-2)).toBe("Skills");
-  });
-
   test.serial("renders the rows with their head", () => {
     servers.value = [flux];
     loadedAt.value = Date.now() - 2 * 60_000;

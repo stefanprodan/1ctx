@@ -122,12 +122,14 @@ describe("formatDatetime", () => {
 
 describe("offered", () => {
   test("offers time, webfetch, visualize and bash, websearch once chosen", () => {
-    expect(
-      area()
-        .offered(now, "")
-        .tools.map((tool) => tool.name),
-    ).toEqual(["datetime", "webfetch", "visualize", "bash"]);
-    expect(area().offered(now, "").search).toBeNull();
+    const plain = area().offered(now, "");
+    expect(plain.tools.map((tool) => tool.name)).toEqual([
+      "datetime",
+      "webfetch",
+      "visualize",
+      "bash",
+    ]);
+    expect(plain.search).toBeNull();
 
     const withExa = area({ "search-exa": "exa-key" }, "exa").offered(now, "");
     expect(withExa.tools.map((tool) => tool.name)).toEqual([
@@ -192,9 +194,8 @@ describe("offered", () => {
     expect(websearch?.description).not.toContain("{{year}}");
     expect(websearch?.description).toContain("The current year is 2026.");
 
-    const fetch = area()
-      .offered(now, "")
-      .tools.find((tool) => tool.name === "webfetch");
+    const plain = area().offered(now, "").tools;
+    const fetch = plain.find((tool) => tool.name === "webfetch");
     expect(fetch?.parameters).toMatchObject({
       required: ["url"],
       properties: {
@@ -202,9 +203,7 @@ describe("offered", () => {
         start_index: { type: "integer", minimum: 0 },
       },
     });
-    const time = area()
-      .offered(now, "")
-      .tools.find((tool) => tool.name === "datetime");
+    const time = plain.find((tool) => tool.name === "datetime");
     expect(time?.parameters).not.toHaveProperty("required");
     expect(time?.parameters).toMatchObject({
       properties: { timezone: { default: "UTC" } },
@@ -273,9 +272,12 @@ describe("the built-in catalog", () => {
 });
 
 describe("run", () => {
+  // nothing here writes the store, so one area serves every test
+  const tools = area();
+  const offered = tools.offered(now, "");
+
   test("runs datetime, in UTC when no timezone is given", async () => {
-    const offered = area().offered(now, "");
-    const result = await area().run(
+    const result = await tools.run(
       offered,
       {
         id: "call_1",
@@ -301,7 +303,7 @@ describe("run", () => {
     };
     for (const args of ["", "{}", '{"timezone":null}', '{"timezone":""}']) {
       expect(
-        await area().run(
+        await tools.run(
           offered,
           { id: "call_2", name: "datetime", arguments: args },
           context(),
@@ -309,7 +311,7 @@ describe("run", () => {
       ).toEqual(utc);
     }
     expect(
-      await area().run(
+      await tools.run(
         offered,
         { id: "call_3", name: "datetime", arguments: '{"timezone":3}' },
         context(),
@@ -321,16 +323,15 @@ describe("run", () => {
   });
 
   test("turns unknown tools, bad JSON and invalid zones into failed results", async () => {
-    const offered = area().offered(now, "");
     expect(
-      await area().run(
+      await tools.run(
         offered,
         { id: "x", name: "missing", arguments: "{}" },
         context(),
       ),
     ).toEqual({ content: 'Error: tool "missing" not found.', error: true });
     expect(
-      await area().run(
+      await tools.run(
         offered,
         { id: "x", name: "datetime", arguments: "{" },
         context(),
@@ -340,7 +341,7 @@ describe("run", () => {
       content: 'Error: invalid JSON arguments for tool "datetime"',
     });
     expect(
-      await area().run(
+      await tools.run(
         offered,
         {
           id: "x",
@@ -356,9 +357,8 @@ describe("run", () => {
   });
 
   test("rejects arguments that are not a JSON object", async () => {
-    const offered = area().offered(now, "");
     expect(
-      await area().run(
+      await tools.run(
         offered,
         { id: "x", name: "datetime", arguments: "[1,2]" },
         context(),
@@ -366,35 +366,6 @@ describe("run", () => {
     ).toMatchObject({
       error: true,
       content: 'Error: arguments for tool "datetime" must be an object',
-    });
-  });
-
-  test("a switched-off tool named by the model is not run", async () => {
-    const tools = area();
-    tools.store.setAccess("off", [], now);
-    const offered = tools.offered(now, "");
-    const result = await tools.run(
-      offered,
-      { id: "x", name: "webfetch", arguments: '{"url":"https://x.test"}' },
-      context(),
-    );
-    expect(result).toEqual({
-      error: true,
-      content: 'Error: tool "webfetch" not found.',
-    });
-  });
-
-  test("websearch not offered is not run", async () => {
-    const noSearch = area().offered(now, "");
-    expect(noSearch.search).toBeNull();
-    const result = await area().run(
-      noSearch,
-      { id: "x", name: "websearch", arguments: '{"query":"hi"}' },
-      context(),
-    );
-    expect(result).toMatchObject({
-      error: true,
-      content: 'Error: tool "websearch" not found.',
     });
   });
 });

@@ -8,6 +8,7 @@ import type {
   VisualDraft,
 } from "../../shared/contracts/session.ts";
 import { isVisualFrame, type VisualFrame } from "../../shared/socket.ts";
+import { baseName } from "../lib/tree.ts";
 import type { ReplyNode } from "./rows.ts";
 import { shortArg } from "./Tool.model.ts";
 
@@ -114,8 +115,6 @@ export type FileCard = {
 
 export const isFileCard = (card: VisualCard | FileCard): card is FileCard =>
   "kind" in card;
-
-const baseName = (path: string): string => path.split("/").pop() || path;
 
 // what a turn draws, in call order: a call's own visual first, then the
 // files that call opened, in the order open ran

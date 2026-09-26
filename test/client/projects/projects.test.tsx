@@ -87,7 +87,7 @@ describe("the projects entity", () => {
     },
   );
 
-  test("keeps the list for the user it was loaded for", async () => {
+  test.serial("keeps the list for the user it was loaded for", async () => {
     answer = () => ({ projects: [personal] });
     await loadProjects();
     expect(projects.value).toEqual([personal]);
@@ -112,7 +112,7 @@ describe("the projects entity", () => {
     me.value = null;
   });
 
-  test("drops the list with the signed-in user", async () => {
+  test.serial("drops the list with the signed-in user", async () => {
     projects.value = [personal];
     project.value = {
       ...personal,
@@ -151,7 +151,7 @@ describe("the projects entity", () => {
     },
   );
 
-  test("an older list answer never overwrites a newer one", async () => {
+  test.serial("an older list answer never overwrites a newer one", async () => {
     const gates: ((rows: (typeof personal)[]) => void)[] = [];
     globalThis.fetch = (() =>
       new Promise<Response>((resolve) => {
@@ -187,40 +187,43 @@ describe("the projects entity", () => {
     },
   );
 
-  test("an older project answer never overwrites a newer one", async () => {
-    const gates: (() => void)[] = [];
-    globalThis.fetch = ((url: string) =>
-      new Promise((resolve) => {
-        const id = url.split("/").pop();
-        gates.push(() =>
-          resolve(
-            Response.json({
-              project: {
-                ...personal,
-                id,
-                name: id,
-                createdAt: 0,
-                description: "",
-                chats: 0,
-                knowledge: { files: 0, tokens: 0 },
-                members: [],
-              },
-            }),
-          ),
-        );
-      })) as unknown as typeof fetch;
-    const first = loadProject("p1");
-    const second = loadProject("p2");
-    // the first answers last
-    gates[1]();
-    await second;
-    expect(project.value?.id).toBe("p2");
-    gates[0]();
-    await first;
-    expect(project.value?.id).toBe("p2");
-  });
+  test.serial(
+    "an older project answer never overwrites a newer one",
+    async () => {
+      const gates: (() => void)[] = [];
+      globalThis.fetch = ((url: string) =>
+        new Promise((resolve) => {
+          const id = url.split("/").pop();
+          gates.push(() =>
+            resolve(
+              Response.json({
+                project: {
+                  ...personal,
+                  id,
+                  name: id,
+                  createdAt: 0,
+                  description: "",
+                  chats: 0,
+                  knowledge: { files: 0, tokens: 0 },
+                  members: [],
+                },
+              }),
+            ),
+          );
+        })) as unknown as typeof fetch;
+      const first = loadProject("p1");
+      const second = loadProject("p2");
+      // the first answers last
+      gates[1]();
+      await second;
+      expect(project.value?.id).toBe("p2");
+      gates[0]();
+      await first;
+      expect(project.value?.id).toBe("p2");
+    },
+  );
 
-  test("a failure of an older project request is dropped", async () => {
+  test.serial("a failure of an older project request is dropped", async () => {
     const gates: (() => void)[] = [];
     globalThis.fetch = ((url: string) =>
       new Promise((resolve) => {

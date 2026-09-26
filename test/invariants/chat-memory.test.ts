@@ -6,7 +6,6 @@ import { open } from "../../src/server/db/index.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import { savedWords } from "../../src/server/memory/index.ts";
-import { wireTokens } from "../../src/server/providers/index.ts";
 import {
   MEMORY,
   MEMORY_OFF_LINE,
@@ -666,34 +665,6 @@ describe("a chat saves to the project's memory", () => {
       last.reply("done");
       await settled(chat, sessionId);
       expect(note(chat).revision).toBe(0);
-    } finally {
-      await chat.app.shutdown();
-    }
-  });
-
-  test("the agent page counts memory_edit only for a model that takes tools", async () => {
-    const chat = await chatApp();
-    try {
-      await chat.makeAgent({ name: "plain", model: NO_TOOLS });
-      const plain = await (
-        await chat.member.call("GET", "/api/directory/agents/plain")
-      ).json();
-      expect(plain.tools).toEqual([]);
-      expect(plain.tokens.tools).toBe(0);
-      const coder = await (
-        await chat.member.call("GET", "/api/directory/agents/coder")
-      ).json();
-      expect(coder.tools.map((tool: { name: string }) => tool.name)).toContain(
-        "memory_edit",
-      );
-      const started = await startChat(chat);
-      expect(coder.tokens.tools).toBe(
-        wireTokens(
-          chat.app.runner.registry.get(started.sessionId)!.policy.offered.tools,
-        ),
-      );
-      started.script.reply("hi");
-      await settled(chat, started.sessionId);
     } finally {
       await chat.app.shutdown();
     }

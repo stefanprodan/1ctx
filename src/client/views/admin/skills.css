@@ -4,12 +4,10 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  .skills-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .skills-fields {
+  /* the add form, its fields and an open row */
+  .skills-form,
+  .skills-fields,
+  .skills-open {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
@@ -26,11 +24,6 @@
   }
 
   /* an open row: the facts as label and value lines */
-  .skills-open {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
   .skills-facts {
     display: grid;
     grid-template-columns: 120px 1fr;

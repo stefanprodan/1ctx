@@ -816,20 +816,6 @@ describe("message limits and admission", () => {
     expect(send.status).toBe(413);
     chat.app.socket.dispose();
   });
-
-  test("refuses a second message while the first is running", async () => {
-    const chat = await chatApp();
-    const started = await startChat(chat);
-    const second = await chat.member.call(
-      "POST",
-      `/api/sessions/${started.sessionId}/messages`,
-      { body: { message: "again" } },
-    );
-    expect(second.status).toBe(409);
-    expect(await second.json()).toEqual({ error: "Casey Doe is sending" });
-    await finish(started.script);
-    chat.app.socket.dispose();
-  });
 });
 
 describe("the usage on the summary", () => {

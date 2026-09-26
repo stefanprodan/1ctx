@@ -47,13 +47,6 @@
     min-width: 0;
   }
   /* the folder gives way long before the name does */
-  .knowledge-dir,
-  .knowledge-base {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .knowledge-dir {
     flex-shrink: 1000;
     min-width: 2ch;
@@ -91,12 +84,6 @@
     color: var(--faint);
     text-align: right;
   }
-  .knowledge-hit-text {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
   /* an empty base: the drop target is the card */
   .knowledge-empty {
     margin: var(--space-4);
@@ -209,7 +196,7 @@
   }
 
   @media (max-width: 719px) {
-    /* the search has its own line; the buttons are icons, on the next */
+    /* the search has its own line, the rest the next */
     .knowledge-head {
       padding-bottom: var(--space-3);
     }
@@ -224,9 +211,6 @@
     }
     .knowledge-acts {
       margin-left: auto;
-    }
-    .knowledge-word {
-      display: none;
     }
     .knowledge-hit {
       padding-left: var(--space-4);

@@ -8,8 +8,6 @@
 // settings, with Manage for an admin; where it is hidden, the head carries the provider and the
 // model's meta line.
 
-import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import {
   modelMeta,
   priceLine,
@@ -20,8 +18,9 @@ import type { Params } from "../../app/params.ts";
 import { agentPage, agentPageError } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
-import { ago, longDate } from "../../lib/format.ts";
+import { ago, longDate, tokensText } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Fold } from "../../ui/Fold.tsx";
@@ -36,14 +35,13 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import {
   effortText,
   serverLine,
   serverMeta,
   thinkingText,
-  tokensText,
 } from "./People.model.ts";
 import "./people.css";
 
@@ -72,18 +70,10 @@ function Prompt({ text, tokens }: { text: string; tokens: number }) {
   );
 }
 
-// the fetched-ago words move on the minute
-const MINUTE = 60 * 1000;
-
 export function Agent({ params }: { params: Params }) {
   const name = params.name ?? "";
-  const now = useSignal(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, MINUTE);
-    return () => clearInterval(timer);
-  }, [now]);
+  // the fetched-ago words move on the minute
+  const now = useNow(60_000);
   const answer = agentPage.value;
   const shown = answer !== null && answer.agent.name === name ? answer : null;
   return (
@@ -98,10 +88,9 @@ export function Agent({ params }: { params: Params }) {
           aside={
             <>
               <AsideSection label="Model">
-                <div class="split-line">
-                  Provider
-                  <span class="split-strong cut">{shown.provider}</span>
-                </div>
+                <AsideLine label="Provider" cut>
+                  {shown.provider}
+                </AsideLine>
                 <div class="split-line">
                   Model
                   <Fit
@@ -111,26 +100,20 @@ export function Agent({ params }: { params: Params }) {
                   />
                 </div>
                 {shown.agent.model.contextLength !== null && (
-                  <div class="split-line">
-                    Context
-                    <span class="split-strong">
-                      {windowLine(shown.agent.model.contextLength)}
-                    </span>
-                  </div>
+                  <AsideLine label="Context">
+                    {windowLine(shown.agent.model.contextLength)}
+                  </AsideLine>
                 )}
                 {priceLine(
                   shown.agent.model.promptPrice,
                   shown.agent.model.completionPrice,
                 ) !== "" && (
-                  <div class="split-line">
-                    Price
-                    <span class="split-strong">
-                      {priceLine(
-                        shown.agent.model.promptPrice,
-                        shown.agent.model.completionPrice,
-                      )}
-                    </span>
-                  </div>
+                  <AsideLine label="Price">
+                    {priceLine(
+                      shown.agent.model.promptPrice,
+                      shown.agent.model.completionPrice,
+                    )}
+                  </AsideLine>
                 )}
               </AsideSection>
               <AsideSection
@@ -146,20 +129,13 @@ export function Agent({ params }: { params: Params }) {
                   ) : undefined
                 }
               >
-                <div class="split-line">
-                  Thinking
-                  <span class="split-strong">{thinkingText(shown.agent)}</span>
-                </div>
-                <div class="split-line">
-                  Effort
-                  <span class="split-strong">{effortText(shown.agent)}</span>
-                </div>
-                <div class="split-line">
-                  Created
-                  <span class="split-strong">
-                    {longDate(shown.agent.createdAt)}
-                  </span>
-                </div>
+                <AsideLine label="Thinking">
+                  {thinkingText(shown.agent)}
+                </AsideLine>
+                <AsideLine label="Effort">{effortText(shown.agent)}</AsideLine>
+                <AsideLine label="Created">
+                  {longDate(shown.agent.createdAt)}
+                </AsideLine>
               </AsideSection>
             </>
           }
@@ -206,7 +182,7 @@ export function Agent({ params }: { params: Params }) {
                       <Icon name="skill" size={14} />
                     </RowsAvatar>
                     <RowsTitle name={s.name} sub={s.description} mono />
-                    <RowsMeta>fetched {ago(s.fetchedAt, now.value)}</RowsMeta>
+                    <RowsMeta>fetched {ago(s.fetchedAt, now)}</RowsMeta>
                   </RowsLine>
                 ))}
               </RowsCard>
@@ -226,7 +202,7 @@ export function Agent({ params }: { params: Params }) {
                   </RowsNote>
                 )}
                 {shown.mcp.servers.map((server) => {
-                  const line = serverLine(server, now.value);
+                  const line = serverLine(server, now);
                   return (
                     <RowsLine key={server.name} flush>
                       <RowsAvatar>

@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A composer chip's list: open on a click, closed by a click outside
-// it or by Escape. A menu with a pane inside passes `back`, which takes
-// Escape first and says whether it used it.
+// A menu: open on a click, closed by a click outside it or by
+// Escape. A menu with a pane inside passes `back`, which takes Escape
+// first and says whether it used it.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";

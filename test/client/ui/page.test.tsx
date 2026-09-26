@@ -27,16 +27,10 @@ test("a label, a crumb, a menu and a failure draw as they always have", () => {
   );
   expect(
     render(
-      <Page
-        crumb="Account"
-        crumbHref="/profile"
-        title="Profile"
-        aside="v1"
-        loading
-      />,
+      <Page crumb="Account" crumbHref="/profile" title="Profile" loading />,
     ),
   ).toBe(
-    '<div class="page"><div class="page-head"><h1 class="page-crumb label"><a class="page-crumb-up" href="/profile">Account</a><span class="page-crumb-sep">/</span><span class="page-crumb-on">Profile</span></h1><div class="page-aside">v1</div></div><p class="page-state">Loading</p></div>',
+    '<div class="page"><div class="page-head"><h1 class="page-crumb label"><a class="page-crumb-up" href="/profile">Account</a><span class="page-crumb-sep">/</span><span class="page-crumb-on">Profile</span></h1></div><p class="page-state">Loading</p></div>',
   );
   expect(render(<Page crumb="" title="Home" empty="Nothing yet" />)).toBe(
     '<div class="page"><div class="page-head"><h1 class="page-crumb label"><span class="page-crumb-on">Home</span></h1></div><p class="page-state">Nothing yet</p></div>',

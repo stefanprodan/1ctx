@@ -66,38 +66,33 @@ describe("visual tool administration", () => {
         await chat.admin.call("GET", "/api/tools")
       ).json();
       expect(reload.visualize).toEqual(body.visualize);
-      for (const hosts of [
-        ["https://assets.test/path"],
-        ["https://assets.test?q=1"],
-        ["https://*.test"],
-        ["http://assets.test"],
-        ["https://assets.test:8443"],
-        ["https://assets.test;"],
-        ["https://assets.test https://other.test"],
-        Array.from({ length: 17 }, (_, i) => `https://h${i}.test`),
-      ]) {
-        const refused = await chat.admin.call("PATCH", "/api/tools/visualize", {
-          body: { hosts, enabled: false },
-        });
-        expect(refused.status).toBe(400);
-        expect((await refused.json()).error).toContain("hosts");
-      }
-      for (const name of ["webfetch", "websearch", "web"]) {
+      // the host rules are the parseHosts table; here a refusal saves nothing
+      const refusedHosts = await chat.admin.call(
+        "PATCH",
+        "/api/tools/visualize",
+        { body: { hosts: ["https://assets.test/path"], enabled: false } },
+      );
+      expect(refusedHosts.status).toBe(400);
+      expect((await refusedHosts.json()).error).toContain("hosts");
+      for (const name of ["webfetch", "datetime", "websearch", "web"]) {
         const refused = await chat.admin.call("PATCH", `/api/tools/${name}`, {
           body: { hosts: [], enabled: false },
         });
         expect(refused.status).toBe(400);
         expect(await refused.json()).toEqual({
-          error: name === "webfetch" ? "no such tool" : "unknown field hosts",
+          error:
+            name === "webfetch" || name === "datetime"
+              ? "no such tool"
+              : "unknown field hosts",
         });
       }
-      expect(
-        (
-          await chat.admin.call("PATCH", "/api/tools/visualize", {
-            body: { provider: "exa" },
-          })
-        ).status,
-      ).toBe(400);
+      const provider = await chat.admin.call("PATCH", "/api/tools/visualize", {
+        body: { provider: "exa" },
+      });
+      expect(provider.status).toBe(400);
+      expect(await provider.json()).toEqual({
+        error: "unknown field provider",
+      });
       const after: ToolsResponse = await (
         await chat.admin.call("GET", "/api/tools")
       ).json();

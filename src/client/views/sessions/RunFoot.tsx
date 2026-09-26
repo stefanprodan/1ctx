@@ -8,13 +8,13 @@
 // own at first, and Fork, which makes a chat from the run and opens it.
 
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import { forking } from "../../data/fork.ts";
 import { count, says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { useNow } from "../../lib/now.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { durationOf, durationText } from "../projects/Automations.model.ts";
 
@@ -29,25 +29,18 @@ export function RunFoot({
   // the run has no answer to fork
   fork?: { agents: AgentSummary[]; onFork: (agentId: string) => Promise<void> };
 }) {
-  const now = useSignal(Date.now());
   const failure = useSignal<string | null>(null);
   const picked = useSignal(row.session.agentId);
   const running = row.session.status === "running";
   const forkable =
     fork !== undefined &&
     (row.session.status === "done" || row.session.status === "stopped");
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [running, now]);
+  const now = useNow(running ? 1000 : null);
   // a done row's line is the answer's first line, which the transcript
   // above already shows; the foot says how long it took and what it cost
-  const took = durationOf(row, now.value);
+  const took = durationOf(row, now);
   const text = running
-    ? `${stateLine(row).text} · ${whenText(row, now.value)}`
+    ? `${stateLine(row).text} · ${whenText(row, now)}`
     : row.session.status === "done"
       ? [
           took === null ? "done" : `done in ${durationText(took)}`,
@@ -61,11 +54,7 @@ export function RunFoot({
       <Icon
         name="clock"
         size={14}
-        class={`chat-run-icon ${
-          row.session.status === "stopped"
-            ? "chat-run-icon-stopped"
-            : `status-${row.session.status}`
-        }`}
+        class={`chat-run-icon status-${row.session.status}`}
       />
       <span
         class={`chat-run-state cut${row.session.status === "failed" ? " error" : ""}`}

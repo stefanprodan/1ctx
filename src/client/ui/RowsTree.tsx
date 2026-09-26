@@ -67,7 +67,7 @@ function Folder({
           class={`rows-tree-chevron${node.open ? " rows-tree-chevron-open" : ""}`}
         />
         <Icon name="folder" size={14} class="rows-tree-icon" />
-        <span class="rows-tree-name">{node.name}</span>
+        <span class="rows-tree-name cut">{node.name}</span>
         <span class="rows-tree-meta">
           {count(node.count)} {node.count === 1 ? "file" : "files"}
         </span>
@@ -101,7 +101,7 @@ function Nodes({ nodes, depth }: { nodes: RowsTreeNode[]; depth: number }) {
                 size={14}
                 class="rows-tree-icon"
               />
-              <span class="rows-tree-name">{node.name}</span>
+              <span class="rows-tree-name cut">{node.name}</span>
               {node.meta !== undefined && (
                 <span
                   class={`rows-tree-meta${node.lit ? " rows-tree-lit" : ""}`}

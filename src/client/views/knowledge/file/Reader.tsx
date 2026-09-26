@@ -7,16 +7,24 @@
 // else by its numbered lines. And the aside's facts.
 
 import { useSignal } from "@preact/signals";
+import type { Ref } from "preact";
 import { useRef } from "preact/hooks";
 import type { KnowledgeFileView } from "../../../../shared/contracts/knowledge.ts";
 import { VISUAL_FRAME_BYTES } from "../../../../shared/words.ts";
 import { navigate } from "../../../app/router.ts";
 import { switchable } from "../../../data/capabilities.ts";
-import { ago, count, longDate } from "../../../lib/format.ts";
+import {
+  ago,
+  count,
+  longDate,
+  plural,
+  sizeWords,
+} from "../../../lib/format.ts";
+import { Seg } from "../../../ui/Seg.tsx";
 import { Source } from "../../../ui/Source.tsx";
-import { AsideSection } from "../../../ui/Split.tsx";
+import { AsideLine, AsideSection } from "../../../ui/Split.tsx";
 import { Author } from "../Author.tsx";
-import { authorOf, plural, sizeWords } from "../Knowledge.model.ts";
+import { authorOf, historyHref } from "../Knowledge.model.ts";
 import { OutlineMenu } from "./DocMenus.tsx";
 import { OUTLINE_FROM, outlineOf, utf8Bytes } from "./DocPage.model.ts";
 import { DocVisual } from "./DocVisual.tsx";
@@ -26,22 +34,31 @@ import { DocVisual } from "./DocVisual.tsx";
 export function Facts({ file }: { file: KnowledgeFileView }) {
   return (
     <AsideSection label="File">
-      <div class="split-line">
-        Size
-        <span class="split-strong">
-          {sizeWords(file.bytes)} · {plural(file.lines, "line")}
-        </span>
-      </div>
-      <div class="split-line">
-        Tokens<span class="split-strong">{count(file.tokens)}</span>
-      </div>
-      <div class="split-line">
-        Revisions<span class="split-strong">{file.revision}</span>
-      </div>
-      <div class="split-line">
-        Created<span class="split-strong">{longDate(file.createdAt)}</span>
-      </div>
+      <AsideLine label="Size">
+        {sizeWords(file.bytes)} · {plural(file.lines, "line")}
+      </AsideLine>
+      <AsideLine label="Tokens">{count(file.tokens)}</AsideLine>
+      <AsideLine label="Revisions">{file.revision}</AsideLine>
+      <AsideLine label="Created">{longDate(file.createdAt)}</AsideLine>
     </AsideSection>
+  );
+}
+
+export function MarkdownBody({
+  html,
+  body,
+}: {
+  html: string;
+  body?: Ref<HTMLDivElement>;
+}) {
+  return (
+    // the server renders the Markdown with raw HTML off: render/ is the
+    // safety boundary
+    <div
+      class="docpage-md md-wide"
+      ref={body}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
@@ -80,8 +97,8 @@ export function Reader({
       <div class="docpage-band">
         {/* who and when leave a phone's band for the foot, where a long
             name may wrap; History is also the head's More */}
-        <span class="docpage-band-words docpage-band-line">
-          <a class="docpage-link" href={`${href}?history`}>
+        <span class="docpage-band-words docpage-band-line cut">
+          <a class="docpage-link" href={historyHref(file.projectId, file.id)}>
             Revision {file.revision}
           </a>
           <span class="docpage-wide">
@@ -94,32 +111,23 @@ export function Reader({
           <OutlineMenu entries={outline} body={() => mdBody.current} />
         )}
         {previewable && (
-          <fieldset class="seg seg-small" aria-label="Show">
-            {(["preview", "source"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                class={`seg-option${view === value ? " seg-on" : ""}`}
-                aria-pressed={view === value}
-                onClick={() => {
-                  shown.value = value;
-                  if (line !== null) navigate(href, true);
-                }}
-              >
-                {value === "preview" ? "Preview" : "Source"}
-              </button>
-            ))}
-          </fieldset>
+          <Seg
+            label="Show"
+            small
+            options={[
+              { value: "preview", label: "Preview" },
+              { value: "source", label: "Source" },
+            ]}
+            value={view}
+            onPick={(value) => {
+              shown.value = value;
+              if (line !== null) navigate(href, true);
+            }}
+          />
         )}
       </div>
       {view === "preview" && markdown ? (
-        // the server renders the Markdown with raw HTML off: render/ is
-        // the safety boundary
-        <div
-          class="docpage-md md-wide"
-          ref={mdBody}
-          dangerouslySetInnerHTML={{ __html: file.html ?? "" }}
-        />
+        <MarkdownBody html={file.html ?? ""} body={mdBody} />
       ) : view === "preview" && visual ? (
         <DocVisual
           fileId={file.id}

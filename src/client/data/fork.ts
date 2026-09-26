@@ -14,6 +14,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import { navigate } from "../app/router.ts";
 import { draftKey, writeDraft } from "../composer/draft.ts";
+import { chatHref } from "../lib/hrefs.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 import { session } from "./sessions.ts";
@@ -71,7 +72,7 @@ export async function forkSession(
     // the page moves only for the chat they asked from, and only when
     // no later fork superseded it
     if (mine !== turn || session.value?.session.id !== id) return;
-    navigate(`/chat/${detail.session.id}`);
+    navigate(chatHref(detail.session.id));
   } finally {
     if (mine === turn) forking.value = false;
   }

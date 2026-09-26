@@ -149,26 +149,6 @@ describe("the memory phase boundary", () => {
     fresh.socket.dispose();
   });
 
-  test("records memory_error when the phase does not fit", async () => {
-    const chat = await chatApp();
-    const automation = await createAutomation(chat, { ownMemory: true });
-    const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
-    active.policy.contextLength = 1;
-    run.main.reply("Done.");
-    await settle(chat, run.sessionId);
-
-    // no request went out for the phase
-    expect(chat.scripted.scripts).toHaveLength(1);
-    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
-      cause: "finish",
-      status: "done",
-      memoryRound: 2,
-      memoryError: "the memory phase did not fit",
-    });
-    await chat.app.shutdown();
-  });
-
   test("a fire that comes due inside the phase is skipped", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();

@@ -55,8 +55,7 @@ describe("memory note rules", () => {
     const at = Array.from({ length: 5 }, (_, i) =>
       entry(String(i), "x".repeat(i < 4 ? 433 : 435)),
     );
-    expect(memoryChars(at)).toBe(MEMORY_CHARS);
-    expect(renderEntries(at).length).toBe(MEMORY_CHARS);
+    // at the budget exactly, as the memoryBlock cases below assert
     expect(checkEntries(at)).toBeNull();
     const past = at.map((value, i) =>
       i === 4 ? { ...value, text: `${value.text}x` } : value,

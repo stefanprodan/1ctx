@@ -13,6 +13,7 @@ import {
 } from "../../src/server/runner/round.ts";
 import { collectLogs } from "../helpers/app.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
+import { answerNodes } from "../helpers/tool-loop.ts";
 
 describe("the terminal transition", () => {
   test("a provider failure ends the send as failed with the message", async () => {
@@ -118,23 +119,36 @@ describe("the terminal transition", () => {
     });
   });
 
-  test("a refused request is a failure with the provider's words, and no key", async () => {
-    const chat = await chatApp();
-    chat.scripted.refuse(429, '{"error":{"message":"slow down"}}');
-    const res = await chat.member.call("POST", "/api/sessions", {
-      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
-    });
-    expect(res.status).toBe(201);
-    const { session, send } = await res.json();
-    await tick();
-    await tick();
-    expect(chat.app.sessions.send(send.id)!).toMatchObject({
-      status: "failed",
-      cause: "failure",
-      error: 'HTTP 429: {"error":{"message":"slow down"}}',
-    });
-    expect(chat.app.sessions.byId(session.id)!.status).toBe("failed");
-  });
+  // a refused request is a failure with the provider's words, and it is
+  // never asked again
+  test.each([
+    [429, '{"error":{"message":"slow down"}}'],
+    [500, "down"],
+  ])(
+    "a refused request (%i) fails once with its words",
+    async (status, body) => {
+      const chat = await chatApp();
+      chat.scripted.refuse(status, body);
+      const res = await chat.member.call("POST", "/api/sessions", {
+        body: {
+          projectId: chat.projectId,
+          agentId: chat.agentId,
+          message: "x",
+        },
+      });
+      expect(res.status).toBe(201);
+      const { session, send } = await res.json();
+      await tick();
+      await tick();
+      expect(chat.scripted.chats()).toBe(1);
+      expect(chat.app.sessions.send(send.id)!).toMatchObject({
+        status: "failed",
+        cause: "failure",
+        error: `HTTP ${status}: ${body}`,
+      });
+      expect(chat.app.sessions.byId(session.id)!.status).toBe("failed");
+    },
+  );
 
   test("a request with no answer is asked again once", async () => {
     const logs = collectLogs();
@@ -170,19 +184,6 @@ describe("the terminal transition", () => {
       cause: "failure",
       error: "local failed: the connection was reset",
     });
-  });
-
-  test("a refused request is never asked again", async () => {
-    const chat = await chatApp();
-    chat.scripted.refuse(500, "down");
-    const res = await chat.member.call("POST", "/api/sessions", {
-      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
-    });
-    const { send } = await res.json();
-    await tick();
-    await tick();
-    expect(chat.scripted.chats()).toBe(1);
-    expect(chat.app.sessions.send(send.id)!.status).toBe("failed");
   });
 
   test("a stop that races a finish ends the send once", async () => {
@@ -325,6 +326,7 @@ describe("the terminal transition", () => {
     expect(reply.status).toBe("stopped");
     expect(chat.app.runner.registry.size).toBe(0);
     expect(script.aborted).toBe(true);
+    answerNodes(chat, sessionId);
     chat.app.socket.dispose();
   });
 

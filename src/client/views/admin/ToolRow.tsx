@@ -8,15 +8,15 @@
 // is off. It opens in place to when a send
 // carries it, the text and the parameters the model gets.
 
-import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type {
   BuiltinToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import { patchTool } from "../../data/tools.ts";
-import { says, showAll } from "../../lib/format.ts";
+import { firstSentence, showAll, tokensText } from "../../lib/format.ts";
 import { useCut } from "../../lib/resize.ts";
+import { useAction } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import {
@@ -27,10 +27,8 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import {
-  firstSentence,
   jsonLines,
   NAMES_WORDS,
-  tokensText,
   VARIANT_WHEN_WORDS,
   WHEN_WORDS,
 } from "./Tools.model.ts";
@@ -39,18 +37,9 @@ import "../../transcript/md.css";
 import "./tools.css";
 
 function Switch({ tool }: { tool: WebToolSummary }) {
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
-  const flip = async () => {
-    busy.value = true;
-    failure.value = null;
-    try {
-      await patchTool(tool.name, { enabled: !tool.enabled });
-    } catch (err) {
-      failure.value = says(err);
-    }
-    busy.value = false;
-  };
+  const { busy, failure, run } = useAction();
+  const flip = () =>
+    run(() => patchTool(tool.name, { enabled: !tool.enabled }));
   return (
     <RowsEnd error={failure.value}>
       <RowsSwitch
@@ -72,8 +61,6 @@ export function ToolRow({
   open: boolean;
   onToggle: () => void;
 }) {
-  // the block's Copy is a button inside rendered HTML, so the click is
-  // delegated the way the transcript does it
   // the parameters are cut to a height, Show all at the block's foot,
   // since a box that scrolls on its own inside the page's scroll leaves
   // the page's sticky head behind; once open the block stays whole
@@ -86,6 +73,8 @@ export function ToolRow({
   useEffect(() => {
     if (!open) all.value = false;
   }, [open]);
+  // the block's Copy is a button inside rendered HTML, so the click is
+  // delegated the way the transcript does it
   useEffect(() => {
     const el = json.current;
     if (!el) return;

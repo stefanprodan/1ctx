@@ -1,24 +1,6 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  .overview,
-  .overview-ghost {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .overview {
-    padding-bottom: var(--space-5);
-  }
-  .overview-ghost {
-    pointer-events: none;
-  }
-  .overview-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    align-items: stretch;
-  }
   .overview-wide {
     display: flex;
     flex-direction: column;
@@ -32,20 +14,6 @@
     grid-auto-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 0 var(--space-2) 24px 52px;
-  }
-  .overview-none {
-    margin: 0;
-    padding: var(--space-5) var(--space-4);
-    font-size: var(--text-ui);
-    color: var(--faint);
-  }
-  .overview-facts {
-    margin: 0;
-    padding: 0 2px;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-    overflow-wrap: anywhere;
   }
   /* a phone breaks the foot between its parts, never inside one */
   .overview-part {
@@ -117,12 +85,6 @@
   .overview-total-sub {
     font-size: var(--text-small);
     color: var(--faint);
-  }
-
-  @media (max-width: 899px) {
-    .overview-grid {
-      grid-template-columns: minmax(0, 1fr);
-    }
   }
 
   @media (max-width: 719px) {

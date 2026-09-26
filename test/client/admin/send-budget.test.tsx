@@ -6,14 +6,11 @@ import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
 import { limits, tools, toolsError } from "../../../src/client/data/tools.ts";
 import {
-  collect,
   defaultLine,
   displayOf,
-  draftOf,
   LIMIT_WORDS,
   limitFieldOf,
   problem,
-  withSaved,
 } from "../../../src/client/views/admin/Tools.model.ts";
 import { Tools } from "../../../src/client/views/admin/Tools.tsx";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
@@ -62,21 +59,6 @@ describe("send budget fields", () => {
       expect(problem(row, String(row.min))).toBeNull();
       expect(problem(row, String(row.max))).toBeNull();
     }
-  });
-
-  test("saves each scope without changing the other's budget", () => {
-    expect(collect(rows, draftOf(rows))).toEqual({
-      values: expect.objectContaining({
-        toolWorkTokens: 750_000,
-        maxBashCalls: 200,
-      }),
-    });
-    expect(withSaved(rows, "send", { toolWorkTokens: 10_000 })).toEqual(
-      expect.objectContaining({ toolWorkTokens: 10_000, maxBashCalls: 200 }),
-    );
-    expect(withSaved(rows, "call", { maxBashCalls: 1 })).toEqual(
-      expect.objectContaining({ toolWorkTokens: 750_000, maxBashCalls: 1 }),
-    );
   });
 
   test.serial("the Limits tab puts each labelled row in its own form", () => {

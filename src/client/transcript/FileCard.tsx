@@ -17,7 +17,7 @@ import type { FileCard as Card } from "./visuals.ts";
 import "./filecard.css";
 
 // the lines the cut shows, the same count in filecard.css
-export const FOLD_LINES = 12;
+const FOLD_LINES = 12;
 
 export function FileCard({ card }: { card: Card }) {
   const stored = openedFiles.value.get(card.key);

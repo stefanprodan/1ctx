@@ -270,7 +270,8 @@ test("tools PATCH refuses invalid names, fields, modes and domain lists", async 
   const client = app.client();
   try {
     await client.login("admin", "initial-password");
-    for (const [name, body] of [
+    const refusals: [string, Record<string, unknown>, string?][] = [
+      ["datetime", { enabled: false }, "no such tool"],
       ["webfetch", { enabled: true }],
       ["websearch", { enabled: true }],
       ["websearch", { provider: "unknown" }],
@@ -297,12 +298,17 @@ test("tools PATCH refuses invalid names, fields, modes and domain lists", async 
       ["web", {}],
       ["visualize", { mode: "off" }],
       ["visualize", { provider: null }],
-    ] as const) {
+      ["visualize", { provider: "exa" }, "unknown field provider"],
+    ];
+    for (const [name, body, error] of refusals) {
       const response = await client.call("PATCH", `/api/tools/${name}`, {
         body,
       });
       expect(response.status, `${name} ${JSON.stringify(body)}`).toBe(400);
-      if (name === "web" && "mode" in body && body.mode === "listed") {
+      if (error !== undefined) {
+        expect(await response.json()).toEqual({ error });
+      }
+      if (name === "web" && body.mode === "listed") {
         expect(await response.json()).toMatchObject({
           error: "list at least one host",
         });

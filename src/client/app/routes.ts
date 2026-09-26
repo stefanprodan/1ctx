@@ -63,7 +63,15 @@ export type Route = {
 };
 
 // the icon of a group's row in the rail
-export const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
+const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
+
+// a project page's head, tabs and aside
+const frame = (id: string) => [
+  loadProject(id),
+  loadProjectAgents(id),
+  loadAutomations(id),
+  loadRecentDays(),
+];
 
 // the automation's two tabs share one view, so a tab change keeps the
 // page mounted instead of drawing it again
@@ -76,7 +84,7 @@ const docView = lazy(() =>
   import("../views/knowledge/file/DocPage.tsx").then((m) => m.DocPage),
 );
 
-// the tools page's three tabs share one view the same way
+// the tools page's tabs share one view the same way
 const toolsView = lazy<{ params: Params }>(() =>
   import("../views/admin/Tools.tsx").then((m) => m.Tools),
 );
@@ -149,15 +157,12 @@ export const ROUTES: Route[] = [
     role: "authenticated",
     load: async (params, query) => {
       await Promise.all([
-        loadProject(params.id),
+        ...frame(params.id),
         loadList({
           project: params.id,
           q: query.get("q")?.trim() ?? "",
           origin: originOf(`?${query.toString()}`),
         }),
-        loadProjectAgents(params.id),
-        loadAutomations(params.id),
-        loadRecentDays(),
         loadUploads(params.id),
       ]);
     },
@@ -170,12 +175,7 @@ export const ROUTES: Route[] = [
     title: () => "Automations",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([
-        loadProject(params.id),
-        loadProjectAgents(params.id),
-        loadAutomations(params.id),
-        loadRecentDays(),
-      ]);
+      await Promise.all(frame(params.id));
     },
   },
   {
@@ -187,10 +187,7 @@ export const ROUTES: Route[] = [
     role: "authenticated",
     load: async (params) => {
       await Promise.all([
-        loadProject(params.id),
-        loadProjectAgents(params.id),
-        loadAutomations(params.id),
-        loadRecentDays(),
+        ...frame(params.id),
         loadMemory(keyOf(params.id, null)),
       ]);
     },
@@ -203,13 +200,7 @@ export const ROUTES: Route[] = [
     title: () => "Knowledge",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([
-        loadProject(params.id),
-        loadProjectAgents(params.id),
-        loadAutomations(params.id),
-        loadRecentDays(),
-        loadKnowledge(params.id),
-      ]);
+      await Promise.all([...frame(params.id), loadKnowledge(params.id)]);
     },
   },
   {
@@ -298,12 +289,7 @@ export const ROUTES: Route[] = [
     title: () => "Members",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([
-        loadProject(params.id),
-        loadProjectAgents(params.id),
-        loadAutomations(params.id),
-        loadRecentDays(),
-      ]);
+      await Promise.all(frame(params.id));
     },
   },
   {
@@ -314,12 +300,7 @@ export const ROUTES: Route[] = [
     title: () => "Settings",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([
-        loadProject(params.id),
-        loadProjectAgents(params.id),
-        loadAutomations(params.id),
-        loadRecentDays(),
-      ]);
+      await Promise.all(frame(params.id));
     },
   },
   {
@@ -398,8 +379,8 @@ export const ROUTES: Route[] = [
     title: () => "Agents",
     role: "admin",
     load: async () => {
-      // the limits too: the agents page shows where each model compacts;
-      // the skills for the form's section
+      // the tools bring the limits, where each model compacts; the
+      // skills and the MCP servers are the form's sections
       await Promise.all([
         loadAgents(),
         loadProviders(),

@@ -6,8 +6,8 @@
 // that each scroll to their place. Either closes on a click outside it
 // or on Escape.
 
-import { useMenu } from "../../../composer/menu.ts";
 import { Icon, type IconName } from "../../../lib/icons.tsx";
+import { useMenu } from "../../../lib/menu.ts";
 import { scrollParent } from "../../../lib/scroll.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { newFileIn, type OutlineEntry } from "./DocPage.model.ts";
@@ -97,7 +97,7 @@ export function MoreMenu({
             const body = (
               <>
                 <Icon name={action.icon} size={14} />
-                <span class="docpage-menu-words">{action.label}</span>
+                <span class="cut">{action.label}</span>
               </>
             );
             return action.href !== undefined ? (
@@ -187,7 +187,7 @@ export function OutlineMenu({
                 goToHeading(body(), i);
               }}
             >
-              <span class="docpage-menu-words">{entry.text}</span>
+              <span class="cut">{entry.text}</span>
             </button>
           ))}
         </div>

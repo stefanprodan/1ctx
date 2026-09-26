@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import { splitLines, textLines } from "../../../src/client/lib/lines.ts";
+import {
+  cutLines,
+  splitLines,
+  textLines,
+} from "../../../src/client/lib/lines.ts";
 
 test("a span that crosses a newline is closed and reopened on each line", () => {
   const html =
@@ -37,4 +41,19 @@ test("a final newline ends the last line", () => {
   expect(textLines("")).toEqual([""]);
   expect(textLines("\n")).toEqual([""]);
   expect(textLines("a\n\n")).toEqual(["a", ""]);
+});
+
+test("a text past its lines is cut unless expanded, whole otherwise", () => {
+  const long = Array.from({ length: 5 }, (_, i) => `l${i}`).join("\n");
+  expect(cutLines(long, 3, false)).toEqual({
+    text: "l0\nl1\nl2",
+    cut: true,
+    lines: 5,
+  });
+  expect(cutLines(long, 3, true).text).toBe(long);
+  expect(cutLines("a\nb\n", 2, false)).toEqual({
+    text: "a\nb\n",
+    cut: false,
+    lines: 2,
+  });
 });

@@ -74,6 +74,13 @@ test.each(cases)(
     expect(alone.result.skipped.map((skip) => skip.reason)).toEqual(
       entries.map(() => reason),
     );
+    for (const skip of alone.result.skipped) {
+      if (reason === "duplicate" || reason === "clash") {
+        expect(skip.other).toBe(1 - skip.index);
+      } else {
+        expect(skip).not.toHaveProperty("other");
+      }
+    }
     for (const order of permutations([
       ...entries,
       entry("a", "\0"),
@@ -82,6 +89,10 @@ test.each(cases)(
       const { files, result } = judge(order);
       expect(files).toEqual([{ name: "a/b", text: "text", replaces: false }]);
       expect(result.saved).toEqual(["a/b"]);
+      expect(result).toMatchObject({
+        skippedTotal: entries.length + 1,
+        renamed: 0,
+      });
       expect(
         result.skipped
           .map((skip) => [order[skip.index]!.name, skip.reason])
@@ -94,8 +105,12 @@ test.each(cases)(
       );
       for (const skip of result.skipped) {
         if (skip.reason === "duplicate" || skip.reason === "clash") {
-          expect(skip.other).toBeDefined();
-          expect(skip.other).not.toBe(skip.index);
+          // the pair names each other whatever the order
+          expect(order[skip.other!]!.name).toBe(
+            entries.find((file) => file.name !== order[skip.index]!.name)!.name,
+          );
+        } else {
+          expect(skip).not.toHaveProperty("other");
         }
       }
     }
@@ -132,6 +147,7 @@ test("manifest selection excludes duplicates, metadata and invalid names before 
   const names = [
     "A b.md",
     "a-b.md",
+    "A-B.MD",
     "../outside",
     "__MACOSX/link",
     ".git/config",
@@ -148,7 +164,7 @@ test("manifest selection excludes duplicates, metadata and invalid names before 
     type: "file",
   }));
   const selection = selectMembers(manifest, "");
-  expect(selection.candidates.map((file) => file.index)).toEqual([9]);
+  expect(selection.candidates.map((file) => file.index)).toEqual([10]);
   expect(
     selection.skipped.map(({ index, reason, other }) => ({
       index,
@@ -156,14 +172,15 @@ test("manifest selection excludes duplicates, metadata and invalid names before 
       other,
     })),
   ).toEqual([
-    { index: 2, reason: "outside", other: undefined },
+    { index: 3, reason: "outside", other: undefined },
     { index: 0, reason: "duplicate", other: 1 },
     { index: 1, reason: "duplicate", other: 0 },
+    { index: 2, reason: "duplicate", other: 0 },
   ]);
   expect(() => judgeMembers(manifest, selection, live, 6)).toThrow(
     "an upload member was not read",
   );
-  manifest[9]!.data = new TextEncoder().encode("text");
+  manifest[10]!.data = new TextEncoder().encode("text");
   expect(judgeMembers(manifest, selection, live, 6).result.saved).toEqual([
     ".gitignore",
   ]);
@@ -247,6 +264,28 @@ test("directories disappear, non-regular types skip, and folders count toward pa
   ]);
 });
 
+test("directories and macOS metadata vanish, every other non-regular type skips", () => {
+  const { result } = judge([
+    entry("ignored/", "", "directory"),
+    entry("__MACOSX/symlink", "", "symlink"),
+    entry("hardlink", "", "link"),
+    entry("device", "", "other"),
+    entry("./__MACOSX/x"),
+    entry("a\\._b"),
+    entry("a/.DS_Store"),
+    entry("a/./__MACOSX//x"),
+    entry("__macosx", ""),
+  ]);
+  // metadata is judged on the raw name, before normalization, so a
+  // lowercase __macosx is an ordinary file
+  expect(result.skipped.map(({ index, reason }) => [index, reason])).toEqual([
+    [2, "not-regular"],
+    [3, "not-regular"],
+  ]);
+  expect(result.skippedTotal).toBe(2);
+  expect(result.saved).toEqual(["__macosx"]);
+});
+
 test("every eligible ancestor loses while a rejected ancestor blocks nothing", () => {
   for (const entries of permutations([
     entry("a"),
@@ -299,17 +338,28 @@ test.each(["\u0001", "\u200b", "\ud800"])(
     const display = skippedName(character.repeat(500));
     expect(display.length).toBeLessThanOrEqual(200);
     expect(Buffer.byteLength(JSON.stringify(display))).toBeLessThanOrEqual(300);
+    // long saved names first, so the cut list holds the longest
     const entries = [
+      ...Array.from({ length: 200 }, (_, i) =>
+        entry(
+          `${"a".repeat(80)}/${"b".repeat(80)}/${`${i}`.padStart(38, "c")}`,
+        ),
+      ),
       ...Array.from({ length: 201 }, (_, i) => entry(`file${i}`)),
-      ...Array.from({ length: 201 }, (_, i) =>
+      ...Array.from({ length: 1800 }, (_, i) =>
         entry(`${character.repeat(200)}${"!".repeat(i + 1)}a.md`),
       ),
     ];
     const { files, result } = judge(entries);
-    expect(files).toHaveLength(201);
-    expect(result).toMatchObject({ added: 201, skippedTotal: 201 });
+    expect(files).toHaveLength(401);
+    expect(result).toMatchObject({ added: 401, skippedTotal: 1800 });
     expect(result.saved).toHaveLength(200);
     expect(result.skipped).toHaveLength(200);
+    expect(
+      result.skipped.every(
+        (skip) => skip.reason === "duplicate" && skip.name.length <= 200,
+      ),
+    ).toBe(true);
     expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(128 * 1024);
   },
 );

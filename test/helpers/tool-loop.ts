@@ -5,12 +5,14 @@ import { expect } from "bun:test";
 import { EXHAUSTED_LINE } from "../../src/server/runner/context.ts";
 import { type ChatApp, tick } from "./chat.ts";
 
-// The fake clock lets a finalize retry resolve while the loop settles.
+// The fake clock lets a finalize retry resolve while the loop settles;
+// once no send is active there is nothing left to wait for.
 export async function settle(chat: ChatApp, times = 6) {
   for (let i = 0; i < times; i++) {
     await tick();
     chat.app.now.value += 200;
     await tick();
+    if (chat.app.runner.registry.values().length === 0) return;
   }
 }
 

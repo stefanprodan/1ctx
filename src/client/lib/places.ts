@@ -163,7 +163,7 @@ export type Place = { countries: string[]; cities: string };
 let index: Map<string, Place> | null = null;
 
 // the places of every zone, built once, on the first search
-export function placesByZone(): Map<string, Place> {
+function placesByZone(): Map<string, Place> {
   if (index !== null) return index;
   const countries = countriesByZone();
   const out = new Map<string, Place>();

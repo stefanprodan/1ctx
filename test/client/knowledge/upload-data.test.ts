@@ -228,11 +228,8 @@ describe("knowledge upload transport", () => {
         ["folder", folder],
         ["name", picked.name],
       ]);
-      expect(xhr.method).toBe("POST");
-      expect(xhr.async).toBe(true);
-      expect(xhr.headers.get("content-type")).toBe("application/octet-stream");
+      // the method, the headers and the bytes are upload()'s, in api.test.ts
       expect(xhr.body).toBe(picked);
-      expect(new Uint8Array(await xhr.body!.arrayBuffer())).toEqual(bytes);
       xhr.upload.onprogress?.({ loaded: 2, total: bytes.length });
       expect(progress).toEqual([[2, bytes.length]]);
       xhr.respond(uploaded);
@@ -248,10 +245,7 @@ describe("knowledge upload transport", () => {
       const xhr = requests[0]!;
       expect(xhr.path).toBe(`${base}/upload?folder=&name=Note.md`);
       xhr.respond({ error: "folder must not contain .." }, 400);
-      await expect(result).rejects.toMatchObject({
-        status: 400,
-        message: "folder must not contain ..",
-      });
+      await expect(result).rejects.toMatchObject({ status: 400 });
       expect(fetched).toEqual([]);
     },
   );
@@ -269,16 +263,6 @@ describe("knowledge upload transport", () => {
       expect(fetched).toEqual([]);
     },
   );
-
-  test.serial("an already stopped request sends no File", async () => {
-    await expect(
-      uploadFile("p1", new File(["text"], "Note.md"), "", {
-        signal: AbortSignal.abort(),
-      }),
-    ).rejects.toMatchObject({ name: "AbortError" });
-    expect(requests[0]?.body).toBeNull();
-    expect(fetched).toEqual([]);
-  });
 
   for (const stop of [false, true]) {
     test.serial(

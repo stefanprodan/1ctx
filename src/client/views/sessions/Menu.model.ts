@@ -7,7 +7,7 @@
 // rename is on its way. Editing replaces the title with a box: the
 // menu is shut, Enter saves and Escape or a blur gives the title back.
 
-export type MenuState = {
+type MenuState = {
   open: boolean;
   asking: boolean;
   editing: boolean;

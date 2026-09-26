@@ -8,11 +8,11 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { diffLines } from "../../../lib/diff.ts";
+import { sizeWords } from "../../../lib/format.ts";
 import { DiffStat } from "../../../ui/Diff.tsx";
-import { sizeWords } from "../Knowledge.model.ts";
 import { editorRows, utf8Bytes } from "./DocPage.model.ts";
 
-export const COUNT_PAUSE_MS = 400;
+const COUNT_PAUSE_MS = 400;
 
 type Counts = { added: number; removed: number } | "same" | null;
 
@@ -30,8 +30,7 @@ export function EditorBand({
   text,
   cap,
 }: {
-  // null for a new file
-  revision?: number;
+  revision: number;
   before: string;
   text: string;
   cap: number | null;

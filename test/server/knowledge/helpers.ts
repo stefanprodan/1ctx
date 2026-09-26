@@ -180,3 +180,16 @@ export function scratchState(s: Setup) {
       .get(s.session.id)?.used_at,
   };
 }
+
+// Runs a write right after the next mount reads its rows, the race a
+// concurrent writer makes, without waiting on real time.
+export function afterMountRead(s: Setup, write: () => void) {
+  const store = s.area.store;
+  const read = store.read;
+  store.read = (projectId) => {
+    store.read = read;
+    const rows = read.call(store, projectId);
+    write();
+    return rows;
+  };
+}

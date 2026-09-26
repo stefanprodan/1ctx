@@ -45,7 +45,7 @@ export function AgentsAside({
                 {a.name}
               </a>
               <Fit
-                class="split-faint"
+                class="split-faint cut"
                 long={a.model.id}
                 short={shortModel(a.model.id)}
               />

@@ -4,14 +4,13 @@
 // The tools page's model: the unit each limit is typed in and the
 // conversion both ways, the range check in the page's words, the
 // draft and what a Save collects, the search lines; the entity that
-// loads both routes and replaces what it holds on a write; the rail
-// entry; and the page rendered over the rows.
+// loads both routes and replaces what it holds on a write; and the
+// page rendered over the rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { onPage } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
-import { railRows } from "../../../src/client/app/routes.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   limits,
@@ -21,6 +20,7 @@ import {
   tools,
   toolsError,
 } from "../../../src/client/data/tools.ts";
+import { firstSentence } from "../../../src/client/lib/format.ts";
 import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
   ACCESS_WORDS,
@@ -33,7 +33,6 @@ import {
   domainsFieldOf,
   domainsOf,
   draftOf,
-  firstSentence,
   jsonLines,
   keyLine,
   LIMIT_WORDS,
@@ -446,23 +445,6 @@ describe("the tools entity", () => {
 });
 
 describe("the page", () => {
-  test.serial("sits in the Admin group after Agents", () => {
-    const group = railRows("admin").find((r) => r.kind === "group");
-    const labels =
-      group?.kind === "group" ? group.routes.map((r) => r.nav!.label) : [];
-    expect(labels).toEqual([
-      "Overview",
-      "Storage",
-      "Projects",
-      "Users",
-      "Agents",
-      "Tools",
-      "Skills",
-      "MCP",
-    ]);
-    expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
-  });
-
   test.serial("the tab is the address, and Tools stays lit on it", () => {
     expect(toolsTab("/admin/tools")).toBe("builtin");
     expect(toolsTab("/admin/tools/web")).toBe("web");

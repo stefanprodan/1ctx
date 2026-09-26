@@ -32,10 +32,6 @@
   }
   .rows-hint {
     margin-left: auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
@@ -521,13 +517,9 @@
     color: var(--faint);
   }
   .rows-tree-name {
-    min-width: 0;
-    overflow: hidden;
     font-family: var(--mono);
     font-size: var(--text-mono);
     color: var(--fg);
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
   .rows-tree-folder .rows-tree-name {
     color: var(--dim);
@@ -623,7 +615,6 @@
     .rows-toggle:has(> .avatar) > .rows-meta {
       padding-left: calc(14px + var(--space-3) + 28px + var(--space-3));
     }
-    .rows-body,
     .rows-body-avatar,
     .rows-body-chevron {
       padding: var(--space-4);
@@ -631,7 +622,6 @@
     .rows-list .rows-line-static {
       padding-left: var(--space-3);
     }
-    .rows-list .rows-body,
     .rows-list .rows-body-chevron {
       padding: var(--space-3);
     }

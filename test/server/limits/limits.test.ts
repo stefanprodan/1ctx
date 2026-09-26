@@ -58,6 +58,62 @@ const budgetLimits = [
     unit: "count",
     scope: "runs",
   },
+  {
+    name: "contextReserve",
+    default: 20_000,
+    min: 1000,
+    max: 200_000,
+    unit: "tokens",
+    scope: "send",
+  },
+  {
+    name: "summaryMaxTokens",
+    default: 4096,
+    min: 256,
+    max: 32_768,
+    unit: "tokens",
+    scope: "send",
+  },
+  {
+    name: "scratchBytes",
+    default: 16 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  {
+    name: "scratchFiles",
+    default: 1000,
+    min: 10,
+    max: 10_000,
+    unit: "count",
+    scope: "knowledge",
+  },
+  {
+    name: "scratchIdleDays",
+    default: 7,
+    min: 1,
+    max: 90,
+    unit: "days",
+    scope: "knowledge",
+  },
+  {
+    name: "uploadBytes",
+    default: 16 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "knowledge",
+  },
+  {
+    name: "uploadFiles",
+    default: 1000,
+    min: 10,
+    max: 10_000,
+    unit: "count",
+    scope: "knowledge",
+  },
 ] as const;
 
 describe("limits area", () => {
@@ -170,39 +226,7 @@ describe("limits area", () => {
     }
   });
 
-  test("the runs scope travels through the full-set PUT", async () => {
-    const app = await testApp();
-    try {
-      const admin = app.client();
-      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
-      const saved = await admin.call("PUT", "/api/limits", {
-        body: { values: { ...DEFAULT_LIMITS, runsPerUser: 2, runsRunning: 8 } },
-      });
-      expect(saved.status).toBe(200);
-      const body: LimitsResponse = await saved.json();
-      expect(body.limits.filter((row) => row.scope === "runs")).toEqual([
-        expect.objectContaining({ name: "runsPerUser", value: 2 }),
-        expect.objectContaining({ name: "runsRunning", value: 8 }),
-      ]);
-      const missing: Record<string, number> = { ...DEFAULT_LIMITS };
-      delete missing.runsRunning;
-      const refused = await admin.call("PUT", "/api/limits", {
-        body: { values: missing },
-      });
-      expect(refused.status).toBe(400);
-      const over = await admin.call("PUT", "/api/limits", {
-        body: { values: { ...DEFAULT_LIMITS, runsRunning: 65 } },
-      });
-      expect(over.status).toBe(400);
-      expect(await over.json()).toEqual({
-        error: "runsRunning must be between 1 and 64",
-      });
-    } finally {
-      await app.shutdown();
-    }
-  });
-
-  test("saves the tool-work and bash limits through the admin route", async () => {
+  test("saves the run, tool-work and bash limits through the full-set PUT", async () => {
     const app = await testApp();
     try {
       const admin = app.client();
@@ -214,6 +238,8 @@ describe("limits area", () => {
             rounds: 250,
             toolWorkTokens: 750_000,
             maxBashCalls: 200,
+            runsPerUser: 2,
+            runsRunning: 8,
           },
         },
       });
@@ -235,58 +261,29 @@ describe("limits area", () => {
           }),
         ]),
       );
+      expect(body.limits.filter((row) => row.scope === "runs")).toEqual([
+        expect.objectContaining({ name: "runsPerUser", value: 2 }),
+        expect.objectContaining({ name: "runsRunning", value: 8 }),
+      ]);
       const loaded = await admin.call("GET", "/api/limits");
       expect(loaded.status).toBe(200);
       expect(await loaded.json()).toEqual(body);
+      const missing: Record<string, number> = { ...DEFAULT_LIMITS };
+      delete missing.runsRunning;
+      const refused = await admin.call("PUT", "/api/limits", {
+        body: { values: missing },
+      });
+      expect(refused.status).toBe(400);
+      const over = await admin.call("PUT", "/api/limits", {
+        body: { values: { ...DEFAULT_LIMITS, runsRunning: 65 } },
+      });
+      expect(over.status).toBe(400);
+      expect(await over.json()).toEqual({
+        error: "runsRunning must be between 1 and 64",
+      });
     } finally {
       await app.shutdown();
       app.db.close();
-    }
-  });
-
-  test.each([
-    {
-      name: "scratchBytes",
-      default: 16 * 1024 * 1024,
-      min: 1024 * 1024,
-      max: 64 * 1024 * 1024,
-      unit: "bytes",
-    },
-    {
-      name: "scratchFiles",
-      default: 1000,
-      min: 10,
-      max: 10_000,
-      unit: "count",
-    },
-    { name: "scratchIdleDays", default: 7, min: 1, max: 90, unit: "days" },
-    {
-      name: "uploadBytes",
-      default: 16 * 1024 * 1024,
-      min: 1024 * 1024,
-      max: 64 * 1024 * 1024,
-      unit: "bytes",
-    },
-    {
-      name: "uploadFiles",
-      default: 1000,
-      min: 10,
-      max: 10_000,
-      unit: "count",
-    },
-  ])("defines the session tree limit %p", ({ name, ...definition }) => {
-    const db = memoryDb();
-    try {
-      const area = limitsArea({ db, clock: () => 100 });
-      expect(area.rows().find((row) => row.name === name)).toEqual({
-        name,
-        ...definition,
-        scope: "knowledge",
-        value: definition.default,
-        changedAt: null,
-      });
-    } finally {
-      db.close();
     }
   });
 
@@ -483,27 +480,6 @@ describe("parseLimits", () => {
         callTimeoutMs: LIMIT_DEFINITIONS.callTimeoutMs.max,
       },
     });
-  });
-
-  test.each([
-    LIMIT_DEFINITIONS.rounds.min - 1,
-    LIMIT_DEFINITIONS.rounds.max + 1,
-    1.5,
-  ])("refuses an invalid rounds value %p", (rounds) => {
-    expect(() =>
-      parseLimits({ values: { ...DEFAULT_LIMITS, rounds } }),
-    ).toThrow(BadRequest);
-  });
-
-  test("refuses a compaction limit below its floor", () => {
-    expect(() =>
-      parseLimits({
-        values: {
-          ...DEFAULT_LIMITS,
-          contextReserve: LIMIT_DEFINITIONS.contextReserve.min - 1,
-        },
-      }),
-    ).toThrow(BadRequest);
   });
 
   test("refuses a missing or unknown limit name", () => {

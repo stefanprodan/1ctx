@@ -15,7 +15,6 @@ import {
   pickedWords,
   progressWords,
   skippedLog,
-  skipWords,
   uploadTotals,
 } from "../../../src/client/views/knowledge/Upload.words.ts";
 import type {
@@ -831,12 +830,14 @@ describe("upload runs", () => {
   );
 
   test.serial(
-    "an item's refusal stays on its line and the run goes on",
+    "an archive item's refusal stays on its line and the run goes on",
     async () => {
       const h = setup();
-      await h.state.pick([archive("first.zip"), new PickedFile("next.md")]);
+      const zip = archive("first.zip");
+      await h.state.pick([zip, new PickedFile("next.md")]);
       const running = h.state.run();
       const first = await h.next(0);
+      expect(first.file).toBe(zip);
       first.answer.reject(
         refusal("notes.md changed while uploading, try again", 409),
       );
@@ -892,7 +893,9 @@ describe("upload runs", () => {
       expect(h.reloads).toBe(1);
       expect(progressWords(h.state)).toMatchObject({
         title: "Saved 1 file",
+        detail: "1 added",
         failed: "1 upload failed",
+        percent: 100,
       });
     },
   );
@@ -1303,25 +1306,6 @@ describe("upload runs", () => {
 });
 
 describe("upload logs", () => {
-  test("words every skip code without inserting a member name", () => {
-    const words: [KnowledgeUploadReason, string][] = [
-      ["not-regular", "not a regular file"],
-      ["outside", "outside the folder"],
-      ["no-letters", "no letters or digits"],
-      ["too-long", "name too long"],
-      ["bad-name", "bad name"],
-      ["duplicate", "duplicate name"],
-      ["too-big", "over the file limit"],
-      ["not-text", "not text"],
-      ["clash", "clashes with another"],
-      ["clash-live", "clashes with a file"],
-    ];
-    for (const [reason, expected] of words) {
-      expect(skipWords(reason)).toBe(expected);
-    }
-    expect(skipWords("upload-size")).toBe("over the 32 MB upload limit");
-  });
-
   test("byte progress uses one shared unit, including empty files", () => {
     expect(byteProgress(0, 0)).toBe("0 of 0 B");
     expect(byteProgress(3, 8)).toBe("3 of 8 B");

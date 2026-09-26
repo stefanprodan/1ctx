@@ -12,7 +12,7 @@ import { textLines } from "./lines.ts";
 // both texts' lines together, and the edits the script may need
 export const MAX_DIFF_LINES = 10_000;
 export const MAX_DIFF_EDITS = 1_000;
-export const DIFF_CONTEXT = 3;
+const DIFF_CONTEXT = 3;
 
 export type DiffOp = {
   kind: "same" | "add" | "del";

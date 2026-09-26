@@ -6,10 +6,9 @@
 // name leads to the author's page when the author is known.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import { clock, initials } from "../lib/format.ts";
+import { clock, initials, uploadNote } from "../lib/format.ts";
 import { userHref } from "../lib/hrefs.ts";
 import { FileChip } from "../ui/FileChip.tsx";
-import { plural, sizeWords } from "../views/knowledge/Knowledge.model.ts";
 
 export function UserRow({
   message: m,
@@ -44,11 +43,7 @@ export function UserRow({
                 key={index}
                 name={item.name}
                 archive={item.archive}
-                note={
-                  item.archive
-                    ? plural(item.files, "file")
-                    : sizeWords(item.bytes)
-                }
+                note={uploadNote(item)}
               />
             ))}
           </div>

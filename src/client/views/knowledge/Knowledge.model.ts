@@ -13,16 +13,11 @@ import type {
   KnowledgeFile,
   KnowledgeTotals,
 } from "../../../shared/contracts/knowledge.ts";
-import { ago, count } from "../../lib/format.ts";
+import { ago, count, plural } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import type { IconName } from "../../lib/icons.tsx";
 import { FOLDER_ROWS, type TreeFolder } from "../../lib/tree.ts";
 import type { RowsTreeNode } from "../../ui/Rows.tsx";
-
-// "1 file", "6.6K tokens"
-export function plural(n: number, word: string): string {
-  return `${count(n)} ${word}${n === 1 ? "" : "s"}`;
-}
 
 // the aside's line: "6 files · 6.6K tokens"
 export function knowledgeWords(counts: KnowledgeCounts | KnowledgeTotals) {
@@ -41,6 +36,24 @@ export function fileHref(
   const at = line === undefined ? "" : `?line=${line}`;
   return `${project(projectId)}/files/${encodeURIComponent(fileId)}${at}`;
 }
+
+// a past revision's page; the file itself when it is the latest
+export function revisionHref(
+  projectId: string,
+  fileId: string,
+  revision: number,
+  latest?: number,
+): string {
+  const file = fileHref(projectId, fileId);
+  return revision === latest ? file : `${file}?revision=${revision}`;
+}
+
+export const historyHref = (projectId: string, fileId: string): string =>
+  `${fileHref(projectId, fileId)}?history`;
+
+// a file just brought back from the bin
+export const restoredHref = (projectId: string, fileId: string): string =>
+  `${fileHref(projectId, fileId)}?restored`;
 
 export function newFileHref(projectId: string): string {
   return `${project(projectId)}/new`;
@@ -92,7 +105,7 @@ export function authorOf(author: KnowledgeAuthor): AuthorWords {
 }
 
 // an agent's write stands out in the tree for this long
-export const FRESH_MS = 3 * 86_400_000;
+const FRESH_MS = 3 * 86_400_000;
 
 export function fresh(file: KnowledgeFile, now: number): boolean {
   return file.author.kind === "agent" && now - file.updatedAt < FRESH_MS;
@@ -252,7 +265,7 @@ export function pathParts(name: string): { dir: string; base: string } {
 }
 
 // a text in runs, every place it holds q marked, not case-sensitive
-export type Marked = { text: string; mark: boolean }[];
+type Marked = { text: string; mark: boolean }[];
 
 export function marked(text: string, q: string): Marked {
   const needle = q.toLowerCase();
@@ -303,21 +316,4 @@ export function keptWords(historyDays: number): string {
 
 export function emptyAsk(files: number): string {
   return `Are you sure you want to permanently erase ${plural(files, "file")}?`;
-}
-
-// a size as a field says it: "256 KB", "4 MB"
-// three significant digits, but never a rounded thousand: 1,023.5 MB
-// to three digits is "1020 MB", so the next unit takes over at 1,000
-export function sizeWords(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  let value = bytes;
-  for (const unit of ["KB", "MB", "GB"]) {
-    value /= 1024;
-    if (value < 1000 || unit === "GB") {
-      const shown =
-        value < 100 ? Number(value.toPrecision(3)) : Math.round(value);
-      return `${shown} ${unit}`;
-    }
-  }
-  return `${bytes} B`;
 }

@@ -6,8 +6,8 @@
 // picked file that was refused first, then what each archive dropped,
 // named under the folder the archive lands in.
 
-import { plural, sizeWords } from "../views/knowledge/Knowledge.model.ts";
-import { skipWords } from "../views/knowledge/Upload.words.ts";
+import { plural, uploadNote } from "../lib/format.ts";
+import { skipWords } from "../lib/pick.ts";
 import type { AttachItem, AttachSkip } from "./Attach.state.ts";
 
 export const LOG_FOLD = 5;
@@ -69,9 +69,7 @@ export function attachedLines(items: readonly AttachItem[]): AttachedLine[] {
         item.phase === "sending"
           ? `sending ${percent(item)}%`
           : item.phase === "staged"
-            ? item.archive
-              ? plural(item.files, "file")
-              : sizeWords(item.bytes)
+            ? uploadNote(item)
             : item.phase,
       running: item.phase === "sending" || item.phase === "checking",
     }));

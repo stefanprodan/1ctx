@@ -6,13 +6,12 @@
 // with them. The aside is how to reach them and when it is for them;
 // where it is hidden, the head carries the email and the local time.
 
-import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { person, personError } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { initials, longDate } from "../../lib/format.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
+import { useNow } from "../../lib/now.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -22,27 +21,19 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { peopleLine } from "../projects/Project.model.ts";
-import { localTime } from "./People.model.ts";
+import { localTime, roleWords } from "./People.model.ts";
 import "./people.css";
-
-// the local time moves on the minute
-const MINUTE = 60 * 1000;
 
 export function User({ params }: { params: Params }) {
   const username = params.username ?? "";
   const answer = person.value;
   const shown =
     answer !== null && answer.user.username === username ? answer : null;
-  const now = useSignal(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      now.value = Date.now();
-    }, MINUTE);
-    return () => clearInterval(timer);
-  }, [now]);
+  // the local time moves on the minute
+  const now = useNow(60_000);
   const self = me.value?.id === shown?.user.id;
   return (
     <Page
@@ -55,34 +46,19 @@ export function User({ params }: { params: Params }) {
         <Split
           aside={
             <AsideSection label="Account">
-              <div class="split-line">
-                Email
-                <a class="split-strong cut" href={`mailto:${shown.user.email}`}>
-                  {shown.user.email}
-                </a>
-              </div>
-              <div class="split-line">
-                Role
-                <span class="split-strong">
-                  {shown.user.role === "admin" ? "Admin" : "Member"}
-                </span>
-              </div>
-              <div class="split-line">
-                Local time
-                <span class="split-strong">
-                  {localTime(shown.user.tz, now.value)}
-                </span>
-              </div>
-              <div class="split-line">
-                Zone
-                <span class="split-strong cut">{shown.user.tz}</span>
-              </div>
-              <div class="split-line">
-                Joined
-                <span class="split-strong">
-                  {longDate(shown.user.createdAt)}
-                </span>
-              </div>
+              <AsideLine label="Email" cut href={`mailto:${shown.user.email}`}>
+                {shown.user.email}
+              </AsideLine>
+              <AsideLine label="Role">{roleWords(shown.user.role)}</AsideLine>
+              <AsideLine label="Local time">
+                {localTime(shown.user.tz, now)}
+              </AsideLine>
+              <AsideLine label="Zone" cut>
+                {shown.user.tz}
+              </AsideLine>
+              <AsideLine label="Joined">
+                {longDate(shown.user.createdAt)}
+              </AsideLine>
             </AsideSection>
           }
         >
@@ -96,7 +72,7 @@ export function User({ params }: { params: Params }) {
               {/* the aside holds these, and it is hidden this narrow */}
               <WhoLine narrow>{shown.user.email}</WhoLine>
               <WhoLine narrow>
-                {localTime(shown.user.tz, now.value)} in {shown.user.tz}
+                {localTime(shown.user.tz, now)} in {shown.user.tz}
               </WhoLine>
             </Who>
             <section class="people-section">

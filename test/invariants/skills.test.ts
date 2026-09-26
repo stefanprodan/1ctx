@@ -12,9 +12,9 @@ import {
   type ChatApp,
   chatApp,
   startChat,
-  tick,
   waitScript,
 } from "../helpers/chat.ts";
+import { settle } from "../helpers/tool-loop.ts";
 
 const fixture = (name: string) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", "skills", name));
@@ -393,14 +393,6 @@ const loadedSkill = (
   droppedMore: 0,
   files,
 });
-
-async function settle(chat: ChatApp, times = 6) {
-  for (let i = 0; i < times; i++) {
-    await tick();
-    chat.app.now.value += 200;
-    await tick();
-  }
-}
 
 function assign(chat: ChatApp, skills: LoadedSkill[]) {
   const rows = skills.map((skill, index) =>

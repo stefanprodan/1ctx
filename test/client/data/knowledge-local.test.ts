@@ -4,7 +4,7 @@
 // What the knowledge pages keep in this browser: an unsaved edit per
 // user and file, and the tree's open folders per user and project.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import {
   DRAFT_PAUSE_MS,
   draftBehind,
@@ -42,6 +42,7 @@ function storage(value: object): void {
 }
 
 beforeEach(() => {
+  jest.useFakeTimers();
   rows = new Map();
   storage({
     getItem: (key: string) => rows.get(key) ?? null,
@@ -52,17 +53,22 @@ beforeEach(() => {
   me.value = reader;
 });
 
+// a flush that throws, over a storage stub left throwing, must not
+// leave fake timers on for the files that run after this one
 afterEach(() => {
-  flushDrafts();
-  if (realStorage === undefined) {
-    Reflect.deleteProperty(globalThis, "localStorage");
-  } else {
-    Object.defineProperty(globalThis, "localStorage", realStorage);
+  try {
+    flushDrafts();
+  } finally {
+    jest.useRealTimers();
+    if (realStorage === undefined) {
+      Reflect.deleteProperty(globalThis, "localStorage");
+    } else {
+      Object.defineProperty(globalThis, "localStorage", realStorage);
+    }
   }
 });
 
-const pause = () =>
-  new Promise((resolve) => setTimeout(resolve, DRAFT_PAUSE_MS + 30));
+const pause = () => jest.advanceTimersByTime(DRAFT_PAUSE_MS + 30);
 
 describe("a draft", () => {
   test.serial(

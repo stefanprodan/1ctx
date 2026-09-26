@@ -303,6 +303,10 @@ describe("MCP servers over the routes", () => {
   test("shutdown aborts a running discovery, writes no failure, and refuses the next", async () => {
     const recorded = await fixture("flux");
     let hang = false;
+    let reached!: () => void;
+    const hung = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
     const flux = mcpFetch({ recorded });
     const hanging = (async (
       input: string | URL | Request,
@@ -313,6 +317,7 @@ describe("MCP servers over the routes", () => {
         init?.signal?.addEventListener("abort", () =>
           reject(new DOMException("aborted", "AbortError")),
         );
+        reached();
       });
     }) as typeof fetch;
     const { app, client } = await setup({ servers: { "flux.test": hanging } });
@@ -321,7 +326,7 @@ describe("MCP servers over the routes", () => {
     ).json();
     hang = true;
     const pending = client.call("POST", `/api/mcp/${server.id}/refresh`);
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await hung;
     await app.shutdown();
     const ended = await pending;
     expect(ended.status).toBe(502);

@@ -40,3 +40,19 @@ export function textLines(text: string): string[] {
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
   return lines;
 }
+
+// a text folded to its first max lines unless expanded; a text of max
+// lines or fewer is never cut, and a trailing newline is no line
+export function cutLines(
+  text: string,
+  max: number,
+  expanded: boolean,
+): { text: string; cut: boolean; lines: number } {
+  const lines = text.replace(/\n$/, "").split("\n");
+  const cut = lines.length > max;
+  return {
+    text: cut && !expanded ? lines.slice(0, max).join("\n") : text,
+    cut,
+    lines: lines.length,
+  };
+}

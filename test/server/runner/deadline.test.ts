@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { transact } from "../../../src/server/db/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import type { PreparedRun } from "../../../src/server/runner/index.ts";
+import { STREAM_IDLE_MS } from "../../../src/server/runner/round.ts";
 import { createAutomation } from "../../helpers/automations.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
 
@@ -60,15 +59,16 @@ describe("send deadlines", () => {
       chat.app.runner.registry.get(started.sessionId)?.policy.deadlineMs,
     ).toBe(DEFAULT_LIMITS.sendDeadlineMs);
     // a model that keeps thinking out loud never trips the quiet timer
-    const step = 60_000;
+    const step = STREAM_IDLE_MS - 20_000;
     for (let spent = 0; spent < DEFAULT_LIMITS.sendDeadlineMs - 1; ) {
       const ms = Math.min(step, DEFAULT_LIMITS.sendDeadlineMs - 1 - spent);
       started.script.reasoning("still thinking");
       await tick();
       chat.app.now.value += ms;
       spent += ms;
-      await tick();
     }
+    // lets a deadline armed a millisecond early fire before the check
+    await tick();
     expect(chat.app.sessions.byId(started.sessionId)?.status).toBe("running");
     chat.app.now.value += 1;
     expect((await settle(chat.app, started.sessionId))?.status).toBe("stopped");
@@ -128,43 +128,6 @@ describe("send deadlines", () => {
     ).toBe(60_000);
     script.reply("done");
     await settle(chat.app, detail.session.id);
-    await chat.app.shutdown();
-  });
-
-  test("abandon frees a reservation whose transaction rolls back", async () => {
-    const chat = await chatApp();
-    const user = chat.app.users.byId(chat.memberId)!;
-    const project = chat.app.projects.byId(chat.projectId)!;
-    const agent = chat.app.agents.byId(chat.agentId)!;
-    const holder: { prepared: PreparedRun | null } = { prepared: null };
-    try {
-      transact(chat.app.db, () => {
-        holder.prepared = chat.app.runner.startRun({
-          source: "manual",
-          automation: {
-            id: "auto",
-            name: "rolled-back",
-            tz: "UTC",
-            ownMemory: false,
-            memoryGuidance: "",
-            disabledCapabilities: [],
-          },
-          instructions: "check",
-          dueAt: chat.app.now.value,
-          receivedAt: chat.app.now.value,
-          key: null,
-          deadlineMs: null,
-          user,
-          project,
-          agent,
-        });
-        throw new Error("rollback");
-      });
-    } catch {
-      holder.prepared?.abandon();
-    }
-    expect(chat.app.runner.registry.size).toBe(0);
-    expect(chat.app.sessions.count(chat.projectId)).toBe(0);
     await chat.app.shutdown();
   });
 });

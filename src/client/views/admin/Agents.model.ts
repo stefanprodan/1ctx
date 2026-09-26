@@ -7,17 +7,8 @@
 // window, a price and a key.
 
 import { compactsAt } from "../../../shared/compaction.ts";
-import type { AgentServer } from "../../../shared/contracts/mcp.ts";
-import { windowLine } from "../../agents/meta.ts";
-
-export {
-  modelMeta,
-  priceLine,
-  thinkingLine,
-  windowLine,
-} from "../../agents/meta.ts";
-
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
+import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import {
   EFFORTS,
@@ -27,12 +18,13 @@ import {
   MIN_CONTEXT_LENGTH,
   type Wire,
 } from "../../../shared/words.ts";
+import { windowLine } from "../../agents/meta.ts";
 
 // what New provider offers: a server speaking the OpenAI chat shape with
 // the local servers' extra fields, or one that refuses anything outside
 // the spec, whose addresses are typed, then OpenRouter and Google AI
 // Studio, whose addresses are known
-export type Preset = {
+type Preset = {
   wire: Wire;
   label: string;
   text: string;
@@ -73,12 +65,6 @@ export const PRESETS: Preset[] = [
 ];
 export const preset = (wire: Wire): Preset =>
   PRESETS.find((p) => p.wire === wire) ?? PRESETS[0];
-
-// the field shapes the name as it is typed and the server holds the
-// rule, so the one slip worth catching here is an empty field
-export function nameProblem(value: string): string | null {
-  return value.trim() === "" ? "Enter a name" : null;
-}
 
 export function baseUrlProblem(value: string): string | null {
   const v = value.trim();
@@ -207,13 +193,6 @@ export function skillsCount(chosen: number, cap: number): string {
   return `${chosen} of ${cap}`;
 }
 
-// the same ids in any order
-export function sameIds(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const set = new Set(a);
-  return b.every((id) => set.has(id));
-}
-
 // the same servers with the same sides, in any order
 export function sameServers(a: AgentServer[], b: AgentServer[]): boolean {
   if (a.length !== b.length) return false;
@@ -240,16 +219,17 @@ export function toggleSide(
   ];
 }
 
-// a server deleted since the agent was saved is not a line, and it
-// goes from the save too, since the server would refuse the id; when
-// the list did not load, the links are kept as they are
-export function listedServers(
-  links: AgentServer[],
+// a server or a skill deleted since the agent was saved is not a line,
+// and it goes from the save too, since the server would refuse the id;
+// when the list did not load, the picks are kept as they are
+export function listed<T>(
+  picks: T[],
+  idOf: (pick: T) => string,
   rows: { id: string }[] | null,
-): AgentServer[] {
+): T[] {
   return rows === null
-    ? links
-    : links.filter((s) => rows.some((r) => r.id === s.serverId));
+    ? picks
+    : picks.filter((p) => rows.some((r) => r.id === idOf(p)));
 }
 
 // the window an admin types for a model its catalog does not describe:
@@ -269,7 +249,7 @@ export function contextProblem(value: string, tools: boolean): string | null {
 }
 
 // the typed window as the body carries it, null when empty
-export function contextValue(value: string): number | null {
+function contextValue(value: string): number | null {
   const v = value.trim().replaceAll(/[,_ ]/g, "");
   return v === "" ? null : Number(v);
 }

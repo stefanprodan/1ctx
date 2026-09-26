@@ -16,8 +16,10 @@
     gap: var(--space-4);
   }
 
-  /* the avatar picker: the five robots, the chosen one lit */
-  .agents-avatars {
+  /* the avatar picker (the five robots) and the provider picker (one
+     chip per provider), the chosen one lit */
+  .agents-avatars,
+  .agents-picks {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
@@ -37,14 +39,6 @@
     color: var(--fg);
   }
 
-  /* the provider picker: one chip per provider, the chosen one lit */
-  .agents-picks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-height: 36px;
-    align-items: center;
-  }
   .agents-pick {
     height: 30px;
     padding: 0 var(--space-3);

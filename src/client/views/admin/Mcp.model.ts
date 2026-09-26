@@ -30,6 +30,7 @@ import {
   type McpMode,
 } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
+import { cutLines } from "../../lib/lines.ts";
 import { NO_KEY } from "../../lib/secrets.ts";
 
 // the head under the name: the tools and the last good check, or the
@@ -117,15 +118,7 @@ export function settingsDirty(
   );
 }
 
-export function patternsOf(server: McpServerSummary): Patterns {
-  return {
-    read: server.readPatterns,
-    write: server.writePatterns,
-    excluded: server.excludedPatterns,
-  };
-}
-
-export type ToolGroups = {
+type ToolGroups = {
   read: McpToolSummary[];
   write: McpToolSummary[];
   excluded: McpToolSummary[];
@@ -218,7 +211,7 @@ export function isModeValue(value: string): value is McpMode {
 
 // the instructions box: the block as the prompt carries it, its first
 // lines when folded; a block of INSTRUCTIONS_LINES or fewer is never cut
-export const INSTRUCTIONS_LINES = 12;
+const INSTRUCTIONS_LINES = 12;
 
 export function instructionsBox(
   name: string,
@@ -226,14 +219,9 @@ export function instructionsBox(
   expanded: boolean,
 ): { text: string; cut: boolean; count: number; lines: number } {
   const block = serverBlock(name, instructions).replace(/\n$/, "");
-  const lines = block.split("\n");
-  const cut = lines.length > INSTRUCTIONS_LINES;
   return {
-    text:
-      cut && !expanded ? lines.slice(0, INSTRUCTIONS_LINES).join("\n") : block,
-    cut,
+    ...cutLines(block, INSTRUCTIONS_LINES, expanded),
     count: block.length,
-    lines: lines.length,
   };
 }
 

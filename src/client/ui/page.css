@@ -59,10 +59,7 @@
     line-height: 1;
   }
 
-  /* one line: the section dim, the slash fainter, the title lit. Its
-     line height is the label's, so it sits on the rail's logo row the
-     way the Home label does */
-  /* the crumb takes the head's room up to the aside, so a title box
+  /* the crumb takes the head's room up to the actions, so a title box
      in it can fill the row; its items keep their content's width */
   .page-crumb {
     display: flex;
@@ -155,15 +152,9 @@
     align-items: flex-end;
     gap: var(--space-4);
     min-width: 0;
-    max-width: 900px;
   }
   .page-head-notice .page-head-main {
     flex-wrap: wrap;
-  }
-  @media (max-width: 1099px) {
-    .page-head-main {
-      max-width: none;
-    }
   }
   @media (min-width: 1100px) {
     .page-head-main {
@@ -209,19 +200,9 @@
     gap: var(--space-2);
   }
 
-  .page-aside {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: var(--text-label);
-    color: var(--faint);
-  }
-
   .page-actions {
     display: flex;
     gap: var(--space-2);
-  }
-  .page-aside + .page-actions {
-    margin-left: 0;
   }
   .page-heading + .page-actions,
   .page-crumb + .page-actions {
@@ -282,7 +263,6 @@
   @media (max-width: 719px) {
     /* the button drops under the words, lined up with them */
     .page-failed-retry {
-      flex-basis: auto;
       margin-left: calc(20px + var(--space-3));
     }
     .page-crumb {

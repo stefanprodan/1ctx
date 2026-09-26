@@ -183,16 +183,11 @@ describe("GET /api/usage/days", () => {
     await chat.app.shutdown();
   });
 
-  test("rejects every malformed timezone query", async () => {
+  // the query rules are parseDaysUsageQuery's table; one of each family here
+  test("answers 400 to a malformed timezone or weeks query", async () => {
     const chat = await chatApp();
     for (const path of [
-      "/api/usage/days",
-      "/api/usage/days?tz=",
-      "/api/usage/days?tz=UTC&tz=Europe%2FBucharest",
-      `/api/usage/days?tz=${"a".repeat(65)}`,
       "/api/usage/days?tz=Mars%2FOlympus",
-      "/api/usage/days?tz=UTC&extra=1",
-      "/api/usage/days?tz=UTC&weeks=0",
       "/api/usage/days?tz=UTC&weeks=54",
     ]) {
       expect((await chat.member.call("GET", path)).status, path).toBe(400);

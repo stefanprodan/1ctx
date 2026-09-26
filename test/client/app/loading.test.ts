@@ -212,14 +212,4 @@ describe("startLoading", () => {
     await reload();
     expect(calls).toEqual(["thing a", "thing a", "thing a"]);
   });
-
-  test("a member on an admin route loads nothing; an admin does", () => {
-    const { routes, calls } = table();
-    me.value = casey;
-    path.value = "/admin/x";
-    stop = startLoading(routes);
-    expect(calls).toEqual([]);
-    me.value = { ...casey, id: "a1", role: "admin" };
-    expect(calls).toEqual(["admin"]);
-  });
 });

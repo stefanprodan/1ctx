@@ -10,6 +10,7 @@ import type {
   DaysUsageResponse,
   WeekUsageResponse,
 } from "../../shared/api/usage.ts";
+import { browserZone } from "../lib/zone.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
@@ -21,8 +22,6 @@ export const RECENT_WEEKS = 16;
 
 const MAX_TIMEOUT = 2_147_483_647;
 
-// both routes count calendar days in the browser's zone
-const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 // a server clock a little behind the browser answers midnight with the
 // same until, so the reload waits past it and never less than a minute
 const MIDNIGHT_SLACK = 5_000;
@@ -60,7 +59,7 @@ function daysEntity(weeks: number | null) {
     const forUser = owner;
     const mine = ++turn;
     const current = () => owner === forUser && mine === turn;
-    const query = `tz=${encodeURIComponent(zone())}${
+    const query = `tz=${encodeURIComponent(browserZone())}${
       weeks === null ? "" : `&weeks=${weeks}`
     }`;
     try {
@@ -116,7 +115,7 @@ export async function loadWeek(): Promise<void> {
   const current = () => owner === forUser && mine === weekTurn;
   try {
     const body = await api<WeekUsageResponse>(
-      `/api/usage/week?tz=${encodeURIComponent(zone())}`,
+      `/api/usage/week?tz=${encodeURIComponent(browserZone())}`,
     );
     if (current()) week.value = body;
   } catch {

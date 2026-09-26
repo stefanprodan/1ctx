@@ -31,21 +31,9 @@ import {
   emptyAsk,
   fileHref,
   keptWords,
-  pathParts,
 } from "./Knowledge.model.ts";
+import { PathName } from "./PathName.tsx";
 import "./knowledge.css";
-
-// a path with its folder faint, the name as it stands; a long path
-// cuts its folder, never the name, until the name alone is too long
-export function PathName({ name }: { name: string }) {
-  const { dir, base } = pathParts(name);
-  return (
-    <span class="knowledge-path">
-      {dir !== "" && <span class="knowledge-dir">{dir}</span>}
-      <span class="knowledge-base">{base}</span>
-    </span>
-  );
-}
 
 export function RecentList({
   projectId,

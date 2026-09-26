@@ -11,6 +11,7 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type { IndexEntry } from "../../../shared/contracts/skill.ts";
 import { addSkill, discoverSkills, skills } from "../../data/skills.ts";
+import { firstSentence } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
@@ -22,7 +23,6 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import {
-  firstSentence,
   formKind,
   pathProblem,
   submitLabel,
@@ -120,10 +120,7 @@ export function SkillForm({ onDone }: { onDone: () => void }) {
               aria-invalid={invalid("path") || undefined}
               disabled={busy}
               value={path.value}
-              onInput={(e) => {
-                path.value = (e.currentTarget as HTMLInputElement).value;
-                save.touch();
-              }}
+              onInput={save.bind(path)}
             />
             {invalid("path") ? (
               <FieldError save={save} field="path" />

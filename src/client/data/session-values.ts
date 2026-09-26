@@ -9,6 +9,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
+import { baseName } from "../lib/tree.ts";
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { fileKey, visualKey } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
@@ -200,7 +201,7 @@ export async function loadOpened(
     if (visual) {
       toolVisuals.value = new Map(toolVisuals.value).set(key, {
         status: "done",
-        title: body.title || file.path.split("/").pop() || file.path,
+        title: body.title || baseName(file.path),
         html: body.html,
       });
     } else {

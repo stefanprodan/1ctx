@@ -5,24 +5,18 @@
 
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
-import { longDate } from "../../lib/format.ts";
-
-export function plural(value: number, noun: string): string {
-  return `${value} ${noun}${value === 1 ? "" : "s"}`;
-}
+import { pluralCommas } from "../../lib/format.ts";
+import { stepHighlight } from "../../ui/Select.model.ts";
 
 // the line under the row's name: "3 members"
 export function countLine(project: ProjectSummary): string {
-  return plural(project.memberCount, "member");
-}
-
-// the row's right side: "since 14 September 2026"
-export function sinceLine(project: ProjectSummary): string {
-  return `since ${longDate(project.createdAt)}`;
+  return pluralCommas(project.memberCount, "member", "members");
 }
 
 export function deleteLabel(chats: number): string {
-  return chats === 0 ? "Delete" : `Delete with ${plural(chats, "chat")}`;
+  return chats === 0
+    ? "Delete"
+    : `Delete with ${pluralCommas(chats, "chat", "chats")}`;
 }
 
 // the people the picker offers: every user not in the project whose
@@ -45,12 +39,6 @@ export function candidates(
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
-// the arrow keys walk the list and wrap at either end
-export function step(index: number, delta: number, length: number): number {
-  if (length === 0) return 0;
-  return (((index + delta) % length) + length) % length;
-}
-
 // the faint word at a candidate's right
 export function candidateNote(user: UserAccount): string {
   if (user.disabled) return "disabled";
@@ -63,4 +51,10 @@ export function projectFieldOf(message: string): string | undefined {
   if (message.startsWith("name")) return "name";
   if (message.startsWith("description")) return "description";
   return undefined;
+}
+
+// an arrow in the member list; an empty list keeps 0, so the refilled
+// list starts at the top
+export function stepMember(active: number, length: number, by: 1 | -1) {
+  return Math.max(0, stepHighlight(active, length, by));
 }

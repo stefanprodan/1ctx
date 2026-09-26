@@ -18,8 +18,9 @@ import {
   updateProject,
 } from "../../data/admin-projects.ts";
 import { initials } from "../../lib/format.ts";
+import { nameProblem } from "../../lib/names.ts";
 import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
-import { Foot } from "../../ui/Foot.tsx";
+import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import {
   RowsAvatar,
   RowsEnd,
@@ -28,7 +29,6 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { nameProblem } from "../projects/Project.model.ts";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import { deleteLabel, projectFieldOf } from "./AdminProjects.model.ts";
 import { MemberPicker } from "./MemberPicker.tsx";
@@ -86,9 +86,10 @@ export function ProjectForm({
       name: name.value.trim(),
       description: description.value.trim(),
     };
-    if (project === null) await createProject(body);
-    else await updateProject(project.id, body);
-    if (project === null) onDone();
+    if (project === null) {
+      await createProject(body);
+      onDone();
+    } else await updateProject(project.id, body);
   }, projectFieldOf);
   useFocusField(save, form);
   const remove = async () => {
@@ -156,41 +157,14 @@ export function ProjectForm({
           start={
             project === null ? (
               <span />
-            ) : asking.value ? (
-              <>
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  disabled={busy}
-                  onClick={() => void remove()}
-                >
-                  {save.pending.value === "delete"
-                    ? "Deleting"
-                    : deleteLabel(project.chats)}
-                </button>
-                <button
-                  type="button"
-                  class="btn"
-                  disabled={busy}
-                  onClick={() => {
-                    asking.value = false;
-                    save.touch();
-                  }}
-                >
-                  Keep
-                </button>
-              </>
             ) : (
-              <button
-                type="button"
-                class="btn"
-                disabled={busy}
-                onClick={() => {
-                  asking.value = true;
-                }}
-              >
-                Delete
-              </button>
+              <AskDelete
+                save={save}
+                asking={asking}
+                busy={busy}
+                label={deleteLabel(project.chats)}
+                onDelete={() => void remove()}
+              />
             )
           }
           before={

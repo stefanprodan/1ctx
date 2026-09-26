@@ -7,7 +7,7 @@
 
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import { Icon, projectIcon } from "../lib/icons.tsx";
-import { useMenu } from "./menu.ts";
+import { useMenu } from "../lib/menu.ts";
 
 export function ProjectPicker({
   projects,
@@ -33,7 +33,9 @@ export function ProjectPicker({
         <span class="avatar avatar-18 avatar-agent">
           <Icon name={projectIcon(picked?.kind ?? "team")} size={12} />
         </span>
-        <span class="composer-chip-name">{picked?.name ?? "no project"}</span>
+        <span class="composer-chip-name cut">
+          {picked?.name ?? "no project"}
+        </span>
         <Icon name="chevron" size={12} />
       </button>
       {open.value && (

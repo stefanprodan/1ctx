@@ -16,9 +16,9 @@ import {
   lengthBars,
   lengthWord,
   memoryTile,
+  modelLabel,
   money,
   runsTile,
-  shortModel,
   sinceWords,
   staleWords,
   tokensTile,
@@ -211,9 +211,9 @@ describe("the breakdowns", () => {
   });
 
   test("a model loses its org unless a bare word is left", () => {
-    expect(shortModel("mlx-community/LFM2.5-8B")).toBe("LFM2.5-8B");
-    expect(shortModel("openrouter/free")).toBe("openrouter/free");
-    expect(shortModel("gemini-3.8-flash")).toBe("gemini-3.8-flash");
+    expect(modelLabel("mlx-community/LFM2.5-8B")).toBe("LFM2.5-8B");
+    expect(modelLabel("openrouter/free")).toBe("openrouter/free");
+    expect(modelLabel("gemini-3.8-flash")).toBe("gemini-3.8-flash");
   });
 
   test("turn lengths and their bars", () => {

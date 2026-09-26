@@ -4,27 +4,12 @@
 // What the uploader says: each picked item, each run line, the head over
 // the bar and the skipped log, from the state and the server's answers.
 
-import { plural, sizeWords } from "./Knowledge.model.ts";
-import type { Skip, UploadItem, UploadState } from "./Upload.state.ts";
+import { plural, sizeWords } from "../../lib/format.ts";
+import { skipWords } from "../../lib/pick.ts";
+import type { UploadItem, UploadState } from "./Upload.state.ts";
 
 export const FOLDER_HINT =
   "The root when empty. Names are saved lowercase with dashes, so My Docs/On Call.md becomes my-docs/on-call.md";
-export function skipWords(reason: Skip): string {
-  const words: Record<Skip, string> = {
-    "not-regular": "not a regular file",
-    outside: "outside the folder",
-    "no-letters": "no letters or digits",
-    "too-long": "name too long",
-    "bad-name": "bad name",
-    duplicate: "duplicate name",
-    "too-big": "over the file limit",
-    "not-text": "not text",
-    clash: "clashes with another",
-    "clash-live": "clashes with a file",
-    "upload-size": "over the 32 MB upload limit",
-  };
-  return words[reason];
-}
 export function pickedWords(item: UploadItem): string {
   if (item.outcome?.type === "skipped") return skipWords(item.outcome.reason);
   const kind =

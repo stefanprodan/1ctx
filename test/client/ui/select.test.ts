@@ -61,5 +61,13 @@ describe("the highlight", () => {
     expect(stepHighlight(-1, 3, 1)).toBe(0);
     expect(stepHighlight(-1, 3, -1)).toBe(2);
     expect(stepHighlight(1, 0, 1)).toBe(-1);
+    expect(stepHighlight(0, 0, 1)).toBe(-1);
+    expect(stepHighlight(0, 0, -1)).toBe(-1);
+  });
+
+  test("a list that is never empty wraps as the composer's commands do", () => {
+    expect(stepHighlight(0, 3, 1)).toBe(1);
+    expect(stepHighlight(2, 3, 1)).toBe(0);
+    expect(stepHighlight(0, 3, -1)).toBe(2);
   });
 });

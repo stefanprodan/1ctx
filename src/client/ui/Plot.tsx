@@ -33,6 +33,37 @@ const padded = (u: uPlot, min: number, max: number): uPlot.Range.MinMax => {
 // a repaint from the data, since redraw(true) pads the padded range again
 const repaint = (u: uPlot | null) => u?.setData(u.data);
 
+// A plot made by build on mount and when deps change, sized to its
+// box as the box resizes, repainted on a theme flip, destroyed on
+// unmount.
+function usePlot(build: (el: HTMLDivElement) => uPlot, deps: unknown[]) {
+  const box = useRef<HTMLDivElement>(null);
+  const plot = useRef<uPlot | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const u = build(el);
+    plot.current = u;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth > 0 && el.clientWidth !== u.width) {
+        u.setSize({ width: el.clientWidth, height: el.clientHeight });
+      }
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      u.destroy();
+      plot.current = null;
+    };
+  }, deps);
+  // read in the render, so a theme flip draws the plot again
+  const shade = theme.value;
+  useLayoutEffect(() => {
+    repaint(plot.current);
+  }, [shade]);
+  return { box, plot };
+}
+
 type Box = [number, number, number, number];
 
 // Bars that remember where uPlot drew them, for a hook to paint over.
@@ -104,96 +135,78 @@ export function Spark({
   top?: number;
   zoom?: (min: number, max: number) => [number, number];
 }) {
-  const box = useRef<HTMLDivElement>(null);
-  const plot = useRef<uPlot | null>(null);
   // the hook reads the latest callback without the plot being rebuilt
   const hear = useRef(onCursor);
   hear.current = onCursor;
   const scale = useRef({ top, zoom });
   scale.current = { top, zoom };
 
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const bars = kind === "bars" ? focusBars(6) : null;
-    const u = new uPlot(
-      {
-        width: el.clientWidth,
-        height: el.clientHeight,
-        padding: [6, 6, 2, 6],
-        legend: { show: false },
-        cursor: {
-          sync: { key: sync, setSeries: false },
-          drag: { x: false, y: false },
-          y: false,
-          points: { show: false },
-        },
-        scales: {
-          x: { time: true, range: bars ? padded : undefined },
-          y: {
-            range: (_u, min, max) => {
-              const { top, zoom } = scale.current;
-              return zoom ? zoom(min, max) : [0, top ?? (max || 1)];
+  const { box, plot } = usePlot(
+    (el) => {
+      const bars = kind === "bars" ? focusBars(6) : null;
+      const u = new uPlot(
+        {
+          width: el.clientWidth,
+          height: el.clientHeight,
+          padding: [6, 6, 2, 6],
+          legend: { show: false },
+          cursor: {
+            sync: { key: sync, setSeries: false },
+            drag: { x: false, y: false },
+            y: false,
+            points: { show: false },
+          },
+          scales: {
+            x: { time: true, range: bars ? padded : undefined },
+            y: {
+              range: (_u, min, max) => {
+                const { top, zoom } = scale.current;
+                return zoom ? zoom(min, max) : [0, top ?? (max || 1)];
+              },
             },
           },
-        },
-        axes: [{ show: false }, { show: false }],
-        series: [
-          {},
-          bars
-            ? {
-                stroke: () => token("--heat-2"),
-                fill: () => token("--heat-2"),
-                width: 0,
-                points: { show: false },
-                paths: bars.paths,
-              }
-            : {
-                stroke: () => token("--heat-2"),
-                width: 2,
-                points: {
-                  show: true,
-                  size: 8,
+          axes: [{ show: false }, { show: false }],
+          series: [
+            {},
+            bars
+              ? {
+                  stroke: () => token("--heat-2"),
+                  fill: () => token("--heat-2"),
+                  width: 0,
+                  points: { show: false },
+                  paths: bars.paths,
+                }
+              : {
+                  stroke: () => token("--heat-2"),
                   width: 2,
-                  stroke: () => token("--card"),
-                  fill: () => token("--brand"),
-                  // only the last point, today
-                  filter: (u) => [u.data[0].length - 1],
+                  points: {
+                    show: true,
+                    size: 8,
+                    width: 2,
+                    stroke: () => token("--card"),
+                    fill: () => token("--brand"),
+                    // only the last point, today
+                    filter: (u) => [u.data[0].length - 1],
+                  },
                 },
-              },
-        ],
-        hooks: {
-          draw: bars ? [bars.focus] : [],
-          setCursor: [
-            (u) => {
-              hear.current(u.cursor.idx ?? null);
-              if (bars) u.redraw(false, false);
-            },
           ],
+          hooks: {
+            draw: bars ? [bars.focus] : [],
+            setCursor: [
+              (u) => {
+                hear.current(u.cursor.idx ?? null);
+                if (bars) u.redraw(false, false);
+              },
+            ],
+          },
         },
-      },
-      [[], []],
-      el,
-    );
-    plot.current = u;
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth > 0 && el.clientWidth !== u.width) {
-        u.setSize({ width: el.clientWidth, height: el.clientHeight });
-      }
-    });
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-      u.destroy();
-      plot.current = null;
-    };
-  }, [kind, sync]);
-
-  // read in the render, so a theme flip draws the plot again
-  const shade = theme.value;
-  useLayoutEffect(() => {
-    repaint(plot.current);
-  }, [shade]);
+        [[], []],
+        el,
+      );
+      return u;
+    },
+    [kind, sync],
+  );
 
   useLayoutEffect(() => {
     plot.current?.setData([times.map((t) => t / 1000), values]);
@@ -231,114 +244,97 @@ export function DayBars({
   onCursor: (index: number | null) => void;
   sync?: string;
 }) {
-  const box = useRef<HTMLDivElement>(null);
-  const plot = useRef<uPlot | null>(null);
   const hear = useRef(onCursor);
   hear.current = onCursor;
   const say = useRef(words);
   say.current = words;
   const parts = series.length;
 
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    // the tallest bar is the whole stack, drawn first; each lower part
-    // is drawn over it, so the top series holds the column's box
-    const bars = fadeBars(28);
-    const plain = uPlot.paths.bars?.({ size: [0.72, 28], radius: [0, 0] });
-    const font = () => `${token("--text-tiny")} ${token("--mono")}`;
-    const axis = {
-      stroke: () => token("--faint"),
-      ticks: { show: false },
-      gap: 6,
-    };
-    const u = new uPlot(
-      {
-        width: el.clientWidth,
-        height: el.clientHeight,
-        legend: { show: false },
-        cursor: {
-          ...(sync ? { sync: { key: sync, setSeries: false } } : {}),
-          drag: { x: false, y: false },
-          y: false,
-          points: { show: false },
-        },
-        scales: {
-          x: { time: true, range: padded },
-          y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] },
-        },
-        axes: [
-          {
-            ...axis,
-            font: font(),
-            size: 24,
-            grid: { show: false },
-            // a tick on a day, never between two, every few days when
-            // they would crowd
-            splits: (u) => {
-              const all = u.data[0] as number[];
-              const room = Math.max(
-                1,
-                Math.floor(u.bbox.width / devicePixelRatio / 64),
-              );
-              const step = Math.max(1, Math.ceil(all.length / room));
-              return all.filter((_, i) => (all.length - 1 - i) % step === 0);
+  const { box, plot } = usePlot(
+    (el) => {
+      // the tallest bar is the whole stack, drawn first; each lower part
+      // is drawn over it, so the top series holds the column's box
+      const bars = fadeBars(28);
+      const plain = uPlot.paths.bars?.({ size: [0.72, 28], radius: [0, 0] });
+      const font = () => `${token("--text-tiny")} ${token("--mono")}`;
+      const axis = {
+        stroke: () => token("--faint"),
+        ticks: { show: false },
+        gap: 6,
+      };
+      const u = new uPlot(
+        {
+          width: el.clientWidth,
+          height: el.clientHeight,
+          legend: { show: false },
+          cursor: {
+            ...(sync ? { sync: { key: sync, setSeries: false } } : {}),
+            drag: { x: false, y: false },
+            y: false,
+            points: { show: false },
+          },
+          scales: {
+            x: { time: true, range: padded },
+            y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] },
+          },
+          axes: [
+            {
+              ...axis,
+              font: font(),
+              size: 24,
+              grid: { show: false },
+              // a tick on a day, never between two, every few days when
+              // they would crowd
+              splits: (u) => {
+                const all = u.data[0] as number[];
+                const room = Math.max(
+                  1,
+                  Math.floor(u.bbox.width / devicePixelRatio / 64),
+                );
+                const step = Math.max(1, Math.ceil(all.length / room));
+                return all.filter((_, i) => (all.length - 1 - i) % step === 0);
+              },
+              values: (_u, splits) => splits.map((t) => dayMonth(t * 1000)),
             },
-            values: (_u, splits) => splits.map((t) => dayMonth(t * 1000)),
-          },
-          {
-            ...axis,
-            font: font(),
-            size: 52,
-            space: 32,
-            grid: { stroke: () => token("--line"), width: 1 },
-            values: (_u, splits) => splits.map((v) => say.current(v)),
-          },
-        ],
-        series: [
-          {},
-          ...Array.from({ length: parts }, (_, k) => {
-            const name = STACK_TOKENS[parts - 1 - k] ?? "--heat-3";
-            return {
-              stroke: () => token(name),
-              fill: () => token(name),
-              width: 0,
-              points: { show: false },
-              paths: k === 0 ? bars.paths : plain,
-            };
-          }),
-        ],
-        hooks: {
-          draw: [bars.fade],
-          setCursor: [
-            (u) => {
-              hear.current(u.cursor.idx ?? null);
-              u.redraw(false, false);
+            {
+              ...axis,
+              font: font(),
+              size: 52,
+              space: 32,
+              grid: { stroke: () => token("--line"), width: 1 },
+              values: (_u, splits) => splits.map((v) => say.current(v)),
             },
           ],
+          series: [
+            {},
+            ...Array.from({ length: parts }, (_, k) => {
+              const name = STACK_TOKENS[parts - 1 - k] ?? "--heat-3";
+              return {
+                stroke: () => token(name),
+                fill: () => token(name),
+                width: 0,
+                points: { show: false },
+                paths: k === 0 ? bars.paths : plain,
+              };
+            }),
+          ],
+          hooks: {
+            draw: [bars.fade],
+            setCursor: [
+              (u) => {
+                hear.current(u.cursor.idx ?? null);
+                u.redraw(false, false);
+              },
+            ],
+          },
         },
-      },
-      [[], ...Array.from({ length: parts }, () => [] as number[])],
-      el,
-    );
-    plot.current = u;
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth > 0 && el.clientWidth !== u.width) {
-        u.setSize({ width: el.clientWidth, height: el.clientHeight });
-      }
-    });
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-      u.destroy();
-      plot.current = null;
-    };
-  }, [parts, sync]);
-
-  const shade = theme.value;
-  useLayoutEffect(() => {
-    repaint(plot.current);
-  }, [shade]);
+        [[], ...Array.from({ length: parts }, () => [] as number[])],
+        el,
+      );
+      return u;
+    },
+    [parts, sync],
+  );
 
   useLayoutEffect(() => {
     // each part stacked on the ones under it, the whole stack first

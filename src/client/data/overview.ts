@@ -16,6 +16,7 @@ import {
   type StorageResponse,
 } from "../../shared/api/admin.ts";
 import { type Failure, failure } from "../lib/format.ts";
+import { browserZone } from "../lib/zone.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
@@ -55,9 +56,6 @@ effect(() => {
   serverLoadError.value = null;
 });
 
-// the day boundaries are the browser's zone
-const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-
 export async function loadStorage(): Promise<void> {
   const forUser = owner;
   const mine = ++turn;
@@ -65,7 +63,7 @@ export async function loadStorage(): Promise<void> {
   storageLoading.value = true;
   try {
     const body = await api<StorageResponse>(
-      `/api/admin/storage?tz=${encodeURIComponent(zone())}`,
+      `/api/admin/storage?tz=${encodeURIComponent(browserZone())}`,
     );
     if (!current()) return;
     storage.value = body;
@@ -84,7 +82,7 @@ export async function loadOverview(): Promise<void> {
   overviewLoading.value = true;
   try {
     const body = await api<OverviewResponse>(
-      `/api/admin/overview?tz=${encodeURIComponent(zone())}`,
+      `/api/admin/overview?tz=${encodeURIComponent(browserZone())}`,
     );
     if (!current()) return;
     overview.value = body;

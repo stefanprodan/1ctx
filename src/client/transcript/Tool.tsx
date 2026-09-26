@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { signal, useSignal } from "@preact/signals";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import { loadToolResult, toolResults } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
-import { onResize } from "../lib/resize.ts";
+import { useCut } from "../lib/resize.ts";
 import { Fold } from "../ui/Fold.tsx";
+import { folds } from "./fold.ts";
 import type { CallNode } from "./rows.ts";
 import {
   displayResult,
@@ -17,23 +17,12 @@ import {
   wantsResult,
 } from "./Tool.model.ts";
 
-const opened = signal<ReadonlySet<string>>(new Set());
+const { useFoldOpen } = folds();
 
 // a value is cut to a few lines, Show all in its fade, never a scroll box
 // of its own; once open it stays whole until the fold closes
 function Value({ text, failed }: { text: string; failed?: boolean }) {
-  const open = useSignal(false);
-  const long = useSignal(false);
-  const el = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const node = el.current;
-    if (node === null) return;
-    const measure = () => {
-      if (!open.value) long.value = node.scrollHeight > node.clientHeight + 1;
-    };
-    measure();
-    return onResize(node, measure);
-  }, [text, open, long]);
+  const { el, open, long } = useCut<HTMLDivElement>([text]);
   return (
     <Fold
       cut={long.value && !open.value}
@@ -55,7 +44,7 @@ function Value({ text, failed }: { text: string; failed?: boolean }) {
 }
 
 export function Tool({ node }: { node: CallNode }) {
-  const open = opened.value.has(node.key);
+  const { open, onToggle } = useFoldOpen(node.key);
   const summary = toolSummary(node.call, node.result);
   const label = toolLabel(ranCall(node.call, node.result).name);
   const held =
@@ -75,12 +64,7 @@ export function Tool({ node }: { node: CallNode }) {
       }`}
       data-call={node.call.id}
       open={open}
-      onToggle={(event) => {
-        const next = new Set(opened.value);
-        if (event.currentTarget.open) next.add(node.key);
-        else next.delete(node.key);
-        opened.value = next;
-      }}
+      onToggle={onToggle}
     >
       <summary class="transcript-fold-head transcript-fold-small">
         <Icon name="spinner" size={12} class="transcript-fold-spin" />

@@ -16,7 +16,6 @@ import type {
   McpServerSummary,
   McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
-import { patternLines } from "../../../shared/mcp.ts";
 import {
   deleteServer,
   keys,
@@ -35,7 +34,7 @@ import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Fold } from "../../ui/Fold.tsx";
-import { Foot } from "../../ui/Foot.tsx";
+import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import {
   RowsBad,
   RowsList,
@@ -53,17 +52,15 @@ import {
   KEY_HINT,
   mcpFieldOf,
   metaLine,
-  patternText,
   servedLine,
   settingsDirty,
-  timeoutMs,
   timeoutProblem,
-  timeoutText,
   toolGroups,
   unmatchedIn,
   unmatchedLine,
 } from "./Mcp.model.ts";
 import { McpFields } from "./McpForm.tsx";
+import { draftPatterns, settingsBody, useMcpSettings } from "./McpSettings.ts";
 import "./mcp.css";
 
 function Change({ change, now }: { change: McpChange; now: number }) {
@@ -217,10 +214,7 @@ function Endpoint({ server }: { server: McpServerSummary }) {
             aria-invalid={invalid("url") || undefined}
             disabled={busy}
             value={url.value}
-            onInput={(e) => {
-              url.value = (e.currentTarget as HTMLInputElement).value;
-              save.touch();
-            }}
+            onInput={save.bind(url)}
           />
           <FieldError save={save} field="url" />
         </label>
@@ -231,10 +225,7 @@ function Endpoint({ server }: { server: McpServerSummary }) {
             name="keyName"
             mono
             value={keyName.value}
-            options={keyOptions(
-              keys.value,
-              keyName.value === NO_KEY ? null : keyName.value,
-            )}
+            options={keyOptions(keys.value, keyName.value)}
             disabled={busy}
             invalid={invalid("keyName")}
             onChange={(value) => {
@@ -271,13 +262,8 @@ export function ServerRow({
   open: boolean;
   onToggle: () => void;
 }) {
-  const read = useSignal(server.read);
-  const write = useSignal(server.write);
-  const instructionsOn = useSignal(server.instructionsOn);
-  const timeout = useSignal(timeoutText(server.timeoutMs));
-  const readText = useSignal(patternText(server.readPatterns));
-  const writeText = useSignal(patternText(server.writePatterns));
-  const excludedText = useSignal(patternText(server.excludedPatterns));
+  const settings = useMcpSettings(server);
+  const { instructionsOn, timeout } = settings;
   const expanded = useSignal(false);
   useEffect(() => {
     if (!open) expanded.value = false;
@@ -287,26 +273,13 @@ export function ServerRow({
   const refreshFailure = useSignal<{ words: string; at: number } | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
-    await patchServer(server.id, {
-      read: read.value,
-      write: write.value,
-      instructionsOn: instructionsOn.value,
-      timeoutMs: timeoutMs(timeout.value),
-      readPatterns: patternLines(readText.value),
-      writePatterns: patternLines(writeText.value),
-      excludedPatterns: patternLines(excludedText.value),
-    });
+    await patchServer(server.id, settingsBody(settings));
   }, mcpFieldOf);
   useFocusField(save, form);
-  const invalid = (field: string) => save.fieldError(field) !== null;
-  const patterns = {
-    read: patternLines(readText.value),
-    write: patternLines(writeText.value),
-    excluded: patternLines(excludedText.value),
-  };
+  const patterns = draftPatterns(settings);
   const dirty = settingsDirty(server, {
-    read: read.value,
-    write: write.value,
+    read: settings.read.value,
+    write: settings.write.value,
     instructionsOn: instructionsOn.value,
     timeout: timeout.value,
     patterns,
@@ -393,30 +366,10 @@ export function ServerRow({
         >
           <div class="mcp-fields">
             <McpFields
-              read={read.value}
-              write={write.value}
-              instructionsOn={instructionsOn.value}
-              timeout={timeout.value}
-              readText={readText.value}
-              writeText={writeText.value}
-              excludedText={excludedText.value}
+              settings={settings}
               busy={busy}
-              invalid={invalid}
               save={save}
               marks={marks}
-              onChange={(field, value) => {
-                const target = {
-                  read,
-                  write,
-                  instructionsOn,
-                  timeout,
-                  readText,
-                  writeText,
-                  excludedText,
-                }[field] as { value: string | boolean };
-                target.value = value;
-                save.touch();
-              }}
             />
           </div>
           <Group label="Read" tools={groups.read.map((tool) => ({ tool }))} />
@@ -455,41 +408,14 @@ export function ServerRow({
             dirty={dirty}
             label="Save"
             start={
-              asking.value ? (
-                <>
-                  <span class="mcp-ask">Delete {server.name}?</span>
-                  <button
-                    type="button"
-                    class="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void remove()}
-                  >
-                    {save.pending.value === "delete" ? "Deleting" : "Delete"}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn"
-                    disabled={busy}
-                    onClick={() => {
-                      asking.value = false;
-                      save.touch();
-                    }}
-                  >
-                    Keep
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  class="btn"
-                  disabled={busy}
-                  onClick={() => {
-                    asking.value = true;
-                  }}
-                >
-                  Delete
-                </button>
-              )
+              <AskDelete
+                save={save}
+                asking={asking}
+                busy={busy}
+                words={`Delete ${server.name}?`}
+                wordsClass="mcp-ask"
+                onDelete={() => void remove()}
+              />
             }
           />
         </form>

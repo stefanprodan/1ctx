@@ -19,23 +19,26 @@ import type {
 } from "../../shared/api/sessions.ts";
 import {
   credentialKey,
-  MEMORY,
   mcpKey,
   skillKey,
-  VISUALIZE,
   WEB,
 } from "../../shared/capabilities.ts";
 import type { IconName } from "../lib/icons.tsx";
 
 export type WebItem = { live: boolean; on: boolean; reason: string | null };
 
-// a switch for a kind alone, web access or the visualize tool: live when
-// the picked agent takes tools and the admin has the kind on
-function kindItem(
+// a switch for a kind alone (web access, Visuals, memory): live when
+// the picked agent takes tools and the admin has the kind on. The
+// server always answers memory as switchable
+export function switchItem(
   key: string,
   input: {
+    // the picked agent's model takes tools
     tools: boolean;
+    // the keys the project's agents route says can be switched, null
+    // until it answered
     switchable: readonly string[] | null;
+    // the chat has it off, as the composer shows it
     off: boolean;
   },
 ): WebItem {
@@ -48,38 +51,6 @@ function kindItem(
     return { live: false, on: false, reason: "Turned off by an admin" };
   }
   return { live: true, on: !input.off, reason: null };
-}
-
-export function webItem(input: {
-  // the picked agent's model takes tools
-  tools: boolean;
-  // the keys the project's agents route says can be switched, null
-  // until it answered
-  switchable: readonly string[] | null;
-  // the chat has it off, as the composer shows it
-  off: boolean;
-}): WebItem {
-  return kindItem(WEB, input);
-}
-
-// the Visuals item, the admin's name for the tool so one word means it
-// on both pages
-export function visualsItem(input: {
-  tools: boolean;
-  switchable: readonly string[] | null;
-  off: boolean;
-}): WebItem {
-  return kindItem(VISUALIZE, input);
-}
-
-// saving to the project's memory; the server always answers it as
-// switchable
-export function memoryItem(input: {
-  tools: boolean;
-  switchable: readonly string[] | null;
-  off: boolean;
-}): WebItem {
-  return kindItem(MEMORY, input);
 }
 
 // whether another agent was picked. The list going away for a moment,

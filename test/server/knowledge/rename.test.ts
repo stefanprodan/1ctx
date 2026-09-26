@@ -10,7 +10,7 @@ import {
   NotFound,
 } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { run, setup } from "./helpers.ts";
+import { afterMountRead, run, setup } from "./helpers.ts";
 
 describe("knowledge rename", () => {
   test("keeps the id and the text and writes one version", () => {
@@ -220,10 +220,10 @@ describe("knowledge rename", () => {
           delete: "rm old.md",
           create: "echo made > new.md",
         }[race];
-        const pending = run(s, `${write}; echo other > other.md; sleep 0.1`);
-        await Bun.sleep(25);
-        s.area.rename(s.projectId, s.author, file.id, "new.md", 1);
-        const result = await pending;
+        afterMountRead(s, () =>
+          s.area.rename(s.projectId, s.author, file.id, "new.md", 1),
+        );
+        const result = await run(s, `${write}; echo other > other.md`);
         expect(result.error).toBe(true);
         expect(result.content).toContain(
           `${race === "create" ? "new.md" : "old.md"} changed while the command ran, read it again`,
@@ -246,10 +246,10 @@ describe("knowledge rename", () => {
     const s = setup();
     try {
       const file = s.area.create(s.projectId, s.author, "old.md", "first\n");
-      const pending = run(s, "cat old.md; echo other > other.md; sleep 0.1");
-      await Bun.sleep(25);
-      s.area.rename(s.projectId, s.author, file.id, "new.md", 1);
-      const result = await pending;
+      afterMountRead(s, () =>
+        s.area.rename(s.projectId, s.author, file.id, "new.md", 1),
+      );
+      const result = await run(s, "cat old.md; echo other > other.md");
       expect(result.error).toBeFalsy();
       expect(s.area.list(s.projectId).files.map((f) => f.name)).toEqual([
         "new.md",

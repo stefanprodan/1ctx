@@ -12,10 +12,10 @@
 import { useSignal } from "@preact/signals";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AgentOption } from "../composer/AgentOption.tsx";
-import { useMenu } from "../composer/menu.ts";
 import { forking } from "../data/fork.ts";
 import { says } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
+import { useMenu } from "../lib/menu.ts";
 import { forkChoices, opensUp } from "./Fork.model.ts";
 
 export type OnFork = (messageId: string, agentId: string) => Promise<void>;

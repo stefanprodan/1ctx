@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { MAX_OPENS_PER_COMMAND } from "../../../src/server/knowledge/limits.ts";
 import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
-import { callCaps, run, setup } from "./helpers.ts";
+import { afterMountRead, callCaps, run, setup } from "./helpers.ts";
 
 const receipt = (path: string, kind: string, lines?: number) =>
   `opened ${path} for the user as ${kind}${lines === undefined ? "" : `, ${lines} lines`}. They see it now, so do not repeat its content.`;
@@ -284,10 +284,10 @@ describe("open command", () => {
     const s = setup();
     try {
       const file = s.area.create(s.projectId, s.author, "x.md", "before");
-      const pending = run(s, "open x.md; echo after > x.md; sleep 0.1");
-      await Bun.sleep(25);
-      s.area.store.replace(file, s.author, "racing", 101);
-      const result = await pending;
+      afterMountRead(s, () =>
+        s.area.store.replace(file, s.author, "racing", 101),
+      );
+      const result = await run(s, "open x.md; echo after > x.md");
       expect(result.error).toBe(true);
       expect(result.opened).toBeUndefined();
       expect(result.content).toContain("changed while the command ran");

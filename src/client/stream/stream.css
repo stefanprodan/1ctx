@@ -21,13 +21,9 @@
     color: var(--fg);
   }
 
-  /* the icon says chat or run; its colour says the status, from base,
-     and a stopped one has none */
+  /* the icon says chat or run; its colour says the status, from base */
   .stream-icon {
     flex-shrink: 0;
-  }
-  .stream-icon-stopped {
-    color: var(--faint);
   }
 
   .stream-text {
