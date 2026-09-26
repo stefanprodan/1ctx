@@ -3,10 +3,12 @@
 //
 // An automation's page. The brief reads as one sentence: when, in which
 // zone, which agent is asked, then the instructions as the agent gets
-// them, cut to a few lines. Suspend or Resume and Run now, which anyone
-// in the project presses, and Edit for whoever may change it, sit over
-// two tabs. Runs is a log of RunRow.tsx rows, a page at a time. Memory
-// is the automation's own note.
+// them, cut to a few lines. An automation whose agent was deleted names
+// it with a tag and says it is paused until an edit picks another.
+// Suspend or Resume and Run now, which anyone in the project presses,
+// and Edit for whoever may change it, sit over two tabs. Runs is a log
+// of RunRow.tsx rows, a page at a time. Memory is the automation's own
+// note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
@@ -116,6 +118,9 @@ function NextRuns({
     automation.tz,
   );
   const held = preview.value?.key === key ? preview.value : null;
+  if (automation.agentRetired) {
+    return <div class="split-line">Paused</div>;
+  }
   if (automation.suspendedAt !== null) {
     return <div class="split-line">Suspended</div>;
   }
@@ -249,19 +254,25 @@ export function Automation({ params }: { params: Params }) {
                 {scheduleTitle(row.schedule)}
               </span>
               , {row.tz},{" "}
-              {agent ? (
-                <a class="automations-agent" href={agentHref(agent.name)}>
-                  @{agent.name}
-                </a>
+              {row.agentRetired ? (
+                <>
+                  <span class="automations-agent-gone">@{row.agentName}</span>{" "}
+                  <span class="tag">deleted</span>
+                </>
               ) : (
-                <span class="automations-agent">a deleted agent</span>
+                <a
+                  class="automations-agent"
+                  href={agentHref(agent?.name ?? row.agentName)}
+                >
+                  @{agent?.name ?? row.agentName}
+                </a>
               )}{" "}
               is asked:
             </p>
             <Instructions
               text={row.instructions}
               foot={
-                row.suspendedAt !== null ? (
+                row.agentRetired || row.suspendedAt !== null ? (
                   <p class="automations-brief-next">
                     <Icon name="pause" size={14} />
                     {suspendedText(row, now)}

@@ -28,8 +28,8 @@ function toolRow(s: Setup, sessionId = s.session.id): string {
   s.db
     .query(
       `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
-         model, status, first_message_id, started_at)
-       values (?, ?, 'chat', ?, ?, ?, 'm', 'done', ?, 0)`,
+         provider_name, model, status, first_message_id, started_at)
+       values (?, ?, 'chat', ?, ?, ?, 'p', 'm', 'done', ?, 0)`,
     )
     .run(send, sessionId, s.author.id, s.agent.id, provider_id, message);
   s.db

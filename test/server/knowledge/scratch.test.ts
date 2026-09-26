@@ -241,7 +241,9 @@ describe("scratch store", () => {
     const ctx = setup();
     try {
       write(ctx, 0, { written: [binary, empty] });
-      expect(ctx.sessions.delete(ctx.session.id)).toBeTrue();
+      expect(ctx.sessions.remove(ctx.session.id)).toMatchObject({
+        type: "session.deleted",
+      });
       expect(ctx.db.query("select * from session_scratch").all()).toEqual([]);
       expect(ctx.db.query("select * from session_scratch_files").all()).toEqual(
         [],

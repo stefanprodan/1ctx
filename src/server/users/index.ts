@@ -159,6 +159,8 @@ export type Users = {
   setRole(id: string, role: Role): void;
   setTz(id: string, tz: string): void;
   setAgent(id: string, agentId: string | null): void;
+  // every user's pick of a deleted agent goes, so their start moves on
+  clearAgent(agentId: string): void;
   setDisabled(id: string, disabled: boolean): void;
   setMustChangePassword(id: string, required: boolean): void;
   setPasswordHash(id: string, hash: string): void;
@@ -191,6 +193,7 @@ export function usersArea(deps: UsersDeps): Users {
     setRole: (id, role) => store.setRole(id, role),
     setTz: (id, tz) => store.setTz(id, tz),
     setAgent: (id, agentId) => store.setAgent(id, agentId),
+    clearAgent: (agentId) => store.clearAgent(agentId),
     setDisabled: (id, disabled) => store.setDisabled(id, disabled),
     setMustChangePassword: (id, required) =>
       store.setMustChangePassword(id, required),

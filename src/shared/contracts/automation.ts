@@ -18,6 +18,10 @@ export type AutomationSummary = {
   // the owner's username, an admin outside the project included
   ownerName: string;
   agentId: string;
+  // the agent's name, kept once it is deleted; retired is true then,
+  // and the automation stays paused until an edit picks a live agent
+  agentName: string;
+  agentRetired: boolean;
   name: string;
   instructions: string;
   schedule: string;

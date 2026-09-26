@@ -7,6 +7,7 @@
 
 import type { Db } from "../db/index.ts";
 import { Conflict } from "../lib/errors.ts";
+import { heldSessions } from "./queue.ts";
 
 export type ScratchFile = {
   path: string;
@@ -99,6 +100,18 @@ export class ScratchStore {
          ) where session_id = ?`,
       )
       .run(sessionId, sessionId);
+  }
+
+  // an archived chat never runs a command again; its files go with the row
+  drop(sessionId: string): void {
+    this.db
+      .query("delete from session_scratch where session_id = ?")
+      .run(sessionId);
+  }
+
+  // the sessions a command runs in now, whose scratch no sweep takes
+  held(): ReadonlySet<string> {
+    return heldSessions();
   }
 
   sweep(now: number, idleDays: number, held: ReadonlySet<string>): number {

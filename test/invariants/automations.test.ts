@@ -80,9 +80,6 @@ describe("automations", () => {
       (await chat.member.call("DELETE", `/api/automations/${automation.id}`))
         .status,
     ).toBe(409);
-    expect(
-      (await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`)).status,
-    ).toBe(409);
 
     script.reply("healthy");
     await settle(chat, detail.session.id);

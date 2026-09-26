@@ -191,8 +191,10 @@ export function dayTokensHint(day: OverviewDay): string {
 }
 
 // A breakdown's row as a bar: a personal project by its owner, a team
-// project by its name, an agent in mono. The hint says only what the
-// bar does not: the share and what ran.
+// project by its name, an agent in mono. The deleted projects come as
+// one row named for them, which needs no mark; a retired agent is
+// marked gone, apart from a live one of its name. The hint says only
+// what the bar does not: the share and what ran.
 export function usageBars(kind: UsageBy, rows: UsageRow[]) {
   const total = rows.reduce((sum, row) => sum + row.tokens, 0);
   return rows.map((row, i) => {
@@ -200,7 +202,9 @@ export function usageBars(kind: UsageBy, rows: UsageRow[]) {
       row.owner !== null
         ? `@${row.owner}`
         : kind === "projects"
-          ? `#${row.name ?? ""}`
+          ? row.name === null
+            ? "deleted projects"
+            : `#${row.name}`
           : (row.name ?? "");
     const hint = [
       share(row.tokens, total),
@@ -210,9 +214,10 @@ export function usageBars(kind: UsageBy, rows: UsageRow[]) {
       ...(row.runs > 0 ? [pluralCommas(row.runs, "run", "runs")] : []),
     ].join(" · ");
     return {
-      key: row.id ?? `${row.owner ?? "row"}-${i}`,
+      key: row.id ?? (row.deleted ? "deleted" : `${row.owner ?? "row"}-${i}`),
       name,
       mono: kind === "agents",
+      gone: row.deleted && kind === "agents",
       value: row.tokens,
       label: count(row.tokens),
       hint,

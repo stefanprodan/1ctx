@@ -6,6 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  authorGone,
   iconOf,
   stateLine,
   tickMs,
@@ -27,6 +28,7 @@ import type {
 const now = new Date(2026, 8, 13, 12).getTime();
 
 const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
+  archived: null,
   id: "s1",
   projectId: "p1",
   ownerId: "u1",
@@ -69,6 +71,7 @@ const send = (changes: Partial<SendSummary> = {}): SendSummary => ({
 });
 
 const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
+  agentRetired: false,
   session: session(),
   agent: "assistant",
   send: send(),
@@ -272,5 +275,23 @@ describe("a row built without its agent", () => {
         }),
       ),
     ).toEqual({ author: null, text: "failed · quiet" });
+  });
+});
+
+describe("an archived row", () => {
+  test("wears the box, and a deleted agent's name is marked gone", () => {
+    const archived = row({
+      session: session({ archived: { at: now, reason: "agent" } }),
+      agentRetired: true,
+    });
+    expect(iconOf(archived)).toBe("archive");
+    expect(authorGone(archived, stateLine(archived))).toBe(true);
+    // a person's line on the same row keeps its colour
+    const person = row({
+      agentRetired: true,
+      last: { seq: 3, author: "ana", text: "thanks" },
+    });
+    expect(authorGone(person, stateLine(person))).toBe(false);
+    expect(authorGone(row(), stateLine(row()))).toBe(false);
   });
 });

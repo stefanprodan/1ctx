@@ -46,19 +46,6 @@ export function readLastSend(db: Db, sessionId: string): SendSummary | null {
   return raw ? send(raw) : null;
 }
 
-export function usesAgent(db: Db, agentId: string): boolean {
-  return (
-    db
-      .query<{ n: number }, [string, string, string]>(
-        `select
-         (select count(*) from sessions where agent_id = ?) +
-         (select count(*) from sends where agent_id = ?) +
-         (select count(*) from messages where agent_id = ?) as n`,
-      )
-      .get(agentId, agentId, agentId)!.n > 0
-  );
-}
-
 export function readReasoningDetails(
   db: Db,
   id: string,

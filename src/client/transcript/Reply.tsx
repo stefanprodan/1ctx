@@ -26,7 +26,9 @@ import { Summary } from "./Summary.tsx";
 import { type Live, leadIn, tail } from "./stream.ts";
 import { Work } from "./Work.tsx";
 
-export type Agent = { name: string; avatar: Avatar };
+// retired once an admin deleted the agent: its name is plain text with
+// a tag, never a link to whoever has the name now
+export type Agent = { name: string; avatar: Avatar; retired?: boolean };
 
 export function replyRunning(
   node: ReplyNode,
@@ -140,7 +142,12 @@ export function Reply({
         <span class="avatar avatar-24 avatar-agent">
           <AvatarIcon name={agent?.avatar ?? "bot"} size={14} />
         </span>
-        {agent ? (
+        {agent?.retired ? (
+          <>
+            <span class="transcript-name">{agent.name}</span>
+            <span class="tag">deleted</span>
+          </>
+        ) : agent ? (
           <a
             class="transcript-name transcript-name-link"
             href={agentHref(agent.name)}

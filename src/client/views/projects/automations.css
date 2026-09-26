@@ -8,6 +8,10 @@
   .automations-agent {
     color: var(--brand);
   }
+  /* a deleted agent in the brief */
+  .automations-agent-gone {
+    color: var(--faint);
+  }
   .automations-faint {
     color: var(--faint);
   }

@@ -84,6 +84,19 @@ describe("slash commands", () => {
     expect(calls.length).toBe(3);
   });
 
+  test("a viewer who may not retitle is not offered /rename", async () => {
+    expect(commandMatches("/", false).map((c) => c.name)).toEqual([
+      "compact",
+      "fork",
+    ]);
+    expect(commandMatches("/re", false)).toEqual([]);
+    const rest = { onCompact: async () => {}, onFork: async () => {} };
+    expect(runCommand(commandOf("/rename Mine")!, null, rest)).rejects.toThrow(
+      "/rename: only the owner or an admin",
+    );
+    await runCommand(commandOf("/compact")!, null, rest);
+  });
+
   test("a command is blocked before the chat starts and while it runs", () => {
     const compact = COMMANDS.find((c) => c.name === "compact")!;
     const rename = COMMANDS.find((c) => c.name === "rename")!;

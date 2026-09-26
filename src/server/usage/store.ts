@@ -111,6 +111,14 @@ const usageOf = (raw: Raw): RoundUsage => ({
   contextLength: raw.context_length,
 });
 
+const LIVE_SEND = "exists (select 1 from sends where sends.id = usage.send_id)";
+
+// a turn is a send still there: a regenerate's replaced send and a
+// deleted chat's keep their tokens but are no longer turns
+const countLive = (alias: string, column: "send_id" | "session_id") =>
+  `count(distinct case when exists (select 1 from sends
+     where sends.id = ${alias}.send_id) then ${alias}.${column} end)`;
+
 export class UsageStore {
   constructor(private readonly db: Db) {}
 
@@ -172,8 +180,8 @@ export class UsageStore {
     const marks = projectIds.map(() => "?").join(", ");
     const raw = this.db
       .query<WeekRaw, (string | number)[]>(
-        `select count(distinct send_id) as sends,
-                count(distinct session_id) as sessions,
+        `select ${countLive("usage", "send_id")} as sends,
+                ${countLive("usage", "session_id")} as sessions,
                 coalesce(sum(prompt_tokens), 0) as prompt_tokens,
                 coalesce(sum(completion_tokens), 0) as completion_tokens
            from usage
@@ -212,7 +220,7 @@ export class UsageStore {
            select cast(value as text) as project_id from json_each(?)
          )
          select p.project_id, d.day_index,
-                count(distinct u.send_id) as sends,
+                ${countLive("u", "send_id")} as sends,
                 sum(u.prompt_tokens + u.completion_tokens) as tokens
            from project_ids p
           cross join day_starts d
@@ -233,7 +241,7 @@ export class UsageStore {
     }
     const total = this.db
       .query<TotalRaw, [string, number, number]>(
-        `select count(distinct send_id) as sends,
+        `select ${countLive("usage", "send_id")} as sends,
                 coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens
            from usage
           where project_id in (select value from json_each(?))
@@ -263,7 +271,7 @@ export class UsageStore {
              from json_each(?)
          )
          select d.day_index,
-                count(distinct u.send_id) as sends,
+                ${countLive("u", "send_id")} as sends,
                 sum(u.prompt_tokens + u.completion_tokens) as tokens
            from day_starts d
           cross join usage u
@@ -277,7 +285,7 @@ export class UsageStore {
     }
     const total = this.db
       .query<TotalRaw, [string, number, number]>(
-        `select count(distinct send_id) as sends,
+        `select ${countLive("usage", "send_id")} as sends,
                 coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens
            from usage
           where agent_id = ? and created_at >= ? and created_at < ?`,
@@ -286,42 +294,13 @@ export class UsageStore {
     return { total, usage };
   }
 
-  deleteSend(sendId: string): boolean {
-    return (
-      this.db.query("delete from usage where send_id = ?").run(sendId).changes >
-      0
-    );
-  }
-
-  deleteProject(projectId: string): number {
-    return this.db
-      .query("delete from usage where project_id = ?")
-      .run(projectId).changes;
-  }
-
-  deleteSession(sessionId: string): number {
-    return this.db
-      .query("delete from usage where session_id = ?")
-      .run(sessionId).changes;
-  }
-
-  // many sessions' rows a statement per 500, not one per session
-  deleteSessions(sessionIds: string[]): number {
-    let changes = 0;
-    for (let i = 0; i < sessionIds.length; i += 500) {
-      const ids = sessionIds.slice(i, i + 500);
-      const marks = ids.map(() => "?").join(", ");
-      changes += this.db
-        .query(`delete from usage where session_id in (${marks})`)
-        .run(...ids).changes;
-    }
-    return changes;
-  }
-
+  // a regenerate's replaced turn keeps its usage but is no longer the
+  // history's size, so only rows of sends that are still there count
   latest(sessionId: string): RoundUsage | null {
     const raw = this.db
       .query<Raw, [string]>(
-        "select * from usage where session_id = ? order by seq desc limit 1",
+        `select * from usage where session_id = ? and ${LIVE_SEND}
+         order by seq desc limit 1`,
       )
       .get(sessionId);
     return raw ? usageOf(raw) : null;
@@ -335,7 +314,8 @@ export class UsageStore {
       .query<Raw, string[]>(
         `select u.* from usage u
          join (select session_id, max(seq) as seq from usage
-               where session_id in (${marks}) group by session_id) last
+               where session_id in (${marks}) and ${LIVE_SEND}
+               group by session_id) last
            on last.session_id = u.session_id and last.seq = u.seq`,
       )
       .all(...sessionIds);

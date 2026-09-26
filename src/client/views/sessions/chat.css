@@ -1,6 +1,7 @@
 /* The chat: one column, the transcript then its foot with the composer,
-   scrolled by the shell. The head holds the chat's menu behind the
-   title, Delete asked in place inside it. */
+   or a run's or an archived chat's state and Fork, scrolled by the
+   shell. The head holds the chat's menu behind the title, Delete and
+   Archive asked in place inside it. */
 
 @layer tokens, base, owners;
 
@@ -46,8 +47,15 @@
   .chat-run-icon {
     flex-shrink: 0;
   }
+  /* an archived chat's foot is the run's; archived is no status */
+  .chat-run-archived {
+    color: var(--faint);
+  }
+  /* the state shares the icon's line and wraps inside its own box, so
+     a long reason never leaves the icon alone on a phone */
   .chat-run-state {
-    flex-grow: 1;
+    flex: 1 1 0;
+    min-width: 0;
     font-size: var(--text-ui);
   }
   .chat-run-failure {
@@ -58,19 +66,11 @@
   .chat-run-stop {
     color: var(--failed);
   }
-  /* the fork of a finished run: the agent chip and the button, on
-     their own line under the state where the row is narrow */
+  /* the foot's Fork, one button at the line's end, on a phone too */
   .chat-run-fork {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
     margin-left: auto;
-  }
-  @media (max-width: 719px) {
-    .chat-run-fork {
-      flex-basis: 100%;
-      margin-left: 0;
-    }
   }
   /* the title as the button, the chevron after it, the card hanging
      under it from the title's left edge, as wide as its items; the menu

@@ -6,14 +6,15 @@
 // the project and the state line, the time. A run's title is its
 // automation, so its line is the agent's answer like a chat's. In All
 // a run stands for its automation's runs and counts them with the
-// bolt. The whole row is the link to the chat.
+// bolt. An archived chat wears the box, quiet, and says so before its
+// line. The whole row is the link to the chat.
 
 import { type ComponentChild, Fragment } from "preact";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import { count } from "../lib/format.ts";
 import { chatHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
-import { iconOf, stateLine, whenText } from "./Row.model.ts";
+import { authorGone, iconOf, stateLine, whenText } from "./Row.model.ts";
 
 // the line's parts that are there, a dot between each two
 function joined(parts: (ComponentChild | false)[]) {
@@ -40,16 +41,23 @@ export function Row({
 }) {
   const { session } = row;
   const line = stateLine(row);
+  const archived = session.archived !== null;
   return (
     <a class="stream-row" href={chatHref(session.id)}>
       <Icon
         name={iconOf(row)}
-        class={`stream-icon status-${session.status}`}
+        class={`stream-icon ${archived ? "stream-icon-archived" : `status-${session.status}`}`}
         size={16}
       />
       <span class="stream-text">
         <span class="stream-title cut">{session.title}</span>
         <span class="stream-line cut">
+          {archived && (
+            <>
+              <span class="stream-archived">archived</span>
+              {" · "}
+            </>
+          )}
           {joined([
             projectName !== null && (
               <span class="stream-project">#{projectName}</span>
@@ -63,7 +71,11 @@ export function Row({
             (line.author !== null || line.text !== "") && (
               <>
                 {line.author !== null && (
-                  <span class="stream-author">@{line.author} </span>
+                  <span
+                    class={`stream-author${authorGone(row, line) ? " stream-author-gone" : ""}`}
+                  >
+                    @{line.author}{" "}
+                  </span>
                 )}
                 {session.status === "failed" ? (
                   <span class="stream-bad">{line.text}</span>

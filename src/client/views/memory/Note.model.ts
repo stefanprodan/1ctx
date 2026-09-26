@@ -22,6 +22,8 @@ export type Writer =
   | {
       kind: "agent";
       agentName: string;
+      // the agent was deleted: its name is plain text, never a link
+      retired: boolean;
       // the chat or the run, null once it is deleted
       session: {
         id: string;
@@ -44,6 +46,7 @@ export function writerOf(memory: Memory, now: number): Writer {
     return {
       kind: "agent",
       agentName: memory.agentName,
+      retired: memory.agentRetired,
       session:
         session === null
           ? null

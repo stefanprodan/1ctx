@@ -43,6 +43,11 @@
     font-size: var(--text-label);
   }
 
+  /* the ask before a save that deletes */
+  .tools-ask-words {
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
   /* the buttons under a hairline across the card, Reset under the
      labels and Save ending where the boxes end, before the unit slot
      and the column of defaults */

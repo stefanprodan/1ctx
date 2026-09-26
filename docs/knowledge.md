@@ -152,6 +152,11 @@ our changes to just-bash and the upstream sync are in
   The hourly knowledge sweep also drops scratch past the current
   `scratchIdleDays`, cascading its files and skipping sessions holding
   the per-session queue, including commands waiting for a process slot.
+  Archiving a chat by hand or idle deletes its scratch in the archive's
+  transaction (`ScratchStore.drop()` through the sessions area's port)
+  unless `held()`, the same queue set, has it. An agent's delete keeps
+  the scratch, since its chats may still run; the chats sweep frees
+  what an archive left once nothing holds it.
 - **`open` copies a file onto the chat page.** `open <file>`
   (`knowledge/open.ts`, a just-bash custom command with `trusted:
   false`) copies a mounted text file onto the chat page as it is at that

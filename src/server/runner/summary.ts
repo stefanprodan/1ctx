@@ -9,7 +9,8 @@ import type {
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import type { SessionRow } from "../sessions/index.ts";
+import { NotFound } from "../lib/errors.ts";
+import { refuseArchived, type SessionRow } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
@@ -146,6 +147,9 @@ export function startCompact(
 ): StartedCompact {
   const now = deps.clock();
   return transact(deps.db, () => {
+    const current = deps.sessions.byId(fields.session.id);
+    if (current === null) throw new NotFound("no such chat");
+    refuseArchived(current);
     const send = deps.sessions.createSend({
       id: fields.sendId,
       kind: "compact",

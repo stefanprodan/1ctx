@@ -29,7 +29,7 @@ const usageRows = (chat: ChatApp, sessionId: string) =>
     .get(sessionId)!.n;
 
 describe("deleting an automation with its runs", () => {
-  test("takes every run and its usage, never a chat", async () => {
+  test("takes every run and keeps their usage, never a chat", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat);
     const runs = [
@@ -61,7 +61,7 @@ describe("deleting an automation with its runs", () => {
     expect(chat.app.automations.byId(automation.id)).toBeNull();
     for (const id of runs) {
       expect(chat.app.sessions.byId(id)).toBeNull();
-      expect(usageRows(chat, id)).toBe(0);
+      expect(usageRows(chat, id)).toBeGreaterThan(0);
     }
     expect(chat.app.sessions.byId(chatId)).not.toBeNull();
     expect(usageRows(chat, chatId)).toBeGreaterThan(0);

@@ -143,8 +143,9 @@ export function rowState(
     a.lastRunStatus === "failed" && a.lastEventAt !== null
       ? `failed ${ago(a.lastEventAt, now)}`
       : null;
-  const next =
-    a.suspendedAt !== null
+  const next = a.agentRetired
+    ? "paused"
+    : a.suspendedAt !== null
       ? "suspended"
       : waitingSince(a, now) !== null
         ? "waiting for a slot"
@@ -155,14 +156,25 @@ export function rowState(
 }
 
 // "Suspended by @bogdan 2h ago"; a row suspended before the name was
-// kept says only when
+// kept says only when; one whose agent was deleted stays paused until
+// an edit picks another
 export function suspendedText(
-  a: Pick<AutomationSummary, "suspendedAt" | "suspendedBy">,
+  a: Pick<AutomationSummary, "suspendedAt" | "suspendedBy" | "agentRetired">,
   now: number,
 ): string {
+  if (a.agentRetired) return "Paused, its agent was deleted.";
   if (a.suspendedAt === null) return "";
   const by = a.suspendedBy === null ? "" : ` by @${a.suspendedBy.username}`;
   return `Suspended${by} ${ago(a.suspendedAt, now)}`;
+}
+
+// the editor's refusal while the pick is still the deleted agent
+export function retiredPick(
+  a: Pick<AutomationSummary, "agentId" | "agentName" | "agentRetired"> | null,
+  agentId: string,
+): string | null {
+  if (a === null || !a.agentRetired || agentId !== a.agentId) return null;
+  return `Its agent ${a.agentName} was deleted. Pick another to save.`;
 }
 
 // what started a run: "Scheduled", or "@bogdan" for whoever pressed Run

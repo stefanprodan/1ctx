@@ -12,7 +12,6 @@ import {
   type KnowledgePort,
   routes,
   type SessionsPort,
-  type UsagePort,
   type UsersPort,
 } from "./routes.ts";
 import { type ProjectRow, ProjectStore } from "./store.ts";
@@ -23,7 +22,6 @@ export {
   type RoutesDeps,
   routes,
   type SessionsPort,
-  type UsagePort,
 } from "./routes.ts";
 export { type ProjectRow, ProjectStore, summary } from "./store.ts";
 export { visible } from "./visible.ts";
@@ -34,7 +32,6 @@ export type ProjectsDeps = {
   access: AccessPort;
   users: UsersPort;
   sessions: SessionsPort;
-  usage: UsagePort;
   knowledge: KnowledgePort;
 };
 
@@ -69,7 +66,6 @@ export function projectsArea(deps: ProjectsDeps): Projects {
       access: deps.access,
       users: deps.users,
       sessions: deps.sessions,
-      usage: deps.usage,
       knowledge: deps.knowledge,
       clock: deps.clock,
     }),

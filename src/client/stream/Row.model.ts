@@ -20,9 +20,16 @@ export type StateLine = { author: string | null; text: string };
 const plain = (text: string): StateLine => ({ author: null, text });
 
 // the row's icon: the clock for an automation's run, the bubble for a
-// chat
-export function iconOf(row: StreamRow): "clock" | "chat" {
+// chat, the box for an archived chat
+export function iconOf(row: StreamRow): "clock" | "chat" | "archive" {
+  if (row.session.archived !== null) return "archive";
   return row.session.origin === "automation" ? "clock" : "chat";
+}
+
+// whether the line's author is the session's agent, since deleted: the
+// name is greyed, with no tag, since rows are dense
+export function authorGone(row: StreamRow, line: StateLine): boolean {
+  return row.agentRetired && line.author !== null && line.author === row.agent;
 }
 
 export function stateLine(row: StreamRow): StateLine {

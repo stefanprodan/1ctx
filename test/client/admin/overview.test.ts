@@ -82,6 +82,7 @@ const load = (over: Partial<LoadResponse> = {}): LoadResponse => ({
 });
 
 const row = (over: Partial<UsageRow>): UsageRow => ({
+  deleted: false,
   id: "a1",
   name: "platform",
   owner: null,
@@ -208,6 +209,26 @@ describe("the breakdowns", () => {
     expect(agent).toMatchObject({ name: "sre", mono: true, label: "600" });
     expect(agent?.hint).toBe("50% · 3 turns · 2 runs");
     expect(runner?.hint).toBe("50% · 5 runs");
+  });
+
+  test("the deleted projects are one named row, a retired agent is marked gone", () => {
+    const projects = usageBars("projects", [
+      row({}),
+      row({ id: null, name: null, deleted: true, tokens: 100 }),
+    ]);
+    expect(projects.map((b) => [b.name, b.gone, b.key])).toEqual([
+      ["#platform", false, "a1"],
+      ["deleted projects", false, "deleted"],
+    ]);
+    // a retired sre and a live one of its name are two bars
+    const agents = usageBars("agents", [
+      row({ id: "a1", name: "sre", deleted: true }),
+      row({ id: "a2", name: "sre" }),
+    ]);
+    expect(agents.map((b) => [b.name, b.gone, b.key])).toEqual([
+      ["sre", true, "a1"],
+      ["sre", false, "a2"],
+    ]);
   });
 
   test("a model loses its org unless a bare word is left", () => {

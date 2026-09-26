@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The foot of a form: the notice of a refusal that names no field, on
-// its own line over the buttons so they never move when it shows; the
-// submit button that says what a Save is going through; and room on the
+// its own line over the buttons so they never move when it shows, and
+// a line of the view's over both, what an ask is about; the submit
+// button that says what a Save is going through; and room on the
 // left for the form's other actions. A view composes this, never
 // restyles it.
 
@@ -23,6 +24,7 @@ export function Foot({
   start,
   before,
   after,
+  above,
   children,
 }: {
   save: Pick<Save, "status" | "busy" | "notice">;
@@ -35,6 +37,9 @@ export function Foot({
   before?: ComponentChildren;
   // what follows the submit: a Reset beside it, a count at the end
   after?: ComponentChildren;
+  // a line over the notice and the buttons: what a Delete asked about
+  // would do; its class, which takes the whole line, is the owner's
+  above?: ComponentChildren;
 }) {
   const status = save.status.value;
   const done = status === "done";
@@ -43,6 +48,7 @@ export function Foot({
   const on = (yes: boolean) => `foot-label${yes ? " foot-label-on" : ""}`;
   return (
     <div class="foot">
+      {above}
       {notice !== null && (
         <p class="notice-failed foot-notice" role="alert">
           <Icon name="alert" size={14} class="foot-notice-icon" />
@@ -84,6 +90,7 @@ export function AskDelete({
   words,
   wordsClass,
   label = "Delete",
+  onAsk,
   onDelete,
 }: {
   save: Pick<Save, "pending" | "touch">;
@@ -93,6 +100,8 @@ export function AskDelete({
   wordsClass?: string;
   // the danger button's word
   label?: string;
+  // read what the delete would do before asking; it never throws
+  onAsk?: () => Promise<void>;
   onDelete: () => void;
 }) {
   if (!asking.value) {
@@ -101,7 +110,8 @@ export function AskDelete({
         type="button"
         class="btn"
         disabled={busy}
-        onClick={() => {
+        onClick={async () => {
+          await onAsk?.();
           asking.value = true;
         }}
       >

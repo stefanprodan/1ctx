@@ -62,7 +62,6 @@ export type SessionsPort = {
   ): {
     user: Message;
     removedMessageIds: string[];
-    removedSendIds: string[];
   };
   addReply(fields: {
     id?: string;

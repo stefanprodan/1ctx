@@ -104,7 +104,10 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   folder.
 - **Kept files are rows, trimmed under the lock.** Files are rows of
   `mcp_kept_files`, written by the writer's `finishTool` in the row's
-  transaction, cascading with the message, copied by fork; each call's
+  transaction, cascading with the message, copied by fork. An archived
+  chat and an ended run keep them whole, unpacked, until the chat is
+  deleted, since Fork copies them (`copyKeptFiles`) so the `/mcp/`
+  paths its packed tool results name still resolve; each call's
   folder is `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`,
   never reused. `prepareSend` trims the oldest folders to `mcpKeptBytes`
   and `mcpKeptFiles` (knowledge scope) through `knowledge.startKept()`

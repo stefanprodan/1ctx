@@ -3,7 +3,9 @@
 //
 // Usage: one row per round, what the provider reported, written by the
 // runner in the round's transaction. The weekly summary reads the rows
-// here so the runner does not own dashboard policy.
+// here so the runner does not own dashboard policy. No delete removes
+// a row: usage is the record of what was spent and outlives its session,
+// send, project and agent.
 
 import type { DirectoryAgentDaysResponse } from "../../shared/api/directory.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
@@ -28,10 +30,6 @@ export type UsageDeps = { db: Db; clock: Clock; access: AccessPort };
 export type Usage = {
   store: UsageStore;
   record(fields: UsageFields): UsageRow;
-  deleteSend(sendId: string): boolean;
-  deleteProject(projectId: string): number;
-  deleteSession(sessionId: string): number;
-  deleteSessions(sessionIds: string[]): number;
   // the last round counted for a session, or for many at once
   latest(sessionId: string): RoundUsage | null;
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
@@ -45,10 +43,6 @@ export function usageArea(deps: UsageDeps): Usage {
   return {
     store,
     record: (fields) => store.record(fields),
-    deleteSend: (sendId) => store.deleteSend(sendId),
-    deleteProject: (projectId) => store.deleteProject(projectId),
-    deleteSession: (sessionId) => store.deleteSession(sessionId),
-    deleteSessions: (sessionIds) => store.deleteSessions(sessionIds),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
     agentDays(agentId, timeZone) {

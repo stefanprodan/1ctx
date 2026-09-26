@@ -4,7 +4,9 @@
 // The Limits tab: a form per scope, each limit typed in the page's unit
 // with the default beside a changed one; Save and Reset to defaults at
 // each form's foot. A change applies to the next send, a run cap to the
-// next admission.
+// next admission. A save that would delete asks first, in the foot:
+// lowering the days archived chats are kept deletes the older ones at
+// the next sweep.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -19,9 +21,11 @@ import {
   collect,
   defaultLine,
   defaultsOf,
+  deleteAsk,
   dirty,
   displayOf,
   draftOf,
+  keepDays,
   LIMIT_WORDS,
   limitFieldOf,
   seedOf,
@@ -134,9 +138,39 @@ export function LimitsCard({
   const { own, draft, form, save, submit, reset, changed, type } =
     useLimitsForm(rows, scope);
   const busy = save.busy;
+  // the question a save that deletes asks, and the save it holds back,
+  // until Delete or Keep; Reset to defaults may lower the days too
+  const asking = useSignal<{
+    words: string;
+    go: () => void;
+    keep: () => void;
+  } | null>(null);
+  const ask = (
+    next: Record<string, string>,
+    go: () => void,
+    keep: () => void = () => {},
+  ) => {
+    const words = deleteAsk(own, next);
+    if (words === null) go();
+    else asking.value = { words, go, keep };
+  };
+  const defaults = draftOf(own.map((row) => ({ ...row, value: row.default })));
   return (
     <RowsCard label={title}>
-      <form ref={form} onSubmit={submit}>
+      <form
+        ref={form}
+        onSubmit={(event) => {
+          event.preventDefault();
+          // Keep takes back only the lowered days, never other edits
+          ask(
+            draft.value,
+            () => submit(event),
+            () => {
+              draft.value = keepDays(own, draft.value);
+            },
+          );
+        }}
+      >
         <div class="tools-form">
           {own.map((row) => (
             <LimitField
@@ -155,18 +189,50 @@ export function LimitsCard({
             dirty={dirty(own, draft.value)}
             label="Save"
             start={
-              <button
-                type="button"
-                class="btn"
-                disabled={busy || !changed}
-                onClick={() => void reset()}
-              >
-                {save.pending.value === "reset the limits"
-                  ? "Resetting"
-                  : "Reset to defaults"}
-              </button>
+              asking.value !== null ? (
+                <>
+                  <span class="tools-ask-words">{asking.value.words}</span>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    onClick={() => {
+                      const { go } = asking.value ?? { go: () => {} };
+                      asking.value = null;
+                      go();
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    onClick={() => {
+                      const { keep } = asking.value ?? { keep: () => {} };
+                      asking.value = null;
+                      keep();
+                      save.touch();
+                    }}
+                  >
+                    Keep
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  class="btn"
+                  disabled={busy || !changed}
+                  onClick={() => ask(defaults, () => void reset())}
+                >
+                  {save.pending.value === "reset the limits"
+                    ? "Resetting"
+                    : "Reset to defaults"}
+                </button>
+              )
             }
-          />
+          >
+            {/* while the save asks, its buttons are the only ones */}
+            {asking.value !== null ? <span /> : undefined}
+          </Foot>
         </div>
       </form>
     </RowsCard>

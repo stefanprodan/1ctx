@@ -247,8 +247,7 @@ export const regenerateSession = (id: string): Promise<void> =>
   post(id, "regenerate", changeOf(id) satisfies RegenerateRequest);
 
 // a summary round on its own; the next reply starts from the summary
-export const compactSession = (id: string): Promise<void> =>
-  post(id, "compact");
+export const compactSession = (id: string) => post(id, "compact");
 
 // the answer is empty: the end of the send arrives as an envelope
 export async function stopSession(id: string): Promise<void> {
@@ -342,10 +341,11 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   };
   syncValues(session.value);
   live.value = map;
+  // who archived it and until when are the detail's alone
+  if (!held.session.archived && ev.session.archived) refetch();
 }
 
-// the frames are refetched rather than reasoned about: one detail
-// answers a gap, an overflow, or a frame ahead of the buffer
+// one detail answers a gap, an overflow, a frame ahead of the buffer
 function refetch(): void {
   const held = session.value;
   if (held !== null) void loadSession(held.session.id);

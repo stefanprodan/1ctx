@@ -5,11 +5,16 @@ import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
-import type { MessageStatus, SessionStatus } from "../../shared/words.ts";
+import type {
+  ArchiveReason,
+  MessageStatus,
+  SessionStatus,
+} from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { OpenedRecord } from "../knowledge/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
+import { archiveRow } from "./archive.ts";
 import {
   automationRunning,
   automationRuns,
@@ -17,7 +22,13 @@ import {
   type RunsArgs,
 } from "./automation.ts";
 import { forgetCapability as forget, setDisabled } from "./capabilities.ts";
-import { exportRows, authors as readAuthors } from "./export.ts";
+import { deleteSession, type SessionDeleted } from "./delete.ts";
+import {
+  exportRows,
+  agents as readAgents,
+  archive as readArchive,
+  authors as readAuthors,
+} from "./export.ts";
 import {
   copyRows,
   type ForkFields,
@@ -32,8 +43,14 @@ import {
   lastMcpDigest as readLastMcpDigest,
   sweepMcpDigests,
 } from "./mcp.ts";
-import { addAgentMessage, finishReply } from "./messages.ts";
+import {
+  addAgentMessage,
+  addToolRows,
+  finishReply,
+  nextSeq,
+} from "./messages.ts";
 import { readOpenedFile, writeOpenedFiles } from "./opened-store.ts";
+import { packRows, resultText } from "./pack.ts";
 import { titleFrom } from "./parse.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -57,13 +74,20 @@ import {
   readSend,
   type SendCounters,
   type SendEnd,
-  usesAgent,
 } from "./sends.ts";
+
+// the knowledge area's scratch of a chat, dropped when it is archived,
+// and the sessions a command holds now
+export type ScratchPort = {
+  drop(sessionId: string): void;
+  held(): ReadonlySet<string>;
+};
 
 export class SessionStore {
   constructor(
     private readonly db: Db,
     private readonly usage: UsagePort,
+    private readonly scratch: ScratchPort,
   ) {}
 
   byId(id: string): SessionRow | null {
@@ -150,6 +174,41 @@ export class SessionStore {
     return readAuthors(this.db, id);
   }
 
+  agents(id: string) {
+    return readAgents(this.db, id);
+  }
+
+  archiveOf(id: string, keptDays: number) {
+    return readArchive(this.db, id, keptDays);
+  }
+
+  // null when it was archived already. An agent's delete archives chats
+  // that may still run and a held scratch has a command in it, so the
+  // sweep frees and packs those once they end
+  archive(
+    id: string,
+    reason: ArchiveReason,
+    by: string | null,
+    now: number,
+  ): SessionRow | null {
+    if (!archiveRow(this.db, id, reason, by, now)) return null;
+    if (reason !== "agent" && !this.scratch.held().has(id)) {
+      this.scratch.drop(id);
+    }
+    if (reason !== "agent") packRows(this.db, id);
+    return this.byId(id);
+  }
+
+  // the session's large tool results compressed; never one that runs
+  pack(id: string): number {
+    return packRows(this.db, id);
+  }
+
+  // a tool row's whole text, packed or not
+  result(messageId: string): string | null {
+    return resultText(this.db, messageId);
+  }
+
   setDisabledCapabilities(id: string, set: readonly string[]): void {
     setDisabled(this.db, id, set);
   }
@@ -179,10 +238,8 @@ export class SessionStore {
     return this.byId(id);
   }
 
-  delete(id: string): boolean {
-    return (
-      this.db.query("delete from sessions where id = ?").run(id).changes > 0
-    );
+  remove(id: string): SessionDeleted | "running" | null {
+    return deleteSession(this.db, id);
   }
 
   count(projectId: string): number {
@@ -207,15 +264,9 @@ export class SessionStore {
     return automationRunning(this.db, automationId);
   }
 
-  // every run of the automation with its usage, in the caller's
-  // transaction, in a few statements however many runs it kept
+  // every run of the automation in the caller's transaction, in one
+  // statement however many runs it kept; their usage stays
   deleteRuns(automationId: string): number {
-    const ids = this.db
-      .query<{ id: string }, [string]>(
-        "select id from sessions where automation_id = ?",
-      )
-      .all(automationId);
-    this.usage.deleteSessions(ids.map((row) => row.id));
     return this.db
       .query("delete from sessions where automation_id = ?")
       .run(automationId).changes;
@@ -223,10 +274,6 @@ export class SessionStore {
 
   expiredRuns(now: number): SessionRow[] {
     return expiredAutomationRuns(this.db, this.usage, now);
-  }
-
-  usesAgent(agentId: string): boolean {
-    return usesAgent(this.db, agentId);
   }
 
   messages(sessionId: string): Message[] {
@@ -282,7 +329,7 @@ export class SessionStore {
       .run(
         id,
         fields.sessionId,
-        this.nextSeq(fields.sessionId),
+        nextSeq(this.db, fields.sessionId),
         fields.sendId,
         fields.userId,
         fields.content,
@@ -377,36 +424,8 @@ export class SessionStore {
     return changed ? this.message(id) : null;
   }
 
-  addToolRows(
-    calls: {
-      id?: string;
-      sessionId: string;
-      sendId: string;
-      round: number;
-      toolCallId: string;
-      toolName: string;
-      now: number;
-    }[],
-  ): Message[] {
-    return calls.map((call) => {
-      const id = call.id ?? newId();
-      this.db
-        .query(
-          `insert into messages (id, session_id, seq, kind, send_id, round, tool_call_id, tool_name, status, created_at)
-           values (?, ?, ?, 'tool', ?, ?, ?, ?, 'streaming', ?)`,
-        )
-        .run(
-          id,
-          call.sessionId,
-          this.nextSeq(call.sessionId),
-          call.sendId,
-          call.round,
-          call.toolCallId,
-          call.toolName,
-          call.now,
-        );
-      return this.message(id)!;
-    });
+  addToolRows(calls: Parameters<typeof addToolRows>[1]): Message[] {
+    return addToolRows(this.db, calls);
   }
 
   // guarded by status, so a tool that ends after a terminal cleanup
@@ -470,13 +489,5 @@ export class SessionStore {
       message: (id) => this.message(id)!,
       lastSend: (id) => this.lastSend(id),
     });
-  }
-
-  private nextSeq(sessionId: string): number {
-    return this.db
-      .query<{ n: number }, [string]>(
-        "select coalesce(max(seq), 0) + 1 as n from messages where session_id = ?",
-      )
-      .get(sessionId)!.n;
   }
 }

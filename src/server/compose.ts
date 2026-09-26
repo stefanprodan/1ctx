@@ -55,7 +55,7 @@ import {
 } from "./sessions/index.ts";
 import { type SkillStore, type Skills, skillsArea } from "./skills/index.ts";
 import { type Tools, toolsArea } from "./tools/index.ts";
-import { type Usage, type UsageStore, usageArea } from "./usage/index.ts";
+import { type UsageStore, usageArea } from "./usage/index.ts";
 import {
   type PasswordCost,
   type UserStore,
@@ -114,7 +114,8 @@ export type App = {
   provision: Provision;
   repaired: number;
   reconciled: number;
-  // drop expired logins; called at start and every hour
+  // drop expired logins and sweep the chats; called at start and every
+  // hour; the rows removed, not the chats swept
   sweep(): number;
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
@@ -143,12 +144,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const log = scrubbedLogs(options);
   // Ports that point down the list, at an area built after the one that
   // holds them, are closures called once the list is complete: a user
-  // is made with its personal project, project routes read sessions and
-  // usage built later, a provider an agent runs on and an agent a chat
-  // runs on cannot go, a project route asks access what the principal
-  // may see, the session detail asks the runner for the reply in
-  // flight, and a freed run slot or a moved run cap wakes the scheduler.
-  let usage!: Usage;
+  // is made with its personal project, project routes ask sessions
+  // and access, an agent's delete reaches what runs on it, the
+  // session detail asks the runner for the reply in flight, and a freed
+  // run slot or a moved run cap wakes the scheduler.
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
@@ -219,9 +218,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
       count: (projectId) => sessions.store.count(projectId),
       running: (projectId) => sessions.store.running(projectId),
     },
-    usage: {
-      deleteProject: (projectId) => usage.deleteProject(projectId),
-    },
     knowledge: {
       counts: (projectId) => knowledge.counts(projectId),
       latest: (projectId, limit) => knowledge.latest(projectId, limit),
@@ -243,7 +239,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects,
     activity: { personDays: (...args) => sessions.personDays(...args) },
   });
-  usage = usageArea({
+  const usage = usageArea({
     db,
     clock,
     access: {
@@ -263,10 +259,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
         tools.offered(now, agentId, agentServers, mode, scope),
     },
     access,
-    sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
-    automations: {
-      usesAgent: (agentId) => automations.usesAgent(agentId),
-    },
+    sessions: () => sessions,
+    automations: () => automations,
+    runner: () => runner,
     usage: {
       agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
     },
@@ -288,10 +283,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     agents: { byId: (id) => agents.byId(id) },
     live: (sessionId) => runner.live(sessionId),
     usage,
-    uploads: {
-      copyUploads: (sourceId, targetId, restage, messageIds) =>
-        knowledge.copyUploads(sourceId, targetId, restage, messageIds),
-    },
+    limits,
+    uploads: knowledge,
+    scratch: knowledge.scratch,
   });
   const configuredTools = toolsArea({
     db,
@@ -360,7 +354,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     limits,
     memory,
     sessions: sessions.store,
-    usage,
     runner,
   });
   const overview: Overview = overviewArea({
@@ -466,14 +459,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
         const visits = access.sweepVisits();
         const knowledgeRows = knowledge.sweep(clock());
         const digests = sessions.store.sweepDigests();
+        const chats = sessions.sweep(clock(), limits.current());
         const removed = logins + visits + knowledgeRows + digests;
-        if (removed > 0) {
+        if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
             visits,
             knowledge: knowledgeRows,
             digests,
             removed,
+            ...chats,
           });
         }
         return removed;

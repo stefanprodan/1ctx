@@ -20,6 +20,7 @@ import {
   type CapabilitiesPort,
   type CredentialsPort,
   type ProvidersPort,
+  type RunnerPort,
   routes,
   type SessionsPort,
   type SkillsPort,
@@ -46,6 +47,7 @@ export {
   type McpPort,
   type ProvidersPort,
   type RoutesDeps,
+  type RunnerPort,
   routes,
   type SessionsPort,
   type SkillsPort,
@@ -62,10 +64,11 @@ export type AgentsDeps = {
   tools: ToolsPort & CapabilitiesPort;
   credentials: CredentialsPort;
   access: AccessPort;
-  sessions: SessionsPort;
-  automations: AutomationsPort;
+  sessions: () => SessionsPort;
+  automations: () => AutomationsPort;
+  runner: () => RunnerPort;
   usage: UsagePort;
-  users: PicksPort;
+  users: PicksPort & { clearAgent(agentId: string): void };
 };
 
 export type Agents = {
@@ -97,6 +100,7 @@ export function agentsArea(deps: AgentsDeps): Agents {
         access: deps.access,
         sessions: deps.sessions,
         automations: deps.automations,
+        runner: deps.runner,
         users: deps.users,
         clock: deps.clock,
       }),

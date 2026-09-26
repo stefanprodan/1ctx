@@ -371,7 +371,7 @@ describe("automation scheduler", () => {
     await chat.app.shutdown();
   });
 
-  test("reconciles an ended run and sweeps expired run usage", async () => {
+  test("reconciles an ended run and sweeps an expired run, keeping its usage", async () => {
     const logs = collectLogs();
     const chat = await chatApp({ logFactory: logs.logFactory });
     chat.app.automationScheduler.stop();
@@ -408,7 +408,7 @@ describe("automation scheduler", () => {
     });
     expect(chat.app.sessions.byId(detail.session.id)).toBeNull();
     expect(chat.app.db.query("select count(*) as n from usage").get()).toEqual({
-      n: 0,
+      n: 1,
     });
     await chat.app.shutdown();
   });

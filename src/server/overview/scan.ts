@@ -34,6 +34,8 @@ export type SessionSum = {
   projectId: string;
   origin: "chat" | "automation";
   automationId: string | null;
+  // archived chats go with the chats sweep
+  archived: boolean;
   title: string;
   messages: number;
   messageBytes: number;
@@ -80,8 +82,6 @@ export type ScanResult = {
   slots: Slot[];
   staging: number;
   digests: number;
-  // usage rows in all, and those of runs of tasks that still exist
-  usage: { rows: number; runRows: number };
 };
 
 export const SLOT_MS = 900_000;
@@ -89,13 +89,15 @@ export const SLOT_MS = 900_000;
 // a quarter hour, the stored bytes and the rows created in it
 export type Slot = [slot: number, bytes: number, rows: number];
 
-// the text a message row stores; the short columns are left out
+// the text a message row stores and a packed result's compressed
+// bytes; the short columns are left out
 export const MESSAGE_BYTES =
   "octet_length(content) + octet_length(reasoning) + octet_length(html)" +
   " + coalesce(octet_length(error), 0)" +
   " + coalesce(octet_length(reasoning_details), 0)" +
   " + coalesce(octet_length(tool_calls), 0)" +
-  " + coalesce(octet_length(uploads), 0)";
+  " + coalesce(octet_length(uploads), 0)" +
+  " + coalesce(length(packed), 0)";
 
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
 
@@ -218,16 +220,18 @@ function sessions(db: Db): SessionSum[] {
         projectId: string;
         origin: "chat" | "automation";
         automationId: string | null;
+        archived: number;
         title: string;
       },
       []
     >(
       `select id, project_id as projectId, origin, automation_id as automationId,
-              title from sessions`,
+              archived_at is not null as archived, title from sessions`,
     )
     .all()
     .map((row) => ({
       ...row,
+      archived: row.archived === 1,
       messages: byMessage.get(row.id)?.count ?? 0,
       messageBytes: byMessage.get(row.id)?.bytes ?? 0,
       openedBytes: opened.get(row.id) ?? 0,
@@ -323,17 +327,6 @@ function slots(db: Db, since: number): Slot[] {
 const total = (db: Db, sql: string): number =>
   db.query<{ bytes: number | null }, []>(sql).get()?.bytes ?? 0;
 
-function usage(db: Db): ScanResult["usage"] {
-  return db
-    .query<ScanResult["usage"], []>(
-      `select count(*) as rows,
-              count(s.id) as runRows
-         from usage u left join sessions s
-           on s.id = u.session_id and s.automation_id is not null`,
-    )
-    .get()!;
-}
-
 // one read transaction, so every statement sees the same WAL snapshot
 export function scan(db: Db, input: ScanInput): ScanResult {
   db.exec("begin");
@@ -371,6 +364,5 @@ function read(db: Db, input: ScanInput): ScanResult {
       db,
       "select sum(octet_length(body)) as bytes from mcp_digests",
     ),
-    usage: usage(db),
   };
 }

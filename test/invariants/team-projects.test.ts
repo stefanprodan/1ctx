@@ -425,7 +425,7 @@ describe("team project administration", () => {
   });
 });
 describe("team project chat lifecycle", () => {
-  test("project deletion removes every chat row and its usage", async () => {
+  test("project deletion removes every chat row and keeps its usage", async () => {
     const chat = await chatApp();
     const project = await createTeam(chat, "ops");
     await addMember(chat, project.id, chat.memberId);
@@ -448,7 +448,7 @@ describe("team project chat lifecycle", () => {
     expect(count(chat, "sessions", "project_id", project.id)).toBe(0);
     expect(count(chat, "messages", "session_id", started.sessionId)).toBe(0);
     expect(count(chat, "sends", "session_id", started.sessionId)).toBe(0);
-    expect(count(chat, "usage", "session_id", started.sessionId)).toBe(0);
+    expect(count(chat, "usage", "session_id", started.sessionId)).toBe(1);
     chat.app.socket.dispose();
   });
   test("project deletion refuses a running send admitted in the same tick", async () => {
@@ -511,7 +511,7 @@ describe("team project chat lifecycle", () => {
     expect(refused.status).toBe(404);
     close(chat, conn);
   });
-  test("deleting one chat removes its usage row", async () => {
+  test("deleting one chat keeps its usage row", async () => {
     const chat = await chatApp();
     const started = await startChat(chat);
     await finish(chat, started.script);
@@ -521,7 +521,8 @@ describe("team project chat lifecycle", () => {
       `/api/sessions/${started.sessionId}`,
     );
     expect(deleted.status).toBe(200);
-    expect(chat.app.usage.forSession(started.sessionId)).toEqual([]);
+    expect(chat.app.sessions.byId(started.sessionId)).toBeNull();
+    expect(chat.app.usage.forSession(started.sessionId)).toHaveLength(1);
     chat.app.socket.dispose();
   });
   test("team chats are changed by their owner or an admin, not another writer", async () => {

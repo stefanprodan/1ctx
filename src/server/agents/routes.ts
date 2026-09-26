@@ -5,7 +5,11 @@
 // model must be in that provider's catalog, and what the catalog says
 // about it is kept on the row so a list never asks again.
 
-import type { AgentResponse, AgentsResponse } from "../../shared/api/agents.ts";
+import type {
+  AgentImpactResponse,
+  AgentResponse,
+  AgentsResponse,
+} from "../../shared/api/agents.ts";
 import type {
   ProjectAgentsResponse,
   SwitchableServer,
@@ -20,6 +24,7 @@ import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
@@ -39,14 +44,22 @@ export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
 };
 
-// whether a session runs on the agent: a closure, since sessions are
-// built after agents
+// what an agent's delete does to the areas built after agents, each
+// reached through a thunk the compose root passes: the writes run in
+// the delete's transaction and answer their envelopes
 export type SessionsPort = {
-  usesAgent(agentId: string): boolean;
+  agentImpact(agentId: string): { chats: number; running: number };
+  archiveAgent(agentId: string, now: number): BusEvent[];
 };
 
 export type AutomationsPort = {
-  usesAgent(agentId: string): boolean;
+  store: { activeOn(agentId: string): string[] };
+  scheduler: { wake(): void };
+  suspendAgent(agentId: string, by: string, now: number): BusEvent[];
+};
+
+export type RunnerPort = {
+  stopAgent(agentId: string): void;
 };
 
 export type SkillsPort = {
@@ -80,9 +93,10 @@ export type RoutesDeps = {
   tools: CapabilitiesPort;
   credentials: CredentialsPort;
   access: AccessPort;
-  sessions: SessionsPort;
-  automations: AutomationsPort;
-  users: PicksPort;
+  sessions: () => SessionsPort;
+  automations: () => AutomationsPort;
+  runner: () => RunnerPort;
+  users: PicksPort & { clearAgent(agentId: string): void };
   clock: Clock;
 };
 
@@ -241,18 +255,49 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
+      method: "GET",
+      path: "/api/agents/:id/impact",
+      policy: "admin",
+      handle(_req, ctx) {
+        const agent = find(ctx.params.id);
+        const { chats, running } = deps.sessions().agentImpact(agent.id);
+        const automations = deps.automations().store.activeOn(agent.id);
+        const body: AgentImpactResponse = {
+          chats,
+          automations: automations.length,
+          running,
+        };
+        return json(body);
+      },
+    },
+    {
+      // retires the row, which frees its name, provider, skills and
+      // servers; its chats are archived and its automations paused
       method: "DELETE",
       path: "/api/agents/:id",
       policy: "admin",
       handle(_req, ctx) {
+        const by = ctx.principal!.userId;
         const agent = find(ctx.params.id);
-        if (deps.sessions.usesAgent(agent.id)) {
-          throw new Conflict(`a chat uses ${agent.name}`);
-        }
-        if (deps.automations.usesAgent(agent.id)) {
-          throw new Conflict(`an automation uses ${agent.name}`);
-        }
-        deps.store.delete(agent.id);
+        transact(deps.db, () => {
+          const now = deps.clock();
+          if (!deps.store.retire(agent.id, now)) {
+            throw new NotFound("no such agent");
+          }
+          deps.skills.assign(agent.id, []);
+          deps.mcp.setAgentServers(agent.id, []);
+          deps.users.clearAgent(agent.id);
+          return {
+            result: undefined,
+            events: [
+              ...deps.sessions().archiveAgent(agent.id, now),
+              ...deps.automations().suspendAgent(agent.id, by, now),
+            ],
+          };
+        });
+        deps.automations().scheduler.wake();
+        // an archived chat still running ends as a stop does
+        deps.runner().stopAgent(agent.id);
         return json({});
       },
     },

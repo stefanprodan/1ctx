@@ -19,6 +19,7 @@ import { routes } from "./routes.ts";
 import { LimitStore } from "./store.ts";
 
 export {
+  type ChatCaps,
   DEFAULT_LIMITS,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,

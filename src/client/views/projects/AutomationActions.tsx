@@ -3,7 +3,8 @@
 //
 // The automation page's buttons over its runs. Anyone in the project
 // runs, suspends and resumes; Edit and Delete are for whoever may change
-// the automation, and Delete asks once, in place.
+// the automation, and Delete asks once, in place. Run now and Resume
+// wait while its agent is deleted, until an edit picks another.
 
 import { useSignal } from "@preact/signals";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
@@ -48,6 +49,7 @@ export function AutomationActions({
   };
   const suspended = automation.suspendedAt !== null;
   const running = automation.lastRunStatus === "running";
+  const gone = automation.agentRetired ? "Its agent was deleted" : undefined;
   const off = busy.value !== null;
   // while Delete asks, the confirmation is the only thing to press
   const ask = editable && asking.value;
@@ -57,8 +59,8 @@ export function AutomationActions({
         <button
           type="button"
           class="btn btn-small btn-primary"
-          disabled={off || running}
-          title={running ? "A run is on its way" : undefined}
+          disabled={off || running || gone !== undefined}
+          title={running ? "A run is on its way" : gone}
           onClick={() => void act("run", () => runAutomation(automation.id))}
         >
           <Icon name="bolt" size={12} />
@@ -106,7 +108,8 @@ export function AutomationActions({
             <button
               type="button"
               class="btn btn-small"
-              disabled={off}
+              disabled={off || (suspended && gone !== undefined)}
+              title={suspended ? gone : undefined}
               onClick={() =>
                 void act("suspend", () =>
                   suspendAutomation(automation.id, !suspended),

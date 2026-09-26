@@ -70,6 +70,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
 export type StorageLimits = {
   scratchIdleDays: number;
   knowledgeHistoryDays: number;
+  archivedDeleteDays: number;
 };
 
 const LARGEST = 10;
@@ -291,11 +292,12 @@ function largest(result: ScanResult): StorageResponse["largest"] {
 }
 
 // Kept is what only a delete removes, cleaned what a sweep or a task's
-// retention takes. A run whose task is gone is a chat's equal; a run
-// of a living task goes with its kept MCP files and its usage rows.
-// Rows without a byte count (usage, logins, the rest) are their
-// table's pages on disk, and the runs' usage is the table's pages by
-// the share of its rows that are theirs.
+// retention takes. A chat not archived is kept: the idle sweep archives
+// it and only a delete removes it. An archived chat and a run whose
+// task is gone go with the chats sweep, a run of a living task with its
+// task's retention, each with its uploads and kept MCP files. Usage
+// outlives every delete, so all of it is kept. Rows without a byte
+// count (usage, logins, the rest) are their table's pages on disk.
 function retention(
   result: ScanResult,
   limits: StorageLimits,
@@ -303,21 +305,17 @@ function retention(
   const table = (name: string) =>
     result.pages.find((row) => row.kind === "table" && row.name === name)
       ?.bytes ?? 0;
-  const usagePages = table("usage");
-  const runUsage =
-    result.usage.rows === 0
-      ? 0
-      : Math.round((usagePages * result.usage.runRows) / result.usage.rows);
   const kept: Record<RetentionKept, number> = {
     chats: 0,
     knowledge: 0,
     uploads: 0,
     mcp: 0,
-    usage: usagePages - runUsage,
+    usage: table("usage"),
     rest: 0,
   };
   const cleaned: Record<RetentionCleaned, number> = {
-    runs: runUsage,
+    archived: 0,
+    runs: 0,
     scratch: 0,
     history: 0,
     staging: result.staging,
@@ -326,13 +324,16 @@ function retention(
   };
   for (const session of result.sessions) {
     const own = session.messageBytes + session.openedBytes;
-    if (session.automationId === null) {
-      kept.chats += own;
-      kept.mcp += session.mcpBytes;
+    const withIt = own + session.uploadBytes + session.mcpBytes;
+    if (session.origin === "automation" && session.automationId !== null) {
+      cleaned.runs += withIt;
+    } else if (session.origin === "automation" || session.archived) {
+      cleaned.archived += withIt;
     } else {
-      cleaned.runs += own + session.mcpBytes;
+      kept.chats += own;
+      kept.uploads += session.uploadBytes;
+      kept.mcp += session.mcpBytes;
     }
-    kept.uploads += session.uploadBytes;
     cleaned.scratch += session.scratchBytes;
   }
   for (const row of result.knowledge) {
@@ -347,6 +348,7 @@ function retention(
   const retentions = new Set(result.automations.map((a) => a.retentionDays));
   const runDays = retentions.size === 1 ? [...retentions][0]! : null;
   const cleanedDays: Record<RetentionCleaned, number | null> = {
+    archived: limits.archivedDeleteDays,
     runs: runDays,
     scratch: limits.scratchIdleDays,
     history: limits.knowledgeHistoryDays,

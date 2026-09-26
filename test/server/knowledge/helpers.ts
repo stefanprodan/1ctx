@@ -81,12 +81,14 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     upstream: null,
     now: now.value,
   });
-  const sessions = new SessionStore(db, {
-    latest: () => null,
-    latestFor: () => new Map(),
-    deleteSession: () => 0,
-    deleteSessions: () => 0,
-  });
+  const sessions = new SessionStore(
+    db,
+    {
+      latest: () => null,
+      latestFor: () => new Map(),
+    },
+    { drop() {}, held: () => new Set() },
+  );
   const makeSession = () =>
     sessions.create({
       projectId,

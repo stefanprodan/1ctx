@@ -3,6 +3,7 @@
 
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
@@ -10,7 +11,7 @@ import type { Limits } from "../limits/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
-import type { SessionStore, UsagePort } from "../sessions/index.ts";
+import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
@@ -44,14 +45,15 @@ export type AutomationsDeps = {
   limits: { current(): Limits };
   memory: Pick<MemoryCapability, "read" | "save" | "undo">;
   sessions: SessionStore;
-  usage: UsagePort;
   runner: { startRun(event: Event): PreparedRun };
 };
 
 export type Automations = {
   store: AutomationStore;
   scheduler: Scheduler;
-  usesAgent(agentId: string): boolean;
+  // in the caller's transaction: the agent's active automations
+  // suspended by the admin who deleted it, one envelope each
+  suspendAgent(agentId: string, by: string, now: number): BusEvent[];
   start(): number;
   stop(): void;
   dispose(): void;
@@ -65,7 +67,17 @@ export function automationsArea(deps: AutomationsDeps): Automations {
   return {
     store,
     scheduler: scheduled,
-    usesAgent: (agentId) => store.usesAgent(agentId),
+    suspendAgent: (agentId, by, now) =>
+      store.activeOn(agentId).flatMap((id) => {
+        const row = store.suspend(id, by, now);
+        if (row === null) return [];
+        return [
+          {
+            type: "automation.changed" as const,
+            data: { projectId: row.projectId, automation: row },
+          },
+        ];
+      }),
     start: scheduled.start,
     stop: scheduled.stop,
     dispose: scheduled.dispose,

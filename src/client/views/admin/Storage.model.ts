@@ -244,7 +244,7 @@ export function largestLine(kind: LargestKind, row: LargestRow) {
 }
 
 const KEPT: Record<RetentionKept, [string, string]> = {
-  chats: ["Chats", "until deleted"],
+  chats: ["Chats", "not archived"],
   knowledge: ["Knowledge", "live files and versions"],
   uploads: ["Uploads", "with their chat"],
   mcp: ["MCP results", "with their chat"],
@@ -260,6 +260,11 @@ export function keptLine(key: RetentionKept) {
 export function cleanedLine(key: RetentionCleaned, days: number | null) {
   const d = days === null ? null : pluralCommas(days, "day", "days");
   switch (key) {
+    case "archived":
+      return {
+        name: "Archived chats",
+        sub: d ? `after ${d}` : "when expired",
+      };
     case "runs":
       return {
         name: "Runs",

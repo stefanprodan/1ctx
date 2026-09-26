@@ -96,6 +96,10 @@ export function swapRun(
         // the automation's agent may have changed since the line's run
         agent:
           next.session.agentId === line.session.agentId ? line.agent : null,
+        agentRetired:
+          next.session.agentId === line.session.agentId
+            ? line.agentRetired
+            : false,
         send: next.send ?? null,
         last: next.last ?? null,
         automation: line.automation,

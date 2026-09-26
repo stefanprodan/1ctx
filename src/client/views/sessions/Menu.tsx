@@ -6,10 +6,11 @@
 // the title into a box in the same place and the same type, so the
 // head keeps its height: Enter saves, Escape or leaving the box gives
 // the title back, and a refusal hangs under the box until the next
-// key. Download saves the chat as Markdown; Delete, offered to whoever
-// the server lets delete, asks once in place, inside the menu: Delete
-// again does it, Keep closes the question. A running chat cannot go,
-// so Delete waits for the end; Rename never does. A press outside or Escape
+// key. Download saves the chat as Markdown. Archive, for every member,
+// and Delete, offered to whoever the server lets delete, each ask once
+// in place, inside the menu: the action again does it, Keep closes the
+// question. A running chat cannot go or be archived, so both wait for
+// the end; Rename never does. A press outside or Escape
 // closes the menu, and Escape gives the focus back to the title. The
 // heading is the title button alone, so the items are no part of the
 // page's title. The state is Menu.model.ts.
@@ -18,7 +19,29 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { CLOSED, type MenuAction, menuStep } from "./Menu.model.ts";
+import {
+  CLOSED,
+  type MenuAction,
+  type MenuAsk,
+  menuStep,
+} from "./Menu.model.ts";
+
+// the question each action asks, and its button while it runs
+const ASKS: Record<
+  MenuAsk,
+  { words: (noun: string) => string; label: string; busy: string }
+> = {
+  delete: {
+    words: (noun) => `Delete this ${noun}?`,
+    label: "Delete",
+    busy: "Deleting",
+  },
+  archive: {
+    words: () => "Archive this chat? It becomes read-only.",
+    label: "Archive",
+    busy: "Archiving",
+  },
+};
 
 export function Menu({
   title,
@@ -26,6 +49,7 @@ export function Menu({
   running,
   download,
   onDelete,
+  onArchive,
   onRename,
 }: {
   title: string;
@@ -36,6 +60,8 @@ export function Menu({
   download: string;
   // absent where the chat cannot be deleted from here
   onDelete?: () => Promise<void>;
+  // absent where the chat cannot be archived: a run, an archived chat
+  onArchive?: () => Promise<void>;
   // absent where the title cannot be changed from here: a run's is its
   // automation's
   onRename?: (title: string) => Promise<void>;
@@ -104,11 +130,23 @@ export function Menu({
       document.removeEventListener("keydown", onKey);
     };
   }, [open, state]);
-  const remove = async () => {
-    if (onDelete === undefined) return;
+  // an archive from elsewhere takes the asked action away; a dead
+  // button would stay otherwise
+  const gone =
+    state.value.asking !== null &&
+    (state.value.asking === "archive" ? onArchive : onDelete) === undefined;
+  useEffect(() => {
+    if (gone) step("keep");
+  }, [gone, state.value.busy]);
+  const confirm = async () => {
+    const which = state.value.asking;
+    const call = which === "archive" ? onArchive : onDelete;
+    if (call === undefined) return;
     step("start");
     try {
-      await onDelete();
+      await call();
+      // a delete leaves the page; an archive stays on it, read-only
+      if (which === "archive") step("saved");
     } catch (err) {
       step({ failed: says(err) });
     }
@@ -169,20 +207,20 @@ export function Menu({
       )}
       {open && (
         <div class="menu chat-menu-card">
-          {asking ? (
+          {asking !== null ? (
             <div class="chat-menu-ask">
               <p class={`chat-menu-ask-text${failure ? " error" : ""}`}>
-                {failure ?? `Delete this ${noun}?`}
+                {failure ?? ASKS[asking].words(noun)}
               </p>
               <div class="chat-menu-ask-row">
                 <button
                   type="button"
-                  class="btn btn-small btn-danger"
+                  class={`btn btn-small ${asking === "delete" ? "btn-danger" : "btn-primary"}`}
                   disabled={busy || running}
                   title={running ? `Stop the ${noun} first` : undefined}
-                  onClick={() => void remove()}
+                  onClick={() => void confirm()}
                 >
-                  {busy ? "Deleting" : "Delete"}
+                  {busy ? ASKS[asking].busy : ASKS[asking].label}
                 </button>
                 <button
                   type="button"
@@ -211,13 +249,25 @@ export function Menu({
                 <Icon name="download" size={14} />
                 <span>Download</span>
               </a>
+              {onArchive !== undefined && (
+                <button
+                  type="button"
+                  class="menu-item"
+                  disabled={running}
+                  title={running ? `Stop the ${noun} first` : undefined}
+                  onClick={() => step({ ask: "archive" })}
+                >
+                  <Icon name="archive" size={14} />
+                  <span>Archive</span>
+                </button>
+              )}
               {onDelete !== undefined && (
                 <button
                   type="button"
                   class="menu-item"
                   disabled={running}
                   title={running ? `Stop the ${noun} first` : undefined}
-                  onClick={() => step("ask")}
+                  onClick={() => step({ ask: "delete" })}
                 >
                   <Icon name="trash" size={14} />
                   <span>Delete</span>

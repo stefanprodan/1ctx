@@ -33,6 +33,7 @@ import type { Limits } from "../limits/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
+  refuseArchived,
   type SessionRow,
   type SessionStore,
   titleFrom,
@@ -122,6 +123,8 @@ export type Runner = {
   compact(principal: Principal, sessionId: string): SessionDetail;
   startRun(event: Event): PreparedRun;
   stop(principal: Principal, sessionId: string): void;
+  // every send on a deleted agent ends as a stop does
+  stopAgent(agentId: string): void;
   live: (sessionId: string) => ReturnType<typeof live> | null;
   // every send terminated with cause shutdown and its stream let go,
   // or the deadline passed
@@ -377,6 +380,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.origin === "automation") {
         throw new Conflict("a run cannot continue");
       }
+      refuseArchived(session);
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
@@ -398,6 +402,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.origin === "automation") {
         throw new Conflict("a run cannot regenerate");
       }
+      refuseArchived(session);
       if (registry.get(session.id) !== null) {
         registry.admit(session.id, principal.userId, CHAT_POOL);
       }
@@ -426,6 +431,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.origin === "automation") {
         throw new Conflict("a run cannot compact");
       }
+      refuseArchived(session);
       if (registry.get(session.id) !== null) {
         registry.admit(session.id, principal.userId, CHAT_POOL);
       }
@@ -462,6 +468,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const session = deps.visible(principal, sessionId);
       const send = registry.get(session.id);
       if (send !== null) void terminate(send, "stop");
+    },
+    stopAgent(agentId) {
+      for (const send of registry.values()) {
+        if (send.policy.agentId === agentId) void terminate(send, "stop");
+      }
     },
     live: liveOf,
     shutdown: () =>

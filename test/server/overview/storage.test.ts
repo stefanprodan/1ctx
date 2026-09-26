@@ -246,29 +246,13 @@ describe("the storage answer", () => {
       body.retention.cleaned.map((row) => [row.key, row]),
     );
     expect(kept.chats).toBe(messageBytes(chat, chatId));
-    // the runs' share of the usage table's pages goes with the runs
+    // usage outlives the runs, so the whole table is kept
     const usagePages = body.areas
       .flatMap((area) => area.tables)
       .find((table) => table.name === "usage")!.bytes;
-    const usageRows = chat.app.db
-      .query<{ total: number; runs: number }, []>(
-        `select count(*) as total,
-                sum(session_id in (select id from sessions where automation_id is not null)) as runs
-           from usage`,
-      )
-      .get()!;
-    expect(usageRows.runs).toBe(2);
-    expect(usageRows.total).toBe(3);
-    const runUsage = Math.round(
-      (usagePages * usageRows.runs) / usageRows.total,
-    );
-    expect(runUsage).toBeGreaterThan(0);
-    expect(cleaned.runs).toEqual({
-      key: "runs",
-      bytes: runBytes + runUsage,
-      days: 14,
-    });
-    expect(kept.usage).toBe(usagePages - runUsage);
+    expect(usagePages).toBeGreaterThan(0);
+    expect(cleaned.runs).toEqual({ key: "runs", bytes: runBytes, days: 14 });
+    expect(kept.usage).toBe(usagePages);
     expect(cleaned.scratch?.days).toBe(DEFAULT_LIMITS.scratchIdleDays);
     expect(cleaned.history?.days).toBe(DEFAULT_LIMITS.knowledgeHistoryDays);
     expect(kept.rest).toBeGreaterThan(0);
@@ -278,6 +262,46 @@ describe("the storage answer", () => {
       "runs",
     ]);
     expect(project.bytes).toBe(runBytes + messageBytes(chat, chatId));
+  });
+
+  test("cleans archived chats and orphan runs after the archived limit", async () => {
+    const chat = await chatApp();
+    const liveId = await settledChat(chat);
+    const archivedId = await settledChat(chat);
+    const archived = await chat.member.call(
+      "POST",
+      `/api/sessions/${archivedId}/archive`,
+    );
+    expect(archived.status).toBeLessThan(300);
+    const automation = await createAutomation(chat, { retentionDays: 5 });
+    const { sessionId: runId, main } = await startRun(chat, automation.id);
+    main.reply("done");
+    await settleRun(chat, runId);
+    const gone = await chat.member.call(
+      "DELETE",
+      `/api/automations/${automation.id}`,
+    );
+    expect(gone.status).toBe(204);
+    chat.app.db
+      .query(
+        "insert into session_uploads (session_id, revision, bytes, files) values (?, 1, 400, 1)",
+      )
+      .run(archivedId);
+    const body = await storage(chat);
+    const kept = Object.fromEntries(
+      body.retention.kept.map((row) => [row.key, row.bytes]),
+    );
+    const cleaned = Object.fromEntries(
+      body.retention.cleaned.map((row) => [row.key, row]),
+    );
+    expect(kept.chats).toBe(messageBytes(chat, liveId));
+    expect(kept.uploads).toBe(0);
+    expect(cleaned.archived).toEqual({
+      key: "archived",
+      bytes: messageBytes(chat, archivedId) + 400 + messageBytes(chat, runId),
+      days: DEFAULT_LIMITS.archivedDeleteDays,
+    });
+    expect(cleaned.runs?.bytes).toBe(0);
   });
 
   test("keeps a chat's MCP files and cleans a run's with the run", async () => {

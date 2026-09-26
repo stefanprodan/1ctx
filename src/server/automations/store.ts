@@ -30,6 +30,8 @@ type Raw = {
   suspended_by: string | null;
   suspended_by_name: string | null;
   owner_name: string;
+  agent_name: string;
+  agent_retired: number;
   next_at: number | null;
   last_event_at: number | null;
   last_event_due_at: number | null;
@@ -43,11 +45,18 @@ type Raw = {
   updated_at: number;
 };
 
-// the row with the usernames of its owner and of whoever suspended it
+// resume, run now and an edit that keeps the agent wait for a live pick
+export const RETIRED = "its agent was deleted";
+
+// the row with the usernames of its owner and of whoever suspended it,
+// and its agent's name, a retired one included
 const SELECT = `select automations.*, owners.username as owner_name,
-    suspenders.username as suspended_by_name
+    suspenders.username as suspended_by_name,
+    agents.name as agent_name,
+    agents.deleted_at is not null as agent_retired
   from automations
   join users owners on owners.id = automations.owner_id
+  join agents on agents.id = automations.agent_id
   left join users suspenders on suspenders.id = automations.suspended_by`;
 
 const row = (raw: Raw): AutomationSummary => ({
@@ -56,6 +65,8 @@ const row = (raw: Raw): AutomationSummary => ({
   ownerId: raw.owner_id,
   ownerName: raw.owner_name,
   agentId: raw.agent_id,
+  agentName: raw.agent_name,
+  agentRetired: raw.agent_retired === 1,
   name: raw.name,
   instructions: raw.instructions,
   schedule: raw.schedule,
@@ -415,13 +426,14 @@ export class AutomationStore {
     );
   }
 
-  usesAgent(agentId: string): boolean {
-    return (
-      this.db
-        .query<{ n: number }, [string]>(
-          "select count(*) as n from automations where agent_id = ?",
-        )
-        .get(agentId)!.n > 0
-    );
+  // the active automations on an agent, which its delete suspends
+  activeOn(agentId: string): string[] {
+    return this.db
+      .query<{ id: string }, [string]>(
+        `select id from automations
+         where agent_id = ? and suspended_at is null order by created_at, id`,
+      )
+      .all(agentId)
+      .map((row) => row.id);
   }
 }

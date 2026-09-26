@@ -9,6 +9,7 @@ import { describe, expect, test } from "bun:test";
 import {
   CLOSED,
   type MenuAction,
+  menuItems,
   menuStep,
 } from "../../../src/client/views/sessions/Menu.model.ts";
 
@@ -22,24 +23,27 @@ describe("the chat menu", () => {
   });
 
   test("Delete asks, Keep withdraws, closing forgets the question", () => {
-    expect(after("toggle", "ask")).toEqual({
+    expect(after("toggle", { ask: "delete" })).toEqual({
       ...CLOSED,
       open: true,
-      asking: true,
+      asking: "delete",
     });
-    expect(after("toggle", "ask", "keep")).toEqual({ ...CLOSED, open: true });
-    expect(after("toggle", "ask", "dismiss")).toEqual(CLOSED);
-    expect(after("toggle", "ask", "toggle", "toggle")).toEqual({
+    expect(after("toggle", { ask: "delete" }, "keep")).toEqual({
+      ...CLOSED,
+      open: true,
+    });
+    expect(after("toggle", { ask: "delete" }, "dismiss")).toEqual(CLOSED);
+    expect(after("toggle", { ask: "delete" }, "toggle", "toggle")).toEqual({
       ...CLOSED,
       open: true,
     });
   });
 
   test("a delete on its way is not closed, kept or toggled away", () => {
-    const busy = after("toggle", "ask", "start");
+    const busy = after("toggle", { ask: "delete" }, "start");
     expect(busy).toEqual({
       open: true,
-      asking: true,
+      asking: "delete",
       editing: false,
       busy: true,
       failure: null,
@@ -50,10 +54,12 @@ describe("the chat menu", () => {
   });
 
   test("a failure takes the question's place until Keep or a retry", () => {
-    const failed = after("toggle", "ask", "start", { failed: "409" });
+    const failed = after("toggle", { ask: "delete" }, "start", {
+      failed: "409",
+    });
     expect(failed).toEqual({
       open: true,
-      asking: true,
+      asking: "delete",
       editing: false,
       busy: false,
       failure: "409",
@@ -75,5 +81,49 @@ describe("the chat menu", () => {
       failure: "409",
     });
     expect(menuStep(saving, "edit")).toBe(saving);
+  });
+
+  test("Archive asks its own question and a done archive shuts the menu", () => {
+    expect(after("toggle", { ask: "archive" }).asking).toBe("archive");
+    expect(after("toggle", { ask: "archive" }, "keep").asking).toBeNull();
+    expect(after("toggle", { ask: "archive" }, "start", "saved")).toEqual(
+      CLOSED,
+    );
+  });
+});
+
+describe("the chat menu's items", () => {
+  test("a member archives, the owner also renames and deletes", () => {
+    expect(menuItems({ run: false, archived: false, manage: false })).toEqual({
+      rename: false,
+      archive: true,
+      delete: false,
+    });
+    expect(menuItems({ run: false, archived: false, manage: true })).toEqual({
+      rename: true,
+      archive: true,
+      delete: true,
+    });
+  });
+
+  test("an archived chat keeps Delete alone, for whoever may delete", () => {
+    expect(menuItems({ run: false, archived: true, manage: true })).toEqual({
+      rename: false,
+      archive: false,
+      delete: true,
+    });
+    expect(menuItems({ run: false, archived: true, manage: false })).toEqual({
+      rename: false,
+      archive: false,
+      delete: false,
+    });
+  });
+
+  test("a run is never archived or renamed", () => {
+    expect(menuItems({ run: true, archived: false, manage: true })).toEqual({
+      rename: false,
+      archive: false,
+      delete: true,
+    });
   });
 });

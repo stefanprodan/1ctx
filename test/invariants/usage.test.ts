@@ -185,6 +185,43 @@ describe("GET /api/usage/days", () => {
     await chat.app.shutdown();
   });
 
+  test("a regenerate adds its tokens but not a turn", async () => {
+    const chat = await chatApp();
+    chat.app.now.value = Date.parse("2026-09-16T12:00:00Z");
+    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    const started = await startChat(chat, "again");
+    await finish(chat, started.script, 11, 5);
+    const pending = chat.scripted.next();
+    expect(
+      (
+        await chat.member.call(
+          "POST",
+          `/api/sessions/${started.sessionId}/regenerate`,
+        )
+      ).status,
+    ).toBe(201);
+    await finish(chat, await pending, 20, 4);
+
+    const days = (await (
+      await chat.member.call("GET", "/api/usage/days?tz=UTC")
+    ).json()) as DaysUsageResponse;
+    expect(days.total).toEqual({ sends: 1, tokens: 40 });
+    const project = days.projects.find(
+      (candidate) => candidate.projectId === chat.projectId,
+    )!;
+    expect(project.usage.at(-1)).toEqual({ sends: 1, tokens: 40 });
+    const week = (await (
+      await chat.member.call("GET", "/api/usage/week?tz=UTC")
+    ).json()) as WeekUsageResponse;
+    expect(week).toMatchObject({
+      sends: 1,
+      sessions: 1,
+      promptTokens: 31,
+      completionTokens: 9,
+    });
+    await chat.app.shutdown();
+  });
+
   // the query rules are parseDaysUsageQuery's table; one of each family here
   test("answers 400 to a malformed timezone or weeks query", async () => {
     const chat = await chatApp();

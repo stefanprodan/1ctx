@@ -58,7 +58,9 @@ and the note card under `src/client/views/memory/`.
   session is deleted. `Memory.agentName` is that session's agent,
   written with the note (`agent_name`) so it outlives the session, null
   for a hand edit or an undo; a chat's save also records the chat's
-  user in `updatedBy`. The note card's writer line names the agent for
+  user in `updatedBy`. `Memory.agentRetired` is true when no live agent
+  has that name, so the card shows it as plain text; the note keeps only
+  the name, so a new agent given it shows as live again. The note card's writer line names the agent for
   any save from a session, "@agent in <chat>", "@agent in a run of
   <automation>" (or "of a deleted automation"), "in a chat since
   deleted" or "in a run since deleted", and "@user" only for a hand

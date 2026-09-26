@@ -70,6 +70,10 @@
   .composer-chip:disabled {
     cursor: default;
   }
+  /* the agent chip a form requires */
+  .composer-chip-invalid {
+    border-color: var(--failed);
+  }
   .composer-chip-name {
     color: var(--fg);
     flex-shrink: 0;

@@ -193,7 +193,8 @@ client change. What each page draws is in `docs/views.md`.
   refusal on an edit. A name field's one check is `nameProblem()` in
   `lib/names.ts`. A row that can be deleted starts its foot with
   `AskDelete` from `ui/Foot.tsx` (Delete, then the words that ask, the
-  danger button and Keep), never its own pair.
+  danger button and Keep, `onAsk` reading what the delete would do
+  first), never its own pair.
 - **An action outside a form is `useAction()`** from `lib/save.ts`: a
   switch or a pick that writes at once, busy while it runs, its
   refusal in words until the next try.

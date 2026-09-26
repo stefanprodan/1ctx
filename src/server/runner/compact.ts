@@ -92,5 +92,7 @@ export function compactSend(
     op: "compact",
   });
   void deps.run(send);
-  return sessionDetail(deps.sessions, started.session, live(send));
+  // a send starts only on a chat that is not archived, so no
+  // archive is read and its kept days go unused
+  return sessionDetail(deps.sessions, started.session, live(send), 0);
 }

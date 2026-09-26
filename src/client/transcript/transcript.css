@@ -210,6 +210,12 @@
     top: auto;
     bottom: calc(100% + 4px);
   }
+  /* the list opens from the button's right edge when the button ends
+     its row */
+  .transcript-fork-menu-end {
+    left: auto;
+    right: 0;
+  }
   .transcript-fork-failure,
   .transcript-fork-none {
     padding: var(--space-1) var(--space-2);

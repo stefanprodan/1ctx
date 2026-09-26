@@ -22,17 +22,30 @@ type AgentMessageFields = {
   now: number;
 };
 
+export function nextSeq(db: Db, sessionId: string): number {
+  return db
+    .query<{ n: number }, [string]>(
+      "select coalesce(max(seq), 0) + 1 as n from messages where session_id = ?",
+    )
+    .get(sessionId)!.n;
+}
+
+function read(db: Db, id: string): Message {
+  const raw = db
+    .query<RawMessage, [string]>(
+      `select ${MESSAGE_COLUMNS} from messages where id = ?`,
+    )
+    .get(id)!;
+  return message(raw);
+}
+
 export function addAgentMessage(
   db: Db,
   kind: Extract<MessageKind, "reply" | "summary">,
   fields: AgentMessageFields,
 ): Message {
   const id = fields.id ?? newId();
-  const seq = db
-    .query<{ n: number }, [string]>(
-      "select coalesce(max(seq), 0) + 1 as n from messages where session_id = ?",
-    )
-    .get(fields.sessionId)!.n;
+  const seq = nextSeq(db, fields.sessionId);
   db.query(
     `insert into messages (id, session_id, seq, kind, send_id, round,
        agent_id, model, status, created_at)
@@ -48,12 +61,38 @@ export function addAgentMessage(
     fields.model,
     fields.now,
   );
-  const raw = db
-    .query<RawMessage, [string]>(
-      `select ${MESSAGE_COLUMNS} from messages where id = ?`,
-    )
-    .get(id)!;
-  return message(raw);
+  return read(db, id);
+}
+
+export function addToolRows(
+  db: Db,
+  calls: {
+    id?: string;
+    sessionId: string;
+    sendId: string;
+    round: number;
+    toolCallId: string;
+    toolName: string;
+    now: number;
+  }[],
+): Message[] {
+  return calls.map((call) => {
+    const id = call.id ?? newId();
+    db.query(
+      `insert into messages (id, session_id, seq, kind, send_id, round, tool_call_id, tool_name, status, created_at)
+       values (?, ?, ?, 'tool', ?, ?, ?, ?, 'streaming', ?)`,
+    ).run(
+      id,
+      call.sessionId,
+      nextSeq(db, call.sessionId),
+      call.sendId,
+      call.round,
+      call.toolCallId,
+      call.toolName,
+      call.now,
+    );
+    return read(db, id);
+  });
 }
 
 export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {

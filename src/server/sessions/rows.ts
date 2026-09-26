@@ -14,6 +14,7 @@ import type {
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
+  ArchiveReason,
   EventSource,
   MessageKind,
   MessageStatus,
@@ -69,13 +70,14 @@ export type RawSession = {
   created_at: number;
   last_activity_at: number;
   mcp_folders: number;
+  archived_at: number | null;
+  archived_reason: ArchiveReason | null;
+  archived_by: string | null;
 };
 
 export type UsagePort = {
   latest(sessionId: string): RoundUsage | null;
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
-  deleteSession(sessionId: string): number;
-  deleteSessions(sessionIds: string[]): number;
 };
 
 export const session = (
@@ -97,6 +99,10 @@ export const session = (
   createdAt: raw.created_at,
   lastActivityAt: raw.last_activity_at,
   usage,
+  archived:
+    raw.archived_at === null || raw.archived_reason === null
+      ? null
+      : { at: raw.archived_at, reason: raw.archived_reason },
 });
 
 export type RawMessage = {
@@ -110,6 +116,7 @@ export type RawMessage = {
   user_id: string | null;
   agent_id: string | null;
   content: string;
+  packed_bytes: number | null;
   uploads: string | null;
   files: string | null;
   reasoning: string;
@@ -131,9 +138,11 @@ export type RawMessage = {
   finished_at: number | null;
 };
 
+// packed_bytes, never packed: opening a chat loads no blob
 export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, messages.kind,
    messages.send_id, messages.round, messages.slot, messages.user_id,
-   messages.agent_id, messages.content, messages.uploads,
+   messages.agent_id, messages.content, messages.packed_bytes,
+   messages.uploads,
    (select json_group_array(json_object(
       'path', path, 'kind', kind, 'language', language,
       'bytes', bytes, 'lines', lines, 'title', title) order by position)
@@ -181,7 +190,8 @@ export const message = (raw: RawMessage): Message => ({
   userId: raw.user_id,
   agentId: raw.agent_id,
   content: raw.content,
-  resultBytes: null,
+  // a packed tool row's content is empty; its size is kept beside it
+  resultBytes: raw.kind === "tool" ? raw.packed_bytes : null,
   uploads: raw.kind === "user" ? messageUploads(raw.uploads) : null,
   files: raw.kind === "tool" ? messageFiles(raw.files) : null,
   promptTokens:
@@ -206,7 +216,7 @@ export const message = (raw: RawMessage): Message => ({
 
 // a tool row leaves its result behind: the content, and the error,
 // which is the failed result's text. The size says what the result
-// route will answer
+// route will answer, a packed row's from packed_bytes
 export function offWire(row: Message): Message {
   const toolCalls = row.toolCalls?.map(offWireCall) ?? null;
   if (row.kind !== "tool") return { ...row, toolCalls, resultBytes: null };
@@ -215,7 +225,7 @@ export function offWire(row: Message): Message {
     toolCalls,
     content: "",
     error: null,
-    resultBytes: Buffer.byteLength(row.content, "utf8"),
+    resultBytes: row.resultBytes ?? Buffer.byteLength(row.content, "utf8"),
   };
 }
 

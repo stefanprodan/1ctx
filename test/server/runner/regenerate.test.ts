@@ -97,7 +97,7 @@ describe("POST /api/sessions/:id/regenerate", () => {
           "select count(*) as n from usage where send_id = ?",
         )
         .get(oldSendId)!.n,
-    ).toBe(0);
+    ).toBe(2);
     expect(
       detail.messages
         .map((message: { id: string }) => message.id)

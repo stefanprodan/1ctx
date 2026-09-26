@@ -7,7 +7,9 @@
 // button waits while one is on its way; a refusal is the menu's one
 // line until it opens again. The list hangs under the button when it
 // fits above the transcript's foot, else it rises over the button, so
-// it never covers the composer.
+// it never covers the composer. In a foot, a run's or an archived
+// chat's, the button says Fork and ends the line, so its list opens
+// from its right edge.
 
 import { useSignal } from "@preact/signals";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
@@ -25,12 +27,15 @@ export function ForkButton({
   agents,
   agentId,
   onFork,
+  foot,
 }: {
   messageId: string;
   agents: AgentSummary[];
-  // the session's agent, listed first
+  // the session's agent, listed first while it is live
   agentId: string | null;
   onFork: OnFork;
+  // the foot's button: the word beside the icon, the list from its end
+  foot?: boolean;
 }) {
   const { open, root } = useMenu();
   const failure = useSignal<string | null>(null);
@@ -62,20 +67,33 @@ export function ForkButton({
   };
   return (
     <div class="transcript-fork" ref={root}>
-      <button
-        type="button"
-        class="transcript-act"
-        title="Fork"
-        aria-label="Fork"
-        aria-expanded={open.value}
-        disabled={busy}
-        onClick={toggle}
-      >
-        <Icon name="fork" size={14} />
-      </button>
+      {foot ? (
+        <button
+          type="button"
+          class="btn btn-small"
+          aria-expanded={open.value}
+          disabled={busy}
+          onClick={toggle}
+        >
+          <Icon name="fork" size={12} />
+          Fork
+        </button>
+      ) : (
+        <button
+          type="button"
+          class="transcript-act"
+          title="Fork"
+          aria-label="Fork"
+          aria-expanded={open.value}
+          disabled={busy}
+          onClick={toggle}
+        >
+          <Icon name="fork" size={14} />
+        </button>
+      )}
       {open.value && (
         <ul
-          class={`menu transcript-fork-menu${up.value ? " transcript-fork-menu-up" : ""}`}
+          class={`menu transcript-fork-menu${up.value ? " transcript-fork-menu-up" : ""}${foot ? " transcript-fork-menu-end" : ""}`}
         >
           {failure.value !== null && (
             <li class="transcript-fork-failure">{failure.value}</li>

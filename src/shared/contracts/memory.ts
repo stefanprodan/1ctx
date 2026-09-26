@@ -29,6 +29,8 @@ export type Memory = {
   // the agent of the chat or run that last saved, kept once that session
   // is deleted; null for a hand edit or an undo
   agentName: string | null;
+  // true when no live agent has that name, so the name is plain text
+  agentRetired: boolean;
   // the chat or run that last saved, null for a hand edit and once that
   // session is deleted; the automation is null for a chat and once
   // deleted

@@ -6,7 +6,8 @@
 // What may be seen is access's call: a session in a project the caller
 // may not see is the same 404 as one that is not there. A team chat's
 // rename and delete belong to its owner or an admin; a delete waits for
-// the chat to end, a rename does not.
+// the chat to end, a rename does not. Anyone who sees a chat may
+// archive it, which makes it read-only for good.
 
 import type {
   ForkSessionResponse,
@@ -24,6 +25,7 @@ import { BadRequest, Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
+import { archivedEvent, refuseArchived } from "./archive.ts";
 import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import { openedFileResponse } from "./opened.ts";
 import {
@@ -34,7 +36,7 @@ import {
   parseStreamQuery,
   parseVisualParams,
 } from "./parse.ts";
-import { cutResult, offWire, type SessionRow, type UsagePort } from "./rows.ts";
+import { cutResult, offWire, type SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
 import { readVisual } from "./visual.ts";
 
@@ -64,8 +66,9 @@ export type RoutesDeps = {
   store: SessionStore;
   access: AccessPort;
   live: LivePort;
-  usage: UsagePort;
   uploads: UploadsPort;
+  // the days an archived chat is kept, as the limit reads now
+  keptDays(): number;
   // the session when the principal may see it, else the one 404
   visible(principal: Principal, id: string): SessionRow;
 };
@@ -74,6 +77,7 @@ export function detail(
   store: SessionStore,
   session: SessionRow,
   live: LiveSend | null,
+  keptDays: number,
 ): SessionResponse {
   return {
     session,
@@ -82,6 +86,8 @@ export function detail(
     send: store.lastSend(session.id),
     live,
     authors: store.authors(session.id),
+    agents: store.agents(session.id),
+    archive: store.archiveOf(session.id, keptDays),
   };
 }
 
@@ -108,7 +114,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const session = deps.visible(ctx.principal!, ctx.params.id);
-        return json(detail(deps.store, session, deps.live(session.id)));
+        return json(
+          detail(deps.store, session, deps.live(session.id), deps.keptDays()),
+        );
       },
     },
     {
@@ -149,9 +157,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         ) {
           throw new NotFound("no such tool result");
         }
+        // a packed row is decompressed here, one result at a time
+        const text = deps.store.result(message.id) ?? "";
         const body: ToolResultResponse = {
-          ...cutResult(message.content),
-          bytes: Buffer.byteLength(message.content, "utf8"),
+          ...cutResult(text),
+          bytes: Buffer.byteLength(text, "utf8"),
         };
         return json(body);
       },
@@ -221,7 +231,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             messageIds,
           );
           const result: ForkSessionResponse = {
-            ...detail(deps.store, session, null),
+            ...detail(deps.store, session, null, deps.keptDays()),
             draftUploads,
           };
           return {
@@ -255,6 +265,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         ) {
           throw new Forbidden("only the owner or an admin renames a chat");
         }
+        refuseArchived(session);
         const { title } = parseRenameSession(
           await jsonBody(req, MAX_SMALL_BODY),
         );
@@ -263,6 +274,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           // safe: one more revision on the row, one envelope
           const current = deps.store.byId(session.id);
           if (current === null) throw new NotFound("no such chat");
+          refuseArchived(current);
           const row = deps.store.rename(session.id, title)!;
           return {
             result: row,
@@ -279,7 +291,44 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             ],
           };
         });
-        return json(detail(deps.store, renamed, deps.live(renamed.id)));
+        return json(
+          detail(deps.store, renamed, deps.live(renamed.id), deps.keptDays()),
+        );
+      },
+    },
+    {
+      // anyone who sees the chat may archive it, for good; a run is
+      // read-only once it ends, so it has nothing to archive
+      method: "POST",
+      path: "/api/sessions/:id/archive",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const principal = ctx.principal!;
+        const session = deps.visible(principal, ctx.params.id);
+        transact(deps.db, () => {
+          const current = deps.store.byId(session.id);
+          if (current === null) throw new NotFound("no such chat");
+          if (current.origin === "automation") {
+            throw new Conflict("a run cannot be archived");
+          }
+          if (current.archived !== null) {
+            throw new Conflict("the chat is archived already");
+          }
+          if (current.status === "running") {
+            throw new Conflict("the chat is running, stop it first");
+          }
+          const row = deps.store.archive(
+            current.id,
+            "manual",
+            principal.userId,
+            deps.clock(),
+          )!;
+          return {
+            result: undefined,
+            events: [archivedEvent(row, deps.store.lastSend(row.id))],
+          };
+        });
+        return new Response(null, { status: 204 });
       },
     },
     {
@@ -298,22 +347,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         transact(deps.db, () => {
           // the row is the truth after repair, and the runner keeps it
           // running while it holds the lock
-          const current = deps.store.byId(session.id);
-          if (current === null) return { result: undefined };
-          if (current.status === "running") {
+          const deleted = deps.store.remove(session.id);
+          if (deleted === "running") {
             throw new Conflict("the chat is running, stop it first");
           }
-          deps.usage.deleteSession(session.id);
-          deps.store.delete(session.id);
-          return {
-            result: undefined,
-            events: [
-              {
-                type: "session.deleted" as const,
-                data: { projectId: session.projectId, sessionId: session.id },
-              },
-            ],
-          };
+          return { result: undefined, events: deleted ? [deleted] : [] };
         });
         return json({});
       },

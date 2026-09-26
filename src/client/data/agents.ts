@@ -7,6 +7,7 @@
 
 import { effect, signal } from "@preact/signals";
 import type {
+  AgentImpactResponse,
   AgentResponse,
   AgentsResponse,
   SaveAgentRequest,
@@ -76,6 +77,11 @@ export async function updateAgent(
   if (body.default !== undefined) void loadAgents();
   return agent;
 }
+
+// what a delete would do now: the chats it archives, the automations
+// it pauses and what it stops
+export const agentImpact = (id: string): Promise<AgentImpactResponse> =>
+  api<AgentImpactResponse>(`/api/agents/${encodeURIComponent(id)}/impact`);
 
 export async function deleteAgent(id: string): Promise<void> {
   const forUser = owner;

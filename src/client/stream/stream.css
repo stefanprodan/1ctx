@@ -61,6 +61,20 @@
   .stream-author {
     color: var(--brand);
   }
+  /* a deleted agent loses the brand colour */
+  .stream-author-gone {
+    color: var(--faint);
+  }
+  /* an archived row keeps its place, its icon quiet and the word
+     before its line */
+  .stream-icon-archived {
+    color: var(--faint);
+  }
+  .stream-archived {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
   /* a failure's words, the author keeping its colour */
   .stream-bad {
     color: var(--failed);

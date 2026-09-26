@@ -117,6 +117,12 @@
   .chart-bar-faint .chart-bar-name {
     color: var(--faint);
   }
+  /* a bar whose project or agent is gone, its numbers kept */
+  .chart-gone {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+  }
   .chart-bar-faint .chart-bar-fill {
     background: var(--heat-2);
   }

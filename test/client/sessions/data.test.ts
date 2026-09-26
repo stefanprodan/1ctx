@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { path, query } from "../../../src/client/app/router.ts";
+import { archiveSession } from "../../../src/client/data/archive.ts";
 import {
   changeOf,
   dropFlips,
@@ -53,6 +54,7 @@ import type {
 
 function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
+    archived: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -74,6 +76,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
 
 function row(changes: Partial<SessionSummary> = {}): StreamRow {
   return {
+    agentRetired: false,
     session: summary(changes),
     agent: "assistant",
     send: null,
@@ -134,6 +137,8 @@ function detail(
   changes: Partial<SessionDetail> = {},
 ): SessionDetail {
   return {
+    agents: [],
+    archive: null,
     session: summary({ id }),
     forkedFrom: null,
     messages: [],
@@ -637,6 +642,70 @@ describe("the sessions entity", () => {
     expect(hit).toBe("POST /api/sessions/s1/compact");
     expect(session.value?.session.revision).toBe(5);
     expect(sending.value).toBe(false);
+  });
+
+  test.serial(
+    "an envelope that archives the chat on screen reads the detail again",
+    async () => {
+      session.value = detail();
+      const hits: string[] = [];
+      const archived = { at: 50, reason: "manual" as const };
+      answer = (url) => {
+        hits.push(url);
+        return Response.json(
+          detail("s1", {
+            session: summary({ revision: 3, archived }),
+            archive: { by: { id: "u9", username: "ana" }, keptUntil: 99 },
+          }),
+        );
+      };
+      onSocket({
+        type: "session",
+        projectId: "p1",
+        session: summary({ revision: 2, archived }),
+        messages: [],
+        send: null,
+      });
+      // the envelope lands at once, the detail after
+      expect(session.value?.session.archived).toEqual(archived);
+      await settle();
+      expect(hits).toEqual(["/api/sessions/s1"]);
+      expect(session.value?.archive?.by?.username).toBe("ana");
+      // a later envelope of an archived chat reads nothing more
+      onSocket({
+        type: "session",
+        projectId: "p1",
+        session: summary({ revision: 4, archived }),
+        messages: [],
+        send: null,
+      });
+      await settle();
+      expect(hits).toHaveLength(1);
+    },
+  );
+
+  test.serial("archive posts, then reads the chat on screen", async () => {
+    session.value = detail();
+    const hits: string[] = [];
+    answer = (url, init) => {
+      hits.push(`${init?.method ?? "GET"} ${url}`);
+      if (init?.method === "POST") return new Response(null, { status: 204 });
+      return Response.json(
+        detail("s1", {
+          session: summary({
+            revision: 3,
+            archived: { at: 50, reason: "manual" },
+          }),
+          archive: { by: null, keptUntil: 99 },
+        }),
+      );
+    };
+    await archiveSession("s1");
+    expect(hits).toEqual([
+      "POST /api/sessions/s1/archive",
+      "GET /api/sessions/s1",
+    ]);
+    expect(session.value?.archive?.keptUntil).toBe(99);
   });
 
   test("rename patches the title and takes the detail", async () => {

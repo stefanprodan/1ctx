@@ -44,6 +44,7 @@ import {
   OWN_MEMORY_GUIDANCE,
   pickMemory,
   requestOf,
+  retiredPick,
   rowState,
   scheduleTitle,
   scheduleWords,
@@ -62,6 +63,8 @@ const HOUR = 3_600_000;
 const automation = (
   changes: Partial<AutomationSummary> = {},
 ): AutomationSummary => ({
+  agentName: "assistant",
+  agentRetired: false,
   id: "au1",
   projectId: "p1",
   ownerId: "u1",
@@ -93,6 +96,7 @@ const automation = (
 });
 
 const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
+  archived: null,
   id: "s1",
   projectId: "p1",
   ownerId: "u1",
@@ -112,6 +116,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
 });
 
 const run = (changes: Partial<SessionSummary> = {}): StreamRow => ({
+  agentRetired: false,
   session: session(changes),
   agent: "assistant",
   send: null,
@@ -248,14 +253,36 @@ describe("the row's words", () => {
     const off = {
       suspendedAt: now - 2 * HOUR,
       suspendedBy: { id: "u9", username: "admin" },
+      agentRetired: false,
     };
     expect(suspendedText(off, now)).toBe("Suspended by @admin 2h ago");
     expect(suspendedText({ ...off, suspendedBy: null }, now)).toBe(
       "Suspended 2h ago",
     );
-    expect(suspendedText({ suspendedAt: null, suspendedBy: null }, now)).toBe(
-      "",
+    expect(
+      suspendedText(
+        { suspendedAt: null, suspendedBy: null, agentRetired: false },
+        now,
+      ),
+    ).toBe("");
+  });
+
+  test("a deleted agent leaves it paused until another is picked", () => {
+    const gone = automation({
+      agentId: "a9",
+      agentName: "sre",
+      agentRetired: true,
+      suspendedAt: now - HOUR,
+      suspendedBy: { id: "u9", username: "admin" },
+    });
+    expect(suspendedText(gone, now)).toBe("Paused, its agent was deleted.");
+    expect(rowState(gone, now)).toEqual({ bad: null, text: "paused" });
+    expect(retiredPick(gone, "a9")).toBe(
+      "Its agent sre was deleted. Pick another to save.",
     );
+    expect(retiredPick(gone, "a1")).toBeNull();
+    expect(retiredPick(automation(), "a1")).toBeNull();
+    expect(retiredPick(null, "a1")).toBeNull();
   });
 
   test("a suspended row says so, and a run in flight wins", () => {
