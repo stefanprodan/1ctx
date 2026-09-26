@@ -1,7 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Request and response bodies of the agent routes, all for admins.
+// Request and response bodies of the agent routes, for admins, and of
+// the agent the signed-in user last picked.
 
 import type { AgentSummary } from "../contracts/agent.ts";
 import type { AgentServer } from "../contracts/mcp.ts";
@@ -12,6 +13,11 @@ export type AgentsResponse = { agents: AgentSummary[] };
 
 // POST /api/agents and PATCH /api/agents/:id answer the row
 export type AgentResponse = { agent: AgentSummary };
+// PUT /api/profile/agent, for any signed-in user: the composer's pick,
+// kept so their next new chat starts on it; answers the agent it will
+export type PickAgentRequest = { agentId: string };
+export type PickAgentResponse = { agentId: string | null };
+
 // the model is an id the provider's catalog lists
 export type SaveAgentRequest = {
   name: string;
@@ -35,4 +41,7 @@ export type SaveAgentRequest = {
   // model the catalog describes; a window is required with tools on
   contextLength?: number | null;
   tools?: boolean;
+  // true makes it the default; false on the default takes the mark off,
+  // so the first created is the default again; absent leaves the mark
+  default?: boolean;
 };

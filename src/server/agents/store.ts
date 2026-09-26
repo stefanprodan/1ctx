@@ -33,7 +33,12 @@ type Raw = {
   created_at: number;
 };
 
-const row = (raw: Raw, skills: string[], servers: AgentServer[]): AgentRow => ({
+const row = (
+  raw: Raw,
+  skills: string[],
+  servers: AgentServer[],
+  defaultId: string | null,
+): AgentRow => ({
   id: raw.id,
   name: raw.name,
   avatar: raw.avatar,
@@ -57,6 +62,7 @@ const row = (raw: Raw, skills: string[], servers: AgentServer[]): AgentRow => ({
   servers,
   mcpMode: raw.mcp_mode,
   upstream: raw.upstream,
+  default: raw.id === defaultId,
   createdAt: raw.created_at,
 });
 
@@ -84,15 +90,33 @@ export class AgentStore {
     private readonly agentServers: (agentId: string) => AgentServer[],
   ) {}
 
-  private row(raw: Raw): AgentRow {
-    return row(raw, this.assigned(raw.id), this.agentServers(raw.id));
+  private row(raw: Raw, defaultId = this.defaultId()): AgentRow {
+    return row(
+      raw,
+      this.assigned(raw.id),
+      this.agentServers(raw.id),
+      defaultId,
+    );
+  }
+
+  // the marked agent, else the first created, so deleting the default
+  // hands it on with no write
+  defaultId(): string | null {
+    return (
+      this.db
+        .query<{ id: string }, []>(
+          "select id from agents order by is_default desc, created_at, name limit 1",
+        )
+        .get()?.id ?? null
+    );
   }
 
   list(): AgentRow[] {
+    const defaultId = this.defaultId();
     return this.db
       .query<Raw, []>("select * from agents order by created_at, name")
       .all()
-      .map((raw) => this.row(raw));
+      .map((raw) => this.row(raw, defaultId));
   }
 
   byId(id: string): AgentRow | null {
@@ -107,6 +131,21 @@ export class AgentStore {
       .query<Raw, [string]>("select * from agents where name = ?")
       .get(name);
     return raw ? this.row(raw) : null;
+  }
+
+  // true moves the mark here; false takes it off this agent only, so the
+  // default goes back to the first created
+  setDefault(id: string, on: boolean): void {
+    if (on) {
+      this.db
+        .query(
+          "update agents set is_default = 0 where is_default = 1 and id != ?",
+        )
+        .run(id);
+    }
+    this.db
+      .query("update agents set is_default = ? where id = ?")
+      .run(on ? 1 : 0, id);
   }
 
   usesProvider(providerId: string): boolean {

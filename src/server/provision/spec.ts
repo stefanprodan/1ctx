@@ -139,6 +139,9 @@ export type AgentSpec = {
   tools?: boolean;
   // the OpenRouter endpoint tag tried first, as the agents API takes it
   upstream?: string | null;
+  // only true: the agent a new chat starts on for anyone who has not
+  // picked one; left out, the mark stays where it is
+  default?: true;
 };
 
 export type ToolSpec = {
@@ -351,6 +354,7 @@ export function agent(value: unknown): AgentSpec {
         "contextLength",
         "tools",
         "upstream",
+        "default",
       ],
       "spec",
     ),
@@ -400,6 +404,10 @@ export function agent(value: unknown): AgentSpec {
         if (v !== null && (typeof v !== "string" || v === "")) {
           throw new BadRequest("must be an endpoint tag or null");
         }
+        return v;
+      },
+      default: (v) => {
+        if (v !== true) throw new BadRequest("must be true, or left out");
         return v;
       },
     },

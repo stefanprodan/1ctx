@@ -71,7 +71,9 @@ pages are in `docs/views.md` and `docs/ui.md`.
   No listener, sweep or MCP refresh loop runs. Stop the server before
   provisioning. Omitted fields stay, supplied membership lists replace,
   passwords and their change flag are creation-only, and objects not
-  named are never deleted. Tool objects configure `web` with mode and
+  named are never deleted. An `Agent` takes `default: true` and nothing
+  else there: a second in one apply is refused, and leaving it out
+  keeps the mark wherever it is. Tool objects configure `web` with mode and
   domains, `websearch` with a nullable provider, and `visualize` with
   its switch and hosts; webfetch is read-only. A `Credential`
   (`keyFrom`, `url`, `header`, `value`, `methods`, `projects` by team

@@ -104,6 +104,7 @@ describe("Home", () => {
         servers: [],
         mcpMode: "auto",
         upstream: null,
+        default: false,
         createdAt: 1_756_684_800_000,
       },
     ];

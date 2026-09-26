@@ -10,8 +10,8 @@
 // default is the provider's, and the levels are the wire's. After the
 // prompt, the skills: one line per skill on the server, the checked
 // ones go with the agent into every send, at most the cap; then the MCP
-// servers with their read and write sides and the mode. Delete asks
-// once in place.
+// servers with their read and write sides and the mode, and whether it
+// is the default. Delete asks once in place.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -70,6 +70,7 @@ import {
   toggleSide,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
+import { DefaultField } from "./DefaultField.tsx";
 import { EffortField } from "./EffortField.tsx";
 import { McpPicker } from "./McpPicker.tsx";
 import { ModelFacts } from "./ModelFacts.tsx";
@@ -98,6 +99,7 @@ export function AgentForm({
   const pickedServers = useSignal<AgentServer[]>(agent?.servers ?? []);
   const mcpMode = useSignal<McpMode>(agent?.mcpMode ?? "auto");
   const upstream = useSignal<string | null>(agent?.upstream ?? null);
+  const isDefault = useSignal(agent?.default ?? false);
   // the model the upstream was chosen for: a tag names a provider of it
   const upstreamOf = useRef(agent?.model.id ?? null);
   // the window and tools an admin states when the catalog is silent
@@ -166,6 +168,10 @@ export function AgentForm({
       upstream:
         wireOf(providerId.value) === "openrouter" ? upstream.value : null,
       ...statedFields(model.value, windowText.value, takesTools.value),
+      // sent only when flipped, so a save never moves a mark set since
+      ...(isDefault.value !== (agent?.default ?? false)
+        ? { default: isDefault.value }
+        : {}),
     };
     if (agent) await updateAgent(agent.id, body);
     else await createAgent(body);
@@ -216,6 +222,7 @@ export function AgentForm({
     mcpMode.value !== agent.mcpMode ||
     upstream.value !== agent.upstream ||
     !sameServers(pickedServers.value, agent.servers) ||
+    isDefault.value !== agent.default ||
     picked?.contextLength !== agent.model.contextLength ||
     picked?.tools !== agent.model.tools;
   const submit = (event: Event) => {
@@ -440,6 +447,7 @@ export function AgentForm({
           />
           <FieldError save={save} field="prompt" />
         </label>
+        <DefaultField agent={agent} on={isDefault} save={save} />
         <SkillPicker
           available={skillRows.value}
           chosen={chosen}

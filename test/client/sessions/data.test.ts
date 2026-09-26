@@ -12,6 +12,10 @@ import {
 import { forking, forkSession } from "../../../src/client/data/fork.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
+  rememberAgent,
+  startsOn,
+} from "../../../src/client/data/project-agents.ts";
+import {
   BUFFER_MAX,
   compactSession,
   createSession,
@@ -1337,6 +1341,40 @@ describe("capability flips on a send", () => {
     await loadProjectAgents("p1");
     expect(switchable.value).toEqual([]);
   });
+
+  test.serial(
+    "a pick outlasts an agents answer made before the server had it",
+    async () => {
+      let land = (_ok: boolean) => {};
+      answer = (url) =>
+        url === "/api/profile/agent"
+          ? new Promise<Response>((resolve) => {
+              land = (ok) =>
+                resolve(
+                  ok
+                    ? Response.json({ agentId: "a2" })
+                    : Response.json({ error: "down" }, { status: 500 }),
+                );
+            })
+          : Response.json({ agents: [], startsOn: "a1", capabilities: [] });
+      const picked = rememberAgent("a2");
+      // asked after the pick, answered while its write is out
+      await loadProjectAgents("p1");
+      expect(startsOn.value).toBe("a2");
+      land(true);
+      await picked;
+      // once it settles the server's answer counts again
+      await loadProjectAgents("p1");
+      expect(startsOn.value).toBe("a1");
+
+      // a pick the server did not take stays this tab's start
+      const failed = rememberAgent("a2");
+      land(false);
+      await failed;
+      await loadProjectAgents("p1");
+      expect(startsOn.value).toBe("a2");
+    },
+  );
 });
 
 describe("answers held for the way back", () => {

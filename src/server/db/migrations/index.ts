@@ -34,6 +34,7 @@ import { m0025 } from "./0025-model-thinking.ts";
 import { m0026 } from "./0026-agent-upstream.ts";
 import { m0027 } from "./0027-usage-agent.ts";
 import { m0028 } from "./0028-user-activity.ts";
+import { m0029 } from "./0029-agent-pick.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -64,4 +65,5 @@ export const MIGRATIONS: Migration[] = [
   m0026,
   m0027,
   m0028,
+  m0029,
 ];

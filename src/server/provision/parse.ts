@@ -147,6 +147,17 @@ function duplicate(documents: Document[]): void {
     }
     seen.set(key, doc.source);
   }
+  // one default, since a second would take the mark from the first
+  let marked: Document | null = null;
+  for (const doc of documents) {
+    if (doc.kind !== "Agent" || doc.spec.default !== true) continue;
+    if (marked !== null) {
+      throw new Error(
+        `${doc.source}: Agent/${doc.name}: spec.default is also set on Agent/${marked.name}`,
+      );
+    }
+    marked = doc;
+  }
 }
 
 export function parse(sources: Source[]): Document[] {

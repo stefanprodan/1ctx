@@ -54,6 +54,7 @@ export async function createAgent(
   const { agent } = await api<AgentResponse>("/api/agents", "POST", body);
   turn++;
   if (owner === forUser) agents.value = [...(agents.value ?? []), agent];
+  if (body.default !== undefined) void loadAgents();
   return agent;
 }
 
@@ -71,14 +72,19 @@ export async function updateAgent(
   if (owner === forUser) {
     agents.value = (agents.value ?? []).map((a) => (a.id === id ? agent : a));
   }
+  // the mark moved, so another row's default changed with it
+  if (body.default !== undefined) void loadAgents();
   return agent;
 }
 
 export async function deleteAgent(id: string): Promise<void> {
   const forUser = owner;
+  const wasDefault = agents.value?.find((a) => a.id === id)?.default ?? false;
   await api(`/api/agents/${encodeURIComponent(id)}`, "DELETE");
   turn++;
   if (owner === forUser) {
     agents.value = (agents.value ?? []).filter((a) => a.id !== id);
   }
+  // the oldest left is the default now
+  if (wasDefault) void loadAgents();
 }

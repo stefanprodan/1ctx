@@ -95,6 +95,20 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   upload let go before its answer is forgotten by its attempt in
   `data/uploads.ts`, which deletes it when a list shows it; a write
   supersedes a list load in flight.
+- **The agent a new chat starts on.** A new chat and a new task start
+  on `startingAgent()` in `data/project-agents.ts`: `startsOn` on
+  `GET /api/projects/:id/agents`, which the server resolves as the
+  agent the user last picked in a composer, else the agent an admin
+  marked as the default, else the first created, so the client never
+  repeats the rule; a pick not in the list falls back to the agent the
+  list marks default. A pick in the composer's agent picker is kept at
+  once by `rememberAgent()`, in the tab and through
+  `PUT /api/profile/agent`, so every composer and every visit after
+  starts on it; the pick is the user's, so a held answer never sets it,
+  and a pick wins over an answer asked before it. Deleting an agent
+  clears the picks that named it and a deleted default hands on to the
+  oldest left, with no write. An admin marks the default in the agent
+  form, and every agent row and the agent page's head say "default".
 - **The draft.** The draft (`composer/draft.ts`) is
   keyed by user and by chat, or by project for a chat not made yet
   (Home is one key), and holds `{text, uploads: {projectId, id, name}[]}`,
@@ -173,7 +187,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   left out), the chats and manual runs they started, and one for each
   day they were signed in. Under it is one card whose head is its
   tabs (`RowsCard`'s `tabs` slot, `Tabs` with `head`), About and
-  Projects at `/users/:username` and `/projects`, one view for both. An
+  Projects at `/users/:username` and `/projects`, one view for both.
+  About ends on their local time. An
   agent's page is its head (the model, then the provider, the context
   and the price), the Activity card over its turns in every project as
   one series (`GET /api/directory/agents/:name/days?tz=`, loaded apart

@@ -270,6 +270,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage: {
       agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
     },
+    users,
   });
   const memory: MemoryArea = memoryArea({
     db,

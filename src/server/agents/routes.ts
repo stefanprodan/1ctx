@@ -26,6 +26,7 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ProviderRow } from "../providers/index.ts";
 import { type ParsedAgent, parseAgent } from "./parse.ts";
+import { type PicksPort, startingOf } from "./starting.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
 
 export type ProvidersPort = {
@@ -81,6 +82,7 @@ export type RoutesDeps = {
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
+  users: PicksPort;
   clock: Clock;
 };
 
@@ -134,7 +136,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
   const resolve = async (
     req: Request,
     except: string | null,
-  ): Promise<() => AgentFields> => {
+  ): Promise<() => AgentFields & { mark: boolean | null }> => {
     const body = parseAgent(await jsonBody(req));
     const checked = check(body, except);
     const model = await deps.providers.model(checked.provider, body.model);
@@ -180,6 +182,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         servers: body.servers,
         mcpMode: body.mcpMode,
         upstream: body.upstream,
+        mark: body.mark,
       };
     };
   };
@@ -207,6 +210,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const agent = transact(deps.db, () => {
           const values = fields();
           const created = deps.store.create({ ...values, now: deps.clock() });
+          if (values.mark === true) deps.store.setDefault(created.id, true);
           deps.skills.assign(created.id, values.skills);
           deps.mcp.setAgentServers(created.id, values.servers);
           return { result: deps.store.byId(created.id)! };
@@ -226,6 +230,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const values = fields();
           const saved = deps.store.update(agent.id, values);
           if (!saved) throw new NotFound("no such agent");
+          if (values.mark !== null)
+            deps.store.setDefault(agent.id, values.mark);
           deps.skills.assign(agent.id, values.skills);
           deps.mcp.setAgentServers(agent.id, values.servers);
           return { result: deps.store.byId(agent.id)! };
@@ -261,6 +267,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const agents = deps.store.list().map(summary);
         const body: ProjectAgentsResponse = {
           agents,
+          startsOn: startingOf(deps.store, deps.users, ctx.principal!.userId),
           capabilities: deps.tools.capabilities(),
           servers: deps.mcp.switchableBy(agents),
           skills: deps.skills.switchable(),

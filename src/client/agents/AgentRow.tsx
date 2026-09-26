@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One agent as the parts of a row: the avatar, the name over the model
-// id, and the faint meta with the model's window and prices, the
-// provider OpenRouter tries first, the thinking level and the skill and
-// MCP counts; a phone shows only the window and the price. The admin
-// page puts them in the button that opens the form; the project's
-// members tab in a line. They are the row's
-// own parts, so a phone wraps them as it wraps a user's. The
-// provider's name leads the meta when the caller knows it, since only
-// an admin lists providers.
+// id, and the faint meta: "default" on the agent new chats start on
+// for anyone who has not picked one, the provider's name when the caller
+// knows it (only an admin lists providers), the model's window and
+// prices, the provider OpenRouter tries first, the thinking level and
+// the skill and MCP counts; a phone shows only the default word, the
+// window and the price. The admin page puts them in the button that
+// opens the form; the project's members tab in a line. They are the
+// row's own parts, so a phone wraps them as it wraps a user's.
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
@@ -34,6 +34,7 @@ export function AgentRow({
   lit?: boolean;
 }) {
   const meta = [
+    agent.default ? "default" : "",
     providerName ?? "",
     modelMeta(agent.model),
     agent.upstream === null ? "" : `via ${agent.upstream}`,
@@ -43,8 +44,10 @@ export function AgentRow({
   ]
     .filter((s) => s !== "")
     .join(" · ");
-  // a phone shows the window and the price; the rest is in the open row
+  // a phone shows the default word, the window and the price; the rest
+  // is in the open row
   const short = [
+    agent.default ? "default" : "",
     windowLine(agent.model.contextLength),
     priceLine(agent.model.promptPrice, agent.model.completionPrice),
   ]

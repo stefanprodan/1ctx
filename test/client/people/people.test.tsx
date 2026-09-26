@@ -78,6 +78,7 @@ const agent: DirectoryAgentResponse = {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    default: false,
     createdAt: 0,
   },
   provider: "router",
@@ -405,6 +406,9 @@ describe("People.model", () => {
     expect(
       agentLine("router", { ...model, promptPrice: 0, completionPrice: 0 }),
     ).toBe("router · 128K · free");
+    expect(agentLine("router", model, true)).toBe(
+      "router · 128K · $0.14 / $0.28 · default",
+    );
   });
 
   test("the capabilities say text only when the model has neither", () => {

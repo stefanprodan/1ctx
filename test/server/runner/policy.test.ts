@@ -25,6 +25,7 @@ const user: UserRow = {
   createdAt: 1,
   disabled: false,
   mustChangePassword: false,
+  agentId: null,
 };
 
 const agent: AgentRow = {
@@ -51,6 +52,7 @@ const agent: AgentRow = {
   servers: [],
   mcpMode: "auto",
   upstream: null,
+  default: false,
   createdAt: 1,
 };
 

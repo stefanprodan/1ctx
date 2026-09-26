@@ -79,11 +79,16 @@ export function filesText(n: number): string {
 
 // under the model's name: the provider, the context and the price when
 // the catalog knows them
-export function agentLine(provider: string, model: CatalogMatch): string {
+export function agentLine(
+  provider: string,
+  model: CatalogMatch,
+  isDefault = false,
+): string {
   return [
     provider,
     windowLine(model.contextLength),
     priceLine(model.promptPrice, model.completionPrice),
+    isDefault ? "default" : "",
   ]
     .filter((s) => s !== "")
     .join(" · ");

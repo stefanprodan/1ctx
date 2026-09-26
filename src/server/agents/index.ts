@@ -24,6 +24,7 @@ import {
   type SessionsPort,
   type SkillsPort,
 } from "./routes.ts";
+import { type PicksPort, startingRoutes } from "./starting.ts";
 import { type AgentRow, AgentStore } from "./store.ts";
 
 export {
@@ -49,6 +50,7 @@ export {
   type SessionsPort,
   type SkillsPort,
 } from "./routes.ts";
+export type { PicksPort } from "./starting.ts";
 export { type AgentRow, AgentStore, summary } from "./store.ts";
 
 export type AgentsDeps = {
@@ -63,6 +65,7 @@ export type AgentsDeps = {
   sessions: SessionsPort;
   automations: AutomationsPort;
   usage: UsagePort;
+  users: PicksPort;
 };
 
 export type Agents = {
@@ -94,8 +97,10 @@ export function agentsArea(deps: AgentsDeps): Agents {
         access: deps.access,
         sessions: deps.sessions,
         automations: deps.automations,
+        users: deps.users,
         clock: deps.clock,
       }),
+      ...startingRoutes({ store, users: deps.users }),
       ...directoryRoutes({
         store,
         usage: deps.usage,

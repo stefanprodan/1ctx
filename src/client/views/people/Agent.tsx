@@ -308,7 +308,13 @@ export function Agent({ params }: { params: Params }) {
               name={shown.agent.model.id}
               mono
             >
-              <WhoLine>{agentLine(shown.provider, shown.agent.model)}</WhoLine>
+              <WhoLine>
+                {agentLine(
+                  shown.provider,
+                  shown.agent.model,
+                  shown.agent.default,
+                )}
+              </WhoLine>
             </Who>
             <AgentActivity name={name} agentId={shown.agent.id} />
             <Rows>

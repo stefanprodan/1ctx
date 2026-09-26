@@ -30,5 +30,8 @@ export type AgentSummary = {
   mcpMode: McpMode;
   // the OpenRouter endpoint tag tried first; null lets OpenRouter route
   upstream: string | null;
+  // the agent a new chat starts on for anyone who has not picked one:
+  // the one an admin marked, else the first created
+  default: boolean;
   createdAt: number;
 };
