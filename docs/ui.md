@@ -261,7 +261,9 @@ client change. What each page draws is in `docs/views.md`.
   past two folders folds the middle ones into `…`, which leads to the
   deepest of them. A page whose content is a `Split` passes `split`, so
   the head's row, its actions and notice included, ends where the main
-  column does and nothing sits over the aside.
+  column does and nothing sits over the aside. `test/client/ui/page-split.test.ts`
+  fails a view whose `Page` has `actions` or `notice` over a `Split`
+  without it.
 - **Source and Diff.** A text by its lines is
   `ui/Source.tsx`: the server's highlighted HTML cut at newlines by
   `splitLines()` in `lib/lines.ts`, each line's spans balanced, or the

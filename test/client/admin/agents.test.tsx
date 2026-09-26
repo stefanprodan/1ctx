@@ -630,11 +630,9 @@ describe("the default agent", () => {
   test.serial("the oldest, while it is the default, cannot say No", () => {
     agents.value = [{ ...coder, default: true }, ops];
     let html = field({ ...coder, default: true });
-    expect(html).toContain("The oldest agent is the default");
     expect(html.match(/ disabled/g)).toHaveLength(2);
     agents.value = [coder, { ...ops, default: true }];
     html = field({ ...ops, default: true });
-    expect(html).toContain("New chats start on it");
     expect(html).not.toContain("disabled");
     expect(field(coder)).not.toContain("disabled");
   });

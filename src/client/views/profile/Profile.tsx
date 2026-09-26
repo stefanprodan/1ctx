@@ -243,6 +243,7 @@ export function Profile() {
     <Page
       crumb="Account"
       title="Profile"
+      split
       notice={
         favouriteError.value && (
           <PageNotice tone="failed" words={favouriteError.value.words} />

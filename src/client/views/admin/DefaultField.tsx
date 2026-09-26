@@ -44,9 +44,7 @@ export function DefaultField({
         }}
       />
       <span class="hint">
-        {kept
-          ? "The oldest agent is the default until another is made one."
-          : "New chats start on it for anyone with no favourite."}
+        New chats start on it for anyone with no favourite.
       </span>
     </div>
   );

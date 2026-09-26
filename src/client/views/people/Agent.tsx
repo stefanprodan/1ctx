@@ -289,6 +289,7 @@ export function Agent({ params }: { params: Params }) {
     <Page
       crumb="Agents"
       title={`@${name}`}
+      split
       actions={shown && <FavouriteButton shown={shown} failed={failed} />}
       notice={
         failedHere && <PageNotice tone="failed" words={failedHere.words} />
