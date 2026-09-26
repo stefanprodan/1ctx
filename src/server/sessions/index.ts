@@ -17,6 +17,7 @@ import type { Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
 import { personDays } from "./activity.ts";
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
+import { markAttention, runAnswer } from "./attention.ts";
 import {
   type AccessPort,
   detail,
@@ -100,6 +101,11 @@ export type Sessions = {
   // in every project
   personDays(userId: string, starts: number[], until: number): number[];
   sessionInfo(sessionId: string): Memory["session"];
+  // a run's answer before its memory phase, null when it has none
+  runAnswer(sendId: string, memoryRound: number | null): string | null;
+  // a revision and one rows-free envelope, never activity; false when
+  // the session is gone
+  markAttention(sessionId: string, attention: number, by: string): boolean;
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -159,6 +165,9 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         .get(sessionId);
       return row ?? null;
     },
+    runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
+    markAttention: (sessionId, attention, by) =>
+      markAttention(deps.db, store, sessionId, attention, by),
     repair() {
       const touched = transact(deps.db, () => {
         const rows = store.repair(deps.clock(), RESTART_ERROR);

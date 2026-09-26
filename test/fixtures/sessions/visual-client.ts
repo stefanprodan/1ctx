@@ -54,6 +54,7 @@ export function visualDetail(): SessionDetail {
     archive: null,
     session: {
       archived: null,
+      attention: null,
       id: "session00001", projectId: "project00001", ownerId: "user00000001",
       agentId: "agent0000001", origin: "chat", forkedFromId: null,
       automationId: null, runSource: null, title: "Visual",

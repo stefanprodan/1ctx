@@ -43,7 +43,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   ],
   scratch: ["session_scratch", "session_scratch_files"],
   mcp: ["mcp_kept_files", "mcp_digests"],
-  usage: ["usage"],
+  usage: ["usage", "decision_usage"],
   skills: ["skills", "skill_files", "agent_skills"],
   memory: ["memory_notes", "memory_views"],
   config: [
@@ -54,6 +54,9 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "memberships",
     "providers",
     "agents",
+    "deciders",
+    "decisions",
+    "decision_options",
     "tools",
     "limits",
     "automations",

@@ -51,6 +51,7 @@ const inventory: Inventory = {
   Project: ["nebula"],
   Credential: [],
   Provider: [],
+  Decider: [],
   Skill: [],
   McpServer: [],
   Agent: [],

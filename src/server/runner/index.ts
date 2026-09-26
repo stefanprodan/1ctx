@@ -10,40 +10,28 @@
 // the lock is let go after both the provider iteration and the round's
 // tools have settled.
 
-import type {
-  CreateSessionRequest,
-  RegenerateRequest,
-  SendMessageRequest,
-} from "../../shared/api/sessions.ts";
 import {
   applyChange,
   type CapabilityChange,
 } from "../../shared/capabilities.ts";
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
-import type { SendCause, Wire } from "../../shared/words.ts";
+import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import type { Db } from "../db/index.ts";
-import type { KnowledgeCapability } from "../knowledge/index.ts";
-import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
-import type { Principal, RouteDescriptor } from "../lib/http.ts";
+import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
-import type { Log } from "../lib/log.ts";
-import type { Limits } from "../limits/index.ts";
-import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
   refuseArchived,
   type SessionRow,
-  type SessionStore,
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { attention } from "./attention.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
-import type { ToolsPort } from "./policy.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { regenerateUser } from "./regenerate.ts";
 import { CHAT_POOL, Registry, runPool } from "./registry.ts";
@@ -51,15 +39,18 @@ import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
-import { type ShutdownResult, shutdownRunner } from "./shutdown.ts";
+import { shutdownRunner } from "./shutdown.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
-import { Writer, type WriterDeps } from "./writer.ts";
+import type { Runner, RunnerDeps } from "./types.ts";
+import { Writer } from "./writer.ts";
 
+export type { AttentionPort } from "./attention.ts";
 export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
 export { Registry, RunCapacity } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
 export type { ShutdownResult } from "./shutdown.ts";
+export type { Runner, RunnerDeps } from "./types.ts";
 export {
   HTML_EVERY_MS,
   statusOf,
@@ -72,68 +63,9 @@ export {
 export const SHUTDOWN_DRAIN_MS = 5000;
 export { FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS };
 
-export type RunnerDeps = {
-  db: Db;
-  clock: Clock;
-  log: Log;
-  sessions: SessionStore;
-  access: { project(principal: Principal, id: string): ProjectRow };
-  visible(principal: Principal, id: string): SessionRow;
-  agents: { byId(id: string): AgentRow | null };
-  users: { byId(id: string): UserRow | null };
-  providers: {
-    chat: RoundDeps["chat"];
-    byId(id: string): { name: string; wire: Wire } | null;
-  };
-  tools: ToolsPort;
-  memory: Pick<
-    MemoryCapability,
-    "read" | "commit" | "view" | "startView" | "endView" | "resetSeen"
-  >;
-  knowledge: Pick<KnowledgeCapability, "snapshot" | "startKept">;
-  uploads: WriterDeps["uploads"] & {
-    checkUploads(
-      userId: string,
-      projectId: string,
-      ids: readonly string[],
-    ): void;
-  };
-  limits: { current(): Limits };
-  usage: WriterDeps["usage"];
-  render: WriterDeps["render"];
-  stream: WriterDeps["stream"];
-  registry?: Registry;
-  // a run's slot let go for good, so a waiting fire may start
-  slotFreed(): void;
-};
-
-export type Runner = {
-  registry: Registry;
-  start(principal: Principal, fields: CreateSessionRequest): SessionDetail;
-  send(
-    principal: Principal,
-    sessionId: string,
-    fields: SendMessageRequest,
-  ): SessionDetail;
-  regenerate(
-    principal: Principal,
-    sessionId: string,
-    fields?: RegenerateRequest,
-  ): SessionDetail;
-  compact(principal: Principal, sessionId: string): SessionDetail;
-  startRun(event: Event): PreparedRun;
-  stop(principal: Principal, sessionId: string): void;
-  // every send on a deleted agent ends as a stop does
-  stopAgent(agentId: string): void;
-  live: (sessionId: string) => ReturnType<typeof live> | null;
-  // every send terminated with cause shutdown and its stream let go,
-  // or the deadline passed
-  shutdown(): Promise<ShutdownResult>;
-  routes: RouteDescriptor[];
-};
-
 export function runnerArea(deps: RunnerDeps): Runner {
   const registry = deps.registry ?? new Registry();
+  const asks = attention(deps.attention, deps.log);
   const writer = new Writer({
     db: deps.db,
     clock: deps.clock,
@@ -223,7 +155,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         );
       }
       finalized = await endSend(
-        { writer, phase: phaseDeps, pause, log: deps.log },
+        { writer, phase: phaseDeps, pause, log: deps.log, attention: asks },
         send,
       );
     } finally {
@@ -481,7 +413,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
         deps.clock,
         (send) => void terminate(send, "shutdown"),
         SHUTDOWN_DRAIN_MS,
+        () => asks.close(),
       ),
+    settled: () => asks.settled(),
     routes: [],
   };
   runner.routes = routes({

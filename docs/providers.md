@@ -1,7 +1,8 @@
 # Providers
 
-Governs `src/server/providers/`, `lib/fetcher.ts` and an agent's
-provider, model, window, tools, thinking, effort and upstream fields.
+Governs `src/server/providers/`, `deciders/`, `lib/fetcher.ts` and an
+agent's provider, model, window, tools, thinking, effort and upstream
+fields.
 
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
@@ -13,9 +14,9 @@ provider, model, window, tools, thinking, effort and upstream fields.
   `/openai/chat/completions` under the same base. `providers/catalog.ts`
   picks the path, the header and the parser by the wire and parses into
   the one shape the wire carries. The catalog is cached an hour per
-  provider and searched on the server; the browser never gets the whole
-  list. The New provider form fills OpenRouter's base URL and lets it
-  change, for its EU address; Gemini's is fixed.
+  provider and kind and searched on the server; the browser never gets
+  the whole list. The New provider form fills OpenRouter's base URL
+  and lets it change, for its EU address; Gemini's is fixed.
 - **Everything that leaves the process goes through the fetcher.**
   Anything that reaches a provider goes through the `fetcher`
   compose option, so a test passes a fake and the suite never reaches a
@@ -61,7 +62,8 @@ provider, model, window, tools, thinking, effort and upstream fields.
   names a provider and a model the catalog lists; what the catalog said
   is kept on the agent row, and a provider a live agent runs on is a 409
   to delete; a send keeps its provider's id and name as plain text, so
-  the overview counts a deleted provider's sends under its name. A catalog row with no window and none of
+  the overview counts a deleted provider's sends under its name. A
+  catalog row with no window and none of
   `supported_parameters`, `capabilities` or `supported_features` is
   undescribed (`described: false`, NIM and OpenAI list only ids): the
   agent form asks for its window and Tools, the agents API takes
@@ -93,6 +95,77 @@ provider, model, window, tools, thinking, effort and upstream fields.
   provider that is down or gone costs the preference and not the turn.
   The form's Preferred provider leaves out endpoints without tools when the
   model takes them, and a new model or provider clears the pick.
+- **Decisions are a second catalog and a second call.** A decision model
+  answers typed questions about a state with probabilities and no text.
+  `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and
+  `openai-compatible`, serve them. `GET
+  /api/providers/:id/catalog?q=&kind=` searches the chat catalog by
+  default, or with `kind=decisions`
+  `<base>/models?output_modalities=decisions` (a server that ignores the
+  query answers its whole list); another word, or `decisions` on another
+  wire, is a 400. `parseCatalog` reads OpenAI's `data[].id` and
+  TypeSafe's `models[].name` (kev.serve), the latter undescribed.
+  `forget()` clears both kinds. The call is the capability's
+  `decisions()`: `POST <base>/systemone` with `{model, state,
+  questions}` through the fetcher, the key as a Bearer and OpenRouter's
+  headers on its wire, the body read with a cap
+  (`providers/systemone.ts`). Each answer is normalized to `{type,
+  probabilities, pick, probability}` (the option, the level by its
+  highest probability, or yes as `true`; the vendors' own confidences
+  are ignored), usage to `{inputTokens, outputTokens, cost}` each null
+  when unsaid, and `served` is the build the server named. A score is
+  read by the level's index when every index is a key, else by the
+  level's name. A question missing, another type, a choice or score with
+  no options, a probability outside 0..1, or probabilities whose sum
+  strays from 1 by more than `SUM_TOLERANCE` (0.02) is a
+  `DecisionError`, never a guess; so is every failure, in our words: the
+  status and at most an asked question id the refusal names, never the
+  body, which may echo the state, with the key scrubbed.
+- **A decider is a named decision model.** `deciders/` owns the
+  `deciders` rows and the admin routes `GET`/`POST /api/deciders`,
+  `PATCH`/`DELETE /api/deciders/:id` and `POST /api/deciders/:id/check`,
+  and the decisions' `GET /api/decisions` and `PUT /api/decisions/:id`.
+  A save checks the provider's wire and the model against the decisions
+  catalog, a 400 otherwise, and keeps the window (null when 0 or absent)
+  and the prompt price; a save that keeps the provider and model asks
+  the catalog nothing, so a decider whose model left it stays and fails
+  its checks. The default is derived as the agents' is: the marked row,
+  else the oldest; `default` true moves the mark in the save's
+  `transact()`, false takes it off, absent leaves it. A provider a
+  decider uses is a 409 to delete. Check asks a fixed yes/no within 60
+  seconds and answers `{pick, probability, ms, cost, served}`, or a 502
+  with the error's words, logged as `decider check failed`. `decide(use,
+  questions, state, signal)` asks within 10 seconds or the caller's
+  signal, answers null with no decider, and takes the state as
+  text or as a function of the decider's window, which answers null when
+  nothing fits and nothing is asked. Every answer, a check's included,
+  is one `decision_usage` row (the usage area's, kept through every
+  delete, names as text), written before the answers are validated, so
+  an answer charged but refused as malformed is still counted; a
+  refusal, a timeout or a stop writes none. Logs name the decider, its
+  provider and model, never a state, question or answer.
+  `scripts/deciders-record.ts`, run by hand with `KEY_FILE` and
+  optionally `KEV_URL`, records the bodies under
+  `test/fixtures/providers/systemone/` that the fake fetch answers.
+- **A decision is a question a feature asks.** `DECISIONS` in
+  `shared/contracts/decision.ts` lists them (`run-attention`, whether a
+  finished run needs a person); the question and the option keys are
+  code, and `DECISION_OPTIONS` holds each option's default description.
+  The `decisions` row keeps `enabled` and `decider_id`, and
+  `decision_options` an option's description only while it differs from
+  the code's; no row means enabled, the default decider and the code's
+  text, and a decider deleted sets `decider_id` null. `GET
+  /api/decisions` answers every decision in `DECISIONS` order with each
+  option's description and default; `PUT /api/decisions/:id` takes the
+  whole `{enabled, deciderId, options}`, an unknown id a 404, a
+  `deciderId` naming no decider a 400 checked in the save's
+  `transact()`, `options` naming every key of the decision exactly once,
+  each trimmed to 1 to `MAX_OPTION_TEXT` (1,000) characters, a 400
+  otherwise; the code's text again deletes its row. It answers the
+  decision and logs `decision updated` with its id, never the text.
+  `decide()` with a decision id for purpose answers null while the
+  decision is off, and asks its decider, else the default. A usage row's
+  purpose is `check` or the decision id.
 - **Keys are picked by name.**
   `GET /api/providers` answers the `provider-` key names beside the rows.
   The form picks one with `Select`, or No key; a missing file stays named

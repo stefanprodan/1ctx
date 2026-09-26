@@ -45,6 +45,7 @@ const ERROR_NAMES = new Set([
   "ServiceUnavailable",
   "ProviderError",
   "CatalogError",
+  "DecisionError",
   "ServiceError",
 ]);
 const NON_PRINTABLE = /[\p{White_Space}\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}]/u;

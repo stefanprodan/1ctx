@@ -1,0 +1,16 @@
+{
+  "model": "respan/span-01-lite-20260925",
+  "answers": {
+    "act": {
+      "type": "noul",
+      "noul": 0.020116113
+    }
+  },
+  "usage": {
+    "input_tokens": 55,
+    "output_tokens": 0,
+    "cost": 0
+  },
+  "id": "gen-dec-1790460454-VlD9AtHUYCHCbKnpUVBU",
+  "provider": "Respan"
+}

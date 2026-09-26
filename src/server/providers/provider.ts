@@ -36,7 +36,7 @@ export type ProviderDeps = {
   secret: (name: string) => string | null;
 };
 
-const OPENROUTER_HEADERS = {
+export const OPENROUTER_HEADERS = {
   "http-referer": "https://1ctx.dev",
   "x-title": "1ctx",
 };

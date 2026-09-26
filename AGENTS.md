@@ -83,8 +83,10 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 cookie jar and a fake fetch that
                 answers the recorded catalog for `PROVIDER_URL`, the
                 NIM and Groq recordings for `NIM_URL` and `GROQ_URL`,
-                and fails every other host; chat.ts drives a chat with a
-                scripted provider stream; auth-cases.ts is the
+                the recorded decisions (systemone.ts) for `PROVIDER_URL`
+                and `KEV_URL`, and fails every other host; chat.ts
+                drives a chat with a scripted provider stream;
+                auth-cases.ts is the
                 authorization matrix), fixtures/ (recorded bodies,
                 structure/ holds one violating root per layout rule).
 scripts/        preview.sh, staging.sh (the staging instance over ssh, its
@@ -93,7 +95,8 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, four of them over record-cases.ts
-                (docs/knowledge.md).
+                (docs/knowledge.md) and deciders-record.ts
+                (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
@@ -129,7 +132,7 @@ change before making it.
 | `docs/ui.md` | before any change under `src/client/`: the data layer, the primitives, forms, the shell, themes, the shared helpers |
 | `docs/views.md` | before changing what a page draws: a view under `src/client/views/`, the composer, the stream, the Tools, MCP and Skills pages |
 | `docs/access.md` | before changing logins, users, names, projects' visibility, secrets or the socket server (`access/`, `users/`, `projects/`, `secrets/`, `web/`) |
-| `docs/providers.md` | before changing `src/server/providers/` or an agent's provider, model and thinking fields |
+| `docs/providers.md` | before changing `src/server/providers/`, `deciders/` or an agent's provider, model and thinking fields |
 | `docs/sessions.md` | before changing `src/server/sessions/` or the runner's sends: the writer, capabilities, regenerate, fork, rename, compaction |
 | `docs/memory.md` | before changing `src/server/memory/`, `memory_edit` or a run's memory phase |
 | `docs/automations.md` | before changing `src/server/automations/`, the scheduler or runs |

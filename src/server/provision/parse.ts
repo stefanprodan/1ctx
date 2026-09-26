@@ -29,6 +29,7 @@ export const KINDS = [
   "Project",
   "Credential",
   "Provider",
+  "Decider",
   "Skill",
   "McpServer",
   "Agent",
@@ -66,6 +67,7 @@ export type Document = {
 export type {
   AgentSpec,
   CredentialSpec,
+  DeciderSpec,
   McpServerSpec,
   ProjectSpec,
   ProviderSpec,
@@ -98,6 +100,7 @@ function document(value: unknown, source: string): Document {
       Project: isName,
       Credential: isName,
       Provider: isName,
+      Decider: isName,
       Skill: isSkillName,
       McpServer: isServerName,
       Agent: isName,
@@ -121,6 +124,8 @@ function document(value: unknown, source: string): Document {
         return { ...base, kind, spec: spec.credential(b.spec) };
       case "Provider":
         return { ...base, kind, spec: spec.provider(b.spec) };
+      case "Decider":
+        return { ...base, kind, spec: spec.decider(b.spec) };
       case "Skill":
         return { ...base, kind, spec: spec.skill(b.spec) };
       case "McpServer":
@@ -147,16 +152,19 @@ function duplicate(documents: Document[]): void {
     }
     seen.set(key, doc.source);
   }
-  // one default, since a second would take the mark from the first
-  let marked: Document | null = null;
-  for (const doc of documents) {
-    if (doc.kind !== "Agent" || doc.spec.default !== true) continue;
-    if (marked !== null) {
-      throw new Error(
-        `${doc.source}: Agent/${doc.name}: spec.default is also set on Agent/${marked.name}`,
-      );
+  // one default of a kind, since a second would take the mark from the
+  // first
+  for (const kind of ["Agent", "Decider"] as const) {
+    let marked: Document | null = null;
+    for (const doc of documents) {
+      if (doc.kind !== kind || doc.spec.default !== true) continue;
+      if (marked !== null) {
+        throw new Error(
+          `${doc.source}: ${kind}/${doc.name}: spec.default is also set on ${kind}/${marked.name}`,
+        );
+      }
+      marked = doc;
     }
-    marked = doc;
   }
 }
 
@@ -327,6 +335,11 @@ export function preflight(
         if (!exists) required(["wire", "baseUrl"]);
         if (doc.spec.keyFrom)
           readSecret("keyFrom", "provider-", doc.spec.keyFrom);
+        break;
+      case "Decider":
+        if (!exists) required(["provider", "model"]);
+        if (doc.spec.provider !== undefined)
+          reference("provider", "Provider", doc.spec.provider);
         break;
       case "Skill":
         if (!exists) required(["url"]);

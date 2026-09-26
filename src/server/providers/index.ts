@@ -3,8 +3,10 @@
 //
 // Providers: where the models come from. A row names a wire, a base
 // URL and a key file; its catalog is read from the wire and cached, and
-// a chat request goes out over the wire as one event stream.
+// a chat request goes out over the wire as one event stream, a
+// decisions request as one answer.
 
+import type { CatalogKind } from "../../shared/contracts/decider.ts";
 import type {
   CatalogMatch,
   Endpoint,
@@ -14,11 +16,22 @@ import type { Clock } from "../lib/clock.ts";
 import { BadGateway, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import { CatalogError, Catalogs, type Fetcher } from "./catalog.ts";
+import {
+  CatalogError,
+  Catalogs,
+  type Fetcher,
+  servesDecisions,
+} from "./catalog.ts";
 import { fetchEndpoints } from "./endpoints.ts";
 import { providerFor } from "./provider.ts";
-import { type AgentsPort, routes } from "./routes.ts";
+import { type AgentsPort, type DecidersPort, routes } from "./routes.ts";
 import { type ProviderRow, ProviderStore } from "./store.ts";
+import {
+  DecisionError,
+  type DecisionRequest,
+  type Decisions,
+  requestDecisions,
+} from "./systemone.ts";
 import type { ChatEvent, ChatRequest } from "./types.ts";
 
 export {
@@ -28,6 +41,7 @@ export {
   fetchCatalog,
   parseCatalog,
   search,
+  servesDecisions,
 } from "./catalog.ts";
 export { fetchEndpoints, parseEndpoints } from "./endpoints.ts";
 export {
@@ -40,9 +54,25 @@ export {
 export { requestTokens, wireTokens, wireTools } from "./openai.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseBaseUrl, parseKeyName } from "./parse.ts";
-export { type AgentsPort, type RoutesDeps, routes } from "./routes.ts";
+export {
+  type AgentsPort,
+  type DecidersPort,
+  type RoutesDeps,
+  routes,
+} from "./routes.ts";
 export { type ProviderRow, ProviderStore, summary } from "./store.ts";
 export { buildChatBody as buildStrictChatBody } from "./strict.ts";
+export {
+  type Charged,
+  type DecisionAnswer,
+  DecisionError,
+  type DecisionQuestion,
+  type DecisionRequest,
+  type Decisions,
+  type DecisionUsage,
+  parseDecisions,
+  refusedQuestion,
+} from "./systemone.ts";
 export type {
   ChatEvent,
   ChatMessageIn,
@@ -64,6 +94,7 @@ export type ProvidersDeps = {
   fetcher: Fetcher;
   log: Log;
   agents: AgentsPort;
+  deciders: DecidersPort;
 };
 
 export type Providers = {
@@ -73,7 +104,11 @@ export type Providers = {
   // one model of a provider's catalog, or null when it is not listed; a
   // catalog that does not answer is the 502 the caller would send anyway,
   // so the catalog's own error stays inside this area
-  model(provider: ProviderRow, id: string): Promise<CatalogMatch | null>;
+  model(
+    provider: ProviderRow,
+    id: string,
+    kind?: CatalogKind,
+  ): Promise<CatalogMatch | null>;
   // who serves a model behind an OpenRouter provider, cheapest first; a
   // provider that does not answer is a 502 like the catalog's
   endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
@@ -85,6 +120,14 @@ export type Providers = {
     req: ChatRequest,
     signal: AbortSignal,
   ): AsyncIterable<ChatEvent>;
+  // typed questions answered at the provider's /systemone. A provider
+  // deleted since is a 404; anything else that fails, the wire, the
+  // key, the signal, a bad answer, is a DecisionError in our words
+  decisions(
+    providerId: string,
+    req: DecisionRequest,
+    signal: AbortSignal,
+  ): Promise<Decisions>;
   routes: RouteDescriptor[];
 };
 
@@ -110,9 +153,9 @@ export function providersArea(deps: ProvidersDeps): Providers {
     store,
     catalogs,
     byId: (id) => store.byId(id),
-    model: async (provider, id) => {
+    model: async (provider, id, kind) => {
       try {
-        return await catalogs.model(provider, id);
+        return await catalogs.model(provider, id, kind);
       } catch (err) {
         if (err instanceof CatalogError) throw new BadGateway(err.message);
         throw err;
@@ -124,6 +167,14 @@ export function providersArea(deps: ProvidersDeps): Providers {
       if (row === null) throw new NotFound("no such provider");
       return providerFor(row, deps).chat(req, signal);
     },
+    decisions: async (providerId, req, signal) => {
+      const row = store.byId(providerId);
+      if (row === null) throw new NotFound("no such provider");
+      if (!servesDecisions(row.wire)) {
+        throw new DecisionError(`${row.name} serves no decision models`);
+      }
+      return requestDecisions(row, deps, req, signal);
+    },
     routes: routes({
       store,
       catalogs,
@@ -131,6 +182,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
       hasSecret: (name) => deps.secret(name) !== null,
       keys: deps.keys,
       agents: deps.agents,
+      deciders: deps.deciders,
       clock: deps.clock,
     }),
   };

@@ -47,6 +47,7 @@ const row = (fields: Partial<ExportRow>): ExportRow => ({
 });
 const session: SessionRow = {
   archived: null,
+  attention: null,
   id: "chat",
   projectId: "project",
   ownerId: "user",

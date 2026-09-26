@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { errorFields, type Log } from "../lib/log.ts";
+import type { Attention } from "./attention.ts";
 import {
   type MemoryPhaseDeps,
   memoryPhase,
@@ -19,6 +20,7 @@ export type EndingDeps = {
   phase: MemoryPhaseDeps;
   pause(ms: number): Promise<void>;
   log: Log;
+  attention: Pick<Attention, "ask">;
 };
 
 function words(error: unknown): string {
@@ -96,5 +98,7 @@ export async function endSend(
     ...(send.error === null ? {} : errorFields(send.error, false)),
   });
   send.end(finalized);
+  // after the done state and its frames, so the ask never holds the run
+  if (finalized) deps.attention.ask(send);
   return finalized;
 }

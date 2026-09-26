@@ -17,6 +17,7 @@ export type InventorySources = {
   };
   credentials: Named;
   providers: Named;
+  deciders: Named;
   skills: { summaries(agentNames: () => string[]): { name: string }[] };
   mcp: Named;
   agents: Named;
@@ -31,6 +32,7 @@ export function inventoryOf(sources: InventorySources): Inventory {
       .map((id) => sources.projects.byId(id)!.name),
     Credential: sources.credentials.list().map((row) => row.name),
     Provider: sources.providers.list().map((row) => row.name),
+    Decider: sources.deciders.list().map((row) => row.name),
     Skill: sources.skills.summaries(() => []).map((row) => row.name),
     McpServer: sources.mcp.list().map((row) => row.name),
     Agent: sources.agents.list().map((row) => row.name),

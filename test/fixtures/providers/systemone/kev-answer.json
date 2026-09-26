@@ -1,0 +1,42 @@
+{
+  "model": "jaredpalmer/kev-4b-20260924",
+  "answers": {
+    "outcome": {
+      "type": "choice",
+      "choice": "needs-attention",
+      "probabilities": {
+        "all-good": 0.0194,
+        "needs-attention": 0.9806
+      },
+      "confidence": 0.9613
+    },
+    "severity": {
+      "type": "score",
+      "score": 1.7475,
+      "legend": {
+        "0": "none",
+        "1": "minor",
+        "2": "major",
+        "3": "critical"
+      },
+      "probabilities": {
+        "0": 0.1634,
+        "1": 0.1983,
+        "2": 0.3655,
+        "3": 0.2727
+      },
+      "confidence": 0.734
+    },
+    "act": {
+      "type": "noul",
+      "noul": 0.2194
+    }
+  },
+  "usage": {
+    "input_tokens": 128,
+    "output_tokens": 184,
+    "cost": 0.000005376
+  },
+  "id": "gen-dec-1790460453-fSPH4wi6ybgeZ9Eph7Nh",
+  "provider": "SiliconFlow"
+}

@@ -6,6 +6,11 @@
 
 import type { CreateProviderRequest } from "../../shared/api/providers.ts";
 import {
+  CATALOG_KINDS,
+  type CatalogKind,
+  isCatalogKind,
+} from "../../shared/contracts/decider.ts";
+import {
   isName,
   isSecretName,
   isWire,
@@ -86,6 +91,15 @@ export function parseQuery(url: URL): string {
   const q = url.searchParams.get("q") ?? "";
   if (q.length > MAX_QUERY) throw new BadRequest("q is too long");
   return q.trim();
+}
+
+// ?kind=: which catalog to search, the chat models when absent
+export function parseKind(url: URL): CatalogKind {
+  const kind = url.searchParams.get("kind") ?? "chat";
+  if (!isCatalogKind(kind)) {
+    throw new BadRequest(`kind must be ${CATALOG_KINDS.join(" or ")}`);
+  }
+  return kind;
 }
 
 // ?model=: an OpenRouter id, author/slug with an optional :variant

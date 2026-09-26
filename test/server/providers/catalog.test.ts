@@ -231,7 +231,7 @@ describe("Catalogs", () => {
         level: "info",
         area: "providers",
         msg: "catalog refreshed",
-        fields: { provider: "router", models: 52 },
+        fields: { provider: "router", kind: "chat", models: 52 },
       })),
     );
   });
@@ -289,11 +289,104 @@ describe("Catalogs", () => {
       msg: "catalog refresh failed",
       fields: {
         provider: "router",
+        kind: "chat",
         error: "the provider did not answer: down",
         error_type: "CatalogError",
       },
     });
     fail = false;
     expect((await catalogs.search(provider, "opus 5")).length).toBe(2);
+  });
+});
+
+describe("the decisions catalog", () => {
+  const recorded = (name: string) =>
+    JSON.parse(
+      readFileSync(
+        join(
+          import.meta.dir,
+          "..",
+          "..",
+          "fixtures",
+          "providers",
+          "systemone",
+          name,
+        ),
+        "utf8",
+      ),
+    );
+
+  test("reads OpenRouter's decision models with their window and price", () => {
+    const decisions = parseCatalog(recorded("openrouter-catalog.json"));
+    expect(decisions.map((m) => m.id)).toContain("typesafe/jev-1.13");
+    expect(decisions.find((m) => m.id === "typesafe/jev-1.13")).toMatchObject({
+      contextLength: 32000,
+      promptPrice: expect.any(Number),
+    });
+    // a window of 0 says nothing
+    expect(
+      decisions.find((m) => m.id === "respan/span-01-lite:free"),
+    ).toMatchObject({ contextLength: null, promptPrice: 0 });
+  });
+
+  test("reads TypeSafe's list of names, as kev.serve answers it", () => {
+    expect(parseCatalog(recorded("kev-serve-models.json"))).toEqual(
+      ["kev-latest", "jev-latest"].map((id) => ({
+        id,
+        name: id,
+        contextLength: null,
+        promptPrice: null,
+        completionPrice: null,
+        tools: false,
+        reasoning: false,
+        thinkingRequired: false,
+        reasoningKnown: false,
+        described: false,
+      })),
+    );
+    expect(parseCatalog({ models: [{ name: "" }, { id: "x" }] })).toEqual([]);
+  });
+
+  test("is cached apart from the chat catalog and forgotten with it", async () => {
+    const fake = fakeFetch();
+    const logs = collectLogs();
+    const catalogs = new Catalogs({
+      fetcher: fake.fetcher,
+      clock: () => 0,
+      secret: () => null,
+      log: logs.logFactory("providers"),
+    });
+    const [chat, decisions] = await Promise.all([
+      catalogs.search(provider, "jev"),
+      catalogs.search(provider, "jev", "decisions"),
+      catalogs.model(provider, "typesafe/jev-1.13", "decisions"),
+    ]);
+    expect(chat).toEqual([]);
+    expect(decisions.map((m) => m.id)).toContain("typesafe/jev-1.13");
+    expect(fake.calls.map((call) => call.url)).toEqual([
+      `${PROVIDER_URL}/models`,
+      `${PROVIDER_URL}/models?output_modalities=decisions`,
+    ]);
+    expect(logs.events.map((event) => event.fields.kind)).toEqual([
+      "chat",
+      "decisions",
+    ]);
+    catalogs.forget(provider.id);
+    await catalogs.search(provider, "jev", "decisions");
+    await catalogs.search(provider, "jev");
+    expect(fake.calls).toHaveLength(4);
+  });
+
+  test("a wire with no decisions has no decisions catalog", async () => {
+    const fake = fakeFetch();
+    await expect(
+      fetchCatalog(
+        fake.fetcher,
+        { wire: "gemini", baseUrl: PROVIDER_URL },
+        null,
+        "decisions",
+      ),
+    ).rejects.toThrow("the provider serves no decision models");
+    expect(fake.calls).toHaveLength(0);
   });
 });

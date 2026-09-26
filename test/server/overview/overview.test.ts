@@ -296,6 +296,10 @@ describe("the overview days", () => {
       cachedTokens: 0,
       completionTokens: 35,
       cost: null,
+      decisions: 0,
+      decisionTokens: 0,
+      pricedDecisions: 0,
+      decisionCost: null,
     });
     expect(body.days[0]).toMatchObject({ day: "2026-05-17", turns: 1 });
     expect(body.totals).toEqual({
@@ -309,6 +313,10 @@ describe("the overview days", () => {
       rounds: 4,
       pricedRounds: 0,
       cost: null,
+      decisions: 0,
+      decisionTokens: 0,
+      pricedDecisions: 0,
+      decisionCost: null,
     });
   });
 
@@ -335,6 +343,49 @@ describe("the overview days", () => {
     });
     expect(body.days.at(-1)).toMatchObject({ cachedTokens: 40, cost: 0.75 });
     expect(body.days.at(-2)?.cost).toBeNull();
+  });
+
+  test("count decisions apart from the rounds, priced or not", async () => {
+    const chat = await fixture();
+    const decision = (at: number, tokens: number | null, cost: number | null) =>
+      chat.app.db
+        .query(
+          `insert into decision_usage (id, decider_id, decider_name,
+             provider_id, provider_name, model, purpose, input_tokens,
+             output_tokens, cost, duration, created_at)
+           values (?, 'd1', 'judge', 'p1', 'router', 'm', 'check', ?, 0, ?, 5, ?)`,
+        )
+        .run(`d${ids++}`, tokens, cost, at);
+    decision(NOW, 400, 0.00002);
+    decision(NOW, 100, null);
+    decision(NOW - DAY, null, null);
+    decision(NOW - 400 * DAY, 50, 0.001);
+    const body = await overview(chat);
+    expect(body.days.at(-1)).toMatchObject({
+      decisions: 2,
+      decisionTokens: 500,
+      pricedDecisions: 1,
+      decisionCost: 0.00002,
+      cost: null,
+    });
+    expect(body.days.at(-2)).toMatchObject({
+      decisions: 1,
+      decisionTokens: 0,
+      pricedDecisions: 0,
+      decisionCost: null,
+    });
+    expect(body.totals).toMatchObject({
+      decisions: 3,
+      decisionTokens: 500,
+      pricedDecisions: 1,
+      decisionCost: 0.00002,
+    });
+    expect(body.all).toMatchObject({
+      decisions: 4,
+      decisionTokens: 550,
+      pricedDecisions: 2,
+      decisionCost: 0.00102,
+    });
   });
 });
 
@@ -385,6 +436,10 @@ describe("the overview all time", () => {
       rounds: 0,
       pricedRounds: 0,
       cost: null,
+      decisions: 0,
+      decisionTokens: 0,
+      pricedDecisions: 0,
+      decisionCost: null,
       since: null,
     });
     expect(body.days.every((day) => day.turns === 0 && day.cost === null)).toBe(
@@ -699,6 +754,7 @@ describe("the overview cache", () => {
             readAt: input.now,
             sends: [],
             usage: [],
+            decisions: [],
             by: { agents: [], projects: [] },
             models: [],
             all: {
@@ -714,6 +770,7 @@ describe("the overview cache", () => {
               cost: null,
               since: null,
             },
+            allDecisions: { decisions: 0, tokens: 0, priced: 0, cost: null },
             instance: {
               users: 0,
               projects: 0,

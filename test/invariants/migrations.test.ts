@@ -578,6 +578,7 @@ describe("the schema", () => {
         "0028-user-activity",
         "0029-agent-pick",
         "0030-archived-chats",
+        "0031-deciders",
       ]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
@@ -751,6 +752,7 @@ describe("the schema", () => {
         "0028-user-activity",
         "0029-agent-pick",
         "0030-archived-chats",
+        "0031-deciders",
       ]);
       expect(
         db
@@ -994,7 +996,9 @@ describe("the schema", () => {
         );
         const indexesBefore = indexes(db);
         const sends = db.query("select * from sends order by id").all();
-        expect(migrate(db)).toEqual(["0030-archived-chats"]);
+        expect(migrate(db, MIGRATIONS.slice(0, 30))).toEqual([
+          "0030-archived-chats",
+        ]);
         expect(MIGRATIONS[29]?.rebuild).toBe(true);
         expect(columns(db, "agents")).toEqual([
           ...before.agents!,
@@ -1192,6 +1196,7 @@ describe("additive migrations", () => {
       "0028-user-activity",
       "0029-agent-pick",
       "0030-archived-chats",
+      "0031-deciders",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -1258,6 +1263,7 @@ describe("0005", () => {
       "0028-user-activity",
       "0029-agent-pick",
       "0030-archived-chats",
+      "0031-deciders",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -1333,6 +1339,7 @@ describe("rebuild migrations", () => {
       "0028-user-activity",
       "0029-agent-pick",
       "0030-archived-chats",
+      "0031-deciders",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1441,6 +1448,7 @@ describe("0006 skills migration", () => {
       "0028-user-activity",
       "0029-agent-pick",
       "0030-archived-chats",
+      "0031-deciders",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1508,6 +1516,7 @@ describe("0007 user tz migration", () => {
       "0028-user-activity",
       "0029-agent-pick",
       "0030-archived-chats",
+      "0031-deciders",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1554,6 +1563,7 @@ describe("0009 mcp migration", () => {
       "0028-user-activity",
       "0029-agent-pick",
       "0030-archived-chats",
+      "0031-deciders",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1816,6 +1826,7 @@ describe("0008 search tavily migration", () => {
           "0028-user-activity",
           "0029-agent-pick",
           "0030-archived-chats",
+          "0031-deciders",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

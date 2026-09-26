@@ -36,6 +36,7 @@ import { m0027 } from "./0027-usage-agent.ts";
 import { m0028 } from "./0028-user-activity.ts";
 import { m0029 } from "./0029-agent-pick.ts";
 import { m0030 } from "./0030-archived-chats.ts";
+import { m0031 } from "./0031-deciders.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -68,4 +69,5 @@ export const MIGRATIONS: Migration[] = [
   m0028,
   m0029,
   m0030,
+  m0031,
 ];

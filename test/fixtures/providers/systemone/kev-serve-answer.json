@@ -1,0 +1,40 @@
+{
+  "model": "kev-latest",
+  "answers": {
+    "outcome": {
+      "type": "choice",
+      "choice": "needs-attention",
+      "confidence": 0.9604,
+      "probabilities": {
+        "all-good": 0.0198,
+        "needs-attention": 0.9802
+      }
+    },
+    "severity": {
+      "type": "score",
+      "score": 1.7213,
+      "legend": {
+        "0": "none",
+        "1": "minor",
+        "2": "major",
+        "3": "critical"
+      },
+      "probabilities": {
+        "0": 0.1693,
+        "1": 0.2055,
+        "2": 0.3598,
+        "3": 0.2654
+      },
+      "confidence": 0.1904
+    },
+    "act": {
+      "type": "noul",
+      "noul": 0.2244
+    }
+  },
+  "usage": {
+    "input_tokens": 128,
+    "output_tokens": 185
+  },
+  "latency_ms": 309.7
+}

@@ -42,6 +42,7 @@ import {
   parsePrefix,
   parseTemplate,
 } from "../credentials/index.ts";
+import { MAX_MODEL as MAX_DECIDER_MODEL } from "../deciders/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   parseMcpKeyName,
@@ -106,6 +107,14 @@ export type ProviderSpec = {
   keyFrom?: string | null;
 };
 
+export type DeciderSpec = {
+  provider?: string;
+  model?: string;
+  // only true: the decider every feature asks; left out, the mark stays
+  // where it is
+  default?: true;
+};
+
 export type SkillSpec = {
   url?: string;
   fromIndex?: boolean;
@@ -157,6 +166,7 @@ export type Specs = {
   Project: ProjectSpec;
   Credential: CredentialSpec;
   Provider: ProviderSpec;
+  Decider: DeciderSpec;
   Skill: SkillSpec;
   McpServer: McpServerSpec;
   Agent: AgentSpec;
@@ -235,6 +245,27 @@ export function provider(value: unknown): ProviderSpec {
       wire: guarded(isWire, "must be a known wire"),
       baseUrl: parseBaseUrl,
       keyFrom: parseKeyName,
+    },
+  );
+}
+
+const onlyTrue = (v: unknown): true => {
+  if (v !== true) throw new BadRequest("must be true, or left out");
+  return v;
+};
+
+export function decider(value: unknown): DeciderSpec {
+  return optional<DeciderSpec>(
+    object(value, ["provider", "model", "default"], "spec"),
+    {
+      provider: guarded(isName, "must be a provider name"),
+      model: (v) => {
+        if (typeof v !== "string" || v === "" || v.length > MAX_DECIDER_MODEL) {
+          throw new BadRequest("must be a model id");
+        }
+        return v;
+      },
+      default: onlyTrue,
     },
   );
 }
@@ -406,10 +437,7 @@ export function agent(value: unknown): AgentSpec {
         }
         return v;
       },
-      default: (v) => {
-        if (v !== true) throw new BadRequest("must be true, or left out");
-        return v;
-      },
+      default: onlyTrue,
     },
   );
 }

@@ -5,7 +5,7 @@
 // package upgrade that moves them fails here.
 
 import { describe, expect, test } from "bun:test";
-import { tokens } from "../../../src/server/lib/tokens.ts";
+import { cutToTokens, tokens } from "../../../src/server/lib/tokens.ts";
 
 describe("tokens", () => {
   test("counts in o200k_base", () => {
@@ -32,5 +32,33 @@ describe("long text", () => {
     const started = performance.now();
     expect(tokens(run)).toBeGreaterThan(0);
     expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
+describe("cutToTokens", () => {
+  test("keeps a text that fits and cuts one that does not at its start", () => {
+    expect(cutToTokens("hello world", 10)).toBe("hello world");
+    const text = "lorem ipsum dolor sit amet\n".repeat(1000);
+    const cut = cutToTokens(text, 100);
+    expect(text.startsWith(cut)).toBeTrue();
+    expect(tokens(cut)).toBeLessThanOrEqual(100);
+    expect(tokens(cut)).toBeGreaterThan(90);
+    expect(cutToTokens(text, 0)).toBe("");
+    expect(cutToTokens(text, -5)).toBe("");
+  });
+
+  test("cuts the characters of a huge text before counting", () => {
+    const huge = "a".repeat(64 * 1024 * 1024);
+    const started = performance.now();
+    const cut = cutToTokens(huge, 4000);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(tokens(cut)).toBeLessThanOrEqual(4000);
+    expect(cut.length).toBeGreaterThan(0);
+  });
+
+  test("never ends on half a surrogate pair", () => {
+    const cut = cutToTokens("\u{1F600}".repeat(500), 7);
+    expect(tokens(cut)).toBeLessThanOrEqual(7);
+    expect(cut.length % 2).toBe(0);
   });
 });

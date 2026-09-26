@@ -307,6 +307,7 @@ describe("POST /api/sessions/:id/fork", () => {
         lastActivityAt: chat.app.now.value,
         usage: null,
         archived: null,
+        attention: null,
       });
       const rawSession = chat.app.db
         .query<RawSession, [string]>("select * from sessions where id = ?")
@@ -331,6 +332,8 @@ describe("POST /api/sessions/:id/fork", () => {
         archived_at: null,
         archived_by: null,
         archived_reason: null,
+        attention: null,
+        attention_by: null,
       });
       expect(copied.live).toBeNull();
       expect(copied.send?.kind).toBe("compact");
