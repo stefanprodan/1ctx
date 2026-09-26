@@ -173,10 +173,11 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   left out), the chats and manual runs they started, and one for each
   day they were signed in. Its tabs are About and Projects at
   `/users/:username` and `/projects`, one view for both. An
-  agent's page is its head, the Activity card over its turns in every
-  project as one series (`GET /api/directory/agents/:name/days?tz=`,
+  agent's page is its head (the model and the provider), the Activity
+  card over its turns in every project as one series (`GET /api/directory/agents/:name/days?tz=`,
   loaded apart from the page, `ActivityGhost` until it lands, left out
-  when its first load fails), then Prompt, Tools, Skills and MCP tabs
+  when its first load fails), then Instructions (the prompt, what the
+  model offers at its foot), Tools, Skills and MCP tabs
   at `/agents/:name`, `/tools`, `/skills` and `/mcp`, one view for the
   four so the card stays mounted. It carries the provider's name, the
   skills with their

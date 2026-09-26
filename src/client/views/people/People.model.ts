@@ -97,8 +97,8 @@ export function agentAnswer(
 
 const AGENT_TABS = ["", "/tools", "/skills", "/mcp"] as const;
 
-// the tab an address is on, by its place in the tabs: the prompt's
-// for the page's own address or any other
+// the tab an address is on, by its place in the tabs: the
+// instructions' for the page's own address or any other
 export function agentTab(pathname: string, name: string): number {
   const base = agentHref(name);
   const at = AGENT_TABS.findIndex((tail) => pathname === `${base}${tail}`);
@@ -108,7 +108,7 @@ export function agentTab(pathname: string, name: string): number {
 export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
   const base = agentHref(name);
   return [
-    { label: "Prompt", href: base },
+    { label: "Instructions", href: base },
     { label: "Tools", href: `${base}/tools`, count: shown.tools.length },
     { label: "Skills", href: `${base}/skills`, count: shown.skills.length },
     { label: "MCP", href: `${base}/mcp`, count: shown.mcp.servers.length },

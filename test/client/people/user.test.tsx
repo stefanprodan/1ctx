@@ -193,7 +193,7 @@ describe("the user page's About", () => {
     const html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain(">Head of SRE.<");
     expect(html).toMatch(
-      /class="people-time">.*Local time \d\d:\d\d · GMT\+[23]</,
+      /class="people-foot">.*Local time \d\d:\d\d · GMT\+[23]</,
     );
   });
 
@@ -201,7 +201,7 @@ describe("the user page's About", () => {
     person.value = { ...bogdan, user: { ...bogdan.user, tz: "Nowhere/Land" } };
     const html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain("Nothing written yet.");
-    expect(html).not.toContain("people-time");
+    expect(html).not.toContain("people-foot");
   });
 });
 

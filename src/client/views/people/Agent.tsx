@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An agent's page, open to every signed-in user: how it is configured
-// and how much it works. The head is the model it runs on, then its
-// turns per day in every project, then tabs at their own addresses: its
-// system prompt as written, the built-in tools a send offers it now,
-// its skills with what each is for, and its MCP servers. The aside is
-// the model's facts and the agent's settings, with Manage for an admin;
-// where it is hidden, the head carries the provider and the model's
-// meta line.
+// and how much it works. The head is the model it runs on and its
+// provider, then its turns per day in every project, then tabs at their
+// own addresses: its instructions as written, with what the model
+// offers at their foot, the built-in tools a send offers it now, its
+// skills with what each is for, and its MCP servers. The aside is the
+// model's facts and the agent's settings, with Manage for an admin.
 
 import { useMemo } from "preact/hooks";
 import type { DirectoryAgentResponse } from "../../../shared/api/directory.ts";
@@ -61,12 +60,34 @@ import {
 } from "./People.model.ts";
 import "./people.css";
 
+// what the model offers, at the foot of the instructions it follows:
+// its context, price, tools and reasoning
+function ModelFoot({ meta }: { meta: string }) {
+  if (meta === "") return null;
+  return (
+    <RowsBlock>
+      <p class="people-foot">
+        <Icon name="providers" size={14} />
+        {meta}
+      </p>
+    </RowsBlock>
+  );
+}
+
 // a prompt may run to 16,000 characters: cut to its first lines, Show
 // all in its fade only when the cut hides something
-function Prompt({ text, tokens }: { text: string; tokens: number }) {
+function Prompt({
+  text,
+  tokens,
+  meta,
+}: {
+  text: string;
+  tokens: number;
+  meta: string;
+}) {
   const { el, open, long } = useCut<HTMLPreElement>([text]);
   return (
-    <RowsCard label="Prompt" hint={tokensText(tokens)}>
+    <RowsCard label="Instructions" hint={tokensText(tokens)}>
       {/* the row holds the padding, so the cut ends on a whole line */}
       <RowsBlock>
         <Fold
@@ -82,6 +103,7 @@ function Prompt({ text, tokens }: { text: string; tokens: number }) {
           </pre>
         </Fold>
       </RowsBlock>
+      <ModelFoot meta={meta} />
     </RowsCard>
   );
 }
@@ -115,10 +137,14 @@ function AgentActivity({ name, agentId }: { name: string; agentId: string }) {
 }
 
 function PromptTab({ shown }: { shown: DirectoryAgentResponse }) {
+  const meta = modelMeta(shown.agent.model);
   if (shown.agent.prompt === "") {
     return (
-      <RowsCard label="Prompt">
-        <RowsNote>No prompt. The model runs on its own defaults.</RowsNote>
+      <RowsCard label="Instructions">
+        <RowsNote>
+          No instructions. The model runs on its own defaults.
+        </RowsNote>
+        <ModelFoot meta={meta} />
       </RowsCard>
     );
   }
@@ -127,6 +153,7 @@ function PromptTab({ shown }: { shown: DirectoryAgentResponse }) {
       key={shown.agent.id}
       text={shown.agent.prompt}
       tokens={shown.tokens.prompt}
+      meta={meta}
     />
   );
 }
@@ -305,11 +332,7 @@ export function Agent({ params }: { params: Params }) {
               name={shown.agent.model.id}
               mono
             >
-              <WhoLine>
-                {[shown.provider, modelMeta(shown.agent.model)]
-                  .filter((s) => s !== "")
-                  .join(" · ")}
-              </WhoLine>
+              <WhoLine>{shown.provider}</WhoLine>
             </Who>
             <AgentActivity name={name} agentId={shown.agent.id} />
             <div class="people-tabs">

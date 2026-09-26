@@ -106,7 +106,7 @@ function AboutTab({
         )}
         {time !== "" && (
           <RowsBlock>
-            <p class="people-time">
+            <p class="people-foot">
               <Icon name="clock" size={14} />
               Local time {time}
             </p>
