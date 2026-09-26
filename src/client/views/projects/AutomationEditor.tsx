@@ -35,6 +35,7 @@ import {
   switchable,
 } from "../../data/capabilities.ts";
 import { me } from "../../data/me.ts";
+import { startingAgent } from "../../data/project-agents.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { automationHref } from "../../lib/hrefs.ts";
@@ -80,7 +81,7 @@ function Editor({
   editable: boolean;
 }) {
   const draft = useSignal<Draft>(
-    draftOf(automation, agents[0]?.id ?? "", browserZone(), limitMs),
+    draftOf(automation, startingAgent(agents) ?? "", browserZone(), limitMs),
   );
   const asking = useSignal(false);
   const deadlineTouched = useSignal(false);

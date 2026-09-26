@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { favourite } from "../../../src/client/data/favourite.ts";
 import { profile } from "../../../src/client/data/profile.ts";
 import { initials, longDate } from "../../../src/client/lib/format.ts";
 import {
@@ -86,6 +87,39 @@ describe("Profile", () => {
     expect(html).toContain("Europe/Bucharest");
     expect(html).toContain('autocomplete="new-password"');
     expect(html).toContain("Change password");
+  });
+
+  test.serial("picks the favourite agent, the default first", () => {
+    profile.value = {
+      id: "u1",
+      username: "casey",
+      fullName: "Casey Doe",
+      email: "casey@example.com",
+      tz: "UTC",
+      disabled: false,
+      mustChangePassword: false,
+      about: "",
+      role: "member",
+      createdAt: 0,
+    };
+    favourite.value = null;
+    expect(render(<Profile />)).not.toContain("Favourite agent");
+    const agents = [
+      { id: "a1", name: "coder", avatar: "bot" as const },
+      { id: "a2", name: "writer", avatar: "bot" as const },
+    ];
+    favourite.value = { agentId: null, defaultId: "a1", agents };
+    let html = render(<Profile />);
+    expect(html).toContain("The agent new chats and tasks start on.");
+    expect(html).toContain(">Favourite agent<");
+    expect(html).toContain("The default");
+    favourite.value = { agentId: "a2", defaultId: "a1", agents };
+    html = render(<Profile />);
+    expect(html).toContain("@writer");
+    // with no agents there is nothing to pick
+    favourite.value = { agentId: null, defaultId: null, agents: [] };
+    expect(render(<Profile />)).not.toContain("Favourite agent");
+    favourite.value = null;
   });
 
   test("tells a person with a handed password to change it", () => {

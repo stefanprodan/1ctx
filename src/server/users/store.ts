@@ -14,6 +14,8 @@ import { newId } from "../lib/ids.ts";
 // the row, server only: the hash never leaves this area
 export type UserRow = Profile & {
   passwordHash: string;
+  // the agent a new chat starts on; null follows the default
+  agentId: string | null;
 };
 
 type Raw = {
@@ -28,6 +30,7 @@ type Raw = {
   created_at: number;
   disabled: number;
   must_change_password: number;
+  agent_id: string | null;
 };
 
 const row = (raw: Raw): UserRow => ({
@@ -42,6 +45,7 @@ const row = (raw: Raw): UserRow => ({
   createdAt: raw.created_at,
   disabled: raw.disabled !== 0,
   mustChangePassword: raw.must_change_password !== 0,
+  agentId: raw.agent_id,
 });
 
 export const summary = (user: UserRow): UserSummary => ({
@@ -165,6 +169,12 @@ export class UserStore {
 
   setTz(id: string, tz: string): void {
     this.db.query("update users set tz = ? where id = ?").run(tz, id);
+  }
+
+  setAgent(id: string, agentId: string | null): void {
+    this.db
+      .query("update users set agent_id = ? where id = ?")
+      .run(agentId, id);
   }
 
   setRole(id: string, role: Role): void {

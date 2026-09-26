@@ -33,6 +33,7 @@ function agent(id: string): AgentSummary {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    default: false,
     createdAt: 0,
   };
 }

@@ -8,8 +8,10 @@
 // written with what the model can do at their foot, the built-in tools
 // a send offers it now, its skills and its MCP servers, each row a name,
 // one line under it and one fact at its end. The aside is the model's
-// facts and the agent's settings, with Manage for an admin.
+// facts and the agent's settings, with Manage for an admin. The head's
+// Favourite makes it the agent the user's new chats start on.
 
+import { type Signal, useSignal } from "@preact/signals";
 import { useMemo } from "preact/hooks";
 import type { DirectoryAgentResponse } from "../../../shared/api/directory.ts";
 import { priceLine, shortModel, windowLine } from "../../agents/meta.ts";
@@ -21,15 +23,22 @@ import {
   agentPage,
   agentPageError,
 } from "../../data/directory.ts";
+import { setFavourite } from "../../data/favourite.ts";
 import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
-import { ago, firstSentence, longDate } from "../../lib/format.ts";
+import {
+  ago,
+  type Failure,
+  failure,
+  firstSentence,
+  longDate,
+} from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Fold } from "../../ui/Fold.tsx";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageNotice } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAvatar,
@@ -229,6 +238,43 @@ function McpTab({
   );
 }
 
+// on for the user's own pick; a second press follows the default again
+function FavouriteButton({
+  shown,
+  failed,
+}: {
+  shown: DirectoryAgentResponse;
+  // a failure with the agent it was for, since the page stays mounted
+  // from one agent to the next
+  failed: Signal<{ name: string; failure: Failure } | null>;
+}) {
+  const busy = useSignal(false);
+  const on = shown.favourite;
+  const press = async () => {
+    busy.value = true;
+    failed.value = null;
+    try {
+      await setFavourite(on ? null : shown.agent.id);
+    } catch (err) {
+      failed.value = { name: shown.agent.name, failure: failure(err) };
+    } finally {
+      busy.value = false;
+    }
+  };
+  return (
+    <button
+      type="button"
+      class="btn btn-small"
+      aria-pressed={on}
+      disabled={busy.value}
+      onClick={() => void press()}
+    >
+      <Icon name="star" size={12} class={on ? "people-fav-on" : undefined} />
+      Favourite
+    </button>
+  );
+}
+
 export function Agent({ params }: { params: Params }) {
   const name = params.name ?? "";
   // the fetched-ago words move on the minute
@@ -237,10 +283,16 @@ export function Agent({ params }: { params: Params }) {
   const shown = answer !== null && answer.agent.name === name ? answer : null;
   const tab = agentTab(path.value, name);
   const tabs = shown === null ? [] : agentTabs(name, shown);
+  const failed = useSignal<{ name: string; failure: Failure } | null>(null);
+  const failedHere = failed.value?.name === name ? failed.value.failure : null;
   return (
     <Page
       crumb="Agents"
       title={`@${name}`}
+      actions={shown && <FavouriteButton shown={shown} failed={failed} />}
+      notice={
+        failedHere && <PageNotice tone="failed" words={failedHere.words} />
+      }
       loading={shown === null && agentPageError.value === null}
       error={agentPageError.value}
     >
@@ -308,7 +360,13 @@ export function Agent({ params }: { params: Params }) {
               name={shown.agent.model.id}
               mono
             >
-              <WhoLine>{agentLine(shown.provider, shown.agent.model)}</WhoLine>
+              <WhoLine>
+                {agentLine(
+                  shown.provider,
+                  shown.agent.model,
+                  shown.agent.default,
+                )}
+              </WhoLine>
             </Who>
             <AgentActivity name={name} agentId={shown.agent.id} />
             <Rows>

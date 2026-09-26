@@ -64,6 +64,17 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
+    method: "GET",
+    path: "/api/profile/agent",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/profile/agent",
+    body: { agentId: null },
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
     method: "PATCH",
     path: "/api/profile/project",
     body: { description: "" },

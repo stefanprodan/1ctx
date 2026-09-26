@@ -6,6 +6,7 @@
 // Admin group in the rail, and the page rendered over the rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
 import {
   priceLine,
@@ -18,6 +19,7 @@ import {
   agents,
   agentsError,
   loadAgents,
+  updateAgent,
 } from "../../../src/client/data/agents.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
@@ -53,6 +55,7 @@ import {
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { Agents } from "../../../src/client/views/admin/Agents.tsx";
+import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
 import { ProviderForm } from "../../../src/client/views/admin/ProviderForm.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type {
@@ -102,6 +105,7 @@ const coder: AgentSummary = {
   servers: [],
   mcpMode: "auto",
   upstream: null,
+  default: false,
   createdAt: 0,
 };
 
@@ -600,6 +604,72 @@ describe("the entities", () => {
       expect(asked).toBe("/api/providers/pr1/catalog?q=deep%20seek");
     },
   );
+});
+
+describe("the default agent", () => {
+  const ops: AgentSummary = { ...coder, id: "ag2", name: "ops", createdAt: 1 };
+  const field = (agent: AgentSummary) =>
+    render(
+      <DefaultField
+        agent={agent}
+        on={signal(agent.default)}
+        save={{ busy: false, touch() {} }}
+      />,
+    );
+
+  test.serial("the row says default, on a phone too", () => {
+    providers.value = [router];
+    agents.value = [{ ...coder, default: true }];
+    const html = render(<Agents />);
+    expect(html).toContain(">default · router · 128K · $0.14 / $0.28");
+    expect(html).toContain(
+      '<span class="rows-meta-short">default · 128K · $0.14 / $0.28</span>',
+    );
+  });
+
+  test.serial("the oldest, while it is the default, cannot say No", () => {
+    agents.value = [{ ...coder, default: true }, ops];
+    let html = field({ ...coder, default: true });
+    expect(html).toContain("The oldest agent is the default");
+    expect(html.match(/ disabled/g)).toHaveLength(2);
+    agents.value = [coder, { ...ops, default: true }];
+    html = field({ ...ops, default: true });
+    expect(html).toContain("New chats start on it");
+    expect(html).not.toContain("disabled");
+    expect(field(coder)).not.toContain("disabled");
+  });
+
+  test.serial("a moved mark reloads the list", async () => {
+    agents.value = [{ ...coder, default: true }, ops];
+    const asked: string[] = [];
+    answer = (url, init) => {
+      asked.push(`${init?.method ?? "GET"} ${url}`);
+      return url === "/api/agents"
+        ? Response.json({ agents: [coder, { ...ops, default: true }] })
+        : Response.json({ agent: { ...ops, default: true } });
+    };
+    const body = {
+      name: "ops",
+      avatar: "bot" as const,
+      providerId: "pr1",
+      model: flash.id,
+      thinking: null,
+      effort: null,
+      prompt: "",
+      skills: [],
+      servers: [],
+      mcpMode: "auto" as const,
+    };
+    await updateAgent("ag2", body);
+    expect(asked).toEqual(["PATCH /api/agents/ag2"]);
+    await updateAgent("ag2", { ...body, default: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(asked.slice(1)).toEqual([
+      "PATCH /api/agents/ag2",
+      "GET /api/agents",
+    ]);
+    expect(agents.value?.map((a) => a.default)).toEqual([false, true]);
+  });
 });
 
 describe("the rail", () => {

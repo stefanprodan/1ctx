@@ -74,6 +74,7 @@ describe("the Setup aside", () => {
   afterEach(() => {
     answered({
       agents: [],
+      favourite: null,
       capabilities: [],
       servers: {},
       skills: {},
@@ -87,6 +88,7 @@ describe("the Setup aside", () => {
   test.serial("names the project's credentials that are off", () => {
     answered({
       agents: [],
+      favourite: null,
       capabilities: ["web"],
       servers: {},
       skills: {},
@@ -104,6 +106,7 @@ describe("the Setup aside", () => {
   test.serial("says Web access Off alone while the web is off", () => {
     answered({
       agents: [],
+      favourite: null,
       capabilities: ["web"],
       servers: {},
       skills: {},

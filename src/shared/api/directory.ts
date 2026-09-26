@@ -15,6 +15,9 @@ import type { DayUsage } from "./usage.ts";
 export type DirectoryUserResponse = {
   user: DirectoryUser;
   projects: ProjectSummary[];
+  // the name of the agent they picked as their favourite; null when
+  // they follow the default
+  favourite: string | null;
 };
 
 // a skill the agent carries, with when its source was last fetched and
@@ -58,6 +61,8 @@ export type DirectoryMcp = {
 // carries, the built-in tools a send would offer it now, and its MCP
 export type DirectoryAgentResponse = {
   agent: AgentSummary;
+  // whether the caller picked it as their favourite
+  favourite: boolean;
   provider: string;
   skills: DirectorySkill[];
   tools: DirectoryTool[];

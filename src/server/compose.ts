@@ -242,6 +242,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     projects,
     activity: { personDays: (...args) => sessions.personDays(...args) },
+    agents: { nameOf: (id) => agents.byId(id)?.name ?? null },
   });
   usage = usageArea({
     db,
@@ -264,12 +265,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     access,
     sessions: { usesAgent: (agentId) => sessions.usesAgent(agentId) },
-    automations: {
-      usesAgent: (agentId) => automations.usesAgent(agentId),
-    },
+    automations: { usesAgent: (id) => automations.usesAgent(id) },
     usage: {
       agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
     },
+    users,
   });
   const memory: MemoryArea = memoryArea({
     db,

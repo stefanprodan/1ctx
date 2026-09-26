@@ -34,6 +34,7 @@ import {
   switchable,
 } from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
+import { startingAgent } from "../data/project-agents.ts";
 import {
   askedOf,
   claimed,
@@ -178,12 +179,12 @@ export function Composer({
   const list = agents ?? [];
   const fixed = agentId !== null;
   // a pick not in the list, the agents of another project, falls back
-  // to the first
+  // to the favourite
   const agent = fixed
     ? agentId
     : list.some((a) => a.id === picked.value)
       ? picked.value
-      : (list[0]?.id ?? null);
+      : startingAgent(list);
 
   const grow = () => {
     const el = input.current;

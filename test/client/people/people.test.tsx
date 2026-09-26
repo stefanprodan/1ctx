@@ -54,6 +54,7 @@ const casey: Me = {
 };
 
 const agent: DirectoryAgentResponse = {
+  favourite: false,
   agent: {
     id: "a1",
     name: "coder",
@@ -78,6 +79,7 @@ const agent: DirectoryAgentResponse = {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    default: false,
     createdAt: 0,
   },
   provider: "router",
@@ -145,6 +147,7 @@ const personOf = (username: string): DirectoryUserResponse => ({
     disabled: false,
   },
   projects: [],
+  favourite: null,
 });
 
 // every request waits until the test opens its gate, answering with the
@@ -405,6 +408,9 @@ describe("People.model", () => {
     expect(
       agentLine("router", { ...model, promptPrice: 0, completionPrice: 0 }),
     ).toBe("router · 128K · free");
+    expect(agentLine("router", model, true)).toBe(
+      "router · 128K · $0.14 / $0.28 · default",
+    );
   });
 
   test("the capabilities say text only when the model has neither", () => {
@@ -470,6 +476,7 @@ describe("the pages", () => {
         projects: [
           { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 3 },
         ],
+        favourite: null,
       };
       path.value = "/users/bogdan";
       let html = render(<User params={{ username: "bogdan" }} />);
@@ -517,6 +524,7 @@ describe("the pages", () => {
         disabled: false,
       },
       projects: [],
+      favourite: null,
     };
     path.value = "/users/casey";
     expect(render(<User params={{ username: "casey" }} />)).toContain(
@@ -566,6 +574,26 @@ describe("the pages", () => {
       expect(html).toContain(">high<");
     },
   );
+
+  test.serial("Agent's Favourite is pressed for the user's own pick", () => {
+    agentPage.value = agent;
+    let html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toMatch(
+      /<button type="button" class="btn btn-small" aria-pressed="false"><svg[^>]*><path[^>]*><\/path><\/svg>Favourite<\/button>/,
+    );
+    expect(html).not.toContain("people-fav-on");
+    agentPage.value = {
+      ...agent,
+      favourite: true,
+      agent: { ...agent.agent, default: true },
+    };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('class="people-fav-on"');
+    expect(html).toContain(
+      'class="who-line">router · 128K · $0.14 / $0.28 · default<',
+    );
+  });
 
   test.serial("Agent's Tools, Skills and MCP tabs each fill the card", () => {
     agentPage.value = agent;

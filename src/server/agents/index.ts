@@ -14,6 +14,7 @@ import {
   type ToolsPort,
   type UsagePort,
 } from "./directory.ts";
+import { type FavouritePort, favouriteRoutes } from "./favourite.ts";
 import {
   type AccessPort,
   type AutomationsPort,
@@ -33,6 +34,7 @@ export {
   type ToolsPort,
   type UsagePort,
 } from "./directory.ts";
+export type { FavouritePort } from "./favourite.ts";
 export {
   MAX_MODEL,
   MAX_PROMPT,
@@ -63,6 +65,7 @@ export type AgentsDeps = {
   sessions: SessionsPort;
   automations: AutomationsPort;
   usage: UsagePort;
+  users: FavouritePort;
 };
 
 export type Agents = {
@@ -94,14 +97,17 @@ export function agentsArea(deps: AgentsDeps): Agents {
         access: deps.access,
         sessions: deps.sessions,
         automations: deps.automations,
+        users: deps.users,
         clock: deps.clock,
       }),
+      ...favouriteRoutes({ store, users: deps.users }),
       ...directoryRoutes({
         store,
         usage: deps.usage,
         providers: deps.providers,
         skills: deps.skills,
         tools: deps.tools,
+        users: deps.users,
         clock: deps.clock,
       }),
     ],

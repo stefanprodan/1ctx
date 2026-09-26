@@ -37,10 +37,16 @@ export type ActivityPort = {
   personDays(userId: string, starts: number[], until: number): number[];
 };
 
+// an agent's name by id, for the favourite a user picked
+export type AgentsPort = {
+  nameOf(id: string): string | null;
+};
+
 export type DirectoryDeps = {
   users: UsersPort;
   projects: ProjectsPort;
   activity: ActivityPort;
+  agents: AgentsPort;
   visits: VisitStore;
   clock: Clock;
 };
@@ -75,6 +81,8 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             disabled: user.disabled,
           },
           projects,
+          favourite:
+            user.agentId === null ? null : deps.agents.nameOf(user.agentId),
         };
         return json(body);
       },

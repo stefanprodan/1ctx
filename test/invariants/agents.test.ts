@@ -236,6 +236,8 @@ describe("the agents", () => {
       servers: [],
       mcpMode: "auto",
       upstream: null,
+      // the first agent is the default until an admin marks another
+      default: true,
       createdAt: app.now.value,
     });
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({

@@ -28,7 +28,13 @@ export const MAX_UPSTREAM = 100;
 
 export type ParsedAgent = Omit<
   SaveAgentRequest,
-  "effort" | "servers" | "mcpMode" | "contextLength" | "tools" | "upstream"
+  | "effort"
+  | "servers"
+  | "mcpMode"
+  | "contextLength"
+  | "tools"
+  | "upstream"
+  | "default"
 > & {
   upstream: string | null;
   effort: string | null;
@@ -36,6 +42,8 @@ export type ParsedAgent = Omit<
   mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
   // null when the body did not state them
   stated: { contextLength: number | null; tools: boolean } | null;
+  // null leaves the default mark as it is
+  mark: boolean | null;
 };
 
 // an agent's name as a path names it, by the same rule a save keeps
@@ -96,6 +104,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "contextLength",
     "tools",
     "upstream",
+    "default",
   ]);
   const name = parseAgentName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
@@ -167,6 +176,9 @@ export function parseAgent(body: unknown): ParsedAgent {
   ) {
     throw new BadRequest("upstream must be an endpoint tag or null");
   }
+  if (b.default !== undefined && typeof b.default !== "boolean") {
+    throw new BadRequest("default must be true or false");
+  }
   const stated =
     contextLength === null && b.tools === undefined
       ? null
@@ -184,5 +196,6 @@ export function parseAgent(body: unknown): ParsedAgent {
     mcpMode,
     upstream,
     stated,
+    mark: b.default ?? null,
   };
 }

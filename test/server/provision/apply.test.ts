@@ -279,6 +279,43 @@ describe("provision through the composed app", () => {
     }
   });
 
+  test("marks an agent as the default, once and only with true", async () => {
+    const { app } = await instance();
+    try {
+      await app.provision.apply(await fullDocuments(), ignore);
+      const second = object("Agent", "second", {
+        provider: "mock-provider",
+        model: "fake-model",
+        default: true,
+      });
+      await app.provision.apply(documents(second), ignore);
+      expect(app.agents.byName("second")!.default).toBe(true);
+      expect(app.agents.byName("guide")!.default).toBe(false);
+      // applied again, nothing to change; left out, the mark stays
+      const actions: string[] = [];
+      await app.provision.apply(documents(second), (line) =>
+        actions.push(line),
+      );
+      expect(actions.join("\n")).toContain("unchanged");
+      await app.provision.apply(
+        documents(object("Agent", "second", { prompt: "Other." })),
+        ignore,
+      );
+      expect(app.agents.byName("second")!.default).toBe(true);
+      expect(() =>
+        documents(object("Agent", "second", { default: false })),
+      ).toThrow("spec.default");
+      expect(() =>
+        documents(
+          object("Agent", "guide", { default: true }),
+          object("Agent", "second", { default: true }),
+        ),
+      ).toThrow("Agent/second: spec.default is also set on Agent/guide");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test("passes an agent's upstream to the API, which holds its rule", async () => {
     const { app } = await instance();
     try {

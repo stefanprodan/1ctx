@@ -20,6 +20,12 @@ import { onSocketEvent } from "./socket.ts";
 import { loadUploads } from "./uploads.ts";
 
 export const projectAgents = signal<AgentSummary[] | null>(null);
+// the agent a new chat starts on for this user: their favourite, else
+// the default, as the server resolved it with the agents
+export const favouriteAgent = signal<string | null>(null);
+// bumped by a favourite write, so an agents answer asked before it
+// never puts the old favourite back
+let favouriteTurn = 0;
 // the project Home's composer starts a chat in, as the user picked it
 // for the life of the tab; null for the personal project
 export const homeProjectId = signal<string | null>(null);
@@ -39,10 +45,25 @@ effect(() => {
   turn++;
   shownTurn = turn;
   projectAgents.value = null;
+  favouriteAgent.value = null;
   shownFor = null;
   kept.clear();
   homeProjectId.value = null;
 });
+
+// the agent a new chat or task starts on: the favourite while it is in
+// the list, else the default, else the first
+export function startingAgent(list: AgentSummary[]): string | null {
+  const favourite = favouriteAgent.value;
+  if (list.some((a) => a.id === favourite)) return favourite;
+  return (list.find((a) => a.default) ?? list[0])?.id ?? null;
+}
+
+// a favourite write moves the start at once, before the agents load
+export function pickFavourite(agentId: string | null): void {
+  favouriteTurn++;
+  favouriteAgent.value = agentId;
+}
 
 export function projectAgentCount(projectId: string): number | null {
   const list = projectAgents.value;
@@ -52,7 +73,10 @@ export function projectAgentCount(projectId: string): number | null {
 export async function loadProjectAgents(projectId: string): Promise<void> {
   const forUser = owner;
   const mine = ++turn;
+  const picks = favouriteTurn;
   if (shownFor !== projectId) {
+    // the favourite is the user's, not the project's, so a held answer
+    // never brings back one picked over since
     const held = kept.get(projectId);
     projectAgents.value = held?.agents ?? null;
     if (held !== undefined) answered(held);
@@ -69,6 +93,7 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
     shownTurn = mine;
     kept.set(projectId, body);
     projectAgents.value = body.agents;
+    if (picks === favouriteTurn) favouriteAgent.value = body.favourite;
     answered(body);
   } catch {
     if (current()) projectAgents.value = null;

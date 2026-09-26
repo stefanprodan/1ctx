@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The composer's keys: the arrows, Tab and Escape walk the command list
-// only while it has a match, so a message with none keeps them.
+// only while it has a match, so a message with none keeps them. A new
+// chat starts on the favourite agent.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { options } from "preact";
@@ -10,6 +11,11 @@ import { render } from "preact-render-to-string";
 import { Composer } from "../../../src/client/composer/Composer.tsx";
 import { draftKey } from "../../../src/client/composer/draft.ts";
 import { me } from "../../../src/client/data/me.ts";
+import {
+  favouriteAgent,
+  startingAgent,
+} from "../../../src/client/data/project-agents.ts";
+import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 
 const SCOPE = { sessionId: "s1" };
 const realStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -99,5 +105,78 @@ describe("the composer's keys", () => {
     const press = keysOver("/");
     expect(press("ArrowDown")).toBe(true);
     expect(press("ArrowUp")).toBe(true);
+  });
+});
+
+describe("the composer's agent", () => {
+  const agent = (id: string, name: string): AgentSummary => ({
+    id,
+    name,
+    avatar: "bot",
+    providerId: "pr1",
+    model: {
+      id: "acme/small",
+      name: "Small",
+      contextLength: null,
+      promptPrice: null,
+      completionPrice: null,
+      tools: false,
+      reasoning: false,
+      thinkingRequired: false,
+      reasoningKnown: true,
+      described: true,
+    },
+    thinking: null,
+    effort: null,
+    prompt: "",
+    skills: [],
+    servers: [],
+    mcpMode: "auto",
+    upstream: null,
+    default: id === "a1",
+    createdAt: 0,
+  });
+  const agents = [agent("a1", "coder"), agent("a2", "writer")];
+  const chip = (fixed: string | null = null) =>
+    render(
+      <Composer
+        scope={{ projectId: "home" }}
+        filesProjectId="p1"
+        agents={agents}
+        agentId={fixed}
+        running={false}
+        busy={false}
+        onSend={async () => {}}
+        onStop={async () => {}}
+      />,
+    ).match(/composer-chip-name cut">([^<]*)</)?.[1];
+
+  afterEach(() => {
+    favouriteAgent.value = null;
+  });
+
+  test.serial("a new chat starts on the favourite, else the first", () => {
+    favouriteAgent.value = "a2";
+    expect(chip()).toBe("writer");
+    // a favourite that is not one of the project's agents
+    favouriteAgent.value = "gone";
+    expect(chip()).toBe("coder");
+    favouriteAgent.value = null;
+    expect(chip()).toBe("coder");
+    expect(startingAgent([])).toBeNull();
+  });
+
+  test.serial(
+    "a favourite gone from the list falls back to the default",
+    () => {
+      favouriteAgent.value = "gone";
+      const marked = agents.map((a) => ({ ...a, default: a.id === "a2" }));
+      expect(startingAgent(marked)).toBe("a2");
+    },
+  );
+
+  test.serial("a chat keeps its own agent", () => {
+    favouriteAgent.value = "a2";
+    expect(chip("a1")).toBe("coder");
   });
 });
