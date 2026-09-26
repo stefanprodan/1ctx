@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Request and response bodies of the agent routes, for admins, and of
-// the signed-in user's favourite agent.
+// the agent the signed-in user last picked.
 
 import type { AgentSummary } from "../contracts/agent.ts";
 import type { AgentServer } from "../contracts/mcp.ts";
@@ -13,17 +13,10 @@ export type AgentsResponse = { agents: AgentSummary[] };
 
 // POST /api/agents and PATCH /api/agents/:id answer the row
 export type AgentResponse = { agent: AgentSummary };
-// GET and PUT /api/profile/agent, for any signed-in user: their
-// favourite, null when they follow the default, the default's id, and
-// every agent to pick from, oldest first
-export type FavouriteAgentResponse = {
-  agentId: string | null;
-  defaultId: string | null;
-  agents: { id: string; name: string; avatar: Avatar }[];
-};
-
-// PUT /api/profile/agent; null follows the default again
-export type SetFavouriteAgentRequest = { agentId: string | null };
+// PUT /api/profile/agent, for any signed-in user: the composer's pick,
+// kept so their next new chat starts on it; answers the agent it will
+export type PickAgentRequest = { agentId: string };
+export type PickAgentResponse = { agentId: string | null };
 
 // the model is an id the provider's catalog lists
 export type SaveAgentRequest = {

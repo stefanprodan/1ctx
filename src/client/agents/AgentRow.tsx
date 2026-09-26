@@ -3,7 +3,7 @@
 //
 // One agent as the parts of a row: the avatar, the name over the model
 // id, and the faint meta: "default" on the agent new chats start on
-// for anyone with no favourite, the provider's name when the caller
+// for anyone who has not picked one, the provider's name when the caller
 // knows it (only an admin lists providers), the model's window and
 // prices, the provider OpenRouter tries first, the thinking level and
 // the skill and MCP counts; a phone shows only the default word, the

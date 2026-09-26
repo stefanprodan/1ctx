@@ -1,16 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A new chat starts on the user's favourite agent, else the default an
-// admin marked, else the first created. Deleting an agent hands either
+// A new chat starts on the agent the user last picked in the composer,
+// else the default an admin marked, else the first created. Deleting an agent hands either
 // on with no write.
 
 import { describe, expect, test } from "bun:test";
-import type { FavouriteAgentResponse } from "../../src/shared/api/agents.ts";
-import type {
-  DirectoryAgentResponse,
-  DirectoryUserResponse,
-} from "../../src/shared/api/directory.ts";
+import type { PickAgentResponse } from "../../src/shared/api/agents.ts";
 import type { ProjectAgentsResponse } from "../../src/shared/api/sessions.ts";
 import { type ChatApp, chatApp, FLASH } from "../helpers/chat.ts";
 
@@ -30,7 +26,7 @@ async function starting(chat: ChatApp): Promise<string | null> {
     `/api/projects/${chat.projectId}/agents`,
   );
   expect(res.status).toBe(200);
-  return ((await res.json()) as ProjectAgentsResponse).favourite;
+  return ((await res.json()) as ProjectAgentsResponse).startsOn;
 }
 
 async function defaults(chat: ChatApp): Promise<string[]> {
@@ -54,7 +50,7 @@ const mark = (chat: ChatApp, id: string, on: boolean) =>
     },
   });
 
-const pick = (chat: ChatApp, agentId: string | null) =>
+const pick = (chat: ChatApp, agentId: string) =>
   chat.member.call("PUT", "/api/profile/agent", { body: { agentId } });
 
 describe("the agent a new chat starts on", () => {
@@ -122,19 +118,13 @@ describe("the agent a new chat starts on", () => {
     await chat.app.shutdown();
   });
 
-  test("is the user's favourite, then the default once it is gone", async () => {
+  test("is the user's last pick, then the default once it is gone", async () => {
     const chat = await three();
     await mark(chat, chat.writer, true);
     const res = await pick(chat, chat.ops);
     expect(res.status).toBe(200);
-    expect((await res.json()) as FavouriteAgentResponse).toEqual({
+    expect((await res.json()) as PickAgentResponse).toEqual({
       agentId: chat.ops,
-      defaultId: chat.writer,
-      agents: [
-        { id: chat.agentId, name: "coder", avatar: "bot" },
-        { id: chat.ops, name: "ops", avatar: "bot" },
-        { id: chat.writer, name: "writer", avatar: "bot" },
-      ],
     });
     expect(await starting(chat)).toBe(chat.ops);
     // another user follows the default
@@ -142,11 +132,15 @@ describe("the agent a new chat starts on", () => {
       "GET",
       `/api/projects/${chat.app.projects.personal(chat.adminId)!.id}/agents`,
     );
-    expect(((await theirs.json()) as ProjectAgentsResponse).favourite).toBe(
+    expect(((await theirs.json()) as ProjectAgentsResponse).startsOn).toBe(
       chat.writer,
     );
+    // the next pick replaces it
+    await pick(chat, chat.agentId);
+    expect(await starting(chat)).toBe(chat.agentId);
+    await pick(chat, chat.ops);
 
-    // a deleted favourite clears, so the default answers
+    // a deleted pick clears, so the default answers
     expect(
       (await chat.admin.call("DELETE", `/api/agents/${chat.ops}`)).status,
     ).toBe(200);
@@ -162,27 +156,22 @@ describe("the agent a new chat starts on", () => {
     await chat.app.shutdown();
   });
 
-  test("null follows the default again, an unknown agent is a 400", async () => {
+  test("a pick names an agent that exists", async () => {
     const chat = await three();
-    await pick(chat, chat.ops);
-    const cleared = await pick(chat, null);
-    expect(cleared.status).toBe(200);
-    expect(((await cleared.json()) as FavouriteAgentResponse).agentId).toBe(
-      null,
-    );
-    expect(await starting(chat)).toBe(chat.agentId);
     for (const body of [
       { agentId: "nope" },
       { agentId: "" },
       { agentId: 3 },
+      { agentId: null },
       {},
-      { agentId: null, extra: 1 },
+      { agentId: chat.ops, extra: 1 },
     ]) {
       const res = await chat.member.call("PUT", "/api/profile/agent", {
         body,
       });
       expect(res.status, JSON.stringify(body)).toBe(400);
     }
+    expect(await starting(chat)).toBe(chat.agentId);
     await chat.app.shutdown();
   });
 
@@ -193,36 +182,6 @@ describe("the agent a new chat starts on", () => {
       (await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`)).status,
     ).toBe(200);
     expect(await starting(chat)).toBeNull();
-    const res = await chat.member.call("GET", "/api/profile/agent");
-    expect(await res.json()).toEqual({
-      agentId: null,
-      defaultId: null,
-      agents: [],
-    });
-    await chat.app.shutdown();
-  });
-});
-
-describe("the people pages", () => {
-  test("show the favourite a user picked, never the default", async () => {
-    const chat = await three();
-    const person = async () =>
-      (await (
-        await chat.admin.call("GET", "/api/directory/users/casey")
-      ).json()) as DirectoryUserResponse;
-    const page = async (name: string) =>
-      (await (
-        await chat.member.call("GET", `/api/directory/agents/${name}`)
-      ).json()) as DirectoryAgentResponse;
-
-    expect((await person()).favourite).toBeNull();
-    expect((await page("coder")).favourite).toBe(false);
-    expect((await page("coder")).agent.default).toBe(true);
-
-    await pick(chat, chat.ops);
-    expect((await person()).favourite).toBe("ops");
-    expect((await page("ops")).favourite).toBe(true);
-    expect((await page("coder")).favourite).toBe(false);
     await chat.app.shutdown();
   });
 });

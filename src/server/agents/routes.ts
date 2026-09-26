@@ -25,8 +25,8 @@ import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ProviderRow } from "../providers/index.ts";
-import { type FavouritePort, favouriteOf } from "./favourite.ts";
 import { type ParsedAgent, parseAgent } from "./parse.ts";
+import { type PicksPort, startingOf } from "./starting.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
 
 export type ProvidersPort = {
@@ -82,7 +82,7 @@ export type RoutesDeps = {
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
-  users: FavouritePort;
+  users: PicksPort;
   clock: Clock;
 };
 
@@ -267,7 +267,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const agents = deps.store.list().map(summary);
         const body: ProjectAgentsResponse = {
           agents,
-          favourite: favouriteOf(deps.store, deps.users, ctx.principal!.userId),
+          startsOn: startingOf(deps.store, deps.users, ctx.principal!.userId),
           capabilities: deps.tools.capabilities(),
           servers: deps.mcp.switchableBy(agents),
           skills: deps.skills.switchable(),

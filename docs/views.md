@@ -96,20 +96,18 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `data/uploads.ts`, which deletes it when a list shows it; a write
   supersedes a list load in flight.
 - **The agent a new chat starts on.** A new chat and a new task start
-  on `startingAgent()` in `data/project-agents.ts`: the pick made in
-  this composer while it is on screen, else `favourite` on
+  on `startingAgent()` in `data/project-agents.ts`: `startsOn` on
   `GET /api/projects/:id/agents`, which the server resolves as the
-  user's favourite, else the agent an admin marked as the default, else
-  the first created, so the client never repeats the rule; a favourite
-  not in the list falls back to the agent the list marks default. The
-  favourite is the user's, so a held answer never sets it, and a write
-  wins over an answer asked before it. Deleting an
-  agent clears the favourites that named it and a deleted default
-  hands on to the oldest left, with no write. The picker marks neither.
-  A user picks the favourite with Favourite in an agent page's head
-  and in the profile's Agent section, both through
-  `PUT /api/profile/agent` (`data/favourite.ts`), which moves the
-  composer's start at once. An admin marks the default in the agent
+  agent the user last picked in a composer, else the agent an admin
+  marked as the default, else the first created, so the client never
+  repeats the rule; a pick not in the list falls back to the agent the
+  list marks default. A pick in the composer's agent picker is kept at
+  once by `rememberAgent()`, in the tab and through
+  `PUT /api/profile/agent`, so every composer and every visit after
+  starts on it; the pick is the user's, so a held answer never sets it,
+  and a pick wins over an answer asked before it. Deleting an agent
+  clears the picks that named it and a deleted default hands on to the
+  oldest left, with no write. An admin marks the default in the agent
   form, and every agent row and the agent page's head say "default".
 - **The draft.** The draft (`composer/draft.ts`) is
   keyed by user and by chat, or by project for a chat not made yet
@@ -190,8 +188,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   day they were signed in. Under it is one card whose head is its
   tabs (`RowsCard`'s `tabs` slot, `Tabs` with `head`), About and
   Projects at `/users/:username` and `/projects`, one view for both.
-  About ends on the favourite agent they picked, never the default,
-  then their local time. An
+  About ends on their local time. An
   agent's page is its head (the model, then the provider, the context
   and the price), the Activity card over its turns in every project as
   one series (`GET /api/directory/agents/:name/days?tz=`, loaded apart
@@ -221,8 +218,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `/admin/agents?open=<id>`.
 - **The profile.** The profile's aside is the account (email, role, joined),
   its head the name and the handle, and the email where the aside is
-  hidden. Its Agent section picks the favourite agent, "The default"
-  first, and is left out while there are no agents.
+  hidden.
 - **The Projects page.** The
   Projects page is the same rows: the Activity card (turns per day
   over up to 53 ISO weeks, as many as fit the width, from

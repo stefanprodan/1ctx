@@ -22,7 +22,6 @@ import {
   loadPerson,
   loadPersonDays,
 } from "../data/directory.ts";
-import { loadFavourite } from "../data/favourite.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadMcp } from "../data/mcp.ts";
@@ -510,9 +509,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Profile",
     role: "authenticated",
-    load: async () => {
-      await Promise.all([loadProfile(), loadFavourite()]);
-    },
+    load: () => loadProfile(),
   },
 ];
 

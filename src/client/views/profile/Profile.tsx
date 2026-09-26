@@ -11,13 +11,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
-import type { FavouriteAgentResponse } from "../../../shared/api/agents.ts";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
-import {
-  favourite,
-  favouriteError,
-  setFavourite,
-} from "../../data/favourite.ts";
 import {
   changePassword,
   profile,
@@ -28,9 +22,8 @@ import { initials, longDate } from "../../lib/format.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
-import { Page, PageNotice } from "../../ui/Page.tsx";
+import { Page } from "../../ui/Page.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
-import { Select } from "../../ui/Select.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
@@ -123,52 +116,6 @@ function DetailsForm({ user }: { user: ProfileRow }) {
   );
 }
 
-// the agent new chats and tasks start on; the first choice follows the
-// default, whichever agent that is when the chat starts
-function AgentForm({ answer }: { answer: FavouriteAgentResponse }) {
-  const picked = useSignal(answer.agentId ?? "");
-  const save = useSave(() => setFavourite(picked.value || null));
-  const fallback = answer.agents.find((a) => a.id === answer.defaultId);
-  const submit = (event: Event) => {
-    event.preventDefault();
-    void save.run(null);
-  };
-  return (
-    <SectionForm onSubmit={submit}>
-      <div class="profile-fields">
-        <div class="field">
-          <span class="label">Favourite agent</span>
-          <Select
-            label="Favourite agent"
-            name="agentId"
-            value={picked.value}
-            options={[
-              {
-                value: "",
-                label: "The default",
-                detail: fallback ? `@${fallback.name}` : undefined,
-              },
-              ...answer.agents.map((a) => ({
-                value: a.id,
-                label: `@${a.name}`,
-              })),
-            ]}
-            onChange={(next) => {
-              picked.value = next;
-              save.touch();
-            }}
-          />
-        </div>
-      </div>
-      <Foot
-        save={save}
-        dirty={picked.value !== (answer.agentId ?? "")}
-        label="Save"
-      />
-    </SectionForm>
-  );
-}
-
 function PasswordForm() {
   const current = useSignal("");
   const next = useSignal("");
@@ -243,12 +190,6 @@ export function Profile() {
     <Page
       crumb="Account"
       title="Profile"
-      split
-      notice={
-        favouriteError.value && (
-          <PageNotice tone="failed" words={favouriteError.value.words} />
-        )
-      }
       loading={user === null && profileError.value === null}
       error={profileError.value}
     >
@@ -285,14 +226,6 @@ export function Profile() {
             >
               <DetailsForm user={user} />
             </Section>
-            {favourite.value && favourite.value.agents.length > 0 && (
-              <Section
-                title="Agent"
-                text="The agent new chats and tasks start on."
-              >
-                <AgentForm answer={favourite.value} />
-              </Section>
-            )}
             <Section
               title="Password"
               text="Changing it signs out every other device."

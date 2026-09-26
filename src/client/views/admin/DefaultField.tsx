@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Whether the agent is the default: the one a new chat starts on for
-// anyone with no favourite. No on the default hands it back to the
+// anyone who has not picked one. No on the default hands it back to the
 // oldest agent, so the oldest, while it is the default, has no No.
 
 import type { Signal } from "@preact/signals";
@@ -44,7 +44,7 @@ export function DefaultField({
         }}
       />
       <span class="hint">
-        New chats start on it for anyone with no favourite.
+        New chats start on it until a user picks another agent.
       </span>
     </div>
   );

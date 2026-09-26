@@ -42,7 +42,6 @@ const bogdan: DirectoryUserResponse = {
     { id: "p2", kind: "team", name: "ops", createdAt: 0, memberCount: 3 },
     { id: "p3", kind: "team", name: "web", createdAt: 0, memberCount: 2 },
   ],
-  favourite: null,
 };
 
 // two days, the person busy on the second
@@ -195,17 +194,6 @@ describe("the user page's About", () => {
     expect(html).toContain(">Head of SRE.<");
     expect(html).toMatch(
       /class="people-foot">.*Local time<\/span>\d\d:\d\d · GMT\+[23]</,
-    );
-  });
-
-  test.serial("names the agent they picked as their favourite", () => {
-    person.value = bogdan;
-    expect(render(<User params={{ username: "bogdan" }} />)).not.toContain(
-      "Favourite agent",
-    );
-    person.value = { ...bogdan, favourite: "writer" };
-    expect(render(<User params={{ username: "bogdan" }} />)).toMatch(
-      /Favourite agent<\/span><a class="people-foot-link" href="\/agents\/writer">@writer<\/a>/,
     );
   });
 

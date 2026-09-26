@@ -26,7 +26,6 @@ import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { type FavouritePort, pickOf } from "./favourite.ts";
 import { parseAgentName } from "./parse.ts";
 import type { ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
@@ -98,7 +97,6 @@ export type DirectoryDeps = {
   providers: Pick<ProvidersPort, "byId">;
   skills: SkillsListPort;
   tools: ToolsPort;
-  users: FavouritePort;
   clock: Clock;
 };
 
@@ -149,7 +147,6 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const byId = new Map(versions.map((v) => [v.id, v]));
         const body: DirectoryAgentResponse = {
           agent: summary(agent),
-          favourite: pickOf(deps.users, ctx.principal!.userId) === agent.id,
           provider: deps.providers.byId(agent.providerId)?.name ?? "",
           skills: deps.skills
             .forAgent(agent.id)

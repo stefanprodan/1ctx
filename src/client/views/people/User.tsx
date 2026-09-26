@@ -20,7 +20,6 @@ import {
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { initials, longDate } from "../../lib/format.ts";
-import { agentHref } from "../../lib/hrefs.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { Page } from "../../ui/Page.tsx";
@@ -88,13 +87,10 @@ function UserActivity({
 function AboutTab({
   about,
   tz,
-  agent,
   now,
 }: {
   about: string;
   tz: string;
-  // their favourite agent's name, null when they follow the default
-  agent: string | null;
   now: number;
 }) {
   const time = localTime(tz, now);
@@ -105,17 +101,6 @@ function AboutTab({
       ) : (
         <RowsBlock>
           <p class="people-about">{about}</p>
-        </RowsBlock>
-      )}
-      {agent !== null && (
-        <RowsBlock>
-          <p class="people-foot">
-            <Icon name="star" size={14} />
-            <span class="people-foot-name">Favourite agent</span>
-            <a class="people-foot-link" href={agentHref(agent)}>
-              @{agent}
-            </a>
-          </p>
         </RowsBlock>
       )}
       {time !== "" && (
@@ -225,7 +210,6 @@ export function User({ params }: { params: Params }) {
                   <AboutTab
                     about={shown.user.about}
                     tz={shown.user.tz}
-                    agent={shown.favourite}
                     now={now}
                   />
                 )}

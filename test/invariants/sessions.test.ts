@@ -646,7 +646,7 @@ describe("GET /api/projects/:id/agents", () => {
     expect(visible.status).toBe(200);
     expect(await visible.json()).toEqual({
       agents: [expect.objectContaining({ id: chat.agentId, name: "coder" })],
-      favourite: chat.agentId,
+      startsOn: chat.agentId,
       capabilities: ["web", "visualize", "memory"],
       servers: {},
       skills: {},

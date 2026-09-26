@@ -34,7 +34,7 @@ import {
   switchable,
 } from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
-import { startingAgent } from "../data/project-agents.ts";
+import { rememberAgent, startingAgent } from "../data/project-agents.ts";
 import {
   askedOf,
   claimed,
@@ -170,7 +170,6 @@ export function Composer({
   const placed = files.projectId.value === filesProjectId;
   const held = staged.value.get(filesProjectId) ?? null;
   useEffect(() => files.reconcile(held), [files, held]);
-  const picked = useSignal<string | null>(null);
   const failure = useSignal<string | null>(null);
   // the menu's highlight, and whether Escape shut it for this draft
   const highlight = useSignal(0);
@@ -178,13 +177,9 @@ export function Composer({
   const input = useRef<HTMLTextAreaElement>(null);
   const list = agents ?? [];
   const fixed = agentId !== null;
-  // a pick not in the list, the agents of another project, falls back
-  // to the favourite
-  const agent = fixed
-    ? agentId
-    : list.some((a) => a.id === picked.value)
-      ? picked.value
-      : startingAgent(list);
+  // a new chat starts on the user's last pick, kept across composers
+  // and visits; one not in this project's list falls back to the default
+  const agent = fixed ? agentId : startingAgent(list);
 
   const grow = () => {
     const el = input.current;
@@ -439,13 +434,7 @@ export function Composer({
         <AgentPicker
           agents={agents}
           agentId={agent}
-          onPick={
-            fixed
-              ? undefined
-              : (id) => {
-                  picked.value = id;
-                }
-          }
+          onPick={fixed ? undefined : (id) => void rememberAgent(id)}
         />
         {context && (
           <span class="composer-ctx" title={context.title}>

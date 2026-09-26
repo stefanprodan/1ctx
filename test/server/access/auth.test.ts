@@ -44,7 +44,6 @@ function build(secureCookie: boolean) {
       visibleFor: () => [],
     },
     activity: { personDays: (_userId, starts) => starts.map(() => 0) },
-    agents: { nameOf: () => null },
   });
   return { db, user, users, access };
 }

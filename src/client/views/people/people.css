@@ -30,9 +30,6 @@
   .people-foot-name {
     color: var(--faint);
   }
-  .people-foot-link {
-    color: var(--fg);
-  }
 
   /* the Instructions tab's row: the prompt, folded at its first lines,
      Show all in its fade */
@@ -45,10 +42,5 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--fg);
-  }
-
-  /* the head's Favourite: the star fills for the user's own pick */
-  .people-fav-on {
-    fill: currentColor;
   }
 }

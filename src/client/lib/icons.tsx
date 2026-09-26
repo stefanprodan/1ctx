@@ -147,7 +147,6 @@ const PATHS = {
   more: "M4.5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM9 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM13.5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0z",
   // a bookmark: what the project's memory keeps
   memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
-  star: "M8 2l1.8 3.7 4.1.6-3 2.9.7 4.1L8 11.4l-3.6 1.9.7-4.1-3-2.9 4.1-.6z",
   // the database file: the admin's Storage page
   storage:
     "M3 4c0-1.1 2.2-2 5-2s5 .9 5 2-2.2 2-5 2-5-.9-5-2zM3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2",

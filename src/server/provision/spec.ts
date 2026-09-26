@@ -139,8 +139,8 @@ export type AgentSpec = {
   tools?: boolean;
   // the OpenRouter endpoint tag tried first, as the agents API takes it
   upstream?: string | null;
-  // only true: the agent a new chat starts on for anyone with no
-  // favourite; left out, the mark stays where it is
+  // only true: the agent a new chat starts on for anyone who has not
+  // picked one; left out, the mark stays where it is
   default?: true;
 };
 

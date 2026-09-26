@@ -17,7 +17,6 @@ import {
 } from "./auth.ts";
 import {
   type ActivityPort,
-  type AgentsPort as DirectoryAgentsPort,
   type ProjectsPort as DirectoryProjectsPort,
   type UsersPort as DirectoryUsersPort,
   directoryRoutes,
@@ -79,8 +78,6 @@ export type AccessDeps = {
   // a person's posts, chats and manual runs: a closure, since sessions
   // is built after access
   activity: ActivityPort;
-  // an agent's name: a closure, since agents is built after access
-  agents: DirectoryAgentsPort;
 };
 
 export type Access = Auth & {
@@ -131,7 +128,6 @@ export function accessArea(deps: AccessDeps): Access {
         users: deps.users,
         projects: deps.projects,
         activity: deps.activity,
-        agents: deps.agents,
         visits,
         clock: deps.clock,
       }),

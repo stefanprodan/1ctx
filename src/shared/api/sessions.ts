@@ -120,9 +120,9 @@ export type SwitchableCredential = { id: string; name: string };
 // name order
 export type ProjectAgentsResponse = {
   agents: AgentSummary[];
-  // the agent a new chat starts on for the caller: their favourite, else
-  // the default; null with no agents
-  favourite: string | null;
+  // the agent a new chat starts on for the caller: the one they last
+  // picked, else the default; null with no agents
+  startsOn: string | null;
   capabilities: string[];
   servers: Record<string, SwitchableServer[]>;
   skills: Record<string, SwitchableSkill[]>;
