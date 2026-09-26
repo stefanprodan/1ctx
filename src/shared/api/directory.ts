@@ -17,25 +17,32 @@ export type DirectoryUserResponse = {
   projects: ProjectSummary[];
 };
 
-// a skill the agent carries, with when its source was last fetched
-export type DirectorySkill = OfferedSkill & { fetchedAt: number };
+// a skill the agent carries, with when its source was last fetched and
+// how many files it holds, SKILL.md counted
+export type DirectorySkill = OfferedSkill & {
+  fetchedAt: number;
+  files: number;
+};
 
-// a built-in tool a send would offer, with the provider that answers
-// it when an admin picked one (websearch's exa, firecrawl or tavily)
-export type DirectoryTool = { name: string; provider: string | null };
+// a built-in tool a send would offer: its description as the model
+// reads it, and the provider that answers it when an admin picked one
+// (websearch's exa, firecrawl or tavily)
+export type DirectoryTool = {
+  name: string;
+  description: string;
+  provider: string | null;
+};
 
 // token counts in OpenAI's o200k_base encoding, an estimate for any
 // other vendor: the system prompt, the skill bodies together (what
 // loading every skill costs) and the tool schemas every request carries
 export type DirectoryTokens = { prompt: number; skills: number; tools: number };
 
-// an MCP server a send would offer the agent now: the sides the agent
-// may use, how many of its tools reach the model, when its list was
-// last discovered and when a refresh last failed since, if one did
+// an MCP server a send would offer the agent now: how many of its tools
+// reach the model, when its list was last discovered and when a refresh
+// last failed since, if one did
 export type DirectoryMcpServer = {
   name: string;
-  read: boolean;
-  write: boolean;
   tools: number;
   checkedAt: number;
   refreshFailedAt: number | null;

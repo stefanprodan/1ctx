@@ -193,7 +193,7 @@ describe("the user page's About", () => {
     const html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain(">Head of SRE.<");
     expect(html).toMatch(
-      /class="people-foot">.*Local time \d\d:\d\d · GMT\+[23]</,
+      /class="people-foot">.*Local time<\/span>\d\d:\d\d · GMT\+[23]</,
     );
   });
 

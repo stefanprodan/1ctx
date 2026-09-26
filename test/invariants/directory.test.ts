@@ -185,6 +185,12 @@ describe("the directory", () => {
     const offered = chat.app.runner.registry.get(started.sessionId)!.policy
       .offered.tools;
     expect(body.tokens.tools).toBe(wireTokens(offered));
+    // each with the description the model reads
+    for (const tool of body.tools) {
+      expect(tool.description).toBe(
+        offered.find((t) => t.name === tool.name)!.description,
+      );
+    }
     const catalogResponse = await chat.admin.call("GET", "/api/tools");
     expect(catalogResponse.status).toBe(200);
     const catalog: ToolsResponse = await catalogResponse.json();
@@ -253,7 +259,7 @@ describe("the directory", () => {
     ).toBe(404);
   });
 
-  test("an agent's skills carry their descriptions and fetch times, and every schema counts", async () => {
+  test("an agent's skills carry their descriptions, fetch times and files, and every schema counts", async () => {
     const chat = await chatApp();
     const bare: DirectoryAgentResponse = await (
       await chat.member.call("GET", "/api/directory/agents/coder")
@@ -281,6 +287,8 @@ describe("the directory", () => {
         description: "Use filed.",
         hasFiles: true,
         fetchedAt: now + 60_000,
+        // SKILL.md and the runbook
+        files: 2,
       },
       {
         id: plain.id,
@@ -288,6 +296,7 @@ describe("the directory", () => {
         description: "Use plain.",
         hasFiles: false,
         fetchedAt: now,
+        files: 1,
       },
     ]);
     // the skill tools are left out of the list, never out of the count

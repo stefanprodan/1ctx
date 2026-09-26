@@ -46,7 +46,7 @@ export type Skills = {
   switchable(): Record<string, SwitchableSkill[]>;
   versions(
     agentId: string,
-  ): { id: string; digest: string; fetchedAt: number }[];
+  ): { id: string; digest: string; fetchedAt: number; files: number }[];
   bodyText(id: string): string | null;
   body(id: string, name: string): SkillBody | null;
   file(id: string, name: string, path: string): string | null;

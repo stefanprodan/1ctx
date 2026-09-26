@@ -11,8 +11,10 @@ import type {
 } from "../../../shared/api/directory.ts";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Role } from "../../../shared/words.ts";
-import { ago } from "../../lib/format.ts";
+import { priceLine, windowLine } from "../../agents/meta.ts";
+import { ago, tokensText } from "../../lib/format.ts";
 import { agentHref, userHref } from "../../lib/hrefs.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 import { offsetOf } from "../../ui/Zone.model.ts";
@@ -64,20 +66,37 @@ export function serverLine(
   return { text: `refreshed ${ago(server.checkedAt, now)}`, bad: false };
 }
 
-// the tools that reach the model and the sides the agent may use
-export function serverMeta(server: {
-  read: boolean;
-  write: boolean;
-  tools: number;
-}): string {
+// what a server gives the model: its tools that reach it
+export function serverMeta(server: { tools: number }): string {
   const n = server.tools;
-  const sides =
-    server.read && server.write
-      ? "read and write"
-      : server.read
-        ? "read"
-        : "write";
-  return `${n} tool${n === 1 ? "" : "s"} · ${sides} access`;
+  return `${n} tool${n === 1 ? "" : "s"}`;
+}
+
+// what a skill holds, SKILL.md counted
+export function filesText(n: number): string {
+  return `${n} file${n === 1 ? "" : "s"}`;
+}
+
+// under the model's name: the provider, the context and the price when
+// the catalog knows them
+export function agentLine(provider: string, model: CatalogMatch): string {
+  return [
+    provider,
+    windowLine(model.contextLength),
+    priceLine(model.promptPrice, model.completionPrice),
+  ]
+    .filter((s) => s !== "")
+    .join(" · ");
+}
+
+// what the model can do besides text, or that it does text alone
+export function capabilities(
+  model: Pick<CatalogMatch, "tools" | "reasoning">,
+): string {
+  const can = [model.tools ? "tools" : "", model.reasoning ? "reasoning" : ""]
+    .filter((s) => s !== "")
+    .join(" · ");
+  return can === "" ? "text only" : can;
 }
 
 // the agent's one series as the heatmap's answer, keyed by the agent,
@@ -158,4 +177,30 @@ export function userTabs(
       count: shown.projects.length,
     },
   ];
+}
+
+// the head's hint for the tab on screen: what the model reads of it in
+// tokens, nothing when the tab is empty
+export function agentHint(
+  shown: DirectoryAgentResponse,
+  tab: number,
+): string | undefined {
+  if (tab === 0) {
+    return shown.agent.prompt === ""
+      ? undefined
+      : tokensText(shown.tokens.prompt);
+  }
+  if (tab === 1) {
+    return shown.tools.length === 0
+      ? undefined
+      : tokensText(shown.tokens.tools);
+  }
+  if (tab === 2) {
+    return shown.skills.length === 0
+      ? undefined
+      : tokensText(shown.tokens.skills);
+  }
+  return shown.mcp.servers.length === 0
+    ? undefined
+    : tokensText(shown.mcp.tokens);
 }

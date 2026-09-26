@@ -1,5 +1,5 @@
-/* A user's page and an agent's page: the head, the heatmap, then
-   tabs over the card of the tab on screen. */
+/* A user's page and an agent's page: the head, the heatmap, then one
+   card whose head is the tabs. */
 
 @layer tokens, base, owners;
 
@@ -10,14 +10,6 @@
     gap: var(--space-5);
   }
 
-  /* the tabs over the card of the tab on screen, spaced as a
-     project's tabs are over theirs */
-  .people-tabs {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
   .people-about {
     margin: 0;
     white-space: pre-wrap;
@@ -26,7 +18,7 @@
   }
 
   /* a card's foot: the time where a user is, what an agent's model
-     offers */
+     can do; its name quieter than its words, as the aside names a line */
   .people-foot {
     display: flex;
     align-items: center;
@@ -35,8 +27,11 @@
     font-size: var(--text-small);
     color: var(--dim);
   }
+  .people-foot-name {
+    color: var(--faint);
+  }
 
-  /* the prompt card's one row: the text, folded at its first lines,
+  /* the Instructions tab's row: the prompt, folded at its first lines,
      Show all in its fade */
   .people-prompt {
     --clamp: 12;

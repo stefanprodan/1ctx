@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A user's page, open to every signed-in user: who they are, their
-// actions per day in every project, then tabs at their own addresses:
-// what they say about themselves, and the team projects the viewer
-// shares with them. The aside is how to reach them and when it is for
+// actions per day in every project, then one card whose head is tabs
+// at their own addresses: what they say about themselves, and the team
+// projects the viewer shares with them. The aside is how to reach them and when it is for
 // them; where it is hidden, the head carries the email and the local
 // time.
 
@@ -95,25 +95,24 @@ function AboutTab({
 }) {
   const time = localTime(tz, now);
   return (
-    <Rows>
-      <RowsCard label="About">
-        {about === "" ? (
-          <RowsNote>Nothing written yet.</RowsNote>
-        ) : (
-          <RowsBlock>
-            <p class="people-about">{about}</p>
-          </RowsBlock>
-        )}
-        {time !== "" && (
-          <RowsBlock>
-            <p class="people-foot">
-              <Icon name="clock" size={14} />
-              Local time {time}
-            </p>
-          </RowsBlock>
-        )}
-      </RowsCard>
-    </Rows>
+    <>
+      {about === "" ? (
+        <RowsNote>Nothing written yet.</RowsNote>
+      ) : (
+        <RowsBlock>
+          <p class="people-about">{about}</p>
+        </RowsBlock>
+      )}
+      {time !== "" && (
+        <RowsBlock>
+          <p class="people-foot">
+            <Icon name="clock" size={14} />
+            <span class="people-foot-name">Local time</span>
+            {time}
+          </p>
+        </RowsBlock>
+      )}
+    </>
   );
 }
 
@@ -124,24 +123,24 @@ function ProjectsTab({
   shown: DirectoryUserResponse;
   self: boolean;
 }) {
+  if (shown.projects.length === 0) {
+    return (
+      <RowsNote>
+        {self ? "No team projects yet." : "No team projects in common."}
+      </RowsNote>
+    );
+  }
   return (
-    <Rows>
-      <RowsCard label={self ? "Your team projects" : "Projects in common"}>
-        {shown.projects.length === 0 && (
-          <RowsNote>
-            {self ? "No team projects yet." : "No team projects in common."}
-          </RowsNote>
-        )}
-        {shown.projects.map((p) => (
-          <RowsGo key={p.id} href={`/projects/${p.id}`}>
-            <RowsAvatar>
-              <Icon name={projectIcon(p.kind)} size={14} />
-            </RowsAvatar>
-            <RowsTitle name={p.name} sub={peopleLine(p)} mono />
-          </RowsGo>
-        ))}
-      </RowsCard>
-    </Rows>
+    <>
+      {shown.projects.map((p) => (
+        <RowsGo key={p.id} href={`/projects/${p.id}`}>
+          <RowsAvatar>
+            <Icon name={projectIcon(p.kind)} size={14} />
+          </RowsAvatar>
+          <RowsTitle name={p.name} sub={peopleLine(p)} mono />
+        </RowsGo>
+      ))}
+    </>
   );
 }
 
@@ -196,17 +195,27 @@ export function User({ params }: { params: Params }) {
               </WhoLine>
             </Who>
             <UserActivity username={username} userId={shown.user.id} />
-            <div class="people-tabs">
-              <Tabs tabs={tabs} active={tabs[tab].href} />
-              {tab === 0 && (
-                <AboutTab
-                  about={shown.user.about}
-                  tz={shown.user.tz}
-                  now={now}
-                />
-              )}
-              {tab === 1 && <ProjectsTab shown={shown} self={self} />}
-            </div>
+            <Rows>
+              <RowsCard
+                label={
+                  tab === 0
+                    ? "About"
+                    : self
+                      ? "Your team projects"
+                      : "Projects in common"
+                }
+                tabs={<Tabs tabs={tabs} active={tabs[tab].href} head />}
+              >
+                {tab === 0 && (
+                  <AboutTab
+                    about={shown.user.about}
+                    tz={shown.user.tz}
+                    now={now}
+                  />
+                )}
+                {tab === 1 && <ProjectsTab shown={shown} self={self} />}
+              </RowsCard>
+            </Rows>
           </div>
         </Split>
       )}

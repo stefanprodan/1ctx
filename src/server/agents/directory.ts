@@ -4,8 +4,9 @@
 // An agent's page, for every signed-in user: how it is configured. The
 // composer's route already sends the whole row, so the page adds only
 // what a user cannot see elsewhere: the provider's name, the skills
-// with their descriptions and when they were fetched, the built-in tools
-// a send would offer it now with websearch's provider, and token counts.
+// with when they were fetched and how many files they hold, the
+// built-in tools a send would offer it now with their descriptions and
+// websearch's provider, and token counts.
 // The tools are the tools area's answer at this moment, none when the
 // model does not accept tools. The list is built-ins alone, memory_edit
 // as a chat is offered it; skill and MCP schemas still count because the
@@ -59,7 +60,7 @@ export type SkillsListPort = {
   forAgent(agentId: string): OfferedSkill[];
   versions(
     agentId: string,
-  ): { id: string; digest: string; fetchedAt: number }[];
+  ): { id: string; digest: string; fetchedAt: number; files: number }[];
   bodyText(id: string): string | null;
 };
 
@@ -143,7 +144,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };
         const versions = deps.skills.versions(agent.id);
-        const fetched = new Map(versions.map((v) => [v.id, v.fetchedAt]));
+        const byId = new Map(versions.map((v) => [v.id, v]));
         const body: DirectoryAgentResponse = {
           agent: summary(agent),
           provider: deps.providers.byId(agent.providerId)?.name ?? "",
@@ -151,31 +152,27 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             .forAgent(agent.id)
             .map((skill) => ({
               ...skill,
-              fetchedAt: fetched.get(skill.id) ?? 0,
+              fetchedAt: byId.get(skill.id)?.fetchedAt ?? 0,
+              // SKILL.md is a file too
+              files: (byId.get(skill.id)?.files ?? 0) + 1,
             }))
             .sort(byName),
           tools: offered.tools
             .filter((tool) => LISTED.has(tool.name))
             .map((tool) => ({
               name: tool.name,
+              description: tool.description,
               provider: tool.name === "websearch" ? offered.search : null,
             }))
             .sort(byName),
           mcp: {
             servers: offered.mcp
-              .map((server) => {
-                const link = agent.servers.find(
-                  (s) => s.serverId === server.id,
-                );
-                return {
-                  name: server.name,
-                  read: link?.read ?? false,
-                  write: link?.write ?? false,
-                  tools: server.tools.length,
-                  checkedAt: server.checkedAt,
-                  refreshFailedAt: server.refreshFailedAt,
-                };
-              })
+              .map((server) => ({
+                name: server.name,
+                tools: server.tools.length,
+                checkedAt: server.checkedAt,
+                refreshFailedAt: server.refreshFailedAt,
+              }))
               .sort(byName),
             tokens: schemaTokens(offered.mcp),
           },

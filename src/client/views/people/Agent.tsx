@@ -2,21 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An agent's page, open to every signed-in user: how it is configured
-// and how much it works. The head is the model it runs on and its
-// provider, then its turns per day in every project, then tabs at their
-// own addresses: its instructions as written, with what the model
-// offers at their foot, the built-in tools a send offers it now, its
-// skills with what each is for, and its MCP servers. The aside is the
-// model's facts and the agent's settings, with Manage for an admin.
+// and how much it works. The head is the model it runs on, its provider,
+// context and price, then its turns per day in every project, then one
+// card whose head is tabs at their own addresses: its instructions as
+// written with what the model can do at their foot, the built-in tools
+// a send offers it now, its skills and its MCP servers, each row a name,
+// one line under it and one fact at its end. The aside is the model's
+// facts and the agent's settings, with Manage for an admin.
 
 import { useMemo } from "preact/hooks";
 import type { DirectoryAgentResponse } from "../../../shared/api/directory.ts";
-import {
-  modelMeta,
-  priceLine,
-  shortModel,
-  windowLine,
-} from "../../agents/meta.ts";
+import { priceLine, shortModel, windowLine } from "../../agents/meta.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import {
@@ -27,7 +23,7 @@ import {
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
-import { ago, longDate, tokensText } from "../../lib/format.ts";
+import { ago, firstSentence, longDate } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
@@ -51,62 +47,18 @@ import { activityModel } from "../projects/Activity.model.ts";
 import { Activity, ActivityGhost } from "../projects/Activity.tsx";
 import {
   agentAnswer,
+  agentHint,
+  agentLine,
   agentTab,
   agentTabs,
+  capabilities,
   effortText,
+  filesText,
   serverLine,
   serverMeta,
   thinkingText,
 } from "./People.model.ts";
 import "./people.css";
-
-// what the model offers, at the foot of the instructions it follows:
-// its context, price, tools and reasoning
-function ModelFoot({ meta }: { meta: string }) {
-  if (meta === "") return null;
-  return (
-    <RowsBlock>
-      <p class="people-foot">
-        <Icon name="providers" size={14} />
-        {meta}
-      </p>
-    </RowsBlock>
-  );
-}
-
-// a prompt may run to 16,000 characters: cut to its first lines, Show
-// all in its fade only when the cut hides something
-function Prompt({
-  text,
-  tokens,
-  meta,
-}: {
-  text: string;
-  tokens: number;
-  meta: string;
-}) {
-  const { el, open, long } = useCut<HTMLPreElement>([text]);
-  return (
-    <RowsCard label="Instructions" hint={tokensText(tokens)}>
-      {/* the row holds the padding, so the cut ends on a whole line */}
-      <RowsBlock>
-        <Fold
-          cut={long.value && !open.value}
-          onOpen={() => {
-            open.value = true;
-          }}
-          label="Show all"
-          ground="card"
-        >
-          <pre ref={el} class={`people-prompt${open.value ? "" : " clamp"}`}>
-            {text}
-          </pre>
-        </Fold>
-      </RowsBlock>
-      <ModelFoot meta={meta} />
-    </RowsCard>
-  );
-}
 
 // the agent's turns per day, the Projects page's card over one series;
 // its ghost while they load, nothing when their first load failed
@@ -136,53 +88,83 @@ function AgentActivity({ name, agentId }: { name: string; agentId: string }) {
   );
 }
 
-function PromptTab({ shown }: { shown: DirectoryAgentResponse }) {
-  const meta = modelMeta(shown.agent.model);
-  if (shown.agent.prompt === "") {
-    return (
-      <RowsCard label="Instructions">
+// what the model can do, at the foot of the instructions it follows
+function ModelFoot({ can }: { can: string }) {
+  return (
+    <RowsBlock>
+      <p class="people-foot">
+        <Icon name="providers" size={14} />
+        <span class="people-foot-name">Capabilities</span>
+        {can}
+      </p>
+    </RowsBlock>
+  );
+}
+
+// a prompt may run to 16,000 characters: cut to its first lines, Show
+// all in its fade only when the cut hides something
+function Prompt({ text }: { text: string }) {
+  const { el, open, long } = useCut<HTMLPreElement>([text]);
+  return (
+    // the row holds the padding, so the cut ends on a whole line
+    <RowsBlock>
+      <Fold
+        cut={long.value && !open.value}
+        onOpen={() => {
+          open.value = true;
+        }}
+        label="Show all"
+        ground="card"
+      >
+        <pre ref={el} class={`people-prompt${open.value ? "" : " clamp"}`}>
+          {text}
+        </pre>
+      </Fold>
+    </RowsBlock>
+  );
+}
+
+function InstructionsTab({ shown }: { shown: DirectoryAgentResponse }) {
+  return (
+    <>
+      {shown.agent.prompt === "" ? (
         <RowsNote>
           No instructions. The model runs on its own defaults.
         </RowsNote>
-        <ModelFoot meta={meta} />
-      </RowsCard>
-    );
-  }
-  return (
-    <Prompt
-      key={shown.agent.id}
-      text={shown.agent.prompt}
-      tokens={shown.tokens.prompt}
-      meta={meta}
-    />
+      ) : (
+        <Prompt key={shown.agent.id} text={shown.agent.prompt} />
+      )}
+      <ModelFoot can={capabilities(shown.agent.model)} />
+    </>
   );
 }
 
 function ToolsTab({ shown }: { shown: DirectoryAgentResponse }) {
+  if (shown.tools.length === 0) {
+    return (
+      <RowsNote>
+        {shown.agent.model.tools
+          ? "No tools are switched on."
+          : "The model does not take tools."}
+      </RowsNote>
+    );
+  }
   return (
-    <RowsCard
-      label="Tools"
-      hint={
-        shown.tools.length === 0 ? undefined : tokensText(shown.tokens.tools)
-      }
-    >
-      {shown.tools.length === 0 && (
-        <RowsNote>
-          {shown.agent.model.tools
-            ? "No tools are switched on."
-            : "The model does not take tools."}
-        </RowsNote>
-      )}
+    <>
       {shown.tools.map((tool) => (
         <RowsLine key={tool.name} flush>
           <RowsAvatar>
             <Icon name="tools" size={14} />
           </RowsAvatar>
-          <RowsTitle name={tool.name} mono />
+          <RowsTitle
+            name={tool.name}
+            sub={firstSentence(tool.description)}
+            mono
+          />
           {tool.provider !== null && <RowsMeta>{tool.provider}</RowsMeta>}
         </RowsLine>
       ))}
-    </RowsCard>
+    </>
   );
 }
 
@@ -193,24 +175,23 @@ function SkillsTab({
   shown: DirectoryAgentResponse;
   now: number;
 }) {
+  if (shown.skills.length === 0) return <RowsNote>No skills.</RowsNote>;
   return (
-    <RowsCard
-      label="Skills"
-      hint={
-        shown.skills.length === 0 ? undefined : tokensText(shown.tokens.skills)
-      }
-    >
-      {shown.skills.length === 0 && <RowsNote>No skills.</RowsNote>}
+    <>
       {shown.skills.map((s) => (
         <RowsLine key={s.id} flush>
           <RowsAvatar>
             <Icon name="skill" size={14} />
           </RowsAvatar>
-          <RowsTitle name={s.name} sub={s.description} mono />
-          <RowsMeta>fetched {ago(s.fetchedAt, now)}</RowsMeta>
+          <RowsTitle
+            name={s.name}
+            sub={`fetched ${ago(s.fetchedAt, now)}`}
+            mono
+          />
+          <RowsMeta>{filesText(s.files)}</RowsMeta>
         </RowsLine>
       ))}
-    </RowsCard>
+    </>
   );
 }
 
@@ -221,22 +202,17 @@ function McpTab({
   shown: DirectoryAgentResponse;
   now: number;
 }) {
+  if (shown.mcp.servers.length === 0) {
+    return (
+      <RowsNote>
+        {shown.agent.model.tools
+          ? "No MCP servers."
+          : "The model does not take tools."}
+      </RowsNote>
+    );
+  }
   return (
-    <RowsCard
-      label="MCP"
-      hint={
-        shown.mcp.servers.length === 0
-          ? undefined
-          : tokensText(shown.mcp.tokens)
-      }
-    >
-      {shown.mcp.servers.length === 0 && (
-        <RowsNote>
-          {shown.agent.model.tools
-            ? "No MCP servers."
-            : "The model does not take tools."}
-        </RowsNote>
-      )}
+    <>
       {shown.mcp.servers.map((server) => {
         const line = serverLine(server, now);
         return (
@@ -249,7 +225,7 @@ function McpTab({
           </RowsLine>
         );
       })}
-    </RowsCard>
+    </>
   );
 }
 
@@ -332,18 +308,21 @@ export function Agent({ params }: { params: Params }) {
               name={shown.agent.model.id}
               mono
             >
-              <WhoLine>{shown.provider}</WhoLine>
+              <WhoLine>{agentLine(shown.provider, shown.agent.model)}</WhoLine>
             </Who>
             <AgentActivity name={name} agentId={shown.agent.id} />
-            <div class="people-tabs">
-              <Tabs tabs={tabs} active={tabs[tab].href} />
-              <Rows>
-                {tab === 0 && <PromptTab shown={shown} />}
+            <Rows>
+              <RowsCard
+                label={tabs[tab].label}
+                tabs={<Tabs tabs={tabs} active={tabs[tab].href} head />}
+                hint={agentHint(shown, tab)}
+              >
+                {tab === 0 && <InstructionsTab shown={shown} />}
                 {tab === 1 && <ToolsTab shown={shown} />}
                 {tab === 2 && <SkillsTab shown={shown} now={now} />}
                 {tab === 3 && <McpTab shown={shown} now={now} />}
-              </Rows>
-            </div>
+              </RowsCard>
+            </Rows>
           </div>
         </Split>
       )}

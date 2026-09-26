@@ -35,6 +35,7 @@ export function Rows({ children }: { children: ComponentChildren }) {
 export function RowsCard({
   label,
   search,
+  tabs,
   action,
   hint,
   live,
@@ -45,6 +46,8 @@ export function RowsCard({
   // a search box in place of the label, for a list long enough to need
   // one; the label still names the card to a screen reader
   search?: ComponentChildren;
+  // tabs in place of the label, which still names the card aloud
+  tabs?: ComponentChildren;
   action?: ComponentChildren;
   hint?: string;
   // the hint follows a selection in the card, so a screen reader hears
@@ -55,14 +58,19 @@ export function RowsCard({
   children?: ComponentChildren;
 }) {
   const id = useId();
+  const slot = search ?? tabs;
   return (
     <section
       class={`card rows-card${extra ? ` ${extra}` : ""}`}
-      aria-label={search ? label : undefined}
-      aria-labelledby={search ? undefined : id}
+      aria-label={slot ? label : undefined}
+      aria-labelledby={slot ? undefined : id}
     >
-      <div class={`rows-head${search ? " rows-head-search" : ""}`}>
-        {search ?? (
+      <div
+        class={`rows-head${search ? " rows-head-search" : ""}${
+          tabs ? " rows-head-tabs" : ""
+        }`}
+      >
+        {slot ?? (
           <span class="label" id={id}>
             {label}
           </span>
