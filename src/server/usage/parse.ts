@@ -5,8 +5,8 @@
 // days route may also take how many weeks, up to the year. Anything
 // else is a 400, as every parser answers the unexpected.
 
+import { MAX_WEEKS } from "../../shared/api/usage.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { MAX_WEEKS } from "./window.ts";
 
 function only(url: URL, allowed: string[]): void {
   for (const name of url.searchParams.keys()) {

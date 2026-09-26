@@ -6,11 +6,20 @@
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { recentDays } from "../../../src/client/data/usage.ts";
+import {
+  recentDays,
+  recentDaysFailed,
+} from "../../../src/client/data/usage.ts";
 import { activityModel } from "../../../src/client/views/projects/Activity.model.ts";
-import { Activity } from "../../../src/client/views/projects/Activity.tsx";
+import {
+  Activity,
+  ActivityGhost,
+} from "../../../src/client/views/projects/Activity.tsx";
 import { ActivityAside } from "../../../src/client/views/projects/ActivityAside.tsx";
-import { Strip } from "../../../src/client/views/projects/Strip.tsx";
+import {
+  Strip,
+  StripGhost,
+} from "../../../src/client/views/projects/Strip.tsx";
 import type { DaysUsageResponse } from "../../../src/shared/api/usage.ts";
 
 // a year's answer: 53 weeks from Monday 8 September 2025 to Tuesday
@@ -60,6 +69,19 @@ describe("the Activity card", () => {
     }
   });
 
+  test("its ghost draws the same half year of cells with no day", () => {
+    const html = render(<ActivityGhost />);
+    expect(html).toContain(">Activity<");
+    expect(html).toContain('aria-label="Loading activity"');
+    expect(html.match(/activity-ghost/g)).toHaveLength(26 * 7);
+    expect(html).not.toContain("data-index");
+    expect(html).not.toContain('role="slider"');
+    // the labels the loaded card draws, so it lands where the ghost was
+    expect(html).toContain(">Mon<");
+    expect(html).toContain("activity-month");
+    expect(html).toContain("activity-legend");
+  });
+
   test("a strip draws the last 14 days", () => {
     const body = answer();
     const html = render(
@@ -72,6 +94,13 @@ describe("the Activity card", () => {
     expect(html.match(/activity-cell/g)).toHaveLength(14);
     expect(html).toContain('aria-label="');
     expect(html).toContain("in 14 days");
+  });
+
+  test("a strip's ghost is 14 squares with no levels", () => {
+    const html = render(<StripGhost />);
+    expect(html.match(/activity-ghost/g)).toHaveLength(14);
+    expect(html).not.toContain("activity-level");
+    expect(html).toContain('aria-hidden="true"');
   });
 
   test.serial("a project's aside draws its own recent weeks, no labels", () => {
@@ -116,6 +145,13 @@ describe("the Activity card", () => {
       'data-index="0" class="activity-cell activity-level-4"',
     );
     recentDays.value = null;
-    expect(render(<ActivityAside projectId="p1" />)).toContain("Loading");
+    const ghost = render(<ActivityAside projectId="p1" />);
+    expect(ghost).toContain('aria-label="Loading activity"');
+    expect(ghost).toContain('class="activity-grid activity-grid-compact"');
+    expect(ghost.match(/activity-ghost/g)).toHaveLength(16 * 7);
+    expect(ghost).not.toContain("activity-weekday");
+    recentDaysFailed.value = true;
+    expect(render(<ActivityAside projectId="p1" />)).toBe("");
+    recentDaysFailed.value = false;
   });
 });

@@ -14,7 +14,7 @@ const MIN_WEEKS = 13;
 const MIN_CELL = 14;
 const CELL_GAP = 3;
 // two weeks: a row has room for a few spaced squares, not a month of bars
-const STRIP_DAYS = 14;
+export const STRIP_DAYS = 14;
 
 export type ActivityLevel = 0 | 1 | 2 | 3 | 4;
 

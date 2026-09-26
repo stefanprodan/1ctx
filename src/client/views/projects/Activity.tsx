@@ -9,7 +9,11 @@
 
 import { type Signal, useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
-import type { DaysUsageResponse, DayUsage } from "../../../shared/api/usage.ts";
+import {
+  type DaysUsageResponse,
+  type DayUsage,
+  MAX_WEEKS,
+} from "../../../shared/api/usage.ts";
 import { onResize } from "../../lib/resize.ts";
 import { RowsCard } from "../../ui/Rows.tsx";
 import {
@@ -239,6 +243,38 @@ export function useDaySelection(
 // the width the weekday labels' column and its gap take from the weeks
 const LABELS = 36;
 
+// How many of the available weeks fit the card's width, measured
+// before the first paint and again on a resize. Before the browser
+// measures, as on the server and in a test, half a year.
+function useFitWeeks(available: number) {
+  const weeks = useSignal(Math.min(26, available));
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const measure = () => {
+      // the grid, not the card: the card's padding is not the weeks'
+      const grid = el.firstElementChild ?? el;
+      weeks.value = fitWeeks(grid.clientWidth - LABELS, available);
+    };
+    measure();
+    return onResize(el, measure);
+  }, [available, weeks]);
+  return { weeks: weeks.value, body };
+}
+
+function Legend() {
+  return (
+    <div class="activity-legend" aria-hidden="true">
+      Less
+      {[0, 1, 2, 3, 4].map((level) => (
+        <span key={level} class={`activity-cell activity-level-${level}`} />
+      ))}
+      More
+    </div>
+  );
+}
+
 export function Activity({
   answer,
   model,
@@ -246,24 +282,8 @@ export function Activity({
   answer: DaysUsageResponse;
   model: ActivityModel;
 }) {
-  // before the browser measures, as on the server and in a test, half a
-  // year; the layout effect settles it before the first paint
-  const weeks = useSignal(Math.min(26, model.columns.length));
-  const body = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const el = body.current;
-    if (!el) return;
-    const measure = () => {
-      // the grid, not the card: the card's padding is not the weeks'
-      const grid = el.firstElementChild ?? el;
-      weeks.value = fitWeeks(grid.clientWidth - LABELS, model.columns.length);
-    };
-    measure();
-    return onResize(el, measure);
-  }, [model, weeks]);
-
-  const shown = lastWeekColumns(model.columns, weeks.value);
+  const { weeks, body } = useFitWeeks(model.columns.length);
+  const shown = lastWeekColumns(model.columns, weeks);
   const offset = (model.columns.length - shown.length) * 7;
   const { selection, hint, total } = useDaySelection(answer, model, shown);
 
@@ -278,13 +298,75 @@ export function Activity({
           valueText={hint}
           selection={selection}
         />
-        <div class="activity-legend" aria-hidden="true">
-          Less
-          {[0, 1, 2, 3, 4].map((level) => (
-            <span key={level} class={`activity-cell activity-level-${level}`} />
-          ))}
-          More
-        </div>
+        <Legend />
+      </div>
+    </RowsCard>
+  );
+}
+
+// The cells while an answer loads, pulsing week after week, with the
+// labels the loaded grid draws, so the answer lands where the ghost was.
+export function GhostGrid({
+  weeks,
+  labels = true,
+}: {
+  weeks: number;
+  labels?: boolean;
+}) {
+  const lead = labels ? 1 : 0;
+  return (
+    <div
+      class={`activity-grid${labels ? "" : " activity-grid-compact"}`}
+      aria-hidden="true"
+    >
+      {labels && (
+        <span class="activity-month" style={{ gridColumn: 2, gridRow: 1 }}>
+          {"\u00a0"}
+        </span>
+      )}
+      {labels &&
+        WEEKDAYS.map((name, row) =>
+          name === "" ? null : (
+            <span
+              key={name}
+              class="activity-weekday"
+              style={{ gridColumn: 1, gridRow: row + 2 }}
+            >
+              {name}
+            </span>
+          ),
+        )}
+      {Array.from({ length: weeks }, (_, c) =>
+        WEEKDAYS.map((_, row) => (
+          <span
+            key={`${c}-${row}`}
+            class="activity-cell activity-ghost"
+            style={{
+              gridColumn: c + 1 + lead,
+              gridRow: row + 1 + lead,
+              "--ghost": c,
+            }}
+          />
+        )),
+      )}
+    </div>
+  );
+}
+
+// The card while the year loads, measured as the loaded card is, so the
+// rows under it stay put.
+export function ActivityGhost() {
+  const { weeks, body } = useFitWeeks(MAX_WEEKS);
+  return (
+    <RowsCard label="Activity">
+      <div
+        class="activity-body"
+        ref={body}
+        role="status"
+        aria-label="Loading activity"
+      >
+        <GhostGrid weeks={weeks} />
+        <Legend />
       </div>
     </RowsCard>
   );

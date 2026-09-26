@@ -19,6 +19,9 @@ export type WeekUsageResponse = {
 // their prompt plus completion tokens
 export type DayUsage = { sends: number; tokens: number };
 
+// a year of columns, so the widest card fills with small cells
+export const MAX_WEEKS = 53;
+
 // GET /api/usage/days?tz=&weeks=: the caller's visible projects over
 // the last weeks ISO weeks (1 to 53, the year when left out) in the
 // caller's zone, Monday first, today last. since and

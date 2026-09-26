@@ -184,16 +184,20 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **The Projects page.** The
   Projects page is the same rows: the Activity card (turns per day
   over up to 53 ISO weeks, as many as fit the width, from
-  `GET /api/usage/days`, levels and columns in `Activity.model.ts`),
+  `GET /api/usage/days`, levels and columns in `Activity.model.ts`;
+  `ActivityGhost` holds its place at the same size while the year
+  loads, pulsing cells, and a failed first load leaves the card out),
   then one Projects card, personal first, each row with its 14-day
-  strip, headed by `ui/Search.tsx` (the stream's box too) narrowing the
-  rows by name in place.
+  strip (`StripGhost` while the year loads), headed by
+  `ui/Search.tsx` (the stream's box too) narrowing the rows by name
+  in place.
 - **A project's tabs.** A project's tabs are Feed, Automations, Memory,
   Knowledge, then Members for a team or Settings for a personal one.
   A team project's Members tab is the
   same rows, linking an admin to
   `/admin/projects?open=<id>` and `/admin/agents`.
-  The aside under every tab (`Frame.tsx`) is About, the Activity weeks, then Latest
+  The aside under every tab (`Frame.tsx`) is About, the Activity weeks
+  (`GhostGrid` without labels while they load), then Latest
   knowledge (the three knowledge files changed last, from the held
   list once the Knowledge tab loaded it, else the project row's
   `latestFiles`, left out while the base is empty).
