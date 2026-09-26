@@ -13,6 +13,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -136,12 +137,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       if (!model) {
         throw new BadRequest(`${provider.name} does not list ${body.model}`);
       }
+      const resolved = stated(model, body.stated);
       return {
         name: body.name,
         avatar: body.avatar,
         providerId: provider.id,
-        model: stated(model, body.stated),
-        thinking: body.thinking,
+        model: resolved,
+        // the catalog decides for a model that always or never thinks: a
+        // word saved before it said so, or sent by provisioning, is dropped
+        thinking: fixedThinking(resolved) === null ? body.thinking : null,
         effort,
         prompt: body.prompt,
         skills: body.skills,

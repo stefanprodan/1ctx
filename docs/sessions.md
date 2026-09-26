@@ -119,5 +119,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through
   `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
-  send limits. History starts from the last done summary. Compact on
-  demand is a send of kind `compact` under the same runner lock.
+  send limits. The summary round sends no tools and thinking off, or
+  the wire's least effort (`EFFORTS[wire][0]`) for a model whose
+  catalog says it always thinks (`thinkingRequired`), since a provider
+  refuses Off there. History starts from the last done summary. Compact
+  on demand is a send of kind `compact` under the same runner lock.

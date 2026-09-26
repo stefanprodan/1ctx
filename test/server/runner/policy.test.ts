@@ -40,6 +40,8 @@ const agent: AgentRow = {
     completionPrice: null,
     tools: false,
     reasoning: true,
+    thinkingRequired: false,
+    reasoningKnown: true,
     described: true,
   },
   thinking: null,
@@ -54,6 +56,8 @@ const agent: AgentRow = {
 function policy(
   changes: Partial<Pick<AgentRow, "thinking" | "effort">> & {
     reasoning?: boolean;
+    reasoningKnown?: boolean;
+    thinkingRequired?: boolean;
   },
 ): SendPolicy {
   return buildPolicy({
@@ -65,6 +69,9 @@ function policy(
       model: {
         ...agent.model,
         reasoning: changes.reasoning ?? agent.model.reasoning,
+        reasoningKnown: changes.reasoningKnown ?? agent.model.reasoningKnown,
+        thinkingRequired:
+          changes.thinkingRequired ?? agent.model.thinkingRequired,
       },
     },
     now: 1,
@@ -187,11 +194,25 @@ describe("send policy thinking", () => {
     });
   });
 
-  test("on overrides a non-reasoning model", () => {
+  test("on overrides a model whose catalog lists no capabilities", () => {
+    expect(
+      policy({ thinking: "on", reasoning: false, reasoningKnown: false }),
+    ).toMatchObject({ thinking: true, effort: "high" });
+  });
+
+  test("a word the model cannot take is never sent", () => {
     expect(policy({ thinking: "on", reasoning: false })).toMatchObject({
-      thinking: true,
-      effort: "high",
+      thinking: false,
+      thinkingOff: false,
+      effort: null,
     });
+    expect(policy({ thinking: "off", reasoning: false })).toMatchObject({
+      thinking: false,
+      thinkingOff: false,
+    });
+    expect(
+      policy({ thinking: "off", reasoning: true, thinkingRequired: true }),
+    ).toMatchObject({ thinking: true, thinkingOff: false, effort: "high" });
   });
 
   test("off overrides a reasoning model and drops effort", () => {

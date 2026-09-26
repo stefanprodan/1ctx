@@ -254,6 +254,8 @@ describe("GET /api/providers/:id/catalog", () => {
         completionPrice: null,
         tools: true,
         reasoning: true,
+        thinkingRequired: false,
+        reasoningKnown: true,
         described: true,
       });
       const agent = await client.call("POST", "/api/agents", {
@@ -314,6 +316,8 @@ describe("GET /api/providers/:id/catalog", () => {
       completionPrice: expect.any(Number),
       tools: expect.any(Boolean),
       reasoning: expect.any(Boolean),
+      thinkingRequired: expect.any(Boolean),
+      reasoningKnown: true,
       described: true,
     });
     await client.call("GET", `/api/providers/${provider.id}/catalog?q=chat`);

@@ -58,6 +58,13 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       completionPrice: perMillion(pricing.completion),
       tools: params.includes("tools") || params.includes("tool_use"),
       reasoning: params.includes("reasoning"),
+      // OpenRouter alone says so, as reasoning.mandatory
+      thinkingRequired:
+        (m.reasoning as { mandatory?: unknown } | undefined)?.mandatory ===
+        true,
+      // OpenRouter's parameters always name reasoning when the model
+      // thinks; mlx-serve leaves it out of a thinking model's capabilities
+      reasoningKnown: Array.isArray(m.supported_parameters),
       described: contextLength !== null || lists.length > 0,
     });
   }

@@ -93,6 +93,8 @@ describe("Home", () => {
           completionPrice: null,
           tools: false,
           reasoning: false,
+          thinkingRequired: false,
+          reasoningKnown: true,
           described: true,
         },
         thinking: null,

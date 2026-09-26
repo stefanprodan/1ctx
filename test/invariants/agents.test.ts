@@ -39,6 +39,8 @@ const flash = {
   completionPrice: 0.6,
   tools: true,
   reasoning: true,
+  thinkingRequired: false,
+  reasoningKnown: true,
   described: true,
 };
 
@@ -238,6 +240,39 @@ describe("the agents", () => {
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({
       agents: [agent],
     });
+  });
+
+  test("a model that always or never thinks drops the thinking word", async () => {
+    const { client, provider } = await setup();
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: "openai/gpt-6-astra",
+      thinking: "off",
+    };
+    const res = await client.call("POST", "/api/agents", { body });
+    expect(res.status).toBe(201);
+    const { agent } = await res.json();
+    expect(agent.thinking).toBeNull();
+    expect(agent.model.thinkingRequired).toBe(true);
+    // a save that sends the word again, as a stale form or provisioning
+    // does, still goes through
+    const again = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, prompt: "p" },
+    });
+    expect(again.status).toBe(200);
+    expect((await again.json()).agent.thinking).toBeNull();
+    const plain = await client.call("POST", "/api/agents", {
+      body: {
+        ...body,
+        name: "plain",
+        model: "deepseek/deepseek-chat",
+        thinking: "on",
+      },
+    });
+    expect(plain.status).toBe(201);
+    expect((await plain.json()).agent.thinking).toBeNull();
   });
 
   test("an unknown MCP server rolls the agent save back", async () => {
@@ -525,6 +560,8 @@ describe("a model its catalog does not describe", () => {
       completionPrice: null,
       tools: true,
       reasoning: false,
+      thinkingRequired: false,
+      reasoningKnown: false,
       described: false,
     });
   });

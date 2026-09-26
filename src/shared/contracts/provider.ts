@@ -30,5 +30,10 @@ export type CatalogMatch = {
   completionPrice: number | null;
   tools: boolean;
   reasoning: boolean;
+  // the model always thinks: a request that turns thinking off is refused
+  thinkingRequired: boolean;
+  // the catalog reliably says whether the model thinks, so reasoning
+  // false means it never does; only OpenRouter and Gemini do
+  reasoningKnown: boolean;
   described: boolean;
 };

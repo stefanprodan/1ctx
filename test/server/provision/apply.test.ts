@@ -247,6 +247,8 @@ describe("provision through the composed app", () => {
         completionPrice: null,
         tools: true,
         reasoning: false,
+        thinkingRequired: false,
+        reasoningKnown: false,
         described: false,
       };
       expect(app.agents.byName("bare-guide")!.model).toEqual(stated);

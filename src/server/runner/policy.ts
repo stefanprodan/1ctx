@@ -13,6 +13,7 @@
 import { mcpKey } from "../../shared/capabilities.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
+import { fixedThinking } from "../../shared/thinking.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type {
   Effort,
@@ -86,6 +87,8 @@ export type SendPolicy = {
   thinking: boolean;
   // the agent's own Off, not a default that resolved to off
   thinkingOff: boolean;
+  // the model always thinks, so no request turns it off
+  thinkingRequired: boolean;
   effort: Effort | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
@@ -183,8 +186,11 @@ export function buildPolicy(input: {
           phase: "memory",
         })
       : null;
-  const thinking =
-    agent.thinking === null ? agent.model.reasoning : agent.thinking === "on";
+  // a word the model cannot take, saved before the catalog said so, is
+  // never sent
+  const fixed = fixedThinking(agent.model);
+  const word = fixed ?? agent.thinking;
+  const thinking = word === null ? agent.model.reasoning : word === "on";
   return {
     projectId: input.project.id,
     projectName: input.project.name,
@@ -204,7 +210,8 @@ export function buildPolicy(input: {
     contextLength: agent.model.contextLength,
     prompt: agent.prompt,
     thinking,
-    thinkingOff: agent.thinking === "off",
+    thinkingOff: fixed === null && agent.thinking === "off",
+    thinkingRequired: agent.model.thinkingRequired,
     effort: thinking ? agent.effort : null,
     offered,
     disabledCapabilities,
