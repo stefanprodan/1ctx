@@ -1,6 +1,7 @@
-/* Agents: the form an open agent row holds: the Delete question in its
-   foot, the presets, the avatar and provider pickers, and the model
-   search field. */
+/* Agents: the form an open agent, decider or decision row holds: the
+   Delete question and a decider's Check answer in its foot, the
+   presets, the avatar and provider pickers, the model search field and
+   the prompt boxes. */
 
 @layer tokens, base, owners;
 
@@ -16,6 +17,24 @@
     margin: 0;
     font-size: var(--text-small);
     color: var(--dim);
+  }
+
+  /* what a decider's Check answered, on its own line over the foot */
+  .agents-checked {
+    flex-basis: 100%;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  /* empty until a Check answers, out of the flow but still in the
+     accessibility tree, so the answer is announced */
+  .agents-checked:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .agents-form {

@@ -7,14 +7,22 @@
 // automation, so its line is the agent's answer like a chat's. In All
 // a run stands for its automation's runs and counts them with the
 // bolt. An archived chat wears the box, quiet, and says so before its
-// line. The whole row is the link to the chat.
+// line, as a run that needs attention does. The whole row is the link
+// to the chat.
 
 import { type ComponentChild, Fragment } from "preact";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import { count } from "../lib/format.ts";
 import { chatHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
-import { authorGone, iconOf, stateLine, whenText } from "./Row.model.ts";
+import {
+  ATTENTION_WORDS,
+  authorGone,
+  iconOf,
+  needsAttention,
+  stateLine,
+  whenText,
+} from "./Row.model.ts";
 
 // the line's parts that are there, a dot between each two
 function joined(parts: (ComponentChild | false)[]) {
@@ -42,11 +50,12 @@ export function Row({
   const { session } = row;
   const line = stateLine(row);
   const archived = session.archived !== null;
+  const attention = needsAttention(session);
   return (
     <a class="stream-row" href={chatHref(session.id)}>
       <Icon
         name={iconOf(row)}
-        class={`stream-icon ${archived ? "stream-icon-archived" : `status-${session.status}`}`}
+        class={`stream-icon ${archived ? "stream-icon-archived" : attention ? "status-attention" : `status-${session.status}`}`}
         size={16}
       />
       <span class="stream-text">
@@ -76,6 +85,12 @@ export function Row({
                   >
                     @{line.author}{" "}
                   </span>
+                )}
+                {attention && (
+                  <>
+                    <span class="stream-attention">{ATTENTION_WORDS}</span>
+                    {line.text !== "" && " · "}
+                  </>
                 )}
                 {session.status === "failed" ? (
                   <span class="stream-bad">{line.text}</span>

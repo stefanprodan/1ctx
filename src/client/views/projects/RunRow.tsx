@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One run on an automation's Runs tab: how it started, when, the
-// answer's first line, and how long it took against its deadline, with
+// answer's first line, marked after the agent when the default
+// decider judged it to need a person, and how long it took against its deadline, with
 // Stop while it runs.
 
 import { useSignal } from "@preact/signals";
@@ -11,9 +12,14 @@ import { stopSession } from "../../data/sessions.ts";
 import { says, stamp } from "../../lib/format.ts";
 import { chatHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { authorGone, stateLine, whenText } from "../../stream/Row.model.ts";
 import {
-  RowsAvatar,
+  ATTENTION_WORDS,
+  authorGone,
+  needsAttention,
+  stateLine,
+  whenText,
+} from "../../stream/Row.model.ts";
+import {
   RowsBad,
   RowsEnd,
   RowsGo,
@@ -41,6 +47,7 @@ export function RunRow({
   const failure = useSignal<string | null>(null);
   const { session } = row;
   const running = session.status === "running";
+  const attention = needsAttention(session);
   const line = stateLine(row);
   const took = durationOf(row, now);
   const share = took === null ? 0 : deadlineShare(took, deadlineMs);
@@ -69,13 +76,13 @@ export function RunRow({
     >
       {/* the icon says how the run started, and who pressed Run now
           under the pointer, so the line is the feed's: author and words */}
-      <RowsAvatar title={sourceText(row) || undefined}>
+      <span class="automations-run-icon" title={sourceText(row) || undefined}>
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
           size={15}
-          class={`status-${session.status}`}
+          class={attention ? "status-attention" : `status-${session.status}`}
         />
-      </RowsAvatar>
+      </span>
       <RowsTitle
         name={stamp(row.send?.startedAt ?? session.createdAt)}
         sub={
@@ -86,6 +93,12 @@ export function RunRow({
                   name={line.author}
                   gone={authorGone(row, line)}
                 />{" "}
+              </>
+            )}
+            {attention && (
+              <>
+                <span class="automations-attention">{ATTENTION_WORDS}</span>
+                {line.text !== "" && " · "}
               </>
             )}
             {/* only the failure's words are red; who ran it keeps its colour */}

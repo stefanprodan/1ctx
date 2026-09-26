@@ -15,6 +15,7 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
     agentRetired: false,
     session: {
       archived: null,
+      attention: null,
       id: "s1",
       projectId: "p1",
       ownerId: "u1",

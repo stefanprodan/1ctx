@@ -16,6 +16,8 @@ import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
+import { loadDeciders } from "../data/deciders.ts";
+import { loadDecisions } from "../data/decisions.ts";
 import {
   loadAgentDays,
   loadAgentPage,
@@ -405,6 +407,8 @@ export const ROUTES: Route[] = [
       // skills and the MCP servers are the form's sections
       await Promise.all([
         loadAgents(),
+        loadDeciders(),
+        loadDecisions(),
         loadProviders(),
         loadTools(),
         loadSkills(),

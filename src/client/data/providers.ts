@@ -16,6 +16,7 @@ import type {
   ProviderResponse,
   ProvidersResponse,
 } from "../../shared/api/providers.ts";
+import type { CatalogKind } from "../../shared/contracts/decider.ts";
 import type {
   CatalogMatch,
   Endpoint,
@@ -86,12 +87,14 @@ export async function deleteProvider(id: string): Promise<void> {
   }
 }
 
+// the chat models by default, or the decision models a decider picks
 export async function searchCatalog(
   id: string,
   q: string,
+  kind: CatalogKind = "chat",
 ): Promise<CatalogMatch[]> {
   const body = await api<CatalogResponse>(
-    `/api/providers/${encodeURIComponent(id)}/catalog?q=${encodeURIComponent(q)}`,
+    `/api/providers/${encodeURIComponent(id)}/catalog?q=${encodeURIComponent(q)}${kind === "chat" ? "" : `&kind=${kind}`}`,
   );
   return body.matches;
 }

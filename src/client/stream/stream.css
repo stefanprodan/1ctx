@@ -75,6 +75,10 @@
     font-size: var(--text-label);
     color: var(--dim);
   }
+  /* after the agent, where a failure's word goes */
+  .stream-attention {
+    color: var(--attention);
+  }
   /* a failure's words, the author keeping its colour */
   .stream-bad {
     color: var(--failed);

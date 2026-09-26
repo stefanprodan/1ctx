@@ -55,6 +55,7 @@ import type {
 function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
     archived: null,
+    attention: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",

@@ -1,12 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The agents: a card of rows, each the name, the model and, faint, the
-// provider with the model's window and prices. A row opens in place
-// into its form, or starts open when `?open=` names it; New agent opens an empty one at the top. Under it the
-// card of providers the agents run on: added through New provider,
-// deleted in place, never edited. The forms are AgentForm.tsx and
-// ProviderForm.tsx.
+// The agents page, top to bottom: the providers the agents and deciders
+// run on, added through New provider, deleted in place, never edited;
+// the agents, a card of rows, each the name, the model and, faint, the
+// provider with the model's window and prices, a row opening in place
+// into its form, or starting open when `?open=` names it, New agent
+// opening an empty one at the top; then the deciders (DecidersCard.tsx)
+// and the decisions they answer (DecisionsCard.tsx). The forms are
+// AgentForm.tsx and ProviderForm.tsx.
 
 import { useSignal } from "@preact/signals";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
@@ -14,6 +16,8 @@ import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
 import type { Wire } from "../../../shared/words.ts";
 import { AgentRow as Head } from "../../agents/AgentRow.tsx";
 import { agents, agentsError } from "../../data/agents.ts";
+import { deciders, decidersError } from "../../data/deciders.ts";
+import { decisions, decisionsError } from "../../data/decisions.ts";
 import {
   deleteProvider,
   providers,
@@ -40,6 +44,8 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { AgentForm } from "./AgentForm.tsx";
 import { keyLine } from "./Agents.model.ts";
+import { DecidersCard } from "./DecidersCard.tsx";
+import { DecisionsCard } from "./DecisionsCard.tsx";
 import { useOpenParam } from "./OpenParam.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
 import "./agents.css";
@@ -164,10 +170,46 @@ export function Agents() {
     <Page
       crumb="Admin"
       title="Agents"
-      loading={(list === null || rows === null) && error === null}
+      loading={
+        (list === null ||
+          rows === null ||
+          (deciders.value === null && decidersError.value === null) ||
+          (decisions.value === null && decisionsError.value === null)) &&
+        error === null
+      }
       error={error}
     >
       <Rows>
+        <RowsCard
+          label="Providers"
+          action={
+            <RowsAdd
+              label="New provider"
+              disabled={addingProvider.value}
+              onClick={() => {
+                addingProvider.value = true;
+              }}
+            />
+          }
+        >
+          {addingProvider.value && (
+            <RowsNew>
+              <ProviderForm
+                onDone={() => {
+                  addingProvider.value = false;
+                }}
+              />
+            </RowsNew>
+          )}
+          {rows?.length === 0 && !addingProvider.value && (
+            <RowsNote>
+              No providers yet. Add one so an agent has a model to run on.
+            </RowsNote>
+          )}
+          {(rows ?? []).map((p) => (
+            <ProviderRow key={p.id} provider={p} />
+          ))}
+        </RowsCard>
         <RowsCard
           label="Agents"
           search={
@@ -204,8 +246,8 @@ export function Agents() {
           {list?.length === 0 && !adding.value && (
             <RowsNote>
               {rows?.length === 0
-                ? "No agents yet. Add a provider below, then make the first agent on one of its models."
-                : "No agents yet. New agent picks a model from a provider below."}
+                ? "No agents yet. Add a provider above, then make the first agent on one of its models."
+                : "No agents yet. New agent picks a model from a provider above."}
             </RowsNote>
           )}
           {q.value.trim() !== "" && shown.length === 0 && (
@@ -224,36 +266,8 @@ export function Agents() {
             />
           ))}
         </RowsCard>
-        <RowsCard
-          label="Providers"
-          action={
-            <RowsAdd
-              label="New provider"
-              disabled={addingProvider.value}
-              onClick={() => {
-                addingProvider.value = true;
-              }}
-            />
-          }
-        >
-          {addingProvider.value && (
-            <RowsNew>
-              <ProviderForm
-                onDone={() => {
-                  addingProvider.value = false;
-                }}
-              />
-            </RowsNew>
-          )}
-          {rows?.length === 0 && !addingProvider.value && (
-            <RowsNote>
-              No providers yet. Add one so an agent has a model to run on.
-            </RowsNote>
-          )}
-          {(rows ?? []).map((p) => (
-            <ProviderRow key={p.id} provider={p} />
-          ))}
-        </RowsCard>
+        <DecidersCard providers={rows ?? []} />
+        <DecisionsCard />
       </Rows>
     </Page>
   );

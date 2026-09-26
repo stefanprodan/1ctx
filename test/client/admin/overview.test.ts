@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { h } from "preact";
+import { render } from "preact-render-to-string";
 import { litPage } from "../../../src/client/app/Rail.model.ts";
+import { overview } from "../../../src/client/data/overview.ts";
 import {
   allCells,
   automationsTile,
   buildLine,
   cachedLine,
   chatTile,
+  costOf,
   costTile,
   cpuTile,
   dayTokensHint,
@@ -26,6 +30,7 @@ import {
   usageBars,
   zoomed,
 } from "../../../src/client/views/admin/Overview.model.ts";
+import { Overview } from "../../../src/client/views/admin/Overview.tsx";
 import type {
   LoadResponse,
   OverviewDay,
@@ -48,6 +53,10 @@ const totals = (over: Partial<OverviewTotals> = {}): OverviewTotals => ({
   rounds: 30,
   pricedRounds: 12,
   cost: 4.123,
+  decisions: 0,
+  decisionTokens: 0,
+  pricedDecisions: 0,
+  decisionCost: null,
   ...over,
 });
 
@@ -62,6 +71,10 @@ const day = (over: Partial<OverviewDay> = {}): OverviewDay => ({
   cachedTokens: 420,
   completionTokens: 100,
   cost: 0.031,
+  decisions: 0,
+  decisionTokens: 0,
+  pricedDecisions: 0,
+  decisionCost: null,
   ...over,
 });
 
@@ -186,6 +199,92 @@ describe("the last 30 days", () => {
       "none yet",
     );
     expect(money(0.004)).toBe("<$0.01");
+  });
+
+  test("the rounds' cost and the decisions' add, a null counting as 0", () => {
+    expect(costOf({ cost: null, decisionCost: null })).toBeNull();
+    expect(costOf({ cost: 1.5, decisionCost: null })).toBe(1.5);
+    expect(costOf({ cost: null, decisionCost: 0.25 })).toBe(0.25);
+    expect(costOf({ cost: 1.5, decisionCost: 0.25 })).toBe(1.75);
+    const both = totals({
+      decisions: 10,
+      pricedDecisions: 8,
+      decisionCost: 0.877,
+    });
+    expect(costTile(both, null)).toEqual({
+      figure: "$5.00",
+      sub: "20 of 40 priced",
+    });
+    expect(costTile(both, day({ cost: null, decisionCost: 0.02 })).sub).toBe(
+      "13 Sep · $0.02",
+    );
+    // decisions alone, priced, are a cost; a local decider's are not
+    expect(
+      costTile(
+        totals({
+          rounds: 0,
+          pricedRounds: 0,
+          cost: null,
+          decisions: 4,
+          pricedDecisions: 4,
+          decisionCost: 0.02,
+        }),
+        null,
+      ),
+    ).toEqual({ figure: "$0.02", sub: "4 of 4 priced" });
+    expect(
+      costTile(
+        totals({ rounds: 0, pricedRounds: 0, cost: null, decisions: 4 }),
+        null,
+      ),
+    ).toEqual({ figure: "None", sub: "no provider priced" });
+    expect(allCells({ ...both, since: null }).at(-1)).toMatchObject({
+      label: "Cost",
+      figure: "$5.00",
+    });
+  });
+
+  test("decisions close the automations sub-line, on a day too", () => {
+    const t = totals({ runs: 10, decisions: 1234 });
+    expect(runsTile(t, null).sub).toBe("none failed · 1,234 decisions");
+    expect(runsTile(t, day({ decisions: 1 })).sub).toBe(
+      "13 Sep · 1 run · 1 decision",
+    );
+    expect(runsTile(totals({ runs: 10 }), null).sub).toBe("none failed");
+  });
+
+  test.serial("decisions are only in the automations tile", () => {
+    const answer = (last: number, ever: number): OverviewResponse => ({
+      readAt: 0,
+      days: [day()],
+      totals: totals({ decisions: last, decisionTokens: last * 10 }),
+      by: { projects: [], agents: [] },
+      lengths: [],
+      all: {
+        ...totals({ decisions: ever, decisionTokens: ever * 10 }),
+        since: 0,
+      },
+      instance: {
+        version: "test",
+        startedAt: 0,
+        users: 1,
+        projects: 1,
+        agents: 1,
+        automations: 0,
+        databaseBytes: MB,
+      },
+    });
+    const page = (a: OverviewResponse) => {
+      overview.value = a;
+      try {
+        return render(h(Overview, {}));
+      } finally {
+        overview.value = null;
+      }
+    };
+    expect(page(answer(3, 7))).toContain("3 decisions");
+    expect(page(answer(3, 7))).not.toContain("7 decisions");
+    expect(page(answer(0, 7))).not.toContain("decisions");
   });
 });
 

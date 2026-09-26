@@ -14,6 +14,7 @@ import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
     archived: null,
+    attention: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",

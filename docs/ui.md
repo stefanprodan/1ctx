@@ -189,6 +189,8 @@ client change. What each page draws is in `docs/views.md`.
   place of its hint, and `useFocusField()` moves the focus to the
   control carrying that `name`. Any other refusal is the notice `Foot`
   draws over the buttons, "Could not delete." then the server's words.
+  An action whose words never name a field (a decider's Check) passes
+  `{ whole: true }` to `act`, which skips `fieldOf`.
   A text field's input is `save.bind(signal)`, which clears the
   refusal on an edit. A name field's one check is `nameProblem()` in
   `lib/names.ts`. A row that can be deleted starts its foot with

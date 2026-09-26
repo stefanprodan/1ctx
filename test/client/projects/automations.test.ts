@@ -97,6 +97,7 @@ const automation = (
 
 const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   archived: null,
+  attention: null,
   id: "s1",
   projectId: "p1",
   ownerId: "u1",
