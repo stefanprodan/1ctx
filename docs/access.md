@@ -49,7 +49,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   nothing else creates a user, tests included. Every personal project
   is named `personal` (a table check holds it), and the name is
   reserved: a team project named `personal` is a 409. A personal
-  project is its owner's alone, an admin included; its owner only
+  project is its owner's alone, an admin included, save that an
+  agent's page counts the agent's turns and tokens per day in every
+  project, personal ones too, as one series naming none; its owner only
   describes it, through `PATCH /api/profile/project`, and a username
   rename leaves it alone. The system prompt names it by its owner.
   Admins make, rename, describe, fill and delete team projects; team

@@ -3,6 +3,7 @@
 
 import type {
   DaysUsageResponse,
+  DayUsage,
   WeekUsageResponse,
 } from "../../shared/api/usage.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
@@ -240,6 +241,49 @@ export class UsageStore {
       )
       .get(ids, since, until)!;
     return { total, projects };
+  }
+
+  // one agent's days in every project, one series: the agent page's
+  // heatmap, which never splits the turns by project
+  agentDays(
+    agentId: string,
+    starts: number[],
+    until: number,
+  ): { total: DayUsage; usage: DayUsage[] } {
+    const usage = starts.map(() => ({ sends: 0, tokens: 0 }));
+    if (starts.length === 0) return { total: { sends: 0, tokens: 0 }, usage };
+    const rows = this.db
+      .query<Omit<DayRaw, "project_id">, [number, string, string]>(
+        `with day_starts as materialized (
+           select cast(key as integer) as day_index,
+                  cast(value as integer) as start_at,
+                  lead(cast(value as integer), 1, ?) over (
+                    order by cast(key as integer)
+                  ) as end_at
+             from json_each(?)
+         )
+         select d.day_index,
+                count(distinct u.send_id) as sends,
+                sum(u.prompt_tokens + u.completion_tokens) as tokens
+           from day_starts d
+          cross join usage u
+          where u.agent_id = ?
+            and u.created_at >= d.start_at and u.created_at < d.end_at
+          group by d.day_index`,
+      )
+      .all(until, JSON.stringify(starts), agentId);
+    for (const raw of rows) {
+      usage[raw.day_index] = { sends: raw.sends, tokens: raw.tokens };
+    }
+    const total = this.db
+      .query<TotalRaw, [string, number, number]>(
+        `select count(distinct send_id) as sends,
+                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens
+           from usage
+          where agent_id = ? and created_at >= ? and created_at < ?`,
+      )
+      .get(agentId, starts[0]!, until)!;
+    return { total, usage };
   }
 
   deleteSend(sendId: string): boolean {

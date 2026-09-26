@@ -6,9 +6,13 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { path } from "../../../src/client/app/router.ts";
 import {
+  agentDays,
+  agentDaysFailed,
   agentPage,
   agentPageError,
+  loadAgentDays,
   loadAgentPage,
   loadPerson,
   person,
@@ -19,6 +23,9 @@ import { tokensText } from "../../../src/client/lib/format.ts";
 import { agentHref, userHref } from "../../../src/client/lib/hrefs.ts";
 import { Agent } from "../../../src/client/views/people/Agent.tsx";
 import {
+  agentAnswer,
+  agentTab,
+  agentTabs,
   effortText,
   localTime,
   roleWords,
@@ -28,6 +35,7 @@ import {
 } from "../../../src/client/views/people/People.model.ts";
 import { User } from "../../../src/client/views/people/User.tsx";
 import type {
+  DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
   DirectoryUserResponse,
 } from "../../../src/shared/api/directory.ts";
@@ -86,6 +94,18 @@ const agent: DirectoryAgentResponse = {
   tokens: { prompt: 7, skills: 2000, tools: 300 },
 };
 
+// two days, the agent busy on the second
+const days: DirectoryAgentDaysResponse = {
+  since: Date.UTC(2026, 8, 14),
+  until: Date.UTC(2026, 8, 16),
+  days: ["2026-09-14", "2026-09-15"],
+  total: { sends: 3, tokens: 4000 },
+  usage: [
+    { sends: 0, tokens: 0 },
+    { sends: 3, tokens: 4000 },
+  ],
+};
+
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
@@ -94,6 +114,9 @@ beforeEach(() => {
   personError.value = null;
   agentPage.value = null;
   agentPageError.value = null;
+  agentDays.value = null;
+  agentDaysFailed.value = false;
+  path.value = "/agents/coder";
 });
 
 afterEach(() => {
@@ -233,6 +256,88 @@ describe("the directory entity", () => {
   );
 });
 
+describe("the agent's days", () => {
+  test.serial("asks in the browser's zone and keeps the latest", async () => {
+    const asked: string[] = [];
+    const gates: (() => void)[] = [];
+    globalThis.fetch = ((url: string) =>
+      new Promise<Response>((resolve) => {
+        asked.push(url);
+        gates.push(() => resolve(Response.json(days)));
+      })) as unknown as typeof fetch;
+    const first = loadAgentDays("coder");
+    const second = loadAgentDays("writer");
+    expect(asked[0]).toStartWith("/api/directory/agents/coder/days?tz=");
+    gates[1]();
+    await second;
+    gates[0]();
+    await first;
+    expect(agentDays.value?.name).toBe("writer");
+  });
+
+  test.serial(
+    "a failed first load is failed, a failed refresh keeps the days",
+    async () => {
+      let ok = true;
+      globalThis.fetch = (async () =>
+        ok
+          ? Response.json(days)
+          : Response.json(
+              { error: "down" },
+              { status: 500 },
+            )) as unknown as typeof fetch;
+      ok = false;
+      await loadAgentDays("coder");
+      expect(agentDays.value).toBeNull();
+      expect(agentDaysFailed.value).toBe(true);
+      ok = true;
+      await loadAgentDays("coder");
+      expect(agentDaysFailed.value).toBe(false);
+      expect(agentDays.value?.body).toEqual(days);
+      ok = false;
+      await loadAgentDays("coder");
+      expect(agentDaysFailed.value).toBe(false);
+      expect(agentDays.value?.body).toEqual(days);
+    },
+  );
+
+  test.serial("a failed load forgets the held days of that name", async () => {
+    globalThis.fetch = (async () =>
+      Response.json(days)) as unknown as typeof fetch;
+    await loadAgentDays("coder");
+    await loadAgentDays("writer");
+    globalThis.fetch = (async () =>
+      Response.json(
+        { error: "no such agent" },
+        { status: 404 },
+      )) as unknown as typeof fetch;
+    await loadAgentDays("coder");
+    // back on writer, then coder again: nothing held draws first
+    const gates: (() => void)[] = [];
+    globalThis.fetch = ((_url: string) =>
+      new Promise<Response>((resolve) => {
+        gates.push(() => resolve(Response.json(days)));
+      })) as unknown as typeof fetch;
+    const writer = loadAgentDays("writer");
+    gates[0]();
+    await writer;
+    const coder = loadAgentDays("coder");
+    expect(agentDays.value).toBeNull();
+    gates[1]();
+    await coder;
+  });
+
+  test.serial("a new user drops the days and their failure", async () => {
+    globalThis.fetch = (async () =>
+      Response.json(days)) as unknown as typeof fetch;
+    await loadAgentDays("coder");
+    agentDaysFailed.value = true;
+    me.value = { ...casey, id: "u9", username: "someone" };
+    expect(agentDays.value).toBeNull();
+    expect(agentDaysFailed.value).toBe(false);
+  });
+});
+
 describe("People.model", () => {
   test("the addresses of both pages", () => {
     expect(userHref("casey")).toBe("/users/casey");
@@ -348,7 +453,7 @@ describe("the pages", () => {
   });
 
   test.serial(
-    "Agent shows the model, the prompt, the skills and the tools",
+    "Agent opens on the prompt under the tabs with their counts",
     () => {
       agentPage.value = agent;
       const html = render(<Agent params={{ name: "coder" }} />);
@@ -363,23 +468,77 @@ describe("the pages", () => {
         '>Prompt</span><span class="rows-hint cut">7 tokens<',
       );
       expect(html).toContain(
-        '>Skills</span><span class="rows-hint cut">2K tokens<',
+        'class="tabs-tab tabs-tab-on" href="/agents/coder" aria-current="page">Prompt<',
       );
       expect(html).toContain(
-        '>Tools</span><span class="rows-hint cut">300 tokens<',
+        'href="/agents/coder/tools">Tools<span class="tabs-count">2<',
       );
-      expect(html).toContain(">timoni<");
-      // the description under the name, the fetch time at the row's end
-      expect(html).toContain('class="rows-sub">Deploy with Timoni.<');
-      expect(html).toContain('class="rows-meta">fetched 2h ago<');
-      expect(html).toContain(">datetime<");
-      expect(html).toContain(">websearch<");
-      expect(html).toContain('class="rows-meta">exa<');
-      // the skill's fetch time and websearch's provider, no size on a row
-      expect(html.match(/class="rows-meta"/g)).toHaveLength(2);
+      expect(html).toContain(
+        'href="/agents/coder/skills">Skills<span class="tabs-count">1<',
+      );
+      expect(html).toContain(
+        'href="/agents/coder/mcp">MCP<span class="tabs-count">0<',
+      );
+      // one tab's card at a time
+      expect(html).not.toContain(">timoni<");
+      expect(html).not.toContain(">datetime<");
       expect(html).toContain(">high<");
     },
   );
+
+  test.serial("Agent's Tools, Skills and MCP tabs each draw their card", () => {
+    agentPage.value = agent;
+    path.value = "/agents/coder/tools";
+    let html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain(
+      '>Tools</span><span class="rows-hint cut">300 tokens<',
+    );
+    expect(html).toContain(">datetime<");
+    expect(html).toContain(">websearch<");
+    expect(html).toContain('class="rows-meta">exa<');
+    expect(html).not.toContain("people-prompt");
+
+    path.value = "/agents/coder/skills";
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain(
+      '>Skills</span><span class="rows-hint cut">2K tokens<',
+    );
+    expect(html).toContain(">timoni<");
+    // the description under the name, the fetch time at the row's end
+    expect(html).toContain('class="rows-sub">Deploy with Timoni.<');
+    expect(html).toContain('class="rows-meta">fetched 2h ago<');
+
+    path.value = "/agents/coder/mcp";
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain("No MCP servers.");
+    expect(html).toContain(
+      'class="tabs-tab tabs-tab-on" href="/agents/coder/mcp" aria-current="page">MCP<',
+    );
+  });
+
+  test.serial("Agent draws its activity ghost, then its days", () => {
+    agentPage.value = agent;
+    let html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain('aria-label="Loading activity"');
+    // another agent's days are not this one's
+    agentDays.value = { name: "writer", body: days };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain('aria-label="Loading activity"');
+
+    agentDays.value = { name: "coder", body: days };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).not.toContain('aria-label="Loading activity"');
+    expect(html).toContain(">3 turns · 4K tokens<");
+    expect(html).toContain(
+      'data-index="1" class="activity-cell activity-level-4"',
+    );
+
+    agentDays.value = null;
+    agentDaysFailed.value = true;
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).not.toContain(">Activity<");
+    expect(html).toContain(">Prompt<");
+  });
 
   test.serial("Agent without tools says why", () => {
     agentPage.value = {
@@ -392,9 +551,52 @@ describe("the pages", () => {
       skills: [],
       tools: [],
     };
-    const html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain("The model does not take tools.");
-    expect(html).toContain("No skills.");
-    expect(html).toContain("No prompt.");
+    expect(render(<Agent params={{ name: "coder" }} />)).toContain(
+      "No prompt.",
+    );
+    path.value = "/agents/coder/tools";
+    expect(render(<Agent params={{ name: "coder" }} />)).toContain(
+      "The model does not take tools.",
+    );
+    path.value = "/agents/coder/skills";
+    expect(render(<Agent params={{ name: "coder" }} />)).toContain(
+      "No skills.",
+    );
+    path.value = "/agents/coder/mcp";
+    expect(render(<Agent params={{ name: "coder" }} />)).toContain(
+      "The model does not take tools.",
+    );
+  });
+});
+
+describe("the agent page's words", () => {
+  test("a tab is found by its address, the prompt's for any other", () => {
+    expect(agentTab("/agents/coder", "coder")).toBe(0);
+    expect(agentTab("/agents/coder/tools", "coder")).toBe(1);
+    expect(agentTab("/agents/coder/skills", "coder")).toBe(2);
+    expect(agentTab("/agents/coder/mcp", "coder")).toBe(3);
+    expect(agentTab("/agents/coder/nope", "coder")).toBe(0);
+    expect(agentTab("/agents/writer/mcp", "coder")).toBe(0);
+  });
+
+  test("the tabs count the tools, the skills and the servers", () => {
+    expect(
+      agentTabs("coder", agent).map((t) => [t.label, t.href, t.count]),
+    ).toEqual([
+      ["Prompt", "/agents/coder", undefined],
+      ["Tools", "/agents/coder/tools", 2],
+      ["Skills", "/agents/coder/skills", 1],
+      ["MCP", "/agents/coder/mcp", 0],
+    ]);
+  });
+
+  test("the days are one series keyed by the agent", () => {
+    expect(agentAnswer(days, "a1")).toEqual({
+      since: days.since,
+      until: days.until,
+      days: days.days,
+      total: days.total,
+      projects: [{ projectId: "a1", usage: days.usage }],
+    });
   });
 });

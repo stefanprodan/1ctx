@@ -164,7 +164,13 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   the zone, the about text and the team projects both users are
   members of (an admin's view of every team does not count, a personal
   project never shows). An
-  agent's page carries the provider's name, the skills with their
+  agent's page is its head, the Activity card over its turns in every
+  project as one series (`GET /api/directory/agents/:name/days?tz=`,
+  loaded apart from the page, `ActivityGhost` until it lands, left out
+  when its first load fails), then Prompt, Tools, Skills and MCP tabs
+  at `/agents/:name`, `/tools`, `/skills` and `/mcp`, one view for the
+  four so the card stays mounted. It carries the provider's name, the
+  skills with their
   descriptions and fetch times, the built-in tools the tools area would
   offer a send now (none when the model takes no tools, websearch with
   its search provider, `memory_edit` as a chat is offered it, the skill

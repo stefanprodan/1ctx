@@ -16,7 +16,7 @@ import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
-import { loadAgentPage, loadPerson } from "../data/directory.ts";
+import { loadAgentDays, loadAgentPage, loadPerson } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadMcp } from "../data/mcp.ts";
@@ -83,6 +83,15 @@ const automationView = lazy(() =>
 const docView = lazy(() =>
   import("../views/knowledge/file/DocPage.tsx").then((m) => m.DocPage),
 );
+
+// an agent's tabs share one view the same way, its heatmap included;
+// the page and its days load apart, so the page draws before the days
+const agentView = lazy<{ params: Params }>(() =>
+  import("../views/people/Agent.tsx").then((m) => m.Agent),
+);
+const agentPage = async (name: string) => {
+  await Promise.all([loadAgentPage(name), loadAgentDays(name)]);
+};
 
 // the tools page's tabs share one view the same way
 const toolsView = lazy<{ params: Params }>(() =>
@@ -447,10 +456,31 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/agents/:name",
-    view: lazy(() => import("../views/people/Agent.tsx").then((m) => m.Agent)),
+    view: agentView,
     title: (params) => `@${params.name}`,
     role: "authenticated",
-    load: (params) => loadAgentPage(params.name),
+    load: (params) => agentPage(params.name),
+  },
+  {
+    path: "/agents/:name/tools",
+    view: agentView,
+    title: (params) => `@${params.name} tools`,
+    role: "authenticated",
+    load: (params) => agentPage(params.name),
+  },
+  {
+    path: "/agents/:name/skills",
+    view: agentView,
+    title: (params) => `@${params.name} skills`,
+    role: "authenticated",
+    load: (params) => agentPage(params.name),
+  },
+  {
+    path: "/agents/:name/mcp",
+    view: agentView,
+    title: (params) => `@${params.name} MCP`,
+    role: "authenticated",
+    load: (params) => agentPage(params.name),
   },
   {
     path: "/profile",
