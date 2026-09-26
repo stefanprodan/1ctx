@@ -1,7 +1,7 @@
 # Providers
 
 Governs `src/server/providers/`, `lib/fetcher.ts` and an agent's
-provider, model, window, tools, thinking and effort fields.
+provider, model, window, tools, thinking, effort and upstream fields.
 
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
@@ -14,7 +14,8 @@ provider, model, window, tools, thinking and effort fields.
   picks the path, the header and the parser by the wire and parses into
   the one shape the wire carries. The catalog is cached an hour per
   provider and searched on the server; the browser never gets the whole
-  list.
+  list. The New provider form fills OpenRouter's base URL and lets it
+  change, for its EU address; Gemini's is fixed.
 - **Everything that leaves the process goes through the fetcher.**
   Anything that reaches a provider goes through the `fetcher`
   compose option, so a test passes a fake and the suite never reaches a
@@ -77,6 +78,20 @@ provider, model, window, tools, thinking and effort fields.
   thinking word, the form shows a single On or Off, and the policy
   ignores a word saved before. An agent saved before the flags learns
   them when its model is picked again.
+- **An OpenRouter agent may prefer one upstream.** `GET
+  /api/providers/:id/endpoints?model=` (OpenRouter wire only, a 400
+  otherwise) reads `<base>/models/<id>/endpoints` on demand, uncached,
+  with the catalog's timeout and cap, into `Endpoint` rows cheapest
+  first (`providers/endpoints.ts`; the prices already carry the
+  discount). An agent's `upstream` is one of those tags or null. A save
+  checks the tag against the list when the model or the tag changes
+  (a 400 otherwise, and on another wire); a tag that stops serving
+  later stays. The policy carries it on the OpenRouter wire alone, and
+  every request of a send, the summary and the memory phase included,
+  sends `provider: {order: [tag]}`: tried first, never `only`, so a
+  provider that is down or gone costs the preference and not the turn.
+  The form's Preferred provider leaves out endpoints without tools when the
+  model takes them, and a new model or provider clears the pick.
 - **Keys are picked by name.**
   `GET /api/providers` answers the `provider-` key names beside the rows.
   The form picks one with `Select`, or No key; a missing file stays named

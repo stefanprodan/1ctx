@@ -355,6 +355,14 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
     effort: before?.effort ?? null,
     prompt: before?.prompt ?? "",
     mcpMode: before?.mcpMode ?? "auto",
+    // a tag names an endpoint of one model on one provider, so another
+    // model or provider drops it
+    upstream:
+      before &&
+      providerId === before.providerId &&
+      (fields.model ?? before.model.id) === before.model.id
+        ? before.upstream
+        : null,
     ...keep(before),
     ...fields,
     skills: savedSkills,

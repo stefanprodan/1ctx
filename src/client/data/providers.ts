@@ -5,18 +5,20 @@
 // reached and dropped with the signed-in user, and the calls that
 // change it. A write
 // answers the new list from the server's row, so what shows is what
-// was saved. The catalog search is a plain call: its answer belongs to
-// the form that asked, not here.
+// was saved. The catalog search and a model's endpoints are plain
+// calls: their answers belong to the form that asked, not here.
 
 import { effect, signal } from "@preact/signals";
 import type {
   CatalogResponse,
   CreateProviderRequest,
+  EndpointsResponse,
   ProviderResponse,
   ProvidersResponse,
 } from "../../shared/api/providers.ts";
 import type {
   CatalogMatch,
+  Endpoint,
   ProviderSummary,
 } from "../../shared/contracts/provider.ts";
 import { type Failure, failure } from "../lib/format.ts";
@@ -92,4 +94,14 @@ export async function searchCatalog(
     `/api/providers/${encodeURIComponent(id)}/catalog?q=${encodeURIComponent(q)}`,
   );
   return body.matches;
+}
+
+export async function listEndpoints(
+  id: string,
+  model: string,
+): Promise<Endpoint[]> {
+  const body = await api<EndpointsResponse>(
+    `/api/providers/${encodeURIComponent(id)}/endpoints?model=${encodeURIComponent(model)}`,
+  );
+  return body.endpoints;
 }

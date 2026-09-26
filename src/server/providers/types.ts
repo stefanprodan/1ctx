@@ -63,6 +63,9 @@ export type ChatRequest = {
   // the session id, so a provider that routes or caches by conversation
   // keeps one session's turns together; omitted when not set
   cacheKey?: string | null;
+  // the OpenRouter endpoint tag tried first, others after it; another
+  // wire has no such choice and never gets one
+  upstream?: string | null;
 };
 
 // the tokens and cost of one round, as the provider reported them: null

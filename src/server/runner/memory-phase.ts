@@ -174,6 +174,7 @@ function memoryRequest(
     thinkingOff: send.policy.thinkingOff,
     reasoningEffort: send.policy.effort,
     cacheKey: send.sessionId,
+    upstream: send.policy.upstream,
     ...(offered.tools.length > 0 ? { tools: offered.tools } : {}),
   };
 }

@@ -12,7 +12,10 @@ import type {
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
-import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import type {
+  CatalogMatch,
+  Endpoint,
+} from "../../shared/contracts/provider.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -28,6 +31,7 @@ import { type AgentFields, type AgentStore, summary } from "./store.ts";
 export type ProvidersPort = {
   byId(id: string): ProviderRow | null;
   model(provider: ProviderRow, id: string): Promise<CatalogMatch | null>;
+  endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
 };
 
 export type AccessPort = {
@@ -116,6 +120,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     for (const id of body.skills) {
       if (!deps.skills.exists(id)) throw new BadRequest(`no such skill ${id}`);
     }
+    if (body.upstream !== null && provider.wire !== "openrouter") {
+      throw new BadRequest("upstream is only for an OpenRouter provider");
+    }
     const effort = body.effort;
     if (effort !== null && !isEffort(provider.wire, effort)) {
       throw new BadRequest(
@@ -131,11 +138,32 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     const body = parseAgent(await jsonBody(req));
     const checked = check(body, except);
     const model = await deps.providers.model(checked.provider, body.model);
+    // checked as the model is, when it is chosen; a tag that goes later
+    // is skipped by OpenRouter and costs only the preference, so a save
+    // that keeps the model and the tag never asks again
+    const before = except === null ? null : deps.store.byId(except);
+    const kept =
+      before !== null &&
+      before.providerId === checked.provider.id &&
+      before.model.id === body.model &&
+      before.upstream === body.upstream;
+    const endpoints =
+      body.upstream === null || model === null || kept
+        ? null
+        : await deps.providers.endpoints(checked.provider, body.model);
     // called by the handler right before its write, with no await between
     return () => {
       const { provider, effort } = check(body, except);
       if (!model) {
         throw new BadRequest(`${provider.name} does not list ${body.model}`);
+      }
+      if (
+        endpoints !== null &&
+        !endpoints.some((e) => e.tag === body.upstream)
+      ) {
+        throw new BadRequest(
+          `upstream ${body.upstream} does not serve ${body.model} on ${provider.name}`,
+        );
       }
       const resolved = stated(model, body.stated);
       return {
@@ -151,6 +179,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         skills: body.skills,
         servers: body.servers,
         mcpMode: body.mcpMode,
+        upstream: body.upstream,
       };
     };
   };

@@ -137,6 +137,8 @@ export type AgentSpec = {
   // for a model its catalog does not describe, as the agents API takes
   contextLength?: number | null;
   tools?: boolean;
+  // the OpenRouter endpoint tag tried first, as the agents API takes it
+  upstream?: string | null;
 };
 
 export type ToolSpec = {
@@ -348,6 +350,7 @@ export function agent(value: unknown): AgentSpec {
         "mcpMode",
         "contextLength",
         "tools",
+        "upstream",
       ],
       "spec",
     ),
@@ -392,6 +395,13 @@ export function agent(value: unknown): AgentSpec {
         return v;
       },
       tools: boolean,
+      // the tag's shape is the API's to hold
+      upstream: (v) => {
+        if (v !== null && (typeof v !== "string" || v === "")) {
+          throw new BadRequest("must be an endpoint tag or null");
+        }
+        return v;
+      },
     },
   );
 }

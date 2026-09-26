@@ -27,6 +27,9 @@ export type SaveAgentRequest = {
   // at most 50; an unknown id is a 400
   servers: AgentServer[];
   mcpMode: McpMode;
+  // the OpenRouter endpoint tag tried first, from the model's endpoints;
+  // absent or null lets OpenRouter route. Refused on another wire
+  upstream?: string | null;
   // what the admin states for a model its catalog does not describe:
   // the window in tokens and whether it takes tools. Refused for a
   // model the catalog describes; a window is required with tools on

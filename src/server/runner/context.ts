@@ -308,6 +308,7 @@ export function request(
     thinkingOff: policy.thinkingOff,
     reasoningEffort: policy.effort,
     cacheKey: sessionId,
+    upstream: policy.upstream,
     ...(policy.offered.tools.length > 0 ? { tools: policy.offered.tools } : {}),
   };
 }
@@ -353,6 +354,7 @@ export function summaryRequest(
     thinkingOff: policy.thinkingOff,
     reasoningEffort: policy.thinkingRequired ? leastEffort(policy.wire) : null,
     cacheKey: sessionId,
+    upstream: policy.upstream,
     maxTokens,
   };
 }

@@ -82,6 +82,7 @@ const policy: SendPolicy = {
   thinkingOff: false,
   thinkingRequired: false,
   effort: "high",
+  upstream: null,
   offered: WITH_BASH,
   disabledCapabilities: [],
   mcpOff: [],
@@ -949,6 +950,7 @@ describe("history", () => {
       thinkingOff: false,
       reasoningEffort: null,
       cacheKey: "s1",
+      upstream: null,
       maxTokens: 2000,
     });
     // the answer left less room than the reserve: the summary fits it
@@ -980,11 +982,16 @@ describe("history", () => {
       thinkingOff: false,
       reasoningEffort: "high",
       cacheKey: "s1",
+      upstream: null,
     });
     // the agent's own Off rides along, for the summary round too
     const off = { ...policy, thinking: false, thinkingOff: true, effort: null };
     expect(request({ ...off, offered: NONE }, "s1", []).thinkingOff).toBe(true);
     expect(summaryRequest(off, "s1", []).thinkingOff).toBe(true);
+    // and so does the preferred upstream
+    const pinned = { ...policy, upstream: "inference-net/fp4", offered: NONE };
+    expect(request(pinned, "s1", []).upstream).toBe("inference-net/fp4");
+    expect(summaryRequest(pinned, "s1", []).upstream).toBe("inference-net/fp4");
   });
 
   test("the request carries the offered tools when there are any", () => {

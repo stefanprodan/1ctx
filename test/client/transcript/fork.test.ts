@@ -32,6 +32,7 @@ function agent(id: string): AgentSummary {
     skills: [],
     servers: [],
     mcpMode: "auto",
+    upstream: null,
     createdAt: 0,
   };
 }

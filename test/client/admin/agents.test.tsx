@@ -41,6 +41,7 @@ import {
   effortChoices,
   keyLine,
   preset,
+  presetBaseUrl,
   providerFieldOf,
   reserveOf,
   sentEffort,
@@ -48,6 +49,7 @@ import {
   statedModel,
   statedProblem,
   thinkingChoices,
+  upstreamOptions,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { Agents } from "../../../src/client/views/admin/Agents.tsx";
@@ -99,6 +101,7 @@ const coder: AgentSummary = {
   skills: [],
   servers: [],
   mcpMode: "auto",
+  upstream: null,
   createdAt: 0,
 };
 
@@ -154,8 +157,24 @@ describe("the words", () => {
       label: "OpenAI-strict",
       text: "GPT, Nvidia NIM, vLLM, Groq",
       baseUrl: null,
+      fixed: false,
+      hint: null,
       name: "",
     });
+    // OpenRouter's address is filled in and may move to the EU one
+    expect(preset("openrouter")).toMatchObject({ fixed: false });
+    expect(preset("openrouter").hint).toContain("keeps requests in the EU");
+    expect(preset("gemini").fixed).toBe(true);
+    // a preset's own address follows the preset, a typed one stays
+    const openrouter = preset("openrouter").baseUrl!;
+    expect(presetBaseUrl("", "openrouter")).toBe(openrouter);
+    expect(presetBaseUrl(openrouter, "openai-strict")).toBe("");
+    // the EU address opens the hint
+    const eu = preset("openrouter").hint!.split(" ")[0]!;
+    expect(presetBaseUrl(eu, "openai-strict")).toBe("");
+    expect(presetBaseUrl("http://127.0.0.1:1234/v1", "openrouter")).toBe(
+      "http://127.0.0.1:1234/v1",
+    );
     expect(
       providerFieldOf("keyName must be provider- followed by a name"),
     ).toBe("keyName");
@@ -315,8 +334,76 @@ describe("a model its catalog does not describe", () => {
       expect(
         agentFieldOf("contextLength is required for a model with tools"),
       ).toBe("contextLength");
+      expect(agentFieldOf("upstream modelx does not serve m on router")).toBe(
+        "upstream",
+      );
     },
   );
+
+  test("Preferred provider lists any provider first and leaves out what cannot serve tools", () => {
+    const endpoint = {
+      tag: "inference-net/fp4",
+      name: "InferenceNet",
+      quantization: "fp4",
+      promptPrice: 0.045,
+      completionPrice: 0.14,
+      discount: 0.5,
+      tools: true,
+      reasoning: true,
+    };
+    const endpoints = [
+      endpoint,
+      { ...endpoint, tag: "sail/us", name: "Sail", quantization: "fp8" },
+      { ...endpoint, tag: "sail/fp8", name: "Sail", quantization: "fp8" },
+      {
+        ...endpoint,
+        tag: "relace",
+        name: "Relace",
+        quantization: null,
+        discount: 0,
+        tools: false,
+      },
+    ];
+    expect(upstreamOptions(endpoints, true, null)).toEqual([
+      { value: "", label: "Any provider", detail: "OpenRouter picks" },
+      {
+        value: "inference-net/fp4",
+        label: "InferenceNet fp4",
+        detail: "$0.045 / $0.14 · 50% off",
+        keywords: "inference-net/fp4",
+      },
+      // two with one name are told apart by their tags
+      {
+        value: "sail/us",
+        label: "sail/us",
+        detail: "$0.045 / $0.14 · 50% off",
+        keywords: "sail/us",
+      },
+      {
+        value: "sail/fp8",
+        label: "sail/fp8",
+        detail: "$0.045 / $0.14 · 50% off",
+        keywords: "sail/fp8",
+      },
+    ]);
+    expect(upstreamOptions(endpoints, false, null).at(-1)).toEqual({
+      value: "relace",
+      label: "Relace",
+      detail: "$0.045 / $0.14",
+      keywords: "relace",
+    });
+    // a saved tag no longer listed stays a choice
+    expect(upstreamOptions([], true, "gone").at(-1)).toEqual({
+      value: "gone",
+      label: "gone",
+      detail: "not listed now",
+    });
+    // a list that did not load says nothing of it
+    expect(upstreamOptions(null, true, "kept")).toEqual([
+      { value: "", label: "Any provider", detail: "OpenRouter picks" },
+      { value: "kept", label: "kept" },
+    ]);
+  });
 
   test.serial(
     "only an undescribed pick sends and shows what was stated",
@@ -595,7 +682,10 @@ describe("the page", () => {
         { ...coder, servers: [{ serverId: "s1", read: true, write: false }] },
       ];
       expect(render(<Agents />)).toContain("reasoning · 1 MCP<");
-      agents.value = [{ ...coder }];
+      agents.value = [{ ...coder, upstream: "deepinfra/fp4" }];
+      expect(render(<Agents />)).toContain(
+        "tools · reasoning · via deepinfra/fp4",
+      );
       agents.value = [{ ...coder, thinking: "on", effort: "xhigh" }];
       expect(render(<Agents />)).toContain(
         "reasoning · thinking on · effort xhigh",

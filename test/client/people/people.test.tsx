@@ -65,6 +65,7 @@ const agent: DirectoryAgentResponse = {
     skills: ["s1"],
     servers: [],
     mcpMode: "auto",
+    upstream: null,
     createdAt: 0,
   },
   provider: "router",

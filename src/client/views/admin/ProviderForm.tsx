@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// New provider: the preset, which fixes the wire and, for OpenRouter,
-// the address; then the name, the key file, and the base URL when the
-// preset leaves it to the admin. A provider is never edited after.
+// New provider: the preset, which fixes the wire and fills or fixes
+// the address; then the name, the key file, and the base URL unless
+// the preset fixes it. A provider is never edited after.
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
@@ -19,6 +19,7 @@ import {
   baseUrlProblem,
   PRESETS,
   preset,
+  presetBaseUrl,
   providerFieldOf,
 } from "./Agents.model.ts";
 import { Choices } from "./Choices.tsx";
@@ -27,7 +28,7 @@ import "./agents.css";
 export function ProviderForm({ onDone }: { onDone: () => void }) {
   const wire = useSignal<Wire>(PRESETS[0]!.wire);
   const name = useSignal(preset(wire.value).name);
-  const baseUrl = useSignal("");
+  const baseUrl = useSignal(preset(wire.value).baseUrl ?? "");
   const keyName = useSignal(NO_KEY);
   const chosen = preset(wire.value);
   // read from the signals at call time: the save keeps the callback of
@@ -38,9 +39,9 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
       name: name.value.trim(),
       wire: wire.value,
       baseUrl:
-        p.baseUrl === null
-          ? baseUrl.value.trim().replace(/\/+$/, "")
-          : p.baseUrl,
+        p.fixed && p.baseUrl !== null
+          ? p.baseUrl
+          : baseUrl.value.trim().replace(/\/+$/, ""),
       keyName: keyName.value === NO_KEY ? null : keyName.value,
     };
   };
@@ -52,6 +53,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
     if (name.value.trim() === "" || name.value === was.name) {
       name.value = now.name;
     }
+    baseUrl.value = presetBaseUrl(baseUrl.value, next);
     save.touch();
   };
   const form = useRef<HTMLFormElement>(null);
@@ -66,9 +68,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
     event.preventDefault();
     void save.run(
       at("name", nameProblem(name.value)) ??
-        (chosen.baseUrl === null
-          ? at("baseUrl", baseUrlProblem(baseUrl.value))
-          : null),
+        (chosen.fixed ? null : at("baseUrl", baseUrlProblem(baseUrl.value))),
     );
   };
   return (
@@ -120,7 +120,7 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
             </span>
           )}
         </div>
-        {chosen.baseUrl === null && (
+        {!chosen.fixed && (
           <label class="field pair-wide">
             <span class="label label-required">Base URL</span>
             <input
@@ -134,7 +134,11 @@ export function ProviderForm({ onDone }: { onDone: () => void }) {
               value={baseUrl.value}
               onInput={save.bind(baseUrl)}
             />
-            <FieldError save={save} field="baseUrl" />
+            {invalid("baseUrl") || chosen.hint === null ? (
+              <FieldError save={save} field="baseUrl" />
+            ) : (
+              <span class="hint">{chosen.hint}</span>
+            )}
           </label>
         )}
       </div>

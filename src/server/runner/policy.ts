@@ -90,6 +90,8 @@ export type SendPolicy = {
   // the model always thinks, so no request turns it off
   thinkingRequired: boolean;
   effort: Effort | null;
+  // the OpenRouter endpoint tag the agent prefers, null to let it route
+  upstream: string | null;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
   disabledCapabilities: string[];
@@ -213,6 +215,7 @@ export function buildPolicy(input: {
     thinkingOff: fixed === null && agent.thinking === "off",
     thinkingRequired: agent.model.thinkingRequired,
     effort: thinking ? agent.effort : null,
+    upstream: input.wire === "openrouter" ? agent.upstream : null,
     offered,
     disabledCapabilities,
     mcpOff:

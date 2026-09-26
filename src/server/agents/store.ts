@@ -29,6 +29,7 @@ type Raw = {
   effort: Effort | null;
   prompt: string;
   mcp_mode: McpMode;
+  upstream: string | null;
   created_at: number;
 };
 
@@ -55,6 +56,7 @@ const row = (raw: Raw, skills: string[], servers: AgentServer[]): AgentRow => ({
   skills,
   servers,
   mcpMode: raw.mcp_mode,
+  upstream: raw.upstream,
   createdAt: raw.created_at,
 });
 
@@ -72,6 +74,7 @@ export type AgentFields = {
   skills: string[];
   servers: AgentServer[];
   mcpMode: McpMode;
+  upstream: string | null;
 };
 
 export class AgentStore {
@@ -124,8 +127,8 @@ export class AgentStore {
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
            thinking_required, reasoning_known, model_described, thinking,
-           effort, prompt, mcp_mode, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           effort, prompt, mcp_mode, upstream, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -146,6 +149,7 @@ export class AgentStore {
         fields.effort,
         fields.prompt,
         fields.mcpMode,
+        fields.upstream,
         fields.now,
       );
     return this.byId(id)!;
@@ -159,7 +163,7 @@ export class AgentStore {
            context_length = ?, prompt_price = ?, completion_price = ?,
            tools = ?, reasoning = ?, thinking_required = ?,
            reasoning_known = ?, model_described = ?, thinking = ?,
-           effort = ?, prompt = ?, mcp_mode = ?
+           effort = ?, prompt = ?, mcp_mode = ?, upstream = ?
          where id = ?`,
       )
       .run(
@@ -180,6 +184,7 @@ export class AgentStore {
         fields.effort,
         fields.prompt,
         fields.mcpMode,
+        fields.upstream,
         id,
       );
     return this.byId(id);

@@ -392,6 +392,12 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   instructions as `serverBlock()` gives them, trimmed to 12 lines with
   Show all. `data/mcp.ts` keeps the rows, the keys and `loadedAt`; the
   agent form reads them again on open and says when it did.
+- **The agent form's Preferred provider.** On an OpenRouter provider,
+  a `Select` under the model (`UpstreamField.tsx`) asks for the
+  model's endpoints each time one is picked, Any provider first, and
+  keeps a saved tag the list lacks as a choice; the agent row says
+  `via <tag>`. The New provider form fills OpenRouter's base URL,
+  replaced on a preset change unless the admin typed another one.
 - **The agent form's MCP section.** The agent form's
   section is a line per server with Read and Write boxes (a side off
   on the server faint with the word),

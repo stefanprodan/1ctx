@@ -50,6 +50,7 @@ const agent: AgentRow = {
   skills: [],
   servers: [],
   mcpMode: "auto",
+  upstream: null,
   createdAt: 1,
 };
 
@@ -220,5 +221,25 @@ describe("send policy thinking", () => {
       thinking: false,
       effort: null,
     });
+  });
+});
+
+describe("send policy upstream", () => {
+  const pinned = (wire: SendPolicy["wire"]) =>
+    buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent: { ...agent, upstream: "inference-net/fp4" },
+      wire,
+      now: 1,
+      tools: null,
+      knowledge: { files: 0, recent: [] },
+      limits: DEFAULT_LIMITS,
+    }).upstream;
+
+  test("rides only on the OpenRouter wire", () => {
+    expect(pinned("openrouter")).toBe("inference-net/fp4");
+    expect(pinned("openai-compatible")).toBeNull();
+    expect(pinned(null)).toBeNull();
   });
 });
