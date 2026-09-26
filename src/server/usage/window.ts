@@ -6,6 +6,8 @@
 // so one across a DST change is 23 or 25 hours; nothing here divides a
 // timestamp, which would bucket by a fixed offset.
 
+import { MAX_WEEKS } from "../../shared/api/usage.ts";
+
 export type UsageWindow = {
   days: string[];
   starts: number[];
@@ -64,8 +66,6 @@ const addDays = (day: CalendarDay, count: number): CalendarDay => {
 };
 
 const DAY_MS = 86_400_000;
-// a year of columns, so the widest card fills with small cells
-export const MAX_WEEKS = 53;
 
 const sameDay = (parts: CalendarDay, day: CalendarDay): boolean =>
   parts.year === day.year && parts.month === day.month && parts.day === day.day;

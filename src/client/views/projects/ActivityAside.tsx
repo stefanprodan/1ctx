@@ -3,14 +3,19 @@
 //
 // A project's recent weeks as an aside section: the Projects page's
 // heatmap without its labels, shaded against this project's own days,
-// and a line under it for the total or the selected day.
+// and a line under it for the total or the selected day. Its ghost
+// while the weeks load, and nothing when their first load failed.
 
 import { useMemo } from "preact/hooks";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
-import { recentDays } from "../../data/usage.ts";
+import {
+  RECENT_WEEKS,
+  recentDays,
+  recentDaysFailed,
+} from "../../data/usage.ts";
 import { AsideSection } from "../../ui/Split.tsx";
 import { activityModel, projectAnswer } from "./Activity.model.ts";
-import { ActivityGrid, useDaySelection } from "./Activity.tsx";
+import { ActivityGrid, GhostGrid, useDaySelection } from "./Activity.tsx";
 
 function Recent({ answer }: { answer: DaysUsageResponse }) {
   const model = useMemo(() => activityModel(answer), [answer]);
@@ -45,10 +50,17 @@ export function ActivityAside({ projectId }: { projectId: string }) {
     () => (all === null ? null : projectAnswer(all, projectId)),
     [all, projectId],
   );
+  if (answer === null && recentDaysFailed.value) return null;
   return (
     <AsideSection label="Activity">
       {answer === null ? (
-        <p class="split-empty">Loading</p>
+        <>
+          <GhostGrid weeks={RECENT_WEEKS} labels={false} />
+          {/* the line the total goes on, so the sections under it stay put */}
+          <p class="split-empty" role="status" aria-label="Loading activity">
+            {"\u00a0"}
+          </p>
+        </>
       ) : (
         <Recent answer={answer} />
       )}

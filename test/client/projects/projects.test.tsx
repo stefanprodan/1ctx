@@ -24,6 +24,7 @@ import {
   projectAgentCount,
   projectAgents,
 } from "../../../src/client/data/sessions.ts";
+import { daysFailed } from "../../../src/client/data/usage.ts";
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
@@ -474,7 +475,11 @@ describe("the pages", () => {
       const html = render(<Projects />);
       expect(html).toContain('class="rows-line rows-go" href="/projects/p1"');
       expect(html).toContain('class="rows-line rows-go" href="/projects/p2"');
-      expect(html.match(/class="card rows-card"/g)).toHaveLength(1);
+      // the rows in one card, under the Activity ghost while the year loads
+      expect(html.match(/class="card rows-card"/g)).toHaveLength(2);
+      expect(html).toContain('aria-label="Loading activity"');
+      // and each row's strip pulses in its place
+      expect(html.match(/class="activity-strip"/g)).toHaveLength(2);
       expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
         html.indexOf('href="/projects/p2"'),
       );
@@ -484,6 +489,19 @@ describe("the pages", () => {
       expect(html).not.toContain('href="/admin/projects"');
       me.value = { ...casey, role: "admin" };
       expect(render(<Projects />)).toContain('href="/admin/projects"');
+    },
+  );
+
+  test.serial(
+    "Projects leaves the Activity card out when the year fails",
+    () => {
+      projects.value = [personal];
+      daysFailed.value = true;
+      const html = render(<Projects />);
+      daysFailed.value = false;
+      expect(html).not.toContain(">Activity<");
+      expect(html).not.toContain("activity-strip");
+      expect(html.match(/class="card rows-card"/g)).toHaveLength(1);
     },
   );
 

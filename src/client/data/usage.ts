@@ -35,6 +35,8 @@ let weekTurn = 0;
 // timer, since each window gains the new day.
 function daysEntity(weeks: number | null) {
   const answer = signal<DaysUsageResponse | null>(null);
+  // a first load that failed: the page stops drawing the loading state
+  const failed = signal(false);
   let turn = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -65,6 +67,7 @@ function daysEntity(weeks: number | null) {
     try {
       const body = await api<DaysUsageResponse>(`/api/usage/days?${query}`);
       if (current()) {
+        failed.value = false;
         answer.value = body;
         arm(body.until);
       }
@@ -74,6 +77,7 @@ function daysEntity(weeks: number | null) {
       // first load that fails has nothing to keep
       if (answer.value === null) {
         clear();
+        failed.value = true;
       } else {
         arm(Date.now());
       }
@@ -83,10 +87,11 @@ function daysEntity(weeks: number | null) {
   const reset = () => {
     turn++;
     clear();
+    failed.value = false;
     answer.value = null;
   };
 
-  return { answer, load, reset };
+  return { answer, failed, load, reset };
 }
 
 const year = daysEntity(null);
@@ -94,9 +99,11 @@ const recent = daysEntity(RECENT_WEEKS);
 
 // the year, for the Projects page
 export const days = year.answer;
+export const daysFailed = year.failed;
 export const loadDays = year.load;
 // the last weeks, for Home's aside
 export const recentDays = recent.answer;
+export const recentDaysFailed = recent.failed;
 export const loadRecentDays = recent.load;
 
 effect(() => {

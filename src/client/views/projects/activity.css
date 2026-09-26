@@ -66,6 +66,18 @@
   .activity-level-4 {
     background: var(--heat-4);
   }
+  /* the cells while the year loads, pulsing week after week as the
+     feed's ghost rows do */
+  .activity-ghost {
+    background: var(--heat-0);
+    animation: pulse 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--ghost) * 0.03s);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .activity-ghost {
+      animation: none;
+    }
+  }
   .activity-selected {
     outline: 1px solid var(--fg);
     outline-offset: 1px;

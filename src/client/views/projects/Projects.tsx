@@ -15,7 +15,7 @@ import { AgentsAside } from "../../agents/AgentsAside.tsx";
 import { me } from "../../data/me.ts";
 import { projects, projectsError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
-import { days } from "../../data/usage.ts";
+import { days, daysFailed } from "../../data/usage.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -32,9 +32,9 @@ import { Search } from "../../ui/Search.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { WeekAside } from "../home/WeekAside.tsx";
 import { activityModel } from "./Activity.model.ts";
-import { Activity } from "./Activity.tsx";
+import { Activity, ActivityGhost } from "./Activity.tsx";
 import { listedProjects, peopleLine } from "./Project.model.ts";
-import { Strip } from "./Strip.tsx";
+import { Strip, StripGhost } from "./Strip.tsx";
 
 function ProjectRow({
   project,
@@ -51,7 +51,7 @@ function ProjectRow({
         <Icon name={projectIcon(project.kind)} size={14} />
       </RowsAvatar>
       <RowsTitle name={project.name} sub={peopleLine(project)} mono />
-      {answer !== null && (
+      {answer !== null ? (
         <RowsMeta>
           <Strip
             answer={answer}
@@ -59,6 +59,12 @@ function ProjectRow({
             population={population}
           />
         </RowsMeta>
+      ) : (
+        !daysFailed.value && (
+          <RowsMeta>
+            <StripGhost />
+          </RowsMeta>
+        )
       )}
     </RowsGo>
   );
@@ -87,8 +93,10 @@ export function Projects() {
         }
       >
         <Rows>
-          {answer !== null && model !== null && (
+          {answer !== null && model !== null ? (
             <Activity answer={answer} model={model} />
+          ) : (
+            !daysFailed.value && <ActivityGhost />
           )}
           <RowsCard
             label="Projects"
