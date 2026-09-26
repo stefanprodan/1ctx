@@ -162,6 +162,8 @@ describe("strict catalog", () => {
         completionPrice: null,
         tools: false,
         reasoning: false,
+        thinkingRequired: false,
+        reasoningKnown: false,
         described: false,
       });
     }
@@ -178,12 +180,16 @@ describe("strict catalog", () => {
       completionPrice: 0.6,
       tools: true,
       reasoning: true,
+      thinkingRequired: false,
+      reasoningKnown: false,
       described: true,
     });
     expect(byId.get("whisper-large-v3")).toMatchObject({
       contextLength: 448,
       tools: false,
       reasoning: false,
+      thinkingRequired: false,
+      reasoningKnown: false,
       described: true,
     });
   });

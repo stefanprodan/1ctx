@@ -17,6 +17,7 @@
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
+import { EFFORTS, type Effort, type Wire } from "../../shared/words.ts";
 import { tokens } from "../lib/tokens.ts";
 import type {
   ChatMessageIn,
@@ -318,11 +319,15 @@ export function request(
 export const SUMMARY_MARGIN = 256;
 export const SUMMARY_MIN_TOKENS = 128;
 
+const leastEffort = (wire: Wire | null): Effort | null =>
+  wire === null ? null : EFFORTS[wire][0];
+
 // the summary round: the history plus the instruction, no tools and no
-// thinking. Its answer is capped by the limit and the reserve, then by
-// the room the answer round actually left (its prompt plus completion,
-// `used`): a strict provider refuses a request whose prompt and
-// max_tokens together pass the window
+// thinking, or the least effort the wire names for a model that always
+// thinks, since its thoughts come out of the same cap. Its answer is
+// capped by the limit and the reserve, then by the room the answer round
+// actually left (its prompt plus completion, `used`): a strict provider
+// refuses a request whose prompt and max_tokens together pass the window
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,
@@ -344,9 +349,9 @@ export function summaryRequest(
   return {
     model: policy.model,
     messages: [...messages, { role: "user", content: SUMMARIZE }],
-    thinking: false,
+    thinking: policy.thinkingRequired,
     thinkingOff: policy.thinkingOff,
-    reasoningEffort: null,
+    reasoningEffort: policy.thinkingRequired ? leastEffort(policy.wire) : null,
     cacheKey: sessionId,
     maxTokens,
   };

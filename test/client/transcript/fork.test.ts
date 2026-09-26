@@ -22,6 +22,8 @@ function agent(id: string): AgentSummary {
       completionPrice: null,
       tools: true,
       reasoning: false,
+      thinkingRequired: false,
+      reasoningKnown: true,
       described: true,
     },
     thinking: null,

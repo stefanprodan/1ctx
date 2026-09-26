@@ -10,6 +10,7 @@ import { compactsAt } from "../../../shared/compaction.ts";
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
+import { fixedThinking } from "../../../shared/thinking.ts";
 import {
   EFFORTS,
   type Effort,
@@ -137,6 +138,11 @@ export type Choice<T> = { value: T; label: string };
 export function thinkingChoices(
   model: CatalogMatch | null,
 ): Choice<"on" | "off" | null>[] {
+  // a model that always or never thinks has no choice to make
+  const fixed = model === null ? null : fixedThinking(model);
+  if (fixed !== null) {
+    return [{ value: null, label: fixed === "on" ? "On" : "Off" }];
+  }
   return [
     {
       value: null,
@@ -165,6 +171,7 @@ export function effortApplies(
   model: CatalogMatch | null,
   thinking: "on" | "off" | null,
 ): boolean {
+  if (model !== null) thinking = fixedThinking(model) ?? thinking;
   if (thinking === "off") return false;
   if (thinking === "on") return true;
   return model?.reasoning === true;

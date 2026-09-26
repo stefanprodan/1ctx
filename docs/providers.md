@@ -67,7 +67,16 @@ provider, model, window, tools, thinking and effort fields.
   and a window is required with tools on), and a save without them
   clears them. An agent carries `thinking` and `effort`, null for the
   provider's default; the levels per wire are `EFFORTS` in
-  `shared/words.ts`, and the policy resolves both once per send.
+  `shared/words.ts`, and the policy resolves both once per send. A
+  model OpenRouter lists with `reasoning.mandatory` is
+  `thinkingRequired`. `fixedThinking()` in `shared/thinking.ts` says
+  when the catalog leaves no choice: on for such a model, off for one
+  a catalog that reliably names reasoning (`reasoningKnown`: OpenRouter's
+  `supported_parameters` and Gemini; mlx-serve leaves it out of thinking
+  models) lists without it. Then the agents API stores null for any
+  thinking word, the form shows a single On or Off, and the policy
+  ignores a word saved before. An agent saved before the flags learns
+  them when its model is picked again.
 - **Keys are picked by name.**
   `GET /api/providers` answers the `provider-` key names beside the rows.
   The form picks one with `Select`, or No key; a missing file stays named

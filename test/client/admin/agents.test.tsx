@@ -83,6 +83,8 @@ const flash: CatalogMatch = {
   completionPrice: 0.28,
   tools: true,
   reasoning: true,
+  thinkingRequired: false,
+  reasoningKnown: true,
   described: true,
 };
 const coder: AgentSummary = {
@@ -188,8 +190,19 @@ describe("the words", () => {
     });
     // a catalog that lists only ids does not say whether the model thinks
     expect(
-      thinkingChoices({ ...flash, reasoning: false, described: false })[0],
+      thinkingChoices({
+        ...flash,
+        reasoning: false,
+        described: false,
+        reasoningKnown: false,
+      })[0],
     ).toEqual({ value: null, label: "Default" });
+    expect(
+      thinkingChoices({ ...flash, thinkingRequired: true }).map((c) => c.value),
+    ).toEqual([null]);
+    expect(thinkingChoices({ ...flash, reasoning: false })).toEqual([
+      { value: null, label: "Off" },
+    ]);
     expect(effortChoices("openrouter").map((c) => c.value)).toEqual([
       null,
       "minimal",
@@ -212,7 +225,19 @@ describe("the words", () => {
     ]);
     expect(effortApplies(flash, null)).toBe(true);
     expect(effortApplies({ ...flash, reasoning: false }, null)).toBe(false);
-    expect(effortApplies({ ...flash, reasoning: false }, "on")).toBe(true);
+    expect(
+      effortApplies(
+        {
+          ...flash,
+          reasoning: false,
+          described: false,
+          reasoningKnown: false,
+        },
+        "on",
+      ),
+    ).toBe(true);
+    // a model that never thinks takes no effort whatever the row says
+    expect(effortApplies({ ...flash, reasoning: false }, "on")).toBe(false);
     expect(effortApplies(flash, "off")).toBe(false);
     expect(thinkingLine({ thinking: null, effort: null })).toBe("");
     expect(thinkingLine({ thinking: "off", effort: "high" })).toBe(
@@ -268,6 +293,8 @@ describe("a model its catalog does not describe", () => {
     completionPrice: null,
     tools: false,
     reasoning: false,
+    thinkingRequired: false,
+    reasoningKnown: false,
     described: false,
   };
 

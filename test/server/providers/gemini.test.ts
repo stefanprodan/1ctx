@@ -98,6 +98,8 @@ describe("Gemini catalog", () => {
       completionPrice: null,
       tools: true,
       reasoning: true,
+      thinkingRequired: false,
+      reasoningKnown: true,
       described: true,
     });
     expect(models[2]).toMatchObject({
@@ -105,6 +107,8 @@ describe("Gemini catalog", () => {
       contextLength: 262144,
       tools: true,
       reasoning: true,
+      thinkingRequired: false,
+      reasoningKnown: true,
       described: true,
     });
     expect(
@@ -169,6 +173,8 @@ describe("Gemini catalog", () => {
         completionPrice: null,
         tools: true,
         reasoning: false,
+        thinkingRequired: false,
+        reasoningKnown: true,
         described: true,
       },
     ]);

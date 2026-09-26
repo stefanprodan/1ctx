@@ -55,6 +55,8 @@ const agent: DirectoryAgentResponse = {
       completionPrice: 0.28,
       tools: true,
       reasoning: true,
+      thinkingRequired: false,
+      reasoningKnown: true,
       described: true,
     },
     thinking: "on",

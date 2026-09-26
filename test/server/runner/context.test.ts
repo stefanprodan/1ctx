@@ -80,6 +80,7 @@ const policy: SendPolicy = {
   prompt: "You write Go.",
   thinking: true,
   thinkingOff: false,
+  thinkingRequired: false,
   effort: "high",
   offered: WITH_BASH,
   disabledCapabilities: [],
@@ -959,6 +960,15 @@ describe("history", () => {
       summaryRequest({ ...withTools, contextLength: null }, "s1", [], 6500)
         .maxTokens,
     ).toBe(4096);
+    // a model that always thinks is asked for the least the wire names
+    const required = { ...withTools, thinkingRequired: true };
+    expect(summaryRequest(required, "s1", [])).toMatchObject({
+      thinking: true,
+      reasoningEffort: "low",
+    });
+    expect(
+      summaryRequest({ ...required, wire: "openrouter" }, "s1", []),
+    ).toMatchObject({ thinking: true, reasoningEffort: "minimal" });
   });
 
   test("the request carries the model, the thinking flag and the session as the cache key", () => {

@@ -74,6 +74,8 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       completionPrice: null,
       tools: true,
       reasoning: model.thinking === true,
+      thinkingRequired: false,
+      reasoningKnown: true,
       described: true,
     });
   }

@@ -20,6 +20,7 @@ import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../shared/contracts/provider.ts";
+import { fixedThinking } from "../../../shared/thinking.ts";
 import {
   AVATARS,
   type Avatar,
@@ -168,6 +169,8 @@ export function AgentForm({
   const invalid = (field: string) => save.fieldError(field) !== null;
   const pick = (m: CatalogMatch) => {
     model.value = m;
+    // a model that always or never thinks has one choice, the default
+    if (fixedThinking(m) !== null) thinking.value = null;
     windowText.value = "";
     takesTools.value = false;
     s.clear();
@@ -191,6 +194,11 @@ export function AgentForm({
     avatar.value !== agent.avatar ||
     providerId.value !== agent.providerId ||
     model.value?.id !== agent.model.id ||
+    // a pick of the same model whose catalog now says more about its
+    // thinking saves it
+    model.value?.thinkingRequired !== agent.model.thinkingRequired ||
+    model.value?.reasoningKnown !== agent.model.reasoningKnown ||
+    model.value?.reasoning !== agent.model.reasoning ||
     prompt.value.trim() !== agent.prompt ||
     thinking.value !== agent.thinking ||
     effortSent !== agent.effort ||
@@ -370,7 +378,7 @@ export function AgentForm({
             <span class="label">Thinking</span>
             <Picks
               choices={thinkingChoices(picked)}
-              value={thinking.value}
+              value={fixedThinking(picked) === null ? thinking.value : null}
               busy={busy}
               onPick={(value) => {
                 thinking.value = value;

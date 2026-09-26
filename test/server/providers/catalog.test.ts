@@ -15,6 +15,7 @@ import {
   parseCatalog,
   search,
 } from "../../../src/server/providers/index.ts";
+import { fixedThinking } from "../../../src/shared/thinking.ts";
 import { collectLogs, fakeFetch, PROVIDER_URL } from "../../helpers/app.ts";
 
 const body = JSON.parse(
@@ -45,12 +46,17 @@ describe("parseCatalog", () => {
       completionPrice: 0.6,
       tools: true,
       reasoning: true,
+      thinkingRequired: false,
+      reasoningKnown: true,
       described: true,
     });
     const free = models.find(
       (m) => m.id === "nvidia/nemotron-3-super-120b-a12b:free",
     )!;
     expect([free.promptPrice, free.completionPrice]).toEqual([0, 0]);
+    expect(
+      models.find((m) => m.id === "openai/gpt-6-astra")!.thinkingRequired,
+    ).toBe(true);
   });
 
   test("takes the plain list an OpenAI-compatible server answers", () => {
@@ -65,9 +71,37 @@ describe("parseCatalog", () => {
         completionPrice: null,
         tools: false,
         reasoning: false,
+        thinkingRequired: false,
+        reasoningKnown: false,
         described: false,
       },
     ]);
+  });
+
+  test("mlx-serve capabilities without reasoning say nothing of thinking", () => {
+    const [m] = parseCatalog({
+      data: [
+        {
+          id: "local/thinker",
+          context_length: 262144,
+          capabilities: ["chat", "tool_use", "streaming"],
+        },
+      ],
+    });
+    expect(m).toMatchObject({ reasoning: false, reasoningKnown: false });
+    expect(fixedThinking(m!)).toBeNull();
+  });
+
+  test("a window alone lists no capabilities, so it says nothing of thinking", () => {
+    const [m] = parseCatalog({
+      data: [{ id: "local/model", context_length: 32768 }],
+    });
+    expect(m).toMatchObject({
+      described: true,
+      reasoning: false,
+      reasoningKnown: false,
+    });
+    expect(fixedThinking(m!)).toBeNull();
   });
 
   test("reads the capabilities an mlx-serve model lists", () => {
@@ -85,6 +119,7 @@ describe("parseCatalog", () => {
       contextLength: 262144,
       tools: true,
       reasoning: true,
+      thinkingRequired: false,
       promptPrice: null,
     });
   });

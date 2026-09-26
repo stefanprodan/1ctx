@@ -22,6 +22,8 @@ type Raw = {
   completion_price: number | null;
   tools: number;
   reasoning: number;
+  thinking_required: number;
+  reasoning_known: number;
   model_described: number;
   thinking: "on" | "off" | null;
   effort: Effort | null;
@@ -43,6 +45,8 @@ const row = (raw: Raw, skills: string[], servers: AgentServer[]): AgentRow => ({
     completionPrice: raw.completion_price,
     tools: raw.tools === 1,
     reasoning: raw.reasoning === 1,
+    thinkingRequired: raw.thinking_required === 1,
+    reasoningKnown: raw.reasoning_known === 1,
     described: raw.model_described === 1,
   },
   thinking: raw.thinking,
@@ -119,8 +123,9 @@ export class AgentStore {
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           model_described, thinking, effort, prompt, mcp_mode, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           thinking_required, reasoning_known, model_described, thinking,
+           effort, prompt, mcp_mode, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -134,6 +139,8 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        m.thinkingRequired ? 1 : 0,
+        m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
         fields.thinking,
         fields.effort,
@@ -150,7 +157,8 @@ export class AgentStore {
       .query(
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
-           tools = ?, reasoning = ?, model_described = ?, thinking = ?,
+           tools = ?, reasoning = ?, thinking_required = ?,
+           reasoning_known = ?, model_described = ?, thinking = ?,
            effort = ?, prompt = ?, mcp_mode = ?
          where id = ?`,
       )
@@ -165,6 +173,8 @@ export class AgentStore {
         m.completionPrice,
         m.tools ? 1 : 0,
         m.reasoning ? 1 : 0,
+        m.thinkingRequired ? 1 : 0,
+        m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
         fields.thinking,
         fields.effort,
