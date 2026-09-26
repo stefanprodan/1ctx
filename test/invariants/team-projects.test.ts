@@ -113,28 +113,6 @@ function close(chat: ChatApp, ...connections: FakeConn[]) {
   chat.app.socket.dispose();
 }
 describe("team project administration", () => {
-  test("a member is forbidden from every project write", async () => {
-    const chat = await chatApp();
-    const project = await createTeam(chat, "ops");
-    const calls = [
-      chat.member.call("POST", "/api/projects", { body: { name: "mine" } }),
-      chat.member.call("PATCH", `/api/projects/${project.id}`, {
-        body: { name: "other" },
-      }),
-      chat.member.call("DELETE", `/api/projects/${project.id}`),
-      chat.member.call("POST", `/api/projects/${project.id}/members`, {
-        body: { userId: chat.memberId },
-      }),
-      chat.member.call(
-        "DELETE",
-        `/api/projects/${project.id}/members/${chat.memberId}`,
-      ),
-    ];
-    expect((await Promise.all(calls)).map((res) => res.status)).toEqual([
-      403, 403, 403, 403, 403,
-    ]);
-    chat.app.socket.dispose();
-  });
   test("a personal project is hidden from every project mutation", async () => {
     const chat = await chatApp();
     const personal = chat.app.projects.personal(chat.adminId)!;

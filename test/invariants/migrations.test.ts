@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { migrate, open } from "../../src/server/db/index.ts";
 import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
 import { EFFORTS, WIRES } from "../../src/shared/words.ts";
-import { fileDb } from "../helpers/db.ts";
+import { fileDb, memoryDb } from "../helpers/db.ts";
 
 describe("migrations", () => {
   test("ids are unique and ordered", () => {
@@ -1610,4 +1610,58 @@ describe("0008 search tavily migration", () => {
       }
     });
   });
+});
+
+// Every test's memory database is a copy of one migrated template, so
+// it must be what open() gives: the schema, the rows the migrations
+// seed and the connection's pragmas.
+test("a test's memory database is a fresh migrate", () => {
+  const pragmas = [
+    "journal_mode",
+    "foreign_keys",
+    "busy_timeout",
+    "user_version",
+    "page_size",
+    "auto_vacuum",
+    "encoding",
+    "synchronous",
+    "recursive_triggers",
+    "defer_foreign_keys",
+  ];
+  const state = (db: Database) => ({
+    pragmas: pragmas.map((name) => db.query(`pragma ${name}`).get()),
+    schema: db
+      .query(
+        "select type, name, tbl_name, sql from sqlite_schema order by name",
+      )
+      .all(),
+    migrations: db.query("select id from migrations order by id").all(),
+    tools: db.query("select * from tools order by name").all(),
+  });
+  const fresh = open(":memory:").db;
+  const first = memoryDb();
+  const second = memoryDb();
+  try {
+    // a full migrate leaves the web access row beside the three tool rows
+    expect(
+      fresh
+        .query<{ name: string }, []>("select name from tools order by rowid")
+        .all()
+        .map((row) => row.name),
+    ).toEqual(["webfetch", "websearch", "visualize", "web"]);
+    expect(state(first)).toEqual(state(fresh));
+    first.exec("create table scratch (a int)");
+    expect(state(second)).toEqual(state(fresh));
+    expect(() =>
+      first
+        .query(
+          "insert into agents (id, name, provider_id, model, model_name, created_at) values ('a', 'a', 'none', 'm', 'm', 0)",
+        )
+        .run(),
+    ).toThrow();
+  } finally {
+    fresh.close();
+    first.close();
+    second.close();
+  }
 });

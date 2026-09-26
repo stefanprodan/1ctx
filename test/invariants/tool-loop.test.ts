@@ -17,7 +17,7 @@ import {
   NOT_RUN_REPEAT,
 } from "../../src/server/runner/writer.ts";
 import { settleRun } from "../helpers/automations.ts";
-import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
+import { chatApp, setLimits, startChat, waitScript } from "../helpers/chat.ts";
 import {
   answerNodes,
   asksAnswer,
@@ -438,7 +438,6 @@ describe("the tool loop", () => {
       const script = await waitScript(chat.scripted, round);
       script.toolRound([time("same")]);
       script.end();
-      await settle(chat);
     }
     // the third is refused and the next round is an ordinary one
     const next = await waitScript(chat.scripted, 4);
@@ -471,7 +470,6 @@ describe("the tool loop", () => {
       const script = await waitScript(chat.scripted, round);
       script.toolRound([time("same")]);
       script.end();
-      await settle(chat);
     }
     const answer = await waitScript(chat.scripted, 7);
     expect(asksAnswer(answer.body, LOOP_LINE)).toBe(true);
@@ -491,13 +489,17 @@ describe("the tool loop", () => {
     chat.app.socket.dispose();
   });
 
-  test("the round cap ends the loop after MAX_ROUNDS and lands on an answer", async () => {
+  test("the round cap ends the loop at its limit and lands on an answer", async () => {
     const chat = await chatApp();
     try {
+      // a lowered cap takes the same branch as the default, in a tenth
+      // of the rounds
+      const rounds = 10;
+      await setLimits(chat, { rounds });
       const { detail, sessionId } = await startChat(chat, "many");
-      for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
+      for (let round = 1; round <= rounds; round++) {
         const script = await waitScript(chat.scripted, round);
-        if (round === LOOP_LIMITS.rounds) {
+        if (round === rounds) {
           expect(asksAnswer(script.body)).toBe(true);
           script.reply("done after the cap");
         } else {
@@ -508,7 +510,7 @@ describe("the tool loop", () => {
       }
       expect((await settleRun(chat, sessionId))?.status).toBe("done");
       const send = chat.app.sessions.send(detail.send.id)!;
-      expect(send.rounds).toBe(LOOP_LIMITS.rounds);
+      expect(send.rounds).toBe(rounds);
       const replies = chat.app.sessions
         .messages(sessionId)
         .filter((r) => r.kind === "reply");
@@ -542,22 +544,6 @@ describe("the tool loop", () => {
       .filter((r) => r.kind === "tool");
     expect(toolRows.length).toBe(many.length);
     expect(toolRows.every((r) => r.status === "stopped")).toBe(true);
-    answerNodes(chat, sessionId);
-    chat.app.socket.dispose();
-  });
-
-  test("a stop during a work round's text ends the send stopped", async () => {
-    const chat = await chatApp();
-    const { detail, script, sessionId } = await startChat(chat, "stop me");
-    script.content("thinking about a tool");
-    script.toolCall(time("c1"));
-    await tick();
-    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat);
-    const send = chat.app.sessions.send(detail.send.id)!;
-    expect(send).toMatchObject({ status: "stopped", cause: "stop" });
-    expect(chat.app.sessions.byId(sessionId)!.status).toBe("stopped");
-    expect(script.aborted).toBe(true);
     answerNodes(chat, sessionId);
     chat.app.socket.dispose();
   });

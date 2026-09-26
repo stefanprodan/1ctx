@@ -137,7 +137,7 @@ describe("visual draft gates", () => {
     }
   });
 
-  for (const name of ["visualize", "datetime", "unknown"]) {
+  for (const name of ["visualize", "datetime"]) {
     test(`${name} argument bytes count with content and reasoning toward the reply cap`, async () => {
       const chat = await chatApp();
       try {

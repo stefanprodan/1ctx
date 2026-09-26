@@ -217,17 +217,4 @@ describe("tool loop provider policy", () => {
     await settle(chat);
     chat.app.socket.dispose();
   });
-
-  test("with a chosen provider websearch is offered", async () => {
-    const chat = await chatApp({ secrets: { "search-exa": "exa-key" } });
-    await chooseSearch(chat, "exa");
-    const { script } = await startChat(chat, "search please");
-    const tools = (script.body.tools as { function: { name: string } }[]).map(
-      (t) => t.function.name,
-    );
-    expect(tools).toContain("websearch");
-    script.reply("ok");
-    await settle(chat);
-    chat.app.socket.dispose();
-  });
 });

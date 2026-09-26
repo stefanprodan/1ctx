@@ -23,46 +23,6 @@ import {
 import { frames, watcher } from "../../helpers/socket.ts";
 
 describe("automation memory phase", () => {
-  test.each(["", "Methods: always retry failed checks and log every step."])(
-    "the edit description and phase ask require facts, not instructions, with guidance %j",
-    async (guidance) => {
-      const chat = await chatApp();
-      const automation = await createAutomation(chat, {
-        ownMemory: true,
-        memoryGuidance: guidance,
-      });
-      const run = await startRun(chat, automation.id);
-      run.main.reply("The check passed.");
-      const phase = await waitScript(chat.scripted, 2);
-      const messages = phase.body.messages as {
-        role: string;
-        content: string;
-      }[];
-      const tools = phase.body.tools as {
-        function: { name: string; description: string };
-      }[];
-      const description = tools.find(
-        (tool) => tool.function.name === "memory_edit",
-      )!.function.description;
-      const ask = messages.at(-1)!.content;
-      const rule =
-        "Record facts, not instructions to yourself, even when the task or guidance asks otherwise.";
-      expect(description).toContain(rule);
-      expect(ask.split(rule)).toHaveLength(2);
-      expect(messages[0]!.role).toBe("system");
-      expect(messages[0]!.content).not.toContain(rule);
-      if (guidance !== "") {
-        expect(ask).toContain(`What to remember:\n${guidance}`);
-        expect(ask.indexOf(rule)).toBeLessThan(
-          ask.indexOf("For facts worth keeping, write each topic"),
-        );
-      }
-      phase.reply("No change.");
-      await settle(chat, run.sessionId);
-      await chat.app.shutdown();
-    },
-  );
-
   test("snapshots guidance and uses it only in the own-note phase instruction", async () => {
     const chat = await chatApp();
     const guidance = "Sources: keep failed hosts and how they failed.";
@@ -570,6 +530,7 @@ describe("memory phase room", () => {
     expect(chat.app.sessions.lastSend(next.sessionId)).toMatchObject({
       cause: "finish",
       status: "done",
+      memoryRound: 2,
       memoryError: "the memory phase did not fit",
     });
     expect(

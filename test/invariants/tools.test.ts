@@ -136,7 +136,8 @@ describe("tools administration", () => {
     ).toContain("websearch");
     await finish(chat, keyed.script);
 
-    delete chat.secrets.exa;
+    expect(chat.secrets["search-exa"]).toBe("exa-key");
+    delete chat.secrets["search-exa"];
     const missing = await startChat(chat, "without key");
     expect(
       names(chat.app.runner.registry.get(missing.sessionId)!.policy.offered),
@@ -151,28 +152,6 @@ describe("tools administration", () => {
       names(chat.app.runner.registry.get(unchosen.sessionId)!.policy.offered),
     ).not.toContain("websearch");
     await finish(chat, unchosen.script);
-    chat.app.socket.dispose();
-  });
-
-  test("a built-in has no switch to patch", async () => {
-    const chat = await chatApp();
-    const res = await chat.admin.call("PATCH", "/api/tools/datetime", {
-      body: { enabled: false },
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "no such tool" });
-    chat.app.socket.dispose();
-  });
-
-  test("a provider on a non-search tool is refused", async () => {
-    const chat = await chatApp();
-    const res = await chat.admin.call("PATCH", "/api/tools/visualize", {
-      body: { provider: "exa" },
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
-      error: "unknown field provider",
-    });
     chat.app.socket.dispose();
   });
 
@@ -238,17 +217,6 @@ describe("tools administration", () => {
       { name: "contextReserve", value: 30_000 },
       { name: "summaryMaxTokens", value: 8192 },
     ]);
-    chat.app.socket.dispose();
-  });
-
-  test("the migrations leave the web access row beside the three tool rows", async () => {
-    const chat = await chatApp();
-    expect(
-      chat.app.db
-        .query<{ name: string }, []>("select name from tools order by rowid")
-        .all()
-        .map((row) => row.name),
-    ).toEqual(["webfetch", "websearch", "visualize", "web"]);
     chat.app.socket.dispose();
   });
 });

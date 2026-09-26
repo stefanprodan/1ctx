@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
+import {
+  visualCsp,
+  visualDocument,
+} from "../../src/server/tools/visual-shell.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
 import { chatApp } from "../helpers/chat.ts";
 
@@ -21,32 +25,9 @@ test("the visual shell authenticates its GET and uses the latest hosts", async (
     expect(res.headers.get("cache-control")).toContain("private");
     expect(res.headers.get("cache-control")).toContain("no-cache");
     const csp = res.headers.get("content-security-policy")!;
-    for (const directive of [
-      "sandbox allow-scripts",
-      "default-src 'none'",
-      "script-src 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'unsafe-inline'",
-      "font-src data:",
-      "img-src data: blob:",
-      "connect-src 'none'",
-      "form-action 'none'",
-      "base-uri 'none'",
-      "frame-ancestors 'self'",
-    ]) {
-      expect(csp).toContain(directive);
-    }
-    for (const host of defaults) expect(csp).toContain(host);
-    expect(csp).not.toContain("webrtc");
-    for (const permission of [
-      "allow-same-origin",
-      "allow-popups",
-      "allow-forms",
-      "allow-top-navigation",
-    ]) {
-      expect(csp).not.toContain(permission);
-    }
+    expect(csp).toBe(visualCsp(defaults));
     const shell = await res.text();
-    expect(shell).toContain("Idiomorph");
+    expect(shell).toBe(visualDocument());
     const etag = res.headers.get("etag");
     expect(etag).toBeTruthy();
     const cached = await chat.member.call("GET", "/api/visual", {

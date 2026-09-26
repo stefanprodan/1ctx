@@ -98,6 +98,7 @@ describe("slotFreed", () => {
     await chat.app.automationScheduler.fire(automation.id);
     store.recordEvent = record;
     expect(chat.app.runner.registry.size).toBe(0);
+    expect(chat.app.sessions.count(chat.projectId)).toBe(0);
     expect(store.byId(automation.id)?.lastEventReason).toBe(
       "event write failed",
     );

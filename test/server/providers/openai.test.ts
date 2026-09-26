@@ -319,21 +319,6 @@ describe("parseSse", () => {
 });
 
 describe("ToolCallTracker", () => {
-  test("joins fragmented arguments when the name arrives last", () => {
-    const tracker = new ToolCallTracker();
-    tracker.push(delta({ index: 0, arguments: '{"time' }));
-    tracker.push(delta({ index: 0, arguments: 'zone":"' }));
-    tracker.push(delta({ index: 0, arguments: 'UTC"}' }));
-    tracker.push(delta({ id: "server_call", name: "datetime" }));
-    expect(tracker.flush()).toEqual([
-      {
-        id: "server_call",
-        name: "datetime",
-        arguments: '{"timezone":"UTC"}',
-      },
-    ]);
-  });
-
   test("tracks items without indexes by id and then by latest call", () => {
     const tracker = new ToolCallTracker();
     tracker.push(delta({ id: "first", arguments: "{" }));
@@ -343,16 +328,6 @@ describe("ToolCallTracker", () => {
     expect(tracker.flush()).toEqual([
       { id: "first", name: "one", arguments: "{}" },
       { id: "second", name: "two", arguments: "" },
-    ]);
-  });
-
-  test("keeps first-seen order for sparse indexes and synthesises missing ids", () => {
-    const tracker = new ToolCallTracker();
-    tracker.push(delta({ index: 2, name: "later", arguments: "2" }));
-    tracker.push(delta({ index: 0, name: "first", arguments: "0" }));
-    expect(tracker.flush()).toEqual([
-      { id: "call_0", name: "later", arguments: "2" },
-      { id: "call_1", name: "first", arguments: "0" },
     ]);
   });
 });

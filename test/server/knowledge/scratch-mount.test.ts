@@ -74,7 +74,7 @@ describe("scratch across commands", () => {
       seedScratch(s, { written: [{ path: "payload", data, mode: 0o600 }] });
       const result = await run(
         s,
-        'cd /tmp; cat payload > copy; base64 payload > encoded; tar -cf bundle.tar payload; value=$(cat payload); printf %s "$value" > substituted',
+        'cd /tmp; cat payload > copy; base64 payload > encoded; cat payload | base64 > piped; tar -cf bundle.tar payload; value=$(cat payload); printf %s "$value" > substituted',
         { ...callCaps, callTimeoutMs: 10_000 },
       );
       expect(result).toEqual({
@@ -93,6 +93,9 @@ describe("scratch across commands", () => {
           Buffer.from(files.get("encoded")!.data).toString(),
           "base64",
         ),
+      ).toEqual(Buffer.from(data));
+      expect(
+        Buffer.from(Buffer.from(files.get("piped")!.data).toString(), "base64"),
       ).toEqual(Buffer.from(data));
       expect(files.get("bundle.tar")!.data.byteLength).toBeGreaterThan(
         data.byteLength,

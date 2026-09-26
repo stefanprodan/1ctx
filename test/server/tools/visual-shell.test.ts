@@ -24,6 +24,7 @@ import {
   visualShell,
 } from "../../../src/server/tools/visual-shell.ts";
 import { visualThemeValues } from "../../../src/server/tools/visual-theme.ts";
+import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
 import fixture from "../../fixtures/tools/visual-inert.json";
 
 type FixtureNode = {
@@ -156,14 +157,17 @@ test("only a single parent connect with one port has the right shape", () => {
 });
 
 test("port messages have bounded exact shapes and UTF-8 fragments", () => {
-  expect(visualMessage({ type: "paint", html: "x".repeat(512 * 1024) })).toBe(
-    true,
-  );
   expect(
-    visualMessage({ type: "final", html: "x".repeat(512 * 1024 + 1) }),
+    visualMessage({ type: "paint", html: "x".repeat(VISUAL_FRAME_BYTES) }),
+  ).toBe(true);
+  expect(
+    visualMessage({ type: "final", html: "x".repeat(VISUAL_FRAME_BYTES + 1) }),
   ).toBe(false);
   expect(
-    visualMessage({ type: "paint", html: "😀".repeat(128 * 1024 + 1) }),
+    visualMessage({
+      type: "paint",
+      html: "😀".repeat(VISUAL_FRAME_BYTES / 4 + 1),
+    }),
   ).toBe(false);
   expect(
     visualMessage({

@@ -526,7 +526,10 @@ describe("new tool transaction rollback", () => {
       name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
-    for (let i = 0; i < 20; i++) await tick();
+    for (let i = 0; i < 20; i++) {
+      if (chat.app.runner.registry.get(sessionId) === null) break;
+      await tick();
+    }
 
     expect(chat.app.sessions.byId(sessionId)?.revision).toBe(2);
     expect(chat.app.sessions.message(detail.messages[1].id)).toMatchObject({
@@ -558,7 +561,10 @@ describe("new tool transaction rollback", () => {
     script.finish("tool_calls");
     script.usage({ prompt: 12, completion: 3 });
     script.end();
-    for (let i = 0; i < 20; i++) await tick();
+    for (let i = 0; i < 20; i++) {
+      if (chat.app.runner.registry.get(sessionId) === null) break;
+      await tick();
+    }
 
     const rows = chat.app.sessions.messages(sessionId);
     expect(rows.filter((row) => row.kind === "tool")).toEqual([]);
@@ -598,7 +604,10 @@ describe("new tool transaction rollback", () => {
     script.finish("tool_calls");
     script.usage();
     script.end();
-    for (let i = 0; i < 30; i++) await tick();
+    for (let i = 0; i < 30; i++) {
+      if (chat.app.runner.registry.get(sessionId) === null) break;
+      await tick();
+    }
 
     const replies = chat.app.sessions
       .messages(sessionId)

@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { visualMessage } from "../../../src/server/tools/visual-painter.ts";
 import {
   isVisualFrame,
   PROTOCOL,
   type VisualFrame,
 } from "../../../src/shared/socket.ts";
-import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
 
 const frame: VisualFrame = {
   type: "visual",
@@ -55,16 +53,4 @@ describe("visual socket frames", () => {
     expect(isVisualFrame({ ...frame, html: null })).toBe(false);
     expect(isVisualFrame({ ...frame, type: "html" })).toBe(false);
   });
-});
-
-test("the painter accepts exactly the shared visual byte cap", () => {
-  expect(
-    visualMessage({ type: "final", html: "x".repeat(VISUAL_FRAME_BYTES) }),
-  ).toBe(true);
-  expect(
-    visualMessage({
-      type: "final",
-      html: "x".repeat(VISUAL_FRAME_BYTES + 1),
-    }),
-  ).toBe(false);
 });

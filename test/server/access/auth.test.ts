@@ -6,6 +6,7 @@ import { accessArea, cookieValue } from "../../../src/server/access/index.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { usersArea } from "../../../src/server/users/index.ts";
+import { hashPassword } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 // the access area with fakes for its ports, except the user: a login
@@ -93,10 +94,7 @@ describe("access", () => {
 
   test("login cannot outlive a disable during password verification", async () => {
     const { db, user, users, access } = build(false);
-    users.setPasswordHash(
-      user.id,
-      await Bun.password.hash("longenough", { algorithm: "argon2id" }),
-    );
+    users.setPasswordHash(user.id, await hashPassword("longenough"));
     const byUsername = users.byUsername;
     let first = true;
     users.byUsername = (username) => {

@@ -5,7 +5,7 @@ import { type App, compose } from "../../../src/server/compose.ts";
 import type { Db } from "../../../src/server/db/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { parse } from "../../../src/server/provision/index.ts";
-import type { TestApp } from "../../helpers/app.ts";
+import { TEST_PASSWORD_COST, type TestApp } from "../../helpers/app.ts";
 import { mcpFetch } from "../mcp/fake.ts";
 
 export const MODEL_URL = "http://models.test/v1";
@@ -215,5 +215,6 @@ export async function recompose(
     secureCookie: false,
     trustProxy: false,
     activate: false,
+    passwordCost: TEST_PASSWORD_COST,
   });
 }

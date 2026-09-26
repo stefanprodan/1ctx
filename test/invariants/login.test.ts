@@ -19,18 +19,12 @@ describe("bootstrap", () => {
     expect(admin?.passwordHash).not.toContain("s3cret-key");
   });
 
-  test("refuses a secret under the password floor", async () => {
-    const app = await testApp({ adminPassword: "short" });
-    expect(app.users.count()).toBe(0);
-  });
-
-  test("refuses a secret over the password cap", async () => {
-    const app = await testApp({ adminPassword: "x".repeat(1025) });
-    expect(app.users.count()).toBe(0);
-  });
-
-  test("creates nobody without the secret", async () => {
-    const app = await testApp({ adminPassword: null });
+  test.each([
+    ["under the password floor", "short"],
+    ["over the password cap", "x".repeat(1025)],
+    ["missing", null],
+  ])("creates nobody when the secret is %s", async (_case, adminPassword) => {
+    const app = await testApp({ adminPassword });
     expect(app.users.count()).toBe(0);
   });
 });

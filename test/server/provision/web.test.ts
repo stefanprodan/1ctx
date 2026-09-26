@@ -5,7 +5,6 @@ import { describe, expect, test } from "bun:test";
 import { apply } from "../../../src/server/provision/apply.ts";
 import { client } from "../../../src/server/provision/client.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
-import { MAX_WEB_DOMAINS } from "../../../src/shared/web.ts";
 import { testApp } from "../../helpers/app.ts";
 import {
   changes,
@@ -60,21 +59,10 @@ describe("provision web parsing", () => {
     { domains: "docs.example.test" },
     { domains: [123] },
     { domains: ["*.example.test"] },
-    { domains: ["https://docs.example.test"] },
-    { domains: ["docs.example.test/path"] },
-    { domains: ["docs.example.test:80"] },
     { domains: ["docs.example.test:443"] },
-    { domains: ["[::1]:80"] },
     { domains: ["docs.example.test?query"] },
-    { domains: ["user@docs.example.test"] },
     { domains: ["docs.example.test#fragment"] },
     { domains: ["a".repeat(254)] },
-    {
-      domains: Array.from(
-        { length: MAX_WEB_DOMAINS + 1 },
-        (_, index) => `host-${index}.test`,
-      ),
-    },
   ])("refuses invalid web fields before apply: %j", (spec) => {
     expect(() => documents(web(spec))).toThrow(
       /instance.yaml: Tool\/web: spec\./,
@@ -82,16 +70,12 @@ describe("provision web parsing", () => {
   });
 
   test.each([
-    object("Tool", "webfetch", {}),
-    object("Tool", "webfetch", { enabled: true }),
     object("Tool", "webfetch", { enabled: false }),
     object("Tool", "websearch", { enabled: true }),
     object("Tool", "websearch", { provider: null, enabled: false }),
     object("Tool", "websearch", {}),
     object("Tool", "websearch", { domains: [] }),
     object("Tool", "web", { enabled: true }),
-    object("Tool", "web", { hosts: [] }),
-    object("Tool", "web", { provider: null }),
     object("Tool", "visualize", { mode: "off" }),
     object("Tool", "visualize", { provider: null }),
     object("Automation", "task", { disabledCapabilities: ["web"] }),

@@ -5,7 +5,14 @@ import { describe, expect, test } from "bun:test";
 import { KNOWLEDGE_COMMANDS } from "../../../src/server/knowledge/limits.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { callCaps, freshSignal, run, type Setup, setup } from "./helpers.ts";
+import {
+  afterMountRead,
+  callCaps,
+  freshSignal,
+  run,
+  type Setup,
+  setup,
+} from "./helpers.ts";
 
 const create = (s: Setup, name: string, text: string) =>
   s.area.create(s.projectId, s.author, name, text);
@@ -252,71 +259,9 @@ describe("knowledge command mounts", () => {
     }
   });
 
-  test("an ordinary nonzero exit commits what ran", async () => {
+  test("source budgets and pre-aborted signals discard partial writes", async () => {
     const s = setup();
     try {
-      const result = await run(s, "echo kept > x; false");
-      expect(result).toEqual({
-        error: true,
-        content: "exit 1\nwrote x (rev 1, 1 lines)",
-        opened: [],
-        tail: "exit 1\nwrote x (rev 1, 1 lines)".length,
-      });
-      expect(s.area.store.byName(s.projectId, "x")?.text).toBe("kept\n");
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test.each([124, 126])("exit %i discards all writes", async (exit) => {
-    const s = setup();
-    try {
-      expect((await run(s, `echo discarded > x; exit ${exit}`)).error).toBe(
-        true,
-      );
-      expect(s.area.list(s.projectId).files).toEqual([]);
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test("a runaway loop stops and discards its partial writes", async () => {
-    const s = setup();
-    try {
-      const result = await run(s, "echo discarded > x; while true; do :; done");
-      expect(result.error).toBe(true);
-      expect(result.content).toContain("exit 126");
-      expect(s.area.list(s.projectId).files).toEqual([]);
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test("aborts, deadlines and source budgets discard partial writes", async () => {
-    const s = setup();
-    try {
-      const controller = new AbortController();
-      const promise = run(
-        s,
-        "echo discarded > x; sleep 1",
-        callCaps,
-        controller.signal,
-      );
-      await Bun.sleep(30);
-      controller.abort(new Error("send stopped"));
-      const aborted = await promise;
-      expect(aborted.error).toBe(true);
-      expect(aborted.content).toContain("send stopped");
-      expect(s.area.list(s.projectId).files).toEqual([]);
-      expect(
-        (
-          await run(s, "echo discarded > x; sleep 1", {
-            callTimeoutMs: 20,
-            resultCut: 1000,
-            visuals: true,
-          })
-        ).error,
-      ).toBe(true);
       expect(
         (await run(s, `echo discarded > x;\n#${"x".repeat(65_536)}`)).error,
       ).toBe(true);
@@ -390,19 +335,19 @@ describe("knowledge command mounts", () => {
       try {
         const file =
           race === "create" ? null : create(s, "docs/x.md", "original");
-        const pending = run(
+        afterMountRead(s, () => {
+          if (race === "replace")
+            s.area.store.replace(file!, s.author, "racing", 101);
+          if (race === "recreate" || race === "delete") {
+            s.area.store.remove(file!, s.author, 101);
+          }
+          if (race === "recreate" || race === "create")
+            create(s, "docs/x.md", "racing");
+        });
+        const result = await run(
           s,
-          "mkdir -p docs; echo edit > docs/x.md; echo partial > second; sleep 0.1",
+          "mkdir -p docs; echo edit > docs/x.md; echo partial > second",
         );
-        await Bun.sleep(25);
-        if (race === "replace")
-          s.area.store.replace(file!, s.author, "racing", 101);
-        if (race === "recreate" || race === "delete") {
-          s.area.store.remove(file!, s.author, 101);
-        }
-        if (race === "recreate" || race === "create")
-          create(s, "docs/x.md", "racing");
-        const result = await pending;
         expect(result.error).toBe(true);
         expect(result.content).toContain(
           "docs/x.md changed while the command ran, read it again",
@@ -421,16 +366,16 @@ describe("knowledge command mounts", () => {
     const s = setup();
     try {
       create(s, "docs-", "");
-      const pending = run(s, "echo new > docs; sleep 0.1");
-      await Bun.sleep(25);
-      create(s, "docs/x", "");
-      expect((await pending).content).toContain("conflicts with file");
+      afterMountRead(s, () => create(s, "docs/x", ""));
+      expect((await run(s, "echo new > docs")).content).toContain(
+        "conflicts with file",
+      );
       expect(s.area.store.byName(s.projectId, "docs")).toBeNull();
       s.caps.knowledgeFiles = 3;
-      const next = run(s, "echo new > fourth; sleep 0.1");
-      await Bun.sleep(25);
-      create(s, "third", "");
-      expect((await next).content).toContain("4 files, the limit is 3");
+      afterMountRead(s, () => create(s, "third", ""));
+      expect((await run(s, "echo new > fourth")).content).toContain(
+        "4 files, the limit is 3",
+      );
       expect(s.area.store.byName(s.projectId, "fourth")).toBeNull();
     } finally {
       s.db.close();

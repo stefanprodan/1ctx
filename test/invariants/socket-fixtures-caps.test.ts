@@ -4,11 +4,12 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
-import { TOOL_CAPS } from "../../src/server/tools/index.ts";
+import { HTML_EVERY_MS } from "../../src/server/runner/stream.ts";
 import { settleRun } from "../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
+  setLimits,
   startChat,
   waitScript,
 } from "../helpers/chat.ts";
@@ -111,40 +112,113 @@ describe("socket fixtures for caps", () => {
   });
 
   test("the result cap with a cut result", async () => {
-    const big = "x".repeat(TOOL_CAPS.resultCut + 5000);
+    // lowered caps: round 1's cut results pass the send's result bytes,
+    // so round 2's calls are recorded not run and the answer round
+    // follows
+    const resultCut = 10_000;
+    const resultBytes = 65_536;
+    const perRound = LOOP_LIMITS.callsPerRound;
+    expect(resultCut * perRound).toBeGreaterThanOrEqual(resultBytes);
+    const big = "x".repeat(resultCut + 5000);
     const plans: Record<string, ToolPlan> = {};
-    for (let r = 1; r <= LOOP_LIMITS.rounds; r++) {
-      for (let i = 0; i < LOOP_LIMITS.callsPerRound; i++) {
+    for (let r = 1; r <= 2; r++) {
+      for (let i = 0; i < perRound; i++) {
         plans[`r${r}c${i}`] = { result: { content: big, error: false } };
       }
     }
     const fake = fakeTools(plans);
     const chat = await chatApp(fake);
+    await setLimits(chat, { resultBytes, resultCut });
     const conn = await watcher(chat);
     const { detail, sessionId } = await startChat(chat, "big results");
     watch(chat, conn, sessionId);
-    for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
-      const send = chat.app.sessions.send(detail.send.id)!;
-      if (send.status !== "running") break;
-      const script = await waitScript(chat.scripted, round);
-      const calls = Array.from({ length: LOOP_LIMITS.callsPerRound }, (_, i) =>
+    const calls = (round: number) =>
+      Array.from({ length: perRound }, (_, i) =>
         call(`r${round}c${i}`, {
           timezone: `Etc/GMT+${((round * 7 + i) % 12) + 1}`,
         }),
       );
-      toolRound(script, calls);
-      await settle(chat, 8);
+    for (let round = 1; round <= 2; round++) {
+      const script = await waitScript(chat.scripted, round);
+      expect(asksAnswer(script.body)).toBe(false);
+      toolRound(script, calls(round));
     }
+    const answer = await waitScript(chat.scripted, 3);
+    expect(asksAnswer(answer.body)).toBe(true);
+    answer.reply("done after the cap");
+    expect((await settleRun(chat, sessionId))?.status).toBe("done");
     await settle(chat, 10);
     record("cap-result", detail, conn);
-    const toolRow = chat.app.sessions
+    const tools = chat.app.sessions
       .messages(sessionId)
-      .find((r) => r.kind === "tool")!;
-    expect(toolRow.content.length).toBe(TOOL_CAPS.resultCut);
+      .filter((r) => r.kind === "tool");
+    expect(tools).toHaveLength(2 * perRound);
+    for (const row of tools.slice(0, perRound)) {
+      expect(row.status).toBe("done");
+      expect(row.content.length).toBe(resultCut);
+    }
+    for (const row of tools.slice(perRound)) expect(row.status).toBe("stopped");
     const replies = chat.app.sessions
       .messages(sessionId)
       .filter((r) => r.kind === "reply");
-    expect(replies.some((r) => r.finishReason === "tool_limit")).toBe(true);
+    expect(replies.at(-2)!.finishReason).toBe("tool_limit");
+    expect(replies.at(-1)!.content).toBe("done after the cap");
+    expect(chat.app.sessions.send(detail.send.id)!.rounds).toBe(3);
+    chat.app.socket.dispose();
+  });
+
+  test("the result cap with a provider that keeps calling", async () => {
+    // every request after the cap still answers with calls, so the
+    // send ends on work rows whose calls were recorded not run and no
+    // answer row
+    const resultCut = 10_000;
+    const resultBytes = 65_536;
+    const perRound = LOOP_LIMITS.callsPerRound;
+    const big = "x".repeat(resultCut + 5000);
+    const plans: Record<string, ToolPlan> = {};
+    for (let r = 1; r <= LOOP_LIMITS.rounds; r++) {
+      for (let i = 0; i < perRound; i++) {
+        plans[`r${r}c${i}`] = { result: { content: big, error: false } };
+      }
+    }
+    const chat = await chatApp(fakeTools(plans));
+    await setLimits(chat, { resultBytes, resultCut });
+    const conn = await watcher(chat);
+    const { detail, sessionId } = await startChat(chat, "keeps calling");
+    watch(chat, conn, sessionId);
+    let requests = 0;
+    for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
+      if (chat.app.sessions.send(detail.send.id)!.status !== "running") break;
+      const script = await waitScript(chat.scripted, round);
+      requests = round;
+      toolRound(
+        script,
+        Array.from({ length: perRound }, (_, i) =>
+          call(`r${round}c${i}`, {
+            timezone: `Etc/GMT+${((round * 7 + i) % 12) + 1}`,
+          }),
+        ),
+      );
+      await settle(chat, 8);
+    }
+    expect((await settleRun(chat, sessionId))?.status).toBe("done");
+    await settle(chat, 10);
+    record("cap-result-calling", detail, conn);
+    const rows = chat.app.sessions.messages(sessionId);
+    const replies = rows.filter((r) => r.kind === "reply");
+    expect(replies.every((r) => r.slot === "work")).toBe(true);
+    for (const reply of replies.slice(1)) {
+      expect(reply.finishReason).toBe("tool_limit");
+    }
+    const tools = rows.filter((r) => r.kind === "tool");
+    for (const row of tools.slice(0, perRound)) {
+      expect(row.status).toBe("done");
+      expect(row.content.length).toBe(resultCut);
+    }
+    const stopped = tools.slice(perRound);
+    expect(stopped.length).toBeGreaterThan(0);
+    for (const row of stopped) expect(row.status).toBe("stopped");
+    expect(chat.app.sessions.send(detail.send.id)!.rounds).toBe(requests);
     chat.app.socket.dispose();
   });
 
@@ -157,11 +231,14 @@ describe("socket fixtures for caps", () => {
     for (let round = 1; round <= 6; round++) {
       const script = await waitScript(chat.scripted, round);
       toolRound(script, [call("same")]);
-      await settle(chat, 6);
     }
     const answer = await waitScript(chat.scripted, 7);
+    // the answer streams past the html interval, so the recording
+    // carries an html frame between its deltas
+    chat.app.now.value += HTML_EVERY_MS;
     answer.reply("answered after the loop");
     await settle(chat, 10);
+    expect(conn.frames.some((f) => f.type === "html")).toBe(true);
     record("loop-check", detail, conn);
     const replies = chat.app.sessions
       .messages(sessionId)
