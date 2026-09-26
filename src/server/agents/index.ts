@@ -12,6 +12,7 @@ import {
   directoryRoutes,
   type SkillsListPort,
   type ToolsPort,
+  type UsagePort,
 } from "./directory.ts";
 import {
   type AccessPort,
@@ -30,6 +31,7 @@ export {
   directoryRoutes,
   type SkillsListPort,
   type ToolsPort,
+  type UsagePort,
 } from "./directory.ts";
 export {
   MAX_MODEL,
@@ -60,6 +62,7 @@ export type AgentsDeps = {
   access: AccessPort;
   sessions: SessionsPort;
   automations: AutomationsPort;
+  usage: UsagePort;
 };
 
 export type Agents = {
@@ -95,6 +98,7 @@ export function agentsArea(deps: AgentsDeps): Agents {
       }),
       ...directoryRoutes({
         store,
+        usage: deps.usage,
         providers: deps.providers,
         skills: deps.skills,
         tools: deps.tools,

@@ -1,5 +1,5 @@
 /* A user's page and an agent's page: the head, then sections of text,
-   then cards of rows. */
+   then cards of rows; an agent's cards under its tabs. */
 
 @layer tokens, base, owners;
 
@@ -8,6 +8,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
+  }
+
+  /* an agent's tabs over the card of the tab on screen, spaced as a
+     project's tabs are over theirs */
+  .people-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
   .people-section {

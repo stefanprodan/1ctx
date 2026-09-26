@@ -266,6 +266,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     automations: {
       usesAgent: (agentId) => automations.usesAgent(agentId),
     },
+    usage: {
+      agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
+    },
   });
   const memory: MemoryArea = memoryArea({
     db,

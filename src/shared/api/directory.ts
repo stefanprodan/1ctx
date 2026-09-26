@@ -8,6 +8,7 @@ import type { AgentSummary } from "../contracts/agent.ts";
 import type { ProjectSummary } from "../contracts/project.ts";
 import type { OfferedSkill } from "../contracts/skill.ts";
 import type { DirectoryUser } from "../contracts/user.ts";
+import type { DayUsage } from "./usage.ts";
 
 // GET /api/directory/users/:username; the projects are the team
 // projects the caller and the user are both members of
@@ -55,4 +56,16 @@ export type DirectoryAgentResponse = {
   tools: DirectoryTool[];
   mcp: DirectoryMcp;
   tokens: DirectoryTokens;
+};
+
+// GET /api/directory/agents/:name/days?tz=: the agent's turns in every
+// project over the 53 ISO weeks in the caller's zone, Monday first,
+// today last, as one series: usage is as long as days, zeros included,
+// and total counts a send once even when its rounds fall on two days
+export type DirectoryAgentDaysResponse = {
+  since: number;
+  until: number;
+  days: string[];
+  total: DayUsage;
+  usage: DayUsage[];
 };

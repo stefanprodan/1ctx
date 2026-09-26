@@ -9,9 +9,13 @@
 // The tools are the tools area's answer at this moment, none when the
 // model does not accept tools. The list is built-ins alone, memory_edit
 // as a chat is offered it; skill and MCP schemas still count because the
-// provider request carries them.
+// provider request carries them. Its days are the agent's turns in
+// every project as one series, whoever asks.
 
-import type { DirectoryAgentResponse } from "../../shared/api/directory.ts";
+import type {
+  DirectoryAgentDaysResponse,
+  DirectoryAgentResponse,
+} from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { WEB_TOOLS } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -20,6 +24,7 @@ import { json, type RouteDescriptor } from "../lib/http.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
+import { parseZoneQuery } from "../usage/index.ts";
 import { parseAgentName } from "./parse.ts";
 import type { ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
@@ -76,8 +81,14 @@ export type ToolsPort = {
   };
 };
 
+// an agent's days in every project, the usage area's answer
+export type UsagePort = {
+  agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
+};
+
 export type DirectoryDeps = {
   store: AgentStore;
+  usage: UsagePort;
   providers: Pick<ProvidersPort, "byId">;
   skills: SkillsListPort;
   tools: ToolsPort;
@@ -168,6 +179,17 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
           },
         };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/directory/agents/:name/days",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const agent = deps.store.byName(parseAgentName(ctx.params.name));
+        if (agent === null) throw new NotFound("no such agent");
+        const timeZone = parseZoneQuery(ctx.url);
+        return json(deps.usage.agentDays(agent.id, timeZone));
       },
     },
   ];
