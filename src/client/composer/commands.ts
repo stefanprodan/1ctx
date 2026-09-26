@@ -51,10 +51,14 @@ export function commandQuery(draft: string): string | null {
   return draft.slice(1);
 }
 
-export function commandMatches(draft: string): Command[] {
+// rename false leaves /rename out, for a chat its viewer may not retitle
+export function commandMatches(draft: string, rename = true): Command[] {
   const query = commandQuery(draft);
   if (query === null) return [];
-  return COMMANDS.filter((command) => command.name.startsWith(query));
+  return COMMANDS.filter(
+    (command) =>
+      command.name.startsWith(query) && (rename || command.name !== "rename"),
+  );
 }
 
 // the command a sent text names exactly and what follows it, else null:
@@ -79,23 +83,22 @@ export type CommandHandlers = {
 };
 
 // what Enter does with a command: refused with the block's reason, or
-// with what the command lacks; else the handler runs. A handler absent
-// is a composer for a chat not started yet
+// with what the command lacks; else the handler runs. Compact and fork
+// absent is a composer for a chat not started yet; rename absent alone
+// is a chat its viewer may not retitle
 export async function runCommand(
   named: { command: Command; arg: string },
   block: string | null,
   handlers: CommandHandlers,
 ): Promise<void> {
   const { onCompact, onRename, onFork } = handlers;
-  if (
-    block !== null ||
-    onCompact === undefined ||
-    onRename === undefined ||
-    onFork === undefined
-  ) {
+  if (block !== null || onCompact === undefined || onFork === undefined) {
     throw new Error(`/${named.command.name}: ${block ?? "not now"}`);
   }
   if (named.command.name === "rename") {
+    if (onRename === undefined) {
+      throw new Error("/rename: only the owner or an admin");
+    }
     if (named.arg === "") throw new Error("/rename needs a title");
     await onRename(named.arg);
   } else if (named.command.name === "fork") {

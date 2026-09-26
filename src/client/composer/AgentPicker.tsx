@@ -4,7 +4,8 @@
 // The chip that names the agent a chat runs on, with the model in
 // faint text. For a chat not started yet it opens the list of the
 // project's agents; a session's agent is fixed, so the chip is static.
-// The automation form picks its agent with the same chip.
+// The automation form picks its agent with the same chip, which asks
+// for a pick in the failed colour while its agent was deleted.
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { shortModel } from "../agents/meta.ts";
@@ -19,6 +20,7 @@ export function AgentPicker({
   agentId,
   onPick,
   field,
+  ask,
 }: {
   // null while the project's agents load
   agents: AgentSummary[] | null;
@@ -28,10 +30,13 @@ export function AgentPicker({
   // drawn as a form field, full width with its list under it, where
   // the composer draws a chip with its list above
   field?: boolean;
+  // the agent is not in the list and a pick is required
+  ask?: boolean;
 }) {
   const { open, root } = useMenu();
   const picked = agents?.find((a) => a.id === agentId) ?? null;
   const fixed = onPick === undefined;
+  const asks = ask === true && picked === null;
   return (
     <div
       class={`composer-agent${field ? " composer-agent-field" : ""}`}
@@ -39,20 +44,25 @@ export function AgentPicker({
     >
       <button
         type="button"
-        class={`composer-chip${field ? " composer-chip-field" : ""}`}
+        class={`composer-chip${field ? " composer-chip-field" : ""}${asks ? " composer-chip-invalid" : ""}`}
         disabled={fixed || agents === null || agents.length === 0}
         aria-expanded={fixed ? undefined : open.value}
+        aria-invalid={asks || undefined}
         onClick={() => {
           open.value = !open.value;
         }}
       >
-        <span
-          class={`avatar ${field ? "avatar-22" : "avatar-18"} avatar-agent`}
-        >
-          <AvatarIcon name={picked?.avatar ?? "bot"} size={12} />
-        </span>
+        {!asks && (
+          <span
+            class={`avatar ${field ? "avatar-22" : "avatar-18"} avatar-agent`}
+          >
+            <AvatarIcon name={picked?.avatar ?? "bot"} size={12} />
+          </span>
+        )}
         <span class="composer-chip-name cut">
-          {picked?.name ?? (agents === null ? "" : "no agent")}
+          {asks
+            ? "Pick an agent"
+            : (picked?.name ?? (agents === null ? "" : "no agent"))}
         </span>
         {picked && (
           <Fit

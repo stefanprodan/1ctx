@@ -11,7 +11,7 @@ import { stopSession } from "../../data/sessions.ts";
 import { says, stamp } from "../../lib/format.ts";
 import { chatHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { stateLine, whenText } from "../../stream/Row.model.ts";
+import { authorGone, stateLine, whenText } from "../../stream/Row.model.ts";
 import {
   RowsAvatar,
   RowsBad,
@@ -82,7 +82,10 @@ export function RunRow({
           <>
             {line.author !== null && (
               <>
-                <RowsHandle name={line.author} />{" "}
+                <RowsHandle
+                  name={line.author}
+                  gone={authorGone(row, line)}
+                />{" "}
               </>
             )}
             {/* only the failure's words are red; who ran it keeps its colour */}

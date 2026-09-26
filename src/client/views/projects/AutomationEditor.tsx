@@ -60,6 +60,7 @@ import {
   MEMORY_MODES,
   pickMemory,
   requestOf,
+  retiredPick,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";
@@ -147,6 +148,9 @@ function Editor({
   const d = draft.value;
   const takesTools =
     agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
+  // the saved agent was deleted: no save until another is picked
+  const gone = retiredPick(automation, d.agentId);
+  const live = agents.filter((a) => retiredPick(automation, a.id) === null);
   const web = switchItem(WEB, {
     tools: takesTools,
     switchable: switchable.value,
@@ -194,11 +198,17 @@ function Editor({
             />
             <div class="automations-task-bar">
               <AgentPicker
-                agents={agents}
+                agents={live}
                 agentId={d.agentId}
                 onPick={off ? undefined : (agentId) => set({ agentId })}
+                ask={gone !== null}
               />
             </div>
+            {gone !== null && (
+              <span class="field-error" role="alert">
+                {gone}
+              </span>
+            )}
           </div>
           <FieldError save={save} field="instructions" />
           <FieldError save={save} field="agent" />
@@ -319,7 +329,7 @@ function Editor({
         {editable ? (
           <Foot
             save={save}
-            dirty={dirtyOf(d, automation, limitMs)}
+            dirty={dirtyOf(d, automation, limitMs) && gone === null}
             label={automation === null ? "Create scheduled task" : "Save"}
             start={
               automation === null ? (

@@ -46,6 +46,8 @@ type Bar = {
   mono?: boolean;
   // a line that sums others, read apart
   faint?: boolean;
+  // what the bar names is gone, its numbers kept: a small word after
+  gone?: boolean;
 };
 
 // Bars from one baseline, the value at the end of each. With onPick
@@ -84,6 +86,12 @@ export function Bars({
           <>
             <span class={`chart-bar-name${b.mono ? " chart-mono" : ""}`}>
               {b.name}
+              {b.gone && (
+                <>
+                  {" "}
+                  <span class="chart-gone">deleted</span>
+                </>
+              )}
             </span>
             <span class="chart-bar-track">
               <span class="chart-bar-fill" style={{ width }} />

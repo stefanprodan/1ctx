@@ -13,6 +13,7 @@ import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
+    archived: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -33,6 +34,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
 }
 
 const chat = (id: string, at: number): StreamRow => ({
+  agentRetired: false,
   session: summary({ id, lastActivityAt: at }),
   agent: "assistant",
   send: null,
@@ -49,6 +51,7 @@ const line = (
   runs: number,
   changes: Partial<SessionSummary> = {},
 ): StreamRow => ({
+  agentRetired: false,
   session: summary({
     id,
     origin: "automation",

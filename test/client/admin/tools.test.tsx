@@ -623,7 +623,8 @@ describe("the page", () => {
     expect(html).toContain("Knowledge");
     expect(html).toContain("Scheduled tasks");
     expect(html).toContain("Runs per user");
-    expect(html.match(/<form/g)).toHaveLength(4);
+    expect(html).toContain(">Chats<");
+    expect(html.match(/<form/g)).toHaveLength(5);
     expect(html).not.toContain("Visuals per turn");
     expect(html).not.toContain(">Limits</span>");
     expect(html).toContain('inputmode="decimal"');

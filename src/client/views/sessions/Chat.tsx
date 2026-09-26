@@ -2,20 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One chat: the crumb is its project, the title its own and opens the
-// menu, with Delete for the chat's owner and for an admin, as the
-// server allows; /rename in the composer
-// changes the title; the transcript
+// menu, Archive for every member, Rename and Delete for the chat's
+// owner and for an admin, as the server allows; /rename in the
+// composer changes the title; the transcript
 // flows down the page and the composer stays at the bottom of the
 // window in the transcript's foot. A fork names its source over the
 // transcript. A run names its automation there and has no composer, no
 // Regenerate and no /compact: its foot is its state, with Stop while it
-// runs, and Fork waits until it is done or stopped. Leaving the page
+// runs, and Fork waits until it is done or stopped. An archived chat
+// has the same foot, why and until when in place of the state, and no
+// Regenerate. A reply keeps its agent's name once the agent is deleted,
+// from the detail's agents. Leaving the page
 // ends the watch on its session, unless the next chat's load already
 // owns the entity, as it does when a chat moves to its fork.
 
 import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
+import { archiveSession } from "../../data/archive.ts";
 import { automations } from "../../data/automations.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
@@ -39,6 +43,8 @@ import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { archivedLine, forkAgents } from "./Chat.model.ts";
+import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
 import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
@@ -69,11 +75,21 @@ export function Chat({ params }: { params: Params }) {
       : { name: known.fullName, username: known.username };
   };
   const agents = projectAgents.value ?? [];
-  const agentOf = (agentId: string | null) =>
-    agents.find((a) => a.id === (agentId ?? shown?.session.agentId)) ?? null;
+  // the detail names every agent its rows do, a deleted one included
+  const agentOf = (agentId: string | null) => {
+    const id = agentId ?? shown?.session.agentId;
+    return (
+      shown?.agents.find((a) => a.id === id) ??
+      agents.find((a) => a.id === id) ??
+      null
+    );
+  };
+  const choices = forkAgents(agents, shown?.agents ?? []);
   const run = shown?.session.origin === "automation";
+  const archived = shown?.session.archived != null;
   // the owner renames and deletes, and so does an admin
   const manage = user?.id === shown?.session.ownerId || user?.role === "admin";
+  const items = menuItems({ run, archived, manage });
   // a run is forked whole from its foot, a chat at any settled turn
   const lastTurn = shown?.messages.findLast(
     (m) => m.kind === "user" || (m.kind === "reply" && m.slot === "answer"),
@@ -97,12 +113,15 @@ export function Chat({ params }: { params: Params }) {
             running={shown.session.status === "running" || sending.value}
             download={markdownHref(shown.session.id)}
             onDelete={
-              manage
+              items.delete
                 ? () => deleteSession(shown.session.id, shown.session.projectId)
                 : undefined
             }
+            onArchive={
+              items.archive ? () => archiveSession(shown.session.id) : undefined
+            }
             onRename={
-              !run && manage
+              items.rename
                 ? (title) => renameSession(shown.session.id, title)
                 : undefined
             }
@@ -155,7 +174,10 @@ export function Chat({ params }: { params: Params }) {
             agentOf={agentOf}
             authorOf={authorOf}
             onRegenerate={
-              run || shown.session.status === "running" || sending.value
+              run ||
+              archived ||
+              shown.session.status === "running" ||
+              sending.value
                 ? undefined
                 : () => void regenerateSession(shown.session.id)
             }
@@ -163,32 +185,40 @@ export function Chat({ params }: { params: Params }) {
               run
                 ? undefined
                 : {
-                    agents,
+                    agents: choices,
                     agentId: shown.session.agentId,
                     onFork: (messageId, agentId) =>
                       forkSession(shown.session.id, messageId, agentId),
                   }
             }
             foot={
-              run ? (
+              run || archived ? (
                 <RunFoot
                   row={{
                     session: shown.session,
                     agent: null,
+                    agentRetired: false,
                     send: shown.send,
                     last: null,
                     automation: null,
                     runBy: null,
                     runs: null,
                   }}
+                  archived={
+                    archived
+                      ? archivedLine(shown.session, shown.archive)
+                      : undefined
+                  }
                   onStop={() => stopSession(shown.session.id)}
                   fork={
                     lastTurn === undefined
                       ? undefined
                       : {
-                          agents,
-                          onFork: (agentId) =>
-                            forkSession(shown.session.id, lastTurn.id, agentId),
+                          agents: choices,
+                          agentId: shown.session.agentId,
+                          messageId: lastTurn.id,
+                          onFork: (messageId, agentId) =>
+                            forkSession(shown.session.id, messageId, agentId),
                         }
                   }
                 />
@@ -207,7 +237,11 @@ export function Chat({ params }: { params: Params }) {
                   }
                   onStop={() => stopSession(shown.session.id)}
                   onCompact={() => compactSession(shown.session.id)}
-                  onRename={(title) => renameSession(shown.session.id, title)}
+                  onRename={
+                    items.rename
+                      ? (title) => renameSession(shown.session.id, title)
+                      : undefined
+                  }
                   onFork={(title) =>
                     lastTurn === undefined
                       ? Promise.reject(new Error("nothing to fork yet"))

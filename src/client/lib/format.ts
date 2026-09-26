@@ -63,6 +63,11 @@ export function dayMonth(ms: number): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+// "19 Sep 2027"
+export function dayMonthYear(ms: number): string {
+  return `${dayMonth(ms)} ${new Date(ms).getFullYear()}`;
+}
+
 // "Sat 19 Sep"
 export function weekdayDayMonth(ms: number): string {
   return `${WEEKDAYS[new Date(ms).getDay()]} ${dayMonth(ms)}`;

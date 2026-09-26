@@ -280,6 +280,7 @@ export async function runAutomation(id: string): Promise<SessionDetail> {
     applyRun(held, {
       session: detail.session,
       agent: null,
+      agentRetired: false,
       send: detail.send,
       last: null,
       automation: labelOf(id),

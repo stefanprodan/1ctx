@@ -455,9 +455,9 @@ export function RowsTag({ children }: { children: ComponentChildren }) {
   return <span class="tag">{children}</span>;
 }
 
-// who a line names, in the brand colour
-export function RowsHandle({ name }: { name: string }) {
-  return <span class="rows-handle">@{name}</span>;
+// who a line names, in the brand colour; faint once the agent is gone
+export function RowsHandle({ name, gone }: { name: string; gone?: boolean }) {
+  return <span class={gone ? "rows-handle-gone" : "rows-handle"}>@{name}</span>;
 }
 
 // the failed part of a line

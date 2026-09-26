@@ -242,6 +242,7 @@ export function applyRunEnvelope(
   applyRun(held, {
     session: ev.session,
     agent: mine?.agent ?? null,
+    agentRetired: mine?.agentRetired ?? false,
     send: ev.send ?? mine?.send ?? null,
     last: ev.last ?? mine?.last ?? null,
     automation: mine?.automation ?? label(held.id),

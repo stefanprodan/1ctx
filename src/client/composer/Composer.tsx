@@ -125,7 +125,8 @@ export function Composer({
   // /compact runs a summary round on the chat; a chat not started yet
   // has nothing to fold, so the command is refused without a call
   onCompact?: () => Promise<void>;
-  // /rename <title>; a chat not started yet has no row to name
+  // /rename <title>; absent before the chat starts and for a viewer who
+  // may not retitle it, whose menu then leaves it out
   onRename?: (title: string) => Promise<void>;
   // /fork <name>: the chat so far as a new chat under the name
   onFork?: (title: string) => Promise<void>;
@@ -254,11 +255,12 @@ export function Composer({
     failure.value = null;
     void files.add(picked, readable);
   };
-  const started =
-    onCompact !== undefined && onRename !== undefined && onFork !== undefined;
+  const started = onCompact !== undefined && onFork !== undefined;
   const block = (command: Command) =>
     commandBlock({ started, running }, command);
-  const matches = shut.value ? [] : commandMatches(text.value);
+  const matches = shut.value
+    ? []
+    : commandMatches(text.value, !started || onRename !== undefined);
   // the highlight follows the list as it shrinks
   const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
   const submit = async () => {

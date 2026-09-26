@@ -433,6 +433,7 @@ export function applyEnvelope(
   const next: StreamRow = {
     session: ev.session,
     agent: held.agent,
+    agentRetired: held.agentRetired,
     send: ev.send ?? held.send,
     last: ev.last ?? held.last,
     automation: held.automation,

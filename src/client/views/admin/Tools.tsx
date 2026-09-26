@@ -194,6 +194,7 @@ export function Tools() {
             <LimitsCard rows={rows} scope="call" title="Per call" />
             <LimitsCard rows={rows} scope="knowledge" title="Knowledge" />
             <LimitsCard rows={rows} scope="runs" title="Scheduled tasks" />
+            <LimitsCard rows={rows} scope="chats" title="Chats" />
           </>
         )}
       </Rows>

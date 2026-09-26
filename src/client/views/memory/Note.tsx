@@ -60,9 +60,13 @@ function Writer({ memory, now }: { memory: Memory; now: number }) {
   return (
     <span>
       Written {writer.when} by{" "}
-      <a class="note-head-link" href={agentHref(writer.agentName)}>
-        <RowsHandle name={writer.agentName} />
-      </a>{" "}
+      {writer.retired ? (
+        <RowsHandle name={writer.agentName} gone />
+      ) : (
+        <a class="note-head-link" href={agentHref(writer.agentName)}>
+          <RowsHandle name={writer.agentName} />
+        </a>
+      )}{" "}
       in{" "}
       {session === null ? (
         writer.run ? (

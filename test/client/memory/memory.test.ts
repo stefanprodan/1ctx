@@ -187,6 +187,7 @@ describe("the Memory fold's line", () => {
 describe("the note card", () => {
   const now = 1_000_000;
   const memory = (changes: Partial<Memory> = {}): Memory => ({
+    agentRetired: false,
     projectId: "p1",
     automationId: null,
     entries: [
@@ -221,6 +222,7 @@ describe("the note card", () => {
     expect(writerOf(memory(), now)).toEqual({
       kind: "agent",
       agentName: "sre",
+      retired: false,
       session: {
         id: "s1",
         chat: null,
@@ -262,6 +264,12 @@ describe("the note card", () => {
     expect(
       writerOf(memory({ session: null, automationId: "au1" }), now),
     ).toMatchObject({ kind: "agent", session: null, run: true });
+    // a deleted agent's name stays, drawn as plain text
+    expect(writerOf(memory({ agentRetired: true }), now)).toMatchObject({
+      kind: "agent",
+      agentName: "sre",
+      retired: true,
+    });
     // a hand edit or an undo
     expect(
       writerOf(

@@ -11,7 +11,7 @@
 // prompt, the skills: one line per skill on the server, the checked
 // ones go with the agent into every send, at most the cap; then the MCP
 // servers with their read and write sides and the mode, and whether it
-// is the default. Delete asks once in place.
+// is the default. Delete asks once in place, saying what it would do.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -44,7 +44,6 @@ import { sameIds, toggledId } from "../../lib/ids.ts";
 import { nameProblem, shapedInput } from "../../lib/names.ts";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import {
   RowsBad,
   RowsButton,
@@ -55,6 +54,7 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { AgentFoot } from "./AgentFoot.tsx";
 import {
   agentFieldOf,
   compactLine,
@@ -468,29 +468,13 @@ export function AgentForm({
           }}
         />
       </div>
-      <Foot
+      <AgentFoot
+        agent={agent}
         save={save}
         dirty={dirty}
-        label={agent ? "Save" : "Add agent"}
-        start={
-          agent === null ? (
-            <span />
-          ) : (
-            <AskDelete
-              save={save}
-              asking={asking}
-              busy={busy}
-              words={`Delete ${agent.name}?`}
-              wordsClass="agents-ask-words"
-              onDelete={() => void remove()}
-            />
-          )
-        }
-        before={
-          <button type="button" class="btn" onClick={onDone}>
-            Cancel
-          </button>
-        }
+        asking={asking}
+        onDelete={() => void remove()}
+        onDone={onDone}
       />
     </form>
   );

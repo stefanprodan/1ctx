@@ -29,7 +29,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   its envelope brings it. The `session.changed` envelope carries `last`
   only when its transaction wrote such a row. `stream/Row.model.ts`
   composes the state line and the time from those and never reads a
-  transcript.
+  transcript. An archived chat's row wears the archive icon, quiet,
+  and "archived ·" before its line; a retired agent's name is greyed
+  (`authorGone()`), with no tag.
 - **All lists an automation once.** All (`origin` null) lists an
   automation once, as its newest run holding the query, with `runs` the
   count of its kept runs (null on every other row), which the row draws
@@ -59,16 +61,30 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 ## The chat page
 
 - **The chat menu.**
-  The chat menu offers Download to everyone and, to the owner and admins,
-  Rename and Delete; its `<h1>` is the title button alone, or, while
-  Rename is open, the title box in the button's place and type (Enter
-  saves, Escape or leaving the box gives the title back). A run's menu
-  has no Rename.
+  The chat menu offers Download and Archive to everyone who sees the
+  chat and, to the owner and admins, Rename and Delete; its `<h1>` is
+  the title button alone, or, while Rename is open, the title box in
+  the button's place and type (Enter saves, Escape or leaving the box
+  gives the title back). Archive and Delete each ask once inside the
+  menu (`menuStep()` knows which); Archive's button is primary, not
+  red. A run's menu and an archived chat's have no Rename and no
+  Archive (`menuItems()` in `Menu.model.ts`).
 - **A run's chat page.** A run's chat page names its automation over
   the transcript and has no composer, no Regenerate and no `/compact`;
   its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
   done run's length and its send's `tokens` (prompt plus completion over
   its counted rounds, summed from `usage` by the send queries).
+- **An archived chat.** An archived chat has the run's foot in the
+  composer's place and no Regenerate: the archive icon, why it was
+  archived and the day the delete limit removes it (`archivedLine()` in
+  `Chat.model.ts`, from `SessionDetail.archive`), then Fork. An
+  envelope that archives the chat on screen reads the detail again, so
+  the foot learns who and until when. The foot's Fork, a run's and an
+  archived chat's, is the turn's `ForkButton` with `foot`: one button
+  whose list of the project's live agents opens up from its right edge.
+- **A deleted agent keeps its name.** The transcript names a reply's
+  agent from `SessionDetail.agents`; a retired one is plain text with
+  a `deleted` tag, and a memory note names it without a link.
 
 ## The composer
 
@@ -381,6 +397,12 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **Delete asks in place.**
   The automation page and the editor confirm with Keep, Delete and
   Delete with runs, and hide every other button while they ask.
+- **An automation on a deleted agent.** The page, the list and the
+  editor name the agent from `agentName`: the brief says `@name` greyed
+  with a `deleted` tag and "Paused, its agent was deleted.", Run now and
+  Resume are off, and the list says paused. The editor's chip asks for
+  a pick in the failed colour and Save stays off until a live agent is
+  picked (`retiredPick()`).
 
 ## Admin
 
@@ -421,8 +443,10 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   with every field and button disabled, the saved values kept.
 - **The Limits tab is a form per scope.** Limit fields are text boxes
   with `inputmode="decimal"`, never number inputs. Limits is a form per
-  scope (Per turn, Per call, Knowledge, Scheduled tasks), each saving
-  the full set with the other scopes' saved values.
+  scope (Per turn, Per call, Knowledge, Scheduled tasks, Chats), each
+  saving the full set with the other scopes' saved values. A save or a
+  reset that lowers the days archived chats are kept asks in the foot
+  first (`deleteAsk()`), Delete then Keep.
 - **The MCP page shows the loaded rows as a send would carry them.**
   `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
   by `shapeServerName()`, the key a `Select` of the `mcp-` files the
@@ -444,6 +468,14 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
+- **The agent form's Delete.** Delete reads `GET
+  /api/agents/:id/impact` before it asks, and the ask has a line over
+  the buttons (`impactLine()`, `Foot`'s `above`): the chats it archives
+  and the automations it pauses, then what it stops, each part only
+  when there is any; a failed read asks without it.
+- **The overview's usage bars** name the one row of every deleted
+  project "deleted projects", unmarked, and mark a retired agent with a
+  small "deleted" after the name (`Bars`' `gone`).
 - **The agent form's MCP section.** The agent form's
   section is a line per server with Read and Write boxes (a side off
   on the server faint with the word),

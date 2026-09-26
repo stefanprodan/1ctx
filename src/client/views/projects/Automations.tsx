@@ -4,8 +4,8 @@
 // A project's Automations tab: one card, a row per automation that
 // leads to its page, with the schedule in words and the agent under
 // the name and its state at the right: running, a failed last run,
-// suspended or the next fire. New automation leads to the editor. The
-// words are Automations.model.ts.
+// suspended, paused once its agent was deleted, or the next fire. New
+// automation leads to the editor. The words are Automations.model.ts.
 
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
@@ -23,6 +23,7 @@ import {
   RowsHandle,
   RowsMeta,
   RowsNote,
+  RowsTag,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { rowState, scheduleWords } from "./Automations.model.ts";
@@ -88,7 +89,16 @@ export function Automations({ params }: { params: Params }) {
                         {scheduleWords(automation.schedule) ??
                           automation.schedule}
                         {" · "}
-                        <RowsHandle name={agent?.name ?? "no agent"} />
+                        <RowsHandle
+                          name={agent?.name ?? automation.agentName}
+                          gone={automation.agentRetired}
+                        />
+                        {automation.agentRetired && (
+                          <>
+                            {" "}
+                            <RowsTag>deleted</RowsTag>
+                          </>
+                        )}
                       </>
                     }
                   />

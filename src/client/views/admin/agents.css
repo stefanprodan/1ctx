@@ -9,6 +9,14 @@
     font-size: var(--text-ui);
     color: var(--dim);
   }
+  /* what a delete archives, pauses and stops, on its own line over the
+     ask */
+  .agents-ask-impact {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
 
   .agents-form {
     display: flex;

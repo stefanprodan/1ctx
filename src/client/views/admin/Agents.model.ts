@@ -6,6 +6,7 @@
 // the presets a provider is made from, and the words a row shows for a
 // window, a price and a key.
 
+import type { AgentImpactResponse } from "../../../shared/api/agents.ts";
 import { compactsAt } from "../../../shared/compaction.ts";
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { AgentServer } from "../../../shared/contracts/mcp.ts";
@@ -23,6 +24,7 @@ import {
   type Wire,
 } from "../../../shared/words.ts";
 import { priceLine, windowLine } from "../../agents/meta.ts";
+import { commas, pluralCommas } from "../../lib/format.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 // what New provider offers: a server speaking the OpenAI chat shape with
@@ -371,4 +373,23 @@ export function upstreamOptions(
     );
   }
   return options;
+}
+
+// The line over an agent's Delete ask: the chats it archives and the
+// automations it pauses, then what it stops, each part only when there
+// is any; empty when the delete touches nothing.
+export function impactLine(impact: AgentImpactResponse): string {
+  const { chats, automations, running } = impact;
+  const chatWords = `${pluralCommas(chats, "chat", "chats")} will be archived`;
+  const first =
+    chats > 0 && automations > 0
+      ? `${chatWords} and ${pluralCommas(automations, "automation", "automations")} paused.`
+      : chats > 0
+        ? `${chatWords}.`
+        : automations > 0
+          ? `${pluralCommas(automations, "automation", "automations")} will be paused.`
+          : "";
+  const stops =
+    running > 0 ? `${commas(running)} running now will be stopped.` : "";
+  return [first, stops].filter((part) => part !== "").join(" ");
 }

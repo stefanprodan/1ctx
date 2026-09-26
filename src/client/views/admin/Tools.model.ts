@@ -21,7 +21,7 @@ import type {
   LimitScope,
   SearchProvider,
 } from "../../../shared/words.ts";
-import { sentence } from "../../lib/format.ts";
+import { pluralCommas, sentence } from "../../lib/format.ts";
 
 // the label over each field and the line under it
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
@@ -181,6 +181,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Runs at once",
     text: "Runs the server may have going at once, every user counted.",
   },
+  archiveIdleDays: {
+    label: "Archive idle chats",
+    text: "Days a chat may go without a turn before it is archived.",
+  },
+  archivedDeleteDays: {
+    label: "Delete archived chats",
+    text: "Days an archived chat is kept before it is deleted.",
+  },
 };
 
 // when a send carries a built-in, over its description
@@ -284,6 +292,34 @@ export function problem(row: LimitRow, text: string): string | null {
     return `${label} must be from ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
   }
   return null;
+}
+
+// A save that lowers the days archived chats are kept deletes the ones
+// past the new days at the next sweep, so it asks first; null when it
+// does not lower them or the days are not a valid number yet.
+export function deleteAsk(
+  rows: LimitRow[],
+  draft: Record<string, string>,
+): string | null {
+  const row = rows.find((r) => r.name === "archivedDeleteDays");
+  if (row === undefined) return null;
+  const text = draft[row.name] ?? "";
+  if (problem(row, text) !== null) return null;
+  const next = read(row, text);
+  if (next === null || next >= row.value) return null;
+  return `Delete chats archived over ${pluralCommas(next, "day", "days")} ago?`;
+}
+
+// Keep on that ask: the days back to the saved value, every other
+// field as typed
+export function keepDays(
+  rows: LimitRow[],
+  draft: Record<string, string>,
+): Record<string, string> {
+  const row = rows.find((r) => r.name === "archivedDeleteDays");
+  return row === undefined
+    ? draft
+    : { ...draft, [row.name]: show(row, row.value) };
 }
 
 // the fields' text as the rows come in

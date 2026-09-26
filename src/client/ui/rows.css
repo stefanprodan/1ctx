@@ -261,6 +261,9 @@
   .rows-handle {
     color: var(--brand);
   }
+  .rows-handle-gone {
+    color: var(--faint);
+  }
   .rows-bad {
     color: var(--failed);
   }

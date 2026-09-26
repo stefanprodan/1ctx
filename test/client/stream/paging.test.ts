@@ -12,7 +12,9 @@ import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 function row(changes: Partial<SessionSummary> = {}): StreamRow {
   return {
+    agentRetired: false,
     session: {
+      archived: null,
       id: "s1",
       projectId: "p1",
       ownerId: "u1",
