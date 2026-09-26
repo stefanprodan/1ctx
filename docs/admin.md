@@ -20,10 +20,26 @@ pages are in `docs/views.md` and `docs/ui.md`.
   tables with a creation time added a day over the zone's last 30 days
   (the bytes of the 30 before too), the ten largest projects, chats
   and tasks, and the retention lists. Stored is a table's `bytes`, or
-  `octet_length` of the text columns of `messages` (`MESSAGE_BYTES`);
-  usage, logins and the rest are their table's pages, and a living
-  task's runs take their kept MCP files and the usage pages by their
-  share of the rows.
+  `octet_length` of the text columns of `messages` and the length of a
+  packed result (`MESSAGE_BYTES`), so packing lowers what past days
+  counted; usage, logins and the rest are their table's pages. A chat
+  not archived is kept with its uploads and MCP files, since the idle
+  sweep only archives it; an archived chat and a run whose task is gone
+  are cleaned as archived chats after `archivedDeleteDays`, and a
+  living task's runs with its retention, each with its uploads and MCP
+  files. Usage is all kept, since no delete removes it.
+- **What goes and what stays.** Usage outlives every delete (a chat,
+  a run, an automation, a project, a regenerated turn), so the
+  overview's tokens and cost read `usage` alone and never fall; every
+  deleted project is summed into one breakdown row, ranked like the
+  others, and a retired agent keeps its own row and name;
+  turns, runs and the models breakdown read `sends` and fall with a
+  delete. Archived chats are deleted `archivedDeleteDays` after they
+  were archived and orphan runs after their last activity (the chats
+  sweep, `docs/sessions.md`). Nothing vacuums: SQLite reuses the pages
+  a delete frees, so the file stays at its peak and grows no further
+  once deletes keep pace, and the database keeps its `auto_vacuum`
+  mode.
 - **The scan runs in a worker.** `scan.ts` is the queries, pure over a
   `Db` inside one read transaction; it sums what was added by quarter
   hour of UTC, which every zone's midnight falls on, so one scan serves
@@ -71,7 +87,13 @@ pages are in `docs/views.md` and `docs/ui.md`.
   No listener, sweep or MCP refresh loop runs. Stop the server before
   provisioning. Omitted fields stay, supplied membership lists replace,
   passwords and their change flag are creation-only, and objects not
-  named are never deleted. An `Agent` takes `default: true` and nothing
+  named are never deleted. An `Agent` is matched by name among live
+  agents, so one naming a deleted agent creates a new agent, and the
+  automations the delete paused stay on the retired one until edited.
+  Provisioning has no `Automation` object to move them: until someone
+  picks a live agent on each, its resume, run now and any edit that
+  keeps the agent are 409s.
+  An `Agent` takes `default: true` and nothing
   else there: a second in one apply is refused, and leaving it out
   keeps the mark wherever it is. Tool objects configure `web` with mode and
   domains, `websearch` with a nullable provider, and `visualize` with

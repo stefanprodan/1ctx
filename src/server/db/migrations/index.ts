@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The ordered list. New tables, columns and indexes are a migration
-// appended here. A rename or a retype rewrites the migration that made
-// the thing and wipes the preview db; alpha owes no compatibility.
+// The ordered list. Every schema change is a migration appended here,
+// a rename or a retype included; a migration on main is never edited,
+// since staging holds real data.
 
 import type { Migration } from "../migration.ts";
 import { m0001 } from "./0001-init.ts";
@@ -35,6 +35,7 @@ import { m0026 } from "./0026-agent-upstream.ts";
 import { m0027 } from "./0027-usage-agent.ts";
 import { m0028 } from "./0028-user-activity.ts";
 import { m0029 } from "./0029-agent-pick.ts";
+import { m0030 } from "./0030-archived-chats.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -66,4 +67,5 @@ export const MIGRATIONS: Migration[] = [
   m0027,
   m0028,
   m0029,
+  m0030,
 ];

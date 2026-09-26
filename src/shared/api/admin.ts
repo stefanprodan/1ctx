@@ -86,8 +86,10 @@ export type LargestRow = {
 };
 
 // Stored bytes by how long they stay. days is what sweeps them when an
-// admin sets it (the scratch and history limits, a task's retention
-// when every task has the same), null when it is fixed or varies
+// admin sets it (the scratch, history and archived chats limits, a
+// task's retention when every task has the same), null when it is
+// fixed or varies. Archived chats are the archived chats and the runs
+// whose task is gone, which the chats sweep deletes
 export type RetentionKept =
   | "chats"
   | "knowledge"
@@ -96,6 +98,7 @@ export type RetentionKept =
   | "usage"
   | "rest";
 export type RetentionCleaned =
+  | "archived"
   | "runs"
   | "scratch"
   | "history"
@@ -159,11 +162,15 @@ export type UsageBy = (typeof USAGE_BY)[number];
 
 // A row of a breakdown, by prompt plus completion tokens. name is the
 // team project's or the agent's; a personal project has id and name
-// null and owner set
+// null and owner set. deleted is true for a project or an agent that
+// is gone, whose usage stays: every deleted project is summed into one
+// row with id, name and owner null, ranked like any other, and a
+// retired agent keeps its own row and name
 export type UsageRow = {
   id: string | null;
   name: string | null;
   owner: string | null;
+  deleted: boolean;
   tokens: number;
   turns: number;
   runs: number;

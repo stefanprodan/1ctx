@@ -306,6 +306,7 @@ describe("POST /api/sessions/:id/fork", () => {
         createdAt: chat.app.now.value,
         lastActivityAt: chat.app.now.value,
         usage: null,
+        archived: null,
       });
       const rawSession = chat.app.db
         .query<RawSession, [string]>("select * from sessions where id = ?")
@@ -327,6 +328,9 @@ describe("POST /api/sessions/:id/fork", () => {
         created_at: chat.app.now.value,
         last_activity_at: chat.app.now.value,
         mcp_folders: 0,
+        archived_at: null,
+        archived_by: null,
+        archived_reason: null,
       });
       expect(copied.live).toBeNull();
       expect(copied.send?.kind).toBe("compact");
@@ -834,19 +838,11 @@ describe("POST /api/sessions/:id/fork", () => {
         (await chat.admin.call("DELETE", `/api/sessions/${source.sessionId}`))
           .status,
       ).toBe(200);
-      const deletion = await chat.admin.call(
-        "DELETE",
-        `/api/agents/${chat.agentId}`,
-      );
-      expect(deletion.status).toBe(409);
-      expect(await deletion.json()).toEqual({ error: "a chat uses coder" });
-      expect(
-        (await chat.member.call("DELETE", `/api/sessions/${copied.session.id}`))
-          .status,
-      ).toBe(200);
       expect(
         (await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`)).status,
       ).toBe(200);
+      // the fork is on the picked agent, so the delete leaves it live
+      expect(chat.app.sessions.byId(copied.session.id)?.archived).toBeNull();
     } finally {
       await chat.app.shutdown();
     }

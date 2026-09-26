@@ -3,6 +3,7 @@
 //
 // The rows after the last user message may belong to compact sends, so
 // every send in the replaced tail goes, not only the user message's.
+// Their usage rows stay: a replaced turn was still spent.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
@@ -15,7 +16,6 @@ export function replaceSendRows(
 ): {
   user: Message;
   removedMessageIds: string[];
-  removedSendIds: string[];
 } {
   const tail = db
     .query<{ id: string; send_id: string }, [string, number]>(
@@ -39,5 +39,5 @@ export function replaceSendRows(
       `select ${MESSAGE_COLUMNS} from messages where id = ?`,
     )
     .get(user.id)!;
-  return { user: message(raw), removedMessageIds, removedSendIds };
+  return { user: message(raw), removedMessageIds };
 }

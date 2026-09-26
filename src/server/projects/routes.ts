@@ -41,10 +41,6 @@ export type SessionsPort = {
   running(projectId: string): boolean;
 };
 
-export type UsagePort = {
-  deleteProject(projectId: string): number;
-};
-
 // the knowledge base's counts for the detail, an area built later
 export type KnowledgePort = {
   counts(projectId: string): KnowledgeCounts;
@@ -57,7 +53,6 @@ export type RoutesDeps = {
   access: AccessPort;
   users: UsersPort;
   sessions: SessionsPort;
-  usage: UsagePort;
   knowledge: KnowledgePort;
   clock: Clock;
 };
@@ -217,7 +212,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             throw new Conflict("project has a running chat");
           }
           const chats = deps.sessions.count(project.id);
-          deps.usage.deleteProject(project.id);
           if (!deps.store.remove(project.id)) {
             throw new NotFound("no such project");
           }

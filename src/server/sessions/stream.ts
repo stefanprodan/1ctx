@@ -99,17 +99,23 @@ function automations(db: Db, sessionIds: string[]) {
 }
 
 // the agent of each session by name; a session keeps its agent for
-// life and an agent in use cannot be deleted
+// life, and a deleted agent is retired, never removed, so its name stays
 function agentNames(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
-    .query<{ session_id: string; name: string }, string[]>(
-      `select sessions.id as session_id, agents.name
+    .query<{ session_id: string; name: string; retired: number }, string[]>(
+      `select sessions.id as session_id, agents.name,
+         agents.deleted_at is not null as retired
        from sessions join agents on agents.id = sessions.agent_id
        where sessions.id in (${marks})`,
     )
     .all(...sessionIds);
-  return new Map(rows.map((raw) => [raw.session_id, raw.name]));
+  return new Map(
+    rows.map((raw) => [
+      raw.session_id,
+      { name: raw.name, retired: raw.retired === 1 },
+    ]),
+  );
 }
 
 // who pressed Run now on each manual run, by the session's owner
@@ -145,7 +151,8 @@ export function streamRows(
       raw.run_source === "manual" ? names.get(raw.owner_id) : undefined;
     return {
       session: session(raw, usage.get(raw.id) ?? null),
-      agent: agents.get(raw.id) ?? null,
+      agent: agents.get(raw.id)?.name ?? null,
+      agentRetired: agents.get(raw.id)?.retired ?? false,
       send: sends.get(raw.id) ?? null,
       last: lines.get(raw.id) ?? null,
       automation: automationRows.get(raw.id) ?? null,

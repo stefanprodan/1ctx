@@ -73,13 +73,93 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   running with cause `restart`. Shutdown terminates every send, waits
   for the streams, closes the sockets with 1012, then stops the
   listener; runner and app shutdown return the ended count and whether
-  the drain timed out. An agent a session references is a 409 to delete.
-  An agent is in use when sessions, sends or messages name it.
+  the drain timed out.
+- **Deleting an agent retires it.**
+  `DELETE /api/agents/:id` never removes the row, since sessions, sends,
+  messages, usage and memory notes name it: one transaction sets
+  `deleted_at`, nulls its provider and default mark, deletes its skill
+  and server rows and users' picks of it, archives each of its chats
+  (reason `agent`, a revision and an envelope each, its scratch
+  deleted, never a run) through `SessionStore.archive()`, and suspends
+  its active automations as the admin. After the commit the scheduler
+  is woken and the runner stops every send whose policy names the
+  agent, so a chat archived while running ends as a stop does. `GET
+  /api/agents/:id/impact` counts what it would archive, pause and
+  stop. Every `AgentStore` read skips a retired agent; history reads
+  its name through its own queries, and `SessionDetail.agents` marks it
+  retired. Sends keep `provider_name`, so a provider that served them
+  can go.
+- **An archived chat is read-only, for good.**
+  `sessions.archived_at`, `archived_reason` (`manual`, `agent`, `idle`)
+  and `archived_by` (only for `manual`) mark it; there is no unarchive
+  and Fork is the way on. A send and regenerate are refused in
+  `startSend`'s transaction and compact in `startCompact`'s, never in
+  `startSummary`, so a send an agent delete stops ends as a stop;
+  `runner.send`, `regenerate` and `compact` refuse before resolving
+  the agent, so a chat on a retired agent is the 409 "the chat is
+  archived", not "no such agent". Rename is refused before the body is
+  read and again in its transaction. Stop stays allowed. Fork takes an
+  archived chat or a run as its source onto a live agent; a retired
+  one is the 400 "no such agent". `POST /api/sessions/:id/archive`
+  (no body, 204) is for anyone who sees the chat: reason `manual`, by
+  the caller, a revision and one envelope, the scratch deleted and the
+  results packed in the same transaction; a 409 while it runs, on a run
+  and when archived already. A run is never archived, since it takes no
+  turn once it ends.
+- **An archived chat's and an ended run's large results are packed.**
+  A tool row of `PACK_FROM` (1 KiB) UTF-8 bytes or more gets `packed`,
+  zstd level 3 of its bytes, `packed_bytes` its size and `content` ''
+  (`sessions/pack.ts`). Packing never touches a running session, whose
+  next round and memory phase read `content`: an archive by hand and
+  the idle sweep pack in the archive's transaction, an agent's delete
+  (which archives chats that may still run) packs nothing, and the
+  sweep packs the rest once they end. `MESSAGE_COLUMNS` selects
+  `packed_bytes`, never `packed`, so opening a chat loads no blob and
+  `offWire` sends `resultBytes` from it. Two readers decompress, each by
+  id: the result route, one row, and Fork's `copyRows`, which binds the
+  text as `content` and leaves `packed` null, since a fork is live. The
+  context builder and the memory packet never meet a packed row, the
+  download reads user messages and answers only, and search reads
+  titles.
+- **The chats sweep archives, packs and deletes.**
+  `sessions.sweep(now, caps)` (`sessions/sweep.ts`) runs inside the
+  hourly sweep in `compose.ts`, which also runs at startup. It is an
+  ordered list of steps, each over at most `CHATS_PER_STEP` sessions
+  per pass, one `transact()` per session with its own catch that
+  rechecks the row. First every chat, not a run, not running and not
+  archived, whose `last_activity_at` is older than `archiveIdleDays`
+  (the `chats` scope) is archived with reason `idle`, over the partial
+  index `sessions_idle`, one envelope each; lowering the limit takes
+  more at the next pass. Then archived chats not running are packed,
+  and their scratch deleted, skipping the sessions a command holds,
+  since a chat archived while its send ran can write scratch until the
+  stop lands. Then every ended run is packed, its memory phase
+  included, which runs under the run's running status; never at the
+  run's end, so a finish adds no write. Last, an archived chat is
+  deleted `archivedDeleteDays` after `archived_at`, and a run whose
+  automation is gone `archivedDeleteDays` after its last activity, one
+  `session.deleted` each; a live automation's runs keep its retention.
+  The counts are the `sweep` event's `chats_archived`, `chats_packed`,
+  `scratch_freed`, `runs_packed`, `chats_deleted` and `runs_deleted`,
+  and any count above zero logs the event. No sweep vacuums: SQLite
+  reuses the pages a delete frees, and the file keeps its
+  `auto_vacuum` mode.
+- **Usage outlives what it measured.** No delete removes a `usage`
+  row: a chat's, a run's by retention or the sweep, an automation's
+  with its runs, a project's, and a turn regenerate replaces all keep
+  theirs, so the cost of the past never reads lower than what was
+  spent. `usage` has no foreign keys. `latest()` counts only rows of
+  sends still there, so a replaced turn is not the history's size.
+  Every delete of a session is `deleteSession()` (`sessions/delete.ts`,
+  `SessionStore.remove()`), for the route, a task's retention and the
+  sweep: the foreign keys take its sends, messages, opened and kept MCP
+  files, scratch, uploads and memory views, and null memory notes' and
+  automations' pointers to it.
 - **Regenerate replaces the last turn.**
   Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
   reuses the last user message: inside `startSend`'s transaction the
-  rows after it, their send and its usage go, and the envelope names
-  them in `removedMessageIds`; 409 while the session runs, 400 when
+  rows after it and their send go, their usage stays, and the envelope
+  names them in `removedMessageIds`; 409 while the session runs, 400 when
   the last message is the user's. Its optional JSON body goes through
   `readBody()` under `MAX_REGENERATE_BODY` and `parseRegenerate()`.
 - **Fork copies a chat through a settled turn.**
@@ -101,10 +181,12 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
 - **Rename and delete are the owner's.**
   Rename (`PATCH /api/sessions/:id`, the composer's `/rename <title>`)
   and delete are the session owner's or, in a team project, an admin's;
-  a member who did not start the chat gets 403. A rename is one
+  a member who did not start the chat gets 403, and neither the menu
+  nor the composer's commands offer them Rename. Archive is anyone's
+  who sees the chat. A rename is one
   revision and one envelope without rows and is allowed while the chat
   runs, since a send never writes the title; a delete waits for the
-  end and removes its usage rows.
+  end and keeps its usage rows.
   The detail's `authors` names the owner and every user who wrote in
   the chat, so the page names an admin outside the project.
 - **A chat downloads as Markdown.**

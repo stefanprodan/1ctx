@@ -9,11 +9,14 @@ import type { Memory } from "../../shared/contracts/memory.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
+import type { ChatCaps } from "../limits/index.ts";
 import { personDays } from "./activity.ts";
+import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import {
   type AccessPort,
   detail,
@@ -23,7 +26,9 @@ import {
 } from "./routes.ts";
 import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
+import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
+export { ARCHIVED, refuseArchived } from "./archive.ts";
 export {
   type FeedCursor,
   parseFeedCursor,
@@ -61,7 +66,8 @@ export {
   STREAM_LIMIT,
   type UsagePort,
 } from "./rows.ts";
-export { SessionStore } from "./store.ts";
+export { type ScratchPort, SessionStore } from "./store.ts";
+export type { ChatSweep } from "./sweep.ts";
 
 export const RESTART_ERROR = "the server restarted";
 
@@ -74,6 +80,8 @@ export type SessionsDeps = {
   live: LivePort;
   usage: UsagePort;
   uploads: UploadsPort;
+  scratch: SweepScratch;
+  limits: { current(): { archivedDeleteDays: number } };
 };
 
 export type Sessions = {
@@ -83,7 +91,11 @@ export type Sessions = {
   visible(principal: Principal, id: string): SessionRow;
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
-  usesAgent(agentId: string): boolean;
+  // the chats an agent's delete archives and the sends it stops
+  agentImpact(agentId: string): { chats: number; running: number };
+  // in the caller's transaction: every chat on the agent archived, one
+  // envelope each
+  archiveAgent(agentId: string, now: number): BusEvent[];
   // a person's posts, chats and manual runs on each day of a window,
   // in every project
   personDays(userId: string, starts: number[], until: number): number[];
@@ -91,11 +103,15 @@ export type Sessions = {
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
+  // the hourly chats sweep: idle chats archived, archived chats and
+  // ended runs packed, scratch freed, archived chats and orphan runs
+  // deleted past the limit; the counts go on the sweep event
+  sweep(now: number, caps: ChatCaps): ChatSweep;
   routes: RouteDescriptor[];
 };
 
 export function sessionsArea(deps: SessionsDeps): Sessions {
-  const store = new SessionStore(deps.db, deps.usage);
+  const store = new SessionStore(deps.db, deps.usage, deps.scratch);
   const visible = (principal: Principal, id: string): SessionRow => {
     const session = store.byId(id);
     if (session === null) throw new NotFound("no such chat");
@@ -118,7 +134,15 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         throw err;
       }
     },
-    usesAgent: (agentId) => store.usesAgent(agentId),
+    agentImpact: (agentId) => ({
+      chats: agentChats(deps.db, agentId).length,
+      running: agentRunning(deps.db, agentId),
+    }),
+    archiveAgent: (agentId, now) =>
+      agentChats(deps.db, agentId).flatMap((id) => {
+        const row = store.archive(id, "agent", null, now);
+        return row === null ? [] : [archivedEvent(row, store.lastSend(row.id))];
+      }),
     personDays: (userId, starts, until) =>
       personDays(deps.db, userId, starts, until),
     sessionInfo(sessionId) {
@@ -156,6 +180,12 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
       return touched.length;
     },
+    sweep: (now, caps) =>
+      sweepChats(
+        { db: deps.db, store, scratch: deps.scratch, log: deps.log },
+        now,
+        caps,
+      ),
     routes: routes({
       db: deps.db,
       clock: deps.clock,
@@ -163,8 +193,8 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       store,
       access: deps.access,
       live: deps.live,
-      usage: deps.usage,
       uploads: deps.uploads,
+      keptDays: () => deps.limits.current().archivedDeleteDays,
       visible,
     }),
   };

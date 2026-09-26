@@ -27,11 +27,14 @@ export type SessionsResponse = { rows: StreamRow[]; next: string | null };
 // who pressed Run now, whether or not they are in the project; null
 // for a chat and a scheduled run. agent is the session's agent by name,
 // credited on a line that says a send did not finish; null where the
-// row is built without it. runs is how many runs the automation keeps,
-// set only on its one line in All, which stands for them all
+// row is built without it; agentRetired is true once that agent was
+// deleted, so the row draws the name as plain text. runs is how many
+// runs the automation keeps, set only on its one line in All, which
+// stands for them all
 export type StreamRow = {
   session: SessionSummary;
   agent: string | null;
+  agentRetired: boolean;
   send: SendSummary | null;
   last: LastLine | null;
   automation: { id: string; name: string } | null;
@@ -86,6 +89,10 @@ export type RegenerateRequest = { capabilities?: CapabilityChange };
 
 // PATCH /api/sessions/:id: a new title, one line up to the title cap
 export type RenameSessionRequest = { title: string };
+
+// POST /api/sessions/:id/archive takes no body and answers 204: a chat
+// not running and not archived becomes read-only for good; a run is a
+// 409, since it is read-only once it ends
 
 // POST /api/sessions/:id/fork: the turn to fork at, the agent the fork
 // runs on, and its title, "Fork of <the source's>" when absent

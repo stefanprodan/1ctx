@@ -177,6 +177,12 @@ export class UserStore {
       .run(agentId, id);
   }
 
+  clearAgent(agentId: string): void {
+    this.db
+      .query("update users set agent_id = null where agent_id = ?")
+      .run(agentId);
+  }
+
   setRole(id: string, role: Role): void {
     this.db.query("update users set role = ? where id = ?").run(role, id);
   }

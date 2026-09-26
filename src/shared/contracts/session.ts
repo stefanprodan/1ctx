@@ -8,6 +8,8 @@
 
 import type { MessageUpload } from "../uploads.ts";
 import type {
+  ArchiveReason,
+  Avatar,
   EventSource,
   MessageKind,
   MessageStatus,
@@ -43,6 +45,18 @@ export type SessionSummary = {
   // what the chat turned off for itself, sorted keys of
   // shared/capabilities.ts; empty for a run, whose automation holds its own
   disabledCapabilities: string[];
+  // set once a chat is archived, for good; null while it takes turns,
+  // and always for a run, which is read-only once it ends
+  archived: { at: number; reason: ArchiveReason } | null;
+};
+
+// what the chat page says of an archived chat beyond the summary: who
+// archived it by hand, null for the other reasons and once that user is
+// deleted, and when the delete limit removes it, as of the limit when
+// the detail was read
+export type SessionArchive = {
+  by: { id: string; username: string } | null;
+  keptUntil: number;
 };
 
 // what the provider counted for one round: the prompt is the whole
@@ -234,4 +248,19 @@ export type SessionDetail = {
   send: SendSummary | null;
   live: LiveSend | null;
   authors: SessionAuthor[];
+  // the agents its rows name, a retired one included, so a reply keeps
+  // its agent's name and avatar once the agent is deleted
+  agents: SessionAgent[];
+  // set exactly when session.archived is; the client reads the detail
+  // again when an envelope archives the chat it shows
+  archive: SessionArchive | null;
+};
+
+// retired is true once an admin deleted the agent: its name is plain
+// text, never a link, and it is offered nowhere
+export type SessionAgent = {
+  id: string;
+  name: string;
+  avatar: Avatar;
+  retired: boolean;
 };

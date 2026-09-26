@@ -13,6 +13,15 @@ export type AgentsResponse = { agents: AgentSummary[] };
 
 // POST /api/agents and PATCH /api/agents/:id answer the row
 export type AgentResponse = { agent: AgentSummary };
+
+// GET /api/agents/:id/impact, what DELETE /api/agents/:id would do now:
+// the chats it archives, the automations it pauses, and the chats and
+// runs on the agent running now, which it stops
+export type AgentImpactResponse = {
+  chats: number;
+  automations: number;
+  running: number;
+};
 // PUT /api/profile/agent, for any signed-in user: the composer's pick,
 // kept so their next new chat starts on it; answers the agent it will
 export type PickAgentRequest = { agentId: string };

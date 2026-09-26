@@ -14,8 +14,6 @@ import { memoryDb } from "../../helpers/db.ts";
 const noUsage: UsagePort = {
   latest: () => null,
   latestFor: () => new Map(),
-  deleteSession: () => 0,
-  deleteSessions: () => 0,
 };
 
 function seeded() {
@@ -44,7 +42,10 @@ function seeded() {
   automation("digest", "p", "digest");
   automation("spend", "p", "spend");
   automation("audit", "t", "audit");
-  const store = new SessionStore(db, noUsage);
+  const store = new SessionStore(db, noUsage, {
+    drop() {},
+    held: () => new Set(),
+  });
   const chat = (now: number, title = "chat", projectId = "p") =>
     store.create({
       projectId,

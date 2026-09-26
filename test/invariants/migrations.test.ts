@@ -80,6 +80,16 @@ describe("the schema", () => {
     const db = new Database(":memory:");
     db.exec("pragma foreign_keys = on");
     migrate(db, migrations);
+    // sends keep the provider's name from 0030 on
+    const named = db
+      .query<{ name: string }, []>(
+        "select name from pragma_table_info('sends')",
+      )
+      .all()
+      .some((column) => column.name === "provider_name");
+    const [nameColumn, nameValue] = named
+      ? [", provider_name", ", 'prov'"]
+      : ["", ""];
     db.exec(`
       insert into users (id, username, full_name, email, role, password_hash, created_at)
         values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
@@ -91,9 +101,9 @@ describe("the schema", () => {
         values ('a', 'agent', 'pr', 'm', 'M', 0);
       insert into sessions (id, project_id, owner_id, agent_id, origin, title, status, revision, created_at, last_activity_at)
         values ('sess', 'p', 'u', 'a', 'chat', 'chat', 'done', 2, 0, 0);
-      insert into sends (id, session_id, kind, user_id, agent_id, provider_id, model, status, first_message_id, started_at)
-        values ('send1', 'sess', 'chat', 'u', 'a', 'pr', 'm', 'done', 'm1', 0),
-               ('send2', 'sess', 'compact', 'u', 'a', 'pr', 'm', 'done', 'm3', 10);
+      insert into sends (id, session_id, kind, user_id, agent_id, provider_id${nameColumn}, model, status, first_message_id, started_at)
+        values ('send1', 'sess', 'chat', 'u', 'a', 'pr'${nameValue}, 'm', 'done', 'm1', 0),
+               ('send2', 'sess', 'compact', 'u', 'a', 'pr'${nameValue}, 'm', 'done', 'm3', 10);
       insert into messages (id, session_id, seq, kind, send_id, round, user_id, content, status, created_at, finished_at)
         values ('m1', 'sess', 1, 'user', 'send1', 1, 'u', 'q', 'done', 0, 0);
       insert into messages (id, session_id, seq, kind, send_id, round, slot, agent_id, model, content, status, created_at, finished_at)
@@ -567,6 +577,7 @@ describe("the schema", () => {
         "0027-usage-agent",
         "0028-user-activity",
         "0029-agent-pick",
+        "0030-archived-chats",
       ]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
@@ -739,6 +750,7 @@ describe("the schema", () => {
         "0027-usage-agent",
         "0028-user-activity",
         "0029-agent-pick",
+        "0030-archived-chats",
       ]);
       expect(
         db
@@ -947,6 +959,180 @@ describe("the schema", () => {
     ).toEqual({ name: "personal", description: "" });
     db.close();
   });
+
+  describe("0030 archived chats migration", () => {
+    const columns = (db: Database, table: string) =>
+      db
+        .query<{ name: string }, []>(
+          `select name from pragma_table_info('${table}')`,
+        )
+        .all()
+        .map((column) => column.name);
+    const indexes = (db: Database) =>
+      db
+        .query<{ name: string }, []>(
+          "select name from sqlite_schema where type = 'index' and name not like 'sqlite_%' order by name",
+        )
+        .all()
+        .map((row) => row.name);
+
+    test("keeps the rows, names each send's provider and frees a retired agent", () => {
+      const db = seed(MIGRATIONS.slice(0, 29));
+      try {
+        // a send whose provider row is gone, which 0029's key refused
+        db.exec("pragma foreign_keys = off");
+        db.exec(`
+        insert into sends (id, session_id, kind, user_id, agent_id, provider_id, model, status, first_message_id, started_at)
+          values ('send3', 'sess', 'chat', 'u', 'a', 'gone', 'm', 'done', 'm1', 20);
+      `);
+        db.exec("pragma foreign_keys = on");
+        const before = Object.fromEntries(
+          ["agents", "sends", "sessions", "messages"].map((table) => [
+            table,
+            columns(db, table),
+          ]),
+        );
+        const indexesBefore = indexes(db);
+        const sends = db.query("select * from sends order by id").all();
+        expect(migrate(db)).toEqual(["0030-archived-chats"]);
+        expect(MIGRATIONS[29]?.rebuild).toBe(true);
+        expect(columns(db, "agents")).toEqual([
+          ...before.agents!,
+          "deleted_at",
+        ]);
+        expect(columns(db, "sends")).toEqual([
+          ...before.sends!.slice(0, 6),
+          "provider_name",
+          ...before.sends!.slice(6),
+        ]);
+        expect(columns(db, "sessions")).toEqual([
+          ...before.sessions!,
+          "archived_at",
+          "archived_by",
+          "archived_reason",
+        ]);
+        expect(columns(db, "messages")).toEqual([
+          ...before.messages!,
+          "packed",
+          "packed_bytes",
+        ]);
+        expect(indexes(db)).toEqual(
+          [
+            ...indexesBefore,
+            "agents_name",
+            "messages_packable",
+            "messages_send",
+            "sessions_idle",
+          ].sort(),
+        );
+        expect(
+          db
+            .query(
+              "select id, provider_id, provider_name from sends order by id",
+            )
+            .all(),
+        ).toEqual([
+          { id: "send1", provider_id: "pr", provider_name: "prov" },
+          { id: "send2", provider_id: "pr", provider_name: "prov" },
+          { id: "send3", provider_id: "gone", provider_name: "gone" },
+        ]);
+        expect(
+          db
+            .query(
+              `select ${Object.keys(sends[0] as object).join(", ")} from sends order by id`,
+            )
+            .all(),
+        ).toEqual(sends);
+        expect(
+          db.query("select deleted_at, is_default from agents").all(),
+        ).toEqual([{ deleted_at: null, is_default: 0 }]);
+        expect(
+          db
+            .query(
+              "select archived_at, archived_by, archived_reason from sessions",
+            )
+            .all(),
+        ).toEqual([
+          { archived_at: null, archived_by: null, archived_reason: null },
+        ]);
+        expect(
+          db
+            .query(
+              "select count(*) as n from messages where packed is not null",
+            )
+            .get(),
+        ).toEqual({ n: 0 });
+
+        // a provider that served sends can go once no agent runs on it
+        db.exec(`
+        insert into providers (id, name, wire, base_url, created_at)
+          values ('pr2', 'other', 'openai-compatible', 'http://y', 0);
+        update agents set provider_id = 'pr2' where id = 'a';
+        delete from providers where id = 'pr';
+      `);
+
+        // a retired agent holds no provider and no default mark, and its
+        // name is free for a live one
+        const retired = (fields: string) =>
+          db.query(
+            `insert into agents (id, name, provider_id, model, model_name, created_at, deleted_at, is_default)
+             values ${fields}`,
+          );
+        retired("('r1', 'agent', null, 'm', 'M', 0, 5, 0)").run();
+        expect(() =>
+          retired("('r2', 'agent', 'pr2', 'm', 'M', 0, 5, 0)").run(),
+        ).toThrow();
+        expect(() =>
+          retired("('r3', 'retired', null, 'm', 'M', 0, 5, 1)").run(),
+        ).toThrow();
+        expect(() =>
+          retired("('r4', 'live', null, 'm', 'M', 0, null, 0)").run(),
+        ).toThrow();
+        expect(() =>
+          retired("('r5', 'agent', 'pr2', 'm', 'M', 0, null, 0)").run(),
+        ).toThrow();
+        retired("('r6', 'agent', null, 'm', 'M', 0, 6, 0)").run();
+
+        // archived: a reason exactly with a time, a user only by hand
+        const archive = (at: string, by: string, reason: string) =>
+          db.query(
+            `update sessions set archived_at = ${at}, archived_by = ${by},
+             archived_reason = ${reason} where id = 'sess'`,
+          );
+        expect(() => archive("1", "null", "null").run()).toThrow();
+        expect(() => archive("null", "null", "'idle'").run()).toThrow();
+        expect(() => archive("1", "'u'", "'agent'").run()).toThrow();
+        expect(() => archive("1", "null", "'other'").run()).toThrow();
+        expect(() => archive("null", "'u'", "null").run()).toThrow();
+        archive("1", "null", "'agent'").run();
+        archive("2", "'u'", "'manual'").run();
+
+        // packed: a size exactly with a blob, only on an emptied tool row
+        db.exec(`
+        insert into messages (id, session_id, seq, kind, send_id, round, tool_call_id, tool_name, content, status, created_at, finished_at)
+          values ('m4', 'sess', 4, 'tool', 'send1', 1, 'c1', 'bash', 'out', 'done', 0, 1);
+      `);
+        const pack = (id: string, bytes: string) =>
+          db.query(
+            `update messages set packed = x'00', packed_bytes = ${bytes},
+             content = '' where id = '${id}'`,
+          );
+        expect(() => pack("m2", "3").run()).toThrow();
+        expect(() => pack("m4", "null").run()).toThrow();
+        pack("m4", "3").run();
+        expect(() =>
+          db.query("update messages set content = 'x' where id = 'm4'").run(),
+        ).toThrow();
+
+        expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+        expect(db.query("pragma foreign_keys").get()).toEqual({
+          foreign_keys: 1,
+        });
+      } finally {
+        db.close();
+      }
+    });
+  });
 });
 
 describe("additive migrations", () => {
@@ -1005,6 +1191,7 @@ describe("additive migrations", () => {
       "0027-usage-agent",
       "0028-user-activity",
       "0029-agent-pick",
+      "0030-archived-chats",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -1070,6 +1257,7 @@ describe("0005", () => {
       "0027-usage-agent",
       "0028-user-activity",
       "0029-agent-pick",
+      "0030-archived-chats",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -1144,6 +1332,7 @@ describe("rebuild migrations", () => {
       "0027-usage-agent",
       "0028-user-activity",
       "0029-agent-pick",
+      "0030-archived-chats",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1251,6 +1440,7 @@ describe("0006 skills migration", () => {
       "0027-usage-agent",
       "0028-user-activity",
       "0029-agent-pick",
+      "0030-archived-chats",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1317,6 +1507,7 @@ describe("0007 user tz migration", () => {
       "0027-usage-agent",
       "0028-user-activity",
       "0029-agent-pick",
+      "0030-archived-chats",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1362,6 +1553,7 @@ describe("0009 mcp migration", () => {
       "0027-usage-agent",
       "0028-user-activity",
       "0029-agent-pick",
+      "0030-archived-chats",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1623,6 +1815,7 @@ describe("0008 search tavily migration", () => {
           "0027-usage-agent",
           "0028-user-activity",
           "0029-agent-pick",
+          "0030-archived-chats",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(
@@ -1636,6 +1829,7 @@ describe("0008 search tavily migration", () => {
             reasoning_known: 0,
             upstream: null,
             is_default: 0,
+            deleted_at: null,
           })),
         );
         db.exec(`

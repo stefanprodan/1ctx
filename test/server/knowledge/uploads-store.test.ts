@@ -826,10 +826,10 @@ describe("upload store", () => {
       expect(ctx.uploads.read(target)).toEqual({ ...source, revision: 1 });
       ctx.claim([ctx.stage([file("a", "changed")]).id!]);
       expect(ctx.uploads.read(target)).toEqual({ ...source, revision: 1 });
-      ctx.sessions.delete(ctx.session.id);
+      ctx.sessions.remove(ctx.session.id);
       expect(ctx.read()).toEqual(blank);
       expect(ctx.uploads.read(target)).toEqual({ ...source, revision: 1 });
-      ctx.sessions.delete(target);
+      ctx.sessions.remove(target);
       expect(ctx.db.query("select * from session_uploads").all()).toEqual([]);
       expect(ctx.db.query("select * from session_upload_files").all()).toEqual(
         [],

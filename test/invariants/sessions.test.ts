@@ -674,20 +674,17 @@ describe("session titles", () => {
 });
 
 describe("agent deletion", () => {
-  test("refuses an agent with a chat and allows it after chat deletion", async () => {
+  test("keeps a chat on the agent and archives it", async () => {
     const chat = await chatApp();
     const started = await startChat(chat);
     await finish(started.script);
-    const used = await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`);
-    expect(used.status).toBe(409);
-    expect(await used.json()).toEqual({ error: "a chat uses coder" });
-    expect(
-      (await chat.member.call("DELETE", `/api/sessions/${started.sessionId}`))
-        .status,
-    ).toBe(200);
     expect(
       (await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`)).status,
     ).toBe(200);
+    expect(chat.app.sessions.byId(started.sessionId)?.archived).toEqual({
+      at: chat.app.now.value,
+      reason: "agent",
+    });
     chat.app.socket.dispose();
   });
 });
@@ -890,8 +887,6 @@ describe("the usage on the summary", () => {
 const noUsage: UsagePort = {
   latest: () => null,
   latestFor: () => new Map(),
-  deleteSession: () => 0,
-  deleteSessions: () => 0,
 };
 
 function seededStore() {
@@ -908,7 +903,10 @@ function seededStore() {
   db.query(
     "insert into agents (id, name, provider_id, model, model_name, created_at) values ('a', 'agent', 'pr', 'm', 'M', 0)",
   ).run();
-  const store = new SessionStore(db, noUsage);
+  const store = new SessionStore(db, noUsage, {
+    drop() {},
+    held: () => new Set(),
+  });
   const session = store.create({
     projectId: "p",
     ownerId: "u",

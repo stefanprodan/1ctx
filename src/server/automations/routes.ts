@@ -44,6 +44,7 @@ import {
   type AutomationFields,
   type AutomationStore,
   MAX_AUTOMATIONS_PER_PROJECT,
+  RETIRED,
 } from "./store.ts";
 
 export type AccessPort = {
@@ -231,6 +232,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const current = visible(principal, found.id);
           editable(principal, current);
           const next = { ...current, ...patch };
+          if (next.agentId === current.agentId && current.agentRetired) {
+            throw new Conflict(RETIRED);
+          }
           agent(next.agentId);
           deadline(next.deadlineMs);
           if (deps.store.nameTaken(current.projectId, next.name, current.id)) {
@@ -299,6 +303,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const automation = transact(deps.db, () => {
           const current = visible(principal, found.id);
           if (current.suspendedAt === null) return { result: current };
+          if (current.agentRetired) throw new Conflict(RETIRED);
           const now = deps.clock();
           const updated = deps.store.resume(
             current.id,

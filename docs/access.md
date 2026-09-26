@@ -66,7 +66,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   (`isDescription`) that goes into the system prompt after the agent's
   prompt, only when set. A team project is open to its members and to
   admins. Deleting one takes its chats and their
-  usage and is refused while a chat runs. A handler gets a project
+  usage and is refused while a chat runs. Anyone who may open a chat
+  may archive it: every member of a team project, the owner of a
+  personal one, and an admin wherever `access.project` lets them see
+  it; rename and delete stay the owner's or an admin's. A handler gets a project
   through `access.project(principal, id)`, which answers the same 404
   whether the project is missing or not theirs to see. The rule is
   `projects/visible.ts`, pure.

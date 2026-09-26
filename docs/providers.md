@@ -59,8 +59,9 @@ provider, model, window, tools, thinking, effort and upstream fields.
   `skip_thought_signature_validator` on its first call.
 - **An agent names a model the catalog lists.** An agent
   names a provider and a model the catalog lists; what the catalog said
-  is kept on the agent row, and a provider an agent runs on is a 409 to
-  delete. A catalog row with no window and none of
+  is kept on the agent row, and a provider a live agent runs on is a 409
+  to delete; a send keeps its provider's id and name as plain text, so
+  the overview counts a deleted provider's sends under its name. A catalog row with no window and none of
   `supported_parameters`, `capabilities` or `supported_features` is
   undescribed (`described: false`, NIM and OpenAI list only ids): the
   agent form asks for its window and Tools, the agents API takes

@@ -14,7 +14,10 @@ mount in `docs/knowledge.md`.
   floors and ceilings in one table, `limits/defaults.ts`; an admin's
   override is a row in `limits`, `limits.current()` merges them, and
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
-  the defaults; `tools/` never imports `runner/`. `maxBashCalls` refuses
+  the defaults; `tools/` never imports `runner/`. The `chats` scope
+  holds `archiveIdleDays` (1 to 180, default 30) and
+  `archivedDeleteDays` (30 to 1825, default 365), neither with an off
+  value; the chats sweep reads them at each pass. `maxBashCalls` refuses
   excess bash calls before queue or slot admission without ending the loop.
   A bash `command not found` for a name the send offers as a tool gains
   one line saying to call it as a tool, through `mcp_call` for a catalog

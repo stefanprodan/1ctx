@@ -134,7 +134,9 @@ export function prepareSend(fields: {
   }
   let settled = false;
   return {
-    detail: sessionDetail(fields.sessions, started.session, live(send)),
+    // a send starts only on a chat that is not archived, so no
+    // archive is read and its kept days go unused
+    detail: sessionDetail(fields.sessions, started.session, live(send), 0),
     launch() {
       if (settled) return;
       settled = true;

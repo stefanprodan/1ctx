@@ -12,10 +12,10 @@ import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
 import { type Event, type PreparedRun, RunCapacity } from "../runner/index.ts";
-import type { SessionStore, UsagePort } from "../sessions/index.ts";
+import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { nextFire } from "./schedule.ts";
-import type { AutomationStore } from "./store.ts";
+import { type AutomationStore, RETIRED } from "./store.ts";
 import { replaceMissed, type Waiting, Waits } from "./waits.ts";
 
 const PASS_MS = 60_000;
@@ -33,7 +33,6 @@ type Deps = {
   };
   agents: { byId(id: string): AgentRow | null };
   sessions: SessionStore;
-  usage: UsagePort;
   runner: { startRun(event: Event): PreparedRun };
 };
 
@@ -101,6 +100,7 @@ export function scheduler(deps: Deps): Scheduler {
     if (actor === null) throw new BadRequest("the user is gone");
     const project = deps.projects.byId(row.projectId);
     if (project === null) throw new Conflict("no such automation");
+    if (row.agentRetired) throw new Conflict(RETIRED);
     const agent = deps.agents.byId(row.agentId);
     if (agent === null) throw new BadRequest("no such agent");
     return { user: actor, project, agent };
@@ -294,22 +294,12 @@ export function scheduler(deps: Deps): Scheduler {
     for (const session of deps.sessions.expiredRuns(deps.clock())) {
       try {
         transact(deps.db, () => {
-          const current = deps.sessions.byId(session.id);
-          if (current === null || current.status === "running") {
+          const deleted = deps.sessions.remove(session.id);
+          if (deleted === null || deleted === "running") {
             return { result: undefined };
           }
-          deps.usage.deleteSession(current.id);
-          deps.sessions.delete(current.id);
           count++;
-          return {
-            result: undefined,
-            events: [
-              {
-                type: "session.deleted" as const,
-                data: { projectId: current.projectId, sessionId: current.id },
-              },
-            ],
-          };
+          return { result: undefined, events: [deleted] };
         });
       } catch (err) {
         deps.log.warn("retention delete failed", {

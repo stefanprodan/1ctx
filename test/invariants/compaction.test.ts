@@ -351,7 +351,7 @@ describe("compaction", () => {
           "select count(*) as n from usage where send_id = ?",
         )
         .get(compactSendId)!.n,
-    ).toBe(0);
+    ).toBe(1);
     finish(replacement, "replacement");
     await settle(chat, started.sessionId);
     chat.app.socket.dispose();

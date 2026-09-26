@@ -119,6 +119,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
             return user === null ? null : summary(user);
           })(),
     agentName: row.agentName,
+    agentRetired: row.agentName !== null && !store.agentLive(row.agentName),
     session:
       row.sessionId === null ? null : deps.sessions.sessionInfo(row.sessionId),
   });

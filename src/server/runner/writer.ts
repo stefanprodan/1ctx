@@ -60,10 +60,7 @@ export type WriterDeps = {
   clock: Clock;
   sessions: SessionsPort;
   uploads: UploadsPort;
-  usage: {
-    record(fields: UsageFields): unknown;
-    deleteSend(sendId: string): boolean;
-  };
+  usage: { record(fields: UsageFields): unknown };
   commitMemory(send: ActiveSend): number | null;
   // a chat's snapshot of the project's note, started with its first send
   // and dropped by a summary, inside the caller's transaction

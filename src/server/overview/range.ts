@@ -45,6 +45,7 @@ export type GroupRow = {
   id: string | null;
   name: string | null;
   owner: string | null;
+  deleted: boolean;
   tokens: number;
   turns: number;
   runs: number;
@@ -138,16 +139,19 @@ function allTime(db: Db): AllTime {
 
 type Tokens = { key: string; tokens: number };
 type Sends = { key: string; turns: number; runs: number };
-type Named = Pick<GroupRow, "key" | "id" | "name" | "owner">;
+type Named = Pick<GroupRow, "key" | "id" | "name" | "owner" | "deleted">;
 
 // the tokens of a group from usage alone and its sends from sends
-// alone, joined by key: a send with three rounds counts once
+// alone, joined by key: a send with three rounds counts once. Usage
+// outlives its project, so a key no row names is a deleted one, kept
+// by its id, or summed into one row keyed merged when it is given
 function grouped(
   db: Db,
   bounds: Bounds,
   tokensSql: string,
   sendsSql: string,
   names: Named[],
+  merged?: string,
 ): GroupRow[] {
   const tokens = new Map(
     db
@@ -173,6 +177,32 @@ function grouped(
       runs: s?.runs ?? 0,
     });
   }
+  const named = new Set(names.map((row) => row.key));
+  let gone: GroupRow | undefined;
+  for (const [key, t] of tokens) {
+    if (named.has(key)) continue;
+    const s = sends.get(key);
+    const row: GroupRow = {
+      key: merged ?? key,
+      id: merged === undefined ? key : null,
+      name: null,
+      owner: null,
+      deleted: true,
+      tokens: t.tokens,
+      turns: s?.turns ?? 0,
+      runs: s?.runs ?? 0,
+    };
+    if (merged === undefined) {
+      rows.push(row);
+    } else if (gone === undefined) {
+      gone = row;
+      rows.push(gone);
+    } else {
+      gone.tokens += row.tokens;
+      gone.turns += row.turns;
+      gone.runs += row.runs;
+    }
+  }
   return rows;
 }
 
@@ -182,13 +212,16 @@ const USAGE_BY = (key: string) =>
 
 function byAgents(db: Db, bounds: Bounds): GroupRow[] {
   const names = db
-    .query<{ id: string; name: string }, []>("select id, name from agents")
+    .query<{ id: string; name: string; retired: number }, []>(
+      "select id, name, deleted_at is not null as retired from agents",
+    )
     .all()
     .map((row) => ({
       key: row.id,
       id: row.id,
       name: row.name,
       owner: null,
+      deleted: row.retired === 1,
     }));
   return grouped(
     db,
@@ -216,12 +249,28 @@ const projectNames = (db: Db): ProjectRow[] =>
     )
     .all();
 
+// every deleted project is one row: none has a name left to tell them
+// apart. No project id is empty
+const DELETED_PROJECTS = "";
+
 function byProjects(db: Db, bounds: Bounds): GroupRow[] {
   // a personal project is counted and never named
   const names = projectNames(db).map((project) =>
     project.kind === "personal"
-      ? { key: project.id, id: null, name: null, owner: project.owner }
-      : { key: project.id, id: project.id, name: project.name, owner: null },
+      ? {
+          key: project.id,
+          id: null,
+          name: null,
+          owner: project.owner,
+          deleted: false,
+        }
+      : {
+          key: project.id,
+          id: project.id,
+          name: project.name,
+          owner: null,
+          deleted: false,
+        },
   );
   return grouped(
     db,
@@ -232,6 +281,7 @@ function byProjects(db: Db, bounds: Bounds): GroupRow[] {
        from sends s join sessions x on x.id = s.session_id
        where s.started_at >= ? and s.started_at < ? group by key`,
     names,
+    DELETED_PROJECTS,
   );
 }
 
@@ -248,10 +298,11 @@ const ANSWERED = `coalesce((select u.served_model from usage u
 function models(db: Db, bounds: Bounds): ModelRow[] {
   const rows = db
     .query<{ provider: string; answered: string; turns: number }, Bounds>(
-      `select p.name as provider, ${ANSWERED} as answered, count(*) as turns
-         from sends s join providers p on p.id = s.provider_id
+      `select s.provider_name as provider, ${ANSWERED} as answered,
+              count(*) as turns
+         from sends s
          where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
-         group by s.provider_id, answered
+         group by s.provider_name, answered
          order by turns desc, provider, answered`,
     )
     .all(...bounds)
@@ -268,9 +319,9 @@ function models(db: Db, bounds: Bounds): ModelRow[] {
   );
   for (const ended of db
     .query<{ provider: string; model: string; ms: number }, Bounds>(
-      `select p.name as provider, ${ANSWERED} as model,
+      `select s.provider_name as provider, ${ANSWERED} as model,
               max(s.finished_at - s.started_at, 0) as ms
-         from sends s join providers p on p.id = s.provider_id
+         from sends s
          where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
            and s.status != 'running' and s.finished_at is not null`,
     )
@@ -299,7 +350,10 @@ function instance(db: Db): RangeResult["instance"] {
       db,
       "select count(*) as n from projects where kind = 'team'",
     ),
-    agents: count(db, "select count(*) as n from agents"),
+    agents: count(
+      db,
+      "select count(*) as n from agents where deleted_at is null",
+    ),
     automations: count(db, "select count(*) as n from automations"),
     databaseBytes: memory
       ? 0

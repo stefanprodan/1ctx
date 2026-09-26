@@ -17,8 +17,6 @@ import { memoryDb } from "../../helpers/db.ts";
 const noUsage: UsagePort = {
   latest: () => null,
   latestFor: () => new Map(),
-  deleteSession: () => 0,
-  deleteSessions: () => 0,
 };
 
 function seeded() {
@@ -41,7 +39,10 @@ function seeded() {
        updated_at)
      values ('au', 'p', 'u', 'a', 'digest', 'go', '0 * * * *', 'UTC', 30, 1, 0, 0)`,
   ).run();
-  const store = new SessionStore(db, noUsage);
+  const store = new SessionStore(db, noUsage, {
+    drop() {},
+    held: () => new Set(),
+  });
   const add = (
     fields: Partial<{
       projectId: string;

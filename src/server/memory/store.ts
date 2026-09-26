@@ -187,6 +187,18 @@ export class MemoryStore {
         };
   }
 
+  // a note keeps the saving agent's name only, so a retired agent is one
+  // no live agent answers to
+  agentLive(name: string): boolean {
+    return (
+      this.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from agents where name = ? and deleted_at is null",
+        )
+        .get(name)!.n > 0
+    );
+  }
+
   save(
     target: MemoryTarget,
     next: readonly MemoryEntry[],

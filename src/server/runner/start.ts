@@ -20,7 +20,7 @@ import type { SendKind } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
-import type { SessionRow } from "../sessions/index.ts";
+import { refuseArchived, type SessionRow } from "../sessions/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
 import type { SessionsPort, UploadsPort } from "./writer-port.ts";
@@ -56,7 +56,6 @@ export type StartDeps = {
   clock: Clock;
   sessions: SessionsPort;
   uploads: UploadsPort;
-  usage: { deleteSend(sendId: string): boolean };
   views: {
     start(sessionId: string, snapshot: readonly MemoryEntry[]): void;
     resetSeen(sessionId: string): void;
@@ -82,6 +81,7 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
           now,
         });
     if (base === null) throw new NotFound("no such chat");
+    refuseArchived(base);
     const changed = applyChange(base.disabledCapabilities, fields.capabilities);
     if (!changed.ok) throw new BadRequest(changed.error);
     if (!sameSet(base.disabledCapabilities, changed.set)) {
@@ -125,9 +125,6 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
         fields.existingUser,
         send.id,
       );
-      for (const sendId of replacement.removedSendIds) {
-        deps.usage.deleteSend(sendId);
-      }
       user = replacement.user;
       removedMessageIds = replacement.removedMessageIds;
       // the rows that saved are gone, so the chat has seen only its snapshot

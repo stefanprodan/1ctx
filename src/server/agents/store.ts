@@ -99,13 +99,14 @@ export class AgentStore {
     );
   }
 
-  // the marked agent, else the first created, so deleting the default
-  // hands it on with no write
+  // the marked agent, else the first live one created, so deleting the
+  // default hands it on
   defaultId(): string | null {
     return (
       this.db
         .query<{ id: string }, []>(
-          "select id from agents order by is_default desc, created_at, name limit 1",
+          `select id from agents where deleted_at is null
+           order by is_default desc, created_at, name limit 1`,
         )
         .get()?.id ?? null
     );
@@ -114,21 +115,27 @@ export class AgentStore {
   list(): AgentRow[] {
     const defaultId = this.defaultId();
     return this.db
-      .query<Raw, []>("select * from agents order by created_at, name")
+      .query<Raw, []>(
+        "select * from agents where deleted_at is null order by created_at, name",
+      )
       .all()
       .map((raw) => this.row(raw, defaultId));
   }
 
   byId(id: string): AgentRow | null {
     const raw = this.db
-      .query<Raw, [string]>("select * from agents where id = ?")
+      .query<Raw, [string]>(
+        "select * from agents where id = ? and deleted_at is null",
+      )
       .get(id);
     return raw ? this.row(raw) : null;
   }
 
   byName(name: string): AgentRow | null {
     const raw = this.db
-      .query<Raw, [string]>("select * from agents where name = ?")
+      .query<Raw, [string]>(
+        "select * from agents where name = ? and deleted_at is null",
+      )
       .get(name);
     return raw ? this.row(raw) : null;
   }
@@ -152,7 +159,7 @@ export class AgentStore {
     return (
       this.db
         .query<{ n: number }, [string]>(
-          "select count(*) as n from agents where provider_id = ?",
+          "select count(*) as n from agents where provider_id = ? and deleted_at is null",
         )
         .get(providerId)!.n > 0
     );
@@ -203,7 +210,7 @@ export class AgentStore {
            tools = ?, reasoning = ?, thinking_required = ?,
            reasoning_known = ?, model_described = ?, thinking = ?,
            effort = ?, prompt = ?, mcp_mode = ?, upstream = ?
-         where id = ?`,
+         where id = ? and deleted_at is null`,
       )
       .run(
         fields.name,
@@ -229,7 +236,16 @@ export class AgentStore {
     return this.byId(id);
   }
 
-  delete(id: string): boolean {
-    return this.db.query("delete from agents where id = ?").run(id).changes > 0;
+  // retired, never removed: its chats, sends and usage keep pointing at
+  // it, while its name, provider and default mark go free
+  retire(id: string, now: number): boolean {
+    return (
+      this.db
+        .query(
+          `update agents set deleted_at = ?, provider_id = null, is_default = 0
+           where id = ? and deleted_at is null`,
+        )
+        .run(now, id).changes > 0
+    );
   }
 }

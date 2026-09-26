@@ -140,8 +140,9 @@ function addSend(
   const status = fields.status ?? "done";
   db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
-       model, status, first_message_id, rounds, started_at, finished_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, 'm', ?, ?, ?)`,
+       provider_name, model, status, first_message_id, rounds, started_at,
+       finished_at)
+     values (?, ?, ?, ?, ?, ?, 'local', ?, ?, 'm', ?, ?, ?)`,
   ).run(
     id,
     sessionId,
@@ -429,6 +430,7 @@ describe("the overview breakdowns", () => {
         id: chat.agentId,
         name: "coder",
         owner: null,
+        deleted: false,
         tokens: 190,
         turns: 2,
         runs: 2,
@@ -439,11 +441,20 @@ describe("the overview breakdowns", () => {
         id: teamId,
         name: "research",
         owner: null,
+        deleted: false,
         tokens: 110 + 20,
         turns: 1,
         runs: 1,
       },
-      { id: null, name: null, owner: "casey", tokens: 60, turns: 1, runs: 1 },
+      {
+        id: null,
+        name: null,
+        owner: "casey",
+        deleted: false,
+        tokens: 60,
+        turns: 1,
+        runs: 1,
+      },
     ]);
     expect(body.instance).toMatchObject({
       version: "v0.0.0-test",
@@ -464,6 +475,49 @@ describe("the overview breakdowns", () => {
     ]) {
       expect(text).not.toContain(secret);
     }
+  });
+
+  test("sum every deleted project into one ranked row", async () => {
+    const chat = await fixture();
+    const live = await team(chat, "research");
+    const liveChat = await settledChat(chat, live);
+    const goneChats: string[] = [];
+    const gone: string[] = [];
+    for (const name of ["old", "older"]) {
+      const id = await team(chat, name);
+      gone.push(id);
+      goneChats.push(await settledChat(chat, id));
+    }
+    hide(chat);
+    addSend(chat, liveChat, { at: NOW, usage: [{ prompt: 90 }] });
+    addSend(chat, goneChats[0]!, { at: NOW, usage: [{ prompt: 50 }] });
+    addSend(chat, goneChats[1]!, { at: NOW, usage: [{ prompt: 60 }] });
+    for (const id of gone) {
+      const res = await chat.admin.call("DELETE", `/api/projects/${id}`);
+      expect(res.status).toBe(200);
+    }
+    const body = await overview(chat);
+    expect(body.by.projects).toEqual([
+      {
+        id: null,
+        name: null,
+        owner: null,
+        deleted: true,
+        tokens: 60 + 70,
+        turns: 0,
+        runs: 0,
+      },
+      {
+        id: live,
+        name: "research",
+        owner: null,
+        deleted: false,
+        tokens: 100,
+        turns: 1,
+        runs: 0,
+      },
+    ]);
+    await chat.app.shutdown();
   });
 
   test("count a send with several rounds once", async () => {

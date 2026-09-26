@@ -289,6 +289,11 @@ export function isSessionOrigin(value: unknown): value is SessionOrigin {
   return SESSION_ORIGINS.includes(value as SessionOrigin);
 }
 
+// why a chat is archived: someone archived it, its agent was deleted,
+// or it went the admin's days without activity
+export const ARCHIVE_REASONS = ["manual", "agent", "idle"] as const;
+export type ArchiveReason = (typeof ARCHIVE_REASONS)[number];
+
 // what made an automation's event: its schedule, or someone's Run now
 export const EVENT_SOURCES = ["schedule", "manual"] as const;
 export type EventSource = (typeof EVENT_SOURCES)[number];
@@ -417,6 +422,8 @@ export const LIMIT_NAMES = [
   "mcpKeptFiles",
   "runsPerUser",
   "runsRunning",
+  "archiveIdleDays",
+  "archivedDeleteDays",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 export function isLimitName(value: unknown): value is LimitName {
@@ -436,14 +443,16 @@ export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
 // where a limit applies: over the whole send, to one tool call, to a
 // project's knowledge base, a storage cap read at each write, to the
-// runs the process holds at once, read at each admission, or to the
-// visuals a send draws
+// runs the process holds at once, read at each admission, to the
+// visuals a send draws, or to chats, which the hourly sweep archives
+// and deletes by their days
 export const LIMIT_SCOPES = [
   "send",
   "call",
   "knowledge",
   "runs",
   "visuals",
+  "chats",
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 

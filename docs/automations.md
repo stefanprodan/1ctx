@@ -16,8 +16,10 @@ editor are in `docs/views.md`.
 - **Who may do what.** Anyone who sees the project creates it, runs it
   now, suspends, resumes and stops a run; the owner or, in a team
   project, an admin edits and deletes it, else 403. At most
-  `MAX_AUTOMATIONS_PER_PROJECT`; an agent an automation names is a 409
-  to delete. `next_at` is the next fire and is null exactly while
+  `MAX_AUTOMATIONS_PER_PROJECT`. Deleting an agent suspends its active
+  automations with `suspended_by` the admin; while an automation's agent
+  is retired, resume, run now and a PATCH that keeps the agent are a 409
+  "its agent was deleted" until a live agent is picked. `next_at` is the next fire and is null exactly while
   suspended (a table check), and `suspended_by` names who suspended it
   (null once resumed and for rows suspended before the column); the
   summary carries the owner's and the suspender's usernames and a stream
@@ -75,8 +77,17 @@ editor are in `docs/views.md`.
 - **Deleting an automation keeps its runs unless asked.**
   Deleting an automation is a 409 while a run runs and leaves its
   runs, with `automation_id` set null; with `?runs=delete` it deletes
-  them and their usage in the same transaction. That is one
+  them in the same transaction. That is one
   `automation.deleted` with `runs: true`, never a `session.deleted`
   per run: the socket unwatches a run that is gone, and the client
   drops their stream rows and held chats and leaves a run on screen
-  or loading. The usage rows go 500 sessions a statement.
+  or loading. A run left without its automation is deleted by the
+  chats sweep `archivedDeleteDays` after its last activity, one
+  `session.deleted` each, since no retention reaches it; a live
+  automation's runs keep its `retention_days`, swept hourly by the
+  scheduler through the sessions area's one delete.
+- **Usage stays.** A run's usage rows outlive its retention, the chats
+  sweep and its automation's delete, so the overview's tokens and cost
+  never fall; the turn and run counts read `sends` and fall with them.
+  An ended run's large tool results are packed by the chats sweep
+  (`docs/sessions.md`), never at its end.

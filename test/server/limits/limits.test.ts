@@ -183,13 +183,14 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
-      expect(rows).toHaveLength(39);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(39);
+      expect(rows).toHaveLength(41);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(41);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(12);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "runs")).toHaveLength(2);
       expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
+      expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 1_000_000,
@@ -245,7 +246,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(39);
+      expect(body.limits).toHaveLength(41);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

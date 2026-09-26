@@ -64,10 +64,18 @@ export type RunCaps = {
   runsRunning: number;
 };
 
+// the days the hourly sweep archives an idle chat after, and deletes
+// an archived chat after; neither has an off value
+export type ChatCaps = {
+  archiveIdleDays: number;
+  archivedDeleteDays: number;
+};
+
 export type Limits = LoopLimits &
   ToolCaps &
   KnowledgeCaps &
-  RunCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  RunCaps &
+  ChatCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -333,6 +341,20 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   },
   runsPerUser: { default: 4, min: 1, max: 32, unit: "count", scope: "runs" },
   runsRunning: { default: 32, min: 1, max: 64, unit: "count", scope: "runs" },
+  archiveIdleDays: {
+    default: 30,
+    min: 1,
+    max: 180,
+    unit: "days",
+    scope: "chats",
+  },
+  archivedDeleteDays: {
+    default: 365,
+    min: 30,
+    max: 1825,
+    unit: "days",
+    scope: "chats",
+  },
 };
 
 export const DEFAULT_LIMITS = Object.fromEntries(

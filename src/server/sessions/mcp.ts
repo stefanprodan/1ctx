@@ -53,15 +53,20 @@ export function insertMcpSend(db: Db, fields: McpSendFields): string {
   const id = fields.id ?? newId();
   const mcp = storeMcpDigest(db, fields.mcpDigest ?? null);
   db.query(
-    `insert into sends (id, session_id, kind, user_id, agent_id, provider_id, model,
-       status, first_message_id, mcp, started_at)
-     values (?, ?, ?, ?, ?, ?, ?, 'running', ?, ?, ?)`,
+    `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
+       provider_name, model, status, first_message_id, mcp, started_at)
+     values (?, ?, ?, ?, ?, ?,
+       coalesce((select name from providers where id = ?), ?), ?,
+       'running', ?, ?, ?)`,
   ).run(
     id,
     fields.sessionId,
     fields.kind ?? "chat",
     fields.userId,
     fields.agentId,
+    fields.providerId,
+    // the name outlives the provider, which may be deleted later
+    fields.providerId,
     fields.providerId,
     fields.model,
     fields.firstMessageId,
