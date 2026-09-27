@@ -35,7 +35,11 @@ import {
   project,
   projects,
 } from "../data/projects.ts";
-import { loadProviders } from "../data/providers.ts";
+import {
+  loadProviders,
+  loadProviderUsage,
+  providers,
+} from "../data/providers.ts";
 import {
   homeProjectId,
   loadList,
@@ -433,14 +437,32 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Providers",
     role: "admin",
+    // New provider is the list's `?new`, as New agent is
     load: async () => {
-      // a provider row names the agents and the deciders on it
+      // a provider row counts the agents on it; the deciders' cards
+      // follow, and the aside reads the instance's last 30 days
       await Promise.all([
         loadAgents(),
         loadDeciders(),
         loadDecisions(),
         loadProviders(),
+        loadOverview(),
       ]);
+    },
+  },
+  {
+    path: "/config/providers/:name",
+    view: lazy(() =>
+      import("../views/admin/ProviderPage.tsx").then((m) => m.ProviderPage),
+    ),
+    title: (params) => params.name,
+    role: "admin",
+    // the rows under Used by name the agents and the deciders on it;
+    // the aside's usage needs the provider's id, which the list gives
+    load: async (params) => {
+      await Promise.all([loadProviders(), loadAgents(), loadDeciders()]);
+      const shown = providers.value?.find((p) => p.name === params.name);
+      if (shown !== undefined) await loadProviderUsage(shown.id);
     },
   },
   {

@@ -15,6 +15,7 @@ import type {
   EndpointsResponse,
   ProviderResponse,
   ProvidersResponse,
+  ProviderUsageResponse,
 } from "../../shared/api/providers.ts";
 import type { CatalogKind } from "../../shared/contracts/decider.ts";
 import type {
@@ -29,6 +30,12 @@ import { me } from "./me.ts";
 export const providers = signal<ProviderSummary[] | null>(null);
 export const keys = signal<string[]>([]);
 export const providersError = signal<Failure | null>(null);
+// a provider page's last 30 days, for the provider it was read for;
+// usage is null when the read failed
+export const providerUsage = signal<{
+  providerId: string;
+  usage: ProviderUsageResponse | null;
+} | null>(null);
 
 let owner: string | null = null;
 
@@ -39,6 +46,7 @@ effect(() => {
   providers.value = null;
   keys.value = [];
   providersError.value = null;
+  providerUsage.value = null;
 });
 
 // a load's answer is kept only when it is still the one wanted: for
@@ -85,6 +93,18 @@ export async function deleteProvider(id: string): Promise<void> {
   if (owner === forUser) {
     providers.value = (providers.value ?? []).filter((p) => p.id !== id);
   }
+}
+
+// a failure is the aside's "Did not load", never the page's
+export async function loadProviderUsage(id: string): Promise<void> {
+  const forUser = owner;
+  let usage: ProviderUsageResponse | null = null;
+  try {
+    usage = await api<ProviderUsageResponse>(
+      `/api/providers/${encodeURIComponent(id)}/usage`,
+    );
+  } catch {}
+  if (owner === forUser) providerUsage.value = { providerId: id, usage };
 }
 
 // the chat models by default, or the decision models a decider picks

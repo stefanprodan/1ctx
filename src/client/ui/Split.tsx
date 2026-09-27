@@ -53,14 +53,17 @@ export function AsideLine({
   label,
   cut,
   href,
+  quiet,
   children,
 }: {
   label: string;
   cut?: boolean;
   href?: string;
+  // the value says there is none: faint, not bright
+  quiet?: boolean;
   children: ComponentChildren;
 }) {
-  const strong = `split-strong${cut ? " cut" : ""}`;
+  const strong = `split-strong${cut ? " cut" : ""}${quiet ? " split-quiet" : ""}`;
   return (
     <div class="split-line">
       {label}

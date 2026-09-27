@@ -307,6 +307,11 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/providers/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/admin/overview",
     expect: { anonymous: 401, member: 403, admin: 400 },
   },

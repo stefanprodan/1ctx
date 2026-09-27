@@ -64,6 +64,10 @@
     color: var(--fg);
     font-weight: 500;
   }
+  .split-quiet {
+    color: var(--faint);
+    font-weight: 400;
+  }
   .split-link {
     color: var(--dim);
   }

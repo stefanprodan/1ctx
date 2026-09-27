@@ -52,6 +52,7 @@ export type Usage = {
   // an agent's year of days in the zone, every project in one series
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
   agentTotal: UsageStore["agentTotal"];
+  providerTotal: UsageStore["providerTotal"];
   routes: RouteDescriptor[];
 };
 
@@ -67,6 +68,8 @@ export function usageArea(deps: UsageDeps): Usage {
     latestFor: (sessionIds) => store.latestFor(sessionIds),
     agentTotal: (agentId, since, until) =>
       store.agentTotal(agentId, since, until),
+    providerTotal: (providerId, since, until) =>
+      store.providerTotal(providerId, since, until),
     agentDays(agentId, timeZone) {
       const { days, starts, since, until } = usageWindow(
         deps.clock(),

@@ -15,6 +15,11 @@ export function agentHref(name: string): string {
   return `/agents/${encodeURIComponent(name)}`;
 }
 
+// a provider's page under Config
+export function configProviderHref(name: string): string {
+  return `/config/providers/${encodeURIComponent(name)}`;
+}
+
 // an agent's page under Config, on one of its tabs
 export type AgentTab = "general" | "skills" | "mcp";
 export function configAgentHref(name: string, tab: AgentTab = "general") {

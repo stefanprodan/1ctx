@@ -187,6 +187,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders: {
       usesProvider: (providerId) => deciders.usesProvider(providerId),
     },
+    usage: {
+      providerTotal: (providerId, since, until) =>
+        usage.providerTotal(providerId, since, until),
+    },
   });
   const deciders = decidersArea({
     db,
