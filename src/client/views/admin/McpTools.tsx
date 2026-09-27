@@ -83,8 +83,9 @@ export function McpTools({
   };
   const n = server.tools.length;
   // the same foot under the matchers and under the list, so Save is near
-  // wherever the edit was made
-  const foot = (
+  // wherever the edit was made; an element each, since a vnode drawn in
+  // two places is patched as one
+  const foot = () => (
     <DraftFoot
       save={save}
       dirty={d.toolsDirty(server)}
@@ -102,7 +103,7 @@ export function McpTools({
         void save.run(null);
       }}
     >
-      <Setting title="Matchers" foot={foot}>
+      <Setting title="Matchers" foot={foot()}>
         <Matchers
           server={server}
           patterns={patterns}
@@ -140,7 +141,7 @@ export function McpTools({
             <ToolRows drafts={d} tools={shown} decided={decided} />
           </>
         )}
-        <div class="mcp-page-foot">{foot}</div>
+        <div class="mcp-page-foot">{foot()}</div>
       </RowsCard>
     </form>
   );
