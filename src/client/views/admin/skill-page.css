@@ -1,0 +1,106 @@
+/* Config › Skills: a list row's meta, the add form's fields, and a
+   skill's page: the failure line over the tabs, the About card's facts
+   and the Delete card's ask. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .skill-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 960px;
+  }
+  .skill-page-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .skill-page-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .skill-page-state {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+
+  /* the list: the agents over the files, right-aligned */
+  .skill-page-list-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-family: var(--sans);
+  }
+  .skill-page-list-files {
+    color: var(--faint);
+  }
+
+  .skill-page-bad {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    color: var(--attention);
+  }
+  .skill-page-bad-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* About: a label and a value per line */
+  .skill-page-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--text-ui);
+  }
+  .skill-page-fact {
+    min-width: 0;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .skill-page-fact-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .skill-page-said {
+    margin: 0;
+    font-size: var(--text-ui);
+  }
+
+  .skill-page-delete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .skill-page-ask {
+    margin-right: auto;
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+
+  @media (max-width: 719px) {
+    .skill-page-list-meta {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-2);
+    }
+    .skill-page-facts {
+      grid-template-columns: 1fr;
+      gap: var(--space-1) 0;
+    }
+    .skill-page-fact {
+      margin-bottom: var(--space-2);
+    }
+  }
+}

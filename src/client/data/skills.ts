@@ -15,6 +15,8 @@ import type {
   SkillFileResponse,
   SkillResponse,
   SkillsResponse,
+  SkillsUsageResponse,
+  SkillUsageResponse,
 } from "../../shared/api/skills.ts";
 import type { IndexEntry, SkillSummary } from "../../shared/contracts/skill.ts";
 import { type Failure, failure } from "../lib/format.ts";
@@ -26,6 +28,16 @@ export const skillsError = signal<Failure | null>(null);
 // the bodies read so far, by id, and the files by id and path
 export const bodies = signal<Record<string, string>>({});
 export const files = signal<Record<string, string>>({});
+
+// one skill's last 30 days for its page, keyed by the skill it is for,
+// and every skill's for the list; usage is null when the read failed
+export const skillUsage = signal<{
+  skillId: string;
+  usage: SkillUsageResponse | null;
+} | null>(null);
+export const allSkillUsage = signal<{
+  usage: SkillsUsageResponse | null;
+} | null>(null);
 
 export const fileKey = (id: string, path: string) => `${id}\n${path}`;
 
@@ -39,6 +51,8 @@ effect(() => {
   skillsError.value = null;
   bodies.value = {};
   files.value = {};
+  skillUsage.value = null;
+  allSkillUsage.value = null;
 });
 
 // a load's answer is kept only when it is still the one wanted: for
@@ -46,6 +60,9 @@ effect(() => {
 // failure included, since a route arrival reloads and a write can land
 // while a load is in flight
 let turn = 0;
+// the writes so far: a body or file read that one overtook keeps
+// nothing, while a list load, which leaves them alone, does not count
+let writes = 0;
 
 const byName = (rows: SkillSummary[]) =>
   rows.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -83,6 +100,7 @@ export async function addSkill(body: AddSkillRequest): Promise<SkillSummary> {
   const forUser = owner;
   const answer = await api<SkillResponse>("/api/skills", "POST", body);
   turn++;
+  writes++;
   if (owner === forUser) keep(answer);
   return answer.skill;
 }
@@ -95,6 +113,7 @@ export async function refreshSkill(id: string): Promise<SkillSummary> {
     {},
   );
   turn++;
+  writes++;
   if (owner === forUser) keep(answer);
   return answer.skill;
 }
@@ -103,6 +122,7 @@ export async function deleteSkill(id: string): Promise<void> {
   const forUser = owner;
   await api(`/api/skills/${encodeURIComponent(id)}`, "DELETE");
   turn++;
+  writes++;
   if (owner === forUser) {
     skills.value = (skills.value ?? []).filter((s) => s.id !== id);
     const nextBodies = { ...bodies.value };
@@ -121,11 +141,11 @@ export async function readSkill(id: string): Promise<string> {
   const held = bodies.value[id];
   if (held !== undefined) return held;
   const forUser = owner;
-  const mine = turn;
+  const mine = writes;
   const answer = await api<SkillResponse>(
     `/api/skills/${encodeURIComponent(id)}`,
   );
-  if (owner === forUser && turn === mine) {
+  if (owner === forUser && writes === mine) {
     bodies.value = { ...bodies.value, [id]: answer.body };
   }
   return answer.body;
@@ -136,11 +156,11 @@ export async function readSkillFile(id: string, path: string): Promise<string> {
   const held = files.value[key];
   if (held !== undefined) return held;
   const forUser = owner;
-  const mine = turn;
+  const mine = writes;
   const answer = await api<SkillFileResponse>(
     `/api/skills/${encodeURIComponent(id)}/file?path=${encodeURIComponent(path)}`,
   );
-  if (owner === forUser && turn === mine) {
+  if (owner === forUser && writes === mine) {
     files.value = { ...files.value, [key]: answer.content };
   }
   return answer.content;
@@ -153,4 +173,34 @@ export async function discoverSkills(url: string): Promise<IndexEntry[]> {
     url,
   });
   return answer.entries;
+}
+
+// a failure is the aside's "Did not load", never the page's; only the
+// latest read lands, so a switch between skills keeps the last one
+let usageTurn = 0;
+
+export async function loadSkillUsage(id: string): Promise<void> {
+  const forUser = owner;
+  const mine = ++usageTurn;
+  let usage: SkillUsageResponse | null = null;
+  try {
+    usage = await api<SkillUsageResponse>(
+      `/api/skills/${encodeURIComponent(id)}/usage`,
+    );
+  } catch {}
+  if (owner === forUser && usageTurn === mine) {
+    skillUsage.value = { skillId: id, usage };
+  }
+}
+
+let allTurn = 0;
+
+export async function loadAllSkillUsage(): Promise<void> {
+  const forUser = owner;
+  const mine = ++allTurn;
+  let usage: SkillsUsageResponse | null = null;
+  try {
+    usage = await api<SkillsUsageResponse>("/api/usage/skills");
+  } catch {}
+  if (owner === forUser && allTurn === mine) allSkillUsage.value = { usage };
 }

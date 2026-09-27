@@ -6,6 +6,8 @@ import type {
   SkillFileResponse,
   SkillResponse,
   SkillsResponse,
+  SkillsUsageResponse,
+  SkillUsageResponse,
 } from "../../shared/api/skills.ts";
 import { skillKey } from "../../shared/capabilities.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -20,17 +22,38 @@ import { parseAdd, parseDiscover, parseFile } from "./parse.ts";
 import { loaded, type SkillRow, type SkillStore, summary } from "./store.ts";
 
 export type AgentsPort = { agentNames(ids: string[]): string[] };
+// the skill and skill_file calls in a window, by the skill they named
+export type UsagePort = {
+  loads(
+    since: number,
+    until: number,
+  ): {
+    loads: number;
+    reads: number;
+    failed: number;
+    skills: {
+      name: string;
+      loads: number;
+      reads: number;
+      failed: number;
+      files: { path: string; reads: number }[];
+    }[];
+  };
+};
 export type RoutesDeps = {
   db: Db;
   store: SkillStore;
   capabilities: { forget(key: string): void };
   agents: AgentsPort;
+  usage: UsagePort;
   fetcher: typeof fetch;
   clock: Clock;
   log: Log;
   shutdown: AbortSignal;
   refreshing: Set<string>;
 };
+
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   const show = (row: SkillRow) =>
@@ -117,6 +140,47 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         return json(detail(ctx.params.id));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/usage/skills",
+      policy: "admin",
+      handle() {
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const all = deps.usage.loads(since, until);
+        const body: SkillsUsageResponse = {
+          since,
+          until,
+          loads: all.loads,
+          reads: all.reads,
+          failed: all.failed,
+          skills: all.skills.map(({ files: _, ...skill }) => skill),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/skills/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const row = find(ctx.params.id);
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const one = deps.usage
+          .loads(since, until)
+          .skills.find((s) => s.name === row.name);
+        const body: SkillUsageResponse = {
+          since,
+          until,
+          loads: one?.loads ?? 0,
+          reads: one?.reads ?? 0,
+          failed: one?.failed ?? 0,
+          files: one?.files ?? [],
+        };
+        return json(body);
       },
     },
     {

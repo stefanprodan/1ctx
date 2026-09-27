@@ -555,6 +555,26 @@ describe("skills in a send", () => {
     );
     expect((await result.json()).content).toContain("Use ops.");
     expect(skill.files).toHaveLength(1);
+    // the usage routes read the skill each call named from the reply
+    const one = await chat.admin.call("GET", `/api/skills/${skill.id}/usage`);
+    expect(await one.json()).toMatchObject({
+      loads: 1,
+      reads: 2,
+      failed: 1,
+      files: [
+        { path: "missing.md", reads: 1 },
+        { path: "references/a.md", reads: 1 },
+      ],
+    });
+    const all = await chat.admin.call("GET", "/api/usage/skills");
+    expect(await all.json()).toMatchObject({
+      loads: 1,
+      reads: 2,
+      failed: 1,
+      skills: [{ name: "ops", loads: 1, reads: 2, failed: 1 }],
+    });
+    const gone = await chat.admin.call("GET", "/api/skills/nope/usage");
+    expect(gone.status).toBe(404);
   });
 
   test("a deleted and re-added name cannot replace the snapshot id", async () => {

@@ -16,7 +16,12 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
-import { mcpCalls, mcpServerCalls, personDays } from "./activity.ts";
+import {
+  mcpCalls,
+  mcpServerCalls,
+  personDays,
+  skillLoads,
+} from "./activity.ts";
 import {
   agentActivity,
   agentChats,
@@ -117,6 +122,8 @@ export type Sessions = {
     since: number,
     until: number,
   ): ReturnType<typeof mcpServerCalls>;
+  // the skill loads and file reads in a window, by skill name
+  skillLoads(since: number, until: number): ReturnType<typeof skillLoads>;
   sessionInfo(sessionId: string): Memory["session"];
   // a run's answer before its memory phase, null when it has none
   runAnswer(sendId: string, memoryRound: number | null): string | null;
@@ -171,6 +178,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       personDays(deps.db, userId, starts, until),
     mcpCalls: (server, since, until) => mcpCalls(deps.db, server, since, until),
     mcpServerCalls: (since, until) => mcpServerCalls(deps.db, since, until),
+    skillLoads: (since, until) => skillLoads(deps.db, since, until),
     sessionInfo(sessionId) {
       const row = deps.db
         .query<NonNullable<Memory["session"]>, [string]>(

@@ -228,6 +228,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: log("skills"),
     fetcher,
     capabilities,
+    usage: { loads: (since, until) => sessions.skillLoads(since, until) },
     agents: {
       agentNames: (ids) =>
         ids.flatMap((id) => {

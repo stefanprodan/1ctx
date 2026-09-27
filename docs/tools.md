@@ -241,3 +241,12 @@ mount in `docs/knowledge.md`.
   `GET /api/projects/:id/agents` also answers `skills`, keyed by agent
   id, with `{id, name}` in name order from `skills/switchable.ts`, one
   read. Agents without skills have no entry.
+- **A skill's usage is read from the calls.** A tool row holds only the
+  result, so `skillLoads()` in `sessions/activity.ts` joins each `skill`
+  and `skill_file` row to the call of the same id in its round's reply
+  and reads the name (and a file's path) from the call's arguments; a
+  call whose arguments are not JSON or name no skill counts for none.
+  `GET /api/usage/skills` and `GET /api/skills/:id/usage` answer the
+  last 30 days, a deleted skill's calls under its name. The usage path
+  sits outside `/api/skills/` since `GET /api/skills/:id` would overlap
+  it.

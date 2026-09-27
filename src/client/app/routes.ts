@@ -64,7 +64,12 @@ import {
   loadSession,
   session,
 } from "../data/sessions.ts";
-import { loadSkills } from "../data/skills.ts";
+import {
+  loadAllSkillUsage,
+  loadSkills,
+  loadSkillUsage,
+  skills,
+} from "../data/skills.ts";
 import { loadTools } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
@@ -144,6 +149,25 @@ const configAgentRoutes = (["", "/skills", "/mcp"] as const).map(
 const configMcpView = lazy<{ params: Params }>(() =>
   import("../views/admin/McpPage.tsx").then((m) => m.McpPage),
 );
+// a skill's tabs share one view as well; Used by names the agents, and
+// the aside's usage needs the skill's id, which the list gives
+const configSkillView = lazy<{ params: Params }>(() =>
+  import("../views/admin/SkillPage.tsx").then((m) => m.SkillPage),
+);
+const configSkillRoutes = (["", "/files"] as const).map(
+  (tab): Route => ({
+    path: `/config/skills/:name${tab}`,
+    view: configSkillView,
+    title: (params) => (tab === "" ? params.name : `${params.name} files`),
+    role: "admin",
+    load: async (params) => {
+      await Promise.all([loadSkills(), loadAgents()]);
+      const shown = skills.value?.find((s) => s.name === params.name);
+      if (shown !== undefined) await loadSkillUsage(shown.id);
+    },
+  }),
+);
+
 const configMcpRoutes = (["", "/tools"] as const).map(
   (tab): Route => ({
     path: `/config/mcp/:name${tab}`,
@@ -619,11 +643,18 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/config/skills",
-    view: lazy(() => import("../views/admin/Skills.tsx").then((m) => m.Skills)),
+    view: lazy(() =>
+      import("../views/admin/SkillList.tsx").then((m) => m.SkillList),
+    ),
     title: () => "Skills",
     role: "admin",
-    load: () => loadSkills(),
+    // Add skill is the list's `?new`; the aside reads every skill's last
+    // 30 days
+    load: async () => {
+      await Promise.all([loadSkills(), loadAllSkillUsage()]);
+    },
   },
+  ...configSkillRoutes,
   {
     path: "/config/mcp",
     view: lazy(() =>
