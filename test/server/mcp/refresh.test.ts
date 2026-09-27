@@ -14,6 +14,11 @@ import { collectLogs } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { fixture, mcpFetch } from "./fake.ts";
 
+const NO_USAGE = {
+  calls: () => ({ calls: 0, failed: 0, tools: [] }),
+  servers: () => ({ calls: 0, failed: 0, servers: [] }),
+};
+
 const fields = (name = "cluster"): CreateMcpRequest => ({
   name,
   url: `https://${name}.test/mcp`,
@@ -82,6 +87,7 @@ describe("MCP refresh coordinator", () => {
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -138,6 +144,7 @@ describe("MCP refresh coordinator", () => {
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -163,6 +170,7 @@ describe("MCP refresh coordinator", () => {
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -194,6 +202,7 @@ describe("MCP refresh coordinator", () => {
     }) as unknown as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -247,6 +256,7 @@ describe("MCP refresh coordinator", () => {
     }) as unknown as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -301,6 +311,7 @@ describe("MCP refresh coordinator", () => {
     }) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -344,6 +355,7 @@ describe("MCP refresh coordinator", () => {
     }) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -389,6 +401,7 @@ describe("MCP refresh coordinator", () => {
       db,
       store,
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       coordinator,
       clock: time.clock,
       log: silent,
@@ -427,6 +440,7 @@ describe("MCP refresh coordinator", () => {
     const fake = mcpFetch({ recorded });
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -475,6 +489,7 @@ describe("MCP refresh coordinator", () => {
     const make = (db: typeof firstDb, fetcher: typeof fetch) =>
       mcpArea({
         capabilities: { forget: () => {} },
+        usage: NO_USAGE,
         db,
         fetcher,
         secret: () => null,
@@ -534,6 +549,7 @@ describe("MCP refresh routes", () => {
     }) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -583,6 +599,7 @@ describe("MCP refresh routes", () => {
     }) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -637,6 +654,7 @@ describe("MCP refresh routes", () => {
     }) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -693,6 +711,7 @@ describe("MCP refresh routes", () => {
       })) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -742,6 +761,7 @@ describe("MCP refresh routes", () => {
     }) as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,
@@ -784,6 +804,7 @@ describe("MCP refresh routes", () => {
       new Response("failed", { status: 500 })) as unknown as typeof fetch;
     const area = mcpArea({
       capabilities: { forget: () => {} },
+      usage: NO_USAGE,
       db,
       fetcher,
       secret: () => null,

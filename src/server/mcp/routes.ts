@@ -4,6 +4,8 @@
 import type {
   McpResponse,
   McpServerResponse,
+  McpUsageAllResponse,
+  McpUsageResponse,
   PatchMcpEndpoint,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
@@ -39,7 +41,23 @@ export type RoutesDeps = {
     endpoint: Pick<McpServerRow, "url" | "keyName">,
     signal: AbortSignal,
   ): Promise<DiscoveryResult>;
+  usage: UsagePort;
 };
+
+// a server's tool calls over a window, answered by the sessions area
+export type UsagePort = {
+  calls(
+    server: string,
+    since: number,
+    until: number,
+  ): Omit<McpUsageResponse, "since" | "until">;
+  servers(
+    since: number,
+    until: number,
+  ): Omit<McpUsageAllResponse, "since" | "until">;
+};
+
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 function gateway(error: unknown): BadGateway {
   return new BadGateway(error instanceof Error ? error.message : String(error));
@@ -140,6 +158,37 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         );
         if (row === null) throw new NotFound("no such MCP server");
         return json(response(row));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/mcp/usage",
+      policy: "admin",
+      handle() {
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const body: McpUsageAllResponse = {
+          since,
+          until,
+          ...deps.usage.servers(since, until),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/mcp/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const server = find(ctx.params.id);
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const body: McpUsageResponse = {
+          since,
+          until,
+          ...deps.usage.calls(server.name, since, until),
+        };
+        return json(body);
       },
     },
     {

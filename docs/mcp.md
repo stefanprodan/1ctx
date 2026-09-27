@@ -32,6 +32,13 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   forgets nothing. Every server string is shown as text;
   `parametersHtml` is the one HTML, rendered on the server. The name
   never changes.
+- **A server's calls are its tool rows.** `GET /api/mcp/usage` and
+  `/api/mcp/:id/usage` count the last 30 days of tool messages by wire
+  name through the sessions port (`mcpCalls()` and `mcpServerCalls()`
+  in `sessions/activity.ts`, over the partial index on tool rows), so
+  a catalog call counts under its tool and a deleted server's calls
+  stay under its name. `decide()` in `shared/mcp.ts` names the pattern
+  that set each side; `classify()` is built on it.
 - **An agent's MCP tools are one send snapshot, decided in the policy.**
   An agent carries `servers` (a server id with `read` and `write`,
   read always on, since write alone is refused by the parser, the

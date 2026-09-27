@@ -31,7 +31,7 @@ import {
 } from "./limits.ts";
 import { RefreshCoordinator } from "./refresh.ts";
 import { type McpCallOutput, resultText } from "./result.ts";
-import { routes } from "./routes.ts";
+import { routes, type UsagePort } from "./routes.ts";
 import { type McpServerRow, McpServerStore } from "./store.ts";
 
 export {
@@ -94,6 +94,8 @@ export type McpDeps = {
   callTimeoutMs: () => number;
   render: (markdown: string, streaming?: boolean) => string;
   capabilities: { forget(key: string): void };
+  // the sessions area, built later: a closure called only on a request
+  usage: UsagePort;
 };
 
 export type Mcp = {
@@ -326,6 +328,7 @@ export function mcpArea(deps: McpDeps): Mcp {
     callTimeoutMs: deps.callTimeoutMs,
     render: deps.render,
     discover: runDiscovery,
+    usage: deps.usage,
   });
   return area;
 }

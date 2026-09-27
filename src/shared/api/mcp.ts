@@ -46,3 +46,25 @@ export type PatchMcpSettings = Partial<{
 }>;
 export type PatchMcpEndpoint = Partial<{ url: string; keyName: string | null }>;
 export type PatchMcpRequest = PatchMcpSettings | PatchMcpEndpoint;
+
+// GET /api/mcp/:id/usage, the server's last 30 days: its tool calls in
+// every chat and run, the failed among them, and the calls per tool,
+// the most called first
+export type McpUsageResponse = {
+  since: number;
+  until: number;
+  calls: number;
+  failed: number;
+  tools: { name: string; calls: number }[];
+};
+
+// GET /api/mcp/usage, every server's last 30 days: the tool calls and
+// the failed among them, and per server name, the most called first,
+// a deleted server's calls under its name
+export type McpUsageAllResponse = {
+  since: number;
+  until: number;
+  calls: number;
+  failed: number;
+  servers: { name: string; calls: number; failed: number }[];
+};
