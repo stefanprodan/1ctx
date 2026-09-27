@@ -126,8 +126,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    padding: var(--space-4);
-    border-bottom: 1px solid var(--line);
   }
   .mcp-page-matcher {
     display: flex;
@@ -185,8 +183,8 @@
     font-size: var(--text-small);
   }
 
-  /* the line over the rows: the filter or the move, the box at the
-     rows' boxes' place */
+  /* the line over the rows: the filter, the box at the rows' boxes'
+     place */
   .mcp-page-bar {
     display: flex;
     align-items: center;
@@ -195,33 +193,43 @@
     padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--line);
   }
+  /* the picks' moves, in the filter's place, on one line so the rows
+     never move */
   .mcp-page-move {
     display: flex;
-    flex: 1 1 auto;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
   }
-  .mcp-page-picked {
-    font-size: var(--text-ui);
-    font-weight: 500;
+  .mcp-page-clear {
+    width: 28px;
+    height: 28px;
   }
-  .mcp-page-move-to {
-    margin-left: var(--space-2);
+  .mcp-page-move-words {
     font-size: var(--text-ui);
-    color: var(--dim);
+    white-space: nowrap;
+  }
+  /* the list's foot, as a settings card's under the matchers */
+  .mcp-page-foot {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--line);
+    border-bottom-left-radius: var(--radius-card);
+    border-bottom-right-radius: var(--radius-card);
+    background: var(--page);
+  }
+  .mcp-page-tools {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
   }
   .mcp-page-all {
     display: flex;
     margin-left: auto;
-  }
-  .mcp-page-moved {
-    margin: 0;
-    padding: var(--space-2) var(--space-4);
-    border-bottom: 1px solid var(--line);
-    font-size: var(--text-ui);
-    color: var(--dim);
   }
 
   /* a tool's meta: the side, then what set it, faint */
@@ -251,6 +259,9 @@
   }
 
   @media (max-width: 719px) {
+    .mcp-page-move-to {
+      display: none;
+    }
     .mcp-page-list-meta {
       flex-direction: row;
       align-items: baseline;

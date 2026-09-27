@@ -4,8 +4,7 @@
 // A settings card, as Vercel's settings: a title, one line, the control,
 // and a foot with its hint and its own Save, so each card saves apart.
 // A card of what an object carries is `list`: the title, a count and
-// its Add in a band over rows that run edge to edge; `sticky` pins a
-// long card's foot to the screen's bottom. `danger` is the
+// its Add in a band over rows that run edge to edge. `danger` is the
 // Delete card, last on its page, in the failed colour. A view composes
 // this, never restyles it.
 
@@ -21,7 +20,6 @@ export function Setting({
   danger,
   list,
   foot,
-  sticky,
   children,
 }: {
   // names the card aloud when it has no title
@@ -35,9 +33,6 @@ export function Setting({
   danger?: boolean;
   list?: boolean;
   foot?: ComponentChildren;
-  // a card longer than the screen keeps its foot at the screen's bottom
-  // while the card is in view, so Save is never a scroll away
-  sticky?: boolean;
   children?: ComponentChildren;
 }) {
   const head = (title !== undefined || action !== undefined) && (
@@ -72,11 +67,7 @@ export function Setting({
           {children}
         </div>
       )}
-      {foot !== undefined && (
-        <div class={`setting-foot${sticky ? " setting-foot-sticky" : ""}`}>
-          {foot}
-        </div>
-      )}
+      {foot !== undefined && <div class="setting-foot">{foot}</div>}
     </section>
   );
 }

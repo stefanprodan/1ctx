@@ -102,8 +102,7 @@ client change. What each page draws is in `docs/views.md`.
   an Add in a band over rows edge to edge (flush `RowsLine`s, controls
   in `RowsEnd`, never a link); `danger` is the Delete card, last. A
   card that drafts ends in `Foot` with `stack`, so a phone gives the
-  hint its own line; `sticky` pins the foot to the screen's bottom,
-  for a card longer than the screen while it has changes to save. The card clips nothing, so a select's list opens
+  hint its own line. The card clips nothing, so a select's list opens
   past it.
 - **A dashboard is a board, not rows.** The admin's Monitor (`/monitor`,
   the zone's own page: rows Now, Last 30 days and All time) and
