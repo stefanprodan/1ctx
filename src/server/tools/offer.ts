@@ -7,6 +7,7 @@
 
 import {
   credentialKey,
+  KNOWLEDGE,
   MEMORY,
   mcpKey,
   skillKey,
@@ -76,6 +77,7 @@ type OfferDeps = {
     hosts: readonly string[],
     web: WebSnapshot | null,
     visuals: boolean,
+    knowledge: boolean,
     credentials: SendCredentials,
   ): Tool<string | ToolResult>[];
   log: Log;
@@ -184,6 +186,7 @@ export function offered(
     return {
       tools: fillYear(phaseTools.map(schema), now),
       visuals: false,
+      knowledge: false,
       web: null,
       search: null,
       skills: { block: "", skills: [] },
@@ -198,6 +201,7 @@ export function offered(
   const rows = new Map(deps.store.rows().map((row) => [row.name, row]));
   const searchRow = rows.get("websearch")!;
   const visuals = rows.get("visualize")!.enabled;
+  const knowledge = !disabledCapabilities.includes(KNOWLEDGE);
   const access = rows.get("web")!;
   const web: WebSnapshot | null =
     access.mode === "off" || disabledCapabilities.includes(WEB)
@@ -247,6 +251,7 @@ export function offered(
           rows.get("visualize")!.hosts,
           web,
           visuals,
+          knowledge,
           credentials,
         )
         .filter((tool) => allowed.has(tool.name)),
@@ -290,6 +295,7 @@ export function offered(
   return {
     tools: [...baseTools, ...mcpSchemas],
     visuals,
+    knowledge,
     web,
     search,
     skills,

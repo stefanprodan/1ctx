@@ -3,17 +3,23 @@
 //
 // The plus at the start of the composer's row and its menu, placed as
 // the agent list is. Add files opens the file picker. Web access,
-// Visuals and Memory are switches, drawn as the rail's theme switch is, and
-// flipping one leaves the menu open. MCP servers and Skills each swap
-// the menu's rows for a switch per server or skill, and so does Web
-// access when the project has credentials, and Escape or the pane's
-// first row swaps them back. A pane's item says how many are on. An
-// item that cannot be used is off and says why on a line of its own.
+// Visuals, Knowledge and Memory are switches, drawn as the rail's
+// theme switch is, and flipping one leaves the menu open. MCP servers
+// and Skills each swap the menu's rows for a switch per server or
+// skill, and so does Web access when the project has credentials, and
+// Escape or the pane's first row swaps them back. A pane's item says
+// how many are on. An item that cannot be used is off and says why on
+// a line of its own.
 
 import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { MEMORY, VISUALIZE, WEB } from "../../shared/capabilities.ts";
+import {
+  KNOWLEDGE,
+  MEMORY,
+  VISUALIZE,
+  WEB,
+} from "../../shared/capabilities.ts";
 import { Icon, type IconName } from "../lib/icons.tsx";
 import { useMenu } from "../lib/menu.ts";
 import {
@@ -114,6 +120,7 @@ export function Add({
   web,
   webPane,
   visuals,
+  knowledge,
   memory,
   servers,
   skills,
@@ -126,6 +133,7 @@ export function Add({
   // Web access with the project's credentials, null without any
   webPane: PaneItem | null;
   visuals: WebItem;
+  knowledge: WebItem;
   memory: WebItem;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
@@ -244,6 +252,12 @@ export function Add({
             icon="visual"
             item={visuals}
             onFlip={() => onFlip(VISUALIZE)}
+          />
+          <SwitchItem
+            name="Knowledge"
+            icon="folder"
+            item={knowledge}
+            onFlip={() => onFlip(KNOWLEDGE)}
           />
           <SwitchItem
             name="Memory"

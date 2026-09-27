@@ -77,8 +77,8 @@ for (const mode of ["off", "all", "listed"] as const) {
           );
           expect(tools.capabilities()).toEqual(
             mode === "off"
-              ? ["visualize", "memory"]
-              : ["web", "visualize", "memory"],
+              ? ["visualize", "knowledge", "memory"]
+              : ["web", "visualize", "knowledge", "memory"],
           );
           const bash = offered.tools.find((tool) => tool.name === "bash")!;
           expect(bash.description.endsWith("No network.")).toBe(!on);
@@ -191,6 +191,7 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
           callTimeoutMs: TOOL_CAPS.callTimeoutMs,
           resultCut: TOOL_CAPS.resultCut,
           visuals: true,
+          knowledge: true,
           fetchDeadlineMs: TOOL_CAPS.fetchDeadlineMs,
           fetchBodyBytes: TOOL_CAPS.fetchBodyBytes,
           web,

@@ -17,6 +17,7 @@ import type {
 } from "../../../shared/api/sessions.ts";
 import {
   credentialOf,
+  KNOWLEDGE,
   serverOf,
   skillOf,
   VISUALIZE,
@@ -28,7 +29,7 @@ import {
 } from "../../../shared/contracts/automation.ts";
 import type { ProjectKind, Role } from "../../../shared/words.ts";
 import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
-import { disabledOf } from "./Access.model.ts";
+import { type AccessDraft, disabledOf } from "./Access.model.ts";
 import {
   daysOf,
   fieldsOf,
@@ -318,17 +319,7 @@ export type Draft = {
   memory: MemoryMode;
   // what the run's own note keeps, as typed
   memoryGuidance: string;
-  // its runs may reach the web, while the instance lets them
-  web: boolean;
-  // its runs may call visualize, while the admin's Visuals row is on
-  visuals: boolean;
-  // the keys of the MCP servers its runs go without
-  mcpOff: string[];
-  // the keys of the skills its runs go without
-  skillsOff: string[];
-  // the keys of the project's credentials its runs go without
-  credentialsOff: string[];
-};
+} & AccessDraft;
 
 const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
 
@@ -354,6 +345,7 @@ export function draftOf(
       memoryGuidance: OWN_MEMORY_GUIDANCE,
       web: true,
       visuals: true,
+      knowledge: true,
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
@@ -371,6 +363,7 @@ export function draftOf(
     memoryGuidance: a.memoryGuidance,
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
+    knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
     mcpOff: a.disabledCapabilities.filter((key) => serverOf(key) !== null),
     skillsOff: a.disabledCapabilities.filter((key) => skillOf(key) !== null),
     credentialsOff: a.disabledCapabilities.filter(

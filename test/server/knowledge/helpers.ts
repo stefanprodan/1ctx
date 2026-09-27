@@ -144,6 +144,7 @@ export const callCaps = {
   callTimeoutMs: 4000,
   resultCut: 1000,
   visuals: true,
+  knowledge: true,
 };
 export const freshSignal = () => new AbortController().signal;
 export type Setup = ReturnType<typeof setup>;

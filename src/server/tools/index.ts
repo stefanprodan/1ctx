@@ -8,7 +8,13 @@ import type {
   PatchToolRequest,
   ToolsResponse,
 } from "../../shared/api/tools.ts";
-import { MEMORY, skillKey, VISUALIZE, WEB } from "../../shared/capabilities.ts";
+import {
+  KNOWLEDGE,
+  MEMORY,
+  skillKey,
+  VISUALIZE,
+  WEB,
+} from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
@@ -189,6 +195,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     hosts: readonly string[],
     web: WebSnapshot | null,
     visuals: boolean,
+    knowledge: boolean,
     credentials: SendCredentials,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
@@ -204,7 +211,14 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           ),
         ]),
     makeVisualizeTool(hosts),
-    makeBashTool(deps.knowledge, web, visuals, credentials, deps.credentials),
+    makeBashTool(
+      deps.knowledge,
+      web,
+      visuals,
+      credentials,
+      deps.credentials,
+      knowledge,
+    ),
   ];
 
   const mcpTools = (
@@ -308,7 +322,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       ...(store.rows().find((row) => row.name === "visualize")!.enabled
         ? [VISUALIZE]
         : []),
-      // no admin row governs it
+      // no admin row governs these
+      KNOWLEDGE,
       MEMORY,
     ],
     serverNames: (links) =>
@@ -370,10 +385,17 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
               server.tools.map((tool) => tool.wireName),
             );
       const base = [
-        ...toolsFor(offered.search, [], offered.web, offered.visuals, {
-          offered: offered.credentials,
-          off: offered.credentialsOff,
-        })
+        ...toolsFor(
+          offered.search,
+          [],
+          offered.web,
+          offered.visuals,
+          offered.knowledge,
+          {
+            offered: offered.credentials,
+            off: offered.credentialsOff,
+          },
+        )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>
             tool.name === "bash"

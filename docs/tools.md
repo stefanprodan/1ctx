@@ -82,9 +82,9 @@ mount in `docs/knowledge.md`.
   `enabled` is used; webfetch's and websearch's are ignored. `GET
   /api/projects/:id/agents` answers the tools capability's
   `capabilities()`: `web` unless the admin's mode is off, `visualize`
-  while the Visuals row is on, and `memory` always, through a forward
-  port.
-- **Three keys stand alone in the set.**
+  while the Visuals row is on, and `knowledge` and `memory` always,
+  through a forward port.
+- **Four keys stand alone in the set.**
   The prompt adds `WEB_OFF_LINE` after the date and before the MCP note
   exactly when the send's set holds `web` and it offers tools, regardless
   of the admin's mode. `visualize` is the second kind-alone key of the
@@ -92,9 +92,14 @@ mount in `docs/knowledge.md`.
   the `visualize` tool and only the tool when the send's set holds it,
   `open` and the skill untouched, and the prompt adds the constant
   `VISUALIZE_OFF_LINE` after the web line by the same rule.
-  `memory` (`MEMORY`) is the third: the offer drops the chat's
+  `knowledge` (`KNOWLEDGE`) is the third: it keeps `bash` and sets
+  `Offered.knowledge` false, which the bash tool's caps carry to the mount
+  (`docs/knowledge.md`); the prompt drops the knowledge block and adds
+  `KNOWLEDGE_OFF_LINE` after the visualize line exactly when the set
+  holds it and the send offers `bash`.
+  `memory` (`MEMORY`) is the fourth: the offer drops the chat's
   `memory_edit` and the note stays in the prompt; `MEMORY_OFF_LINE`
-  follows the visualize line when the set holds it, the send offers
+  follows the knowledge line when the set holds it, the send offers
   tools and it is a chat. An
   automation's set accepts it and it means nothing there. The memory
   phase offers the own-note `memory_edit` alone.

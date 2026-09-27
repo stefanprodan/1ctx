@@ -14,7 +14,8 @@ our changes to just-bash and the upstream sync are in
   post-image and an empty delete version with the last live summary.
   History outlives files and both tables cascade with the project.
   People call the base the project docs or the project files; the prompt
-  block names both and the Knowledge tab, only when bash is offered.
+  block names both and the Knowledge tab, only when bash is offered and
+  the send's set does not hold `knowledge`.
   The bash description separates shared, versioned UTF-8 `/knowledge`
   from the session's unversioned, any-byte `/tmp`.
 - **The routes.**
@@ -121,6 +122,18 @@ our changes to just-bash and the upstream sync are in
   body caps. No snapshot leaves the mount networkless. Downloads belong
   in `/tmp`, since non-text bytes in `/knowledge` fail the save. Signing
   with a credential is in `docs/tools.md`.
+- **The docs off leave no `/knowledge`.** With `knowledge: false` in
+  the command's caps (the send's set holds `knowledge`) the mount reads
+  no rows and makes no `/knowledge`. Anything a command leaves under it
+  is discarded, the diff never reads it, so no version is written and
+  no file reads as deleted. When a file or link was left there, the
+  result opens with `changes under /knowledge were discarded: the
+  project docs are off`, before the `/uploads` notice; empty folders
+  pass without it. The start directory is `/tmp`; a saved cwd under
+  `/knowledge` starts there without a notice and stays saved unless
+  the command ends somewhere other than `/tmp`, so the docs on again
+  start where they were. `open` answers `no such file` for any path
+  under `/knowledge`.
 - **just-bash's curl is an HTTP client.** just-bash's curl is an
   HTTP client, not curl: `-w` knows `http_code`, `content_type`,
   `url_effective` and `size_download` and prints any other variable's
@@ -148,7 +161,8 @@ our changes to just-bash and the upstream sync are in
   and their modes, with the knowledge name and prefix-free rules;
   symlinks and other types fail the command whole. Empty directories
   are not kept. The cwd is kept only for directories under these
-  trees; a missing saved directory starts in `/knowledge` with a notice.
+  trees; a missing saved directory starts in `/knowledge` (or `/tmp`
+  with the docs off) with a notice.
   The hourly knowledge sweep also drops scratch past the current
   `scratchIdleDays`, cascading its files and skipping sessions holding
   the per-session queue, including commands waiting for a process slot.

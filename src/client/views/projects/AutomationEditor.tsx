@@ -10,7 +10,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { VISUALIZE, WEB } from "../../../shared/capabilities.ts";
+import { KNOWLEDGE, VISUALIZE, WEB } from "../../../shared/capabilities.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 import { RETENTION_DAYS } from "../../../shared/words.ts";
@@ -151,16 +151,12 @@ function Editor({
   // the saved agent was deleted: no save until another is picked
   const gone = retiredPick(automation, d.agentId);
   const live = agents.filter((a) => retiredPick(automation, a.id) === null);
-  const web = switchItem(WEB, {
-    tools: takesTools,
-    switchable: switchable.value,
-    off: false,
-  });
-  const visuals = switchItem(VISUALIZE, {
-    tools: takesTools,
-    switchable: switchable.value,
-    off: false,
-  });
+  const kind = (key: string) =>
+    switchItem(key, {
+      tools: takesTools,
+      switchable: switchable.value,
+      off: false,
+    });
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
@@ -254,12 +250,15 @@ function Editor({
         </div>
       </Section>
       <AccessSection
-        web={web}
+        web={kind(WEB)}
         webOn={d.web}
         onWeb={() => set({ web: !d.web })}
-        visuals={visuals}
+        visuals={kind(VISUALIZE)}
         visualsOn={d.visuals}
         onVisuals={() => set({ visuals: !d.visuals })}
+        knowledge={kind(KNOWLEDGE)}
+        knowledgeOn={d.knowledge}
+        onKnowledge={() => set({ knowledge: !d.knowledge })}
         servers={takesTools ? serversOf() : []}
         mcpOff={d.mcpOff}
         onServer={(key) => set({ mcpOff: toggledId(d.mcpOff, key) })}

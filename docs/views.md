@@ -143,10 +143,12 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   which leaves the menu open, and the third is Visuals, the same switch
   over the `visualize` key (`switchItem(VISUALIZE, ...)` beside
   `switchItem(WEB, ...)` in `Add.model.ts`), off with the same reasons.
-  The fourth is Memory, over the `memory` key (`switchItem(MEMORY,
-  ...)`), which the server always answers as switchable, so it is off
-  only for an agent without tools. The automation editor and its Setup
-  aside show nothing for it and drop it on save. `composer/Add.model.ts`
+  The fourth is Knowledge, over the `knowledge` key
+  (`switchItem(KNOWLEDGE, ...)`), and the fifth Memory, over the
+  `memory` key (`switchItem(MEMORY, ...)`). The server always answers
+  both as switchable, so each is off only for an agent without tools.
+  The automation editor and its Setup aside show nothing for memory and
+  drop it on save. `composer/Add.model.ts`
   decides it: off with "Agent cannot use tools" or "Turned off by an
   admin" under it when it cannot be switched, the second from
   `capabilities` on `GET /api/projects/:id/agents`, held as `switchable`
@@ -389,19 +391,22 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   limit, which `GET /api/projects/:id/automations` answers beside the
   rows.
 - **The editor's Access section.** The editor's Access section
-  (`AccessSection.tsx`) is the Web access switch, on for a new task and
-  off with the composer's reasons when it cannot be switched, a switch
-  per credential of the project under it (off and faint, with the
-  reason, while web access is off), the Visuals switch by the same rule,
-  then a `RowsList` with a switch per MCP server of the picked agent and
-  another per skill. The row's whole `disabledCapabilities` is saved by
-  `disabledOf()` in `Access.model.ts`: `web`, `visualize` and the keys
-  of the shown servers, skills and credentials that are off, so a key
-  for one the picked agent or the project lacks is dropped. The
-  automation page's Setup aside (`AutomationAccess.tsx`, `accessOf()`)
-  says Web access Off, Visuals Off, and names the credentials (only
-  while the web is on), the servers and the skills off, and nothing
-  while all is on.
+  (`AccessSection.tsx`) is one `RowsList` of switches, each row an icon,
+  a name, a meta saying what it is ("12 MCP tools" for a server) and
+  the switch: Web access, a row per credential of the project,
+  Visuals, Knowledge, then a row per MCP server and per skill of the
+  picked agent. The three built-ins are on
+  for a new task; one that cannot be switched is off and faint with the
+  composer's reason as its meta, and the credentials are off and faint
+  with "needs web access" while the web is off. The row's whole
+  `disabledCapabilities` is saved by `disabledOf()` in
+  `Access.model.ts`: `web`, `visualize`, `knowledge` and the keys of
+  the shown servers, skills and credentials that are off, so a key for
+  one the picked agent or the project lacks is dropped. The automation
+  page's Setup aside (`AutomationAccess.tsx`, `accessOf()`) says Web
+  access Off, Visuals Off, Knowledge Off, and names the credentials
+  (only while the web is on), the servers and the skills off, and
+  nothing while all is on.
 - **Delete asks in place.**
   The automation page and the editor confirm with Keep, Delete and
   Delete with runs, and hide every other button while they ask.

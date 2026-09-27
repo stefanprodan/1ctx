@@ -59,6 +59,9 @@ function visualTitle(text: string, path: string): string {
   return baseName(path);
 }
 
+export const underKnowledge = (path: string) =>
+  path === "/knowledge" || path.startsWith("/knowledge/");
+
 function mounted(path: string): boolean {
   return ["/knowledge", "/tmp", "/uploads", "/mcp"].some(
     (root) => path === root || path.startsWith(`${root}/`),
@@ -87,7 +90,7 @@ export function openedReceipt(file: OpenedRecord): string {
 }
 
 export function makeOpenCommand(
-  caps: { knowledgeFileBytes: number; visuals: boolean },
+  caps: { knowledgeFileBytes: number; visuals: boolean; knowledge: boolean },
   collect: OpenedRecord[],
 ) {
   return defineCommand(
@@ -103,6 +106,10 @@ export function makeOpenCommand(
       const arg = args[0]!;
       const path = ctx.fs.resolvePath(ctx.cwd, arg);
       if (!mounted(path)) return refusal(arg, "not in the mount");
+      // with the docs off a file made under /knowledge is discarded, so
+      // it is missing here too
+      if (!caps.knowledge && underKnowledge(path))
+        return refusal(arg, "no such file");
       let final: FsStat | undefined;
       try {
         for (const component of components(path)) {

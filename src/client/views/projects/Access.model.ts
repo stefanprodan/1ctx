@@ -11,6 +11,7 @@ import type {
 } from "../../../shared/api/sessions.ts";
 import {
   credentialKey,
+  KNOWLEDGE,
   mcpKey,
   skillKey,
   VISUALIZE,
@@ -19,11 +20,18 @@ import {
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 
 // the editor's switches, as its draft holds them
-type AccessDraft = {
+export type AccessDraft = {
+  // its runs may reach the web, while the instance lets them
   web: boolean;
+  // its runs may call visualize, while the admin's Visuals row is on
   visuals: boolean;
+  // its runs may read and edit the project docs
+  knowledge: boolean;
+  // the keys of the MCP servers its runs go without
   mcpOff: readonly string[];
+  // the keys of the skills its runs go without
   skillsOff: readonly string[];
+  // the keys of the project's credentials its runs go without
   credentialsOff: readonly string[];
 };
 
@@ -40,6 +48,7 @@ export function disabledOf(
   return [
     ...(d.web ? [] : [WEB]),
     ...(d.visuals ? [] : [VISUALIZE]),
+    ...(d.knowledge ? [] : [KNOWLEDGE]),
     ...kept(
       servers.map((server) => mcpKey(server.id)),
       d.mcpOff,
@@ -67,6 +76,7 @@ export function accessOf(
 ): {
   web: boolean;
   visuals: boolean;
+  knowledge: boolean;
   mcpOff: string[];
   skillsOff: string[];
   credentialsOff: string[];
@@ -75,6 +85,7 @@ export function accessOf(
   return {
     web,
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
+    knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
     mcpOff: servers
       .filter((server) => a.disabledCapabilities.includes(mcpKey(server.id)))
       .map((server) => server.name)

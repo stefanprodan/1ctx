@@ -5,12 +5,12 @@
 // agent takes tools and the instance has web access on, and then on
 // unless the chat turned it off. When the project has credentials it
 // leads to a pane instead: Web access first, then a switch per
-// credential, which goes with it. Memory is live whenever the agent
-// takes tools, since no admin switch governs it. MCP servers is there
-// when the picked agent is offered any, and leads to a switch per
-// server; Skills is the same for the skills it carries. A pane's item
-// counts what is on. An item that cannot be switched shows off and says
-// why on a line under its name.
+// credential, which goes with it. Memory and Knowledge are live
+// whenever the agent takes tools, since no admin switch governs them.
+// MCP servers is there when the picked agent is offered any, and leads
+// to a switch per server; Skills is the same for the skills it carries.
+// A pane's item counts what is on. An item that cannot be switched shows
+// off and says why on a line under its name.
 
 import type {
   SwitchableCredential,
@@ -27,9 +27,9 @@ import type { IconName } from "../lib/icons.tsx";
 
 export type WebItem = { live: boolean; on: boolean; reason: string | null };
 
-// a switch for a kind alone (web access, Visuals, memory): live when
-// the picked agent takes tools and the admin has the kind on. The
-// server always answers memory as switchable
+// a switch for a kind alone (web access, Visuals, Knowledge, memory):
+// live when the picked agent takes tools and the admin has the kind on.
+// The server always answers knowledge and memory as switchable
 export function switchItem(
   key: string,
   input: {

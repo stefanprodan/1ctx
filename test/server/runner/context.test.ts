@@ -24,7 +24,13 @@ import { dateLine, systemPrompt } from "../../../src/server/runner/prompt.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/index.ts";
-import { WEB_OFF_LINE } from "../../../src/shared/capabilities.ts";
+import {
+  KNOWLEDGE,
+  KNOWLEDGE_OFF_LINE,
+  VISUALIZE,
+  VISUALIZE_OFF_LINE,
+  WEB_OFF_LINE,
+} from "../../../src/shared/capabilities.ts";
 import { compactsAt, contextReserve } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import { knowledgeBlock } from "../../../src/shared/knowledge.ts";
@@ -47,6 +53,7 @@ const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
 const NONE: Offered = {
   tools: [],
   visuals: false,
+  knowledge: true,
   search: null,
   skills: { block: "", skills: [] },
   mcp: [],
@@ -192,6 +199,45 @@ describe("systemPrompt", () => {
         note,
       ),
     ).not.toContain(WEB_OFF_LINE);
+  });
+
+  test("the docs off drop the knowledge block and add the line after visualize's", () => {
+    const docs = {
+      ...policy,
+      knowledge: {
+        files: 1,
+        recent: [{ name: "docs/x.md", author: "coder", updatedAt: NOW }],
+      },
+    };
+    const on = systemPrompt(docs, NOW);
+    expect(on).toContain("docs/x.md");
+    expect(on).not.toContain(KNOWLEDGE_OFF_LINE);
+    const off = systemPrompt(
+      { ...docs, disabledCapabilities: [KNOWLEDGE, VISUALIZE, "web"] },
+      NOW,
+    );
+    expect(off).not.toContain("docs/x.md");
+    expect(off).not.toContain("knowledge base");
+    expect(off).toEndWith(
+      `${dateLine(NOW)}\n\n${WEB_OFF_LINE}\n\n${VISUALIZE_OFF_LINE}\n\n${KNOWLEDGE_OFF_LINE}`,
+    );
+    // no bash, no line: other tools alone do not mount the docs
+    const datetime = {
+      ...NONE,
+      tools: [{ name: "datetime", description: "time", parameters: {} }],
+    };
+    expect(
+      systemPrompt(
+        { ...docs, offered: datetime, disabledCapabilities: [KNOWLEDGE] },
+        NOW,
+      ),
+    ).not.toContain(KNOWLEDGE_OFF_LINE);
+    expect(
+      systemPrompt(
+        { ...docs, offered: NONE, disabledCapabilities: [KNOWLEDGE] },
+        NOW,
+      ),
+    ).not.toContain(KNOWLEDGE_OFF_LINE);
   });
 
   test("joins the agent's prompt, the about text and the date", () => {

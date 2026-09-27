@@ -1,10 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's Access step: whether runs reach the web, with a
-// switch per credential of the project under it, and whether they may
-// draw visuals, then a switch per MCP server and per skill of the picked
-// agent. A switch that cannot be flipped is off and says why.
+// The task editor's Access step: one list of switches, the web with
+// the project's credentials after it, visuals, the project docs, then
+// the picked agent's MCP servers and skills. Each row's meta says what
+// it is. A switch that cannot be flipped is off and faint, its meta
+// saying why.
 
 import type {
   SwitchableCredential,
@@ -28,94 +29,39 @@ import {
 } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
 
-// one labelled list of switches, on unless its key is in `off`; while
-// `blocked` says why, every one is off and faint
-function Switches({
-  label,
-  icon,
-  rows,
-  off,
-  onFlip,
-  disabled,
-  blocked = null,
-}: {
-  label: string;
+type Row = {
+  key: string;
+  name: string;
   icon: IconName;
-  rows: { key: string; name: string; meta: string | null }[];
-  off: readonly string[];
-  onFlip: (key: string) => void;
-  disabled: boolean;
-  blocked?: string | null;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div class="field">
-      <span class="label">{label}</span>
-      <RowsList>
-        {rows.map((row) => (
-          <RowsLine key={row.key} flush off={blocked !== null}>
-            <RowsAvatar>
-              <Icon name={icon} size={14} />
-            </RowsAvatar>
-            <RowsTitle name={row.name} mono />
-            {row.meta !== null && <RowsMeta>{row.meta}</RowsMeta>}
-            <RowsSwitch
-              on={blocked === null && !off.includes(row.key)}
-              label={row.name}
-              disabled={disabled || blocked !== null}
-              onClick={() => onFlip(row.key)}
-            />
-          </RowsLine>
-        ))}
-      </RowsList>
-      {blocked !== null && <span class="hint">{blocked}</span>}
-    </div>
-  );
-}
-
-// one switch over a kind of access, with what it means and, when it
-// cannot be flipped, why
-function MainSwitch({
-  item,
-  on,
-  label,
-  words,
-  onFlip,
-  disabled,
-}: {
-  item: WebItem;
+  // what it is, or why it cannot be flipped
+  meta: string;
+  mono: boolean;
   on: boolean;
-  label: string;
-  // what runs may do with it on, then off
-  words: [string, string];
+  // cannot be flipped now: off and faint
+  blocked: boolean;
   onFlip: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <div class="field">
-      <div class="automations-web">
-        <RowsSwitch
-          on={on}
-          label={label}
-          disabled={disabled || !item.live}
-          onClick={onFlip}
-        />
-        <span>{on ? words[0] : words[1]}</span>
-      </div>
-      {item.reason !== null && <span class="hint">{item.reason}</span>}
-    </div>
-  );
-}
+};
 
-// "The web and the agent's MCP servers and skills", by what is listed
-function words(servers: number, skills: number): string {
-  const has = [
-    ...(servers > 0 ? ["MCP servers"] : []),
-    ...(skills > 0 ? ["skills"] : []),
-  ];
-  return has.length === 0
-    ? "Fetch, search and curl"
-    : `The web and the agent's ${has.join(" and ")}`;
+// a built-in switch: its meta gives way to the reason it is locked
+function builtin(
+  key: string,
+  name: string,
+  icon: IconName,
+  meta: string,
+  item: WebItem,
+  on: boolean,
+  onFlip: () => void,
+): Row {
+  return {
+    key,
+    name,
+    icon,
+    meta: item.live ? meta : (item.reason ?? meta),
+    mono: false,
+    on: item.on && on,
+    blocked: !item.live,
+    onFlip,
+  };
 }
 
 export function AccessSection({
@@ -125,6 +71,9 @@ export function AccessSection({
   visuals,
   visualsOn,
   onVisuals,
+  knowledge,
+  knowledgeOn,
+  onKnowledge,
   servers,
   mcpOff,
   onServer,
@@ -144,6 +93,10 @@ export function AccessSection({
   // the draft has visuals on
   visualsOn: boolean;
   onVisuals: () => void;
+  knowledge: WebItem;
+  // the draft has the project docs on
+  knowledgeOn: boolean;
+  onKnowledge: () => void;
   // the picked agent's servers, none when its model takes no tools
   servers: readonly SwitchableServer[];
   mcpOff: readonly string[];
@@ -158,65 +111,94 @@ export function AccessSection({
   onCredential: (key: string) => void;
   disabled: boolean;
 }) {
-  const on = web.on && webOn;
-  const drawing = visuals.on && visualsOn;
+  const webRow = builtin(
+    "web",
+    "Web access",
+    "globe",
+    "fetch, search and curl",
+    web,
+    webOn,
+    onWeb,
+  );
+  const rows: Row[] = [
+    webRow,
+    ...credentials.map((credential) => {
+      const key = credentialKey(credential.id);
+      return {
+        key,
+        name: credential.name,
+        icon: "key" as const,
+        meta: webRow.on ? "credential" : "needs web access",
+        mono: true,
+        on: webRow.on && !credentialsOff.includes(key),
+        blocked: !webRow.on,
+        onFlip: () => onCredential(key),
+      };
+    }),
+    builtin(
+      "visualize",
+      "Visuals",
+      "visual",
+      "charts and diagrams",
+      visuals,
+      visualsOn,
+      onVisuals,
+    ),
+    builtin(
+      "knowledge",
+      "Knowledge",
+      "folder",
+      "project docs",
+      knowledge,
+      knowledgeOn,
+      onKnowledge,
+    ),
+    ...servers.map((server) => {
+      const key = mcpKey(server.id);
+      return {
+        key,
+        name: server.name,
+        icon: "mcp" as const,
+        meta: `${server.tools} MCP tools`,
+        mono: true,
+        on: !mcpOff.includes(key),
+        blocked: false,
+        onFlip: () => onServer(key),
+      };
+    }),
+    ...skills.map((skill) => {
+      const key = skillKey(skill.id);
+      return {
+        key,
+        name: skill.name,
+        icon: "skill" as const,
+        meta: "skill",
+        mono: true,
+        on: !skillsOff.includes(key),
+        blocked: false,
+        onFlip: () => onSkill(key),
+      };
+    }),
+  ];
   return (
-    <Section title="Access" text={words(servers.length, skills.length)}>
-      <div class="automations-access">
-        <MainSwitch
-          item={web}
-          on={on}
-          label="Web access"
-          words={["Runs can reach the web", "Runs cannot reach the web"]}
-          onFlip={onWeb}
-          disabled={disabled}
-        />
-        <Switches
-          label="Credentials"
-          icon="key"
-          rows={credentials.map((credential) => ({
-            key: credentialKey(credential.id),
-            name: credential.name,
-            meta: null,
-          }))}
-          off={credentialsOff}
-          onFlip={onCredential}
-          disabled={disabled}
-          blocked={on ? null : (web.reason ?? "Web access is off")}
-        />
-        <MainSwitch
-          item={visuals}
-          on={drawing}
-          label="Visuals"
-          words={["Runs can draw visuals", "Runs cannot draw visuals"]}
-          onFlip={onVisuals}
-          disabled={disabled}
-        />
-        <Switches
-          label="MCP servers"
-          icon="mcp"
-          rows={servers.map((server) => ({
-            key: mcpKey(server.id),
-            name: server.name,
-            meta: `${server.tools} tools`,
-          }))}
-          off={mcpOff}
-          onFlip={onServer}
-          disabled={disabled}
-        />
-        <Switches
-          label="Skills"
-          icon="skill"
-          rows={skills.map((skill) => ({
-            key: skillKey(skill.id),
-            name: skill.name,
-            meta: null,
-          }))}
-          off={skillsOff}
-          onFlip={onSkill}
-          disabled={disabled}
-        />
-      </div>
+    <Section title="Access" text="What a run can use">
+      <RowsList>
+        {rows.map((row) => (
+          <RowsLine key={row.key} flush off={row.blocked}>
+            <RowsAvatar>
+              <Icon name={row.icon} size={14} />
+            </RowsAvatar>
+            <RowsTitle name={row.name} mono={row.mono} />
+            <RowsMeta>{row.meta}</RowsMeta>
+            <RowsSwitch
+              on={row.on}
+              label={row.name}
+              disabled={disabled || row.blocked}
+              onClick={row.onFlip}
+            />
+          </RowsLine>
+        ))}
+      </RowsList>
     </Section>
   );
 }

@@ -315,6 +315,7 @@ describe("finishTool rollback", () => {
         skillsOff: () => [],
         offered: () => ({
           visuals: false,
+          knowledge: true,
           search: null,
           skills: { block: "", skills: [] },
           mcp: [],
@@ -434,6 +435,7 @@ describe("finalizeSend rollback", () => {
       skillsOff: () => [],
       offered: () => ({
         visuals: false,
+        knowledge: true,
         search: null,
         skills: { block: "", skills: [] },
         mcp: [],
