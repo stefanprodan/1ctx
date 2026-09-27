@@ -102,7 +102,8 @@ client change. What each page draws is in `docs/views.md`.
   an Add in a band over rows edge to edge (flush `RowsLine`s, controls
   in `RowsEnd`, never a link); `danger` is the Delete card, last. A
   card that drafts ends in `Foot` with `stack`, so a phone gives the
-  hint its own line. The card clips nothing, so a select's list opens
+  hint its own line; `sticky` pins the foot to the screen's bottom,
+  for a card longer than the screen while it has changes to save. The card clips nothing, so a select's list opens
   past it.
 - **A dashboard is a board, not rows.** The admin's Monitor (`/monitor`,
   the zone's own page: rows Now, Last 30 days and All time) and
@@ -149,7 +150,8 @@ client change. What each page draws is in `docs/views.md`.
   `RowsTag`, `RowsHandle` and `RowsBad` inside a line; its end is
   `RowsEnd` (buttons, after the words that ask or the failure),
   `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first
-  in a label row. A card's head holds `RowsAdd`, `RowsLink` or
+  in a label row; a `RowsCheck` with no words outside a label row takes
+  a `label`, which names it aloud and makes the box its own label. A card's head holds `RowsAdd`, `RowsLink` or
   `RowsFilters`; its `search` or `tabs` (`ui/Tabs.tsx` with `head`, a
   phone hiding the hint) takes the label's place, the label still
   naming the card aloud. `RowsNote` says why a list is empty, `RowsBlock` is a

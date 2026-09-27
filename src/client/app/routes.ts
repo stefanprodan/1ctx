@@ -31,7 +31,12 @@ import {
 } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
-import { loadMcp } from "../data/mcp.ts";
+import {
+  loadAllUsage,
+  loadMcp,
+  loadServerUsage,
+  servers,
+} from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
 import { loadOverview, loadStorage } from "../data/overview.ts";
 import { loadProfile } from "../data/profile.ts";
@@ -124,6 +129,26 @@ const configAgentRoutes = (["", "/skills", "/mcp"] as const).map(
     title: (params) => `@${params.name}`,
     role: "admin",
     load: (params) => configAgentPage(params.name),
+  }),
+);
+
+// an MCP server's tabs share one view the same way; Used by and Delete
+// name the agents, and the aside's usage needs the server's id, which
+// the list gives
+const configMcpView = lazy<{ params: Params }>(() =>
+  import("../views/admin/McpPage.tsx").then((m) => m.McpPage),
+);
+const configMcpRoutes = (["", "/tools"] as const).map(
+  (tab): Route => ({
+    path: `/config/mcp/:name${tab}`,
+    view: configMcpView,
+    title: (params) => (tab === "" ? params.name : `${params.name} tools`),
+    role: "admin",
+    load: async (params) => {
+      await Promise.all([loadMcp(), loadAgents()]);
+      const shown = servers.value?.find((s) => s.name === params.name);
+      if (shown !== undefined) await loadServerUsage(shown.id);
+    },
   }),
 );
 
@@ -586,11 +611,18 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/config/mcp",
-    view: lazy(() => import("../views/admin/Mcp.tsx").then((m) => m.Mcp)),
-    title: () => "MCP",
+    view: lazy(() =>
+      import("../views/admin/McpList.tsx").then((m) => m.McpList),
+    ),
+    title: () => "MCP Servers",
     role: "admin",
-    load: () => loadMcp(),
+    // New server is the list's `?new`; a row counts the agents on it and
+    // the aside reads every server's last 30 days
+    load: async () => {
+      await Promise.all([loadMcp(), loadAgents(), loadAllUsage()]);
+    },
   },
+  ...configMcpRoutes,
   {
     path: "/users/:username",
     view: userView,

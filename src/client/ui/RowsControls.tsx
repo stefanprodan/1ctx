@@ -150,6 +150,7 @@ export function RowsCheck({
   disabled,
   faint,
   note,
+  label,
   onChange,
   children,
 }: {
@@ -160,6 +161,9 @@ export function RowsCheck({
   // the side cannot take effect: its words go faint, the note says why
   faint?: boolean;
   note?: string;
+  // what a box alone says aloud, with no words beside it nor a row
+  // around it as its label; the box is then a label of its own
+  label?: string;
   onChange: () => void;
   // the words beside the box; without them the row is the label
   children?: ComponentChildren;
@@ -180,11 +184,20 @@ export function RowsCheck({
       value={value}
       checked={checked}
       disabled={disabled}
+      aria-label={label}
       onChange={onChange}
     />
   );
   if (children === undefined) {
-    return (
+    // a box of its own, outside a label row, is its own label, so a
+    // click on the drawn box reaches the input under it
+    return label !== undefined ? (
+      // biome-ignore lint/a11y/noLabelWithoutControl: the input is inside, built once above
+      <label class="rows-check">
+        {input}
+        {box}
+      </label>
+    ) : (
       <span class="rows-check">
         {input}
         {box}

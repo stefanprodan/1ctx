@@ -460,21 +460,39 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   saving the full set with the other scopes' saved values. A save or a
   reset that lowers the days archived chats are kept asks in the foot
   first (`deleteAsk()`), Delete then Keep.
-- **The MCP page shows the loaded rows as a send would carry them.**
-  `/config/mcp` is `Rows`: New server opens `McpForm` (the name shaped
-  by `shapeServerName()`, the key a `Select` of the `mcp-` files the
-  route answered, the call timeout in seconds with the limits' call
-  timeout the route answered as its placeholder), a row's head is the
-  name over its tool count and last check (the refresh failure in red)
-  with Refresh at its end, and
-  it opens to the last change, the server's own words, the endpoint
-  with its own Change endpoint button (it discovers first, a 502
-  keeps what was typed), the settings with Save, the tools in the
-  four groups the pattern fields give live through `shared/mcp.ts`
-  (a pattern matching nothing marked under its field), and the
-  instructions as `serverBlock()` gives them, trimmed to 12 lines with
-  Show all. `data/mcp.ts` keeps the rows, the keys and `loadedAt`; the
-  agent form reads them again on open and says when it did.
+- **Config › MCP Servers.** `/config/mcp` (`McpList.tsx`) is one
+  card of links by name, the name over the URL, or over the failed
+  refresh in red, the agents that use it over `sidesLine()` at the
+  right ("25 read · write off", a side the server has off saying so);
+  New server is in the page's head, and `?new` (`NewMcpServer.tsx`) is
+  the name, the key file and the URL in one card, Create listing the
+  tools and opening the Tools tab, read matching nothing and write off.
+  The aside is every server's calls over the last 30 days (`GET
+  /api/mcp/usage`), the most called five, and the `mcp-` key files
+  with the server that reads each.
+  A server's page, `/config/mcp/:name` and `/tools`, is one view
+  (`McpPage.tsx`, drafts in `McpPage.state.ts`), the crumb's own step
+  the switcher, a failed refresh over the tabs. General
+  (`McpGeneral.tsx`, `McpUsedBy.tsx`) is About (what the server says
+  of itself, its tools and last change, Refresh), Endpoint (its save
+  lists the tools there first, a refusal keeping what was typed),
+  Offered to agents (the Read and Write switches), Call timeout,
+  Instructions (the switch over the block as `serverBlock()` gives it,
+  trimmed to 12 lines), Used by (only when an agent does) and Delete,
+  off while an agent uses it. Each card sends only its own fields, so
+  none waits on another, and a card at rest follows the row a save or
+  a refresh answered. Tools (`McpTools.tsx`, its logic in
+  `McpTools.model.ts` over `decide()` in `shared/mcp.ts`) is one draft
+  card with a sticky foot while dirty: the Read, Write and Excluded
+  matchers, each a chip with the tools it decides, in red when it
+  matches none, and a box that adds one; then the tools by name, each
+  its side and the matcher that set it, narrowed by the search and a
+  side `Seg`. Picked tools move to a side by `moveTools()`: their exact
+  names leave the other lists and join the side's unless they land
+  there without one, an empty write list never gets a name nor loses
+  its last, and a tool a matcher earlier in the order keeps is named
+  over the rows. The aside is `GET /api/mcp/:id/usage` and the most
+  called five tools.
 - **The agent form's Preferred provider.** On an OpenRouter provider,
   a `Select` under the model (`UpstreamField.tsx`) asks for the
   model's endpoints each time one is picked, Any provider first, and
@@ -597,9 +615,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   reads `?open=<id>` through `useOpenParam()` in
   `views/admin/OpenParam.ts`. A pick of a few labelled options with a
   line of text each is `Choices` from `views/admin/Choices.tsx` over
-  base's `.choice`. The new-server form and an open MCP row hold a
-  server's settings through `useMcpSettings()` in
-  `views/admin/McpSettings.ts`, and send the one body it builds.
+  base's `.choice`.
 - **The Skills page.** The Skills page, `/config/skills`, is `Rows`: Add
   skill takes the URL (a site or an index is looked up first and its
   entries listed with Add), a row's head is the name over its files and

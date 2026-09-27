@@ -76,6 +76,11 @@
     border-bottom-right-radius: var(--radius-card);
     background: var(--page);
   }
+  .setting-foot-sticky {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
   .setting-danger .setting-foot {
     border-top-color: var(--failed-line);
   }

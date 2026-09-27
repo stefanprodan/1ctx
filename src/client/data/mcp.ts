@@ -13,6 +13,8 @@ import type {
   CreateMcpRequest,
   McpResponse,
   McpServerResponse,
+  McpUsageAllResponse,
+  McpUsageResponse,
   PatchMcpRequest,
 } from "../../shared/api/mcp.ts";
 import type { McpServerSummary } from "../../shared/contracts/mcp.ts";
@@ -25,6 +27,15 @@ export const serversError = signal<Failure | null>(null);
 export const keys = signal<string[]>([]);
 export const callTimeoutMs = signal<number | null>(null);
 export const loadedAt = signal<number | null>(null);
+// a server page's last 30 days, for the server it was read for, and
+// every server's for the list; usage is null when the read failed
+export const serverUsage = signal<{
+  serverId: string;
+  usage: McpUsageResponse | null;
+} | null>(null);
+export const allUsage = signal<{ usage: McpUsageAllResponse | null } | null>(
+  null,
+);
 
 let owner: string | null = null;
 let turn = 0;
@@ -39,6 +50,8 @@ effect(() => {
   keys.value = [];
   callTimeoutMs.value = null;
   loadedAt.value = null;
+  serverUsage.value = null;
+  allUsage.value = null;
 });
 
 // a load's answer is kept only when it is still the one wanted: for
@@ -121,4 +134,34 @@ export async function deleteServer(id: string): Promise<void> {
     turn++;
     servers.value = (servers.value ?? []).filter((s) => s.id !== id);
   }
+}
+
+// a failure is the aside's "Did not load", never the page's; only the
+// latest read lands, so a switch between servers keeps the last one
+let usageTurn = 0;
+
+export async function loadServerUsage(id: string): Promise<void> {
+  const forUser = owner;
+  const mine = ++usageTurn;
+  let usage: McpUsageResponse | null = null;
+  try {
+    usage = await api<McpUsageResponse>(
+      `/api/mcp/${encodeURIComponent(id)}/usage`,
+    );
+  } catch {}
+  if (owner === forUser && usageTurn === mine) {
+    serverUsage.value = { serverId: id, usage };
+  }
+}
+
+let allTurn = 0;
+
+export async function loadAllUsage(): Promise<void> {
+  const forUser = owner;
+  const mine = ++allTurn;
+  let usage: McpUsageAllResponse | null = null;
+  try {
+    usage = await api<McpUsageAllResponse>("/api/mcp/usage");
+  } catch {}
+  if (owner === forUser && allTurn === mine) allUsage.value = { usage };
 }
