@@ -13,7 +13,12 @@ import {
   webPaneItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
-import { MEMORY, VISUALIZE, WEB } from "../../../src/shared/capabilities.ts";
+import {
+  KNOWLEDGE,
+  MEMORY,
+  VISUALIZE,
+  WEB,
+} from "../../../src/shared/capabilities.ts";
 
 describe("the Web access item", () => {
   const cannot = { live: false, on: false };
@@ -89,6 +94,36 @@ describe("the Visuals item", () => {
       on: false,
       reason: null,
     });
+  });
+});
+
+describe("the Knowledge item", () => {
+  test("follows its own key, off for an agent without tools", () => {
+    const all = [WEB, VISUALIZE, KNOWLEDGE, MEMORY];
+    expect(
+      switchItem(KNOWLEDGE, { tools: true, switchable: all, off: false }),
+    ).toEqual({ live: true, on: true, reason: null });
+    expect(
+      switchItem(KNOWLEDGE, { tools: true, switchable: all, off: true }),
+    ).toEqual({ live: true, on: false, reason: null });
+    expect(
+      switchItem(KNOWLEDGE, { tools: false, switchable: all, off: false }),
+    ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
+    // web access and visuals off on the instance leave it live
+    expect(
+      switchItem(KNOWLEDGE, {
+        tools: true,
+        switchable: [KNOWLEDGE, MEMORY],
+        off: false,
+      }).live,
+    ).toBe(true);
+    expect(
+      switchItem(VISUALIZE, {
+        tools: true,
+        switchable: [KNOWLEDGE],
+        off: false,
+      }).reason,
+    ).toBe("Turned off by an admin");
   });
 });
 

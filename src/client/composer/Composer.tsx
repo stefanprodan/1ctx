@@ -14,6 +14,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import {
   CREDENTIAL,
+  KNOWLEDGE,
   MCP,
   MEMORY,
   SKILL,
@@ -226,6 +227,11 @@ export function Composer({
     switchable: switchable.value,
     off: offKey(VISUALIZE),
   });
+  const knowledge = switchItem(KNOWLEDGE, {
+    tools: readable,
+    switchable: switchable.value,
+    off: offKey(KNOWLEDGE),
+  });
   const memory = switchItem(MEMORY, {
     tools: readable,
     switchable: switchable.value,
@@ -421,6 +427,7 @@ export function Composer({
           web={web}
           webPane={webPane}
           visuals={visuals}
+          knowledge={knowledge}
           memory={memory}
           servers={mcp}
           skills={skill}

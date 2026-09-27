@@ -15,7 +15,12 @@ import { type Change, commit, type ScratchCommit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { type KeptEntry, listKept, readKept } from "./kept.ts";
 import { KNOWLEDGE_COMMANDS } from "./limits.ts";
-import { makeOpenCommand, type OpenedRecord, openedReceipt } from "./open.ts";
+import {
+  makeOpenCommand,
+  type OpenedRecord,
+  openedReceipt,
+  underKnowledge,
+} from "./open.ts";
 import { failed, output } from "./output.ts";
 import { parseName } from "./parse.ts";
 import { acquire, acquireSession } from "./queue.ts";
@@ -28,6 +33,8 @@ export type CommandCaps = {
   callTimeoutMs: number;
   resultCut: number;
   visuals: boolean;
+  // false while the send has the project docs off: no /knowledge
+  knowledge: boolean;
 } & (
   | { web?: null }
   | {
@@ -58,6 +65,7 @@ async function diff(
   rows: readonly KnowledgeRow[],
   scratch: Scratch,
   caps: KnowledgeCaps,
+  docs: boolean,
 ): Promise<{
   knowledge: Change[];
   scratch: Omit<ScratchCommit, "sessionId" | "before">;
@@ -74,11 +82,10 @@ async function diff(
     throw new Error("/tmp is not a directory");
   const paths = fs
     .getAllPaths()
+    // with the docs off nothing under /knowledge is read, so an empty
+    // mount never reads as every file deleted
     .filter(
-      (path) =>
-        path === "/knowledge" ||
-        path.startsWith("/knowledge/") ||
-        path.startsWith("/tmp/"),
+      (path) => (docs && underKnowledge(path)) || path.startsWith("/tmp/"),
     )
     .sort();
   for (const path of paths) {
@@ -130,6 +137,14 @@ async function diff(
 
 async function directory(fs: InMemoryFs, path: string): Promise<boolean> {
   return (await fs.exists(path)) && (await fs.stat(path)).isDirectory;
+}
+
+// an empty folder under /knowledge loses nothing worth a notice
+async function docsWritten(fs: InMemoryFs): Promise<boolean> {
+  for (const path of fs.getAllPaths())
+    if (underKnowledge(path) && !(await fs.lstat(path)).isDirectory)
+      return true;
+  return false;
 }
 
 async function uploadsChanged(
@@ -185,9 +200,12 @@ function keptChanged(fs: InMemoryFs, kept: readonly KeptEntry[]): boolean {
   return seen !== expected.size;
 }
 
+const home = (docs: boolean) => (docs ? "/knowledge" : "/tmp");
+
 async function savedCwd(
   fs: InMemoryFs,
   pwd: string | undefined,
+  docs: boolean,
 ): Promise<string> {
   if (
     pwd === undefined ||
@@ -195,20 +213,19 @@ async function savedCwd(
     Buffer.byteLength(pwd) > 256 ||
     /\p{Cc}/u.test(pwd)
   )
-    return "/knowledge";
+    return home(docs);
   const path = fs.resolvePath("/", pwd);
   if (
-    path !== "/knowledge" &&
+    !(docs && underKnowledge(path)) &&
     path !== "/tmp" &&
     path !== "/uploads" &&
     path !== "/mcp" &&
-    !path.startsWith("/knowledge/") &&
     !path.startsWith("/tmp/") &&
     !path.startsWith("/uploads/") &&
     !path.startsWith("/mcp/")
   )
-    return "/knowledge";
-  return (await directory(fs, path)) ? path : "/knowledge";
+    return home(docs);
+  return (await directory(fs, path)) ? path : home(docs);
 }
 
 export async function run(
@@ -235,7 +252,8 @@ export async function run(
     release = await acquire(combined);
     combined.throwIfAborted();
     const storage = deps.current();
-    const rows = deps.store.read(projectId);
+    const docs = caps.knowledge;
+    const rows = docs ? deps.store.read(projectId) : [];
     const scratch = deps.scratch.read(sessionId);
     const uploads = deps.uploads.read(sessionId);
     const kept = listKept(deps.db, sessionId);
@@ -253,7 +271,7 @@ export async function run(
       keptBytes +
       2 * 1024 * 1024;
     const fs = new InMemoryFs({}, { maxTotalBytes: mountBytes });
-    fs.mkdirSync("/knowledge", { recursive: true });
+    if (docs) fs.mkdirSync("/knowledge", { recursive: true });
     fs.mkdirSync("/tmp", { recursive: true });
     fs.mkdirSync("/uploads", { recursive: true });
     for (const row of rows)
@@ -270,9 +288,10 @@ export async function run(
         entry.path,
         () => readKept(deps.db, entry.messageId, entry.position) ?? "",
       );
-    const cwd = await savedCwd(fs, scratch.cwd);
-    if (cwd !== scratch.cwd)
-      notice = `started in /knowledge: ${scratch.cwd} no longer exists\n`;
+    const cwd = await savedCwd(fs, scratch.cwd, docs);
+    // a cwd in the docs while they are off moves without a word
+    if (cwd !== scratch.cwd && (docs || !underKnowledge(scratch.cwd)))
+      notice = `started in ${cwd}: ${scratch.cwd} no longer exists\n`;
     const ioBytes = Math.max(
       4 * caps.resultCut,
       storage.scratchBytes,
@@ -291,6 +310,7 @@ export async function run(
           {
             knowledgeFileBytes: storage.knowledgeFileBytes,
             visuals: caps.visuals,
+            knowledge: docs,
           },
           opened,
         ),
@@ -342,6 +362,11 @@ export async function run(
         "changes under /uploads were discarded: copy a file to /tmp to change it\n" +
         notice;
     }
+    if (!docs && (await docsWritten(fs))) {
+      notice =
+        "changes under /knowledge were discarded: the project docs are off\n" +
+        notice;
+    }
     if (result.exitCode === 124 || result.exitCode === 126) {
       const printed = output(
         stdout,
@@ -356,8 +381,14 @@ export async function run(
         error: true,
       };
     }
-    const changes = await diff(fs, rows, scratch, storage);
-    changes.scratch.changes.cwd = await savedCwd(fs, result.env.PWD);
+    const changes = await diff(fs, rows, scratch, storage, docs);
+    const after = await savedCwd(fs, result.env.PWD, docs);
+    // a cwd in the docs waits in /tmp until they are on again, unless
+    // the command moved
+    changes.scratch.changes.cwd =
+      !docs && underKnowledge(scratch.cwd) && after === cwd
+        ? scratch.cwd
+        : after;
     combined.throwIfAborted();
     const printed = commit(
       deps,

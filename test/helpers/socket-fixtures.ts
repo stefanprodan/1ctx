@@ -147,6 +147,7 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
       offered: () => ({
         tools: schemas,
         visuals: false,
+        knowledge: true,
         search: null,
         skills: { block: "", skills: [] },
         mcp: [],

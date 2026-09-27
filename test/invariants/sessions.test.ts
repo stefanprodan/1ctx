@@ -67,6 +67,7 @@ function fixedTools(content: string): Tools {
     skillsOff: () => [],
     offered: () => ({
       visuals: false,
+      knowledge: true,
       tools: [
         {
           name: "datetime",
@@ -647,7 +648,7 @@ describe("GET /api/projects/:id/agents", () => {
     expect(await visible.json()).toEqual({
       agents: [expect.objectContaining({ id: chat.agentId, name: "coder" })],
       startsOn: chat.agentId,
-      capabilities: ["web", "visualize", "memory"],
+      capabilities: ["web", "visualize", "knowledge", "memory"],
       servers: {},
       skills: {},
       credentials: [],

@@ -30,7 +30,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
 - **A session's disabled capabilities are one sorted set.**
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
-  change with `disable` and `enable` keys: `web`, `visualize`, `memory`,
+  change with `disable` and `enable` keys: `web`, `visualize`,
+  `knowledge`, `memory`,
   `mcp:<server id>`, `skill:<skill id>` and `credential:<credential id>`.
   The parser checks only an id's shape, 1 to 32 lowercase ASCII
   letters or digits; unknown or unassigned server, skill and credential

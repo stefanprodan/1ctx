@@ -120,6 +120,7 @@ describe("bash", () => {
             callTimeoutMs: ctx.caps.callTimeoutMs,
             resultCut: ctx.caps.resultCut,
             visuals: true,
+            knowledge: true,
           });
           expect(signal.aborted).toBe(false);
           return result;

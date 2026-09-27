@@ -5,14 +5,16 @@
 // what is off, since on is the default: a thing added to an agent later
 // is on everywhere without a write, and the empty set is every chat that
 // never touched a switch. A key is a kind, or a kind and a name after a
-// colon. Web access is a kind alone, and so are the visualize tool and
-// saving to the project's memory, which only a chat is offered. An
+// colon. Web access is a kind alone, and so are the visualize tool, the
+// project docs under /knowledge and saving to the project's memory,
+// which only a chat is offered. An
 // MCP server is `mcp:<server id>`: the id, since the name is not what an
 // agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
 // HTTP credential is `credential:<credential id>`.
 
 export const WEB = "web";
 export const VISUALIZE = "visualize";
+export const KNOWLEDGE = "knowledge";
 export const MEMORY = "memory";
 export const MCP = "mcp";
 export const SKILL = "skill";
@@ -53,6 +55,7 @@ export function isCapabilityKey(value: unknown): value is string {
     // still sends
     (value === WEB ||
       value === VISUALIZE ||
+      value === KNOWLEDGE ||
       value === MEMORY ||
       serverOf(value) !== null ||
       skillOf(value) !== null ||
@@ -137,16 +140,21 @@ export function applyChange(
 export const sameSet = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((key, i) => key === b[i]);
 
-// the last line of the system prompt but for a change note, while a chat
-// has web access off: constant, so every send after the flip shares it
+// the last line of the system prompt but for a change note, while web access
+// is off in a chat or a task: constant, so every send after the flip shares it
 export const WEB_OFF_LINE =
-  "The user turned web access off for this chat. Do not call webfetch or websearch or use curl. Say so if the web is needed.";
+  "Web access is off. Do not call webfetch or websearch or use curl. Say so if the web is needed.";
 
-// the line after it while a chat has the visualize tool off: a visual
+// the line after it while the visualize tool is off: a visual
 // drawn before the flip is in the history, and the model would call the
 // tool again and get an unknown tool
 export const VISUALIZE_OFF_LINE =
-  "The user turned the visualize tool off for this chat. Do not call visualize.";
+  "The visualize tool is off. Do not call visualize.";
+
+// the line after it while the project docs are off: the bash
+// description still names /knowledge, and this overrides it
+export const KNOWLEDGE_OFF_LINE =
+  "The project docs are off. /knowledge is not mounted. Do not read or write it.";
 
 // the line after it while a chat has saving to the project's memory
 // off: a save made before the flip is in the history

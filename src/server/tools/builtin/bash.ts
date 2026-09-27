@@ -139,6 +139,7 @@ export function makeBashTool(
   visuals = true,
   credentials: BashCredentials = NONE,
   keys?: CredentialKeysPort,
+  docs = true,
 ): Tool<ToolResult> {
   return {
     name: "bash",
@@ -179,6 +180,7 @@ export function makeBashTool(
         callTimeoutMs: ctx.caps.callTimeoutMs,
         resultCut: ctx.caps.resultCut,
         visuals,
+        knowledge: docs,
       };
       const signing =
         ctx.web === null

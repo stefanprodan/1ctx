@@ -49,6 +49,7 @@ test("events omit private request and chat values", async () => {
         { name: "webfetch", description: "Fetch a URL.", parameters: {} },
       ],
       visuals: false,
+      knowledge: true,
       search: null,
       skills: { block: "", skills: [] },
       mcp: [],

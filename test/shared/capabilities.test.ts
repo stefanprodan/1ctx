@@ -7,6 +7,7 @@ import {
   credentialKey,
   credentialOf,
   isCapabilityKey,
+  KNOWLEDGE,
   MAX_CAPABILITY_KEY,
   MAX_DISABLED_CAPABILITIES,
   mcpKey,
@@ -31,6 +32,21 @@ describe("capability keys", () => {
     expect(parseSet([VISUALIZE, WEB], "set")).toEqual({
       ok: true,
       set: ["visualize", "web"],
+    });
+  });
+  test("the project docs are a kind alone, like the visualize tool", () => {
+    expect(KNOWLEDGE).toBe("knowledge");
+    expect(isCapabilityKey(KNOWLEDGE)).toBe(true);
+    expect(serverOf(KNOWLEDGE)).toBeNull();
+    expect(skillOf(KNOWLEDGE)).toBeNull();
+    expect(isCapabilityKey("knowledge:x")).toBe(false);
+    expect(parseSet([WEB, KNOWLEDGE, VISUALIZE], "set")).toEqual({
+      ok: true,
+      set: ["knowledge", "visualize", "web"],
+    });
+    expect(parseChange({ disable: [KNOWLEDGE] }, "c")).toEqual({
+      ok: true,
+      change: { disable: ["knowledge"] },
     });
   });
   test("an MCP server is a key by its id, checked by shape alone", () => {

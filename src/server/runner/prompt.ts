@@ -11,6 +11,8 @@
 // send so a tool's writes cannot move the prefix between rounds.
 
 import {
+  KNOWLEDGE,
+  KNOWLEDGE_OFF_LINE,
   MEMORY,
   MEMORY_OFF_LINE,
   mcpOffLine,
@@ -121,7 +123,9 @@ export function systemPrompt(
     parts.push(memoryBlock("automation-memory", policy.automationMemory));
   }
   // a model that cannot call the tool is not told of the files behind it
-  if (policy.offered.tools.some((tool) => tool.name === "bash")) {
+  const bash = policy.offered.tools.some((tool) => tool.name === "bash");
+  const docsOff = policy.disabledCapabilities.includes(KNOWLEDGE);
+  if (bash && !docsOff) {
     parts.push(knowledgeBlock(policy.knowledge.files, policy.knowledge.recent));
   }
   parts.push(dateLine(now));
@@ -137,6 +141,7 @@ export function systemPrompt(
   ) {
     parts.push(VISUALIZE_OFF_LINE);
   }
+  if (docsOff && bash) parts.push(KNOWLEDGE_OFF_LINE);
   // a run is never offered the tool, so the key means nothing there
   if (
     policy.disabledCapabilities.includes(MEMORY) &&

@@ -118,6 +118,8 @@ export type OfferedCredential = Pick<
 export type Offered = {
   tools: ChatTool[];
   visuals: boolean;
+  // false while the send has the project docs off
+  knowledge: boolean;
   web: WebSnapshot | null;
   search: SearchProvider | null;
   skills: { block: string; skills: OfferedSkill[] };
