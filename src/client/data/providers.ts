@@ -95,16 +95,22 @@ export async function deleteProvider(id: string): Promise<void> {
   }
 }
 
-// a failure is the aside's "Did not load", never the page's
+// a failure is the aside's "Did not load", never the page's; only the
+// latest read lands, so a switch between providers keeps the last one
+let usageTurn = 0;
+
 export async function loadProviderUsage(id: string): Promise<void> {
   const forUser = owner;
+  const mine = ++usageTurn;
   let usage: ProviderUsageResponse | null = null;
   try {
     usage = await api<ProviderUsageResponse>(
       `/api/providers/${encodeURIComponent(id)}/usage`,
     );
   } catch {}
-  if (owner === forUser) providerUsage.value = { providerId: id, usage };
+  if (owner === forUser && usageTurn === mine) {
+    providerUsage.value = { providerId: id, usage };
+  }
 }
 
 // the chat models by default, or the decision models a decider picks

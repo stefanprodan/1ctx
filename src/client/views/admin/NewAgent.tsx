@@ -9,7 +9,7 @@
 // servers are added with the cards that edit them.
 
 import { useRef } from "preact/hooks";
-import { navigate, query } from "../../app/router.ts";
+import { address, navigate, query } from "../../app/router.ts";
 import { agents, createAgent } from "../../data/agents.ts";
 import { providers, providersError } from "../../data/providers.ts";
 import { configAgentHref, configProviderHref } from "../../lib/hrefs.ts";
@@ -73,6 +73,7 @@ function Form({ providerId }: { providerId: string }) {
     providers.value?.find((p) => p.id === d.providerId.value)?.wire;
   const save = useSave(
     async () => {
+      const from = address();
       const created = await createAgent({
         name: d.name.value.trim(),
         avatar: d.avatar.value,
@@ -82,7 +83,7 @@ function Form({ providerId }: { providerId: string }) {
         servers: [],
         mcpMode: "auto",
       });
-      navigate(configAgentHref(created.name));
+      if (address() === from) navigate(configAgentHref(created.name));
     },
     cardFieldOf(["name", "prompt", "model", "upstream", "contextLength"]),
   );

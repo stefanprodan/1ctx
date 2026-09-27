@@ -15,7 +15,7 @@ import { query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { deciders, decidersError } from "../../data/deciders.ts";
 import { decisions, decisionsError } from "../../data/decisions.ts";
-import { overview } from "../../data/overview.ts";
+import { overview, overviewError } from "../../data/overview.ts";
 import { providers, providersError } from "../../data/providers.ts";
 import { count } from "../../lib/format.ts";
 import { configDeciderHref, configDecisionHref } from "../../lib/hrefs.ts";
@@ -78,7 +78,9 @@ function Aside() {
       }
     >
       {totals === null ? (
-        <p class="split-empty">Loading</p>
+        <p class="split-empty">
+          {overviewError.value === null ? "Loading" : "Did not load."}
+        </p>
       ) : (
         <>
           <AsideLine label="Answers">{count(totals.decisions)}</AsideLine>
@@ -240,7 +242,11 @@ export function DecisionList() {
                 const words = DECISION_WORDS[d.id];
                 const meta = decisionMeta(d, known);
                 return (
-                  <RowsGo key={d.id} href={configDecisionHref(d.id)}>
+                  <RowsGo
+                    key={d.id}
+                    href={configDecisionHref(d.id)}
+                    off={!d.enabled || known.length === 0}
+                  >
                     <RowsAvatar>
                       <Icon name={words.icon} size={15} />
                     </RowsAvatar>

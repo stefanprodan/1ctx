@@ -15,7 +15,7 @@ import type { Wire } from "../../../shared/words.ts";
 import { query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
-import { overview } from "../../data/overview.ts";
+import { overview, overviewError } from "../../data/overview.ts";
 import { keys, providers, providersError } from "../../data/providers.ts";
 import { count, pluralCommas } from "../../lib/format.ts";
 import { configProviderHref } from "../../lib/hrefs.ts";
@@ -179,7 +179,9 @@ function Aside({ providers: all }: { providers: ProviderSummary[] }) {
         }
       >
         {totals === null ? (
-          <p class="split-empty">Loading</p>
+          <p class="split-empty">
+            {overviewError.value === null ? "Loading" : "Did not load."}
+          </p>
         ) : (
           <>
             <AsideLine label="Turns">

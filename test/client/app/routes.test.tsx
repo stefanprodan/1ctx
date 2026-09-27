@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { App } from "../../../src/client/app/App.tsx";
-import { adminFace } from "../../../src/client/app/Rail.model.ts";
+import { adminFace, zoneLit } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
 import {
   conflicts,
@@ -65,6 +65,17 @@ describe("the route table", () => {
       expect(adminFace(route.path), route.path).toBe(true);
     }
     expect(ROUTES.some((r) => r.path.startsWith("/admin"))).toBe(false);
+  });
+
+  test("the rail lights the zone page an address sits under", () => {
+    expect(zoneLit("/config/deciders")).toBe("/config/deciders");
+    expect(zoneLit("/config/deciders/jev")).toBe("/config/deciders");
+    // the Decisions tab stands for Deciders
+    expect(zoneLit("/config/decisions")).toBe("/config/deciders");
+    expect(zoneLit("/config/decisions/run-attention")).toBe("/config/deciders");
+    expect(zoneLit("/config")).toBe("/config");
+    expect(zoneLit("/config/agents/x/mcp")).toBe("/config/agents");
+    expect(zoneLit("/projects")).toBeNull();
   });
 
   test("every route has a title", () => {

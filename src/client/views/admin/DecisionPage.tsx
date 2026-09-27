@@ -78,10 +78,7 @@ export function DecisionPage({ params }: { params: Params }) {
     >
       {decision !== null && deciders.value !== null && (
         <Split aside={<Aside decision={decision} />}>
-          <div class="decider-page" key={decision.id}>
-            <Status decision={decision} list={deciders.value} />
-            <Options decision={decision} />
-          </div>
+          <Cards key={decision.id} decision={decision} list={deciders.value} />
         </Split>
       )}
     </Page>
@@ -123,12 +120,44 @@ function Switcher({ decision }: { decision: DecisionSummary }) {
 const keptTexts = (d: DecisionSummary): Record<string, string> =>
   Object.fromEntries(d.options.map((o) => [o.key, o.description]));
 
-function Status({
+// one decision's cards, made again for another, so a save still running
+// for the last one holds nothing here
+function Cards({
   decision,
   list,
 }: {
   decision: DecisionSummary;
   list: DeciderSummary[];
+}) {
+  // a card is saving: each save sends the whole decision, so the other
+  // waits rather than send what it is about to change
+  const saving = useSignal(false);
+  return (
+    <div class="decider-page">
+      <Status decision={decision} list={list} saving={saving} />
+      <Options decision={decision} saving={saving} />
+    </div>
+  );
+}
+
+// runs a card's save with the page's lock held
+async function locked(saving: Signal<boolean>, call: () => Promise<void>) {
+  saving.value = true;
+  try {
+    await call();
+  } finally {
+    saving.value = false;
+  }
+}
+
+function Status({
+  decision,
+  list,
+  saving,
+}: {
+  decision: DecisionSummary;
+  list: DeciderSummary[];
+  saving: Signal<boolean>;
 }) {
   const words = DECISION_WORDS[decision.id];
   const enabled = useSignal(decision.enabled);
@@ -149,19 +178,23 @@ function Status({
   }
   // a decider deleted since hands over to the default
   const held = heldDecider(list, deciderId.value);
-  const save = useSave(async () => {
-    const was = latest.current;
-    const saved = await saveDecision(
-      was.id,
-      decisionBody(was, {
-        enabled: enabled.value,
-        deciderId: heldDecider(deciders.value ?? [], deciderId.value),
-        texts: keptTexts(was),
+  const save = useSave(
+    () =>
+      locked(saving, async () => {
+        const was = latest.current;
+        const saved = await saveDecision(
+          was.id,
+          decisionBody(was, {
+            enabled: enabled.value,
+            deciderId: heldDecider(deciders.value ?? [], deciderId.value),
+            texts: keptTexts(was),
+          }),
+        );
+        enabled.value = saved.enabled;
+        deciderId.value = saved.deciderId ?? "";
       }),
-    );
-    enabled.value = saved.enabled;
-    deciderId.value = saved.deciderId ?? "";
-  }, decisionFieldOf);
+    decisionFieldOf,
+  );
   const form = useRef<HTMLFormElement>(null);
   useFocusField(save, form);
   const busy = save.busy;
@@ -183,7 +216,14 @@ function Status({
       <Setting
         title="Status"
         line={words.hint}
-        foot={<DraftFoot save={save} dirty={dirty} onDiscard={reset} />}
+        foot={
+          <DraftFoot
+            save={save}
+            dirty={dirty}
+            locked={saving.value}
+            onDiscard={reset}
+          />
+        }
       >
         <div class="pair">
           <div class="field">
@@ -229,7 +269,13 @@ function Status({
   );
 }
 
-function Options({ decision }: { decision: DecisionSummary }) {
+function Options({
+  decision,
+  saving,
+}: {
+  decision: DecisionSummary;
+  saving: Signal<boolean>;
+}) {
   // one box per option, its keys fixed for the decision
   const texts = useMemo(
     () =>
@@ -254,20 +300,25 @@ function Options({ decision }: { decision: DecisionSummary }) {
     Object.fromEntries(
       decision.options.map((o) => [o.key, texts[o.key]!.value]),
     );
-  const save = useSave(async () => {
-    const was = latest.current;
-    const saved = await saveDecision(
-      was.id,
-      decisionBody(was, {
-        enabled: was.enabled,
-        deciderId: was.deciderId ?? "",
-        texts: Object.fromEntries(
-          was.options.map((o) => [o.key, texts[o.key]!.value]),
-        ),
+  const save = useSave(
+    () =>
+      locked(saving, async () => {
+        const was = latest.current;
+        const saved = await saveDecision(
+          was.id,
+          decisionBody(was, {
+            enabled: was.enabled,
+            // a decider deleted since is no decider to send
+            deciderId: heldDecider(deciders.value ?? [], was.deciderId ?? ""),
+            texts: Object.fromEntries(
+              was.options.map((o) => [o.key, texts[o.key]!.value]),
+            ),
+          }),
+        );
+        for (const o of saved.options) texts[o.key]!.value = o.description;
       }),
-    );
-    for (const o of saved.options) texts[o.key]!.value = o.description;
-  }, decisionFieldOf);
+    decisionFieldOf,
+  );
   const form = useRef<HTMLFormElement>(null);
   useFocusField(save, form);
   const busy = save.busy;
@@ -295,7 +346,7 @@ function Options({ decision }: { decision: DecisionSummary }) {
         foot={
           <Foot
             save={save}
-            dirty={dirty}
+            dirty={dirty && !saving.value}
             label="Save"
             stack={dirty}
             start={

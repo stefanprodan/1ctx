@@ -11,7 +11,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { DeciderSummary } from "../../../shared/contracts/decider.ts";
 import type { Params } from "../../app/params.ts";
-import { navigate } from "../../app/router.ts";
+import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
   checkDecider,
@@ -22,7 +22,7 @@ import {
   loadDeciderUsage,
   updateDecider,
 } from "../../data/deciders.ts";
-import { decisions } from "../../data/decisions.ts";
+import { decisions, loadDecisions } from "../../data/decisions.ts";
 import { providersError } from "../../data/providers.ts";
 import { count, says } from "../../lib/format.ts";
 import { configDeciderHref, configDecisionHref } from "../../lib/hrefs.ts";
@@ -103,8 +103,9 @@ export function DeciderPage({ params }: { params: Params }) {
           <div class="decider-page" key={decider.id}>
             <Identity decider={decider} drafts={drafts.current} />
             <Model decider={decider} drafts={drafts.current} />
-            <Check decider={decider} />
-            <DeleteCard decider={decider} />
+            {/* an answer is about the model that gave it */}
+            <Check key={decider.model} decider={decider} />
+            <DeleteCard decider={decider} drafts={drafts.current} />
           </div>
         </Split>
       )}
@@ -164,17 +165,21 @@ function Identity({
   // the save is made once, so it reads the latest row when it runs
   const latest = useRef(decider);
   latest.current = decider;
-  const save = useSave(async () => {
-    const was = latest.current;
-    const saved = await updateDecider(
-      was.id,
-      body(was, { name: d.name.value.trim(), default: d.isDefault.value }),
-    );
-    d.resetGeneral(saved);
-    if (saved.name !== was.name) {
-      navigate(configDeciderHref(saved.name), true);
-    }
-  }, deciderFieldOf);
+  const save = useSave(
+    () =>
+      d.save(async () => {
+        const was = latest.current;
+        const saved = await updateDecider(
+          was.id,
+          body(was, { name: d.name.value.trim(), default: d.isDefault.value }),
+        );
+        d.resetGeneral(saved);
+        if (saved.name !== was.name) {
+          navigate(configDeciderHref(saved.name), true);
+        }
+      }),
+    deciderFieldOf,
+  );
   const form = useRef<HTMLFormElement>(null);
   useFocusField(save, form);
   const name = d.name.value.trim();
@@ -200,6 +205,7 @@ function Identity({
             save={save}
             dirty={d.generalDirty(decider)}
             blocked={taken || name === ""}
+            locked={d.saving.value}
             hint={
               taken ? <span class="error">{name} is taken.</span> : undefined
             }
@@ -250,17 +256,21 @@ function Model({
 }) {
   const latest = useRef(decider);
   latest.current = decider;
-  const save = useSave(async () => {
-    const was = latest.current;
-    const saved = await updateDecider(
-      was.id,
-      body(was, {
-        providerId: d.providerId.value,
-        model: d.model.value?.id ?? "",
+  const save = useSave(
+    () =>
+      d.save(async () => {
+        const was = latest.current;
+        const saved = await updateDecider(
+          was.id,
+          body(was, {
+            providerId: d.providerId.value,
+            model: d.model.value?.id ?? "",
+          }),
+        );
+        d.resetModel(saved);
       }),
-    );
-    d.resetModel(saved);
-  }, deciderFieldOf);
+    deciderFieldOf,
+  );
   const form = useRef<HTMLFormElement>(null);
   useFocusField(save, form);
   return (
@@ -280,6 +290,7 @@ function Model({
             save={save}
             dirty={d.modelDirty(decider)}
             blocked={d.model.value === null || d.changing.value}
+            locked={d.saving.value}
             open={d.changing.value}
             onDiscard={() => d.resetModel(decider)}
           />
@@ -336,7 +347,13 @@ function Check({ decider }: { decider: DeciderSummary }) {
   );
 }
 
-function DeleteCard({ decider }: { decider: DeciderSummary }) {
+function DeleteCard({
+  decider,
+  drafts: d,
+}: {
+  decider: DeciderSummary;
+  drafts: DeciderDrafts;
+}) {
   const asking = useSignal(false);
   const save = useSave(async () => {});
   const asks = askedBy(decider, decisions.value ?? []).length;
@@ -360,15 +377,18 @@ function DeleteCard({ decider }: { decider: DeciderSummary }) {
             <AskDelete
               save={save}
               asking={asking}
-              busy={save.busy}
+              busy={save.busy || d.saving.value}
               words={`Delete ${decider.name}?`}
               wordsClass="decider-page-ask"
               // the list drops the decider as the call ends, which takes
               // this card away before act answers: the call leaves
               onDelete={() => {
                 void save.act("delete", async () => {
+                  const from = address();
                   await deleteDecider(decider.id);
-                  navigate("/config/deciders");
+                  // a decision that named it names none now
+                  void loadDecisions();
+                  if (address() === from) navigate("/config/deciders");
                 });
               }}
             />

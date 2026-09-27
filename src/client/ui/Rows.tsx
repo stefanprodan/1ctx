@@ -180,11 +180,14 @@ export function RowsGo({
   href,
   end,
   under,
+  off,
   children,
 }: {
   href: string;
   end?: ComponentChildren;
   under?: ComponentChildren;
+  // what the row stands for is off: its name goes faint
+  off?: boolean;
   children: ComponentChildren;
 }) {
   // the arrow marks the line's end; a row with a button there leaves it
@@ -196,7 +199,7 @@ export function RowsGo({
     </a>
   );
   return (
-    <div class="rows-item">
+    <div class={`rows-item${off ? " rows-item-off" : ""}`}>
       {end === undefined ? (
         link(true)
       ) : (

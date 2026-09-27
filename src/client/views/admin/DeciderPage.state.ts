@@ -32,6 +32,9 @@ export class DeciderDrafts {
   readonly model = signal<DeciderModel | null>(null);
   // the model's search is open in its place
   readonly changing = signal(false);
+  // a card is saving: each save sends the whole decider, so the others
+  // wait rather than send what it is about to change
+  readonly saving = signal(false);
   // the model the search replaces, to take back on Cancel
   private before: { providerId: string; model: DeciderModel | null } | null =
     null;
@@ -118,6 +121,15 @@ export class DeciderDrafts {
     };
     this.before = null;
     this.changing.value = false;
+  }
+
+  async save<T>(call: () => Promise<T>): Promise<T> {
+    this.saving.value = true;
+    try {
+      return await call();
+    } finally {
+      this.saving.value = false;
+    }
   }
 
   // the row changed under the page: what the admin left alone follows

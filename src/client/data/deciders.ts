@@ -105,18 +105,25 @@ export async function deleteDecider(id: string): Promise<void> {
 export const checkDecider = (id: string): Promise<CheckDeciderResponse> =>
   api<CheckDeciderResponse>(`${path(id)}/check`, "POST");
 
-// a failure is the aside's "Did not load", never the page's
+// a failure is the aside's "Did not load", never the page's; only the
+// latest read of each lands, so a switch between pages keeps the last
+const usageTurns = new Map<typeof deciderUsage, number>();
+
 async function readUsage(
   url: string,
   of: string,
   into: typeof deciderUsage,
 ): Promise<void> {
   const forUser = owner;
+  const mine = (usageTurns.get(into) ?? 0) + 1;
+  usageTurns.set(into, mine);
   let usage: DecisionUsageResponse | null = null;
   try {
     usage = await api<DecisionUsageResponse>(url);
   } catch {}
-  if (owner === forUser) into.value = { of, usage };
+  if (owner === forUser && usageTurns.get(into) === mine) {
+    into.value = { of, usage };
+  }
 }
 
 export const loadDeciderUsage = (id: string): Promise<void> =>

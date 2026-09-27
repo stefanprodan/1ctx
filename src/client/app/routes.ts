@@ -10,6 +10,7 @@
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { isDecisionId } from "../../shared/contracts/decision.ts";
 import { isRunFilter } from "../../shared/words.ts";
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents, loadFacts } from "../data/agents.ts";
@@ -58,6 +59,7 @@ import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
+import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
 import { composeProjectOf, originOf } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -533,7 +535,9 @@ export const ROUTES: Route[] = [
     view: lazy(() =>
       import("../views/admin/DecisionPage.tsx").then((m) => m.DecisionPage),
     ),
-    title: () => "Decision",
+    // the tab says which decision; an unknown id is the page's own word
+    title: (params) =>
+      isDecisionId(params.id) ? DECISION_WORDS[params.id].title : "Decision",
     role: "admin",
     load: async (params) => {
       await Promise.all([

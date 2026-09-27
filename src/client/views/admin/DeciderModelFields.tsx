@@ -34,14 +34,11 @@ export function DeciderModelFields({
   drafts: d,
   save,
   currentId,
-  fresh,
 }: {
   drafts: DeciderDrafts;
   save: Save;
   // the saved model, tagged current in the results
   currentId: string | null;
-  // New decider: the search takes the caret on arrival, with a mouse
-  fresh?: boolean;
 }) {
   const search = useRef<CatalogSearch | null>(null);
   if (search.current === null) {
@@ -57,13 +54,15 @@ export function DeciderModelFields({
   const busy = save.busy;
   const changing = d.changing.value;
   const model = d.model.value;
-  // a closed search keeps no query for the next Change
+  // a closed search keeps no query for the next Change, and another
+  // provider's catalog starts empty, whatever moved the provider
   useEffect(() => {
     if (!changing) s.clear();
   }, [changing]);
+  useEffect(() => s.clear(), [d.providerId.value]);
   const box = useRef<HTMLInputElement | null>(null);
   // Change and a pick move the caret: into the search, or back to Change
-  const into = useRef(fresh === true);
+  const into = useRef(false);
   const back = useRef(false);
   useEffect(() => {
     if (changing && into.current && !touch()) box.current?.focus();

@@ -22,11 +22,13 @@ import {
 import { deciders } from "../../../src/client/data/deciders.ts";
 import { decisions } from "../../../src/client/data/decisions.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { overview, overviewError } from "../../../src/client/data/overview.ts";
 import {
   createProvider,
   deleteProvider,
   keys,
   loadProviders,
+  loadProviderUsage,
   providers,
   providersError,
   providerUsage,
@@ -760,6 +762,50 @@ describe("a provider's page", () => {
     // another provider's answer is not this one's
     providerUsage.value = { providerId: "pr2", usage: null };
     expect(page()).not.toContain("Did not load.");
+    providerUsage.value = null;
+  });
+
+  test.serial("waits for the deciders, which Used by and Delete name", () => {
+    providers.value = [router];
+    agents.value = [];
+    deciders.value = null;
+    const html = render(<ProviderPage params={{ name: "router" }} />);
+    expect(html).not.toContain("Used by");
+    expect(html).not.toContain("Nothing runs on it.");
+    deciders.value = [];
+  });
+
+  test.serial(
+    "the list's aside says when the last 30 days did not load",
+    () => {
+      providers.value = [router];
+      agents.value = [];
+      overview.value = null;
+      overviewError.value = { words: "boom", status: 500 };
+      expect(render(<Providers />)).toContain("Did not load.");
+      overviewError.value = null;
+      expect(render(<Providers />)).toContain("Loading");
+    },
+  );
+
+  test.serial("only the latest usage read lands", async () => {
+    const answers: Record<string, (r: Response) => void> = {};
+    answer = (url) =>
+      new Promise<Response>((resolve) => {
+        answers[url] = resolve;
+      });
+    providerUsage.value = null;
+    const first = loadProviderUsage("pa");
+    const second = loadProviderUsage("pb");
+    const body = (n: number) =>
+      Response.json({ since: 0, until: 1, sends: n, tokens: 0, cost: 0 });
+    answers["/api/providers/pb/usage"]!(body(2));
+    await second;
+    answers["/api/providers/pa/usage"]!(body(1));
+    await first;
+    expect(
+      (providerUsage.value as { providerId: string } | null)?.providerId,
+    ).toBe("pb");
     providerUsage.value = null;
   });
 

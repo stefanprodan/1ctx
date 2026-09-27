@@ -564,7 +564,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   model), Check (`POST /api/deciders/:id/check`, `checkLine()` at the
   foot's left in a `role="status"` span, a refusal's words there, the
   aside read again), and Delete, its line only when a decision would
-  move (`deciderDeleteLine()`). A save's refusal reaches a field
+  move (`deciderDeleteLine()`). Identity and Model each send the whole
+  decider, so one saving holds the other (`DeciderDrafts.save()`), as
+  the agent page's cards do. A save's refusal reaches a field
   through `deciderFieldOf()`, which matches the server's whole phrases.
   The aside is `GET /api/deciders/:id/usage` and the decisions that ask
   it (`askedBy()`: those naming it, and while it is the default those
@@ -576,7 +578,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Options (a textarea per option labelled by `optionLabel()`, Reset to
   default while any box differs from the code's text), each its own
   form sending the whole `decisionBody()` with the other card's saved
-  values, checked by `optionProblem()`, a refusal reaching a field
+  values and a decider that still exists, one saving holding the
+  other, checked by `optionProblem()`, a refusal reaching a field
   through `decisionFieldOf()`. A decision is the code's, so it has no
   Delete. The aside is `GET /api/decisions/:id/usage`.
 - **The overview's usage bars** name the one row of every deleted
