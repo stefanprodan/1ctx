@@ -23,7 +23,10 @@ export const ZONES: Zone[] = [
     label: "Monitor",
     href: "/monitor",
     icon: "visual",
-    pages: [{ label: "Storage", href: "/monitor/storage" }],
+    pages: [
+      { label: "Usage", href: "/monitor/usage" },
+      { label: "Storage", href: "/monitor/storage" },
+    ],
   },
   {
     label: "Access",

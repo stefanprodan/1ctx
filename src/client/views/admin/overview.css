@@ -15,17 +15,10 @@
     gap: 6px;
     padding: 0 var(--space-2) 24px 52px;
   }
-  /* a phone breaks the foot between its parts, never inside one */
-  .overview-part {
-    white-space: nowrap;
+  /* the two day charts under the Stats tiles */
+  .overview-charts {
+    margin-top: 14px;
   }
-  .overview-facts-link {
-    color: var(--dim);
-  }
-  .overview-facts-link:hover {
-    color: var(--fg);
-  }
-
   /* the rows Refresh reads again, spaced as the board is */
   .overview-past {
     display: flex;
@@ -39,6 +32,10 @@
     gap: var(--space-3);
     margin: var(--space-2) 2px calc(-1 * var(--space-1));
   }
+  .overview-section-action {
+    align-self: center;
+    margin-left: auto;
+  }
   .overview-section-note {
     display: inline-flex;
     align-items: center;
@@ -49,58 +46,6 @@
   }
   .overview-section-stale .overview-section-note {
     color: var(--failed);
-  }
-
-  /* All time: figures side by side in one card, the counts at its foot */
-  .overview-all {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .overview-totals {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .overview-total {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-    padding: var(--space-4);
-  }
-  .overview-total + .overview-total {
-    border-left: 1px solid var(--line);
-  }
-  .overview-total-figure {
-    font-size: var(--text-title);
-    font-weight: 500;
-    color: var(--fg);
-  }
-  .overview-total-unit {
-    margin-left: var(--space-1);
-    font-size: var(--text-ui);
-    font-weight: 400;
-    color: var(--faint);
-  }
-  .overview-total-sub {
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
-
-  @media (max-width: 719px) {
-    .overview-totals {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .overview-total {
-      padding: var(--space-3);
-    }
-    .overview-total:nth-child(3) {
-      border-left: 0;
-    }
-    .overview-total:nth-child(3),
-    .overview-total:nth-child(4) {
-      border-top: 1px solid var(--line);
-    }
   }
 
   /* a failed read keeps the last answer on screen, faded */

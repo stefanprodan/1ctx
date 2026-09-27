@@ -2,27 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The scan worker: one read-only connection to the file, one job per
-// message, the storage scan or the overview's range, the result or the
-// failure posted back. bun:sqlite is synchronous, so this runs off the
-// thread that serves the streams.
+// message, the storage scan, the overview's range or the usage page's
+// month, the result or the failure posted back. bun:sqlite is
+// synchronous, so this runs off the thread that serves the streams.
 
 import { Database } from "bun:sqlite";
-import { type RangeInput, type RangeResult, range } from "./range.ts";
+import {
+  type MonthResult,
+  month,
+  type RangeInput,
+  type RangeResult,
+  range,
+} from "./range.ts";
 import { type ScanInput, type ScanResult, scan } from "./scan.ts";
 
 declare var self: Worker;
 
 export type Job =
   | { kind: "storage"; input: ScanInput }
-  | { kind: "range"; input: RangeInput };
+  | { kind: "range"; input: RangeInput }
+  | { kind: "month"; input: RangeInput };
 
 export type WorkerRequest = { path: string; job: Job };
 export type WorkerReply =
-  | { ok: true; result: ScanResult | RangeResult }
+  | { ok: true; result: ScanResult | RangeResult | MonthResult }
   | { ok: false; error: string };
 
-function run(db: Database, job: Job): ScanResult | RangeResult {
-  return job.kind === "storage" ? scan(db, job.input) : range(db, job.input);
+function run(db: Database, job: Job): ScanResult | RangeResult | MonthResult {
+  if (job.kind === "storage") return scan(db, job.input);
+  return job.kind === "range" ? range(db, job.input) : month(db, job.input);
 }
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {

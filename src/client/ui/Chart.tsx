@@ -16,11 +16,14 @@ export function ChartPanel({
   label,
   hint,
   action,
+  hintBelow,
   children,
 }: {
   label: string;
   hint?: string;
   action?: ComponentChildren;
+  // a hint that follows a day plot's pointer: its own line on a phone
+  hintBelow?: boolean;
   children: ComponentChildren;
 }) {
   return (
@@ -28,6 +31,7 @@ export function ChartPanel({
       label={label}
       hint={hint}
       action={action}
+      hintBelow={hintBelow}
       live
       class="chart-panel"
     >

@@ -1,19 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the admin's Overview and Storage pages read. Storage is loaded
-// when the page is reached and again on Refresh. The Overview is kept
-// current while it is on screen and the tab is seen: the server's load
-// every LOAD_SAMPLE_MS, the days and all time every PAST_EVERY_MS, both
-// again as soon as the tab is seen again. A load keeps the last answer
-// on screen until the next lands; a failure keeps it too.
+// What the admin's Monitor pages read. Storage is loaded when the page
+// is reached and again on Refresh, Usage when a month is reached. The
+// Overview is kept current while it is on screen and the tab is seen:
+// the server's load every LOAD_SAMPLE_MS, the days, all time and what
+// needs attention every PAST_EVERY_MS, all again as soon as the tab is
+// seen again. A load keeps the last answer on screen until the next
+// lands; a failure keeps it too.
 
 import { effect, signal } from "@preact/signals";
 import {
+  type AttentionResponse,
   LOAD_SAMPLE_MS,
   type LoadResponse,
+  MONTH_PATTERN,
+  type OverviewRange,
   type OverviewResponse,
   type StorageResponse,
+  type UsageResponse,
 } from "../../shared/api/admin.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { browserZone } from "../lib/zone.ts";
@@ -27,6 +32,17 @@ export const storageLoading = signal(false);
 export const overview = signal<OverviewResponse | null>(null);
 export const overviewError = signal<Failure | null>(null);
 export const overviewLoading = signal(false);
+// the Monitor's Stats range; a list's aside reads 30d whatever it is
+export const overviewRange = signal<OverviewRange>("30d");
+
+export const usage = signal<UsageResponse | null>(null);
+export const usageError = signal<Failure | null>(null);
+export const usageLoading = signal(false);
+// the month on screen, or asked for
+export const usageMonth = signal<string | null>(null);
+
+export const attention = signal<AttentionResponse | null>(null);
+export const attentionError = signal<Failure | null>(null);
 
 // the last load the server answered, and the failure of the polls since
 export const serverLoad = signal<LoadResponse | null>(null);
@@ -35,6 +51,8 @@ export const serverLoadError = signal<Failure | null>(null);
 let owner: string | null = null;
 let turn = 0;
 let overviewTurn = 0;
+let usageTurn = 0;
+let attentionTurn = 0;
 let loadTurn = 0;
 // a poll waiting for its answer; the next tick skips rather than drop it
 let loadAsking = false;
@@ -51,6 +69,14 @@ effect(() => {
   overview.value = null;
   overviewError.value = null;
   overviewLoading.value = false;
+  usageTurn++;
+  usage.value = null;
+  usageError.value = null;
+  usageLoading.value = false;
+  usageMonth.value = null;
+  attentionTurn++;
+  attention.value = null;
+  attentionError.value = null;
   dropLoad();
   serverLoad.value = null;
   serverLoadError.value = null;
@@ -75,14 +101,16 @@ export async function loadStorage(): Promise<void> {
   }
 }
 
-export async function loadOverview(): Promise<void> {
+export async function loadOverview(
+  range: OverviewRange = "30d",
+): Promise<void> {
   const forUser = owner;
   const mine = ++overviewTurn;
   const current = () => owner === forUser && mine === overviewTurn;
   overviewLoading.value = true;
   try {
     const body = await api<OverviewResponse>(
-      `/api/admin/overview?tz=${encodeURIComponent(browserZone())}`,
+      `/api/admin/overview?tz=${encodeURIComponent(browserZone())}&range=${range}`,
     );
     if (!current()) return;
     overview.value = body;
@@ -91,6 +119,60 @@ export async function loadOverview(): Promise<void> {
     if (current()) overviewError.value = failure(err);
   } finally {
     if (current()) overviewLoading.value = false;
+  }
+}
+
+// the Stats switch: the range, read at once
+export function pickOverviewRange(range: OverviewRange): void {
+  overviewRange.value = range;
+  void loadOverview(range);
+}
+
+// this month in the browser's zone, "2026-09"
+export function thisMonth(now = Date.now()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: browserZone(),
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((p) => p.type === type)!.value;
+  return `${part("year")}-${part("month")}`;
+}
+
+// a month from the address, this month when it names none or no month
+export async function loadUsage(asked: string | null): Promise<void> {
+  const month =
+    asked !== null && MONTH_PATTERN.test(asked) ? asked : thisMonth();
+  const forUser = owner;
+  const mine = ++usageTurn;
+  const current = () => owner === forUser && mine === usageTurn;
+  usageMonth.value = month;
+  usageLoading.value = true;
+  try {
+    const body = await api<UsageResponse>(
+      `/api/admin/usage?tz=${encodeURIComponent(browserZone())}&month=${month}`,
+    );
+    if (!current()) return;
+    usage.value = body;
+    usageError.value = null;
+  } catch (err) {
+    if (current()) usageError.value = failure(err);
+  } finally {
+    if (current()) usageLoading.value = false;
+  }
+}
+
+export async function loadAttention(): Promise<void> {
+  const forUser = owner;
+  const mine = ++attentionTurn;
+  const current = () => owner === forUser && mine === attentionTurn;
+  try {
+    const body = await api<AttentionResponse>("/api/admin/attention");
+    if (!current()) return;
+    attention.value = body;
+    attentionError.value = null;
+  } catch (err) {
+    if (current()) attentionError.value = failure(err);
   }
 }
 
@@ -113,6 +195,16 @@ async function pollLoad(): Promise<void> {
   } finally {
     if (current()) loadAsking = false;
   }
+}
+
+// the live page's Refresh: the load, the days and what needs attention
+// at once, the polls going on as before
+export async function refreshOverview(): Promise<void> {
+  await Promise.all([
+    pollLoad(),
+    loadOverview(overviewRange.value),
+    loadAttention(),
+  ]);
 }
 
 // an answer still out lands nowhere, and the next tick asks again
@@ -152,7 +244,8 @@ export function watchOverview(tab: Tab = browserTab): () => void {
   const past = () => {
     if (tab.now() - pastAt < PAST_EVERY_MS || overviewLoading.value) return;
     pastAt = tab.now();
-    void loadOverview();
+    void loadOverview(overviewRange.value);
+    void loadAttention();
   };
   const tick = () => {
     void pollLoad();

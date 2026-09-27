@@ -5,7 +5,10 @@ import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import type { OverviewResponse } from "../../../src/shared/api/admin.ts";
+import type {
+  OverviewResponse,
+  UsageResponse,
+} from "../../../src/shared/api/admin.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import {
   createAutomation,
@@ -233,6 +236,16 @@ describe("usage is permanent", () => {
     return res.json();
   }
 
+  async function usage(chat: ChatApp): Promise<UsageResponse> {
+    const month = new Date(chat.app.now.value).toISOString().slice(0, 7);
+    const res = await chat.admin.call(
+      "GET",
+      `/api/admin/usage?tz=UTC&month=${month}`,
+    );
+    expect(res.status).toBe(200);
+    return res.json();
+  }
+
   test("no delete and no regenerate lowers the cost", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();
@@ -290,7 +303,7 @@ describe("usage is permanent", () => {
     expect(after.totals.promptTokens).toBeGreaterThan(
       before.totals.promptTokens,
     );
-    expect(after.by.projects).toContainEqual(
+    expect((await usage(chat)).by.projects).toContainEqual(
       expect.objectContaining({
         id: null,
         name: null,

@@ -38,7 +38,13 @@ import {
   servers,
 } from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
-import { loadOverview, loadStorage } from "../data/overview.ts";
+import {
+  loadAttention,
+  loadOverview,
+  loadStorage,
+  loadUsage,
+  overviewRange,
+} from "../data/overview.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -410,7 +416,16 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Monitor",
     role: "admin",
-    load: () => loadOverview(),
+    load: async () => {
+      await Promise.all([loadOverview(overviewRange.value), loadAttention()]);
+    },
+  },
+  {
+    path: "/monitor/usage",
+    view: lazy(() => import("../views/admin/Usage.tsx").then((m) => m.Usage)),
+    title: () => "Usage",
+    role: "admin",
+    load: (_params, q) => loadUsage(q.get("month")),
   },
   {
     path: "/monitor/storage",

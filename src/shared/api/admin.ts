@@ -128,7 +128,9 @@ export type StorageResponse = {
 // it and how many of each failed, and the tokens and the cost of the
 // rounds in it. A turn is a send of a chat (a message, a regenerate, a
 // compact), a run a send of a task. cost is null when no round of the
-// day carried one. start is its local midnight
+// day carried one. medianMs and p95Ms are the day's ended chat turns'
+// lengths, null with none. activeUsers counts the users with a turn or
+// a run started in it. start is its local midnight
 export type OverviewDay = {
   day: string;
   start: number;
@@ -146,7 +148,13 @@ export type OverviewDay = {
   decisionTokens: number;
   pricedDecisions: number;
   decisionCost: number | null;
+  medianMs: number | null;
+  p95Ms: number | null;
+  activeUsers: number;
 };
+
+// the median and the 95th percentile of ended chat turns' lengths
+export type TurnLengths = { medianMs: number | null; p95Ms: number | null };
 
 // What the days, or all time, add up to. cost sums the rounds that
 // carry one and pricedRounds counts them; cost is null when no round did
@@ -169,7 +177,7 @@ export type OverviewTotals = {
   decisionCost: number | null;
 };
 
-export const USAGE_BY = ["projects", "agents"] as const;
+export const USAGE_BY = ["projects", "agents", "models"] as const;
 export type UsageBy = (typeof USAGE_BY)[number];
 
 // A row of a breakdown, by prompt plus completion tokens. name is the
@@ -177,15 +185,36 @@ export type UsageBy = (typeof USAGE_BY)[number];
 // null and owner set. deleted is true for a project or an agent that
 // is gone, whose usage stays: every deleted project is summed into one
 // row with id, name and owner null, ranked like any other, and a
-// retired agent keeps its own row and name
+// retired agent keeps its own row and name. cost sums the priced
+// rounds, null when none carried one
 export type UsageRow = {
   id: string | null;
   name: string | null;
   owner: string | null;
   deleted: boolean;
   tokens: number;
+  cost: number | null;
   turns: number;
   runs: number;
+};
+
+// A model by the rounds it answered: provider is the provider's name,
+// null when it is deleted; model is the one that answered, a router's
+// pick included
+export type ModelUsage = {
+  provider: string | null;
+  model: string;
+  tokens: number;
+  cost: number | null;
+  rounds: number;
+};
+
+// A decider by the decisions it answered, under its latest name
+export type DeciderUsage = {
+  name: string;
+  decisions: number;
+  tokens: number;
+  cost: number | null;
 };
 
 // A provider's model over the days: its chat turns, and the median and
@@ -198,18 +227,20 @@ export type TurnLength = {
   slowestMs: number | null;
 };
 
-// GET /api/admin/overview?tz=: the zone's last OVERVIEW_DAYS days, today
-// last, and their totals, the ten largest rows of each breakdown, the
-// ten models with the most turns, all time with the first send's start
-// (null before any), and the instance, as of readAt. Read at most once
-// a minute per zone
+// GET /api/admin/overview?tz=&range=: the range's days in the zone,
+// today last, and their totals, and the instance, as of readAt. 30d and
+// 90d are the last 30 and 90 days, all every day from the first one
+// with a send, a round or a decision (today alone before any); the
+// range is 30d when not given. Read at most once a minute per zone and
+// range
 export type OverviewResponse = {
   readAt: number;
+  range: OverviewRange;
   days: OverviewDay[];
   totals: OverviewTotals;
-  by: Record<UsageBy, UsageRow[]>;
-  lengths: TurnLength[];
-  all: OverviewTotals & { since: number | null };
+  // over every day of the range
+  turnLength: TurnLengths;
+  activeUsers: number;
   instance: {
     version: string;
     startedAt: number;
@@ -221,7 +252,11 @@ export type OverviewResponse = {
   };
 };
 
-export const OVERVIEW_DAYS = 30;
+export const OVERVIEW_RANGES = ["30d", "90d", "all"] as const;
+export type OverviewRange = (typeof OVERVIEW_RANGES)[number];
+export function isOverviewRange(value: unknown): value is OverviewRange {
+  return OVERVIEW_RANGES.includes(value as OverviewRange);
+}
 
 // the server's load sampled every LOAD_SAMPLE_MS, LOAD_SAMPLES kept
 export const LOAD_SAMPLE_MS = 5_000;
@@ -248,3 +283,47 @@ export type LoadResponse = {
   contained: boolean;
   samples: { at: number[]; cpu: number[]; rss: number[] };
 };
+
+// GET /api/admin/usage?tz=&month=YYYY-MM: the month's days in the zone,
+// up to today in this month, and their totals, the ten largest rows of
+// each breakdown, the ten models with the most turns and the deciders
+// by decisions, as of readAt. since is the first send's start, null
+// before any, so the page offers the months from it. Read at most once
+// a minute per zone and month
+export type UsageResponse = {
+  readAt: number;
+  month: string;
+  since: number | null;
+  days: OverviewDay[];
+  totals: OverviewTotals;
+  turnLength: TurnLengths;
+  activeUsers: number;
+  by: { projects: UsageRow[]; agents: UsageRow[]; models: ModelUsage[] };
+  lengths: TurnLength[];
+  deciders: DeciderUsage[];
+};
+
+export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+// What an admin should fix: an MCP server or a skill whose last refresh
+// failed, at when it failed; a provider's, an MCP server's or the
+// search service's key file missing; a credential's key missing or
+// unusable. name is the object's, the search service's for its key
+export type AttentionKind =
+  | "mcp-refresh"
+  | "skill-refresh"
+  | "provider-key"
+  | "mcp-key"
+  | "credential-key"
+  | "credential-unusable"
+  | "search-key";
+
+export type AttentionItem = {
+  kind: AttentionKind;
+  name: string;
+  at: number | null;
+};
+
+// GET /api/admin/attention: read at each request, keys first by kind
+// and name, then the refresh failures newest first
+export type AttentionResponse = { items: AttentionItem[] };

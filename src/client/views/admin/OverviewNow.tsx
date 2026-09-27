@@ -1,11 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Overview's first row, Now: the server's load, polled while the
-// page is on screen. The chat and automation pools against their caps,
-// and the process's CPU and memory over the last 15 minutes on their
-// own cursor. A failed poll keeps the last numbers faded and says since
-// when. Also the row head and the tile bones the board's rows share.
+// The Overview's live tiles, under the head Monitor / Live: the
+// server's load, polled while the page is on screen. The chat and
+// automation pools against their caps, and the process's CPU and
+// memory over the last 15 minutes on their own cursor. A failed poll
+// keeps the last numbers faded and the head says since when. Also the
+// row head and the tile bones the board's rows share.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
@@ -34,20 +35,24 @@ import {
 
 const NOW_SYNC = "overview-now";
 
-// a row's head: its name and, beside it, its scope or its trouble
+// a row's head: its name and, beside it, its scope or its trouble,
+// and a control at its end
 export function BoardRow({
   label,
   note,
   stale,
+  action,
 }: {
   label: string;
   note?: ComponentChildren;
   stale?: boolean;
+  action?: ComponentChildren;
 }) {
   return (
     <div class={`overview-section${stale ? " overview-section-stale" : ""}`}>
       <span class="label">{label}</span>
       {note && <span class="overview-section-note">{note}</span>}
+      {action && <span class="overview-section-action">{action}</span>}
     </div>
   );
 }
@@ -147,23 +152,17 @@ export function Trouble({
 }
 
 export function NowRow() {
-  const load = serverLoad.value;
+  // a server just started has its baseline and no sample yet, which
+  // would draw as 0% and 0 B: the row keeps its bones until one lands
+  const read = serverLoad.value;
+  const load = read && read.samples.at.length > 0 ? read : null;
   const error = serverLoadError.value;
-  return (
-    <>
-      <BoardRow
-        label="Now"
-        stale={error !== null}
-        note={<Trouble error={error} at={load?.at ?? null} />}
-      />
-      {load ? (
-        <div class={error ? "overview-stale" : undefined}>
-          <NowTiles load={load} />
-        </div>
-      ) : (
-        <OverviewGhost at={0} />
-      )}
-    </>
+  return load ? (
+    <div class={error ? "overview-stale" : undefined}>
+      <NowTiles load={load} />
+    </div>
+  ) : (
+    <OverviewGhost at={0} />
   );
 }
 

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What runs over time, drawn by uPlot, its one importer: a sparkline
-// for a tile and bars over days stacked by part with a key.
+// for a tile, bars over days stacked by part and lines over days, each
+// with a key.
 //
 // A plot lives in a ref: made on mount with a ResizeObserver, fed by a
 // second effect, destroyed on unmount. Its colours are tokens read at
@@ -15,6 +16,7 @@ import "uplot/dist/uPlot.min.css";
 import { theme } from "../app/theme.ts";
 import { dayMonth } from "../lib/format.ts";
 import "./chart.css";
+import { DayPlot } from "./DayPlot.tsx";
 
 const token = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -216,10 +218,67 @@ export function Spark({
 }
 
 export type DaySeries = { label: string; values: number[] };
+export type DayLine = { label: string; values: (number | null)[] };
 
-// a stack's parts, bottom first: the bars' grey, the softer grey
-// nearer the card, and the brand colour on top, as the key's swatches
-const STACK_TOKENS = ["--heat-3", "--heat-2", "--brand"];
+// a stack's parts, bottom first, as the key's swatches: the tokens' two
+// greys and the brand colour on top; activity's greys and failed on top
+const STACKS = {
+  tokens: ["--heat-3", "--heat-2", "--brand"],
+  activity: ["--heat-3", "--heat-2", "--failed"],
+};
+export type Stack = keyof typeof STACKS;
+// the lines, first drawn over the second
+const LINE_TOKENS = ["--brand", "--heat-3"];
+
+const font = () => `${token("--text-tiny")} ${token("--mono")}`;
+
+// the day axis and the value axis both day plots draw
+function dayAxes(
+  say: { current: (value: number) => string },
+  incrs?: number[],
+): uPlot.Axis[] {
+  const axis = {
+    stroke: () => token("--faint"),
+    ticks: { show: false },
+    gap: 6,
+  };
+  return [
+    {
+      ...axis,
+      font: font(),
+      size: 24,
+      grid: { show: false },
+      // a tick on a day, never between two, every few days when they
+      // would crowd
+      splits: (u) => {
+        const all = u.data[0] as number[];
+        const room = Math.max(
+          1,
+          Math.floor(u.bbox.width / devicePixelRatio / 64),
+        );
+        const step = Math.max(1, Math.ceil(all.length / room));
+        return all.filter((_, i) => (all.length - 1 - i) % step === 0);
+      },
+      values: (_u, splits) => splits.map((t) => dayMonth(t * 1000)),
+    },
+    {
+      ...axis,
+      font: font(),
+      size: 52,
+      space: 32,
+      grid: { stroke: () => token("--line"), width: 1 },
+      ...(incrs ? { incrs } : {}),
+      values: (_u, splits) => splits.map((v) => say.current(v)),
+    },
+  ];
+}
+
+const dayCursor = (sync?: string): uPlot.Cursor => ({
+  ...(sync ? { sync: { key: sync, setSeries: false } } : {}),
+  drag: { x: false, y: false },
+  y: false,
+  points: { show: false },
+});
 
 // Bars over days with their parts stacked, bottom first and without a
 // gap, on one y axis in the units words gives, and a key above them.
@@ -232,6 +291,7 @@ export function DayBars({
   words,
   onCursor,
   sync,
+  stack = "tokens",
 }: {
   // names the table a screen reader reads in place of the plot
   label: string;
@@ -243,12 +303,15 @@ export function DayBars({
   words: (value: number) => string;
   onCursor: (index: number | null) => void;
   sync?: string;
+  // the parts' colours
+  stack?: Stack;
 }) {
   const hear = useRef(onCursor);
   hear.current = onCursor;
   const say = useRef(words);
   say.current = words;
   const parts = series.length;
+  const colours = STACKS[stack];
 
   const { box, plot } = usePlot(
     (el) => {
@@ -256,59 +319,21 @@ export function DayBars({
       // is drawn over it, so the top series holds the column's box
       const bars = fadeBars(28);
       const plain = uPlot.paths.bars?.({ size: [0.72, 28], radius: [0, 0] });
-      const font = () => `${token("--text-tiny")} ${token("--mono")}`;
-      const axis = {
-        stroke: () => token("--faint"),
-        ticks: { show: false },
-        gap: 6,
-      };
-      const u = new uPlot(
+      return new uPlot(
         {
           width: el.clientWidth,
           height: el.clientHeight,
           legend: { show: false },
-          cursor: {
-            ...(sync ? { sync: { key: sync, setSeries: false } } : {}),
-            drag: { x: false, y: false },
-            y: false,
-            points: { show: false },
-          },
+          cursor: dayCursor(sync),
           scales: {
             x: { time: true, range: padded },
             y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] },
           },
-          axes: [
-            {
-              ...axis,
-              font: font(),
-              size: 24,
-              grid: { show: false },
-              // a tick on a day, never between two, every few days when
-              // they would crowd
-              splits: (u) => {
-                const all = u.data[0] as number[];
-                const room = Math.max(
-                  1,
-                  Math.floor(u.bbox.width / devicePixelRatio / 64),
-                );
-                const step = Math.max(1, Math.ceil(all.length / room));
-                return all.filter((_, i) => (all.length - 1 - i) % step === 0);
-              },
-              values: (_u, splits) => splits.map((t) => dayMonth(t * 1000)),
-            },
-            {
-              ...axis,
-              font: font(),
-              size: 52,
-              space: 32,
-              grid: { stroke: () => token("--line"), width: 1 },
-              values: (_u, splits) => splits.map((v) => say.current(v)),
-            },
-          ],
+          axes: dayAxes(say),
           series: [
             {},
             ...Array.from({ length: parts }, (_, k) => {
-              const name = STACK_TOKENS[parts - 1 - k] ?? "--heat-3";
+              const name = colours[parts - 1 - k] ?? "--heat-3";
               return {
                 stroke: () => token(name),
                 fill: () => token(name),
@@ -331,9 +356,8 @@ export function DayBars({
         [[], ...Array.from({ length: parts }, () => [] as number[])],
         el,
       );
-      return u;
     },
-    [parts, sync],
+    [parts, sync, stack],
   );
 
   useLayoutEffect(() => {
@@ -348,41 +372,100 @@ export function DayBars({
   }, [days, series]);
 
   return (
-    <div class="chart-days">
-      <div class="chart-key" aria-hidden="true">
-        {series.map((s, k) => (
-          <span key={s.label} class="chart-key-item">
-            <span class={`chart-swatch chart-key-${k + 1}`} />
-            {s.label}
-          </span>
-        ))}
-      </div>
-      <div class="chart-plot" ref={box} aria-hidden="true" />
-      <div class="chart-table">
-        <table>
-          <caption>{label}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Day</th>
-              {series.map((s) => (
-                <th key={s.label} scope="col">
-                  {s.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {days.map((d, i) => (
-              <tr key={d}>
-                <th scope="row">{dayMonth(d)}</th>
-                {series.map((s) => (
-                  <td key={s.label}>{words(s.values[i] ?? 0)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DayPlot
+      label={label}
+      days={days}
+      series={series}
+      swatch={(k) => `chart-key-${stack}-${k + 1}`}
+      words={words}
+      box={box}
+    />
+  );
+}
+
+// Lines over days on one y axis from zero, the first drawn over the
+// second, a gap where a day has no value and a point on every day. The cursor marks the day and
+// onCursor hears it; a sync key shares it with the rest of the board.
+export function DayLines({
+  label,
+  days,
+  series,
+  words,
+  onCursor,
+  sync,
+  steps,
+}: {
+  label: string;
+  days: number[];
+  // at most two, the first on top
+  series: DayLine[];
+  words: (value: number) => string;
+  onCursor: (index: number | null) => void;
+  sync?: string;
+  // the value axis's round steps, in the values' unit
+  steps?: number[];
+}) {
+  const hear = useRef(onCursor);
+  hear.current = onCursor;
+  const say = useRef(words);
+  say.current = words;
+  const count = series.length;
+
+  const { box, plot } = usePlot(
+    (el) =>
+      new uPlot(
+        {
+          width: el.clientWidth,
+          height: el.clientHeight,
+          legend: { show: false },
+          cursor: {
+            ...dayCursor(sync),
+            x: true,
+            points: { size: 7, fill: () => token("--card") },
+          },
+          scales: {
+            x: { time: true, range: padded },
+            y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.15 : 1] },
+          },
+          axes: dayAxes(say, steps),
+          // the first series last, so it draws on top
+          series: [
+            {},
+            ...Array.from({ length: count }, (_, k) => {
+              const name = LINE_TOKENS[count - 1 - k] ?? "--heat-3";
+              return {
+                stroke: () => token(name),
+                width: 1.5,
+                // a day between two without a value is a point alone
+                points: { show: true, size: 3, fill: () => token(name) },
+              };
+            }),
+          ],
+          hooks: {
+            setCursor: [(u) => hear.current(u.cursor.idx ?? null)],
+          },
+        },
+        [[], ...Array.from({ length: count }, () => [] as number[])],
+        el,
+      ),
+    [count, sync, steps],
+  );
+
+  useLayoutEffect(() => {
+    plot.current?.setData([
+      days.map((d) => d / 1000),
+      ...[...series].reverse().map((s) => s.values),
+    ] as uPlot.AlignedData);
+  }, [days, series]);
+
+  return (
+    <DayPlot
+      label={label}
+      days={days}
+      series={series}
+      swatch={(k) => `chart-key-line-${k + 1}`}
+      words={words}
+      box={box}
+    />
   );
 }

@@ -105,13 +105,15 @@ client change. What each page draws is in `docs/views.md`.
   hint its own line. The card clips nothing, so a select's list opens
   past it.
 - **A dashboard is a board, not rows.** The admin's Monitor (`/monitor`,
-  the zone's own page: rows Now, Last 30 days and All time) and
-  Storage (`/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
+  the zone's own page, headed `Monitor / Live`: the live tiles, Needs
+  attention and Stats), Usage (`/monitor/usage`) and Storage (`/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
   figure at `--text-figure`) over `ui/Chart.tsx` panels in a grid:
-  `ChartPanel` wears the Rows card head, `Bars` rank from one baseline
+  `ChartPanel` wears the Rows card head (a day plot's passes `hintBelow`, so
+  on a phone its hint that follows the pointer has its own line and
+  never moves the plot), `Bars` rank from one baseline
   in CSS, `Stack` splits a whole, and `ui/Plot.tsx` has uPlot draw what
-  runs over days, `Spark` in a tile and `DayBars` stacked with a key and
-  a table for a screen reader; a plot is made on mount through
+  runs over days, `Spark` in a tile, `DayBars` stacked and `DayLines`,
+  each with a key and a table for a screen reader (`ui/DayPlot.tsx`); a plot is made on mount through
   `usePlot()` inside `ui/Plot.tsx`, fed by a second effect, its colours
   tokens read at every draw, and tiles share their cursor by sync key.
   The board's rows are `.chart-board` (`.chart-board-ghost` while it
@@ -121,10 +123,12 @@ client change. What each page draws is in `docs/views.md`.
   the answer was read, Refresh). A first load draws the board in
   `ui/Bones.tsx` bones at the loaded sizes, never a Loading line; a
   later Storage load keeps the last answer faded until the next lands.
-  `data/overview.ts` loads Storage on arrival and on Refresh. The
-  Overview keeps itself current and has no head actions: a failed read
+  `data/overview.ts` loads Storage on arrival and on Refresh, and a
+  Usage month on arrival; a new month keeps the last one faded. The
+  Overview keeps itself current and has no Refresh: a failed read
   keeps a row's last answer faded, its head saying since when in the
-  failed colour.
+  failed colour; the page head is `Loaded` as Storage's, the time of
+  the last live poll and Refresh, which reads every row again.
 
 ## Lists
 
@@ -305,7 +309,9 @@ client change. What each page draws is in `docs/views.md`.
   step, in its own case, cut at 24 characters and giving way before the
   title; a phone keeps the nearest step and the title). A file's crumb
   past two folders folds the middle ones into `…`, which leads to the
-  deepest of them. A page whose content is a `Split` passes `split`, so
+  deepest of them. Beside a crumb the actions take no height and centre
+  on its line, so a crumb sits in the same place on every page whatever
+  its controls' height. A page whose content is a `Split` passes `split`, so
   the head's row, its actions and notice included, ends where the main
   column does and nothing sits over the aside. `test/client/ui/page-split.test.ts`
   fails a view whose `Page` has `actions` or `notice` over a `Split`

@@ -1,0 +1,86 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the head's month between its arrows: one framed control, as a
+     segmented button, so the arrows read as buttons */
+  .usage-months {
+    display: flex;
+    align-items: stretch;
+    height: 32px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--card);
+  }
+  .usage-month {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 128px;
+    padding: 0 var(--space-2);
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    font-size: var(--text-ui);
+    font-weight: 500;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+  .usage-month-short {
+    display: none;
+  }
+  .usage-months .usage-step {
+    position: relative;
+    width: 32px;
+    height: 100%;
+    border-radius: 0;
+    color: var(--fg);
+  }
+  .usage-months .usage-step:first-child {
+    border-top-left-radius: var(--radius);
+    border-bottom-left-radius: var(--radius);
+  }
+  .usage-months .usage-step:last-child {
+    border-top-right-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+  }
+  .usage-months .usage-step-off {
+    color: var(--faint);
+    opacity: 0.4;
+    cursor: default;
+  }
+  .usage-months .usage-step-off:hover {
+    background: transparent;
+  }
+  /* the last month stays on screen, faded, while another loads */
+  .usage-stale {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+
+  /* a phone's head keeps the crumb whole: the short month */
+  @media (max-width: 719px) {
+    .usage-month {
+      min-width: 76px;
+    }
+    .usage-month-long {
+      display: none;
+    }
+    .usage-month-short {
+      display: inline;
+    }
+  }
+
+  /* a touch: 40px drawn, a 44px tap reaching past the frame */
+  @media (pointer: coarse) {
+    .usage-months {
+      height: 40px;
+    }
+    .usage-months .usage-step {
+      width: 44px;
+    }
+    .usage-months .usage-step::after {
+      content: "";
+      position: absolute;
+      inset: -3px 0;
+    }
+  }
+}
