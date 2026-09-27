@@ -124,7 +124,11 @@ client change. What each page draws is in `docs/views.md`.
   inset in a form or an open row; a `RowsList` of one row keeps its
   ground on hover and open, the chevron and the words lighting instead.
   A row is `RowsOpen` (opens in
-  place; `end` sits outside its toggle, `off` makes the name faint),
+  place; as it opens `reveal()` in `lib/scroll.ts` puts its head back
+  where it was clicked, since a row above may have closed, then shows
+  as much of it as fits, the head never under the page head; `end`
+  sits outside its toggle, `off` makes the name faint; in
+  `ui/RowsOpen.tsx`),
   `RowsGo` (a link, `end` for a button outside it),
   `RowsButton` (an action) or `RowsLine` (neither; `as="label"` for a
   pick, `off` when it cannot be picked, `flush` to start at the edge
