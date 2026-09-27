@@ -277,6 +277,7 @@ describe("the pages", () => {
     deciders.value = [judge, small];
     decisions.value = [own];
     const html = render(<DecisionList />);
+    expect(html).not.toContain("rows-item-off");
     expect(html).toContain('aria-label="Decisions"');
     expect(html).toContain('placeholder="Search decisions"');
     expect(html).toContain('href="/config/decisions/run-attention"');
@@ -293,6 +294,8 @@ describe("the pages", () => {
     deciders.value = [];
     decisions.value = [plain];
     const html = render(<DecisionList />);
+    // an off decision's name goes faint
+    expect(html).toContain('class="rows-item rows-item-off"');
     expect(html).toContain("Mark task runs that need attention");
     expect(html).toContain(">off until a decider is added");
   });

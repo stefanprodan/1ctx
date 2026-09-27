@@ -25,6 +25,7 @@ import {
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
 import { DeciderList } from "../../../src/client/views/admin/DeciderLists.tsx";
+import { DeciderDrafts } from "../../../src/client/views/admin/DeciderPage.state.ts";
 import { DeciderPage } from "../../../src/client/views/admin/DeciderPage.tsx";
 import {
   askedBy,
@@ -37,12 +38,14 @@ import {
   heldProvider,
   inputPriceLine,
   NO_DECIDERS,
-  providerProblem,
 } from "../../../src/client/views/admin/Deciders.model.ts";
 import { NewDecider } from "../../../src/client/views/admin/NewDecider.tsx";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
 import type { DecisionSummary } from "../../../src/shared/contracts/decision.ts";
-import type { ProviderSummary } from "../../../src/shared/contracts/provider.ts";
+import type {
+  CatalogMatch,
+  ProviderSummary,
+} from "../../../src/shared/contracts/provider.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 
 const admin: Me = {
@@ -194,18 +197,16 @@ describe("the words", () => {
     }
   });
 
-  test.serial("the form holds an offered provider while there is one", () => {
-    expect(heldProvider([router, local], "pr2")).toBe("pr2");
-    // the picked one deleted on the same page
-    expect(heldProvider([router, local], "pr9")).toBe("pr1");
-    expect(heldProvider([local], "")).toBe("pr2");
-    expect(heldProvider([], "pr1")).toBe("");
-    expect(providerProblem([router], "pr1")).toBeNull();
-    expect(providerProblem([], "")).toBe(
-      "Add an OpenRouter or OpenAI-compatible provider first",
-    );
-    expect(providerProblem([router], "")).toBe("Pick a provider");
-  });
+  test.serial(
+    "New decider holds an offered provider while there is one",
+    () => {
+      expect(heldProvider([router, local], "pr2")).toBe("pr2");
+      // the picked one deleted meanwhile
+      expect(heldProvider([router, local], "pr9")).toBe("pr1");
+      expect(heldProvider([local], "")).toBe("pr2");
+      expect(heldProvider([], "pr1")).toBe("");
+    },
+  );
 });
 
 describe("the entity", () => {
@@ -416,5 +417,79 @@ describe("the Delete line", () => {
     expect(askedBy({ id: "d2", default: false }, [named, none])).toEqual([
       named,
     ]);
+  });
+});
+
+describe("a decider's drafts", () => {
+  const kev: CatalogMatch = {
+    id: "vendor/kev-4b",
+    name: "Kev 4B",
+    contextLength: 8192,
+    promptPrice: 0.04,
+    completionPrice: null,
+    tools: false,
+    reasoning: false,
+    thinkingRequired: false,
+    reasoningKnown: true,
+    described: true,
+  };
+
+  test("Change, Cancel and a pick", () => {
+    const d = DeciderDrafts.of(judge);
+    expect(d.cancellable).toBe(false);
+    d.change();
+    expect(d.changing.value).toBe(true);
+    expect(d.cancellable).toBe(true);
+    // another provider's catalog: the model goes with the old one
+    d.chooseProvider("pr2");
+    expect(d.model.value).toBeNull();
+    expect(d.modelDirty(judge)).toBe(true);
+    d.cancel();
+    expect(d.providerId.value).toBe("pr1");
+    expect(d.model.value?.id).toBe("vendor/judge-1");
+    expect(d.changing.value).toBe(false);
+    d.change();
+    d.pick(kev);
+    expect(d.model.value).toEqual({
+      id: "vendor/kev-4b",
+      contextLength: 8192,
+      promptPrice: kev.promptPrice,
+    });
+    expect(d.changing.value).toBe(false);
+    expect(d.modelDirty(judge)).toBe(true);
+    d.resetModel(judge);
+    expect(d.modelDirty(judge)).toBe(false);
+  });
+
+  test("New decider opens on the search with nothing to take back", () => {
+    const d = DeciderDrafts.blank("pr1");
+    expect(d.changing.value).toBe(true);
+    expect(d.cancellable).toBe(false);
+    expect(d.deciderId).toBeNull();
+  });
+
+  test("a row changed under the page carries what the admin left", () => {
+    const d = DeciderDrafts.of(judge);
+    d.name.value = "judge-2";
+    d.follow(judge, { ...judge, name: "renamed", default: false });
+    // the typed name stays, the untouched mark follows
+    expect(d.name.value).toBe("judge-2");
+    expect(d.isDefault.value).toBe(false);
+    d.follow(judge, { ...judge, model: "vendor/other" });
+    expect(d.model.value?.id).toBe("vendor/other");
+  });
+
+  test("a card's save holds the others until it answers", async () => {
+    const d = DeciderDrafts.of(judge);
+    let done: () => void = () => {};
+    const saving = d.save(() => new Promise<void>((r) => (done = r)));
+    expect(d.saving.value).toBe(true);
+    done();
+    await saving;
+    expect(d.saving.value).toBe(false);
+    await expect(
+      d.save(() => Promise.reject(new Error("no"))),
+    ).rejects.toThrow();
+    expect(d.saving.value).toBe(false);
   });
 });

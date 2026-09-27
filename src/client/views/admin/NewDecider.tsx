@@ -3,11 +3,12 @@
 //
 // New decider: the name and the model in one card with one Create, as
 // New agent. The search opens on the default decider's provider, else
-// the first by name that answers decisions. Create opens the decider's page; the first decider is the
-// default, and the mark moves on a decider's page.
+// the first by name that answers decisions. Create opens the decider's
+// page; the first decider is the default, and the mark moves on a
+// decider's page.
 
 import { useEffect, useRef } from "preact/hooks";
-import { navigate } from "../../app/router.ts";
+import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { createDecider, deciders } from "../../data/deciders.ts";
 import { providers, providersError } from "../../data/providers.ts";
@@ -25,7 +26,7 @@ import { DeciderDrafts } from "./DeciderPage.state.ts";
 import {
   deciderFieldOf,
   deciderProviders,
-  providerProblem,
+  heldProvider,
 } from "./Deciders.model.ts";
 import "./decider-page.css";
 
@@ -70,12 +71,13 @@ function Form({ providerId }: { providerId: string }) {
   if (drafts.current === null) drafts.current = DeciderDrafts.blank(providerId);
   const d = drafts.current;
   const save = useSave(async () => {
+    const from = address();
     const created = await createDecider({
       name: d.name.value.trim(),
       providerId: d.providerId.value,
       model: d.model.value?.id ?? "",
     });
-    navigate(configDeciderHref(created.name));
+    if (address() === from) navigate(configDeciderHref(created.name));
   }, deciderFieldOf);
   const form = useRef<HTMLFormElement>(null);
   useFocusField(save, form);
@@ -84,20 +86,26 @@ function Form({ providerId }: { providerId: string }) {
   useEffect(() => {
     if (!touch()) nameField.current?.focus();
   }, []);
+  // the provider the search opened on may be deleted meanwhile: the
+  // first left that answers decisions stands in
+  const rows = providers.value;
+  useEffect(() => {
+    const next = heldProvider(
+      byName(deciderProviders(rows ?? [])),
+      d.providerId.value,
+    );
+    if (next !== d.providerId.value) d.chooseProvider(next);
+  }, [rows]);
   const name = d.name.value.trim();
   const taken = (deciders.value ?? []).some((x) => x.name === name);
-  const offered = deciderProviders(providers.value ?? []);
   return (
     <form
       ref={form}
       class="decider-page"
       onSubmit={(e) => {
         e.preventDefault();
-        void save.run(
-          at("name", nameProblem(d.name.value)) ??
-            at("provider", providerProblem(offered, d.providerId.value)) ??
-            at("model", d.model.value === null ? "Pick a model" : null),
-        );
+        // Create waits for a model, so only the name's rule is left
+        void save.run(at("name", nameProblem(d.name.value)));
       }}
     >
       <Setting

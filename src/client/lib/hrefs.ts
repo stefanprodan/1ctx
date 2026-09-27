@@ -20,6 +20,11 @@ export function configProviderHref(name: string): string {
   return `/config/providers/${encodeURIComponent(name)}`;
 }
 
+// New agent, opened on a provider's models
+export function newAgentHref(provider: string): string {
+  return `/config/agents?new&provider=${encodeURIComponent(provider)}`;
+}
+
 // a decider's page, and a decision's, under Config
 export function configDeciderHref(name: string): string {
   return `/config/deciders/${encodeURIComponent(name)}`;

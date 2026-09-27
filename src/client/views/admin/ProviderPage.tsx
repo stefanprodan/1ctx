@@ -11,10 +11,10 @@ import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
 import type { Params } from "../../app/params.ts";
-import { navigate } from "../../app/router.ts";
+import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
-import { deciders } from "../../data/deciders.ts";
+import { deciders, decidersError } from "../../data/deciders.ts";
 import {
   deleteProvider,
   providers,
@@ -27,6 +27,7 @@ import {
   configAgentHref,
   configDeciderHref,
   configProviderHref,
+  newAgentHref,
 } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
@@ -49,7 +50,9 @@ const STEPS = [
 export function ProviderPage({ params }: { params: Params }) {
   const list = providers.value;
   const provider = list?.find((p) => p.name === params.name) ?? null;
-  const error = providersError.value ?? agentsError.value;
+  // Used by and Delete name the deciders too, so the page waits for them
+  const error =
+    providersError.value ?? agentsError.value ?? decidersError.value;
   return (
     <Page
       steps={STEPS}
@@ -57,7 +60,10 @@ export function ProviderPage({ params }: { params: Params }) {
       titleMono
       menu={provider !== null ? <Switcher provider={provider} /> : undefined}
       split
-      loading={(list === null || agents.value === null) && error === null}
+      loading={
+        (list === null || agents.value === null || deciders.value === null) &&
+        error === null
+      }
       empty={
         list !== null && provider === null
           ? "No provider by that name."
@@ -169,10 +175,7 @@ function UsedBy({ provider }: { provider: ProviderSummary }) {
         title="Used by"
         line="No agent or decider runs on it yet."
         action={
-          <a
-            class="btn btn-small"
-            href={`/config/agents?new&provider=${encodeURIComponent(provider.name)}`}
-          >
+          <a class="btn btn-small" href={newAgentHref(provider.name)}>
             <Icon name="plus" size={14} />
             New agent
           </a>
@@ -252,8 +255,9 @@ function DeleteCard({ provider }: { provider: ProviderSummary }) {
               // takes this card away before act answers: the call leaves
               onDelete={() => {
                 void save.act("delete", async () => {
+                  const from = address();
                   await deleteProvider(provider.id);
-                  navigate("/config/providers");
+                  if (address() === from) navigate("/config/providers");
                 });
               }}
             />

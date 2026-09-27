@@ -9,7 +9,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Wire } from "../../../shared/words.ts";
-import { navigate } from "../../app/router.ts";
+import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
   createProvider,
@@ -94,8 +94,9 @@ function Form() {
     if (!touch()) nameField.current?.focus();
   }, []);
   const save = useSave(async () => {
+    const from = address();
     const created = await createProvider(body());
-    navigate(configProviderHref(created.name));
+    if (address() === from) navigate(configProviderHref(created.name));
   }, providerFieldOf);
   useFocusField(save, form);
   const invalid = (field: string) => save.fieldError(field) !== null;

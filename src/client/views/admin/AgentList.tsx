@@ -22,7 +22,7 @@ import {
   loadAgents,
 } from "../../data/agents.ts";
 import { servers } from "../../data/mcp.ts";
-import { overview } from "../../data/overview.ts";
+import { overview, overviewError } from "../../data/overview.ts";
 import { providers, providersError } from "../../data/providers.ts";
 import { skills } from "../../data/skills.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
@@ -251,7 +251,9 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
         }
       >
         {totals === null ? (
-          <p class="split-empty">Loading</p>
+          <p class="split-empty">
+            {overviewError.value === null ? "Loading" : "Did not load."}
+          </p>
         ) : (
           <>
             <AsideLine label="Turns">

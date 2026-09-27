@@ -9,7 +9,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import { navigate } from "../../app/router.ts";
+import { address, navigate } from "../../app/router.ts";
 import {
   agents,
   deleteAgent,
@@ -162,8 +162,9 @@ function DeleteCard({
               // this card away before act answers: the call leaves
               onDelete={() => {
                 void save.act("delete", async () => {
+                  const from = address();
                   await deleteAgent(agent.id);
-                  navigate("/config/agents");
+                  if (address() === from) navigate("/config/agents");
                 });
               }}
             />

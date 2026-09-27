@@ -15,6 +15,10 @@ const here = () =>
 export const path = signal(here().pathname);
 export const query = signal(here().search);
 
+// where the page is now, the path and the query: a call that answers
+// after the admin went elsewhere compares it before it navigates
+export const address = (): string => path.value + query.value;
+
 // "to" is a path with an optional query; the pathname and the query
 // land in their own signals so a route matches on the pathname alone
 export function navigate(to: string, replace = false): void {

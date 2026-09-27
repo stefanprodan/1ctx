@@ -28,17 +28,6 @@ export function heldProvider(
   return offered.some((p) => p.id === picked) ? picked : (offered[0]?.id ?? "");
 }
 
-// the provider field's check before a save
-export function providerProblem(
-  offered: ProviderSummary[],
-  picked: string,
-): string | null {
-  if (picked !== "") return null;
-  return offered.length === 0
-    ? "Add an OpenRouter or OpenAI-compatible provider first"
-    : "Pick a provider";
-}
-
 // "$0.04 input" per million tokens, "free" at zero, empty when the
 // catalog did not say; a decision's output costs nothing
 export function inputPriceLine(promptPrice: number | null): string {
