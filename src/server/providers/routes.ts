@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The providers, all for admins: the list, a new one, its deletion and
-// the catalog search, and who serves a model behind OpenRouter. A provider an agent runs on cannot go; whether
-// one does is the agents port's answer.
+// the catalog search, and who serves a model behind OpenRouter. A
+// provider an agent or a decider runs on cannot go; whether one does is
+// the agents and deciders ports' answer.
 
 import type {
   CatalogResponse,
@@ -16,11 +17,20 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { CatalogError, type Catalogs } from "./catalog.ts";
-import { parseModelQuery, parseProvider, parseQuery } from "./parse.ts";
+import { CatalogError, type Catalogs, servesDecisions } from "./catalog.ts";
+import {
+  parseKind,
+  parseModelQuery,
+  parseProvider,
+  parseQuery,
+} from "./parse.ts";
 import { type ProviderRow, type ProviderStore, summary } from "./store.ts";
 
 export type AgentsPort = {
+  usesProvider(providerId: string): boolean;
+};
+
+export type DecidersPort = {
   usesProvider(providerId: string): boolean;
 };
 
@@ -32,6 +42,7 @@ export type RoutesDeps = {
   hasSecret: (name: string) => boolean;
   keys: () => string[];
   agents: AgentsPort;
+  deciders: DecidersPort;
   clock: Clock;
 };
 
@@ -79,6 +90,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         if (deps.agents.usesProvider(provider.id)) {
           throw new Conflict(`an agent uses ${provider.name}`);
         }
+        if (deps.deciders.usesProvider(provider.id)) {
+          throw new Conflict(`a decider uses ${provider.name}`);
+        }
         deps.store.delete(provider.id);
         deps.catalogs.forget(provider.id);
         return json({});
@@ -91,10 +105,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(_req, ctx) {
         const provider = find(ctx.params.id);
         const q = parseQuery(ctx.url);
+        const kind = parseKind(ctx.url);
+        if (kind === "decisions" && !servesDecisions(provider.wire)) {
+          throw new BadRequest(`${provider.name} serves no decision models`);
+        }
         let matches: CatalogResponse["matches"] = [];
         if (q !== "") {
           try {
-            matches = await deps.catalogs.search(provider, q);
+            matches = await deps.catalogs.search(provider, q, kind);
           } catch (err) {
             if (err instanceof CatalogError) throw new BadGateway(err.message);
             throw err;

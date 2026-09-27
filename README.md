@@ -41,6 +41,7 @@ spec:
 | `User` | `role` (required), `fullName`, `email`, `tz`, `about`, `disabled`, `passwordFrom`, `mustChangePassword` |
 | `Project` | `description`, `members` (usernames); team projects only |
 | `Provider` | `wire`, `baseUrl`, `keyFrom` |
+| `Decider` | `provider`, `model`, `default` (only `true`) |
 | `Skill` | `url`, `fromIndex`, `path` (archives only) |
 | `McpServer` | `url`, `keyFrom`, `read`, `write`, `instructionsOn`, `timeoutMs`, `readPatterns`, `writePatterns`, `excludedPatterns` |
 | `Agent` | `provider`, `model`, `avatar`, `thinking`, `effort`, `prompt`, `skills`, `servers`, `mcpMode` |
@@ -54,8 +55,9 @@ bootstrapped from `user-admin.key`; provision uses that file to sign in as
 `admin` on every run, so it must match the account's current password.
 
 A new provider requires `wire` and `baseUrl`; a new skill or MCP server
-requires `url`; a new agent requires `provider` and `model`. `keyFrom`
-names a `provider-` or `mcp-` key file without `.key`, or is null.
+requires `url`; a new agent or decider requires `provider` and
+`model`. `keyFrom` names a `provider-` or `mcp-` key file without
+`.key`, or is null.
 Providers and skill sources cannot be changed. Skills are fetched on
 creation: `metadata.name` must match the fetched name, or select an entry
 when `fromIndex: true`. MCP servers are discovered on creation and endpoint
@@ -67,7 +69,8 @@ An agent references providers, skills and MCP servers by name. Its
 false); at least one side must be on. New agents default to `avatar: bot`,
 `thinking: null`, `effort: null`, `mcpMode: auto`, an empty prompt and no
 skills or servers. Model catalogs and per-wire effort levels are checked
-at apply time.
+at apply time; a decider's model against its provider's decisions
+catalog, on an `openrouter` or `openai-compatible` provider.
 
 Omitted fields are preserved on existing objects, except `User.disabled`,
 which defaults to false. Supplied lists replace the whole membership;

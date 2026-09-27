@@ -80,7 +80,7 @@ describe("provision through the composed app", () => {
       expect(lines[0]).toBe("bootstrapped user/admin from user-admin.key");
       // the bootstrapped admin is not an object in the file, so it is
       // said on its own line and counted nowhere
-      expect(counts.created).toBe(7);
+      expect(counts.created).toBe(8);
       expect(counts.created + counts.updated + counts.unchanged).toBe(
         docs.length,
       );
@@ -92,6 +92,7 @@ describe("provision through the composed app", () => {
         "project",
         "credential",
         "provider",
+        "decider",
         "skill",
         "mcpserver",
         "agent",
@@ -137,7 +138,17 @@ describe("provision through the composed app", () => {
         skills: [skill.id],
         servers: [{ serverId: server.id, read: true, write: false }],
       });
+      expect(app.deciders.store.byName("judge")).toMatchObject({
+        providerId: app.providers.list()[0]!.id,
+        model: "fake-decider",
+        contextLength: null,
+        promptPrice: null,
+        default: true,
+      });
       expect(fake.calls).toContain(`${MODEL_URL}/models`);
+      expect(fake.calls).toContain(
+        `${MODEL_URL}/models?output_modalities=decisions`,
+      );
       expect(fake.calls).toContain(SKILL_URL);
       expect(fake.calls).toContain(MCP_URL);
       expect(loginCount(app.db)).toBe(0);
@@ -311,6 +322,52 @@ describe("provision through the composed app", () => {
           object("Agent", "second", { default: true }),
         ),
       ).toThrow("Agent/second: spec.default is also set on Agent/guide");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("marks a decider as the default and checks its model live", async () => {
+    const { app } = await instance();
+    try {
+      await app.provision.apply(await fullDocuments(), ignore);
+      const second = object("Decider", "second", {
+        provider: "mock-provider",
+        model: "fake-decider-next",
+        default: true,
+      });
+      await app.provision.apply(documents(second), ignore);
+      expect(app.deciders.store.byName("second")!.default).toBe(true);
+      expect(app.deciders.store.byName("judge")!.default).toBe(false);
+      const actions: string[] = [];
+      await app.provision.apply(documents(second), (line) =>
+        actions.push(line),
+      );
+      expect(actions.join("\n")).toContain("unchanged");
+      // left out, the mark stays
+      await app.provision.apply(
+        documents(object("Decider", "second", { model: "fake-decider" })),
+        ignore,
+      );
+      expect(app.deciders.store.byName("second")).toMatchObject({
+        model: "fake-decider",
+        default: true,
+      });
+      await expect(
+        app.provision.apply(
+          documents(object("Decider", "second", { model: "fake-model" })),
+          ignore,
+        ),
+      ).rejects.toThrow("does not list fake-model as a decision model");
+      expect(() =>
+        documents(
+          object("Decider", "judge", { default: true }),
+          object("Decider", "second", { default: true }),
+        ),
+      ).toThrow("Decider/second: spec.default is also set on Decider/judge");
+      expect(() =>
+        documents(object("Decider", "judge", { default: false })),
+      ).toThrow("spec.default");
     } finally {
       await app.shutdown();
     }

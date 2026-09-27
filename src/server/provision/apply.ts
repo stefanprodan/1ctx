@@ -24,6 +24,7 @@ import type { ToolsResponse } from "../../shared/api/tools.ts";
 import type { UsersResponse } from "../../shared/api/users.ts";
 import type { SecretKind } from "../../shared/words.ts";
 import { type Client, difference } from "./client.ts";
+import { decider } from "./decider.ts";
 import { type Document, KINDS } from "./parse.ts";
 
 export type Action = "created" | "updated" | "unchanged";
@@ -429,6 +430,9 @@ export async function apply(
             break;
           case "Provider":
             action = await provider(api, doc);
+            break;
+          case "Decider":
+            action = await decider(api, doc);
             break;
           case "Skill":
             action = await skill(api, doc);

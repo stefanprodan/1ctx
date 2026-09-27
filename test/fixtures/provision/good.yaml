@@ -42,6 +42,15 @@ spec:
   keyFrom: null
 ---
 apiVersion: config.1ctx.dev/v1
+kind: Decider
+metadata:
+  name: judge
+spec:
+  provider: mock-provider
+  model: fake-decider
+  default: true
+---
+apiVersion: config.1ctx.dev/v1
 kind: Skill
 metadata:
   name: paper-skill

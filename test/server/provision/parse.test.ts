@@ -29,6 +29,7 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   Project: [],
   Credential: [],
   Provider: [],
+  Decider: [],
   Skill: [],
   McpServer: [],
   Agent: [],
@@ -62,7 +63,7 @@ function check(docs: Document[], existing: Partial<Inventory> = {}) {
 }
 
 describe("provision documents", () => {
-  test("parses all seven kinds and resolves forward references without I/O", async () => {
+  test("parses every kind and resolves forward references without I/O", async () => {
     const docs = parse([await fixture("good")]);
     expect([...new Set(docs.map((doc) => doc.kind))]).toEqual([...KINDS]);
     expect(docs.every((doc) => doc.source === `${ROOT}/good.yaml`)).toBe(true);
@@ -402,6 +403,7 @@ describe("provision preflight", () => {
     ["Skill", "paper-skill", {}, "url"],
     ["McpServer", "toolbox", {}, "url"],
     ["Agent", "guide", {}, "provider"],
+    ["Decider", "judge", {}, "provider"],
   ] satisfies [Kind, string, unknown, string][])(
     "new %s requires creation fields, an update does not",
     (kind, name, spec, field) => {
@@ -410,6 +412,19 @@ describe("provision preflight", () => {
       check(docs, { [kind]: [name] });
     },
   );
+
+  test("a Decider names a provider that exists or is in the input", () => {
+    const docs = parse([
+      source("Decider", "judge", { provider: "router", model: "m" }),
+    ]);
+    expect(() => check(docs)).toThrow(
+      "Decider/judge: spec.provider references missing Provider/router",
+    );
+    check(docs, { Provider: ["router"] });
+    expect(() =>
+      parse([source("Decider", "judge", { provider: "router", extra: 1 })]),
+    ).toThrow("spec.extra");
+  });
 
   test("checks every required new user field and the second provider/agent field", () => {
     const fields = {

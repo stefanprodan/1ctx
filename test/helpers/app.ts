@@ -25,6 +25,11 @@ import {
 import { clientAddress } from "../../src/server/web/serve.ts";
 import { isSecretName, SECRET_KINDS } from "../../src/shared/words.ts";
 import { memoryDb } from "./db.ts";
+import {
+  decisionsCatalog,
+  kevServeModels,
+  systemoneAnswer,
+} from "./systemone.ts";
 
 export const ORIGIN = "http://1ctx.test";
 // argon2id's least cost: every test app hashes and checks passwords,
@@ -42,6 +47,9 @@ export const GEMINI_URL = "http://models.test/v1beta";
 // its models (recorded from Groq)
 export const NIM_URL = "http://nim.test/v1";
 export const GROQ_URL = "http://groq.test/openai/v1";
+// a local decisions server on the openai-compatible wire, recorded from
+// kev.serve: TypeSafe's model list, which ignores the catalog's query
+export const KEV_URL = "http://kev.test/v1";
 
 const fixture = (...parts: string[]) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
@@ -111,6 +119,22 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
     calls.push({ url, headers, body });
     if (url === `${PROVIDER_URL}/models`) {
       return new Response(catalogBody(), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === `${PROVIDER_URL}/models?output_modalities=decisions`) {
+      return new Response(decisionsCatalog(), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === `${PROVIDER_URL}/systemone` || url === `${KEV_URL}/systemone`) {
+      return systemoneAnswer(body);
+    }
+    if (
+      url === `${KEV_URL}/models` ||
+      url === `${KEV_URL}/models?output_modalities=decisions`
+    ) {
+      return new Response(kevServeModels(), {
         headers: { "content-type": "application/json" },
       });
     }

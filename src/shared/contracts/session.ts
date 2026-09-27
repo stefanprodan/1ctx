@@ -48,6 +48,9 @@ export type SessionSummary = {
   // set once a chat is archived, for good; null while it takes turns,
   // and always for a run, which is read-only once it ends
   archived: { at: number; reason: ArchiveReason } | null;
+  // the chance, 0 to 1, that a finished run needs a person, as the
+  // default decider answered; null for a chat and a run not asked
+  attention: number | null;
 };
 
 // what the chat page says of an archived chat beyond the summary: who

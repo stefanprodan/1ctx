@@ -73,7 +73,9 @@ editor are in `docs/views.md`.
   `stopped`. The row keeps its last event (`last_event_*`) apart from
   its last run (`last_run_*`, written from the session row on
   `session.changed` and by `reconcile()` at start). The scheduler
-  starts after `sessions.repair()` and stops first at shutdown.
+  starts after `sessions.repair()` and stops first at shutdown. A run
+  that ends with cause `finish` is then asked whether it needs
+  attention, after it is `done` (`docs/sessions.md`).
 - **Deleting an automation keeps its runs unless asked.**
   Deleting an automation is a 409 while a run runs and leaves its
   runs, with `automation_id` set null; with `?runs=delete` it deletes

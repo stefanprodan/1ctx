@@ -27,10 +27,12 @@ pages are in `docs/views.md` and `docs/ui.md`.
   sweep only archives it; an archived chat and a run whose task is gone
   are cleaned as archived chats after `archivedDeleteDays`, and a
   living task's runs with its retention, each with its uploads and MCP
-  files. Usage is all kept, since no delete removes it.
-- **What goes and what stays.** Usage outlives every delete (a chat,
-  a run, an automation, a project, a regenerated turn), so the
-  overview's tokens and cost read `usage` alone and never fall; every
+  files. Usage and `decision_usage` are all kept, since no delete
+  removes them.
+- **What goes and what stays.** Usage and decisions outlive every
+  delete (a chat, a run, an automation, a project, a regenerated turn,
+  a decider), so the overview's tokens and cost read `usage` and
+  `decision_usage` alone and never fall; every
   deleted project is summed into one breakdown row, ranked like the
   others, and a retired agent keeps its own row and name;
   turns, runs and the models breakdown read `sends` and fall with a
@@ -66,8 +68,11 @@ pages are in `docs/views.md` and `docs/ui.md`.
   `started_at` and tokens, rounds and cost by `usage.created_at`, summed
   by quarter hour and laid on the zone's days in `overview.ts`; a
   breakdown sums tokens from `usage` and sends from `sends` apart and
-  joins them by key, so a send of many rounds counts once. The answer is
-  kept a minute per zone.
+  joins them by key, so a send of many rounds counts once. Decisions
+  are summed from `decision_usage` by `created_at` into `decisions`,
+  `decisionTokens` (input tokens), `pricedDecisions` and
+  `decisionCost` on the days, the totals and all time; `cost` stays
+  the rounds' alone. The answer is kept a minute per zone.
 - **Load is read from memory.**
   `GET /api/admin/load` (`admin`, no parameter) is read from memory at
   every request, never kept: the pools from `runner.registry.running()`
@@ -92,25 +97,27 @@ pages are in `docs/views.md` and `docs/ui.md`.
   automations the delete paused stay on the retired one until edited.
   Provisioning has no `Automation` object to move them: until someone
   picks a live agent on each, its resume, run now and any edit that
-  keeps the agent are 409s.
-  An `Agent` takes `default: true` and nothing
-  else there: a second in one apply is refused, and leaving it out
-  keeps the mark wherever it is. Tool objects configure `web` with mode and
-  domains, `websearch` with a nullable provider, and `visualize` with
-  its switch and hosts; webfetch is read-only. A `Credential`
-  (`keyFrom`, `url`, `header`, `value`, `methods`, `projects` by team
-  name) is applied after `Project`; its preflight checks the key file by
-  `readKey()`, refuses a personal or missing project, and checks the
-  per-project cap and prefix overlaps over the held rows with the input
-  laid on them. A `Project`'s `knowledge` names a folder relative to its
-  YAML file, never from stdin: `loadKnowledge()` in
-  `provision/knowledge.ts` reads it before validation, each file a doc
-  named by its path, the uploader's metadata left out and a symlink
-  refused; preflight checks the docs with the knowledge area's
-  `checkFile`, `checkNames` and `checkTotals` against the project's live
-  docs, and apply creates a missing doc or replaces one whose text
-  differs, never deleting one. Staging copies only the `knowledge/`
-  folder beside the YAML.
+  keeps the agent are 409s. An `Agent` takes `default: true` and nothing
+  else there: a second in one apply is refused, and leaving it out keeps
+  the mark wherever it is. A `Decider` (after `Provider`: `spec:
+  {provider, model, default?: true}`) takes the same default rule, and
+  its save checks the model against the live decisions catalog, so it
+  fails while a local server is down. Tool objects configure `web` with
+  mode and domains, `websearch` with a nullable provider, and
+  `visualize` with its switch and hosts; webfetch is read-only. A
+  `Credential` (`keyFrom`, `url`, `header`, `value`, `methods`,
+  `projects` by team name) is applied after `Project`; its preflight
+  checks the key file by `readKey()`, refuses a personal or missing
+  project, and checks the per-project cap and prefix overlaps over the
+  held rows with the input laid on them. A `Project`'s `knowledge` names
+  a folder relative to its YAML file, never from stdin:
+  `loadKnowledge()` in `provision/knowledge.ts` reads it before
+  validation, each file a doc named by its path, the uploader's metadata
+  left out and a symlink refused; preflight checks the docs with the
+  knowledge area's `checkFile`, `checkNames` and `checkTotals` against
+  the project's live docs, and apply creates a missing doc or replaces
+  one whose text differs, never deleting one. Staging copies only the
+  `knowledge/` folder beside the YAML.
 - **`service/` runs the binary as the user's service.**
   `service/` is the CLI-only area after `provision/`; it imports only
   `lib/`, composes nothing and opens no database. `1ctx service

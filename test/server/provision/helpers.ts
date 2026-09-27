@@ -114,6 +114,15 @@ export function network() {
         })),
       });
     }
+    // a local decisions server: TypeSafe's list, whatever the query
+    if (url === `${MODEL_URL}/models?output_modalities=decisions`) {
+      return Response.json({
+        models: ["fake-decider", "fake-decider-next"].map((name) => ({
+          name,
+          description: "A decision model.",
+        })),
+      });
+    }
     if (url === `${MODEL_URL}/models?pageSize=1000`) {
       return Response.json({
         models: ["fake-model", "fake-model-next"].map((id) => ({

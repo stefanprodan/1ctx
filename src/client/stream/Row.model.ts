@@ -7,6 +7,8 @@
 // on the row.
 
 import type { StreamRow } from "../../shared/api/sessions.ts";
+import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
+import type { SessionSummary } from "../../shared/contracts/session.ts";
 import { ago, elapsed } from "../lib/format.ts";
 
 // the first line of an error, so a provider's paragraph stays a line
@@ -25,6 +27,13 @@ export function iconOf(row: StreamRow): "clock" | "chat" | "archive" {
   if (row.session.archived !== null) return "archive";
   return row.session.origin === "automation" ? "clock" : "chat";
 }
+
+// a finished run the default decider judged to need a person; a run
+// not asked, a chat and a chance under the mark say nothing
+export const ATTENTION_WORDS = "needs attention";
+export const needsAttention = (
+  session: Pick<SessionSummary, "attention">,
+): boolean => session.attention !== null && session.attention >= ATTENTION_AT;
 
 // whether the line's author is the session's agent, since deleted: the
 // name is greyed, with no tag, since rows are dense

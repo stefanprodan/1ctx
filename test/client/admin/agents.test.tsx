@@ -21,6 +21,8 @@ import {
   loadAgents,
   updateAgent,
 } from "../../../src/client/data/agents.ts";
+import { deciders } from "../../../src/client/data/deciders.ts";
+import { decisions } from "../../../src/client/data/decisions.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   createProvider,
@@ -119,6 +121,10 @@ beforeEach(() => {
   providersError.value = null;
   agents.value = null;
   agentsError.value = null;
+  // the page waits for the deciders and the decisions too; their cards
+  // have their own suites
+  deciders.value = [];
+  decisions.value = [];
   globalThis.fetch = (async (url: string, init?: RequestInit) =>
     answer(url, init)) as unknown as typeof fetch;
 });
@@ -611,9 +617,10 @@ describe("the default agent", () => {
   const field = (agent: AgentSummary) =>
     render(
       <DefaultField
-        agent={agent}
+        row={agent}
         on={signal(agent.default)}
         save={{ busy: false, touch() {} }}
+        oldest={agents.value?.[0]?.id}
       />,
     );
 
@@ -782,7 +789,7 @@ describe("the page", () => {
     providers.value = [];
     agents.value = [];
     const html = render(<Agents />);
-    expect(html).toContain("Add a provider below");
+    expect(html).toContain("Add a provider above");
     expect(html).toContain("No providers yet");
   });
 });

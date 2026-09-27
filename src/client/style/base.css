@@ -457,6 +457,9 @@
   .status-failed {
     color: var(--failed);
   }
+  .status-attention {
+    color: var(--attention);
+  }
   .status-stopped {
     color: var(--faint);
   }

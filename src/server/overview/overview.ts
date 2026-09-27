@@ -15,7 +15,11 @@ import {
   type UsageBy,
   type UsageRow,
 } from "../../shared/api/admin.ts";
-import { daysWindow, type UsageWindow } from "../usage/index.ts";
+import {
+  type DecisionSums,
+  daysWindow,
+  type UsageWindow,
+} from "../usage/index.ts";
 import type {
   GroupRow,
   ModelRow,
@@ -47,6 +51,10 @@ const empty = (): OverviewTotals => ({
   rounds: 0,
   pricedRounds: 0,
   cost: null,
+  decisions: 0,
+  decisionTokens: 0,
+  pricedDecisions: 0,
+  decisionCost: null,
 });
 
 const addSends = (into: OverviewTotals, row: Omit<SendSlot, "slot">) => {
@@ -74,6 +82,27 @@ const addUsage = (into: OverviewTotals, row: Usage) => {
   into.pricedRounds += row.pricedRounds;
   if (row.pricedRounds > 0) into.cost = (into.cost ?? 0) + (row.cost ?? 0);
 };
+
+type Decided = Pick<
+  OverviewTotals,
+  "decisions" | "decisionTokens" | "pricedDecisions" | "decisionCost"
+>;
+
+const addDecisions = (into: OverviewTotals, row: Decided) => {
+  into.decisions += row.decisions;
+  into.decisionTokens += row.decisionTokens;
+  into.pricedDecisions += row.pricedDecisions;
+  if (row.pricedDecisions > 0) {
+    into.decisionCost = (into.decisionCost ?? 0) + (row.decisionCost ?? 0);
+  }
+};
+
+const decidedOf = (row: DecisionSums): Decided => ({
+  decisions: row.decisions,
+  decisionTokens: row.tokens,
+  pricedDecisions: row.priced,
+  decisionCost: row.cost,
+});
 
 const usageOf = (row: Omit<UsageSlot, "slot">): Usage => ({
   promptTokens: row.prompt,
@@ -115,10 +144,17 @@ function days(
     (into, row) => addUsage(into, usageOf(row)),
     buckets,
   );
+  lay(
+    result.decisions,
+    bounds,
+    (into, row) => addDecisions(into, decidedOf(row)),
+    buckets,
+  );
   const totals = empty();
   for (const b of buckets) {
     addSends(totals, b);
     addUsage(totals, b);
+    addDecisions(totals, b);
   }
   return {
     days: window.days.map(
@@ -133,6 +169,10 @@ function days(
         cachedTokens: buckets[i]!.cachedTokens,
         completionTokens: buckets[i]!.completionTokens,
         cost: buckets[i]!.cost,
+        decisions: buckets[i]!.decisions,
+        decisionTokens: buckets[i]!.decisionTokens,
+        pricedDecisions: buckets[i]!.pricedDecisions,
+        decisionCost: buckets[i]!.decisionCost,
       }),
     ),
     totals,
@@ -175,6 +215,7 @@ function allTime(result: RangeResult): OverviewResponse["all"] {
   const all = { ...empty(), since: result.all.since };
   addSends(all, result.all);
   addUsage(all, usageOf(result.all));
+  addDecisions(all, decidedOf(result.allDecisions));
   return all;
 }
 

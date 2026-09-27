@@ -31,7 +31,13 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   composes the state line and the time from those and never reads a
   transcript. An archived chat's row wears the archive icon, quiet,
   and "archived ·" before its line; a retired agent's name is greyed
-  (`authorGone()`), with no tag.
+  (`authorGone()`), with no tag. A run whose `attention` is at
+  `ATTENTION_AT` or more (`needsAttention()` in `stream/Row.model.ts`)
+  draws its icon in `--attention` orange and says "needs attention"
+  after the agent, where a failure's words go, in the same orange;
+  under it, or null, nothing is drawn. The mark is a hint for
+  which run to open, never a filter or a sort. All shows only the
+  latest run's mark.
 - **All lists an automation once.** All (`origin` null) lists an
   automation once, as its newest run holding the query, with `runs` the
   count of its kept runs (null on every other row), which the row draws
@@ -358,7 +364,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `WAIT_GRACE_MS`, which the Automations tab's row says first as waiting
   for a slot; no field carries it), then Suspend or Resume, Edit and Run
   now over two tabs: Runs, a log of `RunRow.tsx` rows with the source as
-  the icon (who pressed Run now its title) and the feed's line, length
+  a bare icon in the state's colour, no avatar disc (who pressed Run now
+  its title), and the feed's line, the attention mark by the stream
+  row's rule, length
   against the deadline and Stop, filtered by `?runs=` and counted by the
   tally, paged with Show more (`loadMoreRuns()` in `data/runs.ts`, under
   the runs' turn, so `closeRuns()`, a filter change, a revocation and a
@@ -468,6 +476,60 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
+- **The agents page's order.** `/admin/agents` stacks Providers,
+  Agents, Deciders, then Decisions, and waits for all four lists. Each
+  card is named by its search, which filters its rows, and shows them
+  by name (`byName()` in `lib/search.ts`, the entities keeping their
+  own order, the deciders oldest first). An empty Agents card points at
+  a provider above. A provider row (`ProviderRow.tsx`) opens to its
+  facts, never edited: the wire, the base URL, the key file, red when
+  missing, the agents on it linked and the deciders by name, and when
+  it was added, then Delete asked once beside Close; the server's
+  refusal of a provider in use is the foot's notice.
+- **The Deciders card.** `DecidersCard.tsx`, the rows in
+  `data/deciders.ts`, loaded by the route: a row per decider, the name
+  over the model, and "default", the provider, the window and the input
+  price (`deciderMeta()` in `Deciders.model.ts`). New decider, off
+  until a provider's wire is in `DECIDER_WIRES`, and an open row are
+  one `DeciderForm`: the name, the provider as picks of those providers
+  only (`heldProvider()`: when the picked one is deleted on the same
+  page the first eligible one stands in, and "Add an OpenRouter or
+  OpenAI-compatible provider first" only when none is), the model
+  searched in the provider's decisions catalog
+  (`searchCatalog(..., "decisions")`), and the agents' `DefaultField`
+  with its own label and the deciders' oldest id, the oldest while
+  default having no No. A save's refusal reaches a field only through
+  `deciderFieldOf()`, which matches the server's whole phrases, since a
+  provider's name may start them. An open row's foot has Delete and
+  Check: Check asks the saved decider through
+  `POST /api/deciders/:id/check` and says `checkLine()` over the
+  buttons, "Answered in 345 ms for $0.000001", or without the cost when
+  the server named none, in a `role="status"` line kept mounted empty
+  so it is announced; a refusal skips the field mapping (`act(...,
+  { whole: true })`) and is always the foot's notice, "Could not
+  check." then the wire's words. With no deciders the card says
+  decisions stay off until one is added.
+- **The Decisions card.** `DecisionsCard.tsx`, the rows in
+  `data/decisions.ts`, loaded by the route, a save putting the
+  server's answer in the list: a row per decision in `DECISIONS`, its
+  icon, title and sub from `DECISION_WORDS` in `Decisions.model.ts`
+  (the server sends only ids and option keys), and a meta from
+  `decisionMeta()`: "off", else "on" and the name of the decider that
+  answers, the default when none is picked or the picked one is gone,
+  then "custom" while an option differs from its default; a phone
+  shows it without "custom". With no deciders the row stays, faint, "off
+  until a decider is added", and its form still saves. An open row is
+  `DecisionForm.tsx`: Status as a `Seg` (On, Off) over the decision's
+  hint, Decider as a `Select` (`deciderChoices()`: "Default (<name>)",
+  then each decider; a picked one deleted on the page falls back to the
+  default through `heldDecider()`), and a textarea per option labelled
+  by `optionLabel()`, seeded from the entity and seeded again from each
+  answer. Save sends `decisionBody()`, checked by `optionProblem()`,
+  and a refusal reaches a field through `decisionFieldOf()`
+  (`options.<key>`, `enabled`, `decider`). Reset to default, at the
+  foot's left while any box differs from its option's default, fills
+  the boxes with `defaultTexts()` for the admin to save. The form
+  stays open after a save; Cancel closes it.
 - **The agent form's Delete.** Delete reads `GET
   /api/agents/:id/impact` before it asks, and the ask has a line over
   the buttons (`impactLine()`, `Foot`'s `above`): the chats it archives
@@ -506,5 +568,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   time and reads the
   overview again once a minute; the page has no Refresh. Each row's head
   is `BoardRow` in `OverviewNow.tsx`, a failed read its `Trouble`; a
-  model is named by `modelLabel()` in `Overview.model.ts`. The board is
-  in `docs/ui.md`, the routes in `docs/admin.md`.
+  model is named by `modelLabel()` in `Overview.model.ts`. The
+  decisions close the Automations tile's sub-line (`runsTile()`), "none
+  failed · 2 decisions", on the cursor's day too, left out while there
+  are none; the cost tiles, the cost per day and All time's cost add the rounds' cost and `decisionCost` (`costOf()`, a
+  null counting as 0 beside a priced one). The board is in
+  `docs/ui.md`, the routes in `docs/admin.md`.

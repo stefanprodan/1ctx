@@ -29,7 +29,12 @@ import {
   type McpMode,
 } from "../../../shared/words.ts";
 import { modelMeta } from "../../agents/meta.ts";
-import { createAgent, deleteAgent, updateAgent } from "../../data/agents.ts";
+import {
+  agents,
+  createAgent,
+  deleteAgent,
+  updateAgent,
+} from "../../data/agents.ts";
 import {
   loadMcp,
   loadedAt as mcpLoadedAt,
@@ -447,7 +452,12 @@ export function AgentForm({
           />
           <FieldError save={save} field="prompt" />
         </label>
-        <DefaultField agent={agent} on={isDefault} save={save} />
+        <DefaultField
+          row={agent}
+          on={isDefault}
+          save={save}
+          oldest={agents.value?.[0]?.id}
+        />
         <SkillPicker
           available={skillRows.value}
           chosen={chosen}

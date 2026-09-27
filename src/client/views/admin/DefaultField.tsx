@@ -1,13 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Whether the agent is the default: the one a new chat starts on for
-// anyone who has not picked one. No on the default hands it back to the
-// oldest agent, so the oldest, while it is the default, has no No.
+// Whether an agent or a decider is the default: the agent a new chat
+// starts on for anyone who has not picked one, the decider every
+// feature asks. No on the default hands it back to the oldest row, so
+// the oldest, while it is the default, has no No.
 
 import type { Signal } from "@preact/signals";
-import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import { agents } from "../../data/agents.ts";
 import type { Save } from "../../lib/save.ts";
 import type { Choice } from "./Agents.model.ts";
 import { Picks } from "./Picks.tsx";
@@ -17,22 +16,30 @@ const DEFAULT_CHOICES: Choice<"on" | "off">[] = [
   { value: "off", label: "No" },
 ];
 
+const AGENT_HINT = "New chats start on it until a user picks another agent.";
+
 export function DefaultField({
-  agent,
+  row,
   on,
   save,
+  oldest,
+  label = "Default agent",
+  hint = AGENT_HINT,
 }: {
-  // null for a new agent
-  agent: AgentSummary | null;
+  // null for a new row
+  row: { id: string } | null;
   on: Signal<boolean>;
   save: Pick<Save, "busy" | "touch">;
+  // the id at the head of its list, oldest first: the default when
+  // none is marked
+  oldest: string | undefined;
+  label?: string;
+  hint?: string;
 }) {
-  // the list is oldest first, so its head is the default when none is
-  // marked
-  const kept = agent !== null && on.value && agents.value?.[0]?.id === agent.id;
+  const kept = row !== null && on.value && oldest === row.id;
   return (
     <div class="field">
-      <span class="label">Default agent</span>
+      <span class="label">{label}</span>
       <Picks
         name="default"
         choices={DEFAULT_CHOICES}
@@ -43,9 +50,7 @@ export function DefaultField({
           save.touch();
         }}
       />
-      <span class="hint">
-        New chats start on it until a user picks another agent.
-      </span>
+      <span class="hint">{hint}</span>
     </div>
   );
 }

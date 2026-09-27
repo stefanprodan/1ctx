@@ -73,6 +73,8 @@ export type RawSession = {
   archived_at: number | null;
   archived_reason: ArchiveReason | null;
   archived_by: string | null;
+  attention: number | null;
+  attention_by: string | null;
 };
 
 export type UsagePort = {
@@ -103,6 +105,7 @@ export const session = (
     raw.archived_at === null || raw.archived_reason === null
       ? null
       : { at: raw.archived_at, reason: raw.archived_reason },
+  attention: raw.attention,
 });
 
 export type RawMessage = {

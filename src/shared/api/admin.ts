@@ -140,6 +140,12 @@ export type OverviewDay = {
   cachedTokens: number;
   completionTokens: number;
   cost: number | null;
+  // the decisions answered, their input tokens, how many named a cost
+  // and its sum, null when none did; apart from the rounds' cost
+  decisions: number;
+  decisionTokens: number;
+  pricedDecisions: number;
+  decisionCost: number | null;
 };
 
 // What the days, or all time, add up to. cost sums the rounds that
@@ -155,6 +161,12 @@ export type OverviewTotals = {
   rounds: number;
   pricedRounds: number;
   cost: number | null;
+  // the decisions answered, their input tokens, how many named a cost
+  // and its sum, null when none did; apart from the rounds' cost
+  decisions: number;
+  decisionTokens: number;
+  pricedDecisions: number;
+  decisionCost: number | null;
 };
 
 export const USAGE_BY = ["projects", "agents"] as const;

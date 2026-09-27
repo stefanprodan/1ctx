@@ -221,6 +221,44 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/deciders",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/deciders",
+    body: { name: "judge", providerId: "none", model: "x" },
+    expect: { anonymous: 401, member: 403, admin: 400 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/deciders/:id",
+    body: { name: "judge", providerId: "none", model: "x" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/deciders/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/deciders/:id/check",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/decisions",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/decisions/:id",
+    body: { enabled: true, deciderId: null, options: {} },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/agents",
     expect: { anonymous: 401, member: 403, admin: 200 },
   },

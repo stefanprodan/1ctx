@@ -25,6 +25,7 @@ export {
   RowsRadio,
   RowsSwitch,
 } from "./RowsControls.tsx";
+export { RowsOpen } from "./RowsOpen.tsx";
 export { RowsTree, type RowsTreeNode } from "./RowsTree.tsx";
 
 // the page's column of cards
@@ -122,60 +123,6 @@ export function RowsLink({ label, href }: { label: string; href: string }) {
 // a faint line in the card: an empty list, or what the rows add up to
 export function RowsNote({ children }: { children: ComponentChildren }) {
   return <p class="rows-note">{children}</p>;
-}
-
-// a row that opens: the chevron and the head are the toggle, `end`
-// sits outside it, and the body indents to where the head's text starts
-export function RowsOpen({
-  open,
-  onToggle,
-  head,
-  end,
-  indent = "avatar",
-  off,
-  children,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  head: ComponentChildren;
-  end?: ComponentChildren;
-  indent?: "avatar" | "chevron";
-  // the row's subject is switched off: the name goes faint
-  off?: boolean;
-  children?: ComponentChildren;
-}) {
-  const toggle = (line: boolean) => (
-    <button
-      type="button"
-      class={`rows-toggle${line ? " rows-line" : ""}`}
-      aria-expanded={open}
-      onClick={onToggle}
-    >
-      <Icon
-        name="chevron"
-        size={14}
-        class={`rows-chevron${open ? " rows-chevron-open" : ""}`}
-      />
-      {head}
-    </button>
-  );
-  return (
-    <div
-      class={`rows-item${open ? " rows-item-open" : ""}${
-        off ? " rows-item-off" : ""
-      }`}
-    >
-      {end === undefined ? (
-        toggle(true)
-      ) : (
-        <div class="rows-line rows-line-end">
-          {toggle(false)}
-          {end}
-        </div>
-      )}
-      {open && <div class={`rows-body rows-body-${indent}`}>{children}</div>}
-    </div>
-  );
 }
 
 // a row that does not open, its text lined up with an opening row's;

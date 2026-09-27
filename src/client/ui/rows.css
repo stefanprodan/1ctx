@@ -74,8 +74,12 @@
     color: var(--faint);
   }
 
+  /* what reveal() keeps clear when a row opens: the sticky page head
+     above and its card's edge below */
   .rows-item {
     border-bottom: 1px solid var(--line);
+    scroll-margin-top: calc(2 * var(--space-6));
+    scroll-margin-bottom: var(--space-5);
   }
   .rows-item:last-child {
     border-bottom: 0;

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "message": "Respan only accepts noul questions whose instructions and criteria are plain strings (question \"outcome\")",
+    "code": 400
+  }
+}

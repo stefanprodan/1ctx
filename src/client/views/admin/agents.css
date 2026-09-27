@@ -1,6 +1,7 @@
-/* Agents: the form an open agent row holds: the Delete question in its
-   foot, the presets, the avatar and provider pickers, and the model
-   search field. */
+/* Agents: the form an open agent, decider or decision row holds: the
+   Delete question and a decider's Check answer in its foot, the
+   presets, the avatar and provider pickers, the model search field and
+   the prompt boxes; and an open provider row's facts. */
 
 @layer tokens, base, owners;
 
@@ -16,6 +17,24 @@
     margin: 0;
     font-size: var(--text-small);
     color: var(--dim);
+  }
+
+  /* what a decider's Check answered, on its own line over the foot */
+  .agents-checked {
+    flex-basis: 100%;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  /* empty until a Check answers, out of the flow but still in the
+     accessibility tree, so the answer is announced */
+  .agents-checked:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .agents-form {
@@ -107,5 +126,38 @@
   .agents-search-input {
     width: 100%;
     padding-left: 34px;
+  }
+
+  /* an open provider row: its facts, a label beside each, then the foot */
+  .agents-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .agents-facts {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: var(--space-2) var(--space-3);
+    align-items: baseline;
+  }
+  .agents-fact {
+    min-width: 0;
+    font-size: var(--text-ui);
+    line-height: 1.55;
+    color: var(--dim);
+    overflow-wrap: anywhere;
+  }
+  .agents-fact-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  @media (max-width: 719px) {
+    .agents-facts {
+      grid-template-columns: 1fr;
+      gap: var(--space-1) 0;
+    }
+    .agents-fact {
+      margin-bottom: var(--space-2);
+    }
   }
 }

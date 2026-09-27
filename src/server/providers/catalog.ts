@@ -5,6 +5,11 @@
 // server-side so the browser never sees the whole list. The wire picks
 // the catalog's shape and authentication.
 
+import {
+  CATALOG_KINDS,
+  type CatalogKind,
+  DECIDER_WIRES,
+} from "../../shared/contracts/decider.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -29,10 +34,38 @@ export const perMillion = (value: unknown): number | null => {
   return Number((n * 1_000_000).toPrecision(12));
 };
 
+// TypeSafe's list, which kev.serve answers too: a name per model and
+// nothing a match has a field for
+function parseNamed(models: unknown[]): CatalogMatch[] {
+  const out: CatalogMatch[] = [];
+  const seen = new Set<string>();
+  for (const m of models as Record<string, unknown>[]) {
+    const id = m?.name;
+    if (typeof id !== "string" || id === "" || seen.has(id)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      name: id,
+      contextLength: null,
+      promptPrice: null,
+      completionPrice: null,
+      tools: false,
+      reasoning: false,
+      thinkingRequired: false,
+      reasoningKnown: false,
+      described: false,
+    });
+  }
+  return out;
+}
+
 export function parseCatalog(body: unknown): CatalogMatch[] {
   const out: CatalogMatch[] = [];
   const data = (body as { data?: unknown })?.data;
-  if (!Array.isArray(data)) return out;
+  if (!Array.isArray(data)) {
+    const models = (body as { models?: unknown })?.models;
+    return Array.isArray(models) ? parseNamed(models) : out;
+  }
   const seen = new Set<string>();
   for (const m of data as Record<string, unknown>[]) {
     if (typeof m?.id !== "string" || m.id === "" || seen.has(m.id)) continue;
@@ -91,14 +124,30 @@ export async function readCapped(res: Response, max: number): Promise<string> {
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
+// a server that ignores the query answers its whole list, which is
+// what a local decisions server serves
+export const DECISIONS_PATH = "/models?output_modalities=decisions";
+
+export const servesDecisions = (wire: string): boolean =>
+  (DECIDER_WIRES as readonly string[]).includes(wire);
+
 export async function fetchCatalog(
   fetcher: Fetcher,
   provider: Pick<ProviderRow, "wire" | "baseUrl">,
   key: string | null,
+  kind: CatalogKind = "chat",
 ): Promise<CatalogMatch[]> {
   let res: Response;
   const gemini = provider.wire === "gemini";
-  const path = gemini ? "/models?pageSize=1000" : "/models";
+  if (kind === "decisions" && !servesDecisions(provider.wire)) {
+    throw new CatalogError("the provider serves no decision models");
+  }
+  const path =
+    kind === "decisions"
+      ? DECISIONS_PATH
+      : gemini
+        ? "/models?pageSize=1000"
+        : "/models";
   const headers: Record<string, string> =
     key === null
       ? {}
@@ -151,9 +200,13 @@ export function search(
 
 type Cached = { at: number; models: CatalogMatch[] };
 
-// one cache per provider, filled on the first question and kept an
-// hour; one fetch in flight at a time, shared by whoever asks while it
-// runs. The key is read at each fetch, so a file added later is seen.
+const cacheKey = (providerId: string, kind: CatalogKind) =>
+  `${providerId}\n${kind}`;
+
+// one cache per provider and kind, filled on the first question and
+// kept an hour; one fetch in flight at a time, shared by whoever asks
+// while it runs. The key is read at each fetch, so a file added later
+// is seen.
 export class Catalogs {
   private readonly cached = new Map<string, Cached>();
   private readonly inflight = new Map<string, Promise<CatalogMatch[]>>();
@@ -168,24 +221,29 @@ export class Catalogs {
     },
   ) {}
 
-  models(provider: ProviderRow): Promise<CatalogMatch[]> {
-    const hit = this.cached.get(provider.id);
+  models(
+    provider: ProviderRow,
+    kind: CatalogKind = "chat",
+  ): Promise<CatalogMatch[]> {
+    const id = cacheKey(provider.id, kind);
+    const hit = this.cached.get(id);
     const ttl = this.deps.ttlMs ?? CATALOG_TTL_MS;
     if (hit && this.deps.clock() - hit.at < ttl) {
       return Promise.resolve(hit.models);
     }
-    const running = this.inflight.get(provider.id);
+    const running = this.inflight.get(id);
     if (running) return running;
     const key =
       provider.keyName === null ? null : this.deps.secret(provider.keyName);
     // kept only while it is still the fetch wanted: a forget() while it
     // ran means the provider is gone and nothing is cached for it
-    const run = fetchCatalog(this.deps.fetcher, provider, key)
+    const run = fetchCatalog(this.deps.fetcher, provider, key, kind)
       .then((models) => {
-        if (this.inflight.get(provider.id) === run) {
-          this.cached.set(provider.id, { at: this.deps.clock(), models });
+        if (this.inflight.get(id) === run) {
+          this.cached.set(id, { at: this.deps.clock(), models });
           this.deps.log?.info("catalog refreshed", {
             provider: provider.name,
+            kind,
             models: models.length,
           });
         }
@@ -194,31 +252,40 @@ export class Catalogs {
       .catch((error) => {
         this.deps.log?.warn("catalog refresh failed", {
           provider: provider.name,
+          kind,
           ...errorFields(error, false),
         });
         throw error;
       })
       .finally(() => {
-        if (this.inflight.get(provider.id) === run) {
-          this.inflight.delete(provider.id);
-        }
+        if (this.inflight.get(id) === run) this.inflight.delete(id);
       });
-    this.inflight.set(provider.id, run);
+    this.inflight.set(id, run);
     return run;
   }
 
-  async search(provider: ProviderRow, q: string): Promise<CatalogMatch[]> {
-    return search(await this.models(provider), q);
+  async search(
+    provider: ProviderRow,
+    q: string,
+    kind: CatalogKind = "chat",
+  ): Promise<CatalogMatch[]> {
+    return search(await this.models(provider, kind), q);
   }
 
   // one model by id, or null when the catalog does not list it
-  async model(provider: ProviderRow, id: string): Promise<CatalogMatch | null> {
-    const models = await this.models(provider);
+  async model(
+    provider: ProviderRow,
+    id: string,
+    kind: CatalogKind = "chat",
+  ): Promise<CatalogMatch | null> {
+    const models = await this.models(provider, kind);
     return models.find((m) => m.id === id) ?? null;
   }
 
   forget(providerId: string): void {
-    this.cached.delete(providerId);
-    this.inflight.delete(providerId);
+    for (const kind of CATALOG_KINDS) {
+      this.cached.delete(cacheKey(providerId, kind));
+      this.inflight.delete(cacheKey(providerId, kind));
+    }
   }
 }

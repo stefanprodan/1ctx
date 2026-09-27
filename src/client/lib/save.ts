@@ -116,13 +116,19 @@ export class Save {
 
   // another button of the form: "delete", "disable", named as the notice
   // says it ("Could not delete."). Answers whether the call went through,
-  // so the form can close after a delete.
-  async act(action: string, call: () => Promise<unknown>): Promise<boolean> {
+  // so the form can close after a delete. `whole` keeps the refusal off
+  // the fields, for an action whose words are not about the form's
+  // values, such as a check against a remote service.
+  async act(
+    action: string,
+    call: () => Promise<unknown>,
+    { whole = false }: { whole?: boolean } = {},
+  ): Promise<boolean> {
     if (this.busy) return false;
     this.clear();
     this.status.value = "idle";
     this.pending.value = action;
-    const failed = await this.attempt(call);
+    const failed = await this.attempt(call, whole);
     if (!this.live) return false;
     this.pending.value = null;
     if (failed !== null) {
@@ -143,13 +149,16 @@ export class Save {
     this.clear();
   }
 
-  private async attempt(call: () => Promise<unknown>): Promise<Problem | null> {
+  private async attempt(
+    call: () => Promise<unknown>,
+    whole = false,
+  ): Promise<Problem | null> {
     try {
       await call();
       return null;
     } catch (err) {
       const { words: error, status } = failure(err);
-      const field = this.fieldOf(error);
+      const field = whole ? undefined : this.fieldOf(error);
       return {
         error,
         ...(field === undefined ? {} : { field }),

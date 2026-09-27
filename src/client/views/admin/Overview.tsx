@@ -35,6 +35,7 @@ import { Tile, TilePlot, Tiles } from "../../ui/Tiles.tsx";
 import {
   allCells,
   buildLine,
+  costOf,
   costTile,
   databaseWords,
   dayTokensHint,
@@ -72,8 +73,9 @@ function DaysTiles({
       turns: days.map((d) => d.turns),
       runs: days.map((d) => d.runs),
       tokens: days.map((d) => tokensOf(d)),
-      // flat at zero where no provider priced a round
-      cost: days.map((d) => d.cost ?? 0),
+      // the rounds and the decisions, flat at zero where no provider
+      // priced either
+      cost: days.map((d) => costOf(d) ?? 0),
     }),
     [days],
   );

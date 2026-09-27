@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Token counts for what a page shows, through OpenAI's o200k_base
-// encoding. It is exact for OpenAI models and close for the open ones
+// Token counts for what a page shows, and cuts to fit a window, through
+// OpenAI's o200k_base encoding. It is exact for OpenAI models and close for the open ones
 // on English and code; other vendors count their own way, so a count is
 // shown as an estimate. Only the one encoding is imported, since each
 // carries its whole vocabulary into the binary. The merge step is
@@ -35,4 +35,21 @@ export function tokens(text: string): number {
     at = end;
   }
   return total;
+}
+
+// o200k averages four characters a token on English and code; a start
+// this long holds more than max tokens of any text but a rare one
+const CHARS_PER_TOKEN = 12;
+
+// the start of text within max tokens: the characters are cut first,
+// so a huge text is never counted whole, then trimmed to the count
+export function cutToTokens(text: string, max: number): string {
+  if (max <= 0) return "";
+  let cut = text.slice(0, max * CHARS_PER_TOKEN);
+  for (let count = tokens(cut); count > max; count = tokens(cut)) {
+    cut = cut.slice(0, Math.floor((cut.length * max) / count));
+  }
+  // a cut between the halves of a surrogate pair drops the lone half
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
 }

@@ -83,6 +83,19 @@
     min-height: 20px;
   }
 
+  /* a run's icon bare, in its state's colour, where an avatar would sit */
+  .automations-run-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+  }
+  /* after the agent, where a failure's word goes */
+  .automations-attention {
+    color: var(--attention);
+  }
   /* a run's meta: its length over its share of the deadline, then when */
   .automations-run-meta {
     display: flex;

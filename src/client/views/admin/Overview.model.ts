@@ -136,15 +136,19 @@ export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
 }
 
 export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
+  const t = at ?? totals;
+  const line = at
+    ? pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed)
+    : failedLine(totals.runsFailed, totals.runs);
+  // the decisions ride along while runs are what asks them
+  const words =
+    t.decisions > 0
+      ? `${line} · ${pluralCommas(t.decisions, "decision", "decisions")}`
+      : line;
   return {
     figure: commas(totals.runs),
     unit: totals.runs === 1 ? "run" : "runs",
-    sub: at
-      ? onDay(
-          at,
-          pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed),
-        )
-      : failedLine(totals.runsFailed, totals.runs),
+    sub: at ? onDay(at, words) : words,
   };
 }
 
@@ -161,20 +165,33 @@ export function tokensTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// the cost: never $0 where no provider priced a round
+// the rounds' cost and the decisions' together: a null counts as 0
+// beside a priced one, and both null is no price at all
+export function costOf(t: {
+  cost: number | null;
+  decisionCost: number | null;
+}): number | null {
+  if (t.cost === null && t.decisionCost === null) return null;
+  return (t.cost ?? 0) + (t.decisionCost ?? 0);
+}
+
+// the cost of rounds and decisions: never $0 where no provider priced
+// either
 function costWords(t: OverviewTotals) {
-  if (t.rounds === 0) return { figure: "None", sub: "none yet" };
-  if (t.cost === null) return { figure: "None", sub: "no provider priced" };
+  const asked = t.rounds + t.decisions;
+  const cost = costOf(t);
+  if (asked === 0) return { figure: "None", sub: "none yet" };
+  if (cost === null) return { figure: "None", sub: "no provider priced" };
   return {
-    figure: money(t.cost),
-    sub: `${commas(t.pricedRounds)} of ${commas(t.rounds)} priced`,
+    figure: money(cost),
+    sub: `${commas(t.pricedRounds + t.pricedDecisions)} of ${commas(asked)} priced`,
   };
 }
 
 export function costTile(totals: OverviewTotals, at: OverviewDay | null) {
   const words = costWords(totals);
-  return at && totals.cost !== null
-    ? { ...words, sub: onDay(at, money(at.cost ?? 0)) }
+  return at && costOf(totals) !== null
+    ? { ...words, sub: onDay(at, money(costOf(at) ?? 0)) }
     : words;
 }
 

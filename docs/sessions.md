@@ -70,10 +70,41 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   A `finalizeSend` that fails after
   its retries keeps the lock, so the session answers 409 until a
   restart. At start `sessions.repair()` ends whatever a crash left
-  running with cause `restart`. Shutdown terminates every send, waits
-  for the streams, closes the sockets with 1012, then stops the
-  listener; runner and app shutdown return the ended count and whether
-  the drain timed out.
+  running with cause `restart`. Shutdown terminates every send, aborts
+  the attention asks and waits for them with the streams within the
+  same drain deadline, sends or none, closes the
+  sockets with 1012, then stops the listener; runner and app shutdown
+  return the ended count and whether the drain timed out.
+- **A finished run is asked whether it needs attention.**
+  `runner/attention.ts`, started from `endSend()` once `finalizeSend`
+  has committed, so the run is `done` and its frames are out: only a run
+  whose send ended with cause `finish`, never a chat turn or a run that
+  failed, was stopped or hit its deadline. The state is the send's last
+  `answer` row with status `done` before its memory phase
+  (`sessions.runAnswer()`), read when the ask starts, since the queue
+  keeps only the ids; none means no ask. It is the `run-attention`
+  decision (`docs/providers.md`), read through the deciders'
+  `decision()` at each ask: turned off, nothing is asked. `decide()`
+  asks its decider the choice `outcome` between its option keys,
+  purpose `run-attention`, its instructions fixed in `outcomeQuestion()`
+  and each option's description the admin's or the code's, with the
+  answer cut by `cutToTokens()` to 80% of the decider's window less 256
+  tokens, or 4,000 tokens with no window. No decider, or a window with
+  no room left, skips without a word.
+  `sessions.markAttention()` stores the chance of `needs-attention` as
+  `attention` and the decider's name as `attention_by` in one
+  `transact()` that bumps `revision` alone, never `last_activity_at`,
+  and publishes one rows-free envelope as an archive does; a session
+  gone by then is a no-op. A refusal, a timeout, an abort or any throw,
+  a failed read of the answer included, stores nothing, never reaches
+  the run and logs `run attention failed` with `chat` and the error
+  fields, never the answer; there is no retry and no repair at start. At
+  most `ASKS_AT_ONCE` (2) ask at once and the rest queue, at most
+  `MAX_QUEUED` (64): past it the oldest waiting is dropped and logged as
+  `run attention dropped` with `chat`; the runner's `closing` controller
+  aborts those in flight at shutdown, a queued one ends unasked, and
+  `runner.settled()` waits for all of them. A fork does not copy the
+  mark.
 - **Deleting an agent retires it.**
   `DELETE /api/agents/:id` never removes the row, since sessions, sends,
   messages, usage and memory notes name it: one transaction sets

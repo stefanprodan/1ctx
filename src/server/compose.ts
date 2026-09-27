@@ -14,6 +14,7 @@ import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
+import { type Deciders, decidersArea } from "./deciders/index.ts";
 import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import { withUserAgent } from "./lib/fetcher.ts";
@@ -97,6 +98,7 @@ export type App = {
   mcp: McpServerStore;
   skills: SkillStore;
   agents: AgentStore;
+  deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
   sessions: SessionStore;
@@ -167,6 +169,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     runCapsChanged: () => automations.scheduler.wake(),
   });
+  const usage = usageArea({
+    db,
+    clock,
+    access: {
+      visibleProjectIds: (userId) => access.visibleProjectIds(userId),
+    },
+  });
   const providers = providersArea({
     db,
     clock,
@@ -175,6 +184,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
     fetcher,
     log: log("providers"),
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
+    deciders: {
+      usesProvider: (providerId) => deciders.usesProvider(providerId),
+    },
+  });
+  const deciders = decidersArea({
+    db,
+    clock,
+    log: log("deciders"),
+    providers,
+    usage,
   });
   // a deleted server or skill leaves no key behind in a chat or a task
   const capabilities = {
@@ -238,13 +257,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     projects,
     activity: { personDays: (...args) => sessions.personDays(...args) },
-  });
-  const usage = usageArea({
-    db,
-    clock,
-    access: {
-      visibleProjectIds: (userId) => access.visibleProjectIds(userId),
-    },
   });
   agents = agentsArea({
     db,
@@ -342,6 +354,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     stream: (sessionId, frame) => socket.stream(sessionId, frame),
     registry: options.registry,
     slotFreed: () => automations.scheduler.wake(),
+    attention: {
+      decide: (...args) => deciders.decide(...args),
+      decision: () => deciders.decision("run-attention"),
+      runAnswer: (sendId, memoryRound) =>
+        sessions.runAnswer(sendId, memoryRound),
+      markAttention: (sessionId, attention, by) =>
+        sessions.markAttention(sessionId, attention, by),
+    },
   });
   automations = automationsArea({
     db,
@@ -385,6 +405,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...usage.routes,
     ...limits.routes,
     ...providers.routes,
+    ...deciders.routes,
     ...mcp.routes,
     ...skills.routes,
     ...projects.routes,
@@ -424,6 +445,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         projects: projects.store,
         credentials: credentials.store,
         providers: providers.store,
+        deciders: deciders.store,
         skills: skills.store,
         mcp: mcp.store,
         agents: agents.store,
@@ -437,6 +459,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     mcp: mcp.store,
     skills: skills.store,
     agents: agents.store,
+    deciders,
     memory: memory.store,
     knowledge,
     sessions: sessions.store,

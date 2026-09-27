@@ -11,6 +11,12 @@
 
 import { statSync } from "node:fs";
 import type { Db } from "../db/index.ts";
+import {
+  type DecisionSlot,
+  type DecisionSums,
+  decisionSlots,
+  decisionTotals,
+} from "../usage/index.ts";
 
 export type RangeInput = {
   now: number;
@@ -66,9 +72,11 @@ export type RangeResult = {
   readAt: number;
   sends: SendSlot[];
   usage: UsageSlot[];
+  decisions: DecisionSlot[];
   by: { projects: GroupRow[]; agents: GroupRow[] };
   models: ModelRow[];
   all: AllTime;
+  allDecisions: DecisionSums;
   instance: {
     users: number;
     projects: number;
@@ -377,9 +385,11 @@ function read(db: Db, input: RangeInput): RangeResult {
     readAt: input.now,
     sends: sendSlots(db, days),
     usage: usageSlots(db, days),
+    decisions: decisionSlots(db, input.since, input.until, SLOT_MS),
     by: { projects: byProjects(db, days), agents: byAgents(db, days) },
     models: models(db, days),
     all: allTime(db),
+    allDecisions: decisionTotals(db),
     instance: instance(db),
   };
 }

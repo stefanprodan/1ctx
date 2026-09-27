@@ -22,6 +22,7 @@ export const LAYERS = [
   "usage",
   "audit",
   "providers",
+  "deciders",
   "mcp",
   "skills",
   "projects",
@@ -44,6 +45,8 @@ export const MAX_LINES = 500;
 
 // production files allowed past MAX_LINES, with the reason
 export const LINE_EXEMPTIONS: Record<string, string> = {
+  "server/compose.ts":
+    "the composition root: one factory per area and the complete route list",
   "client/app/routes.ts":
     "the one route table: every view is one entry, and the rail reads it",
 };
