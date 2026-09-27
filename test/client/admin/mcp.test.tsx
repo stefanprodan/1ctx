@@ -439,6 +439,15 @@ describe("a server's page", () => {
     expect(html).toContain("Put them in the system prompt");
   });
 
+  test.serial("waits for the agents, so Delete never opens early", () => {
+    servers.value = [flux];
+    agents.value = null;
+    path.value = "/config/mcp/flux";
+    const html = render(<McpPage params={{ name: "flux" }} />);
+    expect(html).toContain("Loading");
+    expect(html).not.toContain("Delete flux");
+  });
+
   test.serial("General: a failed refresh over the tabs, no agents", () => {
     servers.value = [
       server({

@@ -28,3 +28,27 @@ export type SkillFileResponse = {
   content: string;
   bytes: number;
 };
+
+// GET /api/skills/:id/usage, the skill's last 30 days in every chat and
+// run: its loads, its file reads, the failed among them, and the reads
+// per file, the most read first
+export type SkillUsageResponse = {
+  since: number;
+  until: number;
+  loads: number;
+  reads: number;
+  failed: number;
+  files: { path: string; reads: number }[];
+};
+
+// GET /api/usage/skills, every skill's last 30 days: the loads, the file
+// reads and the failed among them, and per skill name, the most loaded
+// first, a deleted skill's under its name
+export type SkillsUsageResponse = {
+  since: number;
+  until: number;
+  loads: number;
+  reads: number;
+  failed: number;
+  skills: { name: string; loads: number; reads: number; failed: number }[];
+};

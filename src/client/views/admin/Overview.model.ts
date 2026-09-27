@@ -26,7 +26,11 @@ import {
   size,
   sizeParts,
 } from "../../lib/format.ts";
-import { configMcpHref, configProviderHref } from "../../lib/hrefs.ts";
+import {
+  configMcpHref,
+  configProviderHref,
+  configSkillHref,
+} from "../../lib/hrefs.ts";
 
 // a container's memory past this share is marked
 const MEMORY_FULL = 0.8;
@@ -283,7 +287,7 @@ const ATTENTION: Record<
     icon: "skill",
     what: "Skill",
     line: "refresh failed",
-    href: () => "/config/skills",
+    href: configSkillHref,
   },
 };
 

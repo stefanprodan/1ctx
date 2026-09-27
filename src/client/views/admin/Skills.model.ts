@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the skills page shows and checks without a DOM: which form the
-// pasted URL takes and what its button says, the words on a row's
-// head and inside it, the change words, and the cut a long body gets.
+// What the skill pages show and check without a DOM: which form the
+// pasted URL takes and what its button says, the source and change
+// words, the dropped files, and the cut a long body gets.
 
 import type {
   SkillChange,
@@ -11,13 +11,7 @@ import type {
 } from "../../../shared/contracts/skill.ts";
 import { sourceForm } from "../../../shared/skills.ts";
 import type { SkillSource } from "../../../shared/words.ts";
-import {
-  ago,
-  count,
-  longDate,
-  plural,
-  pluralCommas,
-} from "../../lib/format.ts";
+import { count, longDate, plural, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
 
 export const URL_HINT =
@@ -46,29 +40,6 @@ export function pathProblem(path: string): string | null {
   if (p.startsWith("/") || p.includes("\\")) return "A relative path";
   if (p.split("/").some((s) => s === "..")) return "A path inside the archive";
   return null;
-}
-
-// the faint line under the name: the files and the fetch, or the
-// failure in red
-export function metaLine(
-  skill: Pick<
-    SkillSummary,
-    "files" | "fetchedAt" | "refreshError" | "refreshFailedAt"
-  >,
-  now: number,
-): { text: string; bad: boolean } {
-  if (skill.refreshError !== null && skill.refreshFailedAt !== null) {
-    return {
-      text: `Refresh failed ${ago(skill.refreshFailedAt, now)}`,
-      bad: true,
-    };
-  }
-  // SKILL.md is a file too, so a skill always has one
-  const files = plural(skill.files.length + 1, "file");
-  return {
-    text: `${files} · fetched ${ago(skill.fetchedAt, now)}`,
-    bad: false,
-  };
 }
 
 // where the skill came from, in words

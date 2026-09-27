@@ -33,7 +33,6 @@ export function configDecisionHref(id: string): string {
   return `/config/decisions/${encodeURIComponent(id)}`;
 }
 
-// an agent's page under Config, on one of its tabs
 // an MCP server's page under Config, on General or Tools
 export type McpTab = "general" | "tools";
 export function configMcpHref(name: string, tab: McpTab = "general") {
@@ -41,6 +40,14 @@ export function configMcpHref(name: string, tab: McpTab = "general") {
   return tab === "general" ? base : `${base}/${tab}`;
 }
 
+// a skill's page under Config, on General or Files
+export type SkillTab = "general" | "files";
+export function configSkillHref(name: string, tab: SkillTab = "general") {
+  const base = `/config/skills/${encodeURIComponent(name)}`;
+  return tab === "general" ? base : `${base}/${tab}`;
+}
+
+// an agent's page under Config, on one of its tabs
 export type AgentTab = "general" | "skills" | "mcp";
 export function configAgentHref(name: string, tab: AgentTab = "general") {
   const base = `/config/agents/${encodeURIComponent(name)}`;

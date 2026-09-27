@@ -9,6 +9,7 @@
 // too, which the chat origin leaves out.
 
 import { splitWireName } from "../../shared/mcp.ts";
+import { SKILL_TOOLS } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { countByDay } from "../usage/index.ts";
 
@@ -113,4 +114,105 @@ export function mcpServerCalls(
     .map(([name, calls]) => ({ name, ...calls }))
     .sort(byCalls);
   return { ...total, servers };
+}
+
+export type SkillLoads = {
+  loads: number;
+  reads: number;
+  failed: number;
+  skills: {
+    name: string;
+    loads: number;
+    reads: number;
+    failed: number;
+    files: { path: string; reads: number }[];
+  }[];
+};
+
+// a tool row holds the result only, so the skill a call named is read
+// from the call in the reply of the same round. A row pairs with its
+// call by position among the round's tool rows, as the writer pairs
+// them, since a provider may repeat a call id; the id must still match.
+// The rows come from their index, the reply and the position from the
+// send's, which a test checks in this query's plan
+export const SKILL_LOADS = `
+  select t.tool_name as tool, json_extract(c.value, '$.arguments') as args,
+              t.status = 'failed' as failed
+         from messages t
+         join messages r
+           on r.send_id = t.send_id and r.round = t.round
+          and r.kind = 'reply' and json_valid(r.tool_calls)
+         join json_each(r.tool_calls) c
+           on c.key = (select count(*) from messages o
+                        where o.send_id = t.send_id and o.round = t.round
+                          and o.kind = 'tool' and o.seq < t.seq)
+          and json_extract(c.value, '$.id') = t.tool_call_id
+        where t.kind = 'tool' and t.tool_name in (?, ?)
+          and t.created_at > ? and t.created_at <= ?`;
+
+// the skill and skill_file calls in a window by skill name, a deleted
+// skill's included
+export function skillLoads(db: Db, since: number, until: number): SkillLoads {
+  const rows = db
+    .query<
+      { tool: string; args: string | null; failed: number },
+      [string, string, number, number]
+    >(SKILL_LOADS)
+    .all(...SKILL_TOOLS, since, until);
+  const total = { loads: 0, reads: 0, failed: 0 };
+  const by = new Map<
+    string,
+    { loads: number; reads: number; failed: number; files: Map<string, number> }
+  >();
+  for (const row of rows) {
+    const args = callArgs(row.args);
+    if (args === null) continue;
+    const seen = by.get(args.name) ?? {
+      loads: 0,
+      reads: 0,
+      failed: 0,
+      files: new Map(),
+    };
+    const which = row.tool === "skill" ? "loads" : "reads";
+    seen[which]++;
+    total[which]++;
+    if (row.failed) {
+      seen.failed++;
+      total.failed++;
+    }
+    if (which === "reads" && args.path !== "") {
+      seen.files.set(args.path, (seen.files.get(args.path) ?? 0) + 1);
+    }
+    by.set(args.name, seen);
+  }
+  const skills = [...by]
+    .map(([name, s]) => ({
+      name,
+      loads: s.loads,
+      reads: s.reads,
+      failed: s.failed,
+      files: [...s.files]
+        .map(([path, reads]) => ({ path, reads }))
+        .sort((a, b) => b.reads - a.reads || a.path.localeCompare(b.path)),
+    }))
+    .sort(
+      (a, b) =>
+        b.loads - a.loads || b.reads - a.reads || a.name.localeCompare(b.name),
+    );
+  return { ...total, skills };
+}
+
+// a model may send arguments that are not JSON; such a call named no skill
+function callArgs(text: string | null): { name: string; path: string } | null {
+  if (text === null) return null;
+  let args: unknown;
+  try {
+    args = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof args !== "object" || args === null) return null;
+  const { name, path } = args as Record<string, unknown>;
+  if (typeof name !== "string" || name === "") return null;
+  return { name, path: typeof path === "string" ? path : "" };
 }

@@ -628,14 +628,28 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `views/admin/OpenParam.ts`. A pick of a few labelled options with a
   line of text each is `Choices` from `views/admin/Choices.tsx` over
   base's `.choice`.
-- **The Skills page.** The Skills page, `/config/skills`, is `Rows`: Add
-  skill takes the URL (a site or an index is looked up first and its
-  entries listed with Add), a row's head is the name over its files and
-  when it was fetched (the refresh failure in red), with Refresh at its
-  end, and it opens to the fields, the body and each file as
-  preformatted text, then Delete; the agent form checks skills by box,
-  at most `MAX_SKILLS_PER_AGENT`, and loads them through the agents
-  route. `data/skills.ts` keeps the list, a body and a file once read,
+- **Config › Skills.** `/config/skills` (`SkillList.tsx`) is one card
+  of links by name, the name over the description's first sentence, or
+  over the failed refresh in red, the agents that carry it (from the
+  agents list, as the skill's page counts them) over its files
+  (SKILL.md counted) at the right; Add skill is in the page's
+  head, and `?new` (`NewSkill.tsx`) is one card: the URL, a path for
+  an archive, and for a site or an index Look up, which lists the
+  entries each with its own Add; an add opens the skill's page. The
+  aside is every skill's loads, file reads and failures over the last
+  30 days (`GET /api/usage/skills`) and the five most loaded. A
+  skill's page, `/config/skills/:name` and `/files`, is one view
+  (`SkillPage.tsx`) with nothing to draft, waiting for the agents as
+  an MCP server's page does so Delete never opens early, the crumb's
+  own step the switcher, a failed refresh over the tabs. General
+  (`SkillGeneral.tsx`) is About (the frontmatter fields, the source,
+  the fetch and the digest with what the last refresh changed,
+  Refresh), Used by (only when an agent carries it, each opening that
+  agent's Skills tab) and Delete, off while an agent carries it. Files
+  (`SkillFiles.tsx`) is SKILL.md, then the files opening in place, all
+  preformatted text folded at 12 lines, and the files not kept. The
+  aside is `GET /api/skills/:id/usage` and the five most read files.
+  `data/skills.ts` keeps the list, a body and a file once read,
   dropped on refresh.
 - **The Overview polls while seen.**
   While the Overview is on screen and the tab is seen, `watchOverview()`
