@@ -33,12 +33,12 @@ import {
   providersError,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
-import { limits } from "../../../src/client/data/tools.ts";
 import { keyOptions } from "../../../src/client/lib/secrets.ts";
-import { AgentForm } from "../../../src/client/views/admin/AgentForm.tsx";
+import { AgentList } from "../../../src/client/views/admin/AgentList.tsx";
+import { AgentModel } from "../../../src/client/views/admin/AgentModel.tsx";
+import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import {
   agentFieldOf,
-  compactLine,
   contextProblem,
   defaultThinking,
   effortApplies,
@@ -47,7 +47,6 @@ import {
   preset,
   presetBaseUrl,
   providerFieldOf,
-  reserveOf,
   sentEffort,
   statedFields,
   statedModel,
@@ -56,9 +55,9 @@ import {
   upstreamOptions,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
-import { Agents } from "../../../src/client/views/admin/Agents.tsx";
 import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
 import { ProviderForm } from "../../../src/client/views/admin/ProviderForm.tsx";
+import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type {
   CatalogMatch,
@@ -278,28 +277,6 @@ describe("the words", () => {
     expect(thinkingLine({ thinking: null, effort: "low" })).toBe("effort low");
   });
 
-  test.serial("where a model compacts, by the runner's formula", () => {
-    expect(reserveOf(null)).toBeNull();
-    const rows = [
-      {
-        name: "contextReserve" as const,
-        value: 20_000,
-        default: 20_000,
-        min: 1000,
-        max: 200_000,
-        unit: "tokens" as const,
-        scope: "send" as const,
-        changedAt: null,
-      },
-    ];
-    expect(reserveOf(rows)).toBe(20_000);
-    expect(compactLine(128000, 20_000)).toBe("auto compaction at 108K");
-    // a small window keeps a quarter, not the whole reserve
-    expect(compactLine(16000, 20_000)).toBe("auto compaction at 12K");
-    expect(compactLine(null, 20_000)).toBe("no auto compaction");
-    expect(compactLine(128000, null)).toBe("");
-  });
-
   test.serial("the effort sent follows the choices and the wire", () => {
     expect(sentEffort(flash, null, "high", "openrouter")).toBe("high");
     expect(sentEffort(flash, "off", "high", "openrouter")).toBeNull();
@@ -335,7 +312,7 @@ describe("a model its catalog does not describe", () => {
       expect(contextProblem("262,144", true)).toBeNull();
       expect(contextProblem("262_144", true)).toBeNull();
       expect(contextProblem("1023", false)).toBe(
-        "Enter a whole number from 1024 to 10000000",
+        "Enter a whole number from 1,024 to 10,000,000",
       );
       expect(contextProblem("12.5k", false)).not.toBeNull();
       expect(statedProblem(flash, "", true)).toBeNull();
@@ -451,18 +428,21 @@ describe("a model its catalog does not describe", () => {
       providerId: "pr2",
       model: { ...ultra, contextLength: 262144, tools: true },
     };
+    providers.value = [nvidia];
     const html = render(
-      <AgentForm agent={nim} providers={[nvidia]} onDone={() => {}} />,
+      <AgentModel agent={nim} drafts={AgentDrafts.of(nim)} />,
     );
     expect(html).toContain("Context window");
     expect(html).toMatch(/name="contextLength"[^>]*value="262144"/);
     expect(html).toContain("262K · tools");
     expect(html).toContain(">Default<");
     expect(html).not.toContain("Default (off)");
+    providers.value = [router];
     const described = render(
-      <AgentForm agent={coder} providers={[router]} onDone={() => {}} />,
+      <AgentModel agent={coder} drafts={AgentDrafts.of(coder)} />,
     );
     expect(described).not.toContain("Context window");
+    providers.value = null;
   });
 });
 
@@ -624,14 +604,12 @@ describe("the default agent", () => {
       />,
     );
 
-  test.serial("the row says default, on a phone too", () => {
+  test.serial("the row says default", () => {
     providers.value = [router];
     agents.value = [{ ...coder, default: true }];
-    const html = render(<Agents />);
-    expect(html).toContain(">default · router · 128K · $0.14 / $0.28");
-    expect(html).toContain(
-      '<span class="rows-meta-short">default · 128K · $0.14 / $0.28</span>',
-    );
+    const html = render(<AgentList />);
+    expect(html).toContain('<span class="tag">default</span>');
+    expect(html).toContain('href="/config/agents/coder"');
   });
 
   test.serial("the oldest, while it is the default, cannot say No", () => {
@@ -650,7 +628,10 @@ describe("the default agent", () => {
     answer = (url, init) => {
       asked.push(`${init?.method ?? "GET"} ${url}`);
       return url === "/api/agents"
-        ? Response.json({ agents: [coder, { ...ops, default: true }] })
+        ? Response.json({
+            agents: [coder, { ...ops, default: true }],
+            activity: [],
+          })
         : Response.json({ agent: { ...ops, default: true } });
     };
     const body = {
@@ -692,6 +673,7 @@ describe("the rail", () => {
         "/admin/projects",
         "/admin/users",
         "/admin/agents",
+        "/config/agents",
         "/admin/tools",
         "/admin/skills",
         "/admin/mcp",
@@ -703,6 +685,7 @@ describe("the rail", () => {
         "Storage",
         "Projects",
         "Users",
+        "Providers",
         "Agents",
         "Tools",
         "Skills",
@@ -724,72 +707,28 @@ describe("the page", () => {
   });
 
   test.serial(
-    "renders the agents with their model and the providers with their key",
+    "lists the agents by model and the providers with their key",
     () => {
       providers.value = [router];
       agents.value = [coder];
-      const html = render(<Agents />);
-      expect(html).toContain("coder");
+      const html = render(<AgentList />);
+      expect(html).toContain("@coder");
       // the row names the model by its id, never the alias
       expect(html).toContain("deepseek/deepseek-v4-flash");
       expect(html).not.toContain("DeepSeek: V4 Flash");
-      expect(html).toContain(
-        "router · 128K · $0.14 / $0.28 · tools · reasoning",
-      );
-      expect(html).toContain("provider-router.key missing");
-      // a phone shows the window and the price alone
-      expect(html).toContain(
-        '<span class="rows-meta-short">128K · $0.14 / $0.28</span>',
-      );
-      agents.value = [
-        {
-          ...coder,
-          servers: [
-            { serverId: "s1", read: true, write: false },
-            { serverId: "s2", read: true, write: true },
-          ],
-        },
-      ];
-      expect(render(<Agents />)).toContain(
-        "router · 128K · $0.14 / $0.28 · tools · reasoning · 2 MCPs",
-      );
-      agents.value = [
-        { ...coder, servers: [{ serverId: "s1", read: true, write: false }] },
-      ];
-      expect(render(<Agents />)).toContain("reasoning · 1 MCP<");
-      agents.value = [{ ...coder, upstream: "deepinfra/fp4" }];
-      expect(render(<Agents />)).toContain(
-        "tools · reasoning · via deepinfra/fp4",
-      );
-      agents.value = [{ ...coder, thinking: "on", effort: "xhigh" }];
-      expect(render(<Agents />)).toContain(
-        "reasoning · thinking on · effort xhigh",
-      );
-      limits.value = [
-        {
-          name: "contextReserve",
-          value: 20_000,
-          default: 20_000,
-          min: 1000,
-          max: 200_000,
-          unit: "tokens",
-          scope: "send",
-          changedAt: null,
-        },
-      ];
-      // where the model compacts is the form's line, not the row's
-      expect(render(<Agents />)).not.toContain("auto compaction");
-      limits.value = null;
+      expect(html).toContain("never ran");
       expect(html).toContain("New agent");
-      expect(html).toContain("New provider");
+      const page = render(<Providers />);
+      expect(page).toContain("provider-router.key missing");
+      expect(page).toContain("New provider");
+      expect(page).not.toContain("New agent");
     },
   );
 
   test.serial("says what to do first when there is nothing", () => {
     providers.value = [];
     agents.value = [];
-    const html = render(<Agents />);
-    expect(html).toContain("Add a provider above");
-    expect(html).toContain("No providers yet");
+    expect(render(<AgentList />)).toContain("Add a provider first");
+    expect(render(<Providers />)).toContain("No providers yet");
   });
 });

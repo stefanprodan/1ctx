@@ -50,6 +50,33 @@
       display: none;
     }
   }
+  /* the count grows to the left, so typing moves only the search */
+  .rows-count {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: var(--text-ui);
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+  }
+  .rows-head-slot {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  @media (max-width: 719px) {
+    .rows-head-wrap {
+      flex-wrap: wrap;
+      row-gap: 0;
+      padding-bottom: var(--space-2);
+    }
+    .rows-head-wrap .rows-head-slot {
+      flex-basis: 100%;
+    }
+    .rows-head-wrap .rows-count {
+      margin-left: 15px;
+      margin-right: auto;
+    }
+  }
   .rows-add {
     margin-left: auto;
     flex-shrink: 0;
@@ -60,6 +87,10 @@
     flex-wrap: nowrap;
     flex-shrink: 0;
     margin-left: auto;
+  }
+  .rows-count + .rows-add,
+  .rows-count + .rows-filters {
+    margin-left: 0;
   }
   /* the hint takes the free room, so what follows it sits beside it */
   .rows-hint ~ .rows-add,

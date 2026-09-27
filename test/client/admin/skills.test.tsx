@@ -25,7 +25,6 @@ import {
   skillsError,
 } from "../../../src/client/data/skills.ts";
 import { SkillForm } from "../../../src/client/views/admin/SkillForm.tsx";
-import { SkillPicker } from "../../../src/client/views/admin/SkillPicker.tsx";
 import {
   changeLine,
   droppedLine,
@@ -41,7 +40,6 @@ import {
 import { Skills } from "../../../src/client/views/admin/Skills.tsx";
 import type { SkillSummary } from "../../../src/shared/contracts/skill.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
-import { MAX_SKILLS_PER_AGENT } from "../../../src/shared/words.ts";
 
 const admin: Me = {
   id: "u1",
@@ -372,43 +370,6 @@ describe("the page", () => {
     skills.value = [];
     expect(render(<Skills />)).toContain("No skills yet");
     expect(render(<Skills />)).not.toContain("rows-hint");
-  });
-
-  test("the picker counts the checked, and past the cap an unchecked line takes no click", () => {
-    const toggle = () => {};
-    const html = render(
-      <SkillPicker
-        available={[gitops, timoni]}
-        chosen={["s1"]}
-        busy={false}
-        onToggle={toggle}
-      />,
-    );
-    expect(html).toContain(`1 of ${MAX_SKILLS_PER_AGENT}`);
-    expect(html).toContain('class="rows-check-box rows-check-on"');
-    expect(html).toContain("Flux CD and Flux Operator expert.");
-    expect(html).not.toContain("rows-item-off");
-    const ids = Array.from({ length: MAX_SKILLS_PER_AGENT }, (_, i) => `x${i}`);
-    const full = render(
-      <SkillPicker
-        available={[gitops, timoni]}
-        chosen={ids}
-        busy={false}
-        onToggle={toggle}
-      />,
-    );
-    expect(full).toContain('class="rows-item rows-item-off"');
-    expect(full).toContain("disabled");
-    expect(
-      render(
-        <SkillPicker
-          available={[]}
-          chosen={[]}
-          busy={false}
-          onToggle={toggle}
-        />,
-      ),
-    ).toContain("No skills yet");
   });
 
   test("the form asks for a URL and names the four forms", () => {

@@ -189,16 +189,12 @@ export function Menu({
           <button
             ref={trigger}
             type="button"
-            class="chat-menu-button"
+            class="page-pill"
             aria-expanded={open}
             onClick={() => step("toggle")}
           >
             <span class="cut">{title}</span>
-            <Icon
-              name="chevron"
-              size={14}
-              class={`chat-menu-chevron${open ? " chat-menu-chevron-open" : ""}`}
-            />
+            <Icon name="chevron" size={14} class="page-pill-chevron" />
           </button>
         )}
       </h1>

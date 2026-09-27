@@ -1,0 +1,15 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .agent-new {
+    max-width: 960px;
+  }
+  /* the model under the name, set apart as the Model card is */
+  .agent-new-model {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+}

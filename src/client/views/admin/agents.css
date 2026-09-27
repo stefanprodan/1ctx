@@ -1,7 +1,8 @@
-/* Agents: the form an open agent, decider or decision row holds: the
+/* Agents: the forms of a provider, a decider and a decision: the
    Delete question and a decider's Check answer in its foot, the
-   presets, the avatar and provider pickers, the model search field and
-   the prompt boxes; and an open provider row's facts. */
+   presets, the provider pickers, the model search field and the prompt
+   boxes; an open provider row's facts; and the model search and effort
+   select the agent page shares. */
 
 @layer tokens, base, owners;
 
@@ -10,15 +11,6 @@
     font-size: var(--text-ui);
     color: var(--dim);
   }
-  /* what a delete archives, pauses and stops, on its own line over the
-     ask */
-  .agents-ask-impact {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: var(--text-small);
-    color: var(--dim);
-  }
-
   /* what a decider's Check answered, on its own line over the foot */
   .agents-checked {
     flex-basis: 100%;
@@ -43,9 +35,7 @@
     gap: var(--space-4);
   }
 
-  /* the avatar picker (the five robots) and the provider picker (one
-     chip per provider), the chosen one lit */
-  .agents-avatars,
+  /* the provider picker, one chip per provider, the chosen one lit */
   .agents-picks {
     display: flex;
     flex-wrap: wrap;
@@ -53,19 +43,6 @@
     min-height: 36px;
     align-items: center;
   }
-  /* each a .avatar that is a button */
-  .agents-avatars .avatar {
-    padding: 0;
-    cursor: pointer;
-  }
-  .agents-avatars .avatar:hover {
-    color: var(--fg);
-  }
-  .agents-avatar-on {
-    border-color: var(--brand);
-    color: var(--fg);
-  }
-
   .agents-pick {
     height: 30px;
     padding: 0 var(--space-3);
@@ -103,7 +80,7 @@
   .agents-select-input {
     flex: 1;
     padding-right: 36px;
-    font-family: var(--mono);
+    font-family: var(--sans);
     font-size: var(--text-small);
   }
   .agents-select-chevron {

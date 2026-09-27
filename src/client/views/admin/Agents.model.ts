@@ -7,8 +7,6 @@
 // window, a price and a key.
 
 import type { AgentImpactResponse } from "../../../shared/api/agents.ts";
-import { compactsAt } from "../../../shared/compaction.ts";
-import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import type {
   CatalogMatch,
@@ -23,7 +21,7 @@ import {
   MIN_CONTEXT_LENGTH,
   type Wire,
 } from "../../../shared/words.ts";
-import { priceLine, windowLine } from "../../agents/meta.ts";
+import { priceLine } from "../../agents/meta.ts";
 import { commas, pluralCommas } from "../../lib/format.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
@@ -135,25 +133,6 @@ export function providerFieldOf(message: string): string | undefined {
   return undefined;
 }
 
-// the reserve the runner keeps, from the limits the tools page holds;
-// null until they are loaded
-export function reserveOf(rows: LimitRow[] | null): number | null {
-  return rows?.find((row) => row.name === "contextReserve")?.value ?? null;
-}
-
-// where the runner compacts a chat on this model, by the formula it
-// uses: "auto compaction at 236K", or that a model with no window is
-// never compacted on its own
-export function compactLine(
-  contextLength: number | null,
-  reserve: number | null,
-): string {
-  if (reserve === null) return "";
-  const at = compactsAt(contextLength, reserve);
-  if (at === null) return "no auto compaction";
-  return `auto compaction at ${windowLine(at)}`;
-}
-
 // what the provider's default resolves to for this model: the runner
 // follows the catalog's reasoning flag when the agent says nothing
 export function defaultThinking(model: CatalogMatch | null): "on" | "off" {
@@ -238,25 +217,6 @@ export function sameServers(a: AgentServer[], b: AgentServer[]): boolean {
   return a.every((s) => bKeys.has(key(s)));
 }
 
-// a side toggled on an agent's server: write on brings read, read off
-// takes write with it and the link goes, since write alone is refused
-export function toggleSide(
-  current: AgentServer[],
-  serverId: string,
-  side: "read" | "write",
-): AgentServer[] {
-  const link = current.find((s) => s.serverId === serverId);
-  const on = !(link?.[side] ?? false);
-  const next =
-    side === "write"
-      ? { serverId, read: on || (link?.read ?? false), write: on }
-      : { serverId, read: on, write: on && (link?.write ?? false) };
-  return [
-    ...current.filter((s) => s.serverId !== serverId),
-    ...(next.read ? [next] : []),
-  ];
-}
-
 // a server or a skill deleted since the agent was saved is not a line,
 // and it goes from the save too, since the server would refuse the id;
 // when the list did not load, the picks are kept as they are
@@ -281,7 +241,7 @@ export function contextProblem(value: string, tools: boolean): string | null {
     n < MIN_CONTEXT_LENGTH ||
     n > MAX_CONTEXT_LENGTH
   ) {
-    return `Enter a whole number from ${MIN_CONTEXT_LENGTH} to ${MAX_CONTEXT_LENGTH}`;
+    return `Enter a whole number from ${MIN_CONTEXT_LENGTH.toLocaleString("en-US")} to ${MAX_CONTEXT_LENGTH.toLocaleString("en-US")}`;
   }
   return null;
 }

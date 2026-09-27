@@ -107,7 +107,7 @@ export function Page({
   const row = (
     <>
       {steps !== undefined ? (
-        <Crumb class="page-crumb label">
+        <Crumb class="page-crumb">
           {steps.map((step, i) => {
             // every step but the nearest folds away on a phone
             const far = i < steps.length - 1 ? " page-crumb-far" : "";
@@ -153,7 +153,7 @@ export function Page({
           )}
         </Crumb>
       ) : crumb !== undefined ? (
-        <Crumb class="page-crumb label">
+        <Crumb class="page-crumb">
           {crumb !== "" && (
             <>
               {crumbHref ? (

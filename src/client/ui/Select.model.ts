@@ -26,7 +26,10 @@ const fold = (text: string) =>
 
 // every word of the query in the label, the detail or the keywords, in
 // any order
-export function filterOptions(options: Option[], query: string): Option[] {
+export function filterOptions<T extends Option>(
+  options: T[],
+  query: string,
+): T[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return options;
   return options.filter((o) => {

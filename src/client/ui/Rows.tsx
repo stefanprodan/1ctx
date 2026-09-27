@@ -40,6 +40,8 @@ export function RowsCard({
   action,
   hint,
   live,
+  count,
+  wrap,
   class: extra,
   children,
 }: {
@@ -54,6 +56,12 @@ export function RowsCard({
   // the hint follows a selection in the card, so a screen reader hears
   // each change
   live?: boolean;
+  // the rows shown, after the search and before the filters: "10", or
+  // "3 of 10" while filtered
+  count?: string;
+  // on a phone the search takes its own line, the count and the action
+  // the next
+  wrap?: boolean;
   // the owner's class beside the card's: a board's panel
   class?: string;
   children?: ComponentChildren;
@@ -69,16 +77,25 @@ export function RowsCard({
       <div
         class={`rows-head${search ? " rows-head-search" : ""}${
           tabs ? " rows-head-tabs" : ""
-        }`}
+        }${wrap ? " rows-head-wrap" : ""}`}
       >
-        {slot ?? (
-          <span class="label" id={id}>
-            {label}
-          </span>
+        {wrap && slot ? (
+          <div class="rows-head-slot">{slot}</div>
+        ) : (
+          (slot ?? (
+            <span class="label" id={id}>
+              {label}
+            </span>
+          ))
         )}
         {hint && (
           <span class="rows-hint cut" aria-live={live ? "polite" : undefined}>
             {hint}
+          </span>
+        )}
+        {count !== undefined && (
+          <span class="rows-count" aria-live="polite">
+            {count}
           </span>
         )}
         {action}

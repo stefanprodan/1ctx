@@ -72,6 +72,7 @@ describe("the route table", () => {
       "/admin/users",
       "/admin/x",
       "/admin/agents",
+      "/config/agents",
       "/admin/tools",
       "/admin/skills",
       "/admin/mcp",

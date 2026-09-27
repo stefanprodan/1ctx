@@ -91,28 +91,6 @@
     font-size: inherit;
     font-weight: inherit;
   }
-  .chat-menu-button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    height: 24px;
-    /* the pill overhangs the text line, so the head keeps the height
-       and the centre of every other crumb, on the logo's row */
-    margin-block: calc((1lh - 24px) / 2);
-    margin-left: calc(-1 * var(--space-1));
-    padding: 0 var(--space-1);
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-  .chat-menu-button:hover,
-  .chat-menu-button[aria-expanded="true"] {
-    background: var(--hover);
-  }
   /* the box takes the button's place and its exact box, so the head
      keeps its height and the logo's row; the type is the crumb's */
   .chat-menu-input {
@@ -133,18 +111,6 @@
   }
   .chat-menu-input[aria-invalid="true"] {
     border-color: var(--failed);
-  }
-  .chat-menu-chevron {
-    flex-shrink: 0;
-    color: var(--faint);
-    transition: transform 120ms;
-  }
-  .chat-menu-button:hover .chat-menu-chevron,
-  .chat-menu-button[aria-expanded="true"] .chat-menu-chevron {
-    color: var(--fg);
-  }
-  .chat-menu-chevron-open {
-    transform: rotate(180deg);
   }
   .chat-menu-card {
     position: absolute;

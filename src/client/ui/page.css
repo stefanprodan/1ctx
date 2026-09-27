@@ -61,6 +61,8 @@
 
   /* the crumb takes the head's room up to the actions, so a title box
      in it can fill the row; its items keep their content's width */
+  /* one font and one case throughout, names as written: the steps
+     dim, the page's own in the foreground */
   .page-crumb {
     display: flex;
     flex: 1 1 auto;
@@ -68,6 +70,10 @@
     gap: var(--space-2);
     min-width: 0;
     margin: 0;
+    font-family: var(--sans);
+    font-size: var(--text-ui);
+    font-weight: 400;
+    color: var(--dim);
   }
   /* a long title, a chat's, keeps the head on one line */
   .page-crumb-sep {
@@ -96,19 +102,13 @@
   .page-crumb-sep {
     color: var(--separator);
   }
-  /* the noun as written, never in the label's caps: a chat's title
-     keeps the user's casing */
   .page-crumb-on {
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
     color: var(--fg);
-    font-family: var(--sans);
-    font-size: var(--text-ui);
     font-weight: 500;
-    letter-spacing: 0;
-    text-transform: none;
   }
 
   /* a title that leads back to the page it is a part of */
@@ -131,12 +131,55 @@
     overflow: visible;
   }
 
-  /* a path's step keeps its own case, in mono */
+  /* a path's step, in mono */
   .page-crumb-path {
     font-family: var(--mono);
     font-size: var(--text-mono);
-    letter-spacing: 0;
-    text-transform: none;
+  }
+
+  /* the page's own step as a control: a chat's menu, an object's
+     switcher. The pill overhangs the text line, so the head keeps the
+     height and the centre of every other crumb; a touch takes 44px */
+  .page-pill {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 24px;
+    margin-block: calc((1lh - 24px) / 2);
+    margin-left: calc(-1 * var(--space-1));
+    padding: 0 var(--space-1);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .page-pill::after {
+    content: "";
+    position: absolute;
+    inset: -10px 0;
+  }
+  .page-pill:hover,
+  .page-pill[aria-expanded="true"] {
+    background: var(--hover);
+  }
+  .page-pill-chevron {
+    flex-shrink: 0;
+    color: var(--faint);
+    transition: transform 120ms;
+  }
+  .page-pill:hover .page-pill-chevron,
+  .page-pill[aria-expanded="true"] .page-pill-chevron {
+    color: var(--fg);
+  }
+  .page-pill[aria-expanded="true"] .page-pill-chevron {
+    transform: rotate(180deg);
   }
 
   /* a notice row across the head, under the crumb and the actions, for

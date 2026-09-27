@@ -56,7 +56,7 @@ export function Members({ params }: { params: Params }) {
           )}
           <RowsCard
             label="Agents"
-            action={admin && <RowsLink label="Manage" href="/admin/agents" />}
+            action={admin && <RowsLink label="Manage" href="/config/agents" />}
           >
             {agents === null ? (
               <RowsNote>Loading</RowsNote>

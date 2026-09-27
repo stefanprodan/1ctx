@@ -30,10 +30,10 @@ test("a label, a crumb, a menu and a failure draw as they always have", () => {
       <Page crumb="Account" crumbHref="/profile" title="Profile" loading />,
     ),
   ).toBe(
-    '<div class="page"><div class="page-head"><h1 class="page-crumb label"><a class="page-crumb-up" href="/profile">Account</a><span class="page-crumb-sep">/</span><span class="page-crumb-on">Profile</span></h1></div><p class="page-state">Loading</p></div>',
+    '<div class="page"><div class="page-head"><h1 class="page-crumb"><a class="page-crumb-up" href="/profile">Account</a><span class="page-crumb-sep">/</span><span class="page-crumb-on">Profile</span></h1></div><p class="page-state">Loading</p></div>',
   );
   expect(render(<Page crumb="" title="Home" empty="Nothing yet" />)).toBe(
-    '<div class="page"><div class="page-head"><h1 class="page-crumb label"><span class="page-crumb-on">Home</span></h1></div><p class="page-state">Nothing yet</p></div>',
+    '<div class="page"><div class="page-head"><h1 class="page-crumb"><span class="page-crumb-on">Home</span></h1></div><p class="page-state">Nothing yet</p></div>',
   );
   expect(
     render(
@@ -46,7 +46,7 @@ test("a label, a crumb, a menu and a failure draw as they always have", () => {
       />,
     ),
   ).toBe(
-    '<div class="page page-flush"><div class="page-head"><div class="page-crumb label"><span>Chats</span><span class="page-crumb-sep">/</span><div class="page-crumb-on page-crumb-menu"><button type="button">t</button></div></div></div><div class="notice-failed page-failed" role="alert">' +
+    '<div class="page page-flush"><div class="page-head"><div class="page-crumb"><span>Chats</span><span class="page-crumb-sep">/</span><div class="page-crumb-on page-crumb-menu"><button type="button">t</button></div></div></div><div class="notice-failed page-failed" role="alert">' +
       ALERT +
       '<div class="page-failed-words"><p class="page-failed-title">This page did not load</p><p class="page-failed-text">Gone.</p></div><button type="button" class="btn page-failed-retry">Try again</button></div></div>',
   );
@@ -75,7 +75,7 @@ test("a crumb of steps links back, keeps a path's case and folds far steps", () 
     />,
   );
   expect(html).toBe(
-    '<div class="page"><div class="page-head"><h1 class="page-crumb label">' +
+    '<div class="page"><div class="page-head"><h1 class="page-crumb">' +
       '<a class="page-crumb-up page-crumb-far" href="/projects/p1">personal</a>' +
       '<span class="page-crumb-sep page-crumb-far">/</span>' +
       '<a class="page-crumb-up page-crumb-far" href="/projects/p1/knowledge">Knowledge</a>' +
@@ -103,7 +103,7 @@ test("a notice spans the head after the actions, a refusal read out at once", ()
   );
   expect(html).toBe(
     '<div class="page"><div class="page-head page-head-notice">' +
-      '<h1 class="page-crumb label"><a class="page-crumb-up" href="/k">Knowledge</a>' +
+      '<h1 class="page-crumb"><a class="page-crumb-up" href="/k">Knowledge</a>' +
       '<span class="page-crumb-sep">/</span><span class="page-crumb-on">New file</span></h1>' +
       '<div class="page-notice page-notice-failed" role="alert">' +
       '<span class="page-notice-words">Could not restore.</span>' +

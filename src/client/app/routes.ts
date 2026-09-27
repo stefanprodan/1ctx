@@ -13,7 +13,7 @@
 
 import { isRunFilter } from "../../shared/words.ts";
 import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
-import { loadAgents } from "../data/agents.ts";
+import { loadAgents, loadFacts } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
 import { loadDeciders } from "../data/deciders.ts";
@@ -99,6 +99,25 @@ const agentView = lazy<{ params: Params }>(() =>
 const agentPage = async (name: string) => {
   await Promise.all([loadAgentPage(name), loadAgentDays(name)]);
 };
+
+// the Config agent page's tabs share one view, so a draft outlives a
+// tab switch; the page's facts need the list, which names the agent
+const configAgentView = lazy<{ params: Params }>(() =>
+  import("../views/admin/AgentPage.tsx").then((m) => m.AgentPage),
+);
+const configAgentPage = async (name: string) => {
+  await Promise.all([loadAgents(), loadProviders(), loadSkills(), loadMcp()]);
+  await loadFacts(name);
+};
+const configAgentRoutes = (["", "/skills", "/mcp"] as const).map(
+  (tab): Route => ({
+    path: `/config/agents/:name${tab}`,
+    view: configAgentView,
+    title: (params) => `@${params.name}`,
+    role: "admin",
+    load: (params) => configAgentPage(params.name),
+  }),
+);
 
 // a user's tabs share one view the same way
 const userView = lazy<{ params: Params }>(() =>
@@ -399,24 +418,43 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/admin/agents",
-    view: lazy(() => import("../views/admin/Agents.tsx").then((m) => m.Agents)),
-    title: () => "Agents",
+    view: lazy(() =>
+      import("../views/admin/Providers.tsx").then((m) => m.Providers),
+    ),
+    title: () => "Providers",
     role: "admin",
     load: async () => {
-      // the tools bring the limits, where each model compacts; the
-      // skills and the MCP servers are the form's sections
+      // a provider row names the agents and the deciders on it
       await Promise.all([
         loadAgents(),
         loadDeciders(),
         loadDecisions(),
         loadProviders(),
-        loadTools(),
-        loadSkills(),
-        loadMcp(),
       ]);
     },
-    nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
+    nav: { label: "Providers", icon: "providers", order: 10, group: "Admin" },
   },
+  {
+    path: "/config/agents",
+    view: lazy(() =>
+      import("../views/admin/AgentList.tsx").then((m) => m.AgentList),
+    ),
+    title: (_params) => "Agents",
+    role: "admin",
+    // New agent is the list's `?new`, since /config/agents/new would be
+    // an agent's page; the rows' failing lines read the skills and servers
+    load: async () => {
+      await Promise.all([
+        loadAgents(),
+        loadProviders(),
+        loadSkills(),
+        loadMcp(),
+        loadOverview(),
+      ]);
+    },
+    nav: { label: "Agents", icon: "agents", order: 10.5, group: "Admin" },
+  },
+  ...configAgentRoutes,
   {
     path: "/admin/tools",
     view: toolsView,

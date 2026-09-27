@@ -10,6 +10,8 @@ export type SegOption<T extends string> = {
   value: T;
   label: ComponentChildren;
   disabled?: boolean;
+  // said on hover: why an option is off
+  title?: string;
 };
 
 export function Seg<T extends string>({
@@ -47,6 +49,7 @@ export function Seg<T extends string>({
             class={`seg-option${on ? " seg-on" : ""}`}
             aria-pressed={on}
             disabled={option.disabled}
+            title={option.title}
             onClick={() => onPick(option.value)}
           >
             {option.label}
