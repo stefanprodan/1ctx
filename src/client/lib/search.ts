@@ -9,3 +9,7 @@ export function matches(query: string, fields: readonly string[]): boolean {
   if (needle === "") return true;
   return fields.some((field) => field.toLowerCase().includes(needle));
 }
+
+// a list as a page shows it, by name; the entity keeps its own order
+export const byName = <T extends { name: string }>(rows: readonly T[]): T[] =>
+  rows.slice().sort((a, b) => a.name.localeCompare(b.name));

@@ -331,10 +331,11 @@ describe("the card", () => {
     deciders.value = [];
     decisions.value = [];
     const html = render(<Agents />);
-    const at = (label: string) => html.indexOf(`>${label}<`);
+    // each card is named by its search
+    const at = (label: string) => html.indexOf(`aria-label="${label}"`);
     expect(at("Providers")).toBeGreaterThan(-1);
-    expect(at("New agent")).toBeGreaterThan(at("New provider"));
-    expect(at("Deciders")).toBeGreaterThan(at("New agent"));
+    expect(at("Agents")).toBeGreaterThan(at("Providers"));
+    expect(at("Deciders")).toBeGreaterThan(at("Agents"));
     expect(at("Decisions")).toBeGreaterThan(at("Deciders"));
   });
 

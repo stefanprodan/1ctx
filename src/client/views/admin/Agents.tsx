@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The agents page, top to bottom: the providers the agents and deciders
-// run on, added through New provider, deleted in place, never edited;
+// The agents page, top to bottom, each card with its search: the
+// providers the agents and deciders run on, added through New provider,
+// a row opening to what it is and Delete, never edited (ProviderRow.tsx);
 // the agents, a card of rows, each the name, the model and, faint, the
 // provider with the model's window and prices, a row opening in place
 // into its form, or starting open when `?open=` names it, New agent
@@ -13,56 +14,29 @@
 import { useSignal } from "@preact/signals";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
-import type { Wire } from "../../../shared/words.ts";
 import { AgentRow as Head } from "../../agents/AgentRow.tsx";
 import { agents, agentsError } from "../../data/agents.ts";
 import { deciders, decidersError } from "../../data/deciders.ts";
 import { decisions, decisionsError } from "../../data/decisions.ts";
-import {
-  deleteProvider,
-  providers,
-  providersError,
-} from "../../data/providers.ts";
-import { says } from "../../lib/format.ts";
-import { Icon } from "../../lib/icons.tsx";
-import { hasMark, WireMark } from "../../lib/marks.tsx";
-import { matches } from "../../lib/search.ts";
+import { providers, providersError } from "../../data/providers.ts";
+import { byName, matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAdd,
-  RowsAvatar,
   RowsCard,
-  RowsEnd,
-  RowsLine,
-  RowsMeta,
   RowsNew,
   RowsNote,
   RowsOpen,
-  RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { AgentForm } from "./AgentForm.tsx";
-import { keyLine } from "./Agents.model.ts";
 import { DecidersCard } from "./DecidersCard.tsx";
 import { DecisionsCard } from "./DecisionsCard.tsx";
 import { useOpenParam } from "./OpenParam.ts";
 import { ProviderForm } from "./ProviderForm.tsx";
+import { ProviderRow } from "./ProviderRow.tsx";
 import "./agents.css";
-
-// a provider shows its service's mark, or a cloud for a server
-// without one; an agent's tile is the shared row's
-function Tile({ wire }: { wire: Wire }) {
-  return (
-    <RowsAvatar>
-      {hasMark(wire) ? (
-        <WireMark wire={wire} size={15} />
-      ) : (
-        <Icon name="providers" size={15} />
-      )}
-    </RowsAvatar>
-  );
-}
 
 function AgentRow({
   agent,
@@ -89,77 +63,20 @@ function AgentRow({
   );
 }
 
-// a provider row: what it is and Delete, asked once in place
-function ProviderRow({ provider }: { provider: ProviderSummary }) {
-  const asking = useSignal(false);
-  const busy = useSignal(false);
-  const failure = useSignal<string | null>(null);
-  const remove = async () => {
-    busy.value = true;
-    failure.value = null;
-    try {
-      await deleteProvider(provider.id);
-    } catch (err) {
-      failure.value = says(err);
-      busy.value = false;
-    }
-  };
-  const keyMissing = provider.keyName !== null && !provider.hasKey;
-  return (
-    <RowsLine>
-      <Tile wire={provider.wire} />
-      <RowsTitle mono name={provider.name} sub={provider.baseUrl} />
-      <RowsMeta bad={keyMissing}>
-        {provider.wire} · {keyLine(provider.keyName, provider.hasKey)}
-      </RowsMeta>
-      {asking.value ? (
-        <RowsEnd words={`Delete ${provider.name}?`} error={failure.value}>
-          <button
-            type="button"
-            class="btn btn-small btn-danger"
-            disabled={busy.value}
-            onClick={() => void remove()}
-          >
-            {busy.value ? "Deleting" : "Delete"}
-          </button>
-          <button
-            type="button"
-            class="btn btn-small"
-            disabled={busy.value}
-            onClick={() => {
-              asking.value = false;
-              failure.value = null;
-            }}
-          >
-            Keep
-          </button>
-        </RowsEnd>
-      ) : (
-        <RowsEnd>
-          <button
-            type="button"
-            class="btn btn-small"
-            onClick={() => {
-              asking.value = true;
-            }}
-          >
-            Delete
-          </button>
-        </RowsEnd>
-      )}
-    </RowsLine>
-  );
-}
-
 export function Agents() {
   const list = agents.value;
   const rows = providers.value;
   const open = useOpenParam();
   const adding = useSignal(false);
   const addingProvider = useSignal(false);
+  const openProvider = useSignal<string | null>(null);
+  const pq = useSignal("");
+  const shownProviders = byName(rows ?? []).filter((p) =>
+    matches(pq.value, [p.name, p.baseUrl, p.wire, p.keyName ?? ""]),
+  );
   const error = agentsError.value ?? providersError.value;
   const q = useSignal("");
-  const shown = (list ?? []).filter((a) =>
+  const shown = byName(list ?? []).filter((a) =>
     matches(q.value, [
       a.name,
       a.model.id,
@@ -182,6 +99,15 @@ export function Agents() {
       <Rows>
         <RowsCard
           label="Providers"
+          search={
+            <Search
+              value={pq.value}
+              onChange={(next) => {
+                pq.value = next;
+              }}
+              placeholder="Search providers"
+            />
+          }
           action={
             <RowsAdd
               label="New provider"
@@ -206,8 +132,19 @@ export function Agents() {
               No providers yet. Add one so an agent has a model to run on.
             </RowsNote>
           )}
-          {(rows ?? []).map((p) => (
-            <ProviderRow key={p.id} provider={p} />
+          {pq.value.trim() !== "" && shownProviders.length === 0 && (
+            <RowsNote>No providers found</RowsNote>
+          )}
+          {shownProviders.map((p) => (
+            <ProviderRow
+              key={p.id}
+              provider={p}
+              open={openProvider.value === p.id}
+              onToggle={() => {
+                openProvider.value = openProvider.value === p.id ? null : p.id;
+                addingProvider.value = false;
+              }}
+            />
           ))}
         </RowsCard>
         <RowsCard

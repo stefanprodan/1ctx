@@ -13,6 +13,7 @@ import type { DeciderSummary } from "../../../shared/contracts/decider.ts";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
 import { deciders, decidersError } from "../../data/deciders.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { byName, matches } from "../../lib/search.ts";
 import {
   RowsAdd,
   RowsAvatar,
@@ -24,6 +25,7 @@ import {
   RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { DeciderForm } from "./DeciderForm.tsx";
 import {
   deciderMeta,
@@ -74,9 +76,26 @@ export function DecidersCard({ providers }: { providers: ProviderSummary[] }) {
   const error = decidersError.value;
   const adding = useSignal(false);
   const open = useSignal<string | null>(null);
+  const q = useSignal("");
+  const shown = byName(list ?? []).filter((d) =>
+    matches(q.value, [
+      d.name,
+      d.model,
+      providers.find((p) => p.id === d.providerId)?.name ?? "",
+    ]),
+  );
   return (
     <RowsCard
       label="Deciders"
+      search={
+        <Search
+          value={q.value}
+          onChange={(next) => {
+            q.value = next;
+          }}
+          placeholder="Search deciders"
+        />
+      }
       action={
         <RowsAdd
           label="New decider"
@@ -106,7 +125,10 @@ export function DecidersCard({ providers }: { providers: ProviderSummary[] }) {
       {list?.length === 0 && !adding.value && (
         <RowsNote>{NO_DECIDERS}</RowsNote>
       )}
-      {(list ?? []).map((d) => (
+      {q.value.trim() !== "" && shown.length === 0 && (
+        <RowsNote>No deciders found</RowsNote>
+      )}
+      {shown.map((d) => (
         <DeciderRow
           key={d.id}
           decider={d}

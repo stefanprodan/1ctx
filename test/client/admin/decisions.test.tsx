@@ -274,7 +274,8 @@ describe("the card", () => {
     deciders.value = [judge, small];
     decisions.value = [own];
     const html = render(<DecisionsCard />);
-    expect(html).toContain(">Decisions<");
+    expect(html).toContain('aria-label="Decisions"');
+    expect(html).toContain('placeholder="Search decisions"');
     expect(html).toContain("Mark task runs that need attention");
     expect(html).toContain(DECISION_WORDS["run-attention"].sub);
     expect(html).toContain(">on · small · custom");

@@ -477,8 +477,15 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
 - **The agents page's order.** `/admin/agents` stacks Providers,
-  Agents, Deciders, then Decisions, and waits for all four lists. An
-  empty Agents card points at a provider above.
+  Agents, Deciders, then Decisions, and waits for all four lists. Each
+  card is named by its search, which filters its rows, and shows them
+  by name (`byName()` in `lib/search.ts`, the entities keeping their
+  own order, the deciders oldest first). An empty Agents card points at
+  a provider above. A provider row (`ProviderRow.tsx`) opens to its
+  facts, never edited: the wire, the base URL, the key file, red when
+  missing, the agents on it linked and the deciders by name, and when
+  it was added, then Delete asked once beside Close; the server's
+  refusal of a provider in use is the foot's notice.
 - **The Deciders card.** `DecidersCard.tsx`, the rows in
   `data/deciders.ts`, loaded by the route: a row per decider, the name
   over the model, and "default", the provider, the window and the input

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { matches } from "../../../src/client/lib/search.ts";
+import { byName, matches } from "../../../src/client/lib/search.ts";
 
 describe("matches", () => {
   test("keeps a row when any field holds the query, in any case", () => {
@@ -14,4 +14,10 @@ describe("matches", () => {
     expect(matches("elena", fields)).toBe(false);
     expect(matches("x", [])).toBe(false);
   });
+});
+
+test("byName orders a copy by name and leaves the list", () => {
+  const rows = [{ name: "sre" }, { name: "assistant" }, { name: "memo" }];
+  expect(byName(rows).map((r) => r.name)).toEqual(["assistant", "memo", "sre"]);
+  expect(rows[0]!.name).toBe("sre");
 });

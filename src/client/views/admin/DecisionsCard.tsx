@@ -13,14 +13,17 @@ import type { DecisionSummary } from "../../../shared/contracts/decision.ts";
 import { deciders } from "../../data/deciders.ts";
 import { decisions, decisionsError } from "../../data/decisions.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { matches } from "../../lib/search.ts";
 import {
   RowsAvatar,
   RowsCard,
   RowsFailed,
   RowsMeta,
+  RowsNote,
   RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { DecisionForm } from "./DecisionForm.tsx";
 import { DECISION_WORDS, decisionMeta } from "./Decisions.model.ts";
 
@@ -62,9 +65,33 @@ export function DecisionsCard() {
   const error = decisionsError.value;
   const known = deciders.value ?? [];
   const open = useSignal<string | null>(null);
+  const q = useSignal("");
+  const shown = (list ?? [])
+    .filter((d) => {
+      const words = DECISION_WORDS[d.id];
+      const by = known.find((x) => x.id === d.deciderId)?.name ?? "";
+      return matches(q.value, [words.title, words.sub, d.id, by]);
+    })
+    .sort((a, b) =>
+      DECISION_WORDS[a.id].title.localeCompare(DECISION_WORDS[b.id].title),
+    );
   return (
-    <RowsCard label="Decisions">
-      {(list ?? []).map((d) => (
+    <RowsCard
+      label="Decisions"
+      search={
+        <Search
+          value={q.value}
+          onChange={(next) => {
+            q.value = next;
+          }}
+          placeholder="Search decisions"
+        />
+      }
+    >
+      {q.value.trim() !== "" && shown.length === 0 && (
+        <RowsNote>No decisions found</RowsNote>
+      )}
+      {shown.map((d) => (
         <DecisionRow
           key={d.id}
           decision={d}
