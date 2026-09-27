@@ -399,6 +399,38 @@ export async function compose(options: ComposeOptions): Promise<App> {
     }),
     online: () => socket.online(),
     automations: () => automations.store.tally(clock() - WAIT_GRACE_MS),
+    attention: () => {
+      const keyed = (kind: SecretKind, name: string | null) =>
+        name !== null && secret(kind, name) !== null;
+      const search =
+        configuredTools.store.rows().find((row) => row.name === "websearch")
+          ?.provider ?? null;
+      return {
+        providers: providers.store.list().map((p) => ({
+          name: p.name,
+          keyName: p.keyName,
+          hasKey: keyed("provider-", p.keyName),
+        })),
+        mcp: mcp.store.list().map((s) => ({
+          name: s.name,
+          keyName: s.keyName,
+          hasKey: keyed(MCP_KEY_PREFIX, s.keyName),
+          refreshFailedAt: s.refreshFailedAt,
+        })),
+        skills: skills.store.list().map((s) => ({
+          name: s.name,
+          refreshFailedAt: s.refreshFailedAt,
+        })),
+        credentials: credentials.store.list().map((c) => ({
+          name: c.name,
+          key: credentials.keyState(c.keyName),
+        })),
+        search: {
+          provider: search,
+          hasKey: keyed("search-", search === null ? null : `search-${search}`),
+        },
+      };
+    },
     // built here, at the compile root, so the binary finds its entry
     worker: new URL("./overview/scan.worker.ts", import.meta.url),
   });

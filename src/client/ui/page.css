@@ -251,6 +251,14 @@
   .page-crumb + .page-actions {
     margin-left: auto;
   }
+  /* beside a crumb the actions take no height and centre on its line,
+     so a taller control never moves the crumb: it sits where it does
+     on a page with no actions */
+  .page-crumb + .page-actions {
+    align-self: center;
+    align-items: center;
+    height: 0;
+  }
 
   .page-state {
     margin: 0;

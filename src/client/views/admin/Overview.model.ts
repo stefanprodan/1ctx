@@ -1,21 +1,21 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Overview's words and numbers, pure: the Now tiles from the load,
-// the last 30 days' tiles and a day's words, the bars of a breakdown
-// and of the turn lengths, all time, and the faint lines. A chat's send
-// is a turn and a task's a run; "send" is never shown.
+// The Monitor's words and numbers, pure: the Now tiles from the load,
+// the days' tiles and a day's words, what needs attention, and the
+// faint line. A chat's send is a turn and a task's a run;
+// "send" is never shown.
 
 import type {
+  AttentionItem,
+  AttentionKind,
   LoadResponse,
   OverviewDay,
   OverviewResponse,
   OverviewTotals,
-  TurnLength,
-  UsageBy,
-  UsageRow,
 } from "../../../shared/api/admin.ts";
 import {
+  ago,
   clock,
   commas,
   count,
@@ -26,6 +26,7 @@ import {
   size,
   sizeParts,
 } from "../../lib/format.ts";
+import { configMcpHref, configProviderHref } from "../../lib/hrefs.ts";
 
 // a container's memory past this share is marked
 const MEMORY_FULL = 0.8;
@@ -135,20 +136,40 @@ export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
+// Usage has no Decisions tile, so the decisions ride along there,
+// runs being what asks them; the Monitor gives them their own
+export function runsTile(
+  totals: OverviewTotals,
+  at: OverviewDay | null,
+  withDecisions = true,
+) {
   const t = at ?? totals;
   const line = at
     ? pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed)
     : failedLine(totals.runsFailed, totals.runs);
-  // the decisions ride along while runs are what asks them
   const words =
-    t.decisions > 0
+    withDecisions && t.decisions > 0
       ? `${line} · ${pluralCommas(t.decisions, "decision", "decisions")}`
       : line;
   return {
     figure: commas(totals.runs),
     unit: totals.runs === 1 ? "run" : "runs",
     sub: at ? onDay(at, words) : words,
+  };
+}
+
+// the decisions answered and the input tokens they read
+function decisionsLine(t: OverviewTotals): string {
+  return t.decisions === 0 ? "none yet" : `${count(t.decisionTokens)} tokens`;
+}
+
+export function decisionsTile(totals: OverviewTotals, at: OverviewDay | null) {
+  return {
+    figure: commas(totals.decisions),
+    unit: totals.decisions === 1 ? "decision" : "decisions",
+    sub: at
+      ? onDay(at, pluralCommas(at.decisions, "decision", "decisions"))
+      : decisionsLine(totals),
   };
 }
 
@@ -207,115 +228,76 @@ export function dayTokensHint(day: OverviewDay): string {
   return parts.join(" · ");
 }
 
-// A breakdown's row as a bar: a personal project by its owner, a team
-// project by its name, an agent in mono. The deleted projects come as
-// one row named for them, which needs no mark; a retired agent is
-// marked gone, apart from a live one of its name. The hint says only
-// what the bar does not: the share and what ran.
-export function usageBars(kind: UsageBy, rows: UsageRow[]) {
-  const total = rows.reduce((sum, row) => sum + row.tokens, 0);
-  return rows.map((row, i) => {
-    const name =
-      row.owner !== null
-        ? `@${row.owner}`
-        : kind === "projects"
-          ? row.name === null
-            ? "deleted projects"
-            : `#${row.name}`
-          : (row.name ?? "");
-    const hint = [
-      share(row.tokens, total),
-      ...(row.turns > 0 || row.runs === 0
-        ? [pluralCommas(row.turns, "turn", "turns")]
-        : []),
-      ...(row.runs > 0 ? [pluralCommas(row.runs, "run", "runs")] : []),
-    ].join(" · ");
-    return {
-      key: row.id ?? (row.deleted ? "deleted" : `${row.owner ?? "row"}-${i}`),
-      name,
-      mono: kind === "agents",
-      gone: row.deleted && kind === "agents",
-      value: row.tokens,
-      label: count(row.tokens),
-      hint,
-    };
-  });
-}
-
-// a turn's length: "41s", "3m 20s", "1h 5m"
-export function lengthWord(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) {
-    const rest = s % 60;
-    return `${Math.floor(s / 60)}m${rest ? ` ${rest}s` : ""}`;
-  }
-  const m = Math.floor((s % 3600) / 60);
-  return `${Math.floor(s / 3600)}h${m ? ` ${m}m` : ""}`;
-}
-
-// A model without its org, as the agent rows show it, unless what is
-// left is a bare word ("openrouter/free").
-export function modelLabel(model: string): string {
-  const rest = model.slice(model.lastIndexOf("/") + 1);
-  return /[\d-]/.test(rest) ? rest : model;
-}
-
-// the models by their median turn, the turns and the slowest the hint
-export function lengthBars(lengths: TurnLength[]) {
-  return lengths.map((m) => ({
-    key: `${m.provider}/${m.model}`,
-    name: modelLabel(m.model),
-    value: m.medianMs ?? 0,
-    label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
-    hint: [
-      pluralCommas(m.turns, "turn", "turns"),
-      ...(m.slowestMs !== null ? [`slowest ${lengthWord(m.slowestMs)}`] : []),
-    ].join(" · "),
-  }));
-}
-
-// all time's four figures
-export function allCells(all: OverviewResponse["all"]) {
-  return [
-    {
-      label: "Chats",
-      figure: commas(all.turns),
-      unit: all.turns === 1 ? "turn" : "turns",
-      sub: failedLine(all.turnsFailed, all.turns),
-    },
-    {
-      label: "Automations",
-      figure: commas(all.runs),
-      unit: all.runs === 1 ? "run" : "runs",
-      sub: failedLine(all.runsFailed, all.runs),
-    },
-    { label: "Tokens", figure: count(tokensOf(all)), sub: cachedLine(all) },
-    { label: "Cost", ...costWords(all) },
-  ];
-}
-
-export const sinceWords = (since: number | null): string =>
-  since === null ? "" : `since ${dayMonth(since)}`;
-
-// all time's foot, before the database's size, which is its own link;
-// each part is kept whole where the line breaks
-export function instanceParts(
-  instance: OverviewResponse["instance"],
-): string[] {
-  return [
-    pluralCommas(instance.users, "user", "users"),
-    pluralCommas(instance.agents, "agent", "agents"),
-    pluralCommas(instance.projects, "team project", "team projects"),
-    pluralCommas(instance.automations, "automation", "automations"),
-  ];
-}
-
-export const databaseWords = (bytes: number): string =>
-  `database ${size(bytes)}`;
-
 // the build and how long it has been up
 export const buildLine = (
   instance: OverviewResponse["instance"],
   now: number,
 ): string => `${instance.version} · up ${elapsed(now - instance.startedAt)}`;
+
+const ATTENTION: Record<
+  AttentionKind,
+  {
+    what: string;
+    line: string;
+    icon: "mcp" | "skill" | "key";
+    href: (name: string) => string;
+  }
+> = {
+  "provider-key": {
+    icon: "key",
+    what: "Provider",
+    line: "key file missing",
+    href: configProviderHref,
+  },
+  "mcp-key": {
+    icon: "mcp",
+    what: "MCP server",
+    line: "key file missing",
+    href: configMcpHref,
+  },
+  "credential-key": {
+    icon: "key",
+    what: "Credential",
+    line: "key file missing",
+    href: () => "/config/tools/web",
+  },
+  "credential-unusable": {
+    icon: "key",
+    what: "Credential",
+    line: "key file unusable",
+    href: () => "/config/tools/web",
+  },
+  "search-key": {
+    icon: "key",
+    what: "Web search",
+    line: "key file missing",
+    href: () => "/config/tools/web",
+  },
+  "mcp-refresh": {
+    icon: "mcp",
+    what: "MCP server",
+    line: "refresh failed",
+    href: configMcpHref,
+  },
+  "skill-refresh": {
+    icon: "skill",
+    what: "Skill",
+    line: "refresh failed",
+    href: () => "/config/skills",
+  },
+};
+
+// a row of what needs attention: the name, what failed and when, what
+// kind of thing it is and its icon (an MCP server's or a skill's own,
+// a key for the rest), and the page that fixes it
+export function attentionRow(item: AttentionItem, now: number) {
+  const words = ATTENTION[item.kind];
+  return {
+    key: `${item.kind}:${item.name}`,
+    name: item.name,
+    line: item.at === null ? words.line : `${words.line} ${ago(item.at, now)}`,
+    what: words.what,
+    icon: words.icon,
+    href: words.href(item.name),
+  };
+}

@@ -15,6 +15,7 @@ import { workerScanner } from "../../../src/server/overview/worker.ts";
 import type {
   OverviewResponse,
   StorageResponse,
+  UsageResponse,
 } from "../../../src/shared/api/admin.ts";
 import { collectLogs, testApp } from "../../helpers/app.ts";
 import { fileDb } from "../../helpers/db.ts";
@@ -60,7 +61,30 @@ describe("the scan worker", () => {
       expect(body.days).toHaveLength(30);
       expect(body.instance.users).toBe(1);
       expect(body.instance.databaseBytes).toBeGreaterThan(0);
-      expect(body.all.since).toBeNull();
+      expect(body.range).toBe("30d");
+      await app.shutdown();
+    } finally {
+      file.cleanup();
+    }
+  });
+
+  test("answers the usage page's month from the same worker", async () => {
+    const file = fileDb();
+    try {
+      const app = await testApp({ db: file.db });
+      const admin = app.client();
+      await admin.login("admin", "hunter2-test");
+      const month = new Date(app.now.value).toISOString().slice(0, 7);
+      const res = await admin.call(
+        "GET",
+        `/api/admin/usage?tz=UTC&month=${month}`,
+      );
+      expect(res.status).toBe(200);
+      const body: UsageResponse = await res.json();
+      expect(body.month).toBe(month);
+      expect(body.days.length).toBeGreaterThan(0);
+      expect(body.since).toBeNull();
+      expect(body.by).toEqual({ projects: [], agents: [], models: [] });
       await app.shutdown();
     } finally {
       file.cleanup();
@@ -89,10 +113,18 @@ describe("the scan worker", () => {
       pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
+      attention: () => ({
+        providers: [],
+        mcp: [],
+        skills: [],
+        credentials: [],
+        search: { provider: null, hasKey: false },
+      }),
       worker: WORKER,
       scanner: {
         scan: () => Promise.reject(new Error("disk gone")),
         range: () => Promise.reject(new Error("disk gone")),
+        month: () => Promise.reject(new Error("disk gone")),
         close() {},
       },
     });

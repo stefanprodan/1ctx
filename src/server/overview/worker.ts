@@ -9,7 +9,7 @@
 // binary, where a URL resolves against the compile root, so compose.ts
 // builds it and passes it in.
 
-import type { RangeInput, RangeResult } from "./range.ts";
+import type { MonthResult, RangeInput, RangeResult } from "./range.ts";
 import type { ScanInput, ScanResult } from "./scan.ts";
 import type { Job, WorkerReply, WorkerRequest } from "./scan.worker.ts";
 
@@ -18,6 +18,7 @@ export const SCAN_DEADLINE_MS = 30_000;
 export type Scanner = {
   scan(input: ScanInput): Promise<ScanResult>;
   range(input: RangeInput): Promise<RangeResult>;
+  month(input: RangeInput): Promise<MonthResult>;
   close(): void;
 };
 
@@ -63,6 +64,7 @@ export function workerScanner(
   return {
     scan: (input) => post<ScanResult>({ kind: "storage", input }),
     range: (input) => post<RangeResult>({ kind: "range", input }),
+    month: (input) => post<MonthResult>({ kind: "month", input }),
     close() {
       for (const job of [...running]) {
         job.fail(new Error("scan closed"));

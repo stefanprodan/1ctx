@@ -66,7 +66,9 @@ describe("loadOverview", () => {
     const calls = held();
     const first = loadOverview();
     const second = loadOverview();
-    expect(calls[0].url).toMatch(/^\/api\/admin\/overview\?tz=[^&]+$/);
+    expect(calls[0].url).toMatch(
+      /^\/api\/admin\/overview\?tz=[^&]+&range=30d$/,
+    );
     calls[1].answer(json(body(7)));
     await second;
     calls[0].answer(json(body(30)));

@@ -42,6 +42,7 @@ export function RowsCard({
   live,
   count,
   wrap,
+  hintBelow,
   class: extra,
   children,
 }: {
@@ -62,6 +63,9 @@ export function RowsCard({
   // on a phone the search takes its own line, the count and the action
   // the next
   wrap?: boolean;
+  // on a phone the hint takes its own line under the label, held even
+  // while empty, so a hint that follows the pointer never moves the card
+  hintBelow?: boolean;
   // the owner's class beside the card's: a board's panel
   class?: string;
   children?: ComponentChildren;
@@ -77,7 +81,7 @@ export function RowsCard({
       <div
         class={`rows-head${search ? " rows-head-search" : ""}${
           tabs ? " rows-head-tabs" : ""
-        }${wrap ? " rows-head-wrap" : ""}`}
+        }${wrap ? " rows-head-wrap" : ""}${hintBelow ? " rows-head-below" : ""}`}
       >
         {wrap && slot ? (
           <div class="rows-head-slot">{slot}</div>
@@ -88,7 +92,7 @@ export function RowsCard({
             </span>
           ))
         )}
-        {hint && (
+        {(hint || hintBelow) && (
           <span class="rows-hint cut" aria-live={live ? "polite" : undefined}>
             {hint}
           </span>

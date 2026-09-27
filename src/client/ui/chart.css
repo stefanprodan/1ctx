@@ -202,14 +202,21 @@
     gap: var(--space-2);
   }
   /* the key's swatches as Plot.tsx stacks the parts, bottom first */
-  .chart-key-1 {
+  .chart-key-tokens-1,
+  .chart-key-activity-1,
+  .chart-key-line-2 {
     background: var(--heat-3);
   }
-  .chart-key-2 {
+  .chart-key-tokens-2,
+  .chart-key-activity-2 {
     background: var(--heat-2);
   }
-  .chart-key-3 {
+  .chart-key-tokens-3,
+  .chart-key-line-1 {
     background: var(--brand);
+  }
+  .chart-key-activity-3 {
+    background: var(--failed);
   }
   .chart-plot {
     position: relative;

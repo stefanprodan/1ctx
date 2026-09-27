@@ -2,18 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The overview answer from one read: the quarter hours laid on the
-// zone's days, their totals, the ten largest rows of each breakdown,
-// the ten models with the most turns, all time and the instance.
+// range's days in the zone, their totals and the instance. The usage
+// page's answer lays a month the same way and adds the ten largest
+// rows of each breakdown and the ten models with the most turns.
 
-import {
-  OVERVIEW_DAYS,
-  type OverviewDay,
-  type OverviewResponse,
-  type OverviewTotals,
-  type TurnLength,
-  USAGE_BY,
-  type UsageBy,
-  type UsageRow,
+import type {
+  OverviewDay,
+  OverviewRange,
+  OverviewResponse,
+  OverviewTotals,
+  TurnLength,
+  TurnLengths,
+  UsageResponse,
+  UsageRow,
 } from "../../shared/api/admin.ts";
 import {
   type DecisionSums,
@@ -23,6 +24,7 @@ import {
 import type {
   GroupRow,
   ModelRow,
+  MonthResult,
   RangeResult,
   SendSlot,
   UsageSlot,
@@ -36,9 +38,51 @@ export type Instance = Pick<
   "version" | "startedAt"
 >;
 
-// the days' bounds in the zone
-export const daysOf = (now: number, timeZone: string): UsageWindow =>
-  daysWindow(now, timeZone, OVERVIEW_DAYS);
+const DAY_MS = 86_400_000;
+
+// a fixed range's days in the zone; all is laid from its read
+export const daysOf = (
+  now: number,
+  timeZone: string,
+  range: "30d" | "90d",
+): UsageWindow => daysWindow(now, timeZone, range === "30d" ? 30 : 90);
+
+// the first slot any of the sums fell in, as an instant, null for none
+export function firstOf(result: Slots): number | null {
+  const firsts = [result.sends, result.usage, result.decisions]
+    .map((rows) => rows[0]?.slot)
+    .filter((slot): slot is number => slot !== undefined);
+  return firsts.length === 0 ? null : Math.min(...firsts) * SLOT_MS;
+}
+
+// the range's days: a fixed one's, or all's from the day the first sum
+// fell on to today, today alone before any
+export function windowOf(
+  now: number,
+  timeZone: string,
+  range: OverviewRange,
+  first: number | null,
+): UsageWindow {
+  if (range !== "all") return daysOf(now, timeZone, range);
+  const count =
+    first === null ? 1 : Math.max(1, Math.ceil((now - first) / DAY_MS) + 1);
+  const window = daysWindow(now, timeZone, count);
+  // the rounding may lead with a day before the first sum's
+  let from = 0;
+  while (
+    first !== null &&
+    from < window.starts.length - 1 &&
+    window.starts[from + 1]! <= first
+  ) {
+    from++;
+  }
+  return {
+    days: window.days.slice(from),
+    starts: window.starts.slice(from),
+    since: window.starts[from]!,
+    until: window.until,
+  };
+}
 
 const empty = (): OverviewTotals => ({
   turns: 0,
@@ -131,12 +175,50 @@ function lay<T extends { slot: number }>(
   }
 }
 
+type Slots = Pick<
+  RangeResult,
+  "sends" | "usage" | "decisions" | "ended" | "actives"
+>;
+
+// the nearest rank: the least length at least 95% of the turns took
+export function p95(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.ceil(sorted.length * 0.95) - 1]!;
+}
+
+const lengthsOf = (values: number[]): TurnLengths => ({
+  medianMs: median(values),
+  p95Ms: p95(values),
+});
+
 function days(
-  result: RangeResult,
+  result: Slots,
   window: UsageWindow,
-): Pick<OverviewResponse, "days" | "totals"> {
+): Pick<OverviewResponse, "days" | "totals" | "turnLength" | "activeUsers"> {
   const bounds = [...window.starts, window.until];
   const buckets = window.starts.map(empty);
+  // each ended turn on the day it started, in order as the days are
+  const lengths: number[][] = window.starts.map(() => []);
+  const all: number[] = [];
+  let on = 0;
+  result.ended.at.forEach((at, k) => {
+    if (at < bounds[0]! || at >= window.until) return;
+    while (at >= bounds[on + 1]!) on++;
+    lengths[on]!.push(result.ended.ms[k]!);
+    all.push(result.ended.ms[k]!);
+  });
+  // each user once a day and once over the range
+  const users = window.starts.map(() => new Set<number>());
+  const everyone = new Set<number>();
+  let day = 0;
+  result.actives.slot.forEach((slot, k) => {
+    const at = slot * SLOT_MS;
+    if (at < bounds[0]! || at >= window.until) return;
+    while (at >= bounds[day + 1]!) day++;
+    users[day]!.add(result.actives.user[k]!);
+    everyone.add(result.actives.user[k]!);
+  });
   lay(result.sends, bounds, addSends, buckets);
   lay(
     result.usage,
@@ -173,9 +255,13 @@ function days(
         decisionTokens: buckets[i]!.decisionTokens,
         pricedDecisions: buckets[i]!.pricedDecisions,
         decisionCost: buckets[i]!.decisionCost,
+        ...lengthsOf(lengths[i]!),
+        activeUsers: users[i]!.size,
       }),
     ),
     totals,
+    turnLength: lengthsOf(all),
+    activeUsers: everyone.size,
   };
 }
 
@@ -188,10 +274,20 @@ const top = (rows: GroupRow[]): UsageRow[] =>
     .slice(0, TOP)
     .map(({ key: _key, ...row }) => row);
 
-function by(result: RangeResult): Record<UsageBy, UsageRow[]> {
-  const out = {} as Record<UsageBy, UsageRow[]>;
-  for (const kind of USAGE_BY) out[kind] = top(result.by[kind]);
-  return out;
+function by(result: MonthResult): UsageResponse["by"] {
+  return {
+    projects: top(result.by.projects),
+    agents: top(result.by.agents),
+    models: result.by.models
+      .filter((row) => row.tokens > 0)
+      .sort(
+        (a, b) =>
+          b.tokens - a.tokens ||
+          a.model.localeCompare(b.model) ||
+          (a.provider ?? "").localeCompare(b.provider ?? ""),
+      )
+      .slice(0, TOP),
+  };
 }
 
 export function median(values: number[]): number | null {
@@ -211,25 +307,34 @@ const length = (row: ModelRow): TurnLength => ({
   slowestMs: row.lengths.length === 0 ? null : Math.max(...row.lengths),
 });
 
-function allTime(result: RangeResult): OverviewResponse["all"] {
-  const all = { ...empty(), since: result.all.since };
-  addSends(all, result.all);
-  addUsage(all, usageOf(result.all));
-  addDecisions(all, decidedOf(result.allDecisions));
-  return all;
-}
-
 export function overviewResponse(
   result: RangeResult,
   window: UsageWindow,
+  range: OverviewRange,
   instance: Instance,
 ): OverviewResponse {
   return {
     readAt: result.readAt,
+    range,
+    ...days(result, window),
+    instance: { ...instance, ...result.instance },
+  };
+}
+
+export function usageResponse(
+  result: MonthResult,
+  window: UsageWindow,
+  month: string,
+): UsageResponse {
+  return {
+    readAt: result.readAt,
+    month,
+    since: result.since,
     ...days(result, window),
     by: by(result),
     lengths: result.models.slice(0, TOP).map(length),
-    all: allTime(result),
-    instance: { ...instance, ...result.instance },
+    deciders: result.deciders
+      .sort((a, b) => b.decisions - a.decisions || a.name.localeCompare(b.name))
+      .slice(0, TOP),
   };
 }

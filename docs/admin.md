@@ -1,8 +1,8 @@
 # Admin: overview, provision, service and staging
 
 Governs `src/server/overview/`, `provision/`, `service/`,
-`scripts/staging.sh` and the staging targets. The Overview and Storage
-pages are in `docs/views.md` and `docs/ui.md`.
+`scripts/staging.sh` and the staging targets. The Overview, Usage and
+Storage pages are in `docs/views.md` and `docs/ui.md`.
 
 - **`overview/` is what an admin reads about the instance.** `overview/`
   is the area after `automations/` and before `provision/`:
@@ -31,12 +31,13 @@ pages are in `docs/views.md` and `docs/ui.md`.
   removes them.
 - **What goes and what stays.** Usage and decisions outlive every
   delete (a chat, a run, an automation, a project, a regenerated turn,
-  a decider), so the overview's tokens and cost read `usage` and
+  a decider, a provider), so the tokens and cost read `usage` and
   `decision_usage` alone and never fall; every
   deleted project is summed into one breakdown row, ranked like the
-  others, and a retired agent keeps its own row and name;
-  turns, runs and the models breakdown read `sends` and fall with a
-  delete. Archived chats are deleted `archivedDeleteDays` after they
+  others, a retired agent keeps its own row and name, a deleted
+  provider's model keeps its row with no provider, and a decider is
+  named by its latest row; turns, runs and the turn lengths read
+  `sends` and fall with a delete. Archived chats are deleted `archivedDeleteDays` after they
   were archived and orphan runs after their last activity (the chats
   sweep, `docs/sessions.md`). Nothing vacuums: SQLite reuses the pages
   a delete frees, so the file stays at its peak and grows no further
@@ -53,33 +54,56 @@ pages are in `docs/views.md` and `docs/ui.md`.
   against the compile root, `src/server`, so `compose.ts` builds the URL
   and passes it in. `cache.ts` keeps one read in flight per key and its
   answer a minute on the clock port; a failed read keeps nothing, is a
-  warning (`storage scan failed`, `overview read failed`) and the
-  router's 500.
+  warning (`storage scan failed`, `overview read failed`, `usage read
+  failed`) and the router's 500.
 - **Overview.**
-  `GET /api/admin/overview?tz=` (`admin`, one `tz`) answers
-  `OverviewResponse`: the zone's last `OVERVIEW_DAYS` days, today last,
-  and their totals, a chat's sends counted as turns and a task's as runs
-  apart, the ten largest projects and agents, the ten models with the
-  most turns and their median and slowest ended turn (a send counted
-  under the model its last round's usage says answered, when a router
-  served another than the one asked for), all time with the
-  first send's start, and the instance. `range.ts` is the worker's second
-  job, one read transaction over the same connection: sends by
-  `started_at` and tokens, rounds and cost by `usage.created_at`, summed
-  by quarter hour and laid on the zone's days in `overview.ts`; a
-  breakdown sums tokens from `usage` and sends from `sends` apart and
-  joins them by key, so a send of many rounds counts once. Decisions
+  `GET /api/admin/overview?tz=&range=` (`admin`, one `tz`, a `range` of
+  `OVERVIEW_RANGES`, 30d when not given) answers `OverviewResponse`: the
+  range's days in the zone, today last, and their totals, a chat's sends
+  counted as turns and a task's as runs apart, the median and the p95
+  (nearest rank) of ended chat turns' lengths a day and over the range
+  (`turnLength`, from `sends` with their start in the range; a run's
+  length is its task's), the users with a turn or a run a day and over
+  the range (`activeUsers`), and the instance. 30d and
+  90d are the last 30 and 90 days; all reads every sum there is and
+  lays them from the day of the first one (`windowOf()`), today alone
+  before any.
+  `range.ts` is the worker's second job, one read transaction over the
+  same connection: sends by `started_at` and tokens, rounds and cost by
+  `usage.created_at`, summed by quarter hour and laid on the zone's days
+  in `overview.ts`. Decisions
   are summed from `decision_usage` by `created_at` into `decisions`,
   `decisionTokens` (input tokens), `pricedDecisions` and
-  `decisionCost` on the days, the totals and all time; `cost` stays
-  the rounds' alone. The answer is kept a minute per zone.
+  `decisionCost` on the days and the totals; `cost` stays the rounds'
+  alone. The answer is kept a minute per zone and range.
+- **Usage.** `GET /api/admin/usage?tz=&month=YYYY-MM` (`admin`, one
+  `tz`, one `month` matching `MONTH_PATTERN`) answers `UsageResponse`:
+  the month's days in the zone (`monthWindow()` in `usage/`), up to
+  today in this month and none for a later one, laid and totalled as
+  the overview's, the ten largest projects, agents and models by tokens
+  with the priced rounds' cost, the ten models with the most turns and
+  their median and slowest ended turn (a send counted under the model
+  its last round's usage says answered, when a router served another
+  than the one asked for), the deciders by decisions, and the first
+  send's start. `month()` in `range.ts` is the worker's third job and
+  `breakdowns.ts` its queries: a breakdown sums tokens from `usage` and
+  sends from `sends` apart and joins them by key, so a send of many
+  rounds counts once. The answer is kept a minute per zone and month.
+- **Attention is read at each request.** `GET /api/admin/attention`
+  (`admin`, no parameter) answers what an admin should fix, from the
+  config rows and the key files through the `attention` port
+  `compose.ts` binds: a provider's, an MCP server's or the websearch
+  service's key file missing, a credential's key missing or unusable,
+  then the MCP servers and skills whose last refresh failed, newest
+  first (`attention.ts`, pure).
 - **Load is read from memory.**
   `GET /api/admin/load` (`admin`, no parameter) is read from memory at
   every request, never kept: the pools from `runner.registry.running()`
   and `chatsCap`, `runsCap` the current `runsRunning`, `online` the users
   with a socket through a port to `web/`, the automations and those due
   past `WAIT_GRACE_MS` through a port to their store, and `load.ts`'s
-  ring of `LOAD_SAMPLES` samples taken every `LOAD_SAMPLE_MS` from start:
+  ring of `LOAD_SAMPLES` samples taken every `LOAD_SAMPLE_MS` from start,
+  the first reading a baseline that draws nothing:
   the process's CPU over `availableParallelism()` cores and its `rss`
   against `process.constrainedMemory()`, `contained` when that is below
   the host's memory, sampled only once `compose()` activates the app.

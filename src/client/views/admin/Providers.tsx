@@ -164,7 +164,9 @@ function Row({
 }
 
 function Aside({ providers: all }: { providers: ProviderSummary[] }) {
-  const totals = overview.value?.totals ?? null;
+  // the aside's last 30 days, never the Monitor's other ranges
+  const answer = overview.value;
+  const totals = answer?.range === "30d" ? answer.totals : null;
   const cost = totals === null ? null : costOf(totals);
   // the key files by name, each with the provider that reads it
   const files = [...keys.value].sort((a, b) => a.localeCompare(b));

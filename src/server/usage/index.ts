@@ -35,6 +35,7 @@ export { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
 export {
   countByDay,
   daysWindow,
+  monthWindow,
   type UsageWindow,
   usageWindow,
 } from "./window.ts";

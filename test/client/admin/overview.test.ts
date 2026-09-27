@@ -7,7 +7,7 @@ import { render } from "preact-render-to-string";
 import { litPage } from "../../../src/client/app/Rail.model.ts";
 import { overview } from "../../../src/client/data/overview.ts";
 import {
-  allCells,
+  attentionRow,
   automationsTile,
   buildLine,
   cachedLine,
@@ -16,21 +16,37 @@ import {
   costTile,
   cpuTile,
   dayTokensHint,
-  instanceParts,
-  lengthBars,
-  lengthWord,
+  decisionsTile,
   memoryTile,
-  modelLabel,
   money,
   runsTile,
-  sinceWords,
   staleWords,
   tokensTile,
   turnsTile,
-  usageBars,
   zoomed,
 } from "../../../src/client/views/admin/Overview.model.ts";
 import { Overview } from "../../../src/client/views/admin/Overview.tsx";
+import {
+  activeTile,
+  activityHint,
+  activitySeries,
+  failureSeries,
+  failureTile,
+  lengthAxis,
+  lengthHint,
+  lengthSeries,
+} from "../../../src/client/views/admin/Stats.model.ts";
+import {
+  deciderBars,
+  lengthBars,
+  lengthWord,
+  modelBars,
+  modelLabel,
+  monthLabel,
+  monthSteps,
+  shiftMonth,
+  usageBars,
+} from "../../../src/client/views/admin/Usage.model.ts";
 import type {
   LoadResponse,
   OverviewDay,
@@ -75,6 +91,9 @@ const day = (over: Partial<OverviewDay> = {}): OverviewDay => ({
   decisionTokens: 0,
   pricedDecisions: 0,
   decisionCost: null,
+  medianMs: 20_000,
+  p95Ms: 65_000,
+  activeUsers: 3,
   ...over,
 });
 
@@ -95,6 +114,7 @@ const load = (over: Partial<LoadResponse> = {}): LoadResponse => ({
 });
 
 const row = (over: Partial<UsageRow>): UsageRow => ({
+  cost: null,
   deleted: false,
   id: "a1",
   name: "platform",
@@ -238,54 +258,86 @@ describe("the last 30 days", () => {
         null,
       ),
     ).toEqual({ figure: "None", sub: "no provider priced" });
-    expect(allCells({ ...both, since: null }).at(-1)).toMatchObject({
-      label: "Cost",
-      figure: "$5.00",
-    });
   });
 
-  test("decisions close the automations sub-line, on a day too", () => {
+  test("on Usage decisions close the automations sub-line, on a day too", () => {
     const t = totals({ runs: 10, decisions: 1234 });
     expect(runsTile(t, null).sub).toBe("none failed · 1,234 decisions");
     expect(runsTile(t, day({ decisions: 1 })).sub).toBe(
       "13 Sep · 1 run · 1 decision",
     );
     expect(runsTile(totals({ runs: 10 }), null).sub).toBe("none failed");
+    // the Monitor gives them their own tile
+    expect(runsTile(t, null, false).sub).toBe("none failed");
   });
 
-  test.serial("decisions are only in the automations tile", () => {
-    const answer = (last: number, ever: number): OverviewResponse => ({
-      readAt: 0,
-      days: [day()],
-      totals: totals({ decisions: last, decisionTokens: last * 10 }),
-      by: { projects: [], agents: [] },
-      lengths: [],
-      all: {
-        ...totals({ decisions: ever, decisionTokens: ever * 10 }),
-        since: 0,
-      },
-      instance: {
-        version: "test",
-        startedAt: 0,
-        users: 1,
-        projects: 1,
-        agents: 1,
-        automations: 0,
-        databaseBytes: MB,
-      },
+  test("the decisions tile counts them and the tokens they read", () => {
+    const t = totals({ decisions: 1234, decisionTokens: 56_000 });
+    expect(decisionsTile(t, null)).toEqual({
+      figure: "1,234",
+      unit: "decisions",
+      sub: "56K tokens",
     });
-    const page = (a: OverviewResponse) => {
-      overview.value = a;
-      try {
-        return render(h(Overview, {}));
-      } finally {
-        overview.value = null;
-      }
-    };
-    expect(page(answer(3, 7))).toContain("3 decisions");
-    expect(page(answer(3, 7))).not.toContain("7 decisions");
-    expect(page(answer(0, 7))).not.toContain("decisions");
+    expect(decisionsTile(t, day({ decisions: 1 })).sub).toBe(
+      "13 Sep · 1 decision",
+    );
+    expect(decisionsTile(totals(), null)).toEqual({
+      figure: "0",
+      unit: "decisions",
+      sub: "none yet",
+    });
   });
+
+  test.serial(
+    "the Monitor's Stats show decisions on their own and no money",
+    () => {
+      const answer = (last: number): OverviewResponse => ({
+        readAt: 0,
+        range: "30d",
+        days: [day()],
+        totals: totals({ decisions: last, decisionTokens: last * 10 }),
+        turnLength: { medianMs: 20_000, p95Ms: 65_000 },
+        activeUsers: 4,
+        instance: {
+          version: "test",
+          startedAt: 0,
+          users: 1,
+          projects: 1,
+          agents: 1,
+          automations: 0,
+          databaseBytes: MB,
+        },
+      });
+      const page = (a: OverviewResponse) => {
+        overview.value = a;
+        try {
+          return render(h(Overview, {}));
+        } finally {
+          overview.value = null;
+        }
+      };
+      const html = page(answer(3));
+      expect(html).toContain(">Stats<");
+      expect(html).toContain(">Decisions<");
+      expect(html).toContain("30 tokens");
+      expect(html).not.toContain("· 3 decisions");
+      // the range switch, and no All time or link to Usage
+      for (const word of [">30d<", ">90d<", ">All<"]) {
+        expect(html).toContain(word);
+      }
+      expect(html).not.toContain("All time");
+      expect(html).toContain(">Active users<");
+      expect(html).toContain(">Failure rate<");
+      expect(html).toContain("4 failures");
+      expect(html).not.toContain(">Chats<");
+      expect(html).toContain(">Activity<");
+      expect(html).toContain(">LLM response time<");
+      expect(html).toContain("median 20s · p95 1m 5s");
+      expect(html).not.toContain('href="/monitor/usage"');
+      expect(html).not.toContain("$");
+      expect(html).not.toContain(">Cost<");
+    },
+  );
 });
 
 describe("the breakdowns", () => {
@@ -330,6 +382,62 @@ describe("the breakdowns", () => {
     ]);
   });
 
+  test("a priced row says its cost after its share", () => {
+    const [priced] = usageBars("projects", [row({ cost: 0.5 })]);
+    expect(priced?.hint).toBe("100% · $0.50 · 3 turns");
+  });
+
+  test("a model by its tokens, its provider first in the hint", () => {
+    const bars = modelBars([
+      {
+        provider: "router",
+        model: "vendor/big-1",
+        tokens: 300,
+        cost: 0.004,
+        rounds: 3,
+      },
+      { provider: null, model: "small-2", tokens: 100, cost: null, rounds: 1 },
+    ]);
+    expect(bars.map((b) => [b.name, b.label, b.hint, b.mono])).toEqual([
+      ["big-1", "300", "router · 75% · <$0.01", true],
+      ["small-2", "100", "deleted provider · 25%", true],
+    ]);
+  });
+
+  test("a decider by its decisions", () => {
+    expect(
+      deciderBars([
+        { name: "jev", decisions: 12, tokens: 4_000, cost: 0.02 },
+      ]).map((b) => [b.name, b.label, b.hint]),
+    ).toEqual([["jev", "12", "4K tokens · $0.02"]]);
+  });
+
+  test("the arrows step a month between the first turn's and this one", () => {
+    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+    expect(shiftMonth("2025-12", 1)).toBe("2026-01");
+    expect(shiftMonth("2026-09", -13)).toBe("2025-08");
+    expect(monthSteps("2026-09", "2026-06", "2026-09")).toEqual({
+      back: "2026-08",
+      forward: null,
+    });
+    expect(monthSteps("2026-06", "2026-06", "2026-09")).toEqual({
+      back: null,
+      forward: "2026-07",
+    });
+    expect(monthSteps("2026-09", null, "2026-09")).toEqual({
+      back: null,
+      forward: null,
+    });
+    // a month before the first, reached by its address, only goes forward
+    expect(monthSteps("2026-03", "2026-06", "2026-09")).toEqual({
+      back: null,
+      forward: "2026-04",
+    });
+    expect(monthLabel("2026-09")).toBe("September 2026");
+    expect(monthLabel("2025-12")).toBe("December 2025");
+    expect(monthLabel("2026-09", true)).toBe("Sep 2026");
+  });
+
   test("a model loses its org unless a bare word is left", () => {
     expect(modelLabel("mlx-community/LFM2.5-8B")).toBe("LFM2.5-8B");
     expect(modelLabel("openrouter/free")).toBe("openrouter/free");
@@ -365,22 +473,120 @@ describe("the breakdowns", () => {
   });
 });
 
-describe("all time", () => {
-  const all = (over: Partial<OverviewResponse["all"]> = {}) => ({
-    ...totals(),
-    since: new Date(2026, 8, 12).getTime(),
-    ...over,
+describe("needs attention", () => {
+  const now = Date.parse("2026-09-28T12:00:00Z");
+
+  test("a row names the thing, what failed and the page that fixes it", () => {
+    expect(
+      attentionRow({ kind: "provider-key", name: "router", at: null }, now),
+    ).toMatchObject({
+      name: "router",
+      line: "key file missing",
+      what: "Provider",
+      icon: "key",
+      href: "/config/providers/router",
+    });
+    expect(
+      attentionRow(
+        { kind: "mcp-refresh", name: "flux", at: now - 3 * 3_600_000 },
+        now,
+      ),
+    ).toMatchObject({
+      line: "refresh failed 3h ago",
+      what: "MCP server",
+      icon: "mcp",
+      href: "/config/mcp/flux",
+    });
+    expect(
+      attentionRow({ kind: "credential-unusable", name: "gh", at: null }, now),
+    ).toMatchObject({ line: "key file unusable", href: "/config/tools/web" });
+  });
+});
+
+describe("the Stats charts", () => {
+  test("activity stacks what did not fail under every failure", () => {
+    const d = day({ turns: 31, turnsFailed: 1, runs: 3, runsFailed: 2 });
+    expect(activitySeries([d]).map((s) => [s.label, s.values[0]])).toEqual([
+      ["Chat turns", 30],
+      ["Automation runs", 1],
+      ["Failed", 3],
+    ]);
+    expect(activityHint(totals(), d)).toBe(
+      "13 Sep · 31 turns · 3 runs · 3 failed",
+    );
+    expect(activityHint(totals(), day({ turnsFailed: 0 }))).toBe(
+      "13 Sep · 31 turns · 1 run",
+    );
+    expect(activityHint(totals(), null)).toBe("120 · 3% failed");
+    expect(
+      activityHint(totals({ turns: 0, turnsFailed: 0, runs: 0 }), null),
+    ).toBe("");
   });
 
-  test("four figures and the instance's counts", () => {
-    expect(allCells(all()).map((c) => [c.label, c.figure, c.sub])).toEqual([
-      ["Chats", "100", "4% failed"],
-      ["Automations", "20", "none failed"],
-      ["Tokens", "1.2K", "38% cached"],
-      ["Cost", "$4.12", "12 of 30 priced"],
-    ]);
-    expect(sinceWords(all().since)).toBe("since 12 Sep");
-    expect(sinceWords(null)).toBe("");
+  test("turn length names the median and the p95", () => {
+    const range = { medianMs: 19_000, p95Ms: 125_000 };
+    expect(lengthHint(range, null)).toBe("median 19s · p95 2m 5s");
+    expect(lengthHint(range, day())).toBe("13 Sep · median 20s · p95 1m 5s");
+    expect(lengthHint(range, day({ medianMs: null, p95Ms: null }))).toBe(
+      "13 Sep · no turns",
+    );
+    expect(lengthHint({ medianMs: null, p95Ms: null }, null)).toBe("");
+    expect(lengthSeries([day(), day({ medianMs: null, p95Ms: null })])).toEqual(
+      [
+        { label: "Median", values: [20_000, null] },
+        { label: "p95", values: [65_000, null] },
+      ],
+    );
+    expect(lengthAxis(0)).toBe("0");
+    expect(lengthAxis(120_000)).toBe("2m");
+  });
+});
+
+describe("the Stats tiles", () => {
+  test("active users against every user, a day's on the cursor", () => {
+    expect(activeTile(6, 8, null)).toEqual({
+      figure: "6",
+      unit: "users",
+      sub: "of 8",
+    });
+    expect(activeTile(1, 8, null).unit).toBe("user");
+    expect(activeTile(6, 8, day({ activeUsers: 1 })).sub).toBe(
+      "13 Sep · 1 user",
+    );
+  });
+
+  test("the failure rate counts the failures", () => {
+    const t = totals({ turns: 90, turnsFailed: 4, runs: 10, runsFailed: 1 });
+    expect(failureTile(t, null)).toEqual({ figure: "5%", sub: "5 failures" });
+    expect(
+      failureTile(totals({ turnsFailed: 1, runsFailed: 0 }), null).sub,
+    ).toBe("1 failure");
+    expect(failureTile(t, day({ turnsFailed: 2 })).sub).toBe(
+      "13 Sep · 2 of 32 failed",
+    );
+    expect(failureTile(t, day({ turnsFailed: 0 })).sub).toBe(
+      "13 Sep · none failed",
+    );
+    expect(
+      failureTile(totals({ turnsFailed: 0, runsFailed: 0 }), null),
+    ).toEqual({ figure: "0%", sub: "none failed" });
+    expect(
+      failureTile(
+        totals({ turns: 0, turnsFailed: 0, runs: 0, runsFailed: 0 }),
+        null,
+      ).sub,
+    ).toBe("none yet");
+    expect(
+      failureSeries([
+        day({ turnsFailed: 1, runs: 1 }),
+        day({ turns: 0, runs: 0 }),
+      ]),
+    ).toEqual([1 / 32, 0]);
+  });
+});
+
+describe("the build line", () => {
+  test("names the build and how long it has been up", () => {
     const instance: OverviewResponse["instance"] = {
       version: "v1.2.3",
       startedAt: 0,
@@ -390,9 +596,6 @@ describe("all time", () => {
       automations: 1,
       databaseBytes: 0,
     };
-    expect(instanceParts(instance).join(" · ")).toBe(
-      "8 users · 9 agents · 5 team projects · 1 automation",
-    );
     expect(buildLine(instance, 7 * 3_600_000)).toBe("v1.2.3 · up 7h");
   });
 });

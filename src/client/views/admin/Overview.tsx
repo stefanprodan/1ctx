@@ -1,336 +1,155 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The instance at a glance, in three rows by time. Now is the server's
-// load, polled while the page is on screen (OverviewNow.tsx). Last 30
-// days is four tiles on one cursor, the tokens of each day stacked by
-// kind, the usage by project or agent and how long each model's turns
-// take. All time is one card of figures and the instance's counts. The
-// page keeps itself current while it is seen (watchOverview()); the
-// first load draws the board in bones, and a failed read keeps the last
-// answer faded and says since when.
+// The instance at a glance, headed Monitor / Live. The first tiles are
+// the server's load, polled while the page is on screen
+// (OverviewNow.tsx); the head says when they were read, or that a poll
+// failed, with Refresh, as Storage's. Needs attention lists what an
+// admin should fix, each row opening the page that fixes it. Stats is
+// four tiles on one cursor over 30 days, 90 days or all, the
+// breakdowns being on Usage. The page keeps
+// itself current while it is seen (watchOverview()); the first load
+// draws the board in bones, and a failed read keeps the last answer
+// faded and says since when.
 
 import { useSignal } from "@preact/signals";
-import { Fragment } from "preact";
-import { useEffect, useMemo } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import {
+  OVERVIEW_RANGES,
+  type OverviewRange,
   type OverviewResponse,
-  USAGE_BY,
-  type UsageBy,
 } from "../../../shared/api/admin.ts";
 import {
+  attention,
+  attentionError,
   overview,
   overviewError,
   overviewLoading,
+  overviewRange,
+  pickOverviewRange,
+  refreshOverview,
   serverLoad,
+  serverLoadError,
   watchOverview,
 } from "../../data/overview.ts";
-import { count, type Failure } from "../../lib/format.ts";
-import { BarsGhost, Bone } from "../../ui/Bones.tsx";
-import { Bars, ChartFoot, ChartPanel } from "../../ui/Chart.tsx";
+import type { Failure } from "../../lib/format.ts";
+import { Icon } from "../../lib/icons.tsx";
+import { useNow } from "../../lib/now.ts";
+import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { DayBars, type DaySeries, Spark } from "../../ui/Plot.tsx";
-import { RowsFilters } from "../../ui/Rows.tsx";
-import { Tile, TilePlot, Tiles } from "../../ui/Tiles.tsx";
 import {
-  allCells,
-  buildLine,
-  costOf,
-  costTile,
-  databaseWords,
-  dayTokensHint,
-  instanceParts,
-  lengthBars,
-  runsTile,
-  sinceWords,
-  tokensHint,
-  tokensOf,
-  tokensTile,
-  turnsTile,
-  usageBars,
-} from "./Overview.model.ts";
+  RowsAvatar,
+  RowsCard,
+  RowsGo,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
+import { RowsFilters } from "../../ui/RowsControls.tsx";
+import { ActivityPanel, DaysTiles, LengthPanel } from "./Days.tsx";
+import { attentionRow, buildLine } from "./Overview.model.ts";
 import { BoardRow, NowRow, OverviewGhost, Trouble } from "./OverviewNow.tsx";
 import "./overview.css";
 
 const DAYS_SYNC = "overview";
 
-const BY_LABELS: Record<UsageBy, string> = {
-  projects: "Projects",
-  agents: "Agents",
+function Attention() {
+  const now = useNow(60_000);
+  const answer = attention.value;
+  const error = attentionError.value;
+  if (answer === null) {
+    return error ? (
+      <RowsCard label="Needs attention" class="overview-stale">
+        <RowsNote>Did not load.</RowsNote>
+      </RowsCard>
+    ) : null;
+  }
+  const rows = answer.items.map((item) => attentionRow(item, now));
+  return (
+    <RowsCard
+      label="Needs attention"
+      count={rows.length > 0 ? String(rows.length) : undefined}
+      class={error ? "overview-stale" : undefined}
+    >
+      {rows.length === 0 ? (
+        <RowsNote>Nothing needs attention.</RowsNote>
+      ) : (
+        rows.map((row) => (
+          <RowsGo key={row.key} href={row.href}>
+            <RowsAvatar>
+              <Icon name={row.icon} size={14} />
+            </RowsAvatar>
+            <RowsTitle name={row.name} sub={row.line} mono bad />
+            <RowsMeta>{row.what}</RowsMeta>
+          </RowsGo>
+        ))
+      )}
+    </RowsCard>
+  );
+}
+
+const RANGE_LABELS: Record<OverviewRange, string> = {
+  "30d": "30d",
+  "90d": "90d",
+  all: "All",
 };
 
-function DaysTiles({
-  answer,
-  day,
-}: {
-  answer: OverviewResponse;
-  day: { value: number | null };
-}) {
-  const { days, totals } = answer;
-  const series = useMemo(
-    () => ({
-      starts: days.map((d) => d.start),
-      turns: days.map((d) => d.turns),
-      runs: days.map((d) => d.runs),
-      tokens: days.map((d) => tokensOf(d)),
-      // the rounds and the decisions, flat at zero where no provider
-      // priced either
-      cost: days.map((d) => costOf(d) ?? 0),
-    }),
-    [days],
-  );
-  const onCursor = (index: number | null) => {
-    day.value = index;
-  };
-  const at = day.value === null ? null : (days[day.value] ?? null);
-  const turns = turnsTile(totals, at);
-  const runs = runsTile(totals, at);
-  const tokens = tokensTile(totals, at);
-  const cost = costTile(totals, at);
-  const spark = (kind: "line" | "bars", values: number[]) => (
-    <Spark
-      kind={kind}
-      times={series.starts}
-      values={values}
-      sync={DAYS_SYNC}
-      onCursor={onCursor}
-    />
-  );
-  return (
-    <Tiles>
-      <Tile
-        label="Chats"
-        figure={turns.figure}
-        unit={turns.unit}
-        sub={turns.sub}
-      >
-        <TilePlot label="Chat turns per day">
-          {spark("bars", series.turns)}
-        </TilePlot>
-      </Tile>
-      <Tile
-        label="Automations"
-        figure={runs.figure}
-        unit={runs.unit}
-        sub={runs.sub}
-      >
-        <TilePlot label="Automation runs per day">
-          {spark("bars", series.runs)}
-        </TilePlot>
-      </Tile>
-      <Tile label="Tokens" figure={tokens.figure} sub={tokens.sub}>
-        <TilePlot label="Tokens per day">
-          {spark("line", series.tokens)}
-        </TilePlot>
-      </Tile>
-      <Tile label="Cost" figure={cost.figure} sub={cost.sub}>
-        <TilePlot label="Cost per day">{spark("line", series.cost)}</TilePlot>
-      </Tile>
-    </Tiles>
-  );
-}
-
-const NO_TURNS = "No turns in the last 30 days";
-
-function TokensPanel({
-  answer,
-  day,
-}: {
-  answer: OverviewResponse;
-  day: { value: number | null };
-}) {
-  const { days, totals } = answer;
-  const starts = useMemo(() => days.map((d) => d.start), [days]);
-  const series = useMemo<DaySeries[]>(
-    () => [
-      {
-        label: "Input",
-        values: days.map((d) => Math.max(0, d.promptTokens - d.cachedTokens)),
-      },
-      { label: "Cached input", values: days.map((d) => d.cachedTokens) },
-      { label: "Output", values: days.map((d) => d.completionTokens) },
-    ],
-    [days],
-  );
-  const any = tokensOf(totals) > 0;
-  const at = day.value === null ? null : days[day.value];
-  return (
-    <ChartPanel
-      label="Tokens per day"
-      hint={any ? (at ? dayTokensHint(at) : tokensHint(totals)) : undefined}
-    >
-      {any ? (
-        <DayBars
-          label="Tokens per day"
-          days={starts}
-          series={series}
-          words={(v) => (v === 0 ? "0" : count(v))}
-          sync={DAYS_SYNC}
-          onCursor={(i) => {
-            day.value = i;
-          }}
-        />
-      ) : (
-        <p class="chart-none">{NO_TURNS}</p>
-      )}
-    </ChartPanel>
-  );
-}
-
-function UsagePanel({ answer }: { answer: OverviewResponse }) {
-  const kind = useSignal<UsageBy>("projects");
-  const over = useSignal<string | null>(null);
-  const bars = usageBars(kind.value, answer.by[kind.value]);
-  const filters = USAGE_BY.map((k) => ({
-    label: BY_LABELS[k],
-    on: kind.value === k,
-    onPick: () => {
-      kind.value = k;
-      over.value = null;
-    },
-  }));
-  return (
-    <ChartPanel
-      label="Usage"
-      hint={bars.find((b) => b.key === over.value)?.hint}
-      action={<RowsFilters label="Usage by" filters={filters} />}
-    >
-      {bars.length === 0 ? (
-        <p class="chart-none">{NO_TURNS}</p>
-      ) : (
-        <Bars
-          wide
-          bars={bars}
-          onHover={(key) => {
-            over.value = key;
-          }}
-        />
-      )}
-    </ChartPanel>
-  );
-}
-
-function LengthPanel({ answer }: { answer: OverviewResponse }) {
-  const over = useSignal<string | null>(null);
-  const bars = lengthBars(answer.lengths);
-  return (
-    <ChartPanel
-      label="Turn length"
-      hint={bars.find((b) => b.key === over.value)?.hint ?? "median"}
-    >
-      {bars.length === 0 ? (
-        <p class="chart-none">{NO_TURNS}</p>
-      ) : (
-        <Bars
-          wide
-          bars={bars.map((b) => ({ ...b, mono: true }))}
-          onHover={(key) => {
-            over.value = key;
-          }}
-        />
-      )}
-    </ChartPanel>
-  );
-}
-
-function AllTime({ answer }: { answer: OverviewResponse }) {
-  return (
-    <>
-      <BoardRow label="All time" note={sinceWords(answer.all.since)} />
-      <section class="card overview-all" aria-label="All time">
-        <div class="overview-totals">
-          {allCells(answer.all).map((cell) => (
-            <div key={cell.label} class="overview-total">
-              <span class="label">{cell.label}</span>
-              <span class="overview-total-figure">
-                {cell.figure}
-                {"unit" in cell && (
-                  <span class="overview-total-unit">{cell.unit}</span>
-                )}
-              </span>
-              <span class="overview-total-sub">{cell.sub}</span>
-            </div>
-          ))}
-        </div>
-        <ChartFoot>
-          {instanceParts(answer.instance).map((part) => (
-            <Fragment key={part}>
-              <span class="overview-part">{part} ·</span>{" "}
-            </Fragment>
-          ))}
-          <a class="overview-facts-link overview-part" href="/monitor/storage">
-            {databaseWords(answer.instance.databaseBytes)}
-          </a>
-        </ChartFoot>
-      </section>
-    </>
-  );
-}
-
-function Past({
+function Stats({
   answer,
   error,
 }: {
-  answer: OverviewResponse;
+  answer: OverviewResponse | null;
   error: Failure | null;
 }) {
-  // the day under the cursor, shared by the tiles and the tokens chart
   const day = useSignal<number | null>(null);
+  const range = overviewRange.value;
+  const filters = OVERVIEW_RANGES.map((r) => ({
+    label: RANGE_LABELS[r],
+    on: range === r,
+    onPick: () => {
+      day.value = null;
+      pickOverviewRange(r);
+    },
+  }));
   return (
     <>
       <BoardRow
-        label="Last 30 days"
-        stale={error !== null}
-        note={<Trouble error={error} at={answer.readAt} />}
+        label="Stats"
+        stale={answer !== null && error !== null}
+        note={answer && <Trouble error={error} at={answer.readAt} />}
+        action={<RowsFilters label="Stats over" filters={filters} />}
       />
-      <DaysTiles answer={answer} day={day} />
-      <div class="chart-grid">
-        <div class="overview-wide">
-          <TokensPanel answer={answer} day={day} />
+      {answer ? (
+        // another range keeps the last one faded until it lands
+        <div class={answer.range !== range ? "overview-stale" : undefined}>
+          <DaysTiles
+            days={answer.days}
+            totals={answer.totals}
+            day={day}
+            sync={DAYS_SYNC}
+            people={{
+              active: answer.activeUsers,
+              users: answer.instance.users,
+            }}
+          />
+          <div class="chart-grid overview-charts">
+            <ActivityPanel
+              days={answer.days}
+              totals={answer.totals}
+              day={day}
+              sync={DAYS_SYNC}
+            />
+            <LengthPanel
+              days={answer.days}
+              lengths={answer.turnLength}
+              day={day}
+              sync={DAYS_SYNC}
+            />
+          </div>
         </div>
-        <UsagePanel answer={answer} />
-        <LengthPanel answer={answer} />
-      </div>
-      <AllTime answer={answer} />
-    </>
-  );
-}
-
-const BAR_WIDTHS = [100, 62, 40, 26, 14];
-const LENGTH_WIDTHS = [100, 48, 30, 12];
-const DAY_HEIGHTS = [
-  38, 60, 52, 41, 20, 14, 62, 60, 60, 50, 48, 18, 34, 54, 64, 76, 56, 42, 12,
-  18, 64, 62, 58, 96, 50, 20, 10, 46, 64, 70,
-];
-
-// the last two rows while their first answer loads, in their shape
-function PastGhost() {
-  return (
-    <>
-      <BoardRow label="Last 30 days" />
-      <OverviewGhost at={16} />
-      <div class="chart-grid chart-board-ghost" aria-hidden="true">
-        <div class="overview-wide">
-          <ChartPanel label="Tokens per day">
-            <div class="chart-days">
-              <div class="chart-key">
-                <Bone kind="title" at={32} width={30} />
-              </div>
-              <div class="chart-plot overview-ghost-days">
-                {DAY_HEIGHTS.map((h, i) => (
-                  <Bone key={i} kind="column" at={33 + i} height={h} />
-                ))}
-              </div>
-            </div>
-          </ChartPanel>
-        </div>
-        <ChartPanel label="Usage">
-          <BarsGhost widths={BAR_WIDTHS} at={64} wide />
-        </ChartPanel>
-        <ChartPanel label="Turn length">
-          <BarsGhost widths={LENGTH_WIDTHS} at={80} wide />
-        </ChartPanel>
-      </div>
+      ) : (
+        <OverviewGhost at={16} />
+      )}
     </>
   );
 }
@@ -342,15 +161,26 @@ export function Overview() {
   const busy = overviewLoading.value;
   return (
     <Page
-      crumb=""
-      title="Monitor"
+      // the zone's own page: the step names the zone, no link to itself
+      steps={[{ label: "Monitor" }]}
+      title="Live"
+      actions={
+        // when the live tiles were last read; Refresh reads it all again
+        <Loaded
+          readAt={serverLoad.value?.at ?? null}
+          busy={overviewLoading.value}
+          error={serverLoadError.value}
+          onRefresh={() => void refreshOverview()}
+        />
+      }
       error={answer === null && !busy ? error : null}
     >
       <div class="chart-board" aria-busy={answer === null && busy}>
         <NowRow />
+        <Attention />
         {/* a failed read keeps the last answer, faded */}
         <div class={`overview-past${answer && error ? " overview-stale" : ""}`}>
-          {answer ? <Past answer={answer} error={error} /> : <PastGhost />}
+          <Stats answer={answer} error={error} />
         </div>
         {answer && (
           <p class="chart-facts">

@@ -238,7 +238,9 @@ function Row({
 }
 
 function Aside({ using }: { using: { name: string; agents: number }[] }) {
-  const totals = overview.value?.totals ?? null;
+  // the aside's last 30 days, never the Monitor's other ranges
+  const answer = overview.value;
+  const totals = answer?.range === "30d" ? answer.totals : null;
   const cost = totals === null ? null : costOf(totals);
   return (
     <>

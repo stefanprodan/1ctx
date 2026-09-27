@@ -67,7 +67,9 @@ function ListTabs({ on }: { on: "deciders" | "decisions" }) {
 }
 
 function Aside() {
-  const totals = overview.value?.totals ?? null;
+  // the aside's last 30 days, never the Monitor's other ranges
+  const answer = overview.value;
+  const totals = answer?.range === "30d" ? answer.totals : null;
   return (
     <AsideSection
       label="Last 30 days"

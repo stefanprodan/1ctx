@@ -602,9 +602,19 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   other, checked by `optionProblem()`, a refusal reaching a field
   through `decisionFieldOf()`. A decision is the code's, so it has no
   Delete. The aside is `GET /api/decisions/:id/usage`.
-- **The overview's usage bars** name the one row of every deleted
-  project "deleted projects", unmarked, and mark a retired agent with a
-  small "deleted" after the name (`Bars`' `gone`).
+- **The Usage page** is a calendar month (`?month=2026-09`, this month
+  without one): the month's tiles and Tokens per day (`Days.tsx`, shared
+  with the Overview's tiles), then Usage by Projects, Agents or Models,
+  Turn length and, when any, Decisions by decider, each a `Bars` panel
+  whose hint follows the pointer (`Usage.model.ts`). The head steps a
+  month at a time with two arrows, links to their month
+  (`monthSteps()`), each faded where there is none: back to the first
+  turn's month, forward to this one; a phone shows the short month
+  name so the crumb stays whole. The
+  usage bars name the one row of every deleted project "deleted
+  projects", unmarked, and mark a retired agent with a small "deleted"
+  after the name (`Bars`' `gone`); a model whose provider is gone says
+  "deleted provider" in its hint.
 - **The New agent form's MCP section.** The form's section is a line
   per server with Read and Write boxes (write on brings read, read off
   takes write, a side off on the server faint with the word),
@@ -631,11 +641,28 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   While the Overview is on screen and the tab is seen, `watchOverview()`
   in `data/overview.ts` polls `GET /api/admin/load` one request at a
   time and reads the
-  overview again once a minute; the page has no Refresh. Each row's head
-  is `BoardRow` in `OverviewNow.tsx`, a failed read its `Trouble`; a
-  model is named by `modelLabel()` in `Overview.model.ts`. The
-  decisions close the Automations tile's sub-line (`runsTile()`), "none
-  failed · 2 decisions", on the cursor's day too, left out while there
-  are none; the cost tiles, the cost per day and All time's cost add the rounds' cost and `decisionCost` (`costOf()`, a
-  null counting as 0 beside a priced one). The board is in
-  `docs/ui.md`, the routes in `docs/admin.md`.
+  overview and what needs attention again once a minute; the head's
+  Refresh (`refreshOverview()`) reads all three at once. Each row's head is `BoardRow` in `OverviewNow.tsx`, a
+  failed read its `Trouble`. Needs attention is a `RowsCard` of `RowsGo`
+  rows, each opening the page that fixes it (`attentionRow()`), or
+  "Nothing needs attention." Stats is the four tiles over 30 days, 90
+  days or all, picked by the `RowsFilters` at the end of its head
+  (`overviewRange` in `data/overview.ts`); another range keeps the last
+  one faded until it lands, and a list's aside reads 30d whatever the
+  Monitor shows. Under the tiles, on their cursor: Activity, turns and
+  runs a day with the failed ones on top in the failed colour
+  (`DayBars`' `stack="activity"`), and LLM response time, the median and p95
+  of chat turns a day as `DayLines` on round time steps, a gap on a day
+  without one (`Stats.model.ts`). A model is named by `modelLabel()` in
+  `Usage.model.ts`. Money is Usage's alone: the Monitor's Stats are
+  Active users ("6 users of 8", `activeTile()`), Failure rate (the
+  failed share of turns and runs over their count, "5 failures",
+  `failureTile()`), Decisions
+  (`decisionsTile()`, the decisions and the input tokens they read) and
+  Tokens, passed as `DaysTiles`' `people`. Usage's tiles are Chats,
+  Automations, Tokens and Cost: its decisions close the Automations
+  tile's sub-line (`runsTile()`), "none failed · 2 decisions", on the
+  cursor's day too, left out while there are none, and its cost adds
+  the rounds' cost and `decisionCost` (`costOf()`, a null counting as 0
+  beside a priced one). The board is in `docs/ui.md`, the routes in
+  `docs/admin.md`.
