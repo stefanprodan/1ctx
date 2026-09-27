@@ -33,7 +33,7 @@ import { money } from "./Overview.model.ts";
 import "./agent-page.css";
 
 const STEPS = [
-  { label: "Config" },
+  { label: "Config", href: "/config" },
   { label: "Agents", href: "/config/agents" },
 ];
 
@@ -195,7 +195,7 @@ function Aside({ agent }: { agent: AgentSummary }) {
       <AsideSection
         label="Last 30 days"
         action={
-          <a class="split-link" href="/admin">
+          <a class="split-link" href="/monitor">
             Usage
           </a>
         }

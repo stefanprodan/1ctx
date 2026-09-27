@@ -26,7 +26,7 @@ import "./agent-page.css";
 import "./agent-new.css";
 
 const STEPS = [
-  { label: "Config" },
+  { label: "Config", href: "/config" },
   { label: "Agents", href: "/config/agents" },
 ];
 
@@ -44,7 +44,7 @@ export function NewAgent() {
         (rows.length === 0 ? (
           <p class="page-state">
             An agent runs on a provider's model.{" "}
-            <a href="/admin/agents">Add a provider</a> first.
+            <a href="/config/providers">Add a provider</a> first.
           </p>
         ) : (
           <Form

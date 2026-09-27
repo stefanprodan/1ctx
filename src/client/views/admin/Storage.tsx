@@ -64,6 +64,7 @@ import {
   walWords,
 } from "./Storage.model.ts";
 import "./storage.css";
+import { zoneStep } from "../../app/zones.ts";
 
 const SYNC = "storage";
 
@@ -424,7 +425,7 @@ export function Storage() {
   );
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Monitor")]}
       title="Storage"
       actions={actions}
       error={answer === null && !busy ? error : null}

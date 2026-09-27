@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { App } from "../../../src/client/app/App.tsx";
+import { adminFace } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
 import {
   conflicts,
@@ -14,6 +15,7 @@ import {
   navEntries,
   ROUTES,
 } from "../../../src/client/app/routes.ts";
+import { ZONES } from "../../../src/client/app/zones.ts";
 import { me } from "../../../src/client/data/me.ts";
 
 describe("the route table", () => {
@@ -49,34 +51,20 @@ describe("the route table", () => {
     }
   });
 
-  test("a member's rail has no admin route", () => {
-    const withAdmin = [
-      ...ROUTES,
-      {
-        ...ROUTES[1],
-        path: "/admin/x",
-        role: "admin" as const,
-        nav: { label: "X", icon: "settings" as const, order: 9 },
-      },
-    ];
-    expect(navEntries("member", withAdmin).map((r) => r.path)).toEqual([
-      "/",
-      "/projects",
-    ]);
-    expect(navEntries("admin", withAdmin).map((r) => r.path)).toEqual([
-      "/",
-      "/projects",
-      "/admin",
-      "/admin/storage",
-      "/admin/projects",
-      "/admin/users",
-      "/admin/x",
-      "/admin/agents",
-      "/config/agents",
-      "/admin/tools",
-      "/admin/skills",
-      "/admin/mcp",
-    ]);
+  test("the working face lists Home and Projects", () => {
+    expect(navEntries().map((r) => r.path)).toEqual(["/", "/projects"]);
+  });
+
+  test("every zone address is an admin route, and every admin route is in a zone", () => {
+    for (const zone of ZONES) {
+      for (const href of [zone.href, ...zone.pages.map((p) => p.href)]) {
+        expect(match(href)?.route.role, href).toBe("admin");
+      }
+    }
+    for (const route of ROUTES.filter((r) => r.role === "admin")) {
+      expect(adminFace(route.path), route.path).toBe(true);
+    }
+    expect(ROUTES.some((r) => r.path.startsWith("/admin"))).toBe(false);
   });
 
   test("every route has a title", () => {

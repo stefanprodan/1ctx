@@ -179,7 +179,7 @@ describe("storage words", () => {
       name: "platform",
       mono: true,
       sub: "knowledge history 38\u00a0MB · uploads 12\u00a0MB",
-      href: "/admin/projects?open=p1",
+      href: "/access/projects?open=p1",
     });
     const chat = row({
       id: "s1",

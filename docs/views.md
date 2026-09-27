@@ -257,7 +257,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Knowledge, then Members for a team or Settings for a personal one.
   A team project's Members tab is the
   same rows, linking an admin to
-  `/admin/projects?open=<id>` and `/config/agents`.
+  `/access/projects?open=<id>` and `/config/agents`.
   The aside under every tab (`Frame.tsx`) is About, the Activity weeks
   (`GhostGrid` without labels while they load), then Latest
   knowledge (the three knowledge files changed last, from the held
@@ -419,9 +419,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has four tabs,** one view over `/admin/tools`
-  (Built-in), `/admin/tools/web`, `/admin/tools/visuals` and
-  `/admin/tools/limits`: Built-in lists every built-in schema, including
+- **The Tools page has four tabs,** one view over `/config/tools`
+  (Built-in), `/config/tools/web`, `/config/tools/visuals` and
+  `/config/tools/limits`: Built-in lists every built-in schema, including
   `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
   each row `RowsTitle` (the name over the first sentence) with its
   tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
@@ -461,7 +461,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   reset that lowers the days archived chats are kept asks in the foot
   first (`deleteAsk()`), Delete then Keep.
 - **The MCP page shows the loaded rows as a send would carry them.**
-  `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
+  `/config/mcp` is `Rows`: New server opens `McpForm` (the name shaped
   by `shapeServerName()`, the key a `Select` of the `mcp-` files the
   route answered, the call timeout in seconds with the limits' call
   timeout the route answered as its placeholder), a row's head is the
@@ -481,7 +481,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
-- **The Providers page.** `/admin/agents`, the rail's Providers,
+- **The Providers page.** `/config/providers`, the rail's Providers,
   stacks Providers, Deciders, then Decisions, and waits for all of
   them. Each card is named by its search, which filters its rows, and
   shows them by name (`byName()` in `lib/search.ts`, the entities
@@ -592,7 +592,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   base's `.choice`. The new-server form and an open MCP row hold a
   server's settings through `useMcpSettings()` in
   `views/admin/McpSettings.ts`, and send the one body it builds.
-- **The Skills page.** The Skills page, `/admin/skills`, is `Rows`: Add
+- **The Skills page.** The Skills page, `/config/skills`, is `Rows`: Add
   skill takes the URL (a site or an index is looked up first and its
   entries listed with Add), a row's head is the name over its files and
   when it was fetched (the refresh failure in red), with Refresh at its

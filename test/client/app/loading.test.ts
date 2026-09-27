@@ -37,7 +37,7 @@ function table() {
     },
     {
       ...base,
-      path: "/admin/x",
+      path: "/config/x",
       role: "admin",
       load: async () => {
         calls.push("admin");
@@ -131,7 +131,7 @@ describe("startLoading", () => {
   test("the same user promoted to admin loads the admin route", () => {
     const { routes, calls } = table();
     me.value = casey;
-    path.value = "/admin/x";
+    path.value = "/config/x";
     stop = startLoading(routes);
     expect(calls).toEqual([]);
     me.value = { ...casey, role: "admin" };

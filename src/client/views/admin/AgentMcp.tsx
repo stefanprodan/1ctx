@@ -172,7 +172,7 @@ function Servers({
           <RowsNote>The servers did not load. Reload the page.</RowsNote>
         ) : all.length === 0 ? (
           <RowsNote>
-            No MCP servers yet. <a href="/admin/mcp">Add one</a> and it shows
+            No MCP servers yet. <a href="/config/mcp">Add one</a> and it shows
             here.
           </RowsNote>
         ) : !takesTools ? (

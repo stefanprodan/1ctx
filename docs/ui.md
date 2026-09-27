@@ -104,9 +104,9 @@ client change. What each page draws is in `docs/views.md`.
   card that drafts ends in `Foot` with `stack`, so a phone gives the
   hint its own line. The card clips nothing, so a select's list opens
   past it.
-- **A dashboard is a board, not rows.** The admin's Overview (`/admin`,
-  the Admin group's first entry: rows Now, Last 30 days and All time)
-  and Storage (`/admin/storage`) are `ui/Tiles.tsx` (stat tiles, the
+- **A dashboard is a board, not rows.** The admin's Monitor (`/monitor`,
+  the zone's own page: rows Now, Last 30 days and All time) and
+  Storage (`/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
   figure at `--text-figure`) over `ui/Chart.tsx` panels in a grid:
   `ChartPanel` wears the Rows card head, `Bars` rank from one baseline
   in CSS, `Stack` splits a whole, and `ui/Plot.tsx` has uPlot draw what
@@ -268,6 +268,16 @@ client change. What each page draws is in `docs/views.md`.
   the view on the page head's row. The width is `NARROW` in `shell.ts`
   and the same number in `shell.css`. The rail never becomes a header
   row and there is no top bar.
+- **The rail has two faces, and the address picks one.** The working
+  face lists the routes that carry `nav`, Home and Projects. The admin
+  face is `app/zones.ts`: Monitor, Access and Config, each a header
+  linking to the zone's own page with its pages under it, all open; an
+  admin page lives under its zone's address and nowhere else. An
+  admin gets a band over the user row, Admin panel or Exit admin
+  panel, opening the last page seen on the other face (`lastAdmin`
+  and `lastWork` in `shell.ts`), Monitor or Home the first time. A
+  crumb's zone step links to the zone (`zoneStep()`); Access and Config
+  are placeholder boards listing their pages (`ZoneBoard.tsx`).
 - **Touch.**
   On a touch screen (`pointer: coarse`, `lib/touch.ts`) every field is
   `--text-touch`, 16px, since iOS zooms into a smaller one and stays

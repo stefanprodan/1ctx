@@ -20,6 +20,7 @@ import { Search } from "../../ui/Search.tsx";
 import { McpForm } from "./McpForm.tsx";
 import { ServerRow } from "./McpRow.tsx";
 import "./mcp.css";
+import { zoneStep } from "../../app/zones.ts";
 
 export function Mcp() {
   const list = servers.value;
@@ -34,7 +35,7 @@ export function Mcp() {
   const now = useNow(60_000);
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Config")]}
       title="MCP"
       loading={list === null && error === null}
       error={error}

@@ -258,7 +258,7 @@ function AllTime({ answer }: { answer: OverviewResponse }) {
               <span class="overview-part">{part} ·</span>{" "}
             </Fragment>
           ))}
-          <a class="overview-facts-link overview-part" href="/admin/storage">
+          <a class="overview-facts-link overview-part" href="/monitor/storage">
             {databaseWords(answer.instance.databaseBytes)}
           </a>
         </ChartFoot>
@@ -342,8 +342,8 @@ export function Overview() {
   const busy = overviewLoading.value;
   return (
     <Page
-      crumb="Admin"
-      title="Overview"
+      crumb=""
+      title="Monitor"
       error={answer === null && !busy ? error : null}
     >
       <div class="chart-board" aria-busy={answer === null && busy}>

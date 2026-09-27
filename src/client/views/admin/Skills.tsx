@@ -51,6 +51,7 @@ import {
   textBox,
 } from "./Skills.model.ts";
 import "./skills.css";
+import { zoneStep } from "../../app/zones.ts";
 
 // a text loaded on open: the body or a file, as the bytes are
 function Text({
@@ -332,7 +333,7 @@ export function Skills() {
   const now = useNow(60_000);
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Config")]}
       title="Skills"
       loading={list === null && error === null}
       error={error}

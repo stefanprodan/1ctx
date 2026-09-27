@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { SessionDetail } from "../../shared/contracts/session.ts";
+import { ZONES } from "./zones.ts";
 
 // the project a page is in: its own pages, the chat's, or the
 // automation's, which only its row names
@@ -28,8 +29,14 @@ export function onPage(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// the one page of a group lit for a path: the longest that holds it, so
-// /admin/storage lights Storage and not the Overview at /admin too
+// the address alone picks the rail's face: a zone's pages are the admin
+// face, every other page the working one
+export function adminFace(pathname: string): boolean {
+  return ZONES.some((z) => onPage(pathname, z.href));
+}
+
+// the one link of a zone lit for a path: the longest that holds it, so
+// /monitor/storage lights Storage and not the zone at /monitor too
 export function litPage(pathname: string, hrefs: string[]): string | null {
   let best: string | null = null;
   for (const href of hrefs) {

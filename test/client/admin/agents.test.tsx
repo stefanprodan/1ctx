@@ -14,7 +14,6 @@ import {
   thinkingLine,
   windowLine,
 } from "../../../src/client/agents/meta.ts";
-import { railRows } from "../../../src/client/app/routes.ts";
 import {
   agents,
   agentsError,
@@ -656,44 +655,6 @@ describe("the default agent", () => {
     ]);
     expect(agents.value?.map((a) => a.default)).toEqual([false, true]);
   });
-});
-
-describe("the rail", () => {
-  test.serial(
-    "groups the admin routes under Admin, and hides them from a member",
-    () => {
-      const rows = railRows("admin");
-      const group = rows.find((r) => r.kind === "group");
-      expect(group?.kind === "group" && group.name).toBe("Admin");
-      expect(
-        group?.kind === "group" && group.routes.map((r) => r.path),
-      ).toEqual([
-        "/admin",
-        "/admin/storage",
-        "/admin/projects",
-        "/admin/users",
-        "/admin/agents",
-        "/config/agents",
-        "/admin/tools",
-        "/admin/skills",
-        "/admin/mcp",
-      ]);
-      expect(
-        group?.kind === "group" && group.routes.map((r) => r.nav!.label),
-      ).toEqual([
-        "Overview",
-        "Storage",
-        "Projects",
-        "Users",
-        "Providers",
-        "Agents",
-        "Tools",
-        "Skills",
-        "MCP",
-      ]);
-      expect(railRows("member").some((r) => r.kind === "group")).toBe(false);
-    },
-  );
 });
 
 describe("the page", () => {
