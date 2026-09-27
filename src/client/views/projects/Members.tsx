@@ -38,7 +38,7 @@ export function Members({ params }: { params: Params }) {
                 admin && (
                   <RowsLink
                     label="Manage"
-                    href={`/admin/projects?open=${encodeURIComponent(shown.id)}`}
+                    href={`/access/projects?open=${encodeURIComponent(shown.id)}`}
                   />
                 )
               }

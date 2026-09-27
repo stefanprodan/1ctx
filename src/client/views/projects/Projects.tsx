@@ -111,7 +111,7 @@ export function Projects() {
             }
             action={
               admin ? (
-                <RowsLink label="Manage" href="/admin/projects" />
+                <RowsLink label="Manage" href="/access/projects" />
               ) : undefined
             }
           >

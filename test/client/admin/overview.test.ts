@@ -398,11 +398,11 @@ describe("all time", () => {
 });
 
 describe("the rail", () => {
-  test("lights Storage alone under /admin/storage", () => {
-    const hrefs = ["/admin", "/admin/storage", "/admin/tools"];
-    expect(litPage("/admin/storage", hrefs)).toBe("/admin/storage");
-    expect(litPage("/admin", hrefs)).toBe("/admin");
-    expect(litPage("/admin/tools/web", hrefs)).toBe("/admin/tools");
+  test("lights Storage alone under /monitor/storage", () => {
+    const hrefs = ["/monitor", "/monitor/storage", "/config/tools"];
+    expect(litPage("/monitor/storage", hrefs)).toBe("/monitor/storage");
+    expect(litPage("/monitor", hrefs)).toBe("/monitor");
+    expect(litPage("/config/tools/web", hrefs)).toBe("/config/tools");
     expect(litPage("/projects", hrefs)).toBeNull();
   });
 });

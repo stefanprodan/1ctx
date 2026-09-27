@@ -76,6 +76,13 @@ const PATHS = {
   lock: "M4.5 7.5h7a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1zM5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2",
   hash: "M6.5 2.5 5 13.5M11 2.5 9.5 13.5M3 6h10.5M2.5 10h10.5",
   settings: "M2.5 4.5h11M2.5 8h11M2.5 11.5h11",
+  // two sliders: Config's header; settings' three lines read as a menu
+  config: "M2.5 4.5h11M2.5 11.5h11M5.5 2.75v3.5M10.5 9.75v3.5",
+  // four tiles: the way to the admin face
+  panel:
+    "M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z",
+  // a box with an arrow out: the whole view changes
+  open: "M9 2.5h4.5V7M13.5 2.5 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3",
   plus: "M8 3v10M3 8h10",
   chevron: "M5 6.5l3 3 3-3",
   "chevron-right": "M6.5 5l3 3-3 3",
@@ -90,8 +97,6 @@ const PATHS = {
   users:
     "M6 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM1.5 13.5c0-2.4 2-3.5 4.5-3.5s4.5 1.1 4.5 3.5M10.5 3.2a2.5 2.5 0 0 1 0 4.6M12.2 10.3c1.4.5 2.3 1.5 2.3 3.2",
   user: "M8 8.5a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5zM2.5 13.5c0-2.5 2.5-3.5 5.5-3.5s5.5 1 5.5 3.5",
-  admin:
-    "M8 2.5l4.5 1.8v3.2c0 2.9-1.9 5-4.5 6-2.6-1-4.5-3.1-4.5-6V4.3zM6 8l1.5 1.5L10.5 6.5",
   providers:
     "M4.5 12.5h7a2.5 2.5 0 0 0 .3-5A3.5 3.5 0 0 0 5 6.6 3 3 0 0 0 4.5 12.5z",
   search: "M7 11.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM10.3 10.3l3.2 3.2",

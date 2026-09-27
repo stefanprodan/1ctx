@@ -21,6 +21,7 @@ import { DecisionsCard } from "./DecisionsCard.tsx";
 import { ProviderForm } from "./ProviderForm.tsx";
 import { ProviderRow } from "./ProviderRow.tsx";
 import "./agents.css";
+import { zoneStep } from "../../app/zones.ts";
 
 export function Providers() {
   const list = agents.value;
@@ -34,7 +35,7 @@ export function Providers() {
   const error = agentsError.value ?? providersError.value;
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Config")]}
       title="Providers"
       loading={
         (list === null ||

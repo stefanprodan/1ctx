@@ -69,7 +69,7 @@ describe("send budget fields", () => {
       error: toolsError.value,
     };
     try {
-      path.value = "/admin/tools/limits";
+      path.value = "/config/tools/limits";
       limits.value = rows;
       tools.value = {
         builtin: [],

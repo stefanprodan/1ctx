@@ -32,6 +32,7 @@ import { countLine } from "./AdminProjects.model.ts";
 import { useOpenParam } from "./OpenParam.ts";
 import { ProjectForm } from "./ProjectForm.tsx";
 import "./admin-projects.css";
+import { zoneStep } from "../../app/zones.ts";
 
 function ProjectRow({
   project,
@@ -81,7 +82,7 @@ export function AdminProjects() {
   );
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Access")]}
       title="Projects"
       loading={(list === null || users.value === null) && error === null}
       error={error}

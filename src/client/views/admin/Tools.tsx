@@ -53,6 +53,7 @@ import {
 import { VisualHosts } from "./VisualHosts.tsx";
 import { WebAccessCard } from "./WebAccessCard.tsx";
 import "./tools.css";
+import { zoneStep } from "../../app/zones.ts";
 
 // one card of rows, one open at a time, the schemas' tokens together
 // in its head
@@ -155,7 +156,7 @@ export function Tools() {
   const href = TOOLS_TABS.find((t) => t.tab === tab)!.href;
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Config")]}
       title="Tools"
       loading={(state === null || rows === null) && error === null}
       error={error}

@@ -29,6 +29,7 @@ import { Search } from "../../ui/Search.tsx";
 import { UserForm } from "./UserForm.tsx";
 import { adminCount, metaLine, stateLine } from "./Users.model.ts";
 import "./users.css";
+import { zoneStep } from "../../app/zones.ts";
 
 function UserRow({
   user,
@@ -80,7 +81,7 @@ export function Users() {
   );
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Access")]}
       title="Users"
       loading={list === null && error === null}
       error={error}

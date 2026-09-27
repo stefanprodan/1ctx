@@ -231,10 +231,10 @@ export function totalTokens(rows: { tokens: number }[]): number {
 type ToolsTab = "builtin" | "web" | "visuals" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
-  { tab: "builtin", label: "Built-in", href: "/admin/tools" },
-  { tab: "web", label: "Web", href: "/admin/tools/web" },
-  { tab: "visuals", label: "Visuals", href: "/admin/tools/visuals" },
-  { tab: "limits", label: "Limits", href: "/admin/tools/limits" },
+  { tab: "builtin", label: "Built-in", href: "/config/tools" },
+  { tab: "web", label: "Web", href: "/config/tools/web" },
+  { tab: "visuals", label: "Visuals", href: "/config/tools/visuals" },
+  { tab: "limits", label: "Limits", href: "/config/tools/limits" },
 ];
 
 export function toolsTab(pathname: string): ToolsTab {

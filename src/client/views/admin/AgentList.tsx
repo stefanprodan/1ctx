@@ -51,7 +51,7 @@ import { NewAgent } from "./NewAgent.tsx";
 import { costOf, money, tokensOf } from "./Overview.model.ts";
 import "./agent-list.css";
 
-const CONFIG = [{ label: "Config" }];
+const CONFIG = [{ label: "Config", href: "/config" }];
 
 export function AgentList() {
   if (new URLSearchParams(query.value).has("new")) return <NewAgent />;
@@ -245,7 +245,7 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
       <AsideSection
         label="Last 30 days"
         action={
-          <a class="split-link" href="/admin">
+          <a class="split-link" href="/monitor">
             Usage
           </a>
         }
@@ -267,7 +267,7 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
       <AsideSection
         label="Providers"
         action={
-          <a class="split-link" href="/admin/agents">
+          <a class="split-link" href="/config/providers">
             Manage
           </a>
         }

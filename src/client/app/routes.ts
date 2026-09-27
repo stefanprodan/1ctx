@@ -3,10 +3,9 @@
 //
 // The one route table. Every view is one entry: the path pattern, the
 // view, its title, the role it needs, what it loads, and either a rail
-// entry or hidden.
-// A rail entry may sit in a group, a row that expands to its entries;
-// Admin is the one so far, and only admins get its routes. The rail and
-// the tests read this; the server enforces access, never this table.
+// entry or hidden. The admin pages are the zones' in app/zones.ts. The
+// rail and the tests read this; the server enforces access, never this
+// table.
 // A view is loaded on first use, so the table stays one small module
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
@@ -66,11 +65,9 @@ export type Route = {
   // matches, with the query for a view filtered by it; a view never
   // fetches
   load?: (params: Params, query: URLSearchParams) => Promise<void>;
-  nav?: { label: string; icon: IconName; order: number; group?: string };
+  // the working face's rail rows; the admin face's are app/zones.ts
+  nav?: { label: string; icon: IconName; order: number };
 };
-
-// the icon of a group's row in the rail
-const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
 
 // a project page's head, tabs and aside
 const frame = (id: string) => [
@@ -371,27 +368,41 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/admin",
+    path: "/monitor",
     view: lazy(() =>
       import("../views/admin/Overview.tsx").then((m) => m.Overview),
     ),
-    title: () => "Overview",
+    title: () => "Monitor",
     role: "admin",
     load: () => loadOverview(),
-    nav: { label: "Overview", icon: "visual", order: 6, group: "Admin" },
   },
   {
-    path: "/admin/storage",
+    path: "/monitor/storage",
     view: lazy(() =>
       import("../views/admin/Storage.tsx").then((m) => m.Storage),
     ),
     title: () => "Storage",
     role: "admin",
     load: () => loadStorage(),
-    nav: { label: "Storage", icon: "storage", order: 7, group: "Admin" },
   },
   {
-    path: "/admin/projects",
+    path: "/access",
+    // a board that lists the zone's pages, until the zone's is designed
+    view: lazy(() =>
+      import("../views/admin/ZoneBoard.tsx").then((m) => m.AccessBoard),
+    ),
+    title: () => "Access",
+    role: "admin",
+  },
+  {
+    path: "/access/users",
+    view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
+    title: () => "Users",
+    role: "admin",
+    load: () => loadUsers(),
+  },
+  {
+    path: "/access/projects",
     view: lazy(() =>
       import("../views/admin/AdminProjects.tsx").then((m) => m.AdminProjects),
     ),
@@ -406,18 +417,17 @@ export const ROUTES: Route[] = [
         open === null ? undefined : loadAdminProject(open),
       ]);
     },
-    nav: { label: "Projects", icon: "projects", order: 8, group: "Admin" },
   },
   {
-    path: "/admin/users",
-    view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
-    title: () => "Users",
+    path: "/config",
+    view: lazy(() =>
+      import("../views/admin/ZoneBoard.tsx").then((m) => m.ConfigBoard),
+    ),
+    title: () => "Config",
     role: "admin",
-    load: () => loadUsers(),
-    nav: { label: "Users", icon: "users", order: 9, group: "Admin" },
   },
   {
-    path: "/admin/agents",
+    path: "/config/providers",
     view: lazy(() =>
       import("../views/admin/Providers.tsx").then((m) => m.Providers),
     ),
@@ -432,7 +442,6 @@ export const ROUTES: Route[] = [
         loadProviders(),
       ]);
     },
-    nav: { label: "Providers", icon: "providers", order: 10, group: "Admin" },
   },
   {
     path: "/config/agents",
@@ -452,19 +461,17 @@ export const ROUTES: Route[] = [
         loadOverview(),
       ]);
     },
-    nav: { label: "Agents", icon: "agents", order: 10.5, group: "Admin" },
   },
   ...configAgentRoutes,
   {
-    path: "/admin/tools",
+    path: "/config/tools",
     view: toolsView,
     title: () => "Tools",
     role: "admin",
     load: () => loadTools(),
-    nav: { label: "Tools", icon: "tools", order: 11, group: "Admin" },
   },
   {
-    path: "/admin/tools/web",
+    path: "/config/tools/web",
     view: toolsView,
     title: () => "Web tools",
     role: "admin",
@@ -473,34 +480,32 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/admin/tools/visuals",
+    path: "/config/tools/visuals",
     view: toolsView,
     title: () => "Visuals",
     role: "admin",
     load: () => loadTools(),
   },
   {
-    path: "/admin/tools/limits",
+    path: "/config/tools/limits",
     view: toolsView,
     title: () => "Limits",
     role: "admin",
     load: () => loadTools(),
   },
   {
-    path: "/admin/skills",
+    path: "/config/skills",
     view: lazy(() => import("../views/admin/Skills.tsx").then((m) => m.Skills)),
     title: () => "Skills",
     role: "admin",
     load: () => loadSkills(),
-    nav: { label: "Skills", icon: "skill", order: 12, group: "Admin" },
   },
   {
-    path: "/admin/mcp",
+    path: "/config/mcp",
     view: lazy(() => import("../views/admin/Mcp.tsx").then((m) => m.Mcp)),
     title: () => "MCP",
     role: "admin",
     load: () => loadMcp(),
-    nav: { label: "MCP", icon: "mcp", order: 13, group: "Admin" },
   },
   {
     path: "/users/:username",
@@ -603,36 +608,9 @@ export function conflicts(routes = ROUTES): string[] {
   return out;
 }
 
-export function navEntries(role: "admin" | "member", routes = ROUTES) {
+// the working face's rail rows, in order
+export function navEntries(routes = ROUTES) {
   return routes
-    .filter((r) => r.nav && (r.role !== "admin" || role === "admin"))
+    .filter((r) => r.nav !== undefined)
     .sort((a, b) => a.nav!.order - b.nav!.order);
-}
-
-// the rail's rows in order: a route on its own, or a group with the
-// routes it holds, placed where its first route sorts
-export type RailRow =
-  | { kind: "route"; route: Route }
-  | { kind: "group"; name: string; icon: IconName; routes: Route[] };
-
-export function railRows(role: "admin" | "member", routes = ROUTES) {
-  const rows: RailRow[] = [];
-  for (const route of navEntries(role, routes)) {
-    const group = route.nav!.group;
-    if (group === undefined) {
-      rows.push({ kind: "route", route });
-      continue;
-    }
-    const open = rows.find((r) => r.kind === "group" && r.name === group);
-    if (open && open.kind === "group") open.routes.push(route);
-    else {
-      rows.push({
-        kind: "group",
-        name: group,
-        icon: GROUP_ICONS[group] ?? "settings",
-        routes: [route],
-      });
-    }
-  }
-  return rows;
 }
