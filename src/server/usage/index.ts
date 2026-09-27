@@ -51,6 +51,7 @@ export type Usage = {
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
   // an agent's year of days in the zone, every project in one series
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
+  agentTotal: UsageStore["agentTotal"];
   routes: RouteDescriptor[];
 };
 
@@ -64,6 +65,8 @@ export function usageArea(deps: UsageDeps): Usage {
     recordDecision: (fields) => decisions.record(fields),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
+    agentTotal: (agentId, since, until) =>
+      store.agentTotal(agentId, since, until),
     agentDays(agentId, timeZone) {
       const { days, starts, since, until } = usageWindow(
         deps.clock(),

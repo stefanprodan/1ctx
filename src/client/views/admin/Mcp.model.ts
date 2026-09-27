@@ -238,6 +238,9 @@ export function promptPreview(
   line: string;
   warnings: string[];
   text: string;
+  // the block's characters, and the servers whose instructions it holds
+  count: number;
+  from: string[];
 } {
   const offered = offeredServers(rows, links);
   const snapshot = promptSnapshot(offered, () => "");
@@ -263,7 +266,13 @@ export function promptPreview(
     snapshot.text === ""
       ? ""
       : `Instructions in the prompt: ${snapshot.text.length.toLocaleString("en-US")} of ${MAX_INSTRUCTIONS_BLOCK.toLocaleString("en-US")} characters, from ${from.join(", ")}`;
-  return { line, warnings, text: snapshot.text };
+  return {
+    line,
+    warnings,
+    text: snapshot.text,
+    count: snapshot.text.length,
+    from,
+  };
 }
 
 // which field of the form a refusal names

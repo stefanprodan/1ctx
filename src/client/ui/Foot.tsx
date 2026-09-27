@@ -25,6 +25,7 @@ export function Foot({
   before,
   after,
   above,
+  stack,
   children,
 }: {
   save: Pick<Save, "status" | "busy" | "notice">;
@@ -40,6 +41,9 @@ export function Foot({
   // a line over the notice and the buttons: what a Delete asked about
   // would do; its class, which takes the whole line, is the owner's
   above?: ComponentChildren;
+  // on a phone the start takes its own line and the buttons the next,
+  // at the right: a hint too long to share a line with them
+  stack?: boolean;
 }) {
   const status = save.status.value;
   const done = status === "done";
@@ -47,7 +51,7 @@ export function Foot({
   const notice = save.notice();
   const on = (yes: boolean) => `foot-label${yes ? " foot-label-on" : ""}`;
   return (
-    <div class="foot">
+    <div class={`foot${stack ? " foot-stack" : ""}`}>
       {above}
       {notice !== null && (
         <p class="notice-failed foot-notice" role="alert">
@@ -63,7 +67,7 @@ export function Foot({
       {children ?? (
         <button
           type="submit"
-          class={`btn btn-primary${done ? " foot-done" : ""}`}
+          class={`btn btn-primary foot-submit${done ? " foot-done" : ""}`}
           disabled={save.busy || done || !dirty}
         >
           <span class="foot-labels">

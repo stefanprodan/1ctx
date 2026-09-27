@@ -7,9 +7,11 @@
 
 import { effect, signal } from "@preact/signals";
 import type {
+  AgentActivity,
   AgentImpactResponse,
   AgentResponse,
   AgentsResponse,
+  AgentUsageResponse,
   SaveAgentRequest,
 } from "../../shared/api/agents.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
@@ -19,6 +21,16 @@ import { me } from "./me.ts";
 
 export const agents = signal<AgentSummary[] | null>(null);
 export const agentsError = signal<Failure | null>(null);
+// when each agent last ran and whether it runs now, read with the list
+export const activity = signal<AgentActivity[]>([]);
+// an agent's page beside the row: its last 30 days and what its delete
+// would touch, each null when its read failed
+export type AgentFacts = {
+  agentId: string;
+  usage: AgentUsageResponse | null;
+  impact: AgentImpactResponse | null;
+};
+export const facts = signal<AgentFacts | null>(null);
 
 let owner: string | null = null;
 
@@ -28,6 +40,8 @@ effect(() => {
   owner = id;
   agents.value = null;
   agentsError.value = null;
+  activity.value = [];
+  facts.value = null;
 });
 
 // a load's answer is kept only when it is still the one wanted: for
@@ -42,7 +56,10 @@ export async function loadAgents(): Promise<void> {
   agentsError.value = null;
   try {
     const body = await api<AgentsResponse>("/api/agents");
-    if (owner === forUser && turn === mine) agents.value = body.agents;
+    if (owner === forUser && turn === mine) {
+      agents.value = body.agents;
+      activity.value = body.activity;
+    }
   } catch (err) {
     if (owner === forUser && turn === mine) agentsError.value = failure(err);
   }
@@ -76,6 +93,22 @@ export async function updateAgent(
   // the mark moved, so another row's default changed with it
   if (body.default !== undefined) void loadAgents();
   return agent;
+}
+
+// read after the list, which names the agent; a later read for another
+// agent supersedes this one
+let factsTurn = 0;
+export async function loadFacts(name: string): Promise<void> {
+  const mine = ++factsTurn;
+  const agent = agents.value?.find((a) => a.name === name);
+  if (agent === undefined) return;
+  if (facts.value?.agentId !== agent.id) facts.value = null;
+  const id = encodeURIComponent(agent.id);
+  const [usage, impact] = await Promise.all([
+    api<AgentUsageResponse>(`/api/agents/${id}/usage`).catch(() => null),
+    api<AgentImpactResponse>(`/api/agents/${id}/impact`).catch(() => null),
+  ]);
+  if (mine === factsTurn) facts.value = { agentId: agent.id, usage, impact };
 }
 
 // what a delete would do now: the chats it archives, the automations

@@ -300,7 +300,7 @@ describe("GET /api/providers/:id/catalog", () => {
     ).json();
     const res = await client.call(
       "GET",
-      `/api/providers/${provider.id}/catalog?q=opus%205`,
+      `/api/providers/${provider.id}/catalog?q=opus-5`,
     );
     expect(res.status).toBe(200);
     const { matches } = await res.json();

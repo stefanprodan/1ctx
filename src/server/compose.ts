@@ -276,6 +276,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner: () => runner,
     usage: {
       agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
+      agentTotal: (agentId, since, until) =>
+        usage.agentTotal(agentId, since, until),
     },
     users,
   });

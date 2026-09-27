@@ -154,11 +154,23 @@ describe("search", () => {
     expect(search(models, "OPUS 5").map((m) => m.id)).toEqual([
       "anthropic/claude-opus-5",
       "anthropic/claude-opus-5:batch",
+      "anthropic/claude-opus-4.5",
+      "anthropic/claude-opus-4.5:batch",
     ]);
     expect(search(models, "a").length).toBe(20);
     expect(search(models, "a", 3).length).toBe(3);
     expect(search(models, "  ")).toEqual([]);
     expect(search(models, "nothing-like-it")).toEqual([]);
+  });
+
+  test("matches every word in any order", () => {
+    const glm = ["z-ai/glm-5.3-flash", "z-ai/glm-5.3-flash:batch"];
+    expect(search(models, "glm flash").map((m) => m.id)).toEqual(glm);
+    expect(search(models, "flash glm").map((m) => m.id)).toEqual(glm);
+    expect(search(models, "GLM Flash").map((m) => m.id)).toEqual(glm);
+    expect(search(models, "  glm   flash ").map((m) => m.id)).toEqual(glm);
+    expect(search(models, "glm").map((m) => m.id)).toContain("z-ai/glm-5.3");
+    expect(search(models, "glm nothing-like-it")).toEqual([]);
   });
 });
 
@@ -208,7 +220,7 @@ describe("Catalogs", () => {
       log: logs.logFactory("providers"),
     });
     const [a, b] = await Promise.all([
-      catalogs.search(provider, "opus 5"),
+      catalogs.search(provider, "opus-5"),
       catalogs.model(provider, "deepseek/deepseek-chat"),
     ]);
     expect(a.length).toBe(2);
@@ -250,11 +262,11 @@ describe("Catalogs", () => {
       clock: () => 0,
       secret: () => null,
     });
-    const first = catalogs.search(provider, "opus 5");
+    const first = catalogs.search(provider, "opus-5");
     catalogs.forget(provider.id);
     gates[0]();
     expect((await first).length).toBe(2);
-    const again = catalogs.search(provider, "opus 5");
+    const again = catalogs.search(provider, "opus-5");
     expect(gates.length).toBe(2);
     gates[1]();
     expect((await again).length).toBe(2);
@@ -295,7 +307,7 @@ describe("Catalogs", () => {
       },
     });
     fail = false;
-    expect((await catalogs.search(provider, "opus 5")).length).toBe(2);
+    expect((await catalogs.search(provider, "opus-5")).length).toBe(2);
   });
 });
 

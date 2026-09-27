@@ -642,7 +642,7 @@ describe("the pages", () => {
       me.value = { ...casey, role: "admin" };
       const html = render(<Members params={{ id: "p1" }} />);
       expect(html).toContain('href="/admin/projects?open=p1">Manage<');
-      expect(html).toContain('href="/admin/agents">Manage<');
+      expect(html).toContain('href="/config/agents">Manage<');
     },
   );
 

@@ -95,6 +95,15 @@ client change. What each page draws is in `docs/views.md`.
   disables its fields. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`.
+- **An object's settings are cards.** An object page's tab (an
+  agent's) stacks `ui/Setting.tsx` cards, as Vercel's settings: a
+  title, one line, the control, and a foot with its hint and its own
+  Save, so each card saves apart; `list` puts the title, a count and
+  an Add in a band over rows edge to edge (flush `RowsLine`s, controls
+  in `RowsEnd`, never a link); `danger` is the Delete card, last. A
+  card that drafts ends in `Foot` with `stack`, so a phone gives the
+  hint its own line. The card clips nothing, so a select's list opens
+  past it.
 - **A dashboard is a board, not rows.** The admin's Overview (`/admin`,
   the Admin group's first entry: rows Now, Last 30 days and All time)
   and Storage (`/admin/storage`) are `ui/Tiles.tsx` (stat tiles, the
@@ -180,6 +189,8 @@ client change. What each page draws is in `docs/views.md`.
   and MCP under Admin) passes `ui/Search.tsx` as `RowsCard`'s `search`, in
   place of the label, and filters the loaded rows through `matches()`
   in `lib/search.ts`, with "No ... found" when nothing is left.
+  `count` puts the rows shown after the search ("9", "3 of 9"), before
+  the filters, and `wrap` gives the search its own line on a phone.
 
 ## Forms
 
@@ -205,8 +216,21 @@ client change. What each page draws is in `docs/views.md`.
   switch or a pick that writes at once, busy while it runs, its
   refusal in words until the next try.
 - **A segmented switch is `ui/Seg.tsx`,** base's `.seg` as pressed
-  buttons, `name` on the picked one so a refusal's focus finds it; a
-  card head's switch is `RowsFilters`.
+  buttons, `name` on the picked one so a refusal's focus finds it, a
+  `title` on an option saying why it is off; a card head's switch is
+  `RowsFilters`. A Seg holds a closed set fixed in code (the words in
+  `shared/words.ts`, Yes and No, the tool schemas modes), never rows
+  from the database, at most five options that fit one line at 390.
+  Named rows are a `Finder`.
+- **A list of names is `ui/Finder.tsx`:** a button opening a menu with
+  a search pinned on top, the names in the given order, the one on
+  screen marked, a row with `href` a link. It is a page's switcher (the
+  crumb's own step, `page-pill`), a list's filter (`Provider All`,
+  anchored right) and an Add over what an object may carry. The panel
+  is fixed, placed from the button's box inside 16px gutters, so a
+  card never clips it, and spans the gutters on a phone; with a mouse
+  the search takes the focus, on touch nothing does. It opens on the
+  one marked, so Enter keeps it.
 - **The uploader and the composer's files are the exceptions.** In the
   uploader `Upload.state.ts`, not `useSave()`, owns busy state; Stop
   alone stays enabled during a run. An item's refusal is its log line
@@ -261,7 +285,11 @@ client change. What each page draws is in `docs/views.md`.
   the lines (`showAll()` in `lib/format.ts`) where the cut is by lines,
   and is bare where lines wrap (a tool value, a prompt, an automation's
   instructions); pressed, it goes and the focus moves to the block.
-- **The page head.** `Page` takes a `crumb` and its `crumbHref`, or
+- **The page head.** The crumb is one font and one case, names as
+  written: the steps dim at `--text-ui`, the page's own step in the
+  foreground at 500. A control in the title's place (a chat's menu, an
+  object's switcher) is the `page-pill` in `ui/page.css`, drawn 24px
+  and tapped at 44px. `Page` takes a `crumb` and its `crumbHref`, or
   `steps`, several links back before the title (`mono` for a path's
   step, in its own case, cut at 24 characters and giving way before the
   title; a phone keeps the nearest step and the title). A file's crumb

@@ -24,6 +24,7 @@ import {
 import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { ago, firstSentence, longDate } from "../../lib/format.ts";
+import { configAgentHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
@@ -283,7 +284,7 @@ export function Agent({ params }: { params: Params }) {
                   me.value?.role === "admin" ? (
                     <a
                       class="split-link"
-                      href={`/admin/agents?open=${encodeURIComponent(shown.agent.id)}`}
+                      href={configAgentHref(shown.agent.name)}
                     >
                       Manage
                     </a>

@@ -24,7 +24,7 @@ export function AgentsAside({
       label="Agents"
       action={
         admin ? (
-          <a class="split-link" href="/admin/agents">
+          <a class="split-link" href="/config/agents">
             Manage
           </a>
         ) : undefined

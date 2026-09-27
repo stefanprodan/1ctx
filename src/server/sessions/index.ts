@@ -5,6 +5,7 @@
 // rename, the deletion, and the boot repair of rows a crash left running. The
 // runner below writes them through the store this area builds.
 
+import type { AgentActivity } from "../../shared/api/agents.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
@@ -16,7 +17,12 @@ import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
 import { personDays } from "./activity.ts";
-import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
+import {
+  agentActivity,
+  agentChats,
+  agentRunning,
+  archivedEvent,
+} from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import {
   type AccessPort,
@@ -94,6 +100,7 @@ export type Sessions = {
   sessionProject(principal: Principal, id: string): string | null;
   // the chats an agent's delete archives and the sends it stops
   agentImpact(agentId: string): { chats: number; running: number };
+  agentActivity(): AgentActivity[];
   // in the caller's transaction: every chat on the agent archived, one
   // envelope each
   archiveAgent(agentId: string, now: number): BusEvent[];
@@ -144,6 +151,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       chats: agentChats(deps.db, agentId).length,
       running: agentRunning(deps.db, agentId),
     }),
+    agentActivity: () => agentActivity(deps.db),
     archiveAgent: (agentId, now) =>
       agentChats(deps.db, agentId).flatMap((id) => {
         const row = store.archive(id, "agent", null, now);

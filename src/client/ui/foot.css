@@ -55,9 +55,32 @@
     visibility: visible;
   }
 
+  /* a submit with something to send stands out, as Vercel's settings
+     do: off and gray at rest, solid once there is a change */
+  .foot-submit:not(:disabled) {
+    background: var(--fg);
+    border-color: var(--fg);
+    color: var(--page);
+  }
+  .foot-submit:not(:disabled):hover {
+    background: var(--dim);
+    border-color: var(--dim);
+    color: var(--page);
+  }
+
   /* the moment after a save: the check in brand, the button quiet */
   .foot-done:disabled {
     opacity: 1;
     color: var(--brand);
+  }
+
+  @media (max-width: 719px) {
+    .foot-stack {
+      justify-content: flex-end;
+    }
+    .foot-stack .foot-start {
+      flex-basis: 100%;
+      margin-right: 0;
+    }
   }
 }

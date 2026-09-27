@@ -74,8 +74,10 @@ function parseServers(value: unknown): AgentServer[] {
     if (typeof server.read !== "boolean" || typeof server.write !== "boolean") {
       throw new BadRequest("server read and write must be booleans");
     }
-    if (!server.read && !server.write) {
-      throw new BadRequest("a server needs read or write");
+    // write alone is no link: a side that changes things needs the one
+    // that reads them
+    if (!server.read) {
+      throw new BadRequest("a server needs read");
     }
     if (seen.has(server.serverId)) {
       throw new BadRequest("serverId must not repeat");

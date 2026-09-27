@@ -25,7 +25,6 @@ import { me } from "../../../src/client/data/me.ts";
 import {
   listed,
   sameServers,
-  toggleSide,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import {
   changeLine,
@@ -43,7 +42,6 @@ import {
   unmatchedLine,
 } from "../../../src/client/views/admin/Mcp.model.ts";
 import { Mcp } from "../../../src/client/views/admin/Mcp.tsx";
-import { McpPicker } from "../../../src/client/views/admin/McpPicker.tsx";
 import { ServerRow } from "../../../src/client/views/admin/McpRow.tsx";
 import type {
   McpServerSummary,
@@ -283,7 +281,13 @@ describe("the model", () => {
       [server({ instructionsOn: false })],
       [links[0]!],
     );
-    expect(quiet).toEqual({ line: "", warnings: [], text: "" });
+    expect(quiet).toEqual({
+      line: "",
+      warnings: [],
+      text: "",
+      count: 0,
+      from: [],
+    });
     // write alone on the agent while the server has it off: nothing offered
     expect(
       promptPreview([flux], [{ serverId: "m1", read: false, write: true }])
@@ -323,25 +327,17 @@ describe("the model", () => {
     expect(mcpFieldOf("the MCP server is refreshing")).toBeUndefined();
   });
 
-  test.serial(
-    "the agent's servers: a side toggled, the listed ones, the same set",
-    () => {
-      const one = toggleSide([], "m1", "read");
-      expect(one).toEqual([{ serverId: "m1", read: true, write: false }]);
-      const both = toggleSide(one, "m1", "write");
-      expect(both).toEqual([{ serverId: "m1", read: true, write: true }]);
-      expect(toggleSide(toggleSide(both, "m1", "read"), "m1", "write")).toEqual(
-        [],
-      );
-      expect(listed(both, (s) => s.serverId, null)).toBe(both);
-      expect(listed(both, (s) => s.serverId, [{ id: "m2" }])).toEqual([]);
-      expect(listed(["s1", "s2"], (id) => id, [{ id: "s2" }])).toEqual(["s2"]);
-      expect(
-        sameServers(both, [{ serverId: "m1", write: true, read: true }]),
-      ).toBe(true);
-      expect(sameServers(both, one)).toBe(false);
-    },
-  );
+  test.serial("the agent's servers: the listed ones, the same set", () => {
+    const one = [{ serverId: "m1", read: true, write: false }];
+    const both = [{ serverId: "m1", read: true, write: true }];
+    expect(listed(both, (s) => s.serverId, null)).toBe(both);
+    expect(listed(both, (s) => s.serverId, [{ id: "m2" }])).toEqual([]);
+    expect(listed(["s1", "s2"], (id) => id, [{ id: "s2" }])).toEqual(["s2"]);
+    expect(
+      sameServers(both, [{ serverId: "m1", write: true, read: true }]),
+    ).toBe(true);
+    expect(sameServers(both, one)).toBe(false);
+  });
 });
 
 describe("the entity", () => {
@@ -504,57 +500,6 @@ describe("the page", () => {
       );
       expect(off).toContain("off, not sent");
       expect(off).not.toContain("Server sent no instructions");
-    },
-  );
-
-  test.serial(
-    "the picker shows a side off on the server faint, and the preview",
-    () => {
-      const html = render(
-        <McpPicker
-          available={[flux]}
-          loadedAt={Date.now() - 60_000}
-          chosen={[{ serverId: "m1", read: true, write: false }]}
-          mode="auto"
-          takesTools
-          busy={false}
-          onToggle={() => {}}
-          onMode={() => {}}
-        />,
-      );
-      expect(html).toContain("off on the server");
-      expect(html).toContain("refreshed 1m ago");
-      expect(html).toContain("Instructions in the prompt:");
-      expect(html).toContain("Every tool schema goes to the model");
-      const noTools = render(
-        <McpPicker
-          available={[flux]}
-          loadedAt={Date.now() - 60_000}
-          chosen={[{ serverId: "m1", read: true, write: false }]}
-          mode="auto"
-          takesTools={false}
-          busy={false}
-          onToggle={() => {}}
-          onMode={() => {}}
-        />,
-      );
-      expect(noTools).toContain("This model takes no tools");
-      expect(noTools).not.toContain("Instructions in the prompt");
-      expect(noTools).not.toContain("Tool schemas");
-      const none = render(
-        <McpPicker
-          available={[]}
-          loadedAt={Date.now() - 60_000}
-          chosen={[]}
-          mode="auto"
-          takesTools={false}
-          busy={false}
-          onToggle={() => {}}
-          onMode={() => {}}
-        />,
-      );
-      expect(none).toContain("No MCP servers yet");
-      expect(none).toContain("refreshed 1m ago");
     },
   );
 });

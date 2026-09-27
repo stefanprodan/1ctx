@@ -238,8 +238,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `o200k_base` alone (each encoding carries its vocabulary into the
   binary), exact only for OpenAI models; a skill
   body's count is kept per skill until its digest moves. For an admin
-  the agent's Settings aside has Manage, which opens its row on
-  `/admin/agents?open=<id>`.
+  the agent's Settings aside has Manage, which opens
+  `/config/agents/:name`.
 - **The profile.** The profile's aside is the account (email, role, joined),
   its head the name and the handle, and the email where the aside is
   hidden.
@@ -257,7 +257,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Knowledge, then Members for a team or Settings for a personal one.
   A team project's Members tab is the
   same rows, linking an admin to
-  `/admin/projects?open=<id>` and `/admin/agents`.
+  `/admin/projects?open=<id>` and `/config/agents`.
   The aside under every tab (`Frame.tsx`) is About, the Activity weeks
   (`GhostGrid` without labels while they load), then Latest
   knowledge (the three knowledge files changed last, from the held
@@ -481,16 +481,55 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
-- **The agents page's order.** `/admin/agents` stacks Providers,
-  Agents, Deciders, then Decisions, and waits for all four lists. Each
-  card is named by its search, which filters its rows, and shows them
-  by name (`byName()` in `lib/search.ts`, the entities keeping their
-  own order, the deciders oldest first). An empty Agents card points at
-  a provider above. A provider row (`ProviderRow.tsx`) opens to its
-  facts, never edited: the wire, the base URL, the key file, red when
-  missing, the agents on it linked and the deciders by name, and when
-  it was added, then Delete asked once beside Close; the server's
-  refusal of a provider in use is the foot's notice.
+- **The Providers page.** `/admin/agents`, the rail's Providers,
+  stacks Providers, Deciders, then Decisions, and waits for all of
+  them. Each card is named by its search, which filters its rows, and
+  shows them by name (`byName()` in `lib/search.ts`, the entities
+  keeping their own order, the deciders oldest first). A provider row
+  (`ProviderRow.tsx`) opens to its facts, never edited: the wire, the
+  base URL, the key file, red when missing, the agents on it linked
+  and the deciders by name, and when it was added, then Delete asked
+  once beside Close; the server's refusal of a provider in use is the
+  foot's notice.
+- **Config › Agents.** `/config/agents` (`AgentList.tsx`) is a Split:
+  one card of links, one row per agent by name, the avatar, `@name`
+  and "default", the model through `Fit` under it, when it last ran
+  ("running", "ran 3d ago", "never ran", from `GET /api/agents`'s
+  `activity`, read again when the tab is seen) over the provider at the
+  right, and a line of the servers and skills whose last refresh
+  failed. The head's search matches the name, the model and the
+  provider; `RowsCard`'s `count` says "9" or "3 of 9"; the Provider
+  filter is a `Finder` of the providers that have agents, drawn only
+  when there are two. The aside is the overview's last 30 days and the
+  providers with their agent counts. `?new` is New agent
+  (`NewAgent.tsx`): one card with one Create, the name card's fields
+  (`NameFields`) and the Model card's (`ModelFields`) on a blank
+  `AgentDrafts`, the search open on the default agent's provider and
+  no Cancel until a pick. Create sends no skills, no servers and no
+  default mark and opens the agent's page, where they are set.
+- **An agent's page.** `/config/agents/:name`, `/skills` and `/mcp`
+  are one view (`AgentPage.tsx`), so the drafts in
+  `AgentPage.state.ts` outlive a tab switch and go with a pick of
+  another agent. The crumb's own step is the switcher, a `Finder` of
+  the other agents opening the same tab. A line over the tabs names
+  the failing servers and skills, each count opening its tab. Each
+  card is a `Setting` with its own Save through `DraftFoot`: the save
+  sends the saved agent with only that card's fields changed
+  (`cardBody()`, the route taking the whole agent), and a rename
+  replaces the address. General is the name, avatar and system prompt
+  with "Default for new users" under them (sent only when flipped, the
+  oldest while default held), then the model, then Delete, its line from `/impact` read with the page and
+  asked in its foot. The model card keeps the form's rules: Change opens the
+  catalog search with the provider beside it and Cancel, which puts
+  back what Change found; a provider change clears the model, the
+  effort and the preferred provider; a pick clears a preferred
+  provider chosen for another model and a thinking the model fixes;
+  Save is off while the search is open. Skills and MCP list only what
+  the agent carries, with Add over the rest; an MCP link is Read or
+  Read and write, a side the server has off disabled with "Disabled in
+  the server config"; Tool schemas is its own card with the
+  instructions the draft would put in the prompt. The aside is `GET
+  /api/agents/:id/usage` and the `/impact` counts.
 - **The Deciders card.** `DecidersCard.tsx`, the rows in
   `data/deciders.ts`, loaded by the route: a row per decider, the name
   over the model, and "default", the provider, the window and the input
@@ -535,17 +574,12 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   foot's left while any box differs from its option's default, fills
   the boxes with `defaultTexts()` for the admin to save. The form
   stays open after a save; Cancel closes it.
-- **The agent form's Delete.** Delete reads `GET
-  /api/agents/:id/impact` before it asks, and the ask has a line over
-  the buttons (`impactLine()`, `Foot`'s `above`): the chats it archives
-  and the automations it pauses, then what it stops, each part only
-  when there is any; a failed read asks without it.
 - **The overview's usage bars** name the one row of every deleted
   project "deleted projects", unmarked, and mark a retired agent with a
   small "deleted" after the name (`Bars`' `gone`).
-- **The agent form's MCP section.** The agent form's
-  section is a line per server with Read and Write boxes (a side off
-  on the server faint with the word),
+- **The New agent form's MCP section.** The form's section is a line
+  per server with Read and Write boxes (write on brings read, read off
+  takes write, a side off on the server faint with the word),
   the mode as a `Select`, and the prompt's instructions total with a
   warning per server a cap leaves out and View for the block, all from
   `promptPreview()` in `Mcp.model.ts` over `offeredServers()` and

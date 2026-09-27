@@ -6,9 +6,11 @@
 // about it is kept on the row so a list never asks again.
 
 import type {
+  AgentActivity,
   AgentImpactResponse,
   AgentResponse,
   AgentsResponse,
+  AgentUsageResponse,
 } from "../../shared/api/agents.ts";
 import type {
   ProjectAgentsResponse,
@@ -40,6 +42,15 @@ export type ProvidersPort = {
   endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
 };
 
+// an agent's turns and runs, tokens and cost over a window
+export type AgentTotalPort = {
+  agentTotal(
+    agentId: string,
+    since: number,
+    until: number,
+  ): Omit<AgentUsageResponse, "since" | "until">;
+};
+
 export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
 };
@@ -49,6 +60,7 @@ export type AccessPort = {
 // the delete's transaction and answer their envelopes
 export type SessionsPort = {
   agentImpact(agentId: string): { chats: number; running: number };
+  agentActivity(): AgentActivity[];
   archiveAgent(agentId: string, now: number): BusEvent[];
 };
 
@@ -97,8 +109,11 @@ export type RoutesDeps = {
   automations: () => AutomationsPort;
   runner: () => RunnerPort;
   users: PicksPort & { clearAgent(agentId: string): void };
+  usage: AgentTotalPort;
   clock: Clock;
 };
+
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 // a catalog that describes the model is never overridden; one that
 // lists only ids takes the admin's window and tools flag, and a model
@@ -211,7 +226,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/agents",
       policy: "admin",
       handle() {
-        const body: AgentsResponse = { agents: deps.store.list().map(summary) };
+        const body: AgentsResponse = {
+          agents: deps.store.list().map(summary),
+          activity: deps.sessions().agentActivity(),
+        };
         return json(body);
       },
     },
@@ -266,6 +284,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           chats,
           automations: automations.length,
           running,
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/agents/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const agent = find(ctx.params.id);
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const body: AgentUsageResponse = {
+          since,
+          until,
+          ...deps.usage.agentTotal(agent.id, since, until),
         };
         return json(body);
       },

@@ -516,8 +516,9 @@ describe("MCP tools in a send", () => {
       flux.requests.filter((request) => request.method === "tools/call"),
     ).toHaveLength(1);
 
+    // write alone is no link: the agent keeps what it had
     const agent = chat.app.agents.byId(chat.agentId)!;
-    await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
+    const refused = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
       body: {
         name: agent.name,
         avatar: agent.avatar,
@@ -531,12 +532,8 @@ describe("MCP tools in a send", () => {
         mcpMode: "all",
       },
     });
-    const none = await startChat(chat, "write flux");
-    expect(
-      toolNames(none.script.body).some((name) => name.startsWith("mcp__")),
-    ).toBe(false);
-    none.script.reply("none");
-    await waitDone(chat.app, none.sessionId);
+    expect(refused.status).toBe(400);
+    expect(chat.app.agents.byId(agent.id)!.servers).toEqual(agent.servers);
   });
 
   test("records an MCP isError answer as a failed tool row", async () => {

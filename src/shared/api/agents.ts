@@ -8,8 +8,19 @@ import type { AgentSummary } from "../contracts/agent.ts";
 import type { AgentServer } from "../contracts/mcp.ts";
 import type { Avatar, Effort, McpMode } from "../words.ts";
 
+// when an agent last started a turn or a run, and whether one runs now;
+// an agent that never ran has no entry
+export type AgentActivity = {
+  agentId: string;
+  lastAt: number;
+  running: boolean;
+};
+
 // GET /api/agents
-export type AgentsResponse = { agents: AgentSummary[] };
+export type AgentsResponse = {
+  agents: AgentSummary[];
+  activity: AgentActivity[];
+};
 
 // POST /api/agents and PATCH /api/agents/:id answer the row
 export type AgentResponse = { agent: AgentSummary };
@@ -22,6 +33,17 @@ export type AgentImpactResponse = {
   automations: number;
   running: number;
 };
+// GET /api/agents/:id/usage, the agent's last 30 days in every project:
+// its turns and runs, their tokens, and the cost, null when rounds ran
+// and none was priced
+export type AgentUsageResponse = {
+  since: number;
+  until: number;
+  sends: number;
+  tokens: number;
+  cost: number | null;
+};
+
 // PUT /api/profile/agent, for any signed-in user: the composer's pick,
 // kept so their next new chat starts on it; answers the agent it will
 export type PickAgentRequest = { agentId: string };
@@ -38,7 +60,7 @@ export type SaveAgentRequest = {
   prompt: string;
   // skill ids, at most MAX_SKILLS_PER_AGENT, empty allowed
   skills: string[];
-  // the full set of servers, each with at least one side on, no repeat,
+  // the full set of servers, each with read on (write alone is refused),
   // at most 50; an unknown id is a 400
   servers: AgentServer[];
   mcpMode: McpMode;

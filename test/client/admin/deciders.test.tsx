@@ -26,7 +26,6 @@ import {
 } from "../../../src/client/data/providers.ts";
 import { sentence } from "../../../src/client/lib/format.ts";
 import { noticeOf, Save } from "../../../src/client/lib/save.ts";
-import { Agents } from "../../../src/client/views/admin/Agents.tsx";
 import { DeciderForm } from "../../../src/client/views/admin/DeciderForm.tsx";
 import {
   checkCost,
@@ -41,6 +40,7 @@ import {
 } from "../../../src/client/views/admin/Deciders.model.ts";
 import { DecidersCard } from "../../../src/client/views/admin/DecidersCard.tsx";
 import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
+import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
 import type { ProviderSummary } from "../../../src/shared/contracts/provider.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
@@ -325,17 +325,16 @@ describe("the card", () => {
     expect(on).not.toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?New decider/);
   });
 
-  test.serial("sits after the providers and the agents", () => {
+  test.serial("sits after the providers", () => {
     providers.value = [router];
     agents.value = [];
     deciders.value = [];
     decisions.value = [];
-    const html = render(<Agents />);
+    const html = render(<Providers />);
     // each card is named by its search
     const at = (label: string) => html.indexOf(`aria-label="${label}"`);
     expect(at("Providers")).toBeGreaterThan(-1);
-    expect(at("Agents")).toBeGreaterThan(at("Providers"));
-    expect(at("Deciders")).toBeGreaterThan(at("Agents"));
+    expect(at("Deciders")).toBeGreaterThan(at("Providers"));
     expect(at("Decisions")).toBeGreaterThan(at("Deciders"));
   });
 

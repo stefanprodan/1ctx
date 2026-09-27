@@ -450,8 +450,8 @@ export class McpServerStore {
       if (seen.has(link.serverId)) {
         throw new BadRequest("serverId must not repeat");
       }
-      if (!link.read && !link.write) {
-        throw new BadRequest("a server needs read or write");
+      if (!link.read) {
+        throw new BadRequest("a server needs read");
       }
       if (this.byId(link.serverId) === null) {
         throw new BadRequest("serverId is unknown");
