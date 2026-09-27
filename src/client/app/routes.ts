@@ -648,10 +648,10 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Skills",
     role: "admin",
-    // Add skill is the list's `?new`; the aside reads every skill's last
-    // 30 days
+    // Add skill is the list's `?new`; a row counts the agents that carry
+    // it and the aside reads every skill's last 30 days
     load: async () => {
-      await Promise.all([loadSkills(), loadAllSkillUsage()]);
+      await Promise.all([loadSkills(), loadAgents(), loadAllSkillUsage()]);
     },
   },
   ...configSkillRoutes,

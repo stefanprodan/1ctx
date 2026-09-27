@@ -4,7 +4,10 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { migrate } from "../../../src/server/db/index.ts";
-import { skillLoads } from "../../../src/server/sessions/activity.ts";
+import {
+  SKILL_LOADS,
+  skillLoads,
+} from "../../../src/server/sessions/activity.ts";
 
 // a reply's calls and their tool rows; the query reads no other table,
 // so the keys are off
@@ -44,9 +47,9 @@ function db() {
     send: string,
     n: number,
     at: number,
-    calls: { tool: string; args: string; status?: string }[],
+    calls: { tool: string; args: string; status?: string; id?: string }[],
   ) => {
-    const ids = calls.map((_, i) => `call_${i}`);
+    const ids = calls.map((c, i) => c.id ?? `call_${i}`);
     row("reply", send, n, at, {
       calls: JSON.stringify(
         calls.map((c, i) => ({ id: ids[i], name: c.tool, arguments: c.args })),
@@ -111,4 +114,40 @@ test("skill calls count by the name their call carried", () => {
     failed: 0,
     skills: [],
   });
+});
+
+test("a repeated call id pairs by position, as the writer pairs them", () => {
+  const { d, round } = db();
+  round("s1", 1, 100, [
+    { ...load("a"), id: "x" },
+    { ...load("b"), id: "x", status: "failed" },
+  ]);
+  // a built-in ahead of a skill call keeps the skill call's position
+  round("s2", 1, 100, [
+    { tool: "bash", args: "{}" },
+    { ...read("a", ""), id: "y" },
+  ]);
+  expect(skillLoads(d as never, 50, 150)).toEqual({
+    loads: 2,
+    reads: 1,
+    failed: 1,
+    skills: [
+      // a read with no path counts but names no file
+      { name: "a", loads: 1, reads: 1, failed: 0, files: [] },
+      { name: "b", loads: 1, reads: 0, failed: 1, files: [] },
+    ],
+  });
+});
+
+test("skill calls read the tool rows' index and the send's", () => {
+  const { d } = db();
+  const plan = d
+    .query<{ detail: string }, [string, string, number, number]>(
+      `explain query plan ${SKILL_LOADS}`,
+    )
+    .all("skill", "skill_file", 0, 1)
+    .map((row) => row.detail)
+    .join(" ");
+  expect(plan).toContain("messages_tool_activity");
+  expect(plan).not.toMatch(/SCAN (t|r|o)\b/);
 });

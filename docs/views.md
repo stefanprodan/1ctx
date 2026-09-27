@@ -630,16 +630,18 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   base's `.choice`.
 - **Config › Skills.** `/config/skills` (`SkillList.tsx`) is one card
   of links by name, the name over the description's first sentence, or
-  over the failed refresh in red, the agents that carry it over its
-  files (SKILL.md counted) at the right; Add skill is in the page's
+  over the failed refresh in red, the agents that carry it (from the
+  agents list, as the skill's page counts them) over its files
+  (SKILL.md counted) at the right; Add skill is in the page's
   head, and `?new` (`NewSkill.tsx`) is one card: the URL, a path for
   an archive, and for a site or an index Look up, which lists the
   entries each with its own Add; an add opens the skill's page. The
   aside is every skill's loads, file reads and failures over the last
   30 days (`GET /api/usage/skills`) and the five most loaded. A
   skill's page, `/config/skills/:name` and `/files`, is one view
-  (`SkillPage.tsx`) with nothing to draft, the crumb's own step the
-  switcher, a failed refresh over the tabs. General
+  (`SkillPage.tsx`) with nothing to draft, waiting for the agents as
+  an MCP server's page does so Delete never opens early, the crumb's
+  own step the switcher, a failed refresh over the tabs. General
   (`SkillGeneral.tsx`) is About (the frontmatter fields, the source,
   the fetch and the digest with what the last refresh changed,
   Refresh), Used by (only when an agent carries it, each opening that

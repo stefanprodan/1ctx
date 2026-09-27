@@ -20,7 +20,9 @@ import {
   discoverSkills,
   fileKey,
   files,
+  loadAllSkillUsage,
   loadSkills,
+  loadSkillUsage,
   readSkill,
   readSkillFile,
   refreshSkill,
@@ -367,12 +369,74 @@ describe("the skills entity", () => {
     },
   );
 
-  test("the entities go with the signed-in user", () => {
+  test.serial(
+    "a file read a refresh overtook reads again, since the refresh dropped it",
+    async () => {
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let reads = 0;
+      answer = (url) => {
+        if (url === "/api/skills/s2/refresh") {
+          return Response.json({ skill: gitops, body: "fresh" });
+        }
+        reads++;
+        const content = reads === 1 ? "stale" : "new";
+        const body = { path: "evals/evals.json", content, bytes: 3 };
+        return (reads === 1
+          ? held.then(() => Response.json(body))
+          : Response.json(body)) as unknown as Response;
+      };
+      const reading = readSkillFile("s2", "evals/evals.json");
+      await refreshSkill("s2");
+      release();
+      expect(await reading).toBe("new");
+      expect(files.value[fileKey("s2", "evals/evals.json")]).toBe("new");
+    },
+  );
+
+  test.serial(
+    "usage: only the latest read lands, a failure is null",
+    async () => {
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const usage = (loads: number) => ({
+        since: 0,
+        until: 1,
+        loads,
+        reads: 0,
+        failed: 0,
+        files: [],
+      });
+      answer = (url) =>
+        url === "/api/skills/s1/usage"
+          ? (held.then(() => Response.json(usage(1))) as unknown as Response)
+          : Response.json(usage(2));
+      // a switch to another skill before the first answer
+      const first = loadSkillUsage("s1");
+      await loadSkillUsage("s2");
+      release();
+      await first;
+      expect(skillUsage.value).toEqual({ skillId: "s2", usage: usage(2) });
+      answer = () => Response.json({ error: "nope" }, { status: 500 });
+      await loadAllSkillUsage();
+      expect(allSkillUsage.value).toEqual({ usage: null });
+    },
+  );
+
+  test.serial("the entities go with the signed-in user", () => {
     skills.value = [timoni];
     bodies.value = { s1: "x" };
+    allSkillUsage.value = { usage: null };
+    skillUsage.value = { skillId: "s1", usage: null };
     me.value = { ...admin, id: "u2" };
     expect(skills.value).toBeNull();
     expect(bodies.value).toEqual({});
+    expect(allSkillUsage.value).toBeNull();
+    expect(skillUsage.value).toBeNull();
   });
 });
 
@@ -388,6 +452,10 @@ const agent = (name: string, skillIds: string[]) =>
 describe("the list", () => {
   test.serial("a row per skill: its first sentence, agents and files", () => {
     skills.value = [gitops, timoni];
+    agents.value = null;
+    // the rows count the agents, so the page waits for them
+    expect(render(<SkillList />)).not.toContain("gitops-knowledge");
+    agents.value = [agent("sre", ["s1"])];
     allSkillUsage.value = null;
     const html = render(<SkillList />);
     expect(html).toContain('href="/config/skills/gitops-knowledge"');
@@ -405,6 +473,7 @@ describe("the list", () => {
     skills.value = [
       { ...gitops, refreshError: "404", refreshFailedAt: Date.now() - 60_000 },
     ];
+    agents.value = [];
     const html = render(<SkillList />);
     expect(html).toContain(
       '<span class="rows-sub rows-bad">refresh failed 1m ago',
@@ -415,6 +484,7 @@ describe("the list", () => {
 
   test.serial("the aside has the loads and the most loaded skills", () => {
     skills.value = [gitops];
+    agents.value = [];
     allSkillUsage.value = {
       usage: {
         since: 0,
@@ -547,6 +617,15 @@ describe("a skill's page", () => {
     expect(page()).toContain("Loading");
     skillUsage.value = { skillId: "s2", usage: null };
     expect(page()).toContain("Did not load.");
+  });
+
+  test.serial("waits for the agents, so Delete never opens early", () => {
+    skills.value = [timoni];
+    agents.value = null;
+    path.value = "/config/skills/timoni";
+    const html = render(<SkillPage params={{ name: "timoni" }} />);
+    expect(html).toContain("Loading");
+    expect(html).not.toContain("Delete timoni");
   });
 
   test.serial("an unknown name, and the Delete words", () => {

@@ -12,7 +12,7 @@ import type { SkillSummary } from "../../../shared/contracts/skill.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
-import { agentsError } from "../../data/agents.ts";
+import { agents, agentsError } from "../../data/agents.ts";
 import { skills, skillsError, skillUsage } from "../../data/skills.ts";
 import { ago, count, sentence } from "../../lib/format.ts";
 import { configSkillHref, type SkillTab } from "../../lib/hrefs.ts";
@@ -49,7 +49,7 @@ export function SkillPage({ params }: { params: Params }) {
       titleMono
       menu={skill !== null ? <Switcher skill={skill} tab={tab} /> : undefined}
       split
-      loading={list === null && error === null}
+      loading={(list === null || agents.value === null) && error === null}
       empty={
         list !== null && skill === null ? "No skill by that name." : undefined
       }

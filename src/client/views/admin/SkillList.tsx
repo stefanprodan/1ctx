@@ -12,6 +12,7 @@ import { useSignal } from "@preact/signals";
 import type { SkillSummary } from "../../../shared/contracts/skill.ts";
 import { query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
+import { agents, agentsError } from "../../data/agents.ts";
 import { allSkillUsage, skills, skillsError } from "../../data/skills.ts";
 import {
   ago,
@@ -50,7 +51,7 @@ function List() {
   // the data layer keeps the list in name order
   const all = rows ?? [];
   const shown = all.filter((s) => matches(q.value, [s.name, s.description]));
-  const error = skillsError.value;
+  const error = skillsError.value ?? agentsError.value;
   return (
     <Page
       steps={[zoneStep("Config")]}
@@ -62,7 +63,7 @@ function List() {
           Add skill
         </a>
       }
-      loading={rows === null && error === null}
+      loading={(rows === null || agents.value === null) && error === null}
       error={error}
     >
       <Split aside={<Aside list={all} />}>
@@ -107,7 +108,10 @@ function List() {
 
 function Row({ skill, now }: { skill: SkillSummary; now: number }) {
   const failed = skill.refreshFailedAt !== null && skill.refreshError !== null;
-  const users = skill.agents.length;
+  // counted as the skill's page counts them, from the agents list
+  const users = (agents.value ?? []).filter((a) =>
+    a.skills.includes(skill.id),
+  ).length;
   return (
     <RowsGo href={configSkillHref(skill.name)}>
       <RowsTitle

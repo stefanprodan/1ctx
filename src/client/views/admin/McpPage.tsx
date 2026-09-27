@@ -12,7 +12,7 @@ import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
-import { agentsError } from "../../data/agents.ts";
+import { agents, agentsError } from "../../data/agents.ts";
 import {
   patchServer,
   servers,
@@ -90,7 +90,7 @@ export function McpPage({ params }: { params: Params }) {
         server !== null ? <Switcher server={server} tab={tab} /> : undefined
       }
       split
-      loading={list === null && error === null}
+      loading={(list === null || agents.value === null) && error === null}
       empty={
         list !== null && server === null
           ? "No MCP server by that name."

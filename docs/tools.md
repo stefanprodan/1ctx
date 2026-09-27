@@ -231,7 +231,9 @@ mount in `docs/knowledge.md`.
   when it can answer. These two tools come from skills, never the tools
   rows or the Tools page, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
-  summary, the user message names still-offered skills loaded before it.
+  summary, the user message names still-offered skills loaded before it,
+  each load paired with its call by position in its round, as the
+  writer pairs them.
   Before the catalog is built, `tools/offer.ts` removes the agent's skills
   whose `skill:<skill id>` is disabled, so the block, the enum and
   `skill_file` come from what is left, and all off means no block and no
@@ -243,8 +245,9 @@ mount in `docs/knowledge.md`.
   read. Agents without skills have no entry.
 - **A skill's usage is read from the calls.** A tool row holds only the
   result, so `skillLoads()` in `sessions/activity.ts` joins each `skill`
-  and `skill_file` row to the call of the same id in its round's reply
-  and reads the name (and a file's path) from the call's arguments; a
+  and `skill_file` row to its call in the round's reply by position
+  among the round's tool rows, as the writer pairs them, the id checked
+  too, and reads the name (and a file's path) from the call's arguments; a
   call whose arguments are not JSON or name no skill counts for none.
   `GET /api/usage/skills` and `GET /api/skills/:id/usage` answer the
   last 30 days, a deleted skill's calls under its name. The usage path

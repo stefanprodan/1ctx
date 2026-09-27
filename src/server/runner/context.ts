@@ -128,6 +128,9 @@ function loadedSkills(
     }
   }
   const calls = new Map<string, ToolCall[]>();
+  // a round's tool rows pair with its calls by position, as the writer
+  // pairs them, since a provider may repeat a call id
+  const positions = new Map<string, number>();
   const names: string[] = [];
   const seen = new Set<string>();
   for (const row of rows.slice(start, cut)) {
@@ -136,17 +139,12 @@ function loadedSkills(
       calls.set(key, row.toolCalls ?? []);
       continue;
     }
-    if (
-      row.kind !== "tool" ||
-      row.status !== "done" ||
-      row.toolName !== "skill"
-    ) {
-      continue;
-    }
-    const call = calls
-      .get(key)
-      ?.find((item) => item.id === row.toolCallId && item.name === "skill");
-    if (call === undefined) continue;
+    if (row.kind !== "tool") continue;
+    const index = positions.get(key) ?? 0;
+    positions.set(key, index + 1);
+    if (row.status !== "done" || row.toolName !== "skill") continue;
+    const call = calls.get(key)?.[index];
+    if (call?.id !== row.toolCallId || call.name !== "skill") continue;
     try {
       const args = JSON.parse(call.arguments || "{}") as Record<
         string,

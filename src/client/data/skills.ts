@@ -136,7 +136,8 @@ export async function deleteSkill(id: string): Promise<void> {
 
 // the body, read once per open and kept; a read that a write overtook
 // (a refresh landed while it was in flight) keeps nothing, since the
-// write's word is the fresher one
+// write's word is the fresher one, and reads again, as a refresh drops
+// the files it held and nothing else would ask for them
 export async function readSkill(id: string): Promise<string> {
   const held = bodies.value[id];
   if (held !== undefined) return held;
@@ -145,9 +146,9 @@ export async function readSkill(id: string): Promise<string> {
   const answer = await api<SkillResponse>(
     `/api/skills/${encodeURIComponent(id)}`,
   );
-  if (owner === forUser && writes === mine) {
-    bodies.value = { ...bodies.value, [id]: answer.body };
-  }
+  if (owner !== forUser) return answer.body;
+  if (writes !== mine) return readSkill(id);
+  bodies.value = { ...bodies.value, [id]: answer.body };
   return answer.body;
 }
 
@@ -160,9 +161,9 @@ export async function readSkillFile(id: string, path: string): Promise<string> {
   const answer = await api<SkillFileResponse>(
     `/api/skills/${encodeURIComponent(id)}/file?path=${encodeURIComponent(path)}`,
   );
-  if (owner === forUser && writes === mine) {
-    files.value = { ...files.value, [key]: answer.content };
-  }
+  if (owner !== forUser) return answer.content;
+  if (writes !== mine) return readSkillFile(id, path);
+  files.value = { ...files.value, [key]: answer.content };
   return answer.content;
 }
 
