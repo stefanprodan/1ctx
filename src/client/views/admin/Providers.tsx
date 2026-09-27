@@ -1,42 +1,89 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The providers page, top to bottom, each card with its search: the
-// providers the agents and deciders run on, added through New provider,
-// a row opening to what it is and Delete, never edited (ProviderRow.tsx);
-// then the deciders (DecidersCard.tsx) and the decisions they answer
-// (DecisionsCard.tsx). The agents have their own pages under Config.
+// Config › Providers: a list of links, one row per provider in name
+// order, each its service's mark, the name over the base URL, and how
+// many agents run on it over its type at the right; a key file that is
+// missing is said under the address. The card's head searches and
+// counts, New provider is in the page's head. The aside has the
+// instance's last 30 days and the key files, each with the provider
+// that reads it. The deciders (DecidersCard.tsx) and the decisions they
+// answer (DecisionsCard.tsx) follow until they have their own page.
+// `?new` is the New provider page.
 
 import { useSignal } from "@preact/signals";
+import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
+import type { Wire } from "../../../shared/words.ts";
+import { query } from "../../app/router.ts";
+import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { deciders, decidersError } from "../../data/deciders.ts";
 import { decisions, decisionsError } from "../../data/decisions.ts";
-import { providers, providersError } from "../../data/providers.ts";
+import { overview } from "../../data/overview.ts";
+import { keys, providers, providersError } from "../../data/providers.ts";
+import { count, pluralCommas } from "../../lib/format.ts";
+import { configProviderHref } from "../../lib/hrefs.ts";
+import { Icon } from "../../lib/icons.tsx";
+import { hasMark, WireMark } from "../../lib/marks.tsx";
 import { byName, matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
-import { Rows, RowsAdd, RowsCard, RowsNew, RowsNote } from "../../ui/Rows.tsx";
+import {
+  Rows,
+  RowsAvatar,
+  RowsCard,
+  RowsGo,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { keyLine, preset } from "./Agents.model.ts";
 import { DecidersCard } from "./DecidersCard.tsx";
 import { DecisionsCard } from "./DecisionsCard.tsx";
-import { ProviderForm } from "./ProviderForm.tsx";
-import { ProviderRow } from "./ProviderRow.tsx";
-import "./agents.css";
-import { zoneStep } from "../../app/zones.ts";
+import { NewProvider } from "./NewProvider.tsx";
+import { costOf, money, tokensOf } from "./Overview.model.ts";
+import "./provider-list.css";
 
 export function Providers() {
+  if (new URLSearchParams(query.value).has("new")) return <NewProvider />;
+  return <List />;
+}
+
+// a provider shows its service's mark, or a cloud for a server
+// without one
+export function ProviderMark({ wire }: { wire: Wire }) {
+  return (
+    <RowsAvatar>
+      {hasMark(wire) ? (
+        <WireMark wire={wire} size={15} />
+      ) : (
+        <Icon name="providers" size={15} />
+      )}
+    </RowsAvatar>
+  );
+}
+
+function List() {
   const list = agents.value;
   const rows = providers.value;
-  const addingProvider = useSignal(false);
-  const openProvider = useSignal<string | null>(null);
-  const pq = useSignal("");
-  const shownProviders = byName(rows ?? []).filter((p) =>
-    matches(pq.value, [p.name, p.baseUrl, p.wire, p.keyName ?? ""]),
+  const q = useSignal("");
+  const all = byName(rows ?? []);
+  const shown = all.filter((p) =>
+    matches(q.value, [p.name, p.baseUrl, preset(p.wire).label]),
   );
   const error = agentsError.value ?? providersError.value;
   return (
     <Page
       steps={[zoneStep("Config")]}
       title="Providers"
+      split
+      actions={
+        <a class="btn btn-small" href="/config/providers?new">
+          <Icon name="plus" size={14} />
+          New provider
+        </a>
+      }
       loading={
         (list === null ||
           rows === null ||
@@ -46,60 +93,140 @@ export function Providers() {
       }
       error={error}
     >
-      <Rows>
-        <RowsCard
-          label="Providers"
-          search={
-            <Search
-              value={pq.value}
-              onChange={(next) => {
-                pq.value = next;
-              }}
-              placeholder="Search providers"
-            />
-          }
-          action={
-            <RowsAdd
-              label="New provider"
-              disabled={addingProvider.value}
-              onClick={() => {
-                addingProvider.value = true;
-              }}
-            />
-          }
-        >
-          {addingProvider.value && (
-            <RowsNew>
-              <ProviderForm
-                onDone={() => {
-                  addingProvider.value = false;
+      <Split aside={<Aside providers={all} />}>
+        <Rows>
+          <RowsCard
+            label="Providers"
+            wrap
+            search={
+              <Search
+                value={q.value}
+                onChange={(next) => {
+                  q.value = next;
                 }}
+                placeholder="Search providers"
               />
-            </RowsNew>
-          )}
-          {rows?.length === 0 && !addingProvider.value && (
-            <RowsNote>
-              No providers yet. Add one so an agent has a model to run on.
-            </RowsNote>
-          )}
-          {pq.value.trim() !== "" && shownProviders.length === 0 && (
-            <RowsNote>No providers found</RowsNote>
-          )}
-          {shownProviders.map((p) => (
-            <ProviderRow
-              key={p.id}
-              provider={p}
-              open={openProvider.value === p.id}
-              onToggle={() => {
-                openProvider.value = openProvider.value === p.id ? null : p.id;
-                addingProvider.value = false;
-              }}
-            />
-          ))}
-        </RowsCard>
-        <DecidersCard providers={rows ?? []} />
-        <DecisionsCard />
-      </Rows>
+            }
+            count={
+              all.length === 0
+                ? undefined
+                : shown.length !== all.length
+                  ? `${shown.length} of ${all.length}`
+                  : String(all.length)
+            }
+          >
+            {all.length === 0 && (
+              <RowsNote>
+                No providers yet. Add one so an agent has a model to run on.
+              </RowsNote>
+            )}
+            {all.length > 0 && shown.length === 0 && (
+              <RowsNote>No provider matches.</RowsNote>
+            )}
+            {shown.map((p) => (
+              <Row
+                key={p.id}
+                provider={p}
+                agents={
+                  (list ?? []).filter((a) => a.providerId === p.id).length
+                }
+              />
+            ))}
+          </RowsCard>
+          <DecidersCard providers={rows ?? []} />
+          <DecisionsCard />
+        </Rows>
+      </Split>
     </Page>
+  );
+}
+
+function Row({
+  provider,
+  agents: onIt,
+}: {
+  provider: ProviderSummary;
+  agents: number;
+}) {
+  const missing = provider.keyName !== null && !provider.hasKey;
+  return (
+    <RowsGo href={configProviderHref(provider.name)}>
+      <ProviderMark wire={provider.wire} />
+      <RowsTitle
+        mono
+        name={provider.name}
+        sub={
+          <span class="provider-list-sub">
+            <span class="cut">{provider.baseUrl}</span>
+            {missing && (
+              <span class="provider-list-bad">
+                {keyLine(provider.keyName, false)}
+              </span>
+            )}
+          </span>
+        }
+      />
+      <RowsMeta keep>
+        <span class="provider-list-meta">
+          <span>
+            {onIt === 0 ? "No agents" : pluralCommas(onIt, "agent", "agents")}
+          </span>
+          <span class="provider-list-type">{preset(provider.wire).label}</span>
+        </span>
+      </RowsMeta>
+    </RowsGo>
+  );
+}
+
+function Aside({ providers: all }: { providers: ProviderSummary[] }) {
+  const totals = overview.value?.totals ?? null;
+  const cost = totals === null ? null : costOf(totals);
+  // the key files by name, each with the provider that reads it
+  const files = [...keys.value].sort((a, b) => a.localeCompare(b));
+  return (
+    <>
+      <AsideSection
+        label="Last 30 days"
+        action={
+          <a class="split-link" href="/monitor">
+            Usage
+          </a>
+        }
+      >
+        {totals === null ? (
+          <p class="split-empty">Loading</p>
+        ) : (
+          <>
+            <AsideLine label="Turns">
+              {count(totals.turns + totals.runs)}
+            </AsideLine>
+            <AsideLine label="Tokens">{count(tokensOf(totals))}</AsideLine>
+            <AsideLine label="Cost">
+              {cost === null ? "not priced" : money(cost)}
+            </AsideLine>
+          </>
+        )}
+      </AsideSection>
+      <AsideSection label="Key files">
+        {files.length === 0 ? (
+          <p class="split-empty">None in the secrets directory.</p>
+        ) : (
+          files.map((file) => {
+            const user = all.find((p) => p.keyName === file);
+            return (
+              <AsideLine
+                key={file}
+                label={`${file}.key`}
+                cut
+                href={user ? configProviderHref(user.name) : undefined}
+                quiet={user === undefined}
+              >
+                {user?.name ?? "unused"}
+              </AsideLine>
+            );
+          })
+        )}
+      </AsideSection>
+    </>
   );
 }

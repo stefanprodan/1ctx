@@ -30,6 +30,7 @@ import {
   loadProviders,
   providers,
   providersError,
+  providerUsage,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
 import { keyOptions } from "../../../src/client/lib/secrets.ts";
@@ -55,9 +56,14 @@ import {
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
-import { ProviderForm } from "../../../src/client/views/admin/ProviderForm.tsx";
+import { NewProvider } from "../../../src/client/views/admin/NewProvider.tsx";
+import {
+  ProviderPage,
+  providerDeleteLine,
+} from "../../../src/client/views/admin/ProviderPage.tsx";
 import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
+import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
 import type {
   CatalogMatch,
   ProviderSummary,
@@ -660,7 +666,10 @@ describe("the default agent", () => {
 describe("the page", () => {
   test.serial("the provider key field is a Select, not a text input", () => {
     keys.value = ["provider-router"];
-    const html = render(<ProviderForm onDone={() => {}} />);
+    providers.value = [];
+    const html = render(<NewProvider />);
+    expect(html).toContain("Create provider");
+    expect(html).toContain('href="/config/providers"');
     expect(html).toMatch(/<button[^>]*name="keyName"/);
     expect(html).not.toMatch(/<input[^>]*name="keyName"/);
     expect(html).toContain("No key");
@@ -681,15 +690,115 @@ describe("the page", () => {
       expect(html).toContain("New agent");
       const page = render(<Providers />);
       expect(page).toContain("provider-router.key missing");
-      expect(page).toContain("New provider");
+      expect(page).toContain('href="/config/providers/router"');
+      expect(page).toContain("1 agent");
+      expect(page).toContain('href="/config/providers?new"');
       expect(page).not.toContain("New agent");
     },
   );
+
+  test.serial("the list's aside names each key file's provider", () => {
+    providers.value = [router];
+    agents.value = [];
+    keys.value = ["provider-spare", "provider-router"];
+    const html = render(<Providers />);
+    expect(html).toMatch(
+      /provider-router\.key<a class="split-strong cut" href="\/config\/providers\/router">router</,
+    );
+    expect(html).toMatch(
+      /provider-spare\.key<span class="split-strong cut split-quiet">unused</,
+    );
+    // by name, whatever order the server answered
+    expect(html.indexOf("provider-router.key")).toBeLessThan(
+      html.indexOf("provider-spare.key"),
+    );
+    keys.value = [];
+    expect(render(<Providers />)).toContain("None in the secrets directory.");
+  });
 
   test.serial("says what to do first when there is nothing", () => {
     providers.value = [];
     agents.value = [];
     expect(render(<AgentList />)).toContain("Add a provider first");
     expect(render(<Providers />)).toContain("No providers yet");
+  });
+});
+
+describe("a provider's page", () => {
+  const judge: DeciderSummary = {
+    id: "d1",
+    name: "judge",
+    providerId: "pr1",
+    model: "vendor/judge-1",
+    contextLength: 32_000,
+    promptPrice: 0.04,
+    default: true,
+    createdAt: 0,
+  };
+
+  test.serial("says what it connects to and what runs on it", () => {
+    providers.value = [router];
+    agents.value = [coder];
+    deciders.value = [judge];
+    const html = render(<ProviderPage params={{ name: "router" }} />);
+    expect(html).toContain("OpenRouter");
+    expect(html).toContain("http://models.test/v1");
+    expect(html).toContain("provider-router.key missing");
+    expect(html).toContain('href="/config/agents/coder"');
+    expect(html).toContain("judge");
+    expect(html).toContain(
+      "1 agent and 1 decider run on it. Move them to another provider first.",
+    );
+    // the server refuses a provider in use, so Delete waits
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Delete</);
+  });
+
+  test.serial("deletes a provider nothing runs on", () => {
+    providers.value = [router];
+    agents.value = [];
+    deciders.value = [];
+    const html = render(<ProviderPage params={{ name: "router" }} />);
+    expect(html).toContain("No agent or decider runs on it yet.");
+    expect(html).toContain('href="/config/agents?new&amp;provider=router"');
+    expect(html).toContain("Nothing runs on it.");
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Delete</);
+  });
+
+  test.serial("the aside has its last 30 days, or says it did not load", () => {
+    providers.value = [router];
+    agents.value = [];
+    providerUsage.value = null;
+    const page = () => render(<ProviderPage params={{ name: "router" }} />);
+    expect(page()).toContain("Loading");
+    providerUsage.value = {
+      providerId: "pr1",
+      usage: { since: 0, until: 1, sends: 12, tokens: 3400, cost: null },
+    };
+    expect(page()).toMatch(/Turns[\s\S]*?12/);
+    expect(page()).toContain("not priced");
+    providerUsage.value = { providerId: "pr1", usage: null };
+    expect(page()).toContain("Did not load.");
+    // another provider's answer is not this one's
+    providerUsage.value = { providerId: "pr2", usage: null };
+    expect(page()).not.toContain("Did not load.");
+    providerUsage.value = null;
+  });
+
+  test.serial("an unknown name is a missing page", () => {
+    providers.value = [router];
+    agents.value = [];
+    expect(render(<ProviderPage params={{ name: "gone" }} />)).toContain(
+      "No provider by that name.",
+    );
+  });
+
+  test("the Delete line counts what keeps it", () => {
+    expect(providerDeleteLine(0, 0)).toBe("Nothing runs on it.");
+    expect(providerDeleteLine(2, 0)).toBe(
+      "2 agents run on it. Move them to another provider first.",
+    );
+    expect(providerDeleteLine(0, 1)).toBe(
+      "1 decider runs on it. Move it to another provider first.",
+    );
   });
 });

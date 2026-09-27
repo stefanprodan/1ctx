@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { query } from "../../../src/client/app/router.ts";
 import { servers } from "../../../src/client/data/mcp.ts";
 import { providers } from "../../../src/client/data/providers.ts";
 import { skills } from "../../../src/client/data/skills.ts";
@@ -407,5 +408,20 @@ describe("the cards", () => {
     providers.value = [];
     expect(render(<NewAgent />)).toContain("Add a provider");
     providers.value = null;
+  });
+
+  test.serial("New agent opens on the provider its link names", () => {
+    const other = { ...provider, id: "pr9", name: "zeta" };
+    providers.value = [provider, other];
+    query.value = "?new&provider=zeta";
+    try {
+      const html = render(<NewAgent />);
+      expect(html).toContain('class="agent-page-provider" title="zeta"');
+      // Cancel returns to the provider's page
+      expect(html).toContain('href="/config/providers/zeta">Cancel<');
+    } finally {
+      query.value = "";
+      providers.value = null;
+    }
   });
 });

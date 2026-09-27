@@ -481,16 +481,30 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
-- **The Providers page.** `/config/providers`, the rail's Providers,
+- **Config › Providers.** `/config/providers` (`Providers.tsx`)
   stacks Providers, Deciders, then Decisions, and waits for all of
   them. Each card is named by its search, which filters its rows, and
   shows them by name (`byName()` in `lib/search.ts`, the entities
   keeping their own order, the deciders oldest first). A provider row
-  (`ProviderRow.tsx`) opens to its facts, never edited: the wire, the
-  base URL, the key file, red when missing, the agents on it linked
-  and the deciders by name, and when it was added, then Delete asked
-  once beside Close; the server's refusal of a provider in use is the
-  foot's notice.
+  is a link: its service's mark, the name over the base URL, a missing
+  key file under it, and the agents on it over its type at the right;
+  New provider is in the page's head. The aside is the instance's last
+  30 days and the key files in the secrets directory by name, each
+  linking to the provider that reads it or "unused" (`quiet` on
+  `AsideLine`).
+  A provider's page, `/config/providers/:name` (`ProviderPage.tsx`),
+  is never edited: the crumb's own step switches providers, then
+  Connection (the type, the base URL, the key file, red when missing,
+  and when it was added), Used by (the agents linked to their pages,
+  the deciders by name) and Delete, off while anything runs on it,
+  since the server refuses that, the line saying what to move first.
+  When nothing runs on it, Used by has no rows and offers New agent,
+  opening New agent with `?provider=<name>` picked and Cancel back to
+  the provider. The aside is its last 30 days (`GET
+  /api/providers/:id/usage`), hidden on a phone as the agent page's.
+  New provider is the list's `?new` (`NewProvider.tsx`): the presets,
+  the name, the key file and the base URL in one card, Create opening
+  the new provider's page.
 - **Config › Agents.** `/config/agents` (`AgentList.tsx`) is a Split:
   one card of links, one row per agent by name, the avatar, `@name`
   and "default", the model through `Fit` under it, when it last ran

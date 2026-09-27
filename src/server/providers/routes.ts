@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The providers, all for admins: the list, a new one, its deletion and
-// the catalog search, and who serves a model behind OpenRouter. A
+// the catalog search, who serves a model behind OpenRouter, and its last
+// 30 days of usage. A
 // provider an agent or a decider runs on cannot go; whether one does is
 // the agents and deciders ports' answer.
 
@@ -11,6 +12,7 @@ import type {
   EndpointsResponse,
   ProviderResponse,
   ProvidersResponse,
+  ProviderUsageResponse,
 } from "../../shared/api/providers.ts";
 import type { Endpoint } from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -34,6 +36,17 @@ export type DecidersPort = {
   usesProvider(providerId: string): boolean;
 };
 
+// a provider's usage over a window, answered by the usage area
+export type UsagePort = {
+  providerTotal(
+    providerId: string,
+    since: number,
+    until: number,
+  ): { sends: number; tokens: number; cost: number | null };
+};
+
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
 export type RoutesDeps = {
   store: ProviderStore;
   catalogs: Catalogs;
@@ -43,6 +56,7 @@ export type RoutesDeps = {
   keys: () => string[];
   agents: AgentsPort;
   deciders: DecidersPort;
+  usage: UsagePort;
   clock: Clock;
 };
 
@@ -79,6 +93,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const provider = deps.store.create({ ...fields, now: deps.clock() });
         const body: ProviderResponse = { provider: show(provider) };
         return json(body, 201);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/providers/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const provider = find(ctx.params.id);
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const body: ProviderUsageResponse = {
+          since,
+          until,
+          ...deps.usage.providerTotal(provider.id, since, until),
+        };
+        return json(body);
       },
     },
     {
