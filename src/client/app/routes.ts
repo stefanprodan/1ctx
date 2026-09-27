@@ -15,7 +15,12 @@ import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
 import { loadAgents, loadFacts } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
-import { loadDeciders } from "../data/deciders.ts";
+import {
+  deciders,
+  loadDeciders,
+  loadDeciderUsage,
+  loadDecisionUsage,
+} from "../data/deciders.ts";
 import { loadDecisions } from "../data/decisions.ts";
 import {
   loadAgentDays,
@@ -439,15 +444,9 @@ export const ROUTES: Route[] = [
     role: "admin",
     // New provider is the list's `?new`, as New agent is
     load: async () => {
-      // a provider row counts the agents on it; the deciders' cards
-      // follow, and the aside reads the instance's last 30 days
-      await Promise.all([
-        loadAgents(),
-        loadDeciders(),
-        loadDecisions(),
-        loadProviders(),
-        loadOverview(),
-      ]);
+      // a provider row counts the agents on it, and the aside reads the
+      // instance's last 30 days
+      await Promise.all([loadAgents(), loadProviders(), loadOverview()]);
     },
   },
   {
@@ -485,6 +484,65 @@ export const ROUTES: Route[] = [
     },
   },
   ...configAgentRoutes,
+  {
+    path: "/config/deciders",
+    view: lazy(() =>
+      import("../views/admin/DeciderLists.tsx").then((m) => m.DeciderList),
+    ),
+    title: () => "Deciders",
+    role: "admin",
+    // New decider is the list's `?new`; the tabs count the decisions and
+    // the aside reads the instance's last 30 days
+    load: async () => {
+      await Promise.all([
+        loadDeciders(),
+        loadDecisions(),
+        loadProviders(),
+        loadOverview(),
+      ]);
+    },
+  },
+  {
+    path: "/config/deciders/:name",
+    view: lazy(() =>
+      import("../views/admin/DeciderPage.tsx").then((m) => m.DeciderPage),
+    ),
+    title: (params) => params.name,
+    role: "admin",
+    // the model's provider and the decisions that ask it; the aside's
+    // usage needs the decider's id, which the list gives
+    load: async (params) => {
+      await Promise.all([loadDeciders(), loadDecisions(), loadProviders()]);
+      const shown = deciders.value?.find((d) => d.name === params.name);
+      if (shown !== undefined) await loadDeciderUsage(shown.id);
+    },
+  },
+  {
+    path: "/config/decisions",
+    view: lazy(() =>
+      import("../views/admin/DeciderLists.tsx").then((m) => m.DecisionList),
+    ),
+    title: () => "Decisions",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadDeciders(), loadDecisions(), loadOverview()]);
+    },
+  },
+  {
+    path: "/config/decisions/:id",
+    view: lazy(() =>
+      import("../views/admin/DecisionPage.tsx").then((m) => m.DecisionPage),
+    ),
+    title: () => "Decision",
+    role: "admin",
+    load: async (params) => {
+      await Promise.all([
+        loadDeciders(),
+        loadDecisions(),
+        loadDecisionUsage(params.id),
+      ]);
+    },
+  },
   {
     path: "/config/tools",
     view: toolsView,

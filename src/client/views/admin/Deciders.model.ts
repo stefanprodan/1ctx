@@ -88,3 +88,29 @@ const DECIDER_FIELDS: [RegExp, string][] = [
 export function deciderFieldOf(message: string): string | undefined {
   return DECIDER_FIELDS.find(([words]) => words.test(message))?.[1];
 }
+
+// the decisions a decider answers: those that name it, and while it is
+// the default those that name none
+export function askedBy<T extends { deciderId: string | null }>(
+  decider: { id: string; default: boolean },
+  decisions: T[],
+): T[] {
+  return decisions.filter(
+    (d) =>
+      d.deciderId === decider.id || (d.deciderId === null && decider.default),
+  );
+}
+
+// the words over a decider's Delete: where what it answers goes, or
+// nothing when it answers nothing
+export function deciderDeleteLine(
+  decider: { id: string; default: boolean },
+  all: { id: string }[],
+  asking: number,
+): string | undefined {
+  if (asking === 0) return undefined;
+  const others = all.filter((d) => d.id !== decider.id).length;
+  return others === 0
+    ? "Decisions stay off until another decider is added."
+    : "Its decisions go to the default decider.";
+}

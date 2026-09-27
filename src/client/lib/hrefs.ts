@@ -20,6 +20,14 @@ export function configProviderHref(name: string): string {
   return `/config/providers/${encodeURIComponent(name)}`;
 }
 
+// a decider's page, and a decision's, under Config
+export function configDeciderHref(name: string): string {
+  return `/config/deciders/${encodeURIComponent(name)}`;
+}
+export function configDecisionHref(id: string): string {
+  return `/config/decisions/${encodeURIComponent(id)}`;
+}
+
 // an agent's page under Config, on one of its tabs
 export type AgentTab = "general" | "skills" | "mcp";
 export function configAgentHref(name: string, tab: AgentTab = "general") {

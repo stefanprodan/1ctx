@@ -176,3 +176,10 @@ fields.
   `usage_provider_activity` index: sends, tokens and cost, the cost 0
   with none and null when rounds ran and none was priced. A decider's
   answers are `decision_usage` and are not in it.
+- **A decider's usage and a decision's are their answers.**
+  `GET /api/deciders/:id/usage` counts a decider's `decision_usage`
+  rows over the last 30 days, Checks included, and
+  `GET /api/decisions/:id/usage` a decision's (its purpose), whichever
+  decider answered, each from its index in an appended migration:
+  answers, input tokens and cost, the cost 0 with none and null when
+  answers came and none was priced.

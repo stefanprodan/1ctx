@@ -4,12 +4,14 @@
 // The deciders and the decisions, all for admins. A decider's save names
 // a provider that serves decisions and a model its decisions catalog
 // lists; what the catalog says about it is kept on the row. Check asks
-// the fixed yes/no. A decision's save is its whole settings.
+// the fixed yes/no. A decision's save is its whole settings. Each has
+// its last 30 days of answers.
 
 import type {
   CheckDeciderResponse,
   DeciderResponse,
   DecidersResponse,
+  DecisionUsageResponse,
 } from "../../shared/api/deciders.ts";
 import type {
   DecisionResponse,
@@ -41,17 +43,35 @@ import {
   summary,
 } from "./store.ts";
 
+// a decider's answers, or a decision's, over a window
+export type TotalsPort = {
+  decisionTotal(
+    by: { deciderId: string } | { purpose: string },
+    since: number,
+    until: number,
+  ): { answers: number; tokens: number; cost: number | null };
+};
+
 export type RoutesDeps = {
   db: Db;
   store: DeciderStore;
   decisions: DecisionStore;
   providers: ProvidersPort;
-  usage: UsagePort;
+  usage: UsagePort & TotalsPort;
   clock: Clock;
   log: Log;
 };
 
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
+  const usage = (
+    by: { deciderId: string } | { purpose: string },
+  ): DecisionUsageResponse => {
+    const until = deps.clock();
+    const since = until - USAGE_WINDOW_MS;
+    return { since, until, ...deps.usage.decisionTotal(by, since, until) };
+  };
   const providerName = (id: string) => deps.providers.byId(id)?.name ?? id;
   const logged = (msg: string, decider: DeciderRow) =>
     deps.log.info(msg, {
@@ -130,6 +150,24 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle() {
         const body: DecisionsResponse = { decisions: deps.decisions.list() };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/decisions/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const id = ctx.params.id;
+        if (!isDecisionId(id)) throw new NotFound("no such decision");
+        return json(usage({ purpose: id }));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/deciders/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        return json(usage({ deciderId: find(ctx.params.id).id }));
       },
     },
     {

@@ -661,6 +661,7 @@
       padding-left: 0;
     }
     .rows-line:has(> .avatar) > .rows-meta,
+    .rows-go:has(> .avatar) > .rows-meta,
     .rows-go-part:has(> .avatar) > .rows-meta {
       padding-left: calc(28px + var(--space-3));
     }

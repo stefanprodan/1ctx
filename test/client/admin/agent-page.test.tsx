@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
+import { agents } from "../../../src/client/data/agents.ts";
 import { servers } from "../../../src/client/data/mcp.ts";
 import { providers } from "../../../src/client/data/providers.ts";
 import { skills } from "../../../src/client/data/skills.ts";
@@ -350,6 +351,25 @@ describe("the model draft", () => {
 });
 
 describe("the cards", () => {
+  test.serial("the oldest, while it is the default, keeps the mark", () => {
+    providers.value = [];
+    const oldest = { ...agent, default: true };
+    const other = { ...agent, id: "ag9", name: "other", createdAt: 9 };
+    agents.value = [oldest, other];
+    const kept = render(
+      <AgentGeneral agent={oldest} drafts={AgentDrafts.of(oldest)} />,
+    );
+    expect(kept).toContain("Mark another agent to move it");
+    expect(kept).toMatch(
+      /<input type="checkbox"[^>]*name="default"[^>]*disabled/,
+    );
+    agents.value = [other, oldest];
+    expect(
+      render(<AgentGeneral agent={oldest} drafts={AgentDrafts.of(oldest)} />),
+    ).not.toContain("Mark another agent");
+    agents.value = null;
+  });
+
   // a Save is the foot's submit, so each card that drafts is a form
   test.serial("every Save submits a form", () => {
     providers.value = [];

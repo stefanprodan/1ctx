@@ -145,6 +145,32 @@ export class DecisionUsageStore {
     return raw ? row(raw) : null;
   }
 
+  // the answers of one decider, or of one decision whatever answered
+  // it, after since up to until: their count, input tokens and cost, the
+  // cost 0 with none and null when answers came and none was priced
+  total(
+    by: { deciderId: string } | { purpose: string },
+    since: number,
+    until: number,
+  ): { answers: number; tokens: number; cost: number | null } {
+    const [column, value] =
+      "deciderId" in by
+        ? ["decider_id", by.deciderId]
+        : ["purpose", by.purpose];
+    return this.db
+      .query<
+        { answers: number; tokens: number; cost: number | null },
+        [string, number, number]
+      >(
+        `select count(*) as answers,
+                coalesce(sum(input_tokens), 0) as tokens,
+                case when count(*) = 0 then 0 else sum(cost) end as cost
+           from decision_usage
+          where ${column} = ? and created_at > ? and created_at <= ?`,
+      )
+      .get(value, since, until)!;
+  }
+
   // newest first, for a test or a later page
   list(limit = 100): DecisionUsageRow[] {
     return this.db

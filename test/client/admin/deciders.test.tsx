@@ -1,18 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Deciders card on the agents page: the words a row and a Check
-// say, the providers a decider may run on, the entity that follows the
-// signed-in user, and the card and its form rendered over the rows.
+// Config › Deciders: the words a row and a Check say, the providers a
+// decider may run on, the entity that follows the signed-in user, and
+// the list, New decider and a decider's page rendered.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
 import { agents, agentsError } from "../../../src/client/data/agents.ts";
 import {
   checkDecider,
   deciders,
   decidersError,
+  deciderUsage,
   deleteDecider,
   loadDeciders,
   updateDecider,
@@ -24,12 +24,13 @@ import {
   providersError,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
-import { sentence } from "../../../src/client/lib/format.ts";
-import { noticeOf, Save } from "../../../src/client/lib/save.ts";
-import { DeciderForm } from "../../../src/client/views/admin/DeciderForm.tsx";
+import { DeciderList } from "../../../src/client/views/admin/DeciderLists.tsx";
+import { DeciderPage } from "../../../src/client/views/admin/DeciderPage.tsx";
 import {
+  askedBy,
   checkCost,
   checkLine,
+  deciderDeleteLine,
   deciderFieldOf,
   deciderMeta,
   deciderProviders,
@@ -38,10 +39,9 @@ import {
   NO_DECIDERS,
   providerProblem,
 } from "../../../src/client/views/admin/Deciders.model.ts";
-import { DecidersCard } from "../../../src/client/views/admin/DecidersCard.tsx";
-import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
-import { Providers } from "../../../src/client/views/admin/Providers.tsx";
+import { NewDecider } from "../../../src/client/views/admin/NewDecider.tsx";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
+import type { DecisionSummary } from "../../../src/shared/contracts/decision.ts";
 import type { ProviderSummary } from "../../../src/shared/contracts/provider.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 
@@ -192,22 +192,6 @@ describe("the words", () => {
     for (const words of refusals.slice(0, 4)) {
       expect(deciderFieldOf(words)).toBeUndefined();
     }
-    // a save's words, yet a Check's too: the Check path skips the fields
-    for (const words of refusals) {
-      const save = new Save(async () => {}, 5, deciderFieldOf);
-      const ok = await save.act(
-        "check",
-        () => Promise.reject(new Error(words)),
-        { whole: true },
-      );
-      expect(ok).toBe(false);
-      expect(save.fieldError("name")).toBeNull();
-      expect(save.fieldError("provider")).toBeNull();
-      expect(save.fieldError("model")).toBeNull();
-      expect(noticeOf(save.notice()!)).toBe(
-        `Could not check. ${sentence(words)}`,
-      );
-    }
   });
 
   test.serial("the form holds an offered provider while there is one", () => {
@@ -292,97 +276,145 @@ describe("the entity", () => {
   });
 });
 
-describe("the card", () => {
+describe("the pages", () => {
+  const page = (name: string) => render(<DeciderPage params={{ name }} />);
+  const run: DecisionSummary = {
+    id: "run-attention",
+    enabled: true,
+    deciderId: null,
+    options: [],
+  };
+
   test.serial("a row per decider: default, provider, window, price", () => {
+    providers.value = [router, local];
     deciders.value = [judge, small];
-    const html = render(<DecidersCard providers={[router, local]} />);
-    expect(html).toContain("judge");
+    decisions.value = [];
+    const html = render(<DeciderList />);
+    expect(html).toContain('href="/config/deciders/judge"');
+    expect(html).toContain('<span class="tag">default</span>');
     expect(html).toContain("vendor/judge-1");
-    expect(html).toContain(">default · router · 32K · $0.04 input");
-    expect(html).toContain(
-      '<span class="rows-meta-short">default · 32K · $0.04 input</span>',
-    );
+    expect(html).toContain(">router<");
+    expect(html).toContain(">32K · $0.04 input<");
     // a local server's decider has no price or window to say
     expect(html).toContain(">local<");
-    expect(html).toContain("New decider");
+    expect(html).toContain('href="/config/deciders?new"');
     expect(html).not.toContain("No deciders yet");
+    expect(html).toMatch(/aria-current="page"[^>]*>Deciders/);
   });
 
-  test.serial("says what having none means", () => {
+  test.serial("says what having none means, and what to add first", () => {
+    providers.value = [router];
     deciders.value = [];
-    const html = render(<DecidersCard providers={[router]} />);
-    expect(html).toContain(NO_DECIDERS);
+    decisions.value = [];
+    expect(render(<DeciderList />)).toContain(NO_DECIDERS);
     expect(NO_DECIDERS).toBe(
       "No deciders yet. Decisions stay off until one is added.",
     );
+    // a provider that answers no decisions offers no New decider
+    providers.value = [strict, gemini];
+    const none = render(<DeciderList />);
+    expect(none).toContain("Add an OpenRouter or OpenAI-compatible provider");
+    expect(none).not.toContain("New decider");
   });
 
-  test.serial("New decider is off without a provider that answers", () => {
+  test.serial("New decider searches the first provider that answers", () => {
+    providers.value = [strict, router, gemini, local];
     deciders.value = [];
-    const off = render(<DecidersCard providers={[strict, gemini]} />);
-    expect(off).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?New decider/);
-    const on = render(<DecidersCard providers={[strict, router]} />);
-    expect(on).not.toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?New decider/);
-  });
-
-  test.serial("sits after the providers", () => {
-    providers.value = [router];
-    agents.value = [];
-    deciders.value = [];
-    decisions.value = [];
-    const html = render(<Providers />);
-    // each card is named by its search
-    const at = (label: string) => html.indexOf(`aria-label="${label}"`);
-    expect(at("Providers")).toBeGreaterThan(-1);
-    expect(at("Deciders")).toBeGreaterThan(at("Providers"));
-    expect(at("Decisions")).toBeGreaterThan(at("Deciders"));
-  });
-
-  test.serial("the form offers only the providers that answer", () => {
-    deciders.value = [];
-    const html = render(
-      <DeciderForm
-        decider={null}
-        providers={[router, strict, local, gemini]}
-        onDone={() => {}}
-      />,
+    const html = render(<NewDecider />);
+    // by name, only the wires that answer decisions: local before router
+    expect(html).toContain('class="decider-page-provider" title="local"');
+    // the default decider's provider comes first
+    deciders.value = [judge];
+    expect(render(<NewDecider />)).toContain(
+      'class="decider-page-provider" title="router"',
     );
-    expect(html).toContain(">router<");
-    expect(html).toContain(">local<");
-    expect(html).not.toContain(">strict<");
-    expect(html).not.toContain(">gemini<");
-    expect(html).toContain("Default decider");
-    expect(html).toContain("Add decider");
-    // a new decider has nothing saved to check
-    expect(html).not.toContain(">Check<");
-    expect(html).not.toContain('role="status"');
+    deciders.value = [];
+    expect(html).toContain('name="model"');
+    expect(html).toContain("Create decider");
+    expect(html).not.toContain("Default decider");
+    expect((html.match(/type="submit"/g) ?? []).length).toBe(1);
+    providers.value = [strict, gemini];
+    expect(render(<NewDecider />)).toContain("Add a provider");
   });
 
-  test.serial("an open row checks and deletes", () => {
+  test.serial("a decider's page: its cards, one form each", () => {
+    providers.value = [router, local];
     deciders.value = [judge, small];
-    const html = render(
-      <DeciderForm decider={small} providers={[router]} onDone={() => {}} />,
-    );
+    decisions.value = [run];
+    const html = page("small");
+    expect(html).toContain(">Identity<");
+    expect(html).toContain(">Model<");
     expect(html).toContain(">Check<");
-    expect(html).toContain(">Delete<");
-    // mounted empty, so a screen reader announces what Check answers
-    expect(html).toContain('<p class="agents-checked" role="status"></p>');
+    expect(html).toContain("Delete small");
     expect(html).toContain("small-latest");
+    expect(html).toContain("local");
+    // Identity and Model save, Check and Delete are buttons
+    expect(html.split("<form").length).toBe(3);
+    // nothing asks it, so Delete has nothing to say
+    expect(html).toContain("Delete small</h2></div>");
+    // the aside names the decisions that ask it: none, judge is default
+    expect(html).toContain("No decision.");
   });
 
-  test.serial("the oldest, while it is the default, cannot say No", () => {
+  test.serial("the default decider answers what names none", () => {
+    providers.value = [router, local];
     deciders.value = [judge, small];
-    const field = (row: DeciderSummary) =>
-      render(
-        <DefaultField
-          row={row}
-          on={signal(row.default)}
-          save={{ busy: false, touch() {} }}
-          oldest={deciders.value?.[0]?.id}
-          label="Default decider"
-        />,
-      );
-    expect(field(judge).match(/ disabled/g)).toHaveLength(2);
-    expect(field(small)).not.toContain("disabled");
+    decisions.value = [run];
+    const html = page("judge");
+    expect(html).toContain('href="/config/decisions/run-attention"');
+    expect(html).toContain("Its decisions go to the default decider.");
+    // the oldest, while it is the default, keeps the mark
+    expect(html).toContain("Mark another decider to move it");
+    expect(html).toMatch(
+      /<input type="checkbox"[^>]*name="default"[^>]*disabled/,
+    );
+    expect(page("small")).not.toContain("Mark another decider");
+  });
+
+  test.serial("an unknown name is a missing page", () => {
+    providers.value = [router];
+    deciders.value = [judge];
+    decisions.value = [];
+    expect(page("gone")).toContain("No decider by that name.");
+  });
+
+  test.serial("the aside has its last 30 days", () => {
+    providers.value = [router];
+    deciders.value = [judge];
+    decisions.value = [];
+    deciderUsage.value = null;
+    expect(page("judge")).toContain("Loading");
+    deciderUsage.value = {
+      of: "d1",
+      usage: { since: 0, until: 1, answers: 12, tokens: 3400, cost: 0.0002 },
+    };
+    expect(page("judge")).toMatch(/Answers[\s\S]*?12/);
+    deciderUsage.value = { of: "d9", usage: null };
+    expect(page("judge")).not.toContain("Did not load.");
+    deciderUsage.value = null;
+  });
+});
+
+describe("the Delete line", () => {
+  test("says where what it answers goes", () => {
+    const one = { id: "d1", default: true };
+    const other = { id: "d2", default: false };
+    expect(deciderDeleteLine(one, [one], 0)).toBeUndefined();
+    expect(deciderDeleteLine(other, [one, other], 0)).toBeUndefined();
+    expect(deciderDeleteLine(one, [one], 1)).toBe(
+      "Decisions stay off until another decider is added.",
+    );
+    expect(deciderDeleteLine(other, [one, other], 2)).toBe(
+      "Its decisions go to the default decider.",
+    );
+  });
+
+  test("a decider answers what names it, and while default what names none", () => {
+    const named = { deciderId: "d2" };
+    const none = { deciderId: null };
+    expect(askedBy({ id: "d1", default: true }, [named, none])).toEqual([none]);
+    expect(askedBy({ id: "d2", default: false }, [named, none])).toEqual([
+      named,
+    ]);
   });
 });

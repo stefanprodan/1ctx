@@ -481,11 +481,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
-- **Config › Providers.** `/config/providers` (`Providers.tsx`)
-  stacks Providers, Deciders, then Decisions, and waits for all of
-  them. Each card is named by its search, which filters its rows, and
-  shows them by name (`byName()` in `lib/search.ts`, the entities
-  keeping their own order, the deciders oldest first). A provider row
+- **Config › Providers.** `/config/providers` (`Providers.tsx`) is one
+  card of providers by name (`byName()` in `lib/search.ts`), named by
+  its search, which filters its rows. A provider row
   is a link: its service's mark, the name over the base URL, a missing
   key file under it, and the agents on it over its type at the right;
   New provider is in the page's head. The aside is the instance's last
@@ -496,7 +494,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   is never edited: the crumb's own step switches providers, then
   Connection (the type, the base URL, the key file, red when missing,
   and when it was added), Used by (the agents linked to their pages,
-  the deciders by name) and Delete, off while anything runs on it,
+  the deciders to theirs) and Delete, off while anything runs on it,
   since the server refuses that, the line saying what to move first.
   When nothing runs on it, Used by has no rows and offers New agent,
   opening New agent with `?provider=<name>` picked and Cancel back to
@@ -544,50 +542,43 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   the server config"; Tool schemas is its own card with the
   instructions the draft would put in the prompt. The aside is `GET
   /api/agents/:id/usage` and the `/impact` counts.
-- **The Deciders card.** `DecidersCard.tsx`, the rows in
-  `data/deciders.ts`, loaded by the route: a row per decider, the name
-  over the model, and "default", the provider, the window and the input
-  price (`deciderMeta()` in `Deciders.model.ts`). New decider, off
-  until a provider's wire is in `DECIDER_WIRES`, and an open row are
-  one `DeciderForm`: the name, the provider as picks of those providers
-  only (`heldProvider()`: when the picked one is deleted on the same
-  page the first eligible one stands in, and "Add an OpenRouter or
-  OpenAI-compatible provider first" only when none is), the model
-  searched in the provider's decisions catalog
-  (`searchCatalog(..., "decisions")`), and the agents' `DefaultField`
-  with its own label and the deciders' oldest id, the oldest while
-  default having no No. A save's refusal reaches a field only through
-  `deciderFieldOf()`, which matches the server's whole phrases, since a
-  provider's name may start them. An open row's foot has Delete and
-  Check: Check asks the saved decider through
-  `POST /api/deciders/:id/check` and says `checkLine()` over the
-  buttons, "Answered in 345 ms for $0.000001", or without the cost when
-  the server named none, in a `role="status"` line kept mounted empty
-  so it is announced; a refusal skips the field mapping (`act(...,
-  { whole: true })`) and is always the foot's notice, "Could not
-  check." then the wire's words. With no deciders the card says
-  decisions stay off until one is added.
-- **The Decisions card.** `DecisionsCard.tsx`, the rows in
-  `data/decisions.ts`, loaded by the route, a save putting the
-  server's answer in the list: a row per decision in `DECISIONS`, its
-  icon, title and sub from `DECISION_WORDS` in `Decisions.model.ts`
-  (the server sends only ids and option keys), and a meta from
-  `decisionMeta()`: "off", else "on" and the name of the decider that
-  answers, the default when none is picked or the picked one is gone,
-  then "custom" while an option differs from its default; a phone
-  shows it without "custom". With no deciders the row stays, faint, "off
-  until a decider is added", and its form still saves. An open row is
-  `DecisionForm.tsx`: Status as a `Seg` (On, Off) over the decision's
-  hint, Decider as a `Select` (`deciderChoices()`: "Default (<name>)",
-  then each decider; a picked one deleted on the page falls back to the
-  default through `heldDecider()`), and a textarea per option labelled
-  by `optionLabel()`, seeded from the entity and seeded again from each
-  answer. Save sends `decisionBody()`, checked by `optionProblem()`,
-  and a refusal reaches a field through `decisionFieldOf()`
-  (`options.<key>`, `enabled`, `decider`). Reset to default, at the
-  foot's left while any box differs from its option's default, fills
-  the boxes with `defaultTexts()` for the admin to save. The form
-  stays open after a save; Cancel closes it.
+- **Config › Deciders and Decisions.** Two lists at their own
+  addresses under one pair of tabs (`DeciderLists.tsx`): the rail's
+  Deciders row stays lit on `/config/decisions` through the zone page's
+  `also`. A decider row is a link, the name and "default" over the
+  model, the provider over `deciderMeta()` at the right; New decider,
+  in the card's head so both tabs' heads match, only while a
+  provider's wire is in `DECIDER_WIRES`. A decision row is a link, its
+  icon, title and sub from `DECISION_WORDS` (the server sends only ids
+  and option keys) and `decisionMeta()`: "off", else "on" and the
+  decider that answers, the default when none is picked or the picked
+  one is gone, then "custom" while an option differs from its default;
+  with no deciders the row says "off until a decider is added". Both
+  asides are the instance's decisions over the last 30 days.
+  A decider's page (`DeciderPage.tsx`, drafts in
+  `DeciderPage.state.ts`) is an agent page's shape: Identity (the name
+  and "Default decider", the oldest while default keeping the mark),
+  Model (`DeciderModelFields.tsx`: the id over the provider and
+  `deciderMeta()`, Change opening the decisions catalog search with a
+  provider picker of the eligible wires, a provider change clearing the
+  model), Check (`POST /api/deciders/:id/check`, `checkLine()` at the
+  foot's left in a `role="status"` span, a refusal's words there, the
+  aside read again), and Delete, its line only when a decision would
+  move (`deciderDeleteLine()`). A save's refusal reaches a field
+  through `deciderFieldOf()`, which matches the server's whole phrases.
+  The aside is `GET /api/deciders/:id/usage` and the decisions that ask
+  it (`askedBy()`: those naming it, and while it is the default those
+  naming none). New decider is the list's `?new` (`NewDecider.tsx`):
+  the name and the model in one card, the search on the default
+  decider's provider, Create opening the page.
+  A decision's page (`DecisionPage.tsx`) has Status (On or Off over the
+  decision's hint, the Decider `Select` from `deciderChoices()`) and
+  Options (a textarea per option labelled by `optionLabel()`, Reset to
+  default while any box differs from the code's text), each its own
+  form sending the whole `decisionBody()` with the other card's saved
+  values, checked by `optionProblem()`, a refusal reaching a field
+  through `decisionFieldOf()`. A decision is the code's, so it has no
+  Delete. The aside is `GET /api/decisions/:id/usage`.
 - **The overview's usage bars** name the one row of every deleted
   project "deleted projects", unmarked, and mark a retired agent with a
   small "deleted" after the name (`Bars`' `gone`).

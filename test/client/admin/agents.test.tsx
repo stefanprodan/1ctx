@@ -6,7 +6,6 @@
 // Admin group in the rail, and the page rendered over the rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
 import {
   priceLine,
@@ -55,7 +54,6 @@ import {
   upstreamOptions,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
-import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
 import { NewProvider } from "../../../src/client/views/admin/NewProvider.tsx";
 import {
   ProviderPage,
@@ -599,15 +597,6 @@ describe("the entities", () => {
 
 describe("the default agent", () => {
   const ops: AgentSummary = { ...coder, id: "ag2", name: "ops", createdAt: 1 };
-  const field = (agent: AgentSummary) =>
-    render(
-      <DefaultField
-        row={agent}
-        on={signal(agent.default)}
-        save={{ busy: false, touch() {} }}
-        oldest={agents.value?.[0]?.id}
-      />,
-    );
 
   test.serial("the row says default", () => {
     providers.value = [router];
@@ -615,16 +604,6 @@ describe("the default agent", () => {
     const html = render(<AgentList />);
     expect(html).toContain('<span class="tag">default</span>');
     expect(html).toContain('href="/config/agents/coder"');
-  });
-
-  test.serial("the oldest, while it is the default, cannot say No", () => {
-    agents.value = [{ ...coder, default: true }, ops];
-    let html = field({ ...coder, default: true });
-    expect(html.match(/ disabled/g)).toHaveLength(2);
-    agents.value = [coder, { ...ops, default: true }];
-    html = field({ ...ops, default: true });
-    expect(html).not.toContain("disabled");
-    expect(field(coder)).not.toContain("disabled");
   });
 
   test.serial("a moved mark reloads the list", async () => {
@@ -745,7 +724,7 @@ describe("a provider's page", () => {
     expect(html).toContain("http://models.test/v1");
     expect(html).toContain("provider-router.key missing");
     expect(html).toContain('href="/config/agents/coder"');
-    expect(html).toContain("judge");
+    expect(html).toContain('href="/config/deciders/judge"');
     expect(html).toContain(
       "1 agent and 1 decider run on it. Move them to another provider first.",
     );

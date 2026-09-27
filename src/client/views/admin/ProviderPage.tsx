@@ -23,14 +23,18 @@ import {
 } from "../../data/providers.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { count, longDate, pluralCommas } from "../../lib/format.ts";
-import { configAgentHref, configProviderHref } from "../../lib/hrefs.ts";
+import {
+  configAgentHref,
+  configDeciderHref,
+  configProviderHref,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
 import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { RowsAvatar, RowsGo, RowsLine, RowsTitle } from "../../ui/Rows.tsx";
+import { RowsAvatar, RowsGo, RowsTitle } from "../../ui/Rows.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { keyLine, preset } from "./Agents.model.ts";
@@ -133,10 +137,7 @@ function Fact({
 function Connection({ provider }: { provider: ProviderSummary }) {
   const missing = provider.keyName !== null && !provider.hasKey;
   return (
-    <Setting
-      title="Connection"
-      line="Set when the provider was added. For another address or key, add a new provider."
-    >
+    <Setting title="Connection">
       <div class="provider-page-facts">
         <Fact label="Type">{preset(provider.wire).label}</Fact>
         <Fact label="Base URL" mono>
@@ -190,12 +191,12 @@ function UsedBy({ provider }: { provider: ProviderSummary }) {
         </RowsGo>
       ))}
       {onDeciders.map((d) => (
-        <RowsLine key={d.id} flush>
+        <RowsGo key={d.id} href={configDeciderHref(d.name)}>
           <RowsAvatar>
             <Icon name="check" size={15} />
           </RowsAvatar>
           <RowsTitle mono name={d.name} sub="Decider" />
-        </RowsLine>
+        </RowsGo>
       ))}
     </Setting>
   );

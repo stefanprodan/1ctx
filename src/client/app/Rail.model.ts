@@ -49,3 +49,18 @@ export function litPage(pathname: string, hrefs: string[]): string | null {
   }
   return best;
 }
+
+// the one link of the admin face lit for a path: the zone or the page
+// that holds it, a page's own tab at another address lighting the page
+export function zoneLit(pathname: string, zones = ZONES): string | null {
+  const targets = new Map<string, string>();
+  for (const z of zones) {
+    targets.set(z.href, z.href);
+    for (const p of z.pages) {
+      targets.set(p.href, p.href);
+      for (const also of p.also ?? []) targets.set(also, p.href);
+    }
+  }
+  const hit = litPage(pathname, [...targets.keys()]);
+  return hit === null ? null : targets.get(hit)!;
+}
