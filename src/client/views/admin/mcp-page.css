@@ -1,0 +1,268 @@
+/* Config › MCP Servers: a list row's meta, and a server's page: the
+   failure line over the tabs, the facts and fields of General's cards,
+   and the Tools card's matchers, bar and tool rows. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .mcp-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 960px;
+  }
+  .mcp-page-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+
+  /* the list: the agents over the sides, right-aligned */
+  .mcp-page-list-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-family: var(--sans);
+  }
+  .mcp-page-list-sides {
+    color: var(--faint);
+  }
+
+  .mcp-page-bad {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    color: var(--attention);
+  }
+  .mcp-page-bad-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* General: a label and a value per line */
+  .mcp-page-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--text-ui);
+  }
+  .mcp-page-fact {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .mcp-page-fact-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .mcp-page-change-head {
+    cursor: pointer;
+  }
+  .mcp-page-change-line {
+    display: flex;
+    gap: var(--space-2);
+    padding-top: var(--space-1);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    overflow-wrap: anywhere;
+  }
+  .mcp-page-change-kind {
+    flex-shrink: 0;
+    font-family: var(--sans);
+    color: var(--faint);
+  }
+  .mcp-page-said {
+    margin: 0;
+    font-size: var(--text-ui);
+  }
+  .mcp-page-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+  .mcp-page-url {
+    flex: 2 1 320px;
+    min-width: 0;
+  }
+  .mcp-page-key {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .mcp-page-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-6);
+  }
+  .mcp-page-timeout {
+    width: 200px;
+    max-width: 100%;
+  }
+  .mcp-page-block {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .mcp-page-delete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .mcp-page-ask {
+    margin-right: auto;
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+
+  /* Tools: a line per side, its label then the matchers and the box
+     that adds one, the hint under them */
+  .mcp-page-matchers {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .mcp-page-matcher {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .mcp-page-matcher-label {
+    flex-shrink: 0;
+    width: 80px;
+    padding-top: 8px;
+  }
+  .mcp-page-matcher-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .mcp-page-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .mcp-page-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 32px;
+    padding: 0 2px 0 var(--space-2);
+    font-size: var(--text-small);
+    color: var(--fg);
+  }
+  .mcp-page-chip-count {
+    font-family: var(--sans);
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+  }
+  .mcp-page-chip-none {
+    border-color: var(--failed-line);
+  }
+  .mcp-page-chip-none .mcp-page-chip-count {
+    color: var(--failed);
+  }
+  .mcp-page-chip-remove {
+    width: 24px;
+    height: 24px;
+  }
+  /* a field's box, as short as a matcher */
+  .mcp-page-matcher-body .mcp-page-add {
+    flex: 0 1 160px;
+    min-width: 100px;
+    height: 32px;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+
+  /* the line over the rows: the filter or the move, the box at the
+     rows' boxes' place */
+  .mcp-page-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .mcp-page-move {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .mcp-page-picked {
+    font-size: var(--text-ui);
+    font-weight: 500;
+  }
+  .mcp-page-move-to {
+    margin-left: var(--space-2);
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  .mcp-page-all {
+    display: flex;
+    margin-left: auto;
+  }
+  .mcp-page-moved {
+    margin: 0;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--line);
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+
+  /* a tool's meta: the side, then what set it, faint */
+  .mcp-page-side {
+    font-family: var(--sans);
+  }
+  .mcp-page-side-read,
+  .mcp-page-side-write {
+    color: var(--fg);
+  }
+  .mcp-page-by {
+    font-family: var(--mono);
+    color: var(--faint);
+  }
+  .mcp-page-pick {
+    display: flex;
+  }
+  .mcp-page-tool {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: var(--text-small);
+  }
+  .mcp-page-tool-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 719px) {
+    .mcp-page-list-meta {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-2);
+    }
+    .mcp-page-matcher {
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    .mcp-page-matcher-label {
+      width: auto;
+      padding-top: 0;
+    }
+  }
+}

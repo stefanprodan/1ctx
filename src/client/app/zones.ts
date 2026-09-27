@@ -46,7 +46,7 @@ export const ZONES: Zone[] = [
         href: "/config/deciders",
         also: ["/config/decisions"],
       },
-      { label: "MCP", href: "/config/mcp" },
+      { label: "MCP Servers", href: "/config/mcp" },
       { label: "Skills", href: "/config/skills" },
       { label: "Tools", href: "/config/tools" },
     ],

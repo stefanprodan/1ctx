@@ -217,6 +217,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     version: options.version,
     render: renderMarkdown,
     capabilities,
+    usage: {
+      calls: (server, since, until) => sessions.mcpCalls(server, since, until),
+      servers: (since, until) => sessions.mcpServerCalls(since, until),
+    },
   });
   const skills: Skills = skillsArea({
     db,

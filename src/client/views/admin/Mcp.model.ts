@@ -1,27 +1,22 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The MCP page's model, tested without a DOM: the head's words, the
-// change and failure lines, the pattern fields to lists and back, the
-// live split and the patterns matching nothing, the timeout in
-// seconds, the key options, the instructions box trimmed to its first
-// lines, and the agent form's preview of what a send would carry from
-// the rows loaded.
+// The MCP pages' model, tested without a DOM: the change line, a
+// pattern list as text, the timeout in seconds, the key hint, the
+// instructions box trimmed to its first lines, a refusal's field, and
+// the agent form's preview of what a send would carry from the rows
+// loaded.
 
 import type {
   AgentServer,
   McpChange,
   McpServerSummary,
-  McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
 import {
-  classify,
   MAX_INSTRUCTIONS_BLOCK,
   offeredServers,
-  type Patterns,
   promptSnapshot,
   serverBlock,
-  unmatched,
 } from "../../../shared/mcp.ts";
 import {
   MCP_KEY_PREFIX,
@@ -31,26 +26,6 @@ import {
 } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
-import { NO_KEY } from "../../lib/secrets.ts";
-
-// the head under the name: the tools and the last good check, or the
-// failure in red
-export function metaLine(
-  server: McpServerSummary,
-  now: number,
-): { text: string; bad: boolean } {
-  if (server.refreshError !== null && server.refreshFailedAt !== null) {
-    return {
-      text: `refresh failed ${ago(server.refreshFailedAt, now)}`,
-      bad: true,
-    };
-  }
-  const n = server.tools.length;
-  return {
-    text: `${n} ${n === 1 ? "tool" : "tools"} · checked ${ago(server.checkedAt, now)}`,
-    bad: false,
-  };
-}
 
 // what the last refresh changed, as one line
 export function changeLine(change: McpChange | null, now: number): string {
@@ -78,92 +53,8 @@ export function changeLine(change: McpChange | null, now: number): string {
   return `${ago(change.at, now)}: ${parts.join(", ")}`;
 }
 
-// a failed refresh keeps the last good list; the line says how old
-export function servedLine(server: McpServerSummary, now: number): string {
-  return `serving the list from ${ago(server.checkedAt, now)}`;
-}
-
 export function patternText(list: string[]): string {
   return list.join("\n");
-}
-
-export function endpointDirty(
-  server: McpServerSummary,
-  url: string,
-  keyName: string,
-): boolean {
-  const key = keyName === NO_KEY ? null : keyName;
-  return url.trim() !== server.url || key !== server.keyName;
-}
-
-export function settingsDirty(
-  server: McpServerSummary,
-  draft: {
-    read: boolean;
-    write: boolean;
-    instructionsOn: boolean;
-    timeout: string;
-    patterns: Patterns;
-  },
-): boolean {
-  return (
-    draft.read !== server.read ||
-    draft.write !== server.write ||
-    draft.instructionsOn !== server.instructionsOn ||
-    timeoutMs(draft.timeout) !== server.timeoutMs ||
-    patternText(draft.patterns.read) !== patternText(server.readPatterns) ||
-    patternText(draft.patterns.write) !== patternText(server.writePatterns) ||
-    patternText(draft.patterns.excluded) !==
-      patternText(server.excludedPatterns)
-  );
-}
-
-type ToolGroups = {
-  read: McpToolSummary[];
-  write: McpToolSummary[];
-  excluded: McpToolSummary[];
-  // with the reason: the stored one, or the wire name
-  unusable: { tool: McpToolSummary; reason: string }[];
-};
-
-// the four groups as the page computes them live from the fields
-export function toolGroups(
-  server: McpServerSummary,
-  patterns: Patterns,
-): ToolGroups {
-  const sides = classify(server.name, server.tools, patterns);
-  const groups: ToolGroups = {
-    read: [],
-    write: [],
-    excluded: [],
-    unusable: [],
-  };
-  for (const tool of server.tools) {
-    const side = sides.get(tool.name);
-    if (side === "unusable") {
-      groups.unusable.push({
-        tool,
-        reason: tool.unusable ?? "unusable name",
-      });
-    } else if (side === "read") groups.read.push(tool);
-    else if (side === "write") groups.write.push(tool);
-    else groups.excluded.push(tool);
-  }
-  return groups;
-}
-
-// the patterns of one field matching no discovered tool
-export function unmatchedIn(
-  server: McpServerSummary,
-  list: string[],
-): string[] {
-  const names = server.tools.map((t) => t.name);
-  return unmatched(names, { read: list, write: [], excluded: [] });
-}
-
-export function unmatchedLine(patterns: string[]): string {
-  if (patterns.length === 0) return "";
-  return `${patterns.length === 1 ? "matches" : "match"} no tool: ${patterns.join(", ")}`;
 }
 
 // the timeout field holds seconds; empty is the limits' value

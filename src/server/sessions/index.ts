@@ -16,7 +16,7 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
-import { personDays } from "./activity.ts";
+import { mcpCalls, mcpServerCalls, personDays } from "./activity.ts";
 import {
   agentActivity,
   agentChats,
@@ -107,6 +107,16 @@ export type Sessions = {
   // a person's posts, chats and manual runs on each day of a window,
   // in every project
   personDays(userId: string, starts: number[], until: number): number[];
+  // an MCP server's calls in a window, for its page
+  mcpCalls(
+    server: string,
+    since: number,
+    until: number,
+  ): ReturnType<typeof mcpCalls>;
+  mcpServerCalls(
+    since: number,
+    until: number,
+  ): ReturnType<typeof mcpServerCalls>;
   sessionInfo(sessionId: string): Memory["session"];
   // a run's answer before its memory phase, null when it has none
   runAnswer(sendId: string, memoryRound: number | null): string | null;
@@ -159,6 +169,8 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }),
     personDays: (userId, starts, until) =>
       personDays(deps.db, userId, starts, until),
+    mcpCalls: (server, since, until) => mcpCalls(deps.db, server, since, until),
+    mcpServerCalls: (since, until) => mcpServerCalls(deps.db, since, until),
     sessionInfo(sessionId) {
       const row = deps.db
         .query<NonNullable<Memory["session"]>, [string]>(

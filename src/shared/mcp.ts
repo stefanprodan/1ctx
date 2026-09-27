@@ -49,8 +49,43 @@ function matches(pattern: string, name: string): boolean {
   return name === pattern;
 }
 
-function matchesAny(patterns: string[], name: string): boolean {
-  return patterns.some((pattern) => matches(pattern, name));
+// the first pattern of a list that matches the name, or null
+function firstMatch(patterns: string[], name: string): string | null {
+  return patterns.find((pattern) => matches(pattern, name)) ?? null;
+}
+
+// a tool's side and the pattern that put it there: null for an
+// unusable tool, and for a write by default, when the write list is
+// empty and nothing else matched
+export type Decided = { side: ToolSide; by: string | null };
+
+export function decide(
+  server: string,
+  tools: { name: string; unusable: string | null }[],
+  patterns: Patterns,
+): Map<string, Decided> {
+  const out = new Map<string, Decided>();
+  for (const tool of tools) {
+    if (tool.unusable !== null || wireName(server, tool.name) === null) {
+      out.set(tool.name, { side: "unusable", by: null });
+      continue;
+    }
+    const excluded = firstMatch(patterns.excluded, tool.name);
+    const read = firstMatch(patterns.read, tool.name);
+    const write = firstMatch(patterns.write, tool.name);
+    if (excluded !== null) {
+      out.set(tool.name, { side: "excluded", by: excluded });
+    } else if (read !== null) {
+      out.set(tool.name, { side: "read", by: read });
+    } else if (patterns.write.length === 0) {
+      out.set(tool.name, { side: "write", by: null });
+    } else if (write !== null) {
+      out.set(tool.name, { side: "write", by: write });
+    } else {
+      out.set(tool.name, { side: "excluded", by: null });
+    }
+  }
+  return out;
 }
 
 export function classify(
@@ -59,21 +94,8 @@ export function classify(
   patterns: Patterns,
 ): Map<string, ToolSide> {
   const out = new Map<string, ToolSide>();
-  for (const tool of tools) {
-    if (tool.unusable !== null || wireName(server, tool.name) === null) {
-      out.set(tool.name, "unusable");
-    } else if (matchesAny(patterns.excluded, tool.name)) {
-      out.set(tool.name, "excluded");
-    } else if (matchesAny(patterns.read, tool.name)) {
-      out.set(tool.name, "read");
-    } else if (
-      patterns.write.length === 0 ||
-      matchesAny(patterns.write, tool.name)
-    ) {
-      out.set(tool.name, "write");
-    } else {
-      out.set(tool.name, "excluded");
-    }
+  for (const [name, { side }] of decide(server, tools, patterns)) {
+    out.set(name, side);
   }
   return out;
 }

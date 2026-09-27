@@ -8,6 +8,7 @@
 // is theirs to count there. A run's instructions are a user message
 // too, which the chat origin leaves out.
 
+import { splitWireName } from "../../shared/mcp.ts";
 import type { Db } from "../db/index.ts";
 import { countByDay } from "../usage/index.ts";
 
@@ -41,4 +42,75 @@ export function personDays(
     until,
     rows.map((row) => row.at),
   );
+}
+
+// the MCP tool rows in a window by wire name: every one starts with
+// mcp__<server>__ in both modes, since the loop writes a catalog call
+// under the tool's own name, and `~` sorts after every character a
+// wire name may hold
+function toolRows(db: Db, prefix: string, since: number, until: number) {
+  return db
+    .query<
+      { name: string; calls: number; failed: number },
+      [string, string, number, number]
+    >(
+      `select tool_name as name, count(*) as calls,
+              sum(status = 'failed') as failed
+         from messages
+        where kind = 'tool' and tool_name >= ? and tool_name < ?
+          and created_at > ? and created_at <= ?
+        group by tool_name`,
+    )
+    .all(prefix, `${prefix}~`, since, until);
+}
+
+type Calls = { calls: number; failed: number };
+
+const byCalls = (a: { name: string; calls: number }, b: typeof a) =>
+  b.calls - a.calls || a.name.localeCompare(b.name);
+
+// one server's calls, per tool; its name holds no underscore, so no
+// other server's names start with its prefix
+export function mcpCalls(
+  db: Db,
+  server: string,
+  since: number,
+  until: number,
+): Calls & { tools: { name: string; calls: number }[] } {
+  const prefix = `mcp__${server}__`;
+  const rows = toolRows(db, prefix, since, until);
+  const total = { calls: 0, failed: 0 };
+  for (const row of rows) {
+    total.calls += row.calls;
+    total.failed += row.failed;
+  }
+  const tools = rows
+    .map((row) => ({ name: row.name.slice(prefix.length), calls: row.calls }))
+    .sort(byCalls);
+  return { ...total, tools };
+}
+
+// every server's calls, by the name its tool rows carry, a deleted
+// server's included
+export function mcpServerCalls(
+  db: Db,
+  since: number,
+  until: number,
+): Calls & { servers: ({ name: string } & Calls)[] } {
+  const total = { calls: 0, failed: 0 };
+  const by = new Map<string, Calls>();
+  for (const row of toolRows(db, "mcp__", since, until)) {
+    const server = splitWireName(row.name)?.server;
+    if (server === undefined) continue;
+    const seen = by.get(server) ?? { calls: 0, failed: 0 };
+    seen.calls += row.calls;
+    seen.failed += row.failed;
+    by.set(server, seen);
+    total.calls += row.calls;
+    total.failed += row.failed;
+  }
+  const servers = [...by]
+    .map(([name, calls]) => ({ name, ...calls }))
+    .sort(byCalls);
+  return { ...total, servers };
 }
