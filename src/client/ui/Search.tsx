@@ -71,7 +71,11 @@ export function Search({
           if (ev.key === "Escape") {
             text.value = "";
             settle("", true);
-          } else if (ev.key === "Enter") settle(text.value, true);
+          } else if (ev.key === "Enter") {
+            // inside a form, Enter would submit it
+            ev.preventDefault();
+            settle(text.value, true);
+          }
         }}
       />
     </label>

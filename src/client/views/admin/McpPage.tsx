@@ -13,16 +13,23 @@ import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agentsError } from "../../data/agents.ts";
-import { servers, serversError, serverUsage } from "../../data/mcp.ts";
-import { ago, count, sentence } from "../../lib/format.ts";
+import {
+  patchServer,
+  servers,
+  serversError,
+  serverUsage,
+} from "../../data/mcp.ts";
+import { ago, count, plural, sentence } from "../../lib/format.ts";
 import { configMcpHref, type McpTab } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
+import { type Save, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { mcpFieldOf } from "./Mcp.model.ts";
 import { McpGeneral } from "./McpGeneral.tsx";
 import { McpDrafts } from "./McpPage.state.ts";
 import { McpTools } from "./McpTools.tsx";
@@ -59,6 +66,21 @@ export function McpPage({ params }: { params: Params }) {
   }
   row.current = server;
   const tab = mcpTabOf(path.value);
+  // the Tools draft's save, held by the page so a tab switch keeps its
+  // state; the row and drafts are read when it runs
+  const toolsSave = useSave(async () => {
+    const s = row.current;
+    const d = drafts.current;
+    if (s === null || d === null) return;
+    const p = d.patterns.value;
+    d.resetTools(
+      await patchServer(s.id, {
+        readPatterns: p.read,
+        writePatterns: p.write,
+        excludedPatterns: p.excluded,
+      }),
+    );
+  }, mcpFieldOf);
   return (
     <Page
       steps={STEPS}
@@ -83,6 +105,7 @@ export function McpPage({ params }: { params: Params }) {
             server={server}
             tab={tab}
             drafts={drafts.current}
+            toolsSave={toolsSave}
           />
         </Split>
       )}
@@ -126,10 +149,12 @@ function Body({
   server,
   tab,
   drafts,
+  toolsSave,
 }: {
   server: McpServerSummary;
   tab: McpTab;
   drafts: McpDrafts;
+  toolsSave: Save;
 }) {
   const now = useNow(60_000);
   const failed =
@@ -141,7 +166,10 @@ function Body({
           <Icon name="alert" size={16} class="mcp-page-bad-icon" />
           {`Refresh failed ${ago(server.refreshFailedAt!, now)}: ${sentence(
             server.refreshError!,
-          )} Agents get the tools found ${ago(server.checkedAt, now)}.`}
+          )} Agents are still offered the ${plural(
+            server.tools.length,
+            "tool",
+          )} listed ${ago(server.checkedAt, now)}, and their calls fail until the server answers.`}
         </p>
       )}
       <Tabs
@@ -158,7 +186,9 @@ function Body({
       {tab === "general" && (
         <McpGeneral server={server} drafts={drafts} now={now} />
       )}
-      {tab === "tools" && <McpTools server={server} drafts={drafts} />}
+      {tab === "tools" && (
+        <McpTools server={server} drafts={drafts} save={toolsSave} />
+      )}
     </div>
   );
 }

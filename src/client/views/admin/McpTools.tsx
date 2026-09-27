@@ -1,28 +1,28 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An MCP server's Tools tab: one card, a draft saved whole. The three
-// matcher lists come first, each matcher with the tools it decides, in
-// red when it matches none; then the tools by name, each with its side
-// and the matcher that set it, narrowed by the search and the side.
+// An MCP server's Tools tab, a draft saved whole from the page's head,
+// which stays on screen: the three matcher lists, each matcher with the
+// tools it decides, in red when it matches none; then the tools by
+// name, each with its side and the matcher that set it, narrowed by the
+// search in the list's head and the side.
 // Picked tools move to a side by exact names, and the bar says which
 // ones a matcher earlier in the order keeps where they are. A tool
 // opens to its description and parameters, the one HTML, rendered on
 // the server.
 
 import { useSignal } from "@preact/signals";
-import { useRef } from "preact/hooks";
 import type {
   McpServerSummary,
   McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
 import { decide, type Patterns, type ToolSide } from "../../../shared/mcp.ts";
-import { patchServer } from "../../data/mcp.ts";
 import { firstSentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { useFocusField, useSave } from "../../lib/save.ts";
+import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import {
+  RowsCard,
   RowsCheck,
   RowsMeta,
   RowsNote,
@@ -33,7 +33,6 @@ import { Search } from "../../ui/Search.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
-import { mcpFieldOf } from "./Mcp.model.ts";
 import type { McpDrafts } from "./McpPage.state.ts";
 import {
   addMatcher,
@@ -66,66 +65,45 @@ const SIDE_HINT: Record<MatcherSide, string> = {
 export function McpTools({
   server,
   drafts: d,
+  save,
 }: {
   server: McpServerSummary;
   drafts: McpDrafts;
+  // the page's, so a tab switch keeps its state
+  save: Save;
 }) {
-  const latest = useRef(server);
-  latest.current = server;
-  const form = useRef<HTMLFormElement>(null);
-  const save = useSave(async () => {
-    const p = d.patterns.value;
-    d.resetTools(
-      await patchServer(latest.current.id, {
-        readPatterns: p.read,
-        writePatterns: p.write,
-        excludedPatterns: p.excluded,
-      }),
-    );
-  }, mcpFieldOf);
-  useFocusField(save, form);
   const patterns = d.patterns.value;
   const decided = decide(server.name, server.tools, patterns);
   const counts = sideCounts(decided);
   const shown = shownTools(server.tools, decided, d.q.value, d.filter.value);
-  const edit = (next: Patterns, words: string[] = []) => {
+  const edit = (next: Patterns) => {
     d.patterns.value = next;
-    d.moved.value = words;
+    d.moved.value = [];
     save.touch();
   };
   const n = server.tools.length;
+  // the same foot under the matchers and under the list, so Save is near
+  // wherever the edit was made; an element each, since a vnode drawn in
+  // two places is patched as one
+  const foot = () => (
+    <DraftFoot
+      save={save}
+      dirty={d.toolsDirty(server)}
+      hint={
+        d.moved.value.length > 0 ? `${d.moved.value.join(". ")}.` : undefined
+      }
+      onDiscard={() => d.resetTools(server)}
+    />
+  );
   return (
     <form
-      ref={form}
+      class="mcp-page-tools"
       onSubmit={(e) => {
         e.preventDefault();
         void save.run(null);
       }}
     >
-      <Setting
-        list
-        sticky={d.toolsDirty(server)}
-        title="Tools"
-        count={shown.length === n ? String(n) : `${shown.length} of ${n}`}
-        action={
-          n > 0 && (
-            <Search
-              value={d.q.value}
-              onChange={(q) => {
-                d.q.value = q;
-              }}
-              placeholder="Search tools"
-            />
-          )
-        }
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={d.toolsDirty(server)}
-            onDiscard={() => d.resetTools(latest.current)}
-          />
-        }
-      >
+      <Setting title="Matchers" foot={foot()}>
         <Matchers
           server={server}
           patterns={patterns}
@@ -133,41 +111,38 @@ export function McpTools({
           save={save}
           onEdit={(next) => edit(next)}
         />
+      </Setting>
+      <RowsCard
+        label="Tools"
+        search={
+          <Search
+            value={d.q.value}
+            onChange={(q) => {
+              d.q.value = q;
+            }}
+            placeholder="Search tools"
+          />
+        }
+        count={shown.length === n ? String(n) : `${shown.length} of ${n}`}
+        wrap
+      >
         {n === 0 ? (
           <RowsNote>The server listed no tools.</RowsNote>
         ) : (
           <>
             <Bar
+              server={server}
               drafts={d}
               shown={shown}
               counts={counts}
-              busy={save.busy}
-              onMove={(target) => {
-                const r = moveTools(
-                  server.name,
-                  server.tools,
-                  patterns,
-                  d.picked.value,
-                  target,
-                );
-                if ("problem" in r) {
-                  d.moved.value = [r.problem];
-                  return;
-                }
-                d.picked.value = [];
-                edit(r.patterns, moveWords(r, target));
-              }}
+              save={save}
             />
-            {d.moved.value.length > 0 && (
-              <p class="mcp-page-moved" role="status">
-                {d.moved.value.join(". ")}.
-              </p>
-            )}
             {shown.length === 0 && <RowsNote>No tool matches.</RowsNote>}
             <ToolRows drafts={d} tools={shown} decided={decided} />
           </>
         )}
-      </Setting>
+        <div class="mcp-page-foot">{foot()}</div>
+      </RowsCard>
     </form>
   );
 }
@@ -182,7 +157,7 @@ function Matchers({
   server: McpServerSummary;
   patterns: Patterns;
   busy: boolean;
-  save: ReturnType<typeof useSave>;
+  save: Save;
   onEdit: (next: Patterns) => void;
 }) {
   const all = matchers(server.name, server.tools, patterns);
@@ -218,7 +193,7 @@ function MatcherLine({
   list: Matcher[];
   patterns: Patterns;
   busy: boolean;
-  save: ReturnType<typeof useSave>;
+  save: Save;
   onEdit: (next: Patterns) => void;
 }) {
   const text = useSignal("");
@@ -304,22 +279,23 @@ function MatcherLine({
   );
 }
 
-// the line over the rows: the side filter, or once tools are picked,
-// how many and the sides to move them to; the box picks every tool
-// shown that can move
+// the line over the rows: the side filter, or while tools are picked
+// how many and the sides to move them to, in the same line so the rows
+// never move; the box at the end picks every tool shown that can move
 function Bar({
+  server,
   drafts: d,
   shown,
   counts,
-  busy,
-  onMove,
+  save,
 }: {
+  server: McpServerSummary;
   drafts: McpDrafts;
   shown: McpToolSummary[];
   counts: Record<ToolSide, number>;
-  busy: boolean;
-  onMove: (target: MatcherSide) => void;
+  save: Save;
 }) {
+  const busy = save.busy;
   const movable = shown.filter(
     (t) => t.unusable === null && t.wireName !== null,
   );
@@ -352,28 +328,32 @@ function Bar({
         />
       ) : (
         <div class="mcp-page-move">
-          <span class="mcp-page-picked">{`${picked.length} picked`}</span>
-          <span class="mcp-page-move-to">Move to</span>
+          <span class="mcp-page-move-words">
+            {`${picked.length} picked`}
+            <span class="mcp-page-move-to">. Move to</span>
+          </span>
           {MATCHER_SIDES.map(({ side, label }) => (
             <button
               key={side}
               type="button"
               class="btn btn-small"
               disabled={busy}
-              onClick={() => onMove(side)}
+              onClick={() => movePicked(server, d, side, save)}
             >
               {label}
             </button>
           ))}
           <button
             type="button"
-            class="btn-text"
+            class="btn-icon mcp-page-clear"
+            aria-label="Clear the picks"
+            title="Clear the picks"
             disabled={busy}
             onClick={() => {
               d.picked.value = [];
             }}
           >
-            Clear
+            <Icon name="close" size={14} />
           </button>
         </div>
       )}
@@ -393,6 +373,30 @@ function Bar({
       </span>
     </div>
   );
+}
+
+// the picked tools to a side, the words of what moved kept for the head
+export function movePicked(
+  server: McpServerSummary,
+  d: McpDrafts,
+  target: MatcherSide,
+  save: Save,
+): void {
+  const r = moveTools(
+    server.name,
+    server.tools,
+    d.patterns.value,
+    d.picked.value,
+    target,
+  );
+  if ("problem" in r) {
+    d.moved.value = [r.problem];
+    return;
+  }
+  d.picked.value = [];
+  d.patterns.value = r.patterns;
+  d.moved.value = moveWords(r, target);
+  save.touch();
 }
 
 function ToolRows({

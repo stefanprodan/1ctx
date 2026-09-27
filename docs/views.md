@@ -483,16 +483,18 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   none waits on another, and a card at rest follows the row a save or
   a refresh answered. Tools (`McpTools.tsx`, its logic in
   `McpTools.model.ts` over `decide()` in `shared/mcp.ts`) is one draft
-  card with a sticky foot while dirty: the Read, Write and Excluded
-  matchers, each a chip with the tools it decides, in red when it
-  matches none, and a box that adds one; then the tools by name, each
-  its side and the matcher that set it, narrowed by the search and a
-  side `Seg`. Picked tools move to a side by `moveTools()`: their exact
+  form: the Matchers card, the Read, Write and Excluded matchers, each
+  a chip with the tools it decides, in red when it matches none, and a
+  box that adds one; then the tools as `Rows` by name, the search in
+  the card's head band, a side `Seg`, in whose place Move to shows
+  while tools are picked so the rows never move, then each tool with its side and the matcher that
+  set it. Picked tools move to a side by `moveTools()`: their exact
   names leave the other lists and join the side's unless they land
   there without one, an empty write list never gets a name nor loses
-  its last, and a tool a matcher earlier in the order keeps is named
-  over the rows. The aside is `GET /api/mcp/:id/usage` and the most
-  called five tools.
+  its last. The Matchers card and the list end in the same foot, either
+  saving the draft, its hint saying what moved and naming a tool a
+  matcher earlier in the order keeps. The aside
+  is `GET /api/mcp/:id/usage` and the most called five tools.
 - **The agent form's Preferred provider.** On an OpenRouter provider,
   a `Select` under the model (`UpstreamField.tsx`) asks for the
   model's endpoints each time one is picked, Any provider first, and

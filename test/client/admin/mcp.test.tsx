@@ -452,7 +452,7 @@ describe("a server's page", () => {
     path.value = "/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toContain(
-      "Refresh failed 1m ago: Discovery failed. Agents get the tools found 2h ago.",
+      "Refresh failed 1m ago: Discovery failed. Agents are still offered the 5 tools listed 2h ago, and their calls fail until the server answers.",
     );
     expect(html).toContain("The server sent no instructions.");
     expect(html).toContain("No agent uses it.");
