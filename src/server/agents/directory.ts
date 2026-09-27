@@ -27,7 +27,7 @@ import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { parseAgentName } from "./parse.ts";
-import type { ProvidersPort } from "./routes.ts";
+import type { AgentTotalPort, ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
 
 // the tools the page lists; the skill and MCP tools are shown as what
@@ -87,7 +87,7 @@ export type ToolsPort = {
 };
 
 // an agent's days in every project, the usage area's answer
-export type UsagePort = {
+export type UsagePort = AgentTotalPort & {
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
 };
 

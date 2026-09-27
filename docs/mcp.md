@@ -34,17 +34,18 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   never changes.
 - **An agent's MCP tools are one send snapshot, decided in the policy.**
   An agent carries `servers` (a server id with `read` and `write`,
-  saved with the agent row in one `transact()` through the mcp
-  capability) and `mcpMode`. Before `mcp.offered()`, `tools/offer.ts`
-  removes links whose `mcp:<server id>` is disabled; schemas, mode,
-  catalog, instructions and digest all come from the remaining links.
-  The offered set is the intersection of the
-  server's and the agent's switches over the patterns, through
-  `offeredServers()` in `shared/mcp.ts`, so the page's preview and the
-  send agree: each schema lean (`wireSchema`, `wireDescription`, the
-  description cut at 1,024) and the tools sorted by server then name
-  after the built-ins and the skill tools, so the `tools` array is
-  byte-stable across a session.
+  read always on, since write alone is refused by the parser, the
+  store and provisioning; saved with the agent row in one
+  `transact()` through the mcp capability) and `mcpMode`. Before
+  `mcp.offered()`, `tools/offer.ts` removes links whose
+  `mcp:<server id>` is disabled; schemas, mode, catalog, instructions
+  and digest all come from the remaining links. The offered set is the
+  intersection of the server's and the agent's switches over the
+  patterns, through `offeredServers()` in `shared/mcp.ts`, so the page's
+  preview and the send agree: each schema lean (`wireSchema`,
+  `wireDescription`, the description cut at 1,024) and the tools sorted
+  by server then name after the built-ins and the skill tools, so the
+  `tools` array is byte-stable across a session.
 - **The mode picks schemas or a catalog.** `mcpMode` `all` puts every
   offered schema on the wire; `catalog` puts `mcp_describe` and
   `mcp_call` (`tools/builtin/mcp.ts`, the name an enum of the offered

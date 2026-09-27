@@ -23,6 +23,7 @@ import {
   parseStreamQuery,
   titleFrom,
 } from "../../src/server/sessions/parse.ts";
+import { shapeName } from "../../src/shared/names.ts";
 import {
   isEmail,
   isName,
@@ -30,7 +31,6 @@ import {
   MAX_MESSAGE_BYTES,
   MAX_SEARCH,
   MAX_TITLE,
-  shapeName,
 } from "../../src/shared/words.ts";
 import { testApp } from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
@@ -94,11 +94,16 @@ describe("the name rule", () => {
     expect(isUsername("casey.d")).toBe(false);
   });
 
-  test("a name field lowercases and dashes spaces and dots as typed", () => {
+  test("a name field shapes what is typed into what can be saved", () => {
     expect(shapeName("Q3 Launch")).toBe("q3-launch");
     expect(shapeName("stefan.prodan")).toBe("stefan-prodan");
     expect(shapeName("on_call")).toBe("on_call");
-    expect(shapeName("ops@home")).toBe("ops@home");
+    expect(shapeName("ops@home")).toBe("opshome");
+    expect(shapeName("Café Crème")).toBe("cafe-creme");
+    expect(shapeName("-_lead")).toBe("lead");
+    expect(shapeName("  pasted  name ")).toBe("pasted--name-");
+    expect(shapeName("Ünïcødé!")).toBe("unicde");
+    expect(shapeName("r2/d2")).toBe("r2d2");
   });
 });
 

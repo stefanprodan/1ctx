@@ -17,7 +17,7 @@ describe("shapedInput", () => {
     ["Q3 Launch", "q3-launch"],
     ["stefan.prodan", "stefan-prodan"],
     ["on_call", "on_call"],
-    ["ops@home", "ops@home"],
+    ["ops@home", "opshome"],
   ])("%s becomes %s in the box and the form", (value, shaped) => {
     const { box, event } = typed(value);
     expect(shapedInput(event)).toBe(shaped);

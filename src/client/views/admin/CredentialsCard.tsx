@@ -13,7 +13,7 @@ import {
   type CredentialSummary,
   HTTP_METHODS,
 } from "../../../shared/contracts/credential.ts";
-import { shapeName } from "../../../shared/words.ts";
+import { shapeName } from "../../../shared/names.ts";
 import {
   addCredential,
   credentialKeys,

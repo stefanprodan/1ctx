@@ -21,12 +21,6 @@ const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
 export const NAME_CHARACTERS =
   "lowercase letters, digits, dashes and underscores";
 
-// what a name field does as it is typed: lowercase, and a space or a dot
-// becomes a dash. Anything else stays for the server to refuse
-export function shapeName(value: string): string {
-  return value.toLowerCase().replace(/[ .]/g, "-");
-}
-
 // a username: the sign-in name and the handle
 export const MIN_USERNAME = 3;
 export const MAX_USERNAME = 32;
@@ -153,12 +147,6 @@ export function isServerName(value: unknown): value is string {
     SERVER_NAME_RE.test(value)
   );
 }
-// what a server name field does as it is typed: shapeName, and an
-// underscore becomes a dash
-export function shapeServerName(value: string): string {
-  return shapeName(value).replace(/_/g, "-");
-}
-
 // the two sides an MCP server's tools are sorted into
 export const SIDES = ["read", "write"] as const;
 export type Side = (typeof SIDES)[number];

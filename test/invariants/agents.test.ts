@@ -137,7 +137,13 @@ describe("parseAgent", () => {
         ...body,
         servers: [{ serverId: "s1", read: false, write: false }],
       }),
-    ).toThrow("a server needs read or write");
+    ).toThrow("a server needs read");
+    expect(() =>
+      parseAgent({
+        ...body,
+        servers: [{ serverId: "s1", read: false, write: true }],
+      }),
+    ).toThrow("a server needs read");
     expect(() =>
       parseAgent({ ...body, servers: [...body.servers, ...body.servers] }),
     ).toThrow("serverId must not repeat");
@@ -242,6 +248,7 @@ describe("the agents", () => {
     });
     expect(await (await client.call("GET", "/api/agents")).json()).toEqual({
       agents: [agent],
+      activity: [],
     });
   });
 

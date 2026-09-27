@@ -35,12 +35,8 @@ import {
   wireName,
   wireSchema,
 } from "../../src/shared/mcp.ts";
-import {
-  isPattern,
-  isServerName,
-  shapeName,
-  shapeServerName,
-} from "../../src/shared/words.ts";
+import { shapeName, shapeServerName } from "../../src/shared/names.ts";
+import { isPattern, isServerName } from "../../src/shared/words.ts";
 
 type Recorded = {
   initialize: { instructions?: string };

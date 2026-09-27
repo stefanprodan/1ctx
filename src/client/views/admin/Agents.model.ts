@@ -238,20 +238,22 @@ export function sameServers(a: AgentServer[], b: AgentServer[]): boolean {
   return a.every((s) => bKeys.has(key(s)));
 }
 
-// a side toggled on an agent's server: a link gains or loses the side,
-// and one with neither side goes
+// a side toggled on an agent's server: write on brings read, read off
+// takes write with it and the link goes, since write alone is refused
 export function toggleSide(
   current: AgentServer[],
   serverId: string,
   side: "read" | "write",
 ): AgentServer[] {
   const link = current.find((s) => s.serverId === serverId);
-  const next = link
-    ? { ...link, [side]: !link[side] }
-    : { serverId, read: side === "read", write: side === "write" };
+  const on = !(link?.[side] ?? false);
+  const next =
+    side === "write"
+      ? { serverId, read: on || (link?.read ?? false), write: on }
+      : { serverId, read: on, write: on && (link?.write ?? false) };
   return [
     ...current.filter((s) => s.serverId !== serverId),
-    ...(next.read || next.write ? [next] : []),
+    ...(next.read ? [next] : []),
   ];
 }
 

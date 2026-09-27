@@ -102,6 +102,7 @@ export function agentsArea(deps: AgentsDeps): Agents {
         automations: deps.automations,
         runner: deps.runner,
         users: deps.users,
+        usage: deps.usage,
         clock: deps.clock,
       }),
       ...startingRoutes({ store, users: deps.users }),

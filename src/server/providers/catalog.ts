@@ -177,23 +177,28 @@ export async function fetchCatalog(
   return models;
 }
 
-// the matches for what was typed: an id that starts with it first,
-// then the rest whose id or name contains it, case-insensitive
+// the matches for what was typed, split into words: a model matches
+// when every word is in its id or its name, in any order, ignoring case.
+// An id that starts with the first word comes first, then the rest, each
+// in the catalog's order
 export function search(
   models: CatalogMatch[],
   q: string,
   limit = SEARCH_LIMIT,
 ): CatalogMatch[] {
-  const needle = q.trim().toLowerCase();
-  if (needle === "") return [];
+  const words = q
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w !== "");
+  if (words.length === 0) return [];
   const first: CatalogMatch[] = [];
   const rest: CatalogMatch[] = [];
   for (const m of models) {
     const id = m.id.toLowerCase();
-    if (id.startsWith(needle)) first.push(m);
-    else if (id.includes(needle) || m.name.toLowerCase().includes(needle)) {
-      rest.push(m);
-    }
+    const name = m.name.toLowerCase();
+    if (!words.every((w) => id.includes(w) || name.includes(w))) continue;
+    if (id.startsWith(words[0])) first.push(m);
+    else rest.push(m);
   }
   return [...first, ...rest].slice(0, limit);
 }

@@ -8,7 +8,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
-import { shapeServerName } from "../../../shared/words.ts";
+import { shapeServerName } from "../../../shared/names.ts";
 import { addServer, callTimeoutMs, keys } from "../../data/mcp.ts";
 import { at, type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";

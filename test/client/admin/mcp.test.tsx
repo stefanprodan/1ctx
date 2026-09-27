@@ -283,7 +283,13 @@ describe("the model", () => {
       [server({ instructionsOn: false })],
       [links[0]!],
     );
-    expect(quiet).toEqual({ line: "", warnings: [], text: "" });
+    expect(quiet).toEqual({
+      line: "",
+      warnings: [],
+      text: "",
+      count: 0,
+      from: [],
+    });
     // write alone on the agent while the server has it off: nothing offered
     expect(
       promptPreview([flux], [{ serverId: "m1", read: false, write: true }])
@@ -330,9 +336,9 @@ describe("the model", () => {
       expect(one).toEqual([{ serverId: "m1", read: true, write: false }]);
       const both = toggleSide(one, "m1", "write");
       expect(both).toEqual([{ serverId: "m1", read: true, write: true }]);
-      expect(toggleSide(toggleSide(both, "m1", "read"), "m1", "write")).toEqual(
-        [],
-      );
+      expect(toggleSide(both, "m1", "read")).toEqual([]);
+      expect(toggleSide([], "m1", "write")).toEqual(both);
+      expect(toggleSide(both, "m1", "write")).toEqual(one);
       expect(listed(both, (s) => s.serverId, null)).toBe(both);
       expect(listed(both, (s) => s.serverId, [{ id: "m2" }])).toEqual([]);
       expect(listed(["s1", "s2"], (id) => id, [{ id: "s2" }])).toEqual(["s2"]);
