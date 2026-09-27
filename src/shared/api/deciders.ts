@@ -22,6 +22,18 @@ export type SaveDeciderRequest = {
   default?: boolean;
 };
 
+// GET /api/deciders/:id/usage and GET /api/decisions/:id/usage: the
+// last 30 days of a decider's answers, checks included, or of a
+// decision's whoever answered: how many, their input tokens and the
+// cost, null when answers came and none was priced
+export type DecisionUsageResponse = {
+  since: number;
+  until: number;
+  answers: number;
+  tokens: number;
+  cost: number | null;
+};
+
 // POST /api/deciders/:id/check: one fixed yes/no answered. probability
 // is the chance of the answer given, ms the whole call, cost in USD
 // when the server named one, served the model build that answered.

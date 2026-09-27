@@ -22,7 +22,7 @@ import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
-import { adminFace, litPage, onPage, projectHere } from "./Rail.model.ts";
+import { adminFace, onPage, projectHere, zoneLit } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { navEntries } from "./routes.ts";
 import { lastAdmin, lastWork } from "./shell.ts";
@@ -70,10 +70,7 @@ function Sub({
 // link is lit, the longest that holds the address, so an agent's page
 // lights Agents
 function Zones({ here, follow }: { here: string; follow?: () => void }) {
-  const lit = litPage(
-    here,
-    ZONES.flatMap((z) => [z.href, ...z.pages.map((p) => p.href)]),
-  );
+  const lit = zoneLit(here);
   return (
     <>
       {ZONES.map((z) => (

@@ -8,7 +8,9 @@
 
 import type { IconName } from "../lib/icons.tsx";
 
-export type ZonePage = { label: string; href: string };
+// `also` are addresses the page stands for too: a tab of it at an
+// address of its own
+export type ZonePage = { label: string; href: string; also?: string[] };
 export type Zone = {
   label: string;
   href: string;
@@ -39,6 +41,11 @@ export const ZONES: Zone[] = [
     pages: [
       { label: "Providers", href: "/config/providers" },
       { label: "Agents", href: "/config/agents" },
+      {
+        label: "Deciders",
+        href: "/config/deciders",
+        also: ["/config/decisions"],
+      },
       { label: "MCP", href: "/config/mcp" },
       { label: "Skills", href: "/config/skills" },
       { label: "Tools", href: "/config/tools" },

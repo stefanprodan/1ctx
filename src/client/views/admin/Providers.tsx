@@ -7,9 +7,7 @@
 // missing is said under the address. The card's head searches and
 // counts, New provider is in the page's head. The aside has the
 // instance's last 30 days and the key files, each with the provider
-// that reads it. The deciders (DecidersCard.tsx) and the decisions they
-// answer (DecisionsCard.tsx) follow until they have their own page.
-// `?new` is the New provider page.
+// that reads it. `?new` is the New provider page.
 
 import { useSignal } from "@preact/signals";
 import type { ProviderSummary } from "../../../shared/contracts/provider.ts";
@@ -17,8 +15,6 @@ import type { Wire } from "../../../shared/words.ts";
 import { query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
-import { deciders, decidersError } from "../../data/deciders.ts";
-import { decisions, decisionsError } from "../../data/decisions.ts";
 import { overview } from "../../data/overview.ts";
 import { keys, providers, providersError } from "../../data/providers.ts";
 import { count, pluralCommas } from "../../lib/format.ts";
@@ -39,8 +35,6 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { keyLine, preset } from "./Agents.model.ts";
-import { DecidersCard } from "./DecidersCard.tsx";
-import { DecisionsCard } from "./DecisionsCard.tsx";
 import { NewProvider } from "./NewProvider.tsx";
 import { costOf, money, tokensOf } from "./Overview.model.ts";
 import "./provider-list.css";
@@ -84,20 +78,13 @@ function List() {
           New provider
         </a>
       }
-      loading={
-        (list === null ||
-          rows === null ||
-          (deciders.value === null && decidersError.value === null) ||
-          (decisions.value === null && decisionsError.value === null)) &&
-        error === null
-      }
+      loading={(list === null || rows === null) && error === null}
       error={error}
     >
       <Split aside={<Aside providers={all} />}>
         <Rows>
           <RowsCard
             label="Providers"
-            wrap
             search={
               <Search
                 value={q.value}
@@ -133,8 +120,6 @@ function List() {
               />
             ))}
           </RowsCard>
-          <DecidersCard providers={rows ?? []} />
-          <DecisionsCard />
         </Rows>
       </Split>
     </Page>

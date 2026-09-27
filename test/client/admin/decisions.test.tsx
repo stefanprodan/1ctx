@@ -1,14 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Decisions card on the agents page: the entity that follows the
-// signed-in user, a row's meta, what the form sends and Reset fills,
-// the checks and the fields a refusal names, and the card and its form
-// rendered.
+// Config › Decisions: the entity that follows the signed-in user, a
+// row's meta, what a save sends and Reset fills, the checks and the
+// fields a refusal names, and the list and a decision's page rendered.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { deciders } from "../../../src/client/data/deciders.ts";
+import { deciders, decisionUsage } from "../../../src/client/data/deciders.ts";
 import {
   decisions,
   decisionsError,
@@ -16,7 +15,8 @@ import {
   saveDecision,
 } from "../../../src/client/data/decisions.ts";
 import { me } from "../../../src/client/data/me.ts";
-import { DecisionForm } from "../../../src/client/views/admin/DecisionForm.tsx";
+import { DecisionList } from "../../../src/client/views/admin/DeciderLists.tsx";
+import { DecisionPage } from "../../../src/client/views/admin/DecisionPage.tsx";
 import {
   DECISION_WORDS,
   deciderChoices,
@@ -30,7 +30,6 @@ import {
   optionLabel,
   optionProblem,
 } from "../../../src/client/views/admin/Decisions.model.ts";
-import { DecisionsCard } from "../../../src/client/views/admin/DecisionsCard.tsx";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
 import {
   DECISION_OPTIONS,
@@ -260,72 +259,107 @@ describe("the entity", () => {
     expect(decisions.value).toEqual([own]);
   });
 
-  test.serial("a failed load is the card's", async () => {
+  test.serial("a failed load is the page's", async () => {
     answer = () => Response.json({ error: "boom" }, { status: 500 });
     await loadDecisions();
     expect(decisionsError.value?.status).toBe(500);
-    decisions.value = [];
-    expect(render(<DecisionsCard />)).toContain("Boom");
+    deciders.value = [];
+    const html = render(<DecisionList />);
+    expect(html).toContain("This page did not load");
+    expect(html).toContain("Boom");
   });
 });
 
-describe("the card", () => {
-  test.serial("a row per decision with its meta", () => {
+describe("the pages", () => {
+  const page = () => render(<DecisionPage params={{ id: "run-attention" }} />);
+
+  test.serial("a row per decision with its meta, linking its page", () => {
     deciders.value = [judge, small];
     decisions.value = [own];
-    const html = render(<DecisionsCard />);
+    const html = render(<DecisionList />);
     expect(html).toContain('aria-label="Decisions"');
     expect(html).toContain('placeholder="Search decisions"');
+    expect(html).toContain('href="/config/decisions/run-attention"');
     expect(html).toContain("Mark task runs that need attention");
     expect(html).toContain(DECISION_WORDS["run-attention"].sub);
     expect(html).toContain(">on · small · custom");
     expect(html).toContain('<span class="rows-meta-short">on · small</span>');
+    // the tabs lead to both lists, each counted
+    expect(html).toContain('href="/config/deciders"');
+    expect(html).toMatch(/aria-current="page"[^>]*>Decisions/);
   });
 
   test.serial("with no deciders the row stays, off until one is added", () => {
     deciders.value = [];
     decisions.value = [plain];
-    const html = render(<DecisionsCard />);
+    const html = render(<DecisionList />);
     expect(html).toContain("Mark task runs that need attention");
     expect(html).toContain(">off until a decider is added");
   });
 
-  test.serial("the form: status, decider, a box per option", () => {
-    const html = render(
-      <DecisionForm
-        decision={own}
-        deciders={[judge, small]}
-        onDone={() => {}}
-      />,
-    );
-    expect(html).toContain(">On<");
-    expect(html).toContain(">Off<");
-    expect(html).toContain(DECISION_WORDS["run-attention"].hint);
-    expect(html).toContain(">Decider<");
-    expect(html).toContain(">small<");
-    expect(html).toContain("All good when");
-    expect(html).toContain("Needs attention when");
-    expect(html).toContain('name="options.all-good"');
-    expect(html).toContain('name="options.needs-attention"');
-    expect(html).toContain("Live data, no errors");
-    expect(html).toContain("Reset to default");
-    // nothing changed yet, so Save waits
-    expect(html).toMatch(/<button type="submit"[^>]*disabled/);
-  });
+  test.serial(
+    "the page: Status with the decider, Options with a box each",
+    () => {
+      deciders.value = [judge, small];
+      decisions.value = [own];
+      const html = page();
+      // two cards, two forms, one submit each
+      expect(html.split("<form").length).toBe(3);
+      expect((html.match(/type="submit"/g) ?? []).length).toBe(2);
+      expect(html).toContain(">On<");
+      expect(html).toContain(">Off<");
+      expect(html).toContain(DECISION_WORDS["run-attention"].hint);
+      expect(html).toContain(">small<");
+      // the select names who answers; no hint repeats it
+      expect(html).not.toContain("Default follows");
+      expect(html).toContain("All good when");
+      expect(html).toContain("Needs attention when");
+      expect(html).toContain('name="options.all-good"');
+      expect(html).toContain('name="options.needs-attention"');
+      expect(html).toContain("Live data, no errors");
+      expect(html).toContain("Reset to default");
+      // nothing changed yet, so each Save waits
+      expect(html.match(/<button type="submit"[^>]*disabled/g)).toHaveLength(2);
+      // the code's decision cannot go
+      expect(html).not.toContain(">Delete<");
+    },
+  );
 
   test.serial("the defaults offer no Reset", () => {
-    const html = render(
-      <DecisionForm decision={plain} deciders={[judge]} onDone={() => {}} />,
-    );
+    deciders.value = [judge];
+    decisions.value = [plain];
+    const html = page();
     expect(html).toContain("Default (judge)");
     expect(html).not.toContain("Reset to default");
   });
 
-  test.serial("the form stays usable with no deciders", () => {
-    const html = render(
-      <DecisionForm decision={plain} deciders={[]} onDone={() => {}} />,
-    );
+  test.serial("the page stays usable with no deciders", () => {
+    deciders.value = [];
+    decisions.value = [plain];
+    const html = page();
     expect(html).toContain("Stays off until a decider is added.");
     expect(html).not.toMatch(/<textarea[^>]*disabled/);
+  });
+
+  test.serial("an unknown decision is a missing page", () => {
+    deciders.value = [];
+    decisions.value = [plain];
+    expect(render(<DecisionPage params={{ id: "nope" }} />)).toContain(
+      "No such decision.",
+    );
+  });
+
+  test.serial("the aside has its last 30 days", () => {
+    deciders.value = [judge];
+    decisions.value = [plain];
+    decisionUsage.value = null;
+    expect(page()).toContain("Loading");
+    decisionUsage.value = {
+      of: "run-attention",
+      usage: { since: 0, until: 1, answers: 7, tokens: 900, cost: null },
+    };
+    expect(page()).toMatch(/Answers[\s\S]*?7/);
+    expect(page()).toContain("not priced");
+    decisionUsage.value = null;
   });
 });
