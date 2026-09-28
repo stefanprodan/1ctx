@@ -33,7 +33,6 @@ export type CredentialDraft = {
 
 export const HEADER_PLACEHOLDER = "Authorization";
 export const TEMPLATE_PLACEHOLDER = "Bearer {key}";
-export const TEMPLATE_HINT = "The key goes where {key} is";
 export const WEB_OFF_NOTE =
   "Web access is off. No credential is used until it is on.";
 
@@ -201,14 +200,12 @@ export function dirtyOf(d: CredentialDraft, c: CredentialSummary): boolean {
   return Object.keys(patchBody(d, c)).length > 0;
 }
 
-// the key card's hint: the saved file's state, or what to pick
+// the key field's hint: the saved file's state, nothing for a new pick
 export function keyHint(
   keyName: string,
   c: Pick<CredentialSummary, "keyName" | "key"> | null,
-): string {
-  if (c === null || c.keyName !== keyName) {
-    return "An http- file in the secrets directory";
-  }
+): string | null {
+  if (c === null || c.keyName !== keyName) return null;
   return c.key === "ok"
     ? `${c.keyName}.key is present`
     : `${c.keyName}.key is ${c.key}`;

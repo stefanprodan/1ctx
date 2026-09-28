@@ -75,7 +75,7 @@ export function KeyField({
   onChange,
 }: {
   value: string;
-  hint: string;
+  hint: string | null;
   save: Save;
   // under a card titled Key the label would say it twice
   bare?: boolean;
@@ -99,7 +99,7 @@ export function KeyField({
       {invalid ? (
         <FieldError save={save} field="keyName" />
       ) : (
-        <span class="hint">{hint}</span>
+        hint !== null && <span class="hint">{hint}</span>
       )}
     </div>
   );

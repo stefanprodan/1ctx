@@ -147,10 +147,8 @@ describe("the model", () => {
       "http-finnhub.key is unusable",
     );
     // a new pick says what to pick, not the saved file's state
-    expect(keyHint("http-other", credential())).toBe(
-      "An http- file in the secrets directory",
-    );
-    expect(keyHint("", null)).toBe("An http- file in the secrets directory");
+    expect(keyHint("http-other", credential())).toBe(null);
+    expect(keyHint("", null)).toBeNull();
     expect(deleteLine(credential())).toBe(
       "curl stops adding the header to requests under https://finnhub.io/api/v1/.",
     );

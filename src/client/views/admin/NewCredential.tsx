@@ -38,7 +38,6 @@ import {
   HEADER_PLACEHOLDER,
   keyHint,
   problemOf,
-  TEMPLATE_HINT,
   TEMPLATE_PLACEHOLDER,
   teamsOf,
 } from "./Credentials.model.ts";
@@ -156,7 +155,6 @@ function Form() {
             name="template"
             value={d.template}
             placeholder={TEMPLATE_PLACEHOLDER}
-            hint={TEMPLATE_HINT}
             required
             save={save}
             onInput={(template) => set({ template })}

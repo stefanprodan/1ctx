@@ -55,7 +55,6 @@ import {
   HEADER_PLACEHOLDER,
   keyHint,
   keyLine,
-  TEMPLATE_HINT,
   TEMPLATE_PLACEHOLDER,
   teamsOf,
   WEB_OFF_NOTE,
@@ -269,7 +268,6 @@ function RequestCard(props: CardProps) {
             name="template"
             value={card.d.template}
             placeholder={TEMPLATE_PLACEHOLDER}
-            hint={TEMPLATE_HINT}
             required
             save={card.save}
             onInput={(template) => card.set({ template })}
