@@ -88,8 +88,7 @@ describe("memory tool refusals", () => {
     const saved = await call('{"action":"none"}');
     expect(saved).toEqual({
       error: false,
-      content:
-        "Saved for the end of the run in this automation's own memory. 1,741 of 2,200 characters.",
+      content: "Nothing changed. 1,741 of 2,200 characters.",
     });
   });
 

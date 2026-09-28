@@ -324,7 +324,7 @@ describe("memory tool handles", () => {
     expect(handle.work!.failedRounds).toBe(1);
     const none = await call("memory_edit", '{"action":"none"}');
     expect(none.error).toBe(false);
-    expect(none.content).toContain("Saved for the end of the run");
+    expect(none.content).toContain("Nothing changed.");
     expect(none.content).toContain("17 of 2,200");
     expect(none.content).not.toContain("one fact");
     handle.settleRound();
