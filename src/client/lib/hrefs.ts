@@ -11,6 +11,12 @@ export function userHref(username: string): string {
   return `/users/${encodeURIComponent(username)}`;
 }
 
+// a user's admin page, under Access
+export const USERS_HREF = "/admin/access/users";
+export function adminUserHref(username: string): string {
+  return `${USERS_HREF}/${encodeURIComponent(username)}`;
+}
+
 export function agentHref(name: string): string {
   return `/agents/${encodeURIComponent(name)}`;
 }

@@ -111,6 +111,11 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
+    method: "GET",
+    path: "/api/users/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
     method: "POST",
     path: "/api/users/:id/password",
     body: { password: "longenough" },

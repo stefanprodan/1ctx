@@ -41,7 +41,12 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   authenticated route not marked `passwordChange` (logout, the
   profile, the socket), and the client shows only the profile.
   `UserSummary` never carries the email or the flags; `Me` carries
-  the flag, `UserAccount` and `Profile` carry all.
+  the flag, `UserAccount` and `Profile` carry all. The admin's routes
+  answer `AdminUser`, the account with `lastVisitDay` (the latest
+  visit's date in the user's own zone, `"2026-09-28"`, null when none is
+  kept, so no reader's zone moves the day) and `projectIds` (the team
+  projects they are in); `GET /api/users/:id/usage` sums the last 30
+  days of the user's personal project alone.
 - **Names follow Slack's channel rule.** A project, an agent and a
   provider name is `isName` in `shared/words.ts`: 2 to 80 lowercase
   ASCII letters, digits, dashes and underscores, starting with a letter

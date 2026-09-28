@@ -73,7 +73,7 @@ import {
 import { loadTools, loadVisualsUsage, loadWebUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
-import { loadUsers } from "../data/users.ts";
+import { loadUsers, loadUserUsage, users } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
 import { composeProjectOf, originOf } from "../views/home/Home.model.ts";
@@ -510,7 +510,23 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
     title: () => "Users",
     role: "admin",
+    // New user is the list's `?new`
     load: () => loadUsers(),
+  },
+  {
+    path: "/admin/access/users/:username",
+    view: lazy(() =>
+      import("../views/admin/UserPage.tsx").then((m) => m.UserPage),
+    ),
+    title: (params) => `@${params.username}`,
+    role: "admin",
+    // the Projects card names the team projects; the aside's usage needs
+    // the user's id, which the list gives
+    load: async (params) => {
+      await Promise.all([loadUsers(), loadProjects()]);
+      const shown = users.value?.find((u) => u.username === params.username);
+      if (shown !== undefined) await loadUserUsage(shown.id);
+    },
   },
   {
     path: "/admin/access/projects",

@@ -42,7 +42,9 @@ function build(secureCookie: boolean) {
       memberProjectIds: () => [],
       teamProjectIds: () => [],
       visibleFor: () => [],
+      personal: () => null,
     },
+    usage: { projectTotal: () => ({ sends: 0, tokens: 0, cost: 0 }) },
     activity: { personDays: (_userId, starts) => starts.map(() => 0) },
   });
   return { db, user, users, access };

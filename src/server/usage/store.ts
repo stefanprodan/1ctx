@@ -294,6 +294,26 @@ export class UsageStore {
       .get(providerId, since, until)!;
   }
 
+  // the same for one project: every agent's turns and runs in it
+  projectTotal(
+    projectId: string,
+    since: number,
+    until: number,
+  ): { sends: number; tokens: number; cost: number | null } {
+    return this.db
+      .query<
+        { sends: number; tokens: number; cost: number | null },
+        [string, number, number]
+      >(
+        `select ${countLive("usage", "send_id")} as sends,
+                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens,
+                case when count(*) = 0 then 0 else sum(cost) end as cost
+           from usage
+          where project_id = ? and created_at > ? and created_at <= ?`,
+      )
+      .get(projectId, since, until)!;
+  }
+
   // one agent's days in every project, one series: the agent page's
   // heatmap, which never splits the turns by project
   agentDays(

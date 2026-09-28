@@ -152,6 +152,10 @@ const PATHS = {
   list: "M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01",
   // three dots: a menu of more actions
   more: "M4.5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM9 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM13.5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0z",
+  // an eye: show what a password box hides, crossed out to hide it again
+  eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  "eye-off":
+    "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM2.5 2.5l11 11",
   // a bookmark: what the project's memory keeps
   memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
   // the database file: the admin's Storage page
