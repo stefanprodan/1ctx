@@ -1,30 +1,27 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The search box in a card's head band: the glass, then the text, no
-// box of its own. The owner holds the query: the stream keeps it in the
-// address, where the route's load does the fetch, so back, reload and a
-// shared address keep the search; a list already loaded filters in
-// place. The box writes the query a moment after the last keystroke,
-// and Escape clears it.
 
-import { useSignal } from "@preact/signals";
+import { type Signal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import "./search.css";
 
 const SEARCH_DELAY = 200;
 
-export function Search({
-  value,
-  onChange,
-  placeholder,
-}: {
-  // the query as its owner holds it
-  value: string;
-  onChange: (q: string) => void;
-  placeholder: string;
-}) {
+export function Search(
+  props: { placeholder: string } & (
+    | { query: Signal<string> }
+    | { value: string; onChange: (q: string) => void }
+  ),
+) {
+  const { placeholder } = props;
+  const value = "query" in props ? props.query.value : props.value;
+  const onChange =
+    "query" in props
+      ? (q: string) => {
+          props.query.value = q;
+        }
+      : props.onChange;
   const text = useSignal(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // the query moved under the box (back, a link): the box follows,

@@ -6,6 +6,7 @@ import {
   clampHighlight,
   filterOptions,
   initialHighlight,
+  keyMove,
   stepHighlight,
 } from "../../../src/client/ui/Select.model.ts";
 
@@ -69,5 +70,16 @@ describe("the highlight", () => {
     expect(stepHighlight(0, 3, 1)).toBe(1);
     expect(stepHighlight(2, 3, 1)).toBe(0);
     expect(stepHighlight(0, 3, -1)).toBe(2);
+  });
+});
+
+describe("keyMove", () => {
+  test("arrows step and wrap, Enter picks, any other key is not the list's", () => {
+    expect(keyMove("ArrowDown", -1, 3)).toBe(0);
+    expect(keyMove("ArrowDown", 2, 3)).toBe(0);
+    expect(keyMove("ArrowUp", 0, 3)).toBe(2);
+    expect(keyMove("ArrowUp", -1, 0)).toBe(-1);
+    expect(keyMove("Enter", 1, 3)).toBe("pick");
+    expect(keyMove("Escape", 1, 3)).toBeNull();
   });
 });

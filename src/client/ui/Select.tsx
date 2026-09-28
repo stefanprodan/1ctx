@@ -1,20 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A select that keeps the picked value in a field-shaped trigger. Its
-// panel may start with a search box for a long list; the highlight and
-// filtering stay apart from the DOM in Select.model.ts.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useId, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import { touch } from "../lib/touch.ts";
+import { ListboxSearch, useActiveInView } from "./Listbox.tsx";
 import {
   clampHighlight,
   filterOptions,
   initialHighlight,
+  keyMove,
   type Option,
-  stepHighlight,
 } from "./Select.model.ts";
 import "./select.css";
 
@@ -35,13 +32,10 @@ export function Select({
   options: Option[];
   onChange: (value: string) => void;
   disabled?: boolean;
-  // the box at the top of the list, for a long one
   search?: boolean;
-  // the label in the mono face, for an identifier
   mono?: boolean;
-  // the form's field name, so a refusal can take the focus here
+  // so a refusal can take the focus here
   name?: string;
-  // a refusal names this field
   invalid?: boolean;
   placeholder?: string;
 }) {
@@ -77,15 +71,14 @@ export function Select({
       close(false);
       return;
     }
-    // The list opens on the picked option, in sight.
     at.value = initialHighlight(options, value);
     if (search && !touch()) box.current?.focus();
     else list.current?.focus();
     const onPress = (ev: PointerEvent) => {
       if (!root.current?.contains(ev.target as Node)) close(false);
     };
-    // Focus has already reached the next control when Tab closes the
-    // panel, so removing the search box cannot break the tab order.
+    // focus has already reached the next control when Tab closes the
+    // panel, so removing the search box cannot break the tab order
     const onFocus = (ev: FocusEvent) => {
       if (!root.current?.contains(ev.target as Node)) close(false);
     };
@@ -95,33 +88,19 @@ export function Select({
       document.removeEventListener("pointerdown", onPress);
       document.removeEventListener("focusin", onFocus);
     };
-    // The list opens once per press; a new value while open changes
-    // nothing.
+    // a new value while open changes nothing
   }, [open.value, disabled]);
 
-  useEffect(() => {
-    const el =
-      activeAt === -1
-        ? null
-        : list.current?.querySelector<HTMLElement>(
-            `[data-index="${activeAt}"]`,
-          );
-    el?.scrollIntoView({ block: "nearest" });
-  }, [activeAt, open.value]);
+  useActiveInView(list, activeAt, open.value);
 
   const onKey = (ev: KeyboardEvent) => {
     if (disabled) return;
-    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
-      ev.preventDefault();
-      at.value = stepHighlight(
-        activeAt,
-        shown.length,
-        ev.key === "ArrowDown" ? 1 : -1,
-      );
-    } else if (ev.key === "Enter") {
+    const move = keyMove(ev.key, activeAt, shown.length);
+    if (move !== null) {
       ev.preventDefault();
       const option = shown[activeAt];
-      if (option) pick(option);
+      if (move !== "pick") at.value = move;
+      else if (option) pick(option);
     } else if (ev.key === "Escape") {
       ev.preventDefault();
       ev.stopPropagation();
@@ -172,36 +151,26 @@ export function Select({
       {open.value && (
         <div class="menu select-panel">
           {search && (
-            <div class="select-search">
-              <Icon name="search" size={14} class="select-glass" />
-              <input
-                ref={box}
-                class="select-input"
-                name="search"
-                type="text"
-                role="combobox"
-                aria-label={`Search ${label.toLowerCase()}`}
-                aria-autocomplete="list"
-                aria-controls={listId}
-                aria-expanded="true"
-                aria-activedescendant={activeId}
-                autocomplete="off"
-                spellcheck={false}
-                placeholder="Search"
-                value={query.value}
-                onInput={(ev) => {
-                  const next = ev.currentTarget.value;
-                  query.value = next;
-                  at.value = filterOptions(options, next).length === 0 ? -1 : 0;
-                }}
-                onKeyDown={onKey}
-              />
-            </div>
+            <ListboxSearch
+              inputRef={box}
+              name="search"
+              aria-label={`Search ${label.toLowerCase()}`}
+              aria-autocomplete="list"
+              aria-controls={listId}
+              aria-activedescendant={activeId}
+              placeholder="Search"
+              value={query.value}
+              onInput={(ev) => {
+                query.value = ev.currentTarget.value;
+                at.value = 0;
+              }}
+              onKeyDown={onKey}
+            />
           )}
           <div
             id={listId}
             ref={list}
-            class="select-list"
+            class="listbox-list select-list"
             role="listbox"
             aria-label={label}
             aria-activedescendant={search ? undefined : activeId}
@@ -209,7 +178,7 @@ export function Select({
             onKeyDown={search ? undefined : onKey}
           >
             {shown.length === 0 ? (
-              <p class="select-none" role="status">
+              <p class="listbox-none" role="status">
                 Nothing matches
               </p>
             ) : (
@@ -222,7 +191,7 @@ export function Select({
                   tabIndex={-1}
                   aria-selected={option.value === value}
                   class={`select-option${i === activeAt ? " select-option-on" : ""}`}
-                  // The press keeps focus in the search box.
+                  // the press keeps focus in the search box
                   onMouseDown={(ev) => ev.preventDefault()}
                   onPointerMove={() => {
                     at.value = i;
