@@ -73,7 +73,7 @@ function List() {
       title="Providers"
       split
       actions={
-        <a class="btn btn-small" href="/config/providers?new">
+        <a class="btn btn-small" href="/admin/config/providers?new">
           <Icon name="plus" size={14} />
           New provider
         </a>
@@ -175,7 +175,7 @@ function Aside({ providers: all }: { providers: ProviderSummary[] }) {
       <AsideSection
         label="Last 30 days"
         action={
-          <a class="split-link" href="/monitor">
+          <a class="split-link" href="/admin/monitor">
             Usage
           </a>
         }

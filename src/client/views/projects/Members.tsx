@@ -38,7 +38,7 @@ export function Members({ params }: { params: Params }) {
                 admin && (
                   <RowsLink
                     label="Manage"
-                    href={`/access/projects?open=${encodeURIComponent(shown.id)}`}
+                    href={`/admin/access/projects?open=${encodeURIComponent(shown.id)}`}
                   />
                 )
               }
@@ -56,7 +56,9 @@ export function Members({ params }: { params: Params }) {
           )}
           <RowsCard
             label="Agents"
-            action={admin && <RowsLink label="Manage" href="/config/agents" />}
+            action={
+              admin && <RowsLink label="Manage" href="/admin/config/agents" />
+            }
           >
             {agents === null ? (
               <RowsNote>Loading</RowsNote>

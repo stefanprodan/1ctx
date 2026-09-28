@@ -36,7 +36,7 @@ export function adminFace(pathname: string): boolean {
 }
 
 // the one link of a zone lit for a path: the longest that holds it, so
-// /monitor/storage lights Storage and not the zone at /monitor too
+// /admin/monitor/storage lights Storage and not the zone at /admin/monitor too
 export function litPage(pathname: string, hrefs: string[]): string | null {
   let best: string | null = null;
   for (const href of hrefs) {

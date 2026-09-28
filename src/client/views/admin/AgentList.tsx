@@ -51,7 +51,7 @@ import { NewAgent } from "./NewAgent.tsx";
 import { costOf, money, tokensOf } from "./Overview.model.ts";
 import "./agent-list.css";
 
-const CONFIG = [{ label: "Config", href: "/config" }];
+const CONFIG = [{ label: "Config", href: "/admin/config" }];
 
 export function AgentList() {
   if (new URLSearchParams(query.value).has("new")) return <NewAgent />;
@@ -101,7 +101,7 @@ function List() {
       title="Agents"
       split
       actions={
-        <a class="btn btn-small" href="/config/agents?new">
+        <a class="btn btn-small" href="/admin/config/agents?new">
           <Icon name="plus" size={14} />
           New agent
         </a>
@@ -247,7 +247,7 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
       <AsideSection
         label="Last 30 days"
         action={
-          <a class="split-link" href="/monitor">
+          <a class="split-link" href="/admin/monitor">
             Usage
           </a>
         }
@@ -271,7 +271,7 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
       <AsideSection
         label="Providers"
         action={
-          <a class="split-link" href="/config/providers">
+          <a class="split-link" href="/admin/config/providers">
             Manage
           </a>
         }

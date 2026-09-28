@@ -188,7 +188,7 @@ function DeleteCard({ skill }: { skill: SkillSummary }) {
                 void save.act("delete", async () => {
                   const from = address();
                   await deleteSkill(skill.id);
-                  if (address() === from) navigate("/config/skills");
+                  if (address() === from) navigate("/admin/config/skills");
                 });
               }}
             />

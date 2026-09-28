@@ -110,9 +110,9 @@ client change. What each page draws is in `docs/views.md`.
   hint in the buttons' line, wrapping beside them on a phone. Nothing
   saves before Save, a switch included. The card clips nothing, so a
   select's list opens past it.
-- **A dashboard is a board, not rows.** The admin's Monitor (`/monitor`,
+- **A dashboard is a board, not rows.** The admin's Monitor (`/admin/monitor`,
   the zone's own page, headed `Monitor / Live`: the live tiles, Needs
-  attention and Stats), Usage (`/monitor/usage`) and Storage (`/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
+  attention and Stats), Usage (`/admin/monitor/usage`) and Storage (`/admin/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
   figure at `--text-figure`) over `ui/Chart.tsx` panels in a grid:
   `ChartPanel` wears the Rows card head (a day plot's passes `hintBelow`, so
   on a phone its hint that follows the pointer has its own line and

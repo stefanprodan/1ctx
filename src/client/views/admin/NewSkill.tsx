@@ -46,7 +46,10 @@ import {
 } from "./Skills.model.ts";
 import "./skill-page.css";
 
-const STEPS = [zoneStep("Config"), { label: "Skills", href: "/config/skills" }];
+const STEPS = [
+  zoneStep("Config"),
+  { label: "Skills", href: "/admin/config/skills" },
+];
 
 export function NewSkill() {
   const error = skillsError.value;
@@ -135,7 +138,7 @@ function Form() {
             label={looking ? "Looking up" : submitLabel(kind)}
             start={<SettingHint>{null}</SettingHint>}
             before={
-              <a class="btn" href="/config/skills">
+              <a class="btn" href="/admin/config/skills">
                 Cancel
               </a>
             }

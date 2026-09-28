@@ -332,7 +332,7 @@ describe("the last 30 days", () => {
       expect(html).toContain(">Activity<");
       expect(html).toContain(">LLM response time<");
       expect(html).toContain("median 20s · p95 1m 5s");
-      expect(html).not.toContain('href="/monitor/usage"');
+      expect(html).not.toContain('href="/admin/monitor/usage"');
       expect(html).not.toContain("$");
       expect(html).not.toContain(">Cost<");
     },
@@ -485,7 +485,7 @@ describe("needs attention", () => {
       line: "key file missing",
       what: "Provider",
       icon: "key",
-      href: "/config/providers/router",
+      href: "/admin/config/providers/router",
     });
     expect(
       attentionRow(
@@ -496,11 +496,14 @@ describe("needs attention", () => {
       line: "refresh failed 3h ago",
       what: "MCP server",
       icon: "mcp",
-      href: "/config/mcp/flux",
+      href: "/admin/config/mcp/flux",
     });
     expect(
       attentionRow({ kind: "credential-unusable", name: "gh", at: null }, now),
-    ).toMatchObject({ line: "key file unusable", href: "/config/tools/web" });
+    ).toMatchObject({
+      line: "key file unusable",
+      href: "/admin/config/tools/web",
+    });
   });
 });
 
@@ -603,10 +606,18 @@ describe("the build line", () => {
 
 describe("the rail", () => {
   test("lights Storage alone under /monitor/storage", () => {
-    const hrefs = ["/monitor", "/monitor/storage", "/config/tools"];
-    expect(litPage("/monitor/storage", hrefs)).toBe("/monitor/storage");
-    expect(litPage("/monitor", hrefs)).toBe("/monitor");
-    expect(litPage("/config/tools/web", hrefs)).toBe("/config/tools");
+    const hrefs = [
+      "/admin/monitor",
+      "/admin/monitor/storage",
+      "/admin/config/tools",
+    ];
+    expect(litPage("/admin/monitor/storage", hrefs)).toBe(
+      "/admin/monitor/storage",
+    );
+    expect(litPage("/admin/monitor", hrefs)).toBe("/admin/monitor");
+    expect(litPage("/admin/config/tools/web", hrefs)).toBe(
+      "/admin/config/tools",
+    );
     expect(litPage("/projects", hrefs)).toBeNull();
   });
 });

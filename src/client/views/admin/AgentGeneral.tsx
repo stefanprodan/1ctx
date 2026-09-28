@@ -164,7 +164,7 @@ function DeleteCard({
                 void save.act("delete", async () => {
                   const from = address();
                   await deleteAgent(agent.id);
-                  if (address() === from) navigate("/config/agents");
+                  if (address() === from) navigate("/admin/config/agents");
                 });
               }}
             />

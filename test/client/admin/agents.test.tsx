@@ -605,7 +605,7 @@ describe("the default agent", () => {
     agents.value = [{ ...coder, default: true }];
     const html = render(<AgentList />);
     expect(html).toContain('<span class="tag">default</span>');
-    expect(html).toContain('href="/config/agents/coder"');
+    expect(html).toContain('href="/admin/config/agents/coder"');
   });
 
   test.serial("a moved mark reloads the list", async () => {
@@ -650,7 +650,7 @@ describe("the page", () => {
     providers.value = [];
     const html = render(<NewProvider />);
     expect(html).toContain("Create provider");
-    expect(html).toContain('href="/config/providers"');
+    expect(html).toContain('href="/admin/config/providers"');
     expect(html).toMatch(/<button[^>]*name="keyName"/);
     expect(html).not.toMatch(/<input[^>]*name="keyName"/);
     expect(html).toContain("No key");
@@ -671,9 +671,9 @@ describe("the page", () => {
       expect(html).toContain("New agent");
       const page = render(<Providers />);
       expect(page).toContain("provider-router.key missing");
-      expect(page).toContain('href="/config/providers/router"');
+      expect(page).toContain('href="/admin/config/providers/router"');
       expect(page).toContain("1 agent");
-      expect(page).toContain('href="/config/providers?new"');
+      expect(page).toContain('href="/admin/config/providers?new"');
       expect(page).not.toContain("New agent");
     },
   );
@@ -684,7 +684,7 @@ describe("the page", () => {
     keys.value = ["provider-spare", "provider-router"];
     const html = render(<Providers />);
     expect(html).toMatch(
-      /provider-router\.key<a class="split-strong cut" href="\/config\/providers\/router">router</,
+      /provider-router\.key<a class="split-strong cut" href="\/admin\/config\/providers\/router">router</,
     );
     expect(html).toMatch(
       /provider-spare\.key<span class="split-strong cut split-quiet">unused</,
@@ -725,8 +725,8 @@ describe("a provider's page", () => {
     expect(html).toContain("OpenRouter");
     expect(html).toContain("http://models.test/v1");
     expect(html).toContain("provider-router.key missing");
-    expect(html).toContain('href="/config/agents/coder"');
-    expect(html).toContain('href="/config/deciders/judge"');
+    expect(html).toContain('href="/admin/config/agents/coder"');
+    expect(html).toContain('href="/admin/config/deciders/judge"');
     expect(html).toContain(
       "1 agent and 1 decider run on it. Move them to another provider first.",
     );
@@ -740,7 +740,9 @@ describe("a provider's page", () => {
     deciders.value = [];
     const html = render(<ProviderPage params={{ name: "router" }} />);
     expect(html).toContain("No agent or decider runs on it yet.");
-    expect(html).toContain('href="/config/agents?new&amp;provider=router"');
+    expect(html).toContain(
+      'href="/admin/config/agents?new&amp;provider=router"',
+    );
     expect(html).toContain("Nothing runs on it.");
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Delete</);
   });

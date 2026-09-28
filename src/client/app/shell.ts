@@ -62,7 +62,7 @@ export function watchWidth(): void {
   query.addEventListener("change", apply);
 }
 
-export const lastAdmin = signal("/monitor");
+export const lastAdmin = signal("/admin/monitor");
 export const lastWork = signal("/");
 
 // follows the address; sign in is no working page to return to

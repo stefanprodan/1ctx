@@ -52,7 +52,7 @@ import "./decider-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "Deciders", href: "/config/deciders" },
+  { label: "Deciders", href: "/admin/config/deciders" },
 ];
 
 export function DeciderPage({ params }: { params: Params }) {
@@ -388,7 +388,7 @@ function DeleteCard({
                   await deleteDecider(decider.id);
                   // a decision that named it names none now
                   void loadDecisions();
-                  if (address() === from) navigate("/config/deciders");
+                  if (address() === from) navigate("/admin/config/deciders");
                 });
               }}
             />
@@ -409,7 +409,7 @@ function Aside({ decider }: { decider: DeciderSummary }) {
       <AsideSection
         label="Last 30 days"
         action={
-          <a class="split-link" href="/monitor">
+          <a class="split-link" href="/admin/monitor">
             Usage
           </a>
         }

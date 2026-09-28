@@ -44,7 +44,7 @@ import "./provider-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "Providers", href: "/config/providers" },
+  { label: "Providers", href: "/admin/config/providers" },
 ];
 
 export function ProviderPage({ params }: { params: Params }) {
@@ -257,7 +257,7 @@ function DeleteCard({ provider }: { provider: ProviderSummary }) {
                 void save.act("delete", async () => {
                   const from = address();
                   await deleteProvider(provider.id);
-                  if (address() === from) navigate("/config/providers");
+                  if (address() === from) navigate("/admin/config/providers");
                 });
               }}
             />
@@ -280,7 +280,7 @@ function Aside({ provider }: { provider: ProviderSummary }) {
     <AsideSection
       label="Last 30 days"
       action={
-        <a class="split-link" href="/monitor">
+        <a class="split-link" href="/admin/monitor">
           Usage
         </a>
       }

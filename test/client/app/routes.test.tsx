@@ -63,18 +63,25 @@ describe("the route table", () => {
     }
     for (const route of ROUTES.filter((r) => r.role === "admin")) {
       expect(adminFace(route.path), route.path).toBe(true);
+      expect(route.path.startsWith("/admin/"), route.path).toBe(true);
     }
-    expect(ROUTES.some((r) => r.path.startsWith("/admin"))).toBe(false);
+    for (const route of ROUTES.filter((r) => r.path.startsWith("/admin"))) {
+      expect(route.role, route.path).toBe("admin");
+    }
   });
 
   test("the rail lights the zone page an address sits under", () => {
-    expect(zoneLit("/config/deciders")).toBe("/config/deciders");
-    expect(zoneLit("/config/deciders/jev")).toBe("/config/deciders");
+    expect(zoneLit("/admin/config/deciders")).toBe("/admin/config/deciders");
+    expect(zoneLit("/admin/config/deciders/jev")).toBe(
+      "/admin/config/deciders",
+    );
     // the Decisions tab stands for Deciders
-    expect(zoneLit("/config/decisions")).toBe("/config/deciders");
-    expect(zoneLit("/config/decisions/run-attention")).toBe("/config/deciders");
-    expect(zoneLit("/config")).toBe("/config");
-    expect(zoneLit("/config/agents/x/mcp")).toBe("/config/agents");
+    expect(zoneLit("/admin/config/decisions")).toBe("/admin/config/deciders");
+    expect(zoneLit("/admin/config/decisions/run-attention")).toBe(
+      "/admin/config/deciders",
+    );
+    expect(zoneLit("/admin/config")).toBe("/admin/config");
+    expect(zoneLit("/admin/config/agents/x/mcp")).toBe("/admin/config/agents");
     expect(zoneLit("/projects")).toBeNull();
   });
 

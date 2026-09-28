@@ -39,7 +39,7 @@ import "./provider-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "Providers", href: "/config/providers" },
+  { label: "Providers", href: "/admin/config/providers" },
 ];
 
 export function NewProvider() {
@@ -131,7 +131,7 @@ function Form() {
               </SettingHint>
             }
             before={
-              <a class="btn" href="/config/providers">
+              <a class="btn" href="/admin/config/providers">
                 Cancel
               </a>
             }

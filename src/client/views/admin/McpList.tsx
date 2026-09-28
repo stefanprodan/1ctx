@@ -74,7 +74,7 @@ function List() {
       title="MCP Servers"
       split
       actions={
-        <a class="btn btn-small" href="/config/mcp?new">
+        <a class="btn btn-small" href="/admin/config/mcp?new">
           <Icon name="plus" size={14} />
           New server
         </a>

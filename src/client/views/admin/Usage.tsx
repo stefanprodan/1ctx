@@ -195,7 +195,7 @@ function Step({
   ) : (
     <a
       class="btn-icon usage-step"
-      href={`/monitor/usage?month=${to}`}
+      href={`/admin/monitor/usage?month=${to}`}
       aria-label={`${label}, ${monthLabel(to)}`}
       title={monthLabel(to)}
     >

@@ -446,19 +446,19 @@ describe("the tools entity", () => {
 
 describe("the page", () => {
   test.serial("the tab is the address, and Tools stays lit on it", () => {
-    expect(toolsTab("/config/tools")).toBe("builtin");
-    expect(toolsTab("/config/tools/web")).toBe("web");
-    expect(toolsTab("/config/tools/visuals")).toBe("visuals");
-    expect(toolsTab("/config/tools/limits")).toBe("limits");
+    expect(toolsTab("/admin/config/tools")).toBe("builtin");
+    expect(toolsTab("/admin/config/tools/web")).toBe("web");
+    expect(toolsTab("/admin/config/tools/visuals")).toBe("visuals");
+    expect(toolsTab("/admin/config/tools/limits")).toBe("limits");
     expect(TOOLS_TABS.map((t) => t.label)).toEqual([
       "Built-in",
       "Web",
       "Visuals",
       "Limits",
     ]);
-    expect(onPage("/config/tools/web", "/config/tools")).toBe(true);
-    expect(onPage("/config/tools", "/config/tools")).toBe(true);
-    expect(onPage("/config/toolsx", "/config/tools")).toBe(false);
+    expect(onPage("/admin/config/tools/web", "/admin/config/tools")).toBe(true);
+    expect(onPage("/admin/config/tools", "/admin/config/tools")).toBe(true);
+    expect(onPage("/admin/config/toolsx", "/admin/config/tools")).toBe(false);
     expect(WHEN_WORDS.always).not.toBe("");
   });
 
@@ -497,7 +497,7 @@ describe("the page", () => {
   test.serial("Built-in renders the rows with tokens and no switch", () => {
     tools.value = body();
     limits.value = rows;
-    path.value = "/config/tools";
+    path.value = "/admin/config/tools";
     const html = render(<Tools />);
     expect(html).toContain('class="tabs"');
     expect(html).toContain("Built-in");
@@ -522,7 +522,7 @@ describe("the page", () => {
   test.serial("Web renders web access and the providers", () => {
     tools.value = body();
     limits.value = rows;
-    path.value = "/config/tools/web";
+    path.value = "/admin/config/tools/web";
     const html = render(<Tools />);
     // no row and no switch for the web tools, visualize on its own tab
     expect(html).not.toContain("webfetch");
@@ -555,7 +555,7 @@ describe("the page", () => {
       updatedAt: 0,
     });
     limits.value = rows;
-    path.value = "/config/tools/web";
+    path.value = "/admin/config/tools/web";
     const html = render(<Tools />);
     expect(html).toMatch(/seg-on" aria-pressed="true">Listed domains/);
     expect(html).toContain(ACCESS_WORDS.listed);
@@ -571,19 +571,19 @@ describe("the page", () => {
   test.serial("Off says so under the providers, a pick kept", () => {
     tools.value = body(fetchTool, { mode: "off", domains: [], updatedAt: 0 });
     limits.value = rows;
-    path.value = "/config/tools/web";
+    path.value = "/admin/config/tools/web";
     const html = render(<Tools />);
     expect(html).toContain(ACCESS_WORDS.off);
     expect(html).toContain("Web access is off. websearch is not offered.");
     // visualize is apart from web access
-    path.value = "/config/tools/visuals";
+    path.value = "/admin/config/tools/visuals";
     expect(render(<Tools />)).toContain('aria-label="visualize on"');
   });
 
   test.serial("Visuals renders three sections: tools, CDNs, limits", () => {
     tools.value = body({ ...fetchTool, hosts: ["https://cdn.example.com"] });
     limits.value = rows;
-    path.value = "/config/tools/visuals";
+    path.value = "/admin/config/tools/visuals";
     const html = render(<Tools />);
     expect(html).not.toContain("rows-card");
     expect(
@@ -616,7 +616,7 @@ describe("the page", () => {
   test.serial("Limits renders the fields", () => {
     tools.value = body();
     limits.value = rows;
-    path.value = "/config/tools/limits";
+    path.value = "/admin/config/tools/limits";
     const html = render(<Tools />);
     expect(html).toContain("Per turn");
     expect(html).toContain("Per call");

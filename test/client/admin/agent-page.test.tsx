@@ -230,10 +230,10 @@ test("a name is taken by another agent only", () => {
 });
 
 test("the tab is the address's last step", () => {
-  expect(tabOf("/config/agents/coder")).toBe("general");
-  expect(tabOf("/config/agents/coder/model")).toBe("general");
-  expect(tabOf("/config/agents/mcp")).toBe("general");
-  expect(tabOf("/config/agents/coder/mcp")).toBe("mcp");
+  expect(tabOf("/admin/config/agents/coder")).toBe("general");
+  expect(tabOf("/admin/config/agents/coder/model")).toBe("general");
+  expect(tabOf("/admin/config/agents/mcp")).toBe("general");
+  expect(tabOf("/admin/config/agents/coder/mcp")).toBe("mcp");
 });
 
 describe("the model draft", () => {
@@ -438,7 +438,7 @@ describe("the cards", () => {
       const html = render(<NewAgent />);
       expect(html).toContain('class="agent-page-provider" title="zeta"');
       // Cancel returns to the provider's page
-      expect(html).toContain('href="/config/providers/zeta">Cancel<');
+      expect(html).toContain('href="/admin/config/providers/zeta">Cancel<');
     } finally {
       query.value = "";
       providers.value = null;

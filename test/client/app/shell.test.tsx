@@ -170,7 +170,7 @@ describe("the rail's faces", () => {
     const html = render(<App />);
     expect(html).toContain("Admin panel");
     expect(html).not.toContain("Exit admin panel");
-    expect(html).not.toContain('href="/access/users"');
+    expect(html).not.toContain('href="/admin/access/users"');
   });
 
   test.serial("a member gets no band", () => {
@@ -179,12 +179,12 @@ describe("the rail's faces", () => {
 
   test.serial("an admin address shows the zones and the way back", () => {
     admin();
-    path.value = "/config/agents/assistant";
+    path.value = "/admin/config/agents/assistant";
     const html = render(<App />);
     expect(html).toContain("Exit admin panel");
     expect(html).toContain('class="rail-face"');
-    expect(html).toContain('href="/monitor"');
-    expect(html).toContain('href="/access/users"');
+    expect(html).toContain('href="/admin/monitor"');
+    expect(html).toContain('href="/admin/access/users"');
     expect(html).toMatch(/class="rail-sub rail-sub-on"[^>]*>Agents</);
     expect(html).not.toContain('href="/projects"');
   });
@@ -193,15 +193,15 @@ describe("the rail's faces", () => {
     const stop = watchPages();
     try {
       path.value = "/";
-      path.value = "/config/mcp";
+      path.value = "/admin/config/mcp";
       query.value = "?q=x";
-      expect(lastAdmin.value).toBe("/config/mcp?q=x");
+      expect(lastAdmin.value).toBe("/admin/config/mcp?q=x");
       query.value = "";
       path.value = "/projects";
       expect(lastWork.value).toBe("/projects");
       path.value = "/login";
       expect(lastWork.value).toBe("/projects");
-      expect(lastAdmin.value).toBe("/config/mcp");
+      expect(lastAdmin.value).toBe("/admin/config/mcp");
     } finally {
       stop();
     }

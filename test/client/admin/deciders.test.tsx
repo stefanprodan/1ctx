@@ -291,14 +291,14 @@ describe("the pages", () => {
     deciders.value = [judge, small];
     decisions.value = [];
     const html = render(<DeciderList />);
-    expect(html).toContain('href="/config/deciders/judge"');
+    expect(html).toContain('href="/admin/config/deciders/judge"');
     expect(html).toContain('<span class="tag">default</span>');
     expect(html).toContain("vendor/judge-1");
     expect(html).toContain(">router<");
     expect(html).toContain(">32K · $0.04 input<");
     // a local server's decider has no price or window to say
     expect(html).toContain(">local<");
-    expect(html).toContain('href="/config/deciders?new"');
+    expect(html).toContain('href="/admin/config/deciders?new"');
     expect(html).not.toContain("No deciders yet");
     expect(html).toMatch(/aria-current="page"[^>]*>Deciders/);
   });
@@ -362,7 +362,7 @@ describe("the pages", () => {
     deciders.value = [judge, small];
     decisions.value = [run];
     const html = page("judge");
-    expect(html).toContain('href="/config/decisions/run-attention"');
+    expect(html).toContain('href="/admin/config/decisions/run-attention"');
     expect(html).toContain("Its decisions go to the default decider.");
     // the oldest, while it is the default, keeps the mark
     expect(html).toContain("Mark another decider to move it");

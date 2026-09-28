@@ -26,7 +26,7 @@ import "./mcp-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "MCP Servers", href: "/config/mcp" },
+  { label: "MCP Servers", href: "/admin/config/mcp" },
 ];
 
 export function NewMcpServer() {
@@ -100,7 +100,7 @@ function Form() {
               </SettingHint>
             }
             before={
-              <a class="btn" href="/config/mcp">
+              <a class="btn" href="/admin/config/mcp">
                 Cancel
               </a>
             }
