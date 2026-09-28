@@ -446,7 +446,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
   `Setting` cards, each its own form with a `DraftFoot`, nothing saved
   before Save, the switch included. Visuals: the switch in the head, the
-  line saying what the saved state does, the `visualize` row under it
+  line and the `visualize` row under it following the draft
   (`ToolRow`, which has no switch of its own). CDNs: the count in the
   head, a box of origins one per line checked through
   `parseVisualHosts()` in `shared/visual.ts` (the rule the server's

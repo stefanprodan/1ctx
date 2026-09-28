@@ -76,8 +76,9 @@ export function Visuals() {
   );
 }
 
-// the switch in the head, the tool it offers as the card's one row. The
-// draft is null until a flip, so the switch shows what was saved, a
+// the switch in the head, the tool it offers as the card's one row; the
+// line and the row follow the draft, so a flip says what Save will do.
+// The draft is null until a flip, so the switch shows what was saved, a
 // load that lands after the first draw included
 function Switch({ tool }: { tool: WebToolSummary }) {
   const drafted = useSignal<boolean | null>(null);
@@ -100,7 +101,7 @@ function Switch({ tool }: { tool: WebToolSummary }) {
     >
       <Setting
         title="Visuals"
-        line={visualsLine(tool.enabled)}
+        line={visualsLine(on)}
         list
         action={
           <RowsSwitch
@@ -124,7 +125,7 @@ function Switch({ tool }: { tool: WebToolSummary }) {
         }
       >
         <ToolRow
-          tool={tool}
+          tool={{ ...tool, enabled: on }}
           open={open.value}
           onToggle={() => {
             open.value = !open.value;
