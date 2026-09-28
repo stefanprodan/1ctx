@@ -481,8 +481,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   lists the tools there first, a refusal keeping what was typed),
   Offered to agents (Off, Read, or Read and write, one `Seg`; write
   alone has no option), Call timeout (seconds, empty for the limits'),
-  Instructions (the switch over the block as `serverBlock()` gives it,
-  trimmed to 12 lines), Used by (only when an agent does) and Delete,
+  Instructions (the switch, a line that follows its draft, and the
+  block as `serverBlock()` gives it, trimmed to 12 lines), Used by (only when an agent does) and Delete,
   off while an agent uses it. Each card sends only its own fields, so
   none waits on another, and a card at rest follows the row a save or
   a refresh answered. Tools (`McpTools.tsx`, its logic in
