@@ -19,7 +19,18 @@ import type { LineCondition, PreFilter } from "./regex.js";
  */
 function preFilterMatches(preFilter: PreFilter, line: string): boolean {
   const haystack = preFilter.ignoreCase ? line.toLowerCase() : line;
-  const needles = preFilter.needles;
+  if (hasNeedle(preFilter.needles, haystack)) return true;
+  // (1ctx) -i folds ſ to s, and toLowerCase keeps it; the needles are
+  // ASCII under -i, and ſ and the Kelvin sign (which lowercases to k) are
+  // the only letters outside ASCII that fold into it
+  return (
+    preFilter.ignoreCase &&
+    haystack.includes("ſ") &&
+    hasNeedle(preFilter.needles, haystack.replaceAll("ſ", "s"))
+  );
+}
+
+function hasNeedle(needles: string[], haystack: string): boolean {
   for (let i = 0; i < needles.length; i++) {
     if (haystack.indexOf(needles[i]) !== -1) return true;
   }

@@ -15,8 +15,10 @@ import {
   ExecutionAbortedError,
   ExecutionLimitError,
 } from "../../../interpreter/errors.js";
+import { SecurityViolationError } from "../../../security/defense-in-depth-box.js";
 import { utf8ByteLength } from "../../printf/escapes.js";
-import type { AwkRuntimeContext } from "./context.js";
+import { type AwkRuntimeContext, addOutput } from "./context.js";
+import { flushFiles } from "./files.js";
 
 export const MAX_OUTPUT_PIPES = 16;
 
@@ -69,10 +71,13 @@ async function runPipe(
   command: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   if (ctx.signal?.aborted) throw new ExecutionAbortedError();
+  if (!ctx.exec) throw new Error("cannot run a command from this awk");
+  // (1ctx) the command sees what the program wrote to its files so far;
+  // on a failed write the pipe stays open for the fatal exit to run
+  await flushFiles(ctx);
   const text = ctx.outputPipes.get(command) ?? "";
   ctx.outputPipes.delete(command);
   ctx.pipeBytes -= utf8ByteLength(text);
-  if (!ctx.exec) throw new Error("cannot run a command from this awk");
   const result = await ctx.exec(command, text);
   return {
     stdout: decodeBytesToUtf8(unsafeBytesFromLatin1(result.stdout)),
@@ -92,7 +97,7 @@ export async function closePipe(
 ): Promise<number | null> {
   if (!ctx.outputPipes.has(command)) return null;
   const result = await runPipe(ctx, command);
-  ctx.output += result.stdout;
+  addOutput(ctx, result.stdout);
   ctx.errorOutput += result.stderr;
   flushOutput(ctx);
   return result.exitCode;
@@ -110,5 +115,25 @@ export async function closePipes(ctx: AwkRuntimeContext): Promise<void> {
     ctx.errorOutput += result.stderr;
   }
   ctx.output = before + piped + after;
+  ctx.outputBytes = utf8ByteLength(ctx.output);
   flushOutput(ctx);
+}
+
+/** Writes every output file, then runs every pipe, as the program ends. */
+export async function closeOutputs(ctx: AwkRuntimeContext): Promise<void> {
+  // a failed write still lets the pipes run, as when it failed at its print
+  let failure: { error: unknown } | undefined;
+  try {
+    await flushFiles(ctx);
+  } catch (error) {
+    if (
+      error instanceof SecurityViolationError ||
+      error instanceof ExecutionAbortedError
+    ) {
+      throw error;
+    }
+    failure = { error };
+  }
+  await closePipes(ctx);
+  if (failure) throw failure.error;
 }

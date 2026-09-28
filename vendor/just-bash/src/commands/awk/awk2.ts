@@ -30,7 +30,8 @@ import {
   createRuntimeContext,
 } from "./interpreter/index.js";
 import { MainInput } from "./interpreter/input.js";
-import { closePipes } from "./interpreter/pipes.js";
+import { flushFiles } from "./interpreter/files.js";
+import { closeOutputs } from "./interpreter/pipes.js";
 import { setVariable } from "./interpreter/variables.js";
 import { parseOptions } from "./options.js";
 import { AwkParser } from "./parser2.js";
@@ -133,7 +134,27 @@ export const awkCommand2: RuntimeCommand = {
     const awkFs: AwkFileSystem = {
       readFile: ctx.fs.readFile.bind(ctx.fs),
       writeFile: ctx.fs.writeFile.bind(ctx.fs),
+      // (1ctx) the filesystem's own append: it keeps the bytes (a BOM
+      // included) and throws on a directory or a full filesystem, where
+      // reading back and writing the whole replaced the file with the
+      // text. A path through a link keeps the old way, since the
+      // filesystem's append would replace the link.
       appendFile: async (path: string, content: string) => {
+        let real = path;
+        try {
+          real = await withDefenseContext("appendFile resolve", () =>
+            ctx.fs.realpath(path),
+          );
+        } catch (e) {
+          if (e instanceof SecurityViolationError) throw e;
+          rethrowFatalExecutionError(e);
+        }
+        if (real === path) {
+          await withDefenseContext("appendFile write", () =>
+            ctx.fs.appendFile(path, content),
+          );
+          return;
+        }
         // Append by reading existing content and writing back
         try {
           const existing = await withDefenseContext("appendFile read", () =>
@@ -205,6 +226,8 @@ export const awkCommand2: RuntimeCommand = {
     runtimeCtx.mainInput = new MainInput(runtimeCtx, {
       readFile: async (file) => {
         const filePath = ctx.fs.resolvePath(ctx.cwd, file);
+        // (1ctx) an operand sees what the program wrote to its files so far
+        await flushFiles(runtimeCtx);
         try {
           const stat = await withDefenseContext("input file stat", () =>
             ctx.fs.stat(filePath),
@@ -257,7 +280,7 @@ export const awkCommand2: RuntimeCommand = {
         await withDefenseContext("END execution after BEGIN exit", () =>
           interp.executeEnd(),
         );
-        await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
+        await withDefenseContext("output close", () => closeOutputs(runtimeCtx));
         return {
           stdout: interp.getOutput(),
           stderr: runtimeCtx.errorOutput,
@@ -269,7 +292,7 @@ export const awkCommand2: RuntimeCommand = {
       // END blocks need NR to be populated from reading files
       if (!hasMainRules && !hasEndBlocks) {
         // Just run END blocks (none), no input processing needed
-        await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
+        await withDefenseContext("output close", () => closeOutputs(runtimeCtx));
         return {
           stdout: interp.getOutput(),
           stderr: runtimeCtx.errorOutput,
@@ -296,7 +319,7 @@ export const awkCommand2: RuntimeCommand = {
       // Execute END blocks (always run, even after exit - AWK semantics)
       await withDefenseContext("END execution", () => interp.executeEnd());
       // (1ctx) the output pipes run last, as gawk closes them at exit
-      await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
+      await withDefenseContext("output close", () => closeOutputs(runtimeCtx));
 
       // awk emits text; the pipeline handles encoding.
       return {
@@ -309,20 +332,27 @@ export const awkCommand2: RuntimeCommand = {
         e instanceof SecurityViolationError ||
         e instanceof ExecutionAbortedError
       ) {
+        // (1ctx) what the files hold, as the writes before it had landed
+        try {
+          await withDefenseContext("output flush", () =>
+            flushFiles(runtimeCtx),
+          );
+        } catch {}
         throw e;
       }
       // Handle errors during execution
       const msg = e instanceof Error ? e.message : String(e);
       const exitCode =
         e instanceof ExecutionLimitError ? ExecutionLimitError.EXIT_CODE : 2;
-      // (1ctx) gawk's fatal exit still closes the pipes; a limit does not
-      if (exitCode === 2) {
-        try {
-          await withDefenseContext("pipe close", () => closePipes(runtimeCtx));
-        } catch (inner) {
-          if (inner instanceof SecurityViolationError) throw inner;
-          rethrowFatalExecutionError(inner);
-        }
+      // (1ctx) gawk's fatal exit still closes the pipes; a limit does not,
+      // but writes what the files hold, as the writes before it happened
+      try {
+        await withDefenseContext("output close", () =>
+          exitCode === 2 ? closeOutputs(runtimeCtx) : flushFiles(runtimeCtx),
+        );
+      } catch (inner) {
+        if (inner instanceof SecurityViolationError) throw inner;
+        rethrowFatalExecutionError(inner);
       }
       return {
         stdout: interp.getOutput(),

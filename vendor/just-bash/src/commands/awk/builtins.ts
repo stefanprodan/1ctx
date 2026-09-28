@@ -19,6 +19,7 @@ import {
   splitText,
 } from "./interpreter/fields.js";
 import { getField, setField } from "./interpreter/fields.js";
+import { flushFile, flushFiles } from "./interpreter/files.js";
 import { closePipe, flushOutput } from "./interpreter/pipes.js";
 import {
   looksLikeNumber,
@@ -871,7 +872,11 @@ async function awkClose(
   if (ctx.fs && ctx.cwd) {
     const path = ctx.fs.resolvePath(ctx.cwd, name);
     if (ctx.getlineFileStreams.delete(path)) closed = true;
-    if (ctx.openedFiles.delete(path)) closed = true;
+    if (ctx.openedFiles.has(path)) {
+      await flushFile(ctx, path);
+      ctx.openedFiles.delete(path);
+      closed = true;
+    }
   }
   return closed ? 0 : -1;
 }
@@ -883,6 +888,7 @@ async function awkFflush(
 ): Promise<number> {
   if (args.length === 0) {
     flushOutput(ctx);
+    await flushFiles(ctx);
     return 0;
   }
   const name = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
@@ -892,7 +898,9 @@ async function awkFflush(
   }
   if (ctx.outputPipes.has(name)) return 0;
   const path = ctx.fs && ctx.cwd ? ctx.fs.resolvePath(ctx.cwd, name) : name;
-  return ctx.openedFiles.has(path) ? 0 : -1;
+  if (!ctx.openedFiles.has(path)) return -1;
+  await flushFile(ctx, path);
+  return 0;
 }
 
 // ─── Unsupported Functions ──────────────────────────────────────

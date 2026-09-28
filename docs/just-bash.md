@@ -77,6 +77,7 @@ without a file of their own.
 | `src/commands/awk/interpreter/pipes.ts` (new), `statements.ts`, `context.ts`, `builtins.ts`, `awk2.ts`, `parser2-print.ts`, `lexer.ts`, `ast.ts` | `print ... \| "cmd"` and `printf ... \| "cmd"`: one pipe per command text holding what is printed to it, run through the shell with that text as stdin at `close("cmd")` (which answers its exit status) or at the end, in the order opened, its stdout placed as gawk places it (gawk flushes its own stdout when a pipe opens and closes, and closes every pipe before its last flush), its stderr on ours; pipes count against the output cap, at most 16 are open, the abort signal stops them, `fflush()` marks our output written, and `\|&` is refused | `print \| "sort"` was a parse error |
 | `src/commands/awk/parser2-print.ts` | `print (a, b)` prints every item, as gawk does | it printed the last one |
 | `src/commands/awk/interpreter/pipes.ts`, `statements.ts`, `expressions.ts` | a redirection or getline whose name is the empty string (an unset variable's too) is gawk's fatal error, `expression for \`|' redirection has null string value`, for `|`, `>`, `>>` and `<` | `print $0 \| constructor` and `getline < x` with `x` unset printed nothing and exited 0 |
+| `src/commands/awk/interpreter/files.ts` (new), `statements.ts`, `pipes.ts`, `context.ts`, `builtins.ts`, `expressions.ts`, `interpreter.ts`, `awk2.ts` | the first write to a `>` or `>>` file lands at once as before; later writes are held and appended when anything could see the file (a command, a `getline`, the next input operand, another file's open, `close()`, `fflush()`, 64 Ki UTF-16 units held, the end, and a limit, abort or security exit); an append is the filesystem's own, so `>>` to a directory and an append that does not fit are fatal and a BOM survives, except through a link, which keeps the read and rewrite; the output's UTF-8 length is kept as it grows, for `printf`'s limit | each `print > f` re-read and re-wrote the whole file, a failed append replaced the file with its text, and each `printf` measured the whole output, so 10k lines took over a second |
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | results are records of a value and the document it counts as read from; YAML output prints a top-level string raw, spaces and newlines kept, an empty string as an empty line, and `--unwrapScalar=false` quotes it again; an error in a later document fails the run after the earlier documents' results | mikefarah unwraps a top-level scalar: `[.a, .b] \| @tsv` printed `"x\ty"` with its escape, and an error in the last document dropped every earlier result |
 | `src/commands/yq/yq.ts` | `-i` groups the results by document, writes one `---` between documents and none before the first, and writes a document that is a string raw | a surviving second document started the file with `---`, and a bare string was written quoted |
 | `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `-N` and `--no-doc` drop the `---` lines; `-j` and `--tojson` are `-o json` with mikefarah's deprecation line; a `.json` file prints JSON unless `-p` or `-o` was given, and several files print in the first one's format; YAML at `-I0` and `-I1` is indented 4 and 2 | mikefarah's meanings: `-j` joined the output here, and JSON input printed YAML |
@@ -102,6 +103,7 @@ without a file of their own.
 | `src/network/index.ts`, `src/index.ts` | the package exports `validateAllowList`, `matchesAllowListEntry`, `createSecureFetch` and the `FetchResult` and `SecureFetchOptions` types | a credential's URL prefix is checked and matched by the rules curl's allow-list uses, and the mount builds curl's fetch itself (see below) |
 | `src/commands/search-engine/rust-regex.ts` (new), `unicode-sets.ts` (new, moved out of `pcre.ts`), `regex.ts`, `matcher.ts` | rg's own syntax: `\w`, `\d` and `\s` are Unicode unless `--no-unicode`; `\<`, `\>`, `\b{start}` and `\b{end}` at a pattern's start or end are word edges checked in code, elsewhere RE2's `\b`; `-P` goes through grep's `-P` layer, its rewrites and its refusals, and refuses groups nested past 250 deep, as PCRE2 does | `-o '\w+'` cut `café` to `caf`, `\<foo\>` matched nothing, and `-P` was refused though ripgrep has PCRE2 |
 | `src/commands/rg/file-types.ts`, `file-types-data.ts` (new) | ripgrep 15's whole type table, written from `rg --type-list` by `scripts/rg-record.ts`, aliases included, each glob matched case-sensitively against the file's name; `--type-add` with `include:` and ripgrep's `invalid definition`, `--type-clear` in order with it, `--type-list` showing both, `-t all`, and `unrecognized file type` for an unknown `-t` or `-T` | 38 types of 224 with their own globs, `-t typescript` found nothing, `--type-add` was ignored and an unknown type searched nothing silently |
+| `src/commands/rg/rg-search.ts`, `src/commands/search-engine/regex.ts`, `matcher.ts` | rg looks for the literal a pattern needs before the regex runs, as grep does, except under `--passthru`, and `-l`, `--files-without-match` and `-q` stop at a file's first match, except under `--json`, `--stats` and `--passthru`; under `-i` a needle outside ASCII gives no shortcut and `ſ` is folded to `s`, and a letter escape other than `\n`, `\t`, `\r`, `\f`, `\v` gives none | `rg -il` over 150 docs took 170 ms against grep's 15, and grep's shortcut missed `ſ` for `-i s`, `ς` and `ΟΣ` for `-i σ`, and BEL for `-P '\a'` |
 
 ### The jq and yq dialects
 
@@ -238,6 +240,8 @@ with `accept` pins ours. Where they part:
 - `--color=always` is refused.
 - `-T` pads numbers on standard input to 19 places, as GNU does on a
   pipe, also when the shell redirected a file there.
+- `-i k` matches the Kelvin sign, which GNU folds to `k` only under
+  `-P`.
 
 ### Where our rg still differs from ripgrep
 
@@ -261,6 +265,8 @@ holds our rg to it; a case with `accept` pins ours. Where they part:
   replaced, where ripgrep prints them as they are. `-E` takes UTF-8 and
   `none` only.
 - `-p` and `--color=always` print no colour, the second refused.
+- `--stats` counts a matching line as one match, where ripgrep counts
+  every match on it.
 - The `accessed` and `created` sort keys order by mtime, the one time a
   stat gives. `--json` reports `elapsed` as zero, `--debug` prints
   nothing, and `--version` names no SIMD features.
