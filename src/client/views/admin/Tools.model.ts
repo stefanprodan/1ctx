@@ -341,8 +341,8 @@ export function collect(
   return { values };
 }
 
-// what re-seeds a form's fields: its rows' values alone, since every
-// save of the full set moves the change time of each kept override
+// what re-seeds a form's fields: its rows' values alone, never their
+// change times
 export function seedOf(rows: LimitRow[]): string {
   return rows.map((row) => `${row.name}=${row.value}`).join(",");
 }

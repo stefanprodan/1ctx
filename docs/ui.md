@@ -82,21 +82,16 @@ client change. What each page draws is in `docs/views.md`.
 - **A name is a link** to its page wherever it is drawn, except inside a
   row that is itself a link (a stream row's author, an automation row's
   agent).
-- **A settings page is `ui/Section.tsx`.**
-  A settings page (the profile, a project's Settings) stacks `ui/Section.tsx`: a title and a line at
-  the left, a `SectionForm` at the right. `section.css` holds the parts
-  a form puts there: `.section-label` with a `.section-fact` (a
-  changed value's default), `.section-grid` of short fields and
-  `.section-lines` (a box of entries). A number with its unit inside
-  the box is `ui/NumberBox.tsx`, on a section or in a card. `Foot`'s
-  `after` puts Reset beside Save and a count (`.section-fact-end`) at
-  the line's end.
-  `off` fades a section whose setting does nothing now; the view
-  disables its fields. The page's stylesheet holds only what it
-  puts inside a row. Small and danger buttons are `.btn-small` and
+- **A user's settings page is `ui/Section.tsx`.** The profile, a
+  project's Settings and the automation editor stack `ui/Section.tsx`:
+  a title and a line at the left, a `SectionForm` at the right. A
+  number with its unit inside the box is `ui/NumberBox.tsx`, on a
+  section or in a card. The page's stylesheet holds only what it puts
+  inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`.
 - **An object's settings are cards.** An object page's tab (an
-  agent's) stacks `ui/Setting.tsx` cards, as Vercel's settings: a
+  agent's) and an admin settings page (Config › Visuals) stack
+  `ui/Setting.tsx` cards, as Vercel's settings: a
   title, one line, the control, and a foot with its hint and its own
   Save, so each card saves apart; `list` puts the title, a count and
   an Add in a band over rows edge to edge (flush `RowsLine`s, controls

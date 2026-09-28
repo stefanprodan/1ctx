@@ -10,18 +10,14 @@ import "./section.css";
 export function Section({
   title,
   text,
-  off,
   children,
 }: {
   title: string;
   text: string;
-  // what the section sets does nothing now: its form is faded, and the
-  // view disables the fields
-  off?: boolean;
   children: ComponentChildren;
 }) {
   return (
-    <section class={`section${off ? " section-off" : ""}`}>
+    <section class="section">
       <div class="section-head">
         <h2 class="section-title">{title}</h2>
         <p class="section-text">{text}</p>

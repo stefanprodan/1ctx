@@ -76,16 +76,21 @@ export function Visuals() {
   );
 }
 
-// the switch in the head, the tool it offers as the card's one row
+// the switch in the head, the tool it offers as the card's one row. The
+// draft is null until a flip, so the switch shows what was saved, a
+// load that lands after the first draw included
 function Switch({ tool }: { tool: WebToolSummary }) {
-  const on = useSignal(tool.enabled);
+  const drafted = useSignal<boolean | null>(null);
   const open = useSignal(false);
   const latest = useRef(tool);
   latest.current = tool;
   const save = useSave(async () => {
-    await patchTool("visualize", { enabled: on.value });
+    const enabled = drafted.value ?? latest.current.enabled;
+    await patchTool("visualize", { enabled });
+    drafted.value = null;
   });
-  const dirty = on.value !== tool.enabled;
+  const on = drafted.value ?? tool.enabled;
+  const dirty = on !== tool.enabled;
   return (
     <form
       onSubmit={(e) => {
@@ -99,11 +104,11 @@ function Switch({ tool }: { tool: WebToolSummary }) {
         list
         action={
           <RowsSwitch
-            on={on.value}
+            on={on}
             label="Visuals"
             disabled={save.busy}
             onClick={() => {
-              on.value = !on.value;
+              drafted.value = !on;
               save.touch();
             }}
           />
@@ -113,7 +118,7 @@ function Switch({ tool }: { tool: WebToolSummary }) {
             save={save}
             dirty={dirty}
             onDiscard={() => {
-              on.value = latest.current.enabled;
+              drafted.value = null;
             }}
           />
         }
@@ -131,22 +136,21 @@ function Switch({ tool }: { tool: WebToolSummary }) {
 }
 
 // a box of origins, one per line, saved whole; Use defaults puts the
-// list a fresh instance starts with in the box
+// list a fresh instance starts with in the box. The draft is null until
+// someone types, so the box shows the saved list as the server wrote it
 function Hosts({ tool }: { tool: WebToolSummary }) {
-  const text = useSignal(hostsText(tool.hosts));
+  const drafted = useSignal<string | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const latest = useRef(tool);
   latest.current = tool;
   const save = useSave(async () => {
-    const parsed = hostsOf(text.value);
+    const parsed = hostsOf(drafted.value ?? hostsText(latest.current.hosts));
     if ("error" in parsed) return;
     await patchTool("visualize", { hosts: parsed.hosts });
-    // the server's list as written, read from the answer, not the render
-    const saved = tools.value?.visualize.hosts;
-    if (saved) text.value = hostsText(saved);
+    drafted.value = null;
   }, hostsFieldOf);
   useFocusField(save, form);
-  const typed = text.value;
+  const typed = drafted.value ?? hostsText(tool.hosts);
   const invalid = save.fieldError("hosts") !== null;
   return (
     <form
@@ -167,7 +171,7 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
             class="btn btn-small"
             disabled={save.busy || isDefaultHosts(typed)}
             onClick={() => {
-              text.value = hostsText();
+              drafted.value = hostsText();
               save.touch();
             }}
           >
@@ -179,7 +183,7 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
             save={save}
             dirty={hostsDirty(typed, tool.hosts)}
             onDiscard={() => {
-              text.value = hostsText(latest.current.hosts);
+              drafted.value = null;
             }}
           />
         }
@@ -197,7 +201,9 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
             disabled={save.busy}
             aria-invalid={invalid || undefined}
             onInput={(event) => {
-              text.value = (event.currentTarget as HTMLTextAreaElement).value;
+              drafted.value = (
+                event.currentTarget as HTMLTextAreaElement
+              ).value;
               save.touch();
             }}
           />

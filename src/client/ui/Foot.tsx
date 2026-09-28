@@ -25,7 +25,6 @@ export function Foot({
   label,
   start,
   before,
-  after,
   above,
   stack,
   inline,
@@ -39,8 +38,6 @@ export function Foot({
   start?: ComponentChildren;
   // what sits right before the submit: a Cancel
   before?: ComponentChildren;
-  // what follows the submit: a Reset beside it, a count at the end
-  after?: ComponentChildren;
   // a line over the notice and the buttons: what a Delete asked about
   // would do; its class, which takes the whole line, is the owner's
   above?: ComponentChildren;
@@ -102,13 +99,11 @@ export function Foot({
         <div class="foot-actions">
           {before}
           {submit}
-          {after}
         </div>
       ) : (
         <>
           {before}
           {submit}
-          {after}
         </>
       )}
     </div>
