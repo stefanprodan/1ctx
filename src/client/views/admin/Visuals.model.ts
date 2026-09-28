@@ -15,7 +15,7 @@ export const VISUAL_LIMITS: readonly LimitName[] = [
   "maxVisuals",
 ];
 
-// the saved state
+// the Visuals card's line, as its switch is drafted
 export function visualsLine(on: boolean): string {
   return on
     ? "Allows agents to draw HTML and SVG visuals."

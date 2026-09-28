@@ -79,7 +79,7 @@ const rows: LimitRow[] = [
 ];
 
 describe("the Visuals words", () => {
-  test("the line says what the saved switch does", () => {
+  test("the line says what the drafted switch does", () => {
     expect(visualsLine(true)).toBe(
       "Allows agents to draw HTML and SVG visuals.",
     );
