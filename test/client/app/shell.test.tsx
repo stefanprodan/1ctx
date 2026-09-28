@@ -202,6 +202,8 @@ describe("the rail's faces", () => {
       path.value = "/login";
       expect(lastWork.value).toBe("/projects");
       expect(lastAdmin.value).toBe("/admin/config/mcp");
+      path.value = "/admin";
+      expect(lastWork.value).toBe("/projects");
     } finally {
       stop();
     }
