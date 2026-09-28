@@ -3,7 +3,7 @@
 Governs `src/server/tools/`, `limits/`, `credentials/`, `skills/`, the
 tool loop and the policy in `src/server/runner/`, and the visual frame
 (`GET /api/visual`, `tools/visual-theme.ts`, `tools/visual-scheme.ts`).
-The Tools page is in `docs/views.md`, MCP tools in `docs/mcp.md`, bash's
+The admin pages are in `docs/views.md`, MCP tools in `docs/mcp.md`, bash's
 mount in `docs/knowledge.md`.
 
 ## The loop
@@ -52,7 +52,7 @@ mount in `docs/knowledge.md`.
   receipts and a cut line. The work row carries `tool_limit`, `token_limit`,
   `context_limit` or `tool_loop`; the answer keeps the provider's finish
   reason, except `tool_text`.
-- **The server places every row.** A change on the Tools page applies to
+- **The server places every row.** A change to a limit or a tool applies to
   the next send, a run cap to the next admission; a send in flight
   keeps the caps and the set it started on. A round's calls run in
   parallel under the call timeout and the send's signal. A tool row is
@@ -211,7 +211,7 @@ mount in `docs/knowledge.md`.
   past the cap is refused; an error is rebuilt from its first line, keys
   replaced, its name kept. The bash description adds `curl to <prefix,
   cut at 80> (<name>) is signed in; send no key.` per offered
-  credential; the Tools catalog and the agent page count bash without
+  credential; the Config board and the agent page count bash without
   any.
 
 ## Skills
@@ -230,7 +230,7 @@ mount in `docs/knowledge.md`.
   `shared/skills.ts` sits in the prompt before the date line. The `skill`
   tool's name is an enum of that catalog, and `skill_file` is offered only
   when it can answer. These two tools come from skills, never the tools
-  rows or the Tools page, a deliberate exception to the offered-set rule.
+  rows or their admin pages, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
   summary, the user message names still-offered skills loaded before it,
   each load paired with its call by position in its round, as the

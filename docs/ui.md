@@ -286,8 +286,9 @@ client change. What each page draws is in `docs/views.md`.
   admin gets a band over the user row, Admin panel or Exit admin
   panel, opening the last page seen on the other face (`lastAdmin`
   and `lastWork` in `shell.ts`), Monitor or Home the first time. A
-  crumb's zone step links to the zone (`zoneStep()`); Access and Config
-  are placeholder boards listing their pages (`ZoneBoard.tsx`).
+  crumb's zone step links to the zone (`zoneStep()`); Access is a
+  placeholder board listing its pages (`ZoneBoard.tsx`), Config's board
+  is in `docs/views.md`.
 - **Touch.**
   On a touch screen (`pointer: coarse`, `lib/touch.ts`) every field is
   `--text-touch`, 16px, since iOS zooms into a smaller one and stays

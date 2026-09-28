@@ -1,4 +1,4 @@
-/* A settings page's Limits card: three limits to a line, one under
+/* A settings card of limits: three to a line, one under
    another on a phone. */
 
 @layer tokens, base, owners;
@@ -13,6 +13,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  /* the ask before a save that deletes, its buttons after the words */
+  .limits-setting-ask {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-2);
   }
 

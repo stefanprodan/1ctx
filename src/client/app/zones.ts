@@ -51,9 +51,8 @@ export const ZONES: Zone[] = [
       },
       { label: "MCP Servers", href: "/admin/config/mcp" },
       { label: "Skills", href: "/admin/config/skills" },
-      { label: "Web access", href: "/admin/config/web" },
       { label: "Visuals", href: "/admin/config/visuals" },
-      { label: "Tools", href: "/admin/config/tools" },
+      { label: "Web access", href: "/admin/config/web" },
     ],
   },
 ];

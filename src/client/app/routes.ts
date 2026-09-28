@@ -190,9 +190,35 @@ const userPage = async (username: string) => {
   await Promise.all([loadPerson(username), loadPersonDays(username)]);
 };
 
-// the tools page's tabs share one view the same way
-const toolsView = lazy<{ params: Params }>(() =>
-  import("../views/admin/Tools.tsx").then((m) => m.Tools),
+// Config's board's three tabs share one view the same way
+const configBoardView = lazy<{ params: Params }>(() =>
+  import("../views/admin/ConfigBoard.tsx").then((m) => m.ConfigBoard),
+);
+const configBoardRoutes = (
+  [
+    ["", "Config"],
+    ["/limits", "Limits"],
+    ["/storage", "Storage"],
+  ] as const
+).map(
+  ([tab, title]): Route => ({
+    path: `/admin/config${tab}`,
+    view: configBoardView,
+    title: () => title,
+    role: "admin",
+    // the aside counts what the other Config pages list
+    load: async () => {
+      await Promise.all([
+        loadTools(),
+        loadProviders(),
+        loadAgents(),
+        loadDeciders(),
+        loadMcp(),
+        loadSkills(),
+        loadCredentials(),
+      ]);
+    },
+  }),
 );
 
 // and Web access's two
@@ -503,14 +529,7 @@ export const ROUTES: Route[] = [
       ]);
     },
   },
-  {
-    path: "/admin/config",
-    view: lazy(() =>
-      import("../views/admin/ZoneBoard.tsx").then((m) => m.ConfigBoard),
-    ),
-    title: () => "Config",
-    role: "admin",
-  },
+  ...configBoardRoutes,
   {
     path: "/admin/config/providers",
     view: lazy(() =>
@@ -661,20 +680,6 @@ export const ROUTES: Route[] = [
     load: async () => {
       await Promise.all([loadTools(), loadVisualsUsage()]);
     },
-  },
-  {
-    path: "/admin/config/tools",
-    view: toolsView,
-    title: () => "Tools",
-    role: "admin",
-    load: () => loadTools(),
-  },
-  {
-    path: "/admin/config/tools/limits",
-    view: toolsView,
-    title: () => "Limits",
-    role: "admin",
-    load: () => loadTools(),
   },
   {
     path: "/admin/config/skills",

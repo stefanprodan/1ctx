@@ -468,7 +468,7 @@ function ToolRows({
               <div
                 class="mcp-page-tool-params"
                 // rendered on the server from the schema's JSON inside a
-                // code fence, as the Tools page shows a built-in's
+                // code fence, as the Config board shows a built-in's
                 dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
               />
             </div>

@@ -416,12 +416,18 @@ export function Storage() {
   const error = storageError.value;
   const busy = storageLoading.value;
   const actions = (
-    <Loaded
-      readAt={answer?.readAt ?? null}
-      busy={busy}
-      error={error}
-      onRefresh={() => void loadStorage()}
-    />
+    <>
+      {/* off on a phone, where the head has room only for the crumb */}
+      <a class="btn btn-small storage-limits" href="/admin/config/storage">
+        Limits
+      </a>
+      <Loaded
+        readAt={answer?.readAt ?? null}
+        busy={busy}
+        error={error}
+        onRefresh={() => void loadStorage()}
+      />
+    </>
   );
   return (
     <Page
