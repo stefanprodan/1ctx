@@ -6,6 +6,7 @@ import { MAX_SKILLS_PER_AGENT } from "../../../shared/words.ts";
 import { updateAgent } from "../../data/agents.ts";
 import { skills as skillRows } from "../../data/skills.ts";
 import { ago, firstSentence } from "../../lib/format.ts";
+import { SKILLS_HREF } from "../../lib/hrefs.ts";
 import { toggledId } from "../../lib/ids.ts";
 import { useNow } from "../../lib/now.ts";
 import { useSave } from "../../lib/save.ts";
@@ -104,7 +105,7 @@ export function AgentSkills({
           <RowsNote>The skills did not load. Reload the page.</RowsNote>
         ) : all.length === 0 ? (
           <RowsNote>
-            No skills yet. <a href="/admin/config/skills?new">Add one</a> and it
+            No skills yet. <a href={`${SKILLS_HREF}?new`}>Add one</a> and it
             shows here.
           </RowsNote>
         ) : !takesTools ? (

@@ -6,23 +6,17 @@ import type {
   OverviewTotals,
   TurnLengths,
 } from "../../../shared/api/admin.ts";
-import { commas, dayMonth, pluralCommas, share } from "../../lib/format.ts";
+import {
+  commas,
+  dayMonth,
+  lengthWord,
+  pluralCommas,
+  share,
+} from "../../lib/format.ts";
 
 const failedOf = (t: { turnsFailed: number; runsFailed: number }) =>
   t.turnsFailed + t.runsFailed;
 const ranOf = (t: { turns: number; runs: number }) => t.turns + t.runs;
-
-// "41s", "3m 20s", "1h 5m"
-export function lengthWord(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) {
-    const rest = s % 60;
-    return `${Math.floor(s / 60)}m${rest ? ` ${rest}s` : ""}`;
-  }
-  const m = Math.floor((s % 3600) / 60);
-  return `${Math.floor(s / 3600)}h${m ? ` ${m}m` : ""}`;
-}
 
 // bottom first: what did not fail, then every failure
 export function activitySeries(days: OverviewDay[]) {

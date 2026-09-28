@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import {
   deleteAsk,
   keepDays,
-} from "../../../src/client/views/admin/Tools.model.ts";
+} from "../../../src/client/views/admin/Limits.model.ts";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
 
 describe("the Limits save that deletes", () => {

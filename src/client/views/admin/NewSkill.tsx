@@ -14,7 +14,7 @@ import {
   skillsError,
 } from "../../data/skills.ts";
 import { firstSentence } from "../../lib/format.ts";
-import { configSkillHref } from "../../lib/hrefs.ts";
+import { configSkillHref, SKILLS_HREF } from "../../lib/hrefs.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -105,7 +105,7 @@ function Form() {
     <NewCard
       label="Add skill"
       create={looking ? "Looking up" : submitLabel(kind)}
-      cancel="/admin/config/skills"
+      cancel={SKILLS_HREF}
       save={save}
       ready={!looking && url.value.trim() !== ""}
       taken={null}

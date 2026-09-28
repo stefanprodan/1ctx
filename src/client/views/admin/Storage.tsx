@@ -55,6 +55,7 @@ import {
   walWords,
 } from "./Storage.model.ts";
 import "./storage.css";
+import { CONFIG_STORAGE_HREF } from "../../lib/hrefs.ts";
 
 const SYNC = "storage";
 
@@ -384,7 +385,7 @@ export function Storage() {
   const actions = (
     <>
       {/* off on a phone, where the head has room only for the crumb */}
-      <a class="btn btn-small storage-limits" href="/admin/config/storage">
+      <a class="btn btn-small storage-limits" href={CONFIG_STORAGE_HREF}>
         Limits
       </a>
       <Loaded

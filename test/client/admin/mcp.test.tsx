@@ -24,6 +24,7 @@ import {
   serversError,
 } from "../../../src/client/data/mcp.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { promptPreview } from "../../../src/client/views/admin/AgentPage.model.ts";
 import {
   listed,
   sameServers,
@@ -35,7 +36,6 @@ import {
   mcpFieldOf,
   offerOf,
   offerSides,
-  promptPreview,
   sidesLine,
   timeoutMs,
   timeoutProblem,

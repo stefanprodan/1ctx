@@ -8,7 +8,7 @@ import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { keys, providers, providersError } from "../../data/providers.ts";
 import { pluralCommas } from "../../lib/format.ts";
-import { configProviderHref } from "../../lib/hrefs.ts";
+import { configProviderHref, PROVIDERS_HREF } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { hasMark, WireMark } from "../../lib/marks.tsx";
 import { byName, useListSearch } from "../../lib/search.ts";
@@ -30,9 +30,9 @@ import {
   SpendLines,
   UsageSection,
 } from "./AdminAside.tsx";
-import { keyLine, preset } from "./Agents.model.ts";
 import { NewProvider } from "./NewProvider.tsx";
 import { costOf, tokensOf } from "./Overview.model.ts";
+import { keyLine, preset } from "./Providers.model.ts";
 import "./provider-list.css";
 
 export function Providers() {
@@ -67,9 +67,7 @@ function List() {
       steps={[zoneStep("Config")]}
       title="Providers"
       split
-      actions={
-        <PageNew href="/admin/config/providers?new" label="New provider" />
-      }
+      actions={<PageNew href={`${PROVIDERS_HREF}?new`} label="New provider" />}
       loading={(list === null || rows === null) && error === null}
       error={error}
     >

@@ -3,6 +3,7 @@
 
 import { type Signal, useSignal } from "@preact/signals";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
+import { RESERVED_PROJECT_NAMES } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
@@ -19,8 +20,8 @@ import { users, usersError } from "../../data/users.ts";
 import { count, dayMonthYear, initials, plural } from "../../lib/format.ts";
 import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
 import { sameIds, toggledId } from "../../lib/ids.ts";
-import { nameProblem } from "../../lib/names.ts";
-import { at, useSave } from "../../lib/save.ts";
+import { nameProblem, nameTaken } from "../../lib/names.ts";
+import { at } from "../../lib/save.ts";
 import { countOf } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
@@ -46,11 +47,10 @@ import {
   deleteLine,
   descriptionProblem,
   memberOptions,
-  nameTaken,
   projectFieldOf,
 } from "./AdminProjects.model.ts";
-import { DraftFoot } from "./DraftFoot.tsx";
-import { holding, useLatest } from "./drafts.ts";
+import { useDraftCard } from "./DraftCard.tsx";
+import { holding } from "./drafts.ts";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];
 
@@ -152,29 +152,22 @@ function aboutBody(row: ProjectDetail, d: About): Partial<About> | null {
 }
 
 function AboutCard({ project, saving }: CardProps) {
-  const latest = useLatest(project);
-  // only the fields edited, so a save elsewhere shows through
-  const drafted = useSignal<Partial<About> | null>(null);
-  const merged = (row: ProjectDetail): About => ({
-    name: row.name,
-    description: row.description,
-    ...drafted.value,
+  const card = useDraftCard({
+    row: project,
+    saving,
+    of: (row): About => ({ name: row.name, description: row.description }),
+    dirty: (d, row) => aboutBody(row, d) !== null,
+    send: async (d, row) => {
+      const body = aboutBody(row, d);
+      if (body !== null) await updateProject(row.id, body);
+    },
+    fieldOf: projectFieldOf,
   });
-  const save = useSave(async () => {
-    const row = latest.current;
-    const body = aboutBody(row, merged(row));
-    if (body !== null) await holding(saving, () => updateProject(row.id, body));
-    drafted.value = null;
-  }, projectFieldOf);
-  const d = merged(project);
+  const { d, save, set } = card;
   const name = d.name.trim();
   const taken =
     name !== project.name &&
-    nameTaken(adminProjects.value ?? [], name, project.id);
-  const set = (patch: Partial<About>) => {
-    drafted.value = { ...drafted.value, ...patch };
-    save.touch();
-  };
+    nameTaken(adminProjects.value, name, project.id, RESERVED_PROJECT_NAMES);
   return (
     <SettingForm
       save={save}
@@ -185,20 +178,10 @@ function AboutCard({ project, saving }: CardProps) {
     >
       <Setting
         label="About"
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={aboutBody(project, d) !== null}
-            blocked={taken}
-            locked={saving.value && !save.busy}
-            hint={
-              taken ? <span class="error">{name} is taken.</span> : undefined
-            }
-            onDiscard={() => {
-              drafted.value = null;
-            }}
-          />
-        }
+        foot={card.foot({
+          blocked: taken,
+          hint: taken ? <span class="error">{name} is taken.</span> : undefined,
+        })}
       >
         <div class="pair">
           <NameField
@@ -223,23 +206,21 @@ function AboutCard({ project, saving }: CardProps) {
 }
 
 function MembersCard({ project, saving }: CardProps) {
-  const latest = useLatest(project);
-  const drafted = useSignal<string[] | null>(null);
-  const saved = project.members.map((m) => m.id);
-  const ids = drafted.value ?? saved;
-  const people = users.value;
-  const save = useSave(async () => {
-    const next = drafted.value;
-    if (next !== null) {
-      await holding(saving, () => setProjectMembers(latest.current, next));
-    }
-    drafted.value = null;
+  const card = useDraftCard({
+    row: project,
+    saving,
+    of: (row) => ({ ids: row.members.map((m) => m.id) }),
+    dirty: (d, row) =>
+      !sameIds(
+        d.ids,
+        row.members.map((m) => m.id),
+      ),
+    send: (d, row) => setProjectMembers(row, d.ids),
   });
-  const set = (next: string[]) => {
-    drafted.value = next;
-    save.touch();
-  };
-  const off = save.busy || saving.value;
+  const { ids } = card.d;
+  const set = (next: string[]) => card.set({ ids: next });
+  const people = users.value;
+  const off = card.save.busy || saving.value;
   // a member the users list does not hold yet still shows, from the detail
   const shown = ids.flatMap((id) => {
     const u =
@@ -248,7 +229,7 @@ function MembersCard({ project, saving }: CardProps) {
     return u === undefined ? [] : [u];
   });
   return (
-    <SettingForm save={save}>
+    <SettingForm save={card.save}>
       <Setting
         title="Members"
         count={countOf(ids.length, ids.length)}
@@ -267,21 +248,12 @@ function MembersCard({ project, saving }: CardProps) {
             />
           )
         }
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={!sameIds(ids, saved)}
-            locked={saving.value && !save.busy}
-            hint={
-              people === null && usersError.value !== null ? (
-                <span class="error">{usersError.value.words}</span>
-              ) : undefined
-            }
-            onDiscard={() => {
-              drafted.value = null;
-            }}
-          />
-        }
+        foot={card.foot({
+          hint:
+            people === null && usersError.value !== null ? (
+              <span class="error">{usersError.value.words}</span>
+            ) : undefined,
+        })}
       >
         {shown.length === 0 ? (
           <RowsNote>No members yet.</RowsNote>

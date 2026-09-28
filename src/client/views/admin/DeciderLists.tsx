@@ -7,7 +7,12 @@ import { zoneStep } from "../../app/zones.ts";
 import { deciders, decidersError } from "../../data/deciders.ts";
 import { decisions, decisionsError } from "../../data/decisions.ts";
 import { providers, providersError } from "../../data/providers.ts";
-import { configDeciderHref, configDecisionHref } from "../../lib/hrefs.ts";
+import {
+  configDeciderHref,
+  configDecisionHref,
+  DECIDERS_HREF,
+  DECISIONS_HREF,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { byName, useListSearch } from "../../lib/search.ts";
 import { Page, PageNew } from "../../ui/Page.tsx";
@@ -40,18 +45,16 @@ function ListTabs({ on }: { on: "deciders" | "decisions" }) {
       tabs={[
         {
           label: "Deciders",
-          href: "/admin/config/deciders",
+          href: DECIDERS_HREF,
           count: deciders.value?.length,
         },
         {
           label: "Decisions",
-          href: "/admin/config/decisions",
+          href: DECISIONS_HREF,
           count: decisions.value?.length,
         },
       ]}
-      active={
-        on === "deciders" ? "/admin/config/deciders" : "/admin/config/decisions"
-      }
+      active={on === "deciders" ? DECIDERS_HREF : DECISIONS_HREF}
     />
   );
 }
@@ -95,9 +98,7 @@ function Deciders() {
       title="Deciders"
       split
       actions={
-        canAdd && (
-          <PageNew href="/admin/config/deciders?new" label="New decider" />
-        )
+        canAdd && <PageNew href={`${DECIDERS_HREF}?new`} label="New decider" />
       }
       loading={(list === null || rows === null) && error === null}
       error={error}

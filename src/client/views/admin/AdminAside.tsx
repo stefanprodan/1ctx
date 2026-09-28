@@ -4,11 +4,9 @@
 import type { ComponentChildren } from "preact";
 import type { OverviewTotals } from "../../../shared/api/admin.ts";
 import { overview, overviewError } from "../../data/overview.ts";
-import { count } from "../../lib/format.ts";
+import { count, money } from "../../lib/format.ts";
+import { USAGE_HREF } from "../../lib/hrefs.ts";
 import { AsideLine, AsideRead, AsideSection } from "../../ui/Split.tsx";
-import { money } from "./Overview.model.ts";
-
-export const USAGE_HREF = "/admin/monitor/usage";
 
 export function UsageSection<T>({
   value,

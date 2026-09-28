@@ -24,9 +24,12 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import { LimitsSetting } from "./LimitsSetting.tsx";
 import { ToolRow } from "./ToolRow.tsx";
-import { hostsCount, hostsFieldOf, hostsLine, hostsOf } from "./Tools.model.ts";
+import { hostsCount } from "./Tools.model.ts";
 import {
   hostsDirty,
+  hostsFieldOf,
+  hostsLine,
+  hostsOf,
   hostsText,
   isDefaultHosts,
   VISUAL_LIMITS,

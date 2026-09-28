@@ -13,8 +13,4 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .tools-json-cut {
-    max-height: 320px;
-    overflow: clip;
-  }
 }

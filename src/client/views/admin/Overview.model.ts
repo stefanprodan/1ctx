@@ -16,6 +16,7 @@ import {
   count,
   dayMonth,
   elapsed,
+  money,
   pluralCommas,
   share,
   size,
@@ -26,14 +27,10 @@ import {
   configMcpHref,
   configProviderHref,
   configSkillHref,
+  WEB_HREF,
 } from "../../lib/hrefs.ts";
 
 const MEMORY_FULL = 0.8;
-
-export function money(n: number): string {
-  if (n > 0 && n < 0.01) return "<$0.01";
-  return `$${n.toFixed(2)}`;
-}
 
 export const tokensOf = (t: {
   promptTokens: number;
@@ -255,7 +252,7 @@ const ATTENTION: Record<
     icon: "key",
     what: "Web search",
     line: "key file missing",
-    href: () => "/admin/config/web",
+    href: () => WEB_HREF,
   },
   "mcp-refresh": {
     icon: "mcp",

@@ -17,7 +17,7 @@ import {
   refreshServer,
 } from "../../data/mcp.ts";
 import { ago, commas, plural, showAll } from "../../lib/format.ts";
-import { configAgentHref } from "../../lib/hrefs.ts";
+import { configAgentHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { at, useAction, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
@@ -399,7 +399,7 @@ function Delete({ server }: { server: McpServerSummary }) {
       // the server refuses to delete a server an agent uses
       off={used > 0}
       onDelete={() => deleteServer(server.id)}
-      leaveTo="/admin/config/mcp"
+      leaveTo={MCP_HREF}
     />
   );
 }

@@ -7,7 +7,7 @@ import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { allUsage, keys, servers, serversError } from "../../data/mcp.ts";
 import { ago, count, pluralCommas } from "../../lib/format.ts";
-import { configMcpHref } from "../../lib/hrefs.ts";
+import { configMcpHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { byName, useListSearch } from "../../lib/search.ts";
 import { Page, PageNew } from "../../ui/Page.tsx";
@@ -46,7 +46,7 @@ function List() {
       steps={[zoneStep("Config")]}
       title="MCP Servers"
       split
-      actions={<PageNew href="/admin/config/mcp?new" label="New server" />}
+      actions={<PageNew href={`${MCP_HREF}?new`} label="New server" />}
       loading={(rows === null || agents.value === null) && error === null}
       error={error}
     >

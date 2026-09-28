@@ -12,12 +12,12 @@ import {
   toolsError,
 } from "../../../src/client/data/tools.ts";
 import { Save } from "../../../src/client/lib/save.ts";
+import { hostsCount } from "../../../src/client/views/admin/Tools.model.ts";
 import {
   defaultHosts,
-  hostsCount,
   hostsFieldOf,
   hostsOf,
-} from "../../../src/client/views/admin/Tools.model.ts";
+} from "../../../src/client/views/admin/Visuals.model.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import {
   DEFAULT_VISUAL_HOSTS,

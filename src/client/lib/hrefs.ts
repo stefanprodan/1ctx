@@ -1,22 +1,35 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The addresses of a user's page, an agent's page, a chat, an
-// automation and a chat's download, so every link to them is built one
-// way.
 
 import { browserZone } from "./zone.ts";
+
+export const ACCESS_HREF = "/admin/access";
+export const PROJECTS_HREF = "/admin/access/projects";
+export const USERS_HREF = "/admin/access/users";
+export const CONFIG_HREF = "/admin/config";
+export const AGENTS_HREF = "/admin/config/agents";
+export const DECIDERS_HREF = "/admin/config/deciders";
+export const DECISIONS_HREF = "/admin/config/decisions";
+export const LIMITS_HREF = "/admin/config/limits";
+export const MCP_HREF = "/admin/config/mcp";
+export const PROVIDERS_HREF = "/admin/config/providers";
+export const SKILLS_HREF = "/admin/config/skills";
+export const CONFIG_STORAGE_HREF = "/admin/config/storage";
+export const VISUALS_HREF = "/admin/config/visuals";
+export const WEB_HREF = "/admin/config/web";
+export const CREDENTIALS_HREF = "/admin/config/web/credentials";
+export const MONITOR_HREF = "/admin/monitor";
+export const STORAGE_HREF = "/admin/monitor/storage";
+export const USAGE_HREF = "/admin/monitor/usage";
 
 export function userHref(username: string): string {
   return `/users/${encodeURIComponent(username)}`;
 }
 
-export const USERS_HREF = "/admin/access/users";
 export function adminUserHref(username: string): string {
   return `${USERS_HREF}/${encodeURIComponent(username)}`;
 }
 
-export const PROJECTS_HREF = "/admin/access/projects";
 export function adminProjectHref(id: string): string {
   return `${PROJECTS_HREF}/${encodeURIComponent(id)}`;
 }
@@ -26,21 +39,20 @@ export function agentHref(name: string): string {
 }
 
 export function configProviderHref(name: string): string {
-  return `/admin/config/providers/${encodeURIComponent(name)}`;
+  return `${PROVIDERS_HREF}/${encodeURIComponent(name)}`;
 }
 
 export function newAgentHref(provider: string): string {
-  return `/admin/config/agents?new&provider=${encodeURIComponent(provider)}`;
+  return `${AGENTS_HREF}?new&provider=${encodeURIComponent(provider)}`;
 }
 
 export function configDeciderHref(name: string): string {
-  return `/admin/config/deciders/${encodeURIComponent(name)}`;
+  return `${DECIDERS_HREF}/${encodeURIComponent(name)}`;
 }
 export function configDecisionHref(id: string): string {
-  return `/admin/config/decisions/${encodeURIComponent(id)}`;
+  return `${DECISIONS_HREF}/${encodeURIComponent(id)}`;
 }
 
-export const CREDENTIALS_HREF = "/admin/config/web/credentials";
 export function configCredentialHref(name: string) {
   return `${CREDENTIALS_HREF}/${encodeURIComponent(name)}`;
 }
@@ -52,15 +64,15 @@ const tabHref = (base: string, name: string, tab: string) => {
 
 export type McpTab = "general" | "tools";
 export const configMcpHref = (name: string, tab: McpTab = "general") =>
-  tabHref("/admin/config/mcp", name, tab);
+  tabHref(MCP_HREF, name, tab);
 
 export type SkillTab = "general" | "files";
 export const configSkillHref = (name: string, tab: SkillTab = "general") =>
-  tabHref("/admin/config/skills", name, tab);
+  tabHref(SKILLS_HREF, name, tab);
 
 export type AgentTab = "general" | "skills" | "mcp";
 export const configAgentHref = (name: string, tab: AgentTab = "general") =>
-  tabHref("/admin/config/agents", name, tab);
+  tabHref(AGENTS_HREF, name, tab);
 
 export function chatHref(id: string): string {
   return `/chat/${encodeURIComponent(id)}`;

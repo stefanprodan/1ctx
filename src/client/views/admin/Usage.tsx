@@ -28,6 +28,7 @@ import {
   usageBars,
 } from "./Usage.model.ts";
 import "./usage.css";
+import { USAGE_HREF } from "../../lib/hrefs.ts";
 
 const SYNC = "usage";
 const NO_TURNS = "No turns this month";
@@ -144,7 +145,7 @@ function Step({
   ) : (
     <a
       class="btn-icon usage-step"
-      href={`/admin/monitor/usage?month=${to}`}
+      href={`${USAGE_HREF}?month=${to}`}
       aria-label={`${label}, ${monthLabel(to)}`}
       title={monthLabel(to)}
     >

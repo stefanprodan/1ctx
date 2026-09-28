@@ -34,7 +34,6 @@ import {
   deleteLine,
   descriptionProblem,
   memberOptions,
-  nameTaken,
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectPage } from "../../../src/client/views/admin/ProjectPage.tsx";
@@ -138,13 +137,6 @@ describe("the words", () => {
     expect(deleteLine({ chats: 0, knowledge: { files: 0, tokens: 0 } })).toBe(
       "Deletes its scheduled tasks and memory. This cannot be undone.",
     );
-  });
-
-  test("a name is taken by another team project or the reserved one", () => {
-    expect(nameTaken([team], "platform")).toBe(true);
-    expect(nameTaken([team], "platform", "p2")).toBe(false);
-    expect(nameTaken([team], "personal")).toBe(true);
-    expect(nameTaken([team], "ops")).toBe(false);
   });
 
   test("New project asks for a description", () => {

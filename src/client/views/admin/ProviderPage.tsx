@@ -19,6 +19,7 @@ import {
   configDeciderHref,
   configProviderHref,
   newAgentHref,
+  PROVIDERS_HREF,
 } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { byName } from "../../lib/search.ts";
@@ -33,11 +34,12 @@ import {
 } from "../../ui/Setting.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
-import { keyLine, preset } from "./Agents.model.ts";
-import { providerDeleteLine } from "./Providers.model.ts";
+import { keyLine, preset, providerDeleteLine } from "./Providers.model.ts";
 
-const LIST = "/admin/config/providers";
-const STEPS = [zoneStep("Config"), { label: "Providers", href: LIST }];
+const STEPS = [
+  zoneStep("Config"),
+  { label: "Providers", href: PROVIDERS_HREF },
+];
 
 export function ProviderPage({ params }: { params: Params }) {
   const list = providers.value;
@@ -180,7 +182,7 @@ function DeleteCard({ provider }: { provider: ProviderSummary }) {
       // the server refuses a provider an agent or a decider uses
       off={agentCount + deciderCount > 0}
       onDelete={() => deleteProvider(provider.id)}
-      leaveTo={LIST}
+      leaveTo={PROVIDERS_HREF}
     />
   );
 }

@@ -6,7 +6,6 @@ import type {
   ProjectSummary,
 } from "../../../shared/contracts/project.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
-import { RESERVED_PROJECT_NAMES } from "../../../shared/words.ts";
 import { plural, pluralCommas } from "../../lib/format.ts";
 import type { FinderOption } from "../../ui/Finder.tsx";
 
@@ -19,17 +18,6 @@ export function descriptionProblem(value: string): string | null {
 
 export function countLine(project: ProjectSummary): string {
   return pluralCommas(project.memberCount, "member", "members");
-}
-
-export function nameTaken(
-  projects: readonly ProjectSummary[],
-  name: string,
-  exceptId?: string,
-): boolean {
-  return (
-    RESERVED_PROJECT_NAMES.includes(name) ||
-    projects.some((p) => p.name === name && p.id !== exceptId)
-  );
 }
 
 export function deleteLine(

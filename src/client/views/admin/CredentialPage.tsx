@@ -30,13 +30,7 @@ import {
   SettingStack,
 } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
-import {
-  AddProject,
-  KeyField,
-  MethodsField,
-  ProjectRows,
-  RequestFields,
-} from "./CredentialFields.tsx";
+import { KeyField, MethodsField, RequestFields } from "./CredentialFields.tsx";
 import {
   type CredentialDraft,
   type CredentialField,
@@ -52,6 +46,7 @@ import {
 } from "./Credentials.model.ts";
 import { type DraftCard, useDraftCard } from "./DraftCard.tsx";
 import { holding } from "./drafts.ts";
+import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import "./credentials.css";
 
 const STEPS = [
@@ -249,9 +244,10 @@ function ProjectsCard(props: CardProps) {
             />
           )
         }
-        foot={card.foot(
-          refused !== null ? <span class="error">{refused}</span> : undefined,
-        )}
+        foot={card.foot({
+          hint:
+            refused !== null ? <span class="error">{refused}</span> : undefined,
+        })}
       >
         {!loaded ? (
           <RowsNote>

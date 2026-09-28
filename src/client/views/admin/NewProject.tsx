@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSignal } from "@preact/signals";
+import { RESERVED_PROJECT_NAMES } from "../../../shared/words.ts";
 import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
@@ -10,14 +11,13 @@ import {
   createProject,
 } from "../../data/admin-projects.ts";
 import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
-import { nameProblem } from "../../lib/names.ts";
+import { nameProblem, nameTaken } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { Page } from "../../ui/Page.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import {
   DESCRIPTION_PLACEHOLDER,
   descriptionProblem,
-  nameTaken,
   projectFieldOf,
 } from "./AdminProjects.model.ts";
 import { NewCard } from "./NewCard.tsx";
@@ -50,7 +50,12 @@ function Form() {
     if (address() === from) navigate(adminProjectHref(created.id));
   }, projectFieldOf);
   const trimmed = name.value.trim();
-  const taken = nameTaken(adminProjects.value ?? [], trimmed);
+  const taken = nameTaken(
+    adminProjects.value,
+    trimmed,
+    "",
+    RESERVED_PROJECT_NAMES,
+  );
   return (
     <NewCard
       label="New project"

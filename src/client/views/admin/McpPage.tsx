@@ -13,7 +13,7 @@ import {
   serverUsage,
 } from "../../data/mcp.ts";
 import { count } from "../../lib/format.ts";
-import { configMcpHref, type McpTab } from "../../lib/hrefs.ts";
+import { configMcpHref, MCP_HREF, type McpTab } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { type Save, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
@@ -30,10 +30,7 @@ import { McpTools } from "./McpTools.tsx";
 import { refreshLine } from "./refresh.ts";
 import "./mcp-page.css";
 
-const STEPS = [
-  zoneStep("Config"),
-  { label: "MCP Servers", href: "/admin/config/mcp" },
-];
+const STEPS = [zoneStep("Config"), { label: "MCP Servers", href: MCP_HREF }];
 
 // the step after the name, so a server named tools opens on General
 export function mcpTabOf(pathname: string): McpTab {

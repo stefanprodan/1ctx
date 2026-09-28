@@ -6,7 +6,7 @@ import { shapeServerName } from "../../../shared/names.ts";
 import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { addServer, keys, servers, serversError } from "../../data/mcp.ts";
-import { configMcpHref } from "../../lib/hrefs.ts";
+import { configMcpHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -16,10 +16,7 @@ import { mcpFieldOf } from "./Mcp.model.ts";
 import { NewCard } from "./NewCard.tsx";
 import "./mcp-page.css";
 
-const STEPS = [
-  zoneStep("Config"),
-  { label: "MCP Servers", href: "/admin/config/mcp" },
-];
+const STEPS = [zoneStep("Config"), { label: "MCP Servers", href: MCP_HREF }];
 
 export function NewMcpServer() {
   const error = serversError.value;
@@ -64,7 +61,7 @@ function Form() {
     <NewCard
       label="New server"
       create="Create server"
-      cancel="/admin/config/mcp"
+      cancel={MCP_HREF}
       save={save}
       ready={trimmed !== "" && url.value.trim() !== ""}
       taken={taken ? trimmed : null}

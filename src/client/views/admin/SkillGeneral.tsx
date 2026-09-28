@@ -6,7 +6,7 @@ import { AgentLinks } from "../../agents/AgentLinks.tsx";
 import { agents } from "../../data/agents.ts";
 import { deleteSkill, loadSkills, refreshSkill } from "../../data/skills.ts";
 import { ago } from "../../lib/format.ts";
-import { configAgentHref } from "../../lib/hrefs.ts";
+import { configAgentHref, SKILLS_HREF } from "../../lib/hrefs.ts";
 import { useAction } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import {
@@ -49,7 +49,7 @@ export function SkillGeneral({
         ask={`Delete ${skill.name}?`}
         off={carriers.length > 0}
         onDelete={() => deleteSkill(skill.id)}
-        leaveTo="/admin/config/skills"
+        leaveTo={SKILLS_HREF}
       />
     </>
   );

@@ -7,14 +7,26 @@ import type {
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import type { LimitName } from "../../../shared/words.ts";
-import { CREDENTIALS_HREF } from "../../lib/hrefs.ts";
+import {
+  AGENTS_HREF,
+  CONFIG_HREF,
+  CONFIG_STORAGE_HREF,
+  CREDENTIALS_HREF,
+  DECIDERS_HREF,
+  LIMITS_HREF,
+  MCP_HREF,
+  PROVIDERS_HREF,
+  SKILLS_HREF,
+  VISUALS_HREF,
+  WEB_HREF,
+} from "../../lib/hrefs.ts";
 
 type ConfigTab = "overview" | "limits" | "storage";
 
 export const CONFIG_TABS: { tab: ConfigTab; label: string; href: string }[] = [
-  { tab: "overview", label: "Overview", href: "/admin/config" },
-  { tab: "limits", label: "Limits", href: "/admin/config/limits" },
-  { tab: "storage", label: "Storage", href: "/admin/config/storage" },
+  { tab: "overview", label: "Overview", href: CONFIG_HREF },
+  { tab: "limits", label: "Limits", href: LIMITS_HREF },
+  { tab: "storage", label: "Storage", href: CONFIG_STORAGE_HREF },
 ];
 
 export function configTab(pathname: string): ConfigTab {
@@ -148,27 +160,27 @@ export function instanceLines(
   const provider = state.search.provider;
   const drawn = state.visualize.enabled;
   return [
-    ...counted("Providers", lists.providers, "/admin/config/providers"),
-    ...counted("Agents", lists.agents, "/admin/config/agents"),
-    ...counted("Deciders", lists.deciders, "/admin/config/deciders"),
-    ...counted("MCP servers", lists.servers, "/admin/config/mcp"),
-    ...counted("Skills", lists.skills, "/admin/config/skills"),
+    ...counted("Providers", lists.providers, PROVIDERS_HREF),
+    ...counted("Agents", lists.agents, AGENTS_HREF),
+    ...counted("Deciders", lists.deciders, DECIDERS_HREF),
+    ...counted("MCP servers", lists.servers, MCP_HREF),
+    ...counted("Skills", lists.skills, SKILLS_HREF),
     {
       label: "Visuals",
       value: drawn ? "On" : "Off",
-      href: "/admin/config/visuals",
+      href: VISUALS_HREF,
       quiet: !drawn,
     },
     {
       label: "Web access",
       value: MODE_WORDS[mode],
-      href: "/admin/config/web",
+      href: WEB_HREF,
       quiet: mode === "off",
     },
     {
       label: "Search",
       value: provider ?? "None",
-      href: "/admin/config/web",
+      href: WEB_HREF,
       quiet: provider === null,
     },
     ...counted("Credentials", lists.credentials, CREDENTIALS_HREF),

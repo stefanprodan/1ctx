@@ -4,8 +4,9 @@
 import { describe, expect, test } from "bun:test";
 import { h } from "preact";
 import { render } from "preact-render-to-string";
-import { litPage } from "../../../src/client/app/Rail.model.ts";
+import { zoneLit } from "../../../src/client/app/Rail.model.ts";
 import { overview } from "../../../src/client/data/overview.ts";
+import { lengthWord, money } from "../../../src/client/lib/format.ts";
 import {
   attentionRow,
   automationsTile,
@@ -17,7 +18,6 @@ import {
   dayTokensHint,
   decisionsTile,
   memoryTile,
-  money,
   runsTile,
   staleWords,
   tokensTile,
@@ -34,7 +34,6 @@ import {
   lengthAxis,
   lengthHint,
   lengthSeries,
-  lengthWord,
 } from "../../../src/client/views/admin/Stats.model.ts";
 import {
   agentBars,
@@ -607,18 +606,9 @@ describe("the build line", () => {
 
 describe("the rail", () => {
   test("lights Storage alone under /monitor/storage", () => {
-    const hrefs = [
-      "/admin/monitor",
-      "/admin/monitor/storage",
-      "/admin/config/web",
-    ];
-    expect(litPage("/admin/monitor/storage", hrefs)).toBe(
-      "/admin/monitor/storage",
-    );
-    expect(litPage("/admin/monitor", hrefs)).toBe("/admin/monitor");
-    expect(litPage("/admin/config/web/credentials", hrefs)).toBe(
-      "/admin/config/web",
-    );
-    expect(litPage("/projects", hrefs)).toBeNull();
+    expect(zoneLit("/admin/monitor/storage")).toBe("/admin/monitor/storage");
+    expect(zoneLit("/admin/monitor")).toBe("/admin/monitor");
+    expect(zoneLit("/admin/config/web/credentials")).toBe("/admin/config/web");
+    expect(zoneLit("/projects")).toBeNull();
   });
 });

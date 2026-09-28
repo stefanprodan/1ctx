@@ -7,7 +7,11 @@ import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { createDecider, deciders } from "../../data/deciders.ts";
 import { providers, providersError } from "../../data/providers.ts";
-import { configDeciderHref } from "../../lib/hrefs.ts";
+import {
+  configDeciderHref,
+  DECIDERS_HREF,
+  PROVIDERS_HREF,
+} from "../../lib/hrefs.ts";
 import { nameProblem, shapedInput } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
@@ -23,8 +27,7 @@ import {
 import { NewCard } from "./NewCard.tsx";
 import "./decider-page.css";
 
-const LIST = "/admin/config/deciders";
-const STEPS = [zoneStep("Config"), { label: "Deciders", href: LIST }];
+const STEPS = [zoneStep("Config"), { label: "Deciders", href: DECIDERS_HREF }];
 
 export function NewDecider() {
   const rows = providers.value;
@@ -41,7 +44,7 @@ export function NewDecider() {
         (offered.length === 0 ? (
           <p class="page-state">
             A decider runs on an OpenRouter or OpenAI-compatible provider.{" "}
-            <a href="/admin/config/providers?new">Add a provider</a> first.
+            <a href={`${PROVIDERS_HREF}?new`}>Add a provider</a> first.
           </p>
         ) : (
           <Form
@@ -85,7 +88,7 @@ function Form({ providerId }: { providerId: string }) {
     <NewCard
       label="New decider"
       create="Create decider"
-      cancel={LIST}
+      cancel={DECIDERS_HREF}
       save={save}
       ready={name !== "" && d.model.value !== null && !d.changing.value}
       taken={taken ? name : null}

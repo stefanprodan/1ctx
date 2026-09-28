@@ -6,8 +6,7 @@ import type {
   ModelUsage,
   UsageRow,
 } from "../../../shared/api/admin.ts";
-import { count, pluralCommas, share } from "../../lib/format.ts";
-import { money } from "./Overview.model.ts";
+import { count, money, pluralCommas, share } from "../../lib/format.ts";
 
 type RowsBy = "projects" | "agents";
 

@@ -16,7 +16,7 @@ import {
   adminProjectsError,
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
-import { count, initials } from "../../lib/format.ts";
+import { initials } from "../../lib/format.ts";
 import { adminUserHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { countOf } from "../../lib/search.ts";
@@ -128,7 +128,6 @@ function SignedIn({
           series={series}
           stack="activity"
           whole
-          words={(v) => (v === 0 ? "0" : count(v))}
           sync="access-board"
           onCursor={(i) => {
             day.value = i;

@@ -17,7 +17,6 @@ import {
   failing,
   failingLine,
   lastUse,
-  nameTaken,
 } from "../../../src/client/views/admin/AgentPage.model.ts";
 import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import { tabOf } from "../../../src/client/views/admin/AgentPage.tsx";
@@ -229,13 +228,6 @@ test("the Delete line says only the parts that apply", () => {
     "This cannot be undone.",
   );
   expect(deleteLine(null)).toBe("This cannot be undone.");
-});
-
-test("a name is taken by another agent only", () => {
-  const list = [agent, { ...agent, id: "ag2", name: "writer" }];
-  expect(nameTaken("writer", list, "ag1")).toBe(true);
-  expect(nameTaken(" coder ", list, "ag1")).toBe(false);
-  expect(nameTaken("writer", null, "ag1")).toBe(false);
 });
 
 test("the tab is the address's last step", () => {

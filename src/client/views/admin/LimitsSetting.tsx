@@ -24,7 +24,7 @@ import {
   dirty as limitsDirty,
   seedOf,
   show,
-} from "./Tools.model.ts";
+} from "./Limits.model.ts";
 import "./limits-setting.css";
 
 export function LimitsSetting({

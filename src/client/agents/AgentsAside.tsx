@@ -3,7 +3,7 @@
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { agentHref } from "../lib/hrefs.ts";
+import { AGENTS_HREF, agentHref } from "../lib/hrefs.ts";
 import { Fit } from "../ui/Fit.tsx";
 import { AsideSection } from "../ui/Split.tsx";
 import { shortModel } from "./meta.ts";
@@ -20,7 +20,7 @@ export function AgentsAside({
       label="Agents"
       action={
         admin ? (
-          <a class="split-link" href="/admin/config/agents">
+          <a class="split-link" href={AGENTS_HREF}>
             Manage
           </a>
         ) : undefined

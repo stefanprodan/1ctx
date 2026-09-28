@@ -3,23 +3,12 @@
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
-  AgentServer,
   McpChange,
   McpServerSummary,
 } from "../../../shared/contracts/mcp.ts";
-import {
-  classify,
-  MAX_INSTRUCTIONS_BLOCK,
-  offeredServers,
-  promptSnapshot,
-  serverBlock,
-} from "../../../shared/mcp.ts";
-import {
-  MCP_MODES,
-  MCP_TIMEOUT_MS,
-  type McpMode,
-} from "../../../shared/words.ts";
-import { ago, commas, plural, pluralCommas } from "../../lib/format.ts";
+import { classify, serverBlock } from "../../../shared/mcp.ts";
+import { MCP_TIMEOUT_MS } from "../../../shared/words.ts";
+import { ago, plural, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
 
 export function changeLine(change: McpChange | null, now: number): string {
@@ -70,23 +59,6 @@ export function timeoutMs(text: string): number | null {
   return trimmed === "" ? null : Math.round(Number(trimmed) * 1000);
 }
 
-export const MODE_OPTIONS: { value: McpMode; label: string }[] = [
-  { value: "auto", label: "Auto" },
-  { value: "all", label: "All schemas" },
-  { value: "catalog", label: "Catalog" },
-];
-
-export const MODE_HINT: Record<McpMode, string> = {
-  auto: "Every tool schema goes to the model until they pass the token cap, then a catalog with two tools.",
-  all: "Every offered tool schema goes to the model on every request.",
-  catalog:
-    "The model gets one line per tool and asks for a schema before calling it.",
-};
-
-export function isModeValue(value: string): value is McpMode {
-  return (MCP_MODES as readonly string[]).includes(value);
-}
-
 const INSTRUCTIONS_LINES = 12;
 
 export function instructionsBox(
@@ -105,49 +77,6 @@ export function instructionsLine(on: boolean): string {
   return on
     ? "Agents get these instructions in their system prompt."
     : "Agents do not get these instructions.";
-}
-
-export function promptPreview(
-  rows: McpServerSummary[],
-  links: AgentServer[],
-): {
-  line: string;
-  warnings: string[];
-  text: string;
-  count: number;
-  from: string[];
-} {
-  const offered = offeredServers(rows, links);
-  const snapshot = promptSnapshot(offered, () => "");
-  const warnings: string[] = [];
-  for (const name of snapshot.leftForInstructions) {
-    warnings.push(
-      `${name} left out: over the ${commas(MAX_INSTRUCTIONS_BLOCK)} cap`,
-    );
-  }
-  for (const name of snapshot.leftForSchemas) {
-    warnings.push(`${name} left out: its tools are over the 1 MB cap`);
-  }
-  const included = new Set(snapshot.included);
-  const from = offered
-    .filter(
-      (s) =>
-        included.has(s.name) &&
-        s.instructions !== null &&
-        !snapshot.leftForInstructions.includes(s.name),
-    )
-    .map((s) => s.name);
-  const line =
-    snapshot.text === ""
-      ? ""
-      : `Instructions in the prompt: ${commas(snapshot.text.length)} of ${commas(MAX_INSTRUCTIONS_BLOCK)} characters, from ${from.join(", ")}`;
-  return {
-    line,
-    warnings,
-    text: snapshot.text,
-    count: snapshot.text.length,
-    from,
-  };
 }
 
 // write alone has no option

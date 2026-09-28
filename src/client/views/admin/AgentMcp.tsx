@@ -10,6 +10,7 @@ import { MAX_INSTRUCTIONS_BLOCK, offeredServers } from "../../../shared/mcp.ts";
 import { updateAgent } from "../../data/agents.ts";
 import { servers as serverRows } from "../../data/mcp.ts";
 import { commas, showAll } from "../../lib/format.ts";
+import { MCP_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
 import { useSave } from "../../lib/save.ts";
@@ -26,17 +27,17 @@ import {
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
 import { serverLine, serverMeta } from "../people/People.model.ts";
-import { cardBody } from "./AgentPage.model.ts";
-import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
-import { listed } from "./Agents.model.ts";
-import { DraftFoot } from "./DraftFoot.tsx";
-import { useLatest } from "./drafts.ts";
 import {
+  cardBody,
   isModeValue,
   MODE_HINT,
   MODE_OPTIONS,
   promptPreview,
-} from "./Mcp.model.ts";
+} from "./AgentPage.model.ts";
+import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
+import { listed } from "./Agents.model.ts";
+import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 
 const OFF = "Disabled in the server config";
 
@@ -152,8 +153,8 @@ function Servers({
           <RowsNote>The servers did not load. Reload the page.</RowsNote>
         ) : all.length === 0 ? (
           <RowsNote>
-            No MCP servers yet. <a href="/admin/config/mcp">Add one</a> and it
-            shows here.
+            No MCP servers yet. <a href={MCP_HREF}>Add one</a> and it shows
+            here.
           </RowsNote>
         ) : !takesTools ? (
           <RowsNote>This model takes no tools.</RowsNote>

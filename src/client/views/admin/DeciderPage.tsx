@@ -19,7 +19,11 @@ import {
 import { decisions, loadDecisions } from "../../data/decisions.ts";
 import { providersError } from "../../data/providers.ts";
 import { says } from "../../lib/format.ts";
-import { configDeciderHref, configDecisionHref } from "../../lib/hrefs.ts";
+import {
+  configDeciderHref,
+  configDecisionHref,
+  DECIDERS_HREF,
+} from "../../lib/hrefs.ts";
 import { nameProblem, shapedInput } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
@@ -47,8 +51,7 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import { holding, useLatest, useRowDrafts, useShownRow } from "./drafts.ts";
 import "./decider-page.css";
 
-const LIST = "/admin/config/deciders";
-const STEPS = [zoneStep("Config"), { label: "Deciders", href: LIST }];
+const STEPS = [zoneStep("Config"), { label: "Deciders", href: DECIDERS_HREF }];
 
 export function DeciderPage({ params }: { params: Params }) {
   const list = deciders.value;
@@ -112,7 +115,7 @@ export function DeciderPage({ params }: { params: Params }) {
                 // a decision that named it names none now
                 void loadDecisions();
               }}
-              leaveTo={LIST}
+              leaveTo={DECIDERS_HREF}
             />
           </SettingStack>
         </Split>

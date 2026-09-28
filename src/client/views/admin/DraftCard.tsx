@@ -11,7 +11,10 @@ export type DraftCard<D> = {
   d: D;
   save: Save;
   set: (patch: Partial<D>) => void;
-  foot: (hint?: ComponentChildren) => ComponentChildren;
+  foot: (o?: {
+    hint?: ComponentChildren;
+    blocked?: boolean;
+  }) => ComponentChildren;
 };
 
 export function useDraftCard<R, D extends object>({
@@ -50,12 +53,13 @@ export function useDraftCard<R, D extends object>({
       drafted.value = { ...(drafted.value ?? {}), ...patch };
       save.touch();
     },
-    foot: (hint) => (
+    foot: (o) => (
       <DraftFoot
         save={save}
         dirty={changed}
+        blocked={o?.blocked}
         locked={saving.value && !save.busy}
-        hint={hint}
+        hint={o?.hint}
         onDiscard={() => {
           drafted.value = null;
         }}

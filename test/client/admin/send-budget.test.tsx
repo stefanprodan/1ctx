@@ -12,7 +12,7 @@ import {
   LIMIT_WORDS,
   limitFieldOf,
   problem,
-} from "../../../src/client/views/admin/Tools.model.ts";
+} from "../../../src/client/views/admin/Limits.model.ts";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
 
 const tokenLimit: LimitRow = {

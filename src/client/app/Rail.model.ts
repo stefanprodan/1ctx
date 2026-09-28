@@ -35,7 +35,7 @@ export function adminFace(pathname: string): boolean {
 
 // the longest that holds the path, so /admin/monitor/storage lights
 // Storage and not /admin/monitor too
-export function litPage(pathname: string, hrefs: string[]): string | null {
+function litPage(pathname: string, hrefs: string[]): string | null {
   let best: string | null = null;
   for (const href of hrefs) {
     if (

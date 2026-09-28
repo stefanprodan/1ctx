@@ -10,13 +10,13 @@ import {
   type WebAccessMode,
 } from "../../../shared/web.ts";
 import type { LimitName, SearchProvider } from "../../../shared/words.ts";
-import { CREDENTIALS_HREF } from "../../lib/hrefs.ts";
+import { CREDENTIALS_HREF, WEB_HREF } from "../../lib/hrefs.ts";
 import { hostsCount, lineError } from "./Tools.model.ts";
 
 type WebTab = "general" | "credentials";
 
 export const WEB_TABS: { tab: WebTab; label: string; href: string }[] = [
-  { tab: "general", label: "General", href: "/admin/config/web" },
+  { tab: "general", label: "General", href: WEB_HREF },
   { tab: "credentials", label: "Credentials", href: CREDENTIALS_HREF },
 ];
 

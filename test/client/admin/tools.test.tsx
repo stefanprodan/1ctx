@@ -31,19 +31,21 @@ import {
   STORAGE_CARDS,
 } from "../../../src/client/views/admin/Config.model.ts";
 import { ConfigBoard } from "../../../src/client/views/admin/ConfigBoard.tsx";
-import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
   collect,
   defaultLine,
   dirty,
   displayOf,
   draftOf,
-  jsonLines,
   LIMIT_WORDS,
   problem,
   read,
   seedOf,
   show,
+} from "../../../src/client/views/admin/Limits.model.ts";
+import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
+import {
+  jsonLines,
   totalTokens,
   WHEN_WORDS,
 } from "../../../src/client/views/admin/Tools.model.ts";

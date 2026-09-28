@@ -7,7 +7,7 @@ import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { allSkillUsage, skills, skillsError } from "../../data/skills.ts";
 import { ago, firstSentence, plural, pluralCommas } from "../../lib/format.ts";
-import { configSkillHref } from "../../lib/hrefs.ts";
+import { configSkillHref, SKILLS_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { useListSearch } from "../../lib/search.ts";
 import { Page, PageNew } from "../../ui/Page.tsx";
@@ -45,7 +45,7 @@ function List() {
       steps={[zoneStep("Config")]}
       title="Skills"
       split
-      actions={<PageNew href="/admin/config/skills?new" label="Add skill" />}
+      actions={<PageNew href={`${SKILLS_HREF}?new`} label="Add skill" />}
       loading={(rows === null || agents.value === null) && error === null}
       error={error}
     >

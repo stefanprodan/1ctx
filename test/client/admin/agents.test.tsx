@@ -43,10 +43,6 @@ import {
   defaultThinking,
   effortApplies,
   effortChoices,
-  keyLine,
-  preset,
-  presetBaseUrl,
-  providerFieldOf,
   sentEffort,
   statedFields,
   statedModel,
@@ -57,7 +53,13 @@ import {
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { NewProvider } from "../../../src/client/views/admin/NewProvider.tsx";
 import { ProviderPage } from "../../../src/client/views/admin/ProviderPage.tsx";
-import { providerDeleteLine } from "../../../src/client/views/admin/Providers.model.ts";
+import {
+  keyLine,
+  preset,
+  presetBaseUrl,
+  providerDeleteLine,
+  providerFieldOf,
+} from "../../../src/client/views/admin/Providers.model.ts";
 import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";

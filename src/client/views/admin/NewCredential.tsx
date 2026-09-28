@@ -17,10 +17,8 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsList } from "../../ui/Rows.tsx";
 import {
-  AddProject,
   KeyField,
   MethodsField,
-  ProjectRows,
   RequestFields,
   TextField,
 } from "./CredentialFields.tsx";
@@ -34,6 +32,7 @@ import {
   teamsOf,
 } from "./Credentials.model.ts";
 import { NewCard } from "./NewCard.tsx";
+import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import "./credentials.css";
 
 const STEPS = [

@@ -10,7 +10,11 @@ import { servers } from "../../data/mcp.ts";
 import { providersError } from "../../data/providers.ts";
 import { skills } from "../../data/skills.ts";
 import { count, pluralCommas } from "../../lib/format.ts";
-import { type AgentTab, configAgentHref } from "../../lib/hrefs.ts";
+import {
+  AGENTS_HREF,
+  type AgentTab,
+  configAgentHref,
+} from "../../lib/hrefs.ts";
 import { byName } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
@@ -25,10 +29,7 @@ import { AgentSkills } from "./AgentSkills.tsx";
 import { useRowDrafts, useShownRow } from "./drafts.ts";
 import "./agent-page.css";
 
-const STEPS = [
-  zoneStep("Config"),
-  { label: "Agents", href: "/admin/config/agents" },
-];
+const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
 
 const TABS: { tab: AgentTab; label: string }[] = [
   { tab: "general", label: "General" },

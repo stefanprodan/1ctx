@@ -13,7 +13,7 @@ import {
   decisionsError,
   saveDecision,
 } from "../../data/decisions.ts";
-import { configDecisionHref } from "../../lib/hrefs.ts";
+import { configDecisionHref, DECISIONS_HREF } from "../../lib/hrefs.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
@@ -47,7 +47,7 @@ import "./decider-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "Decisions", href: "/admin/config/decisions" },
+  { label: "Decisions", href: DECISIONS_HREF },
 ];
 
 const SWITCH = [

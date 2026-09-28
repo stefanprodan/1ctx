@@ -20,7 +20,7 @@ import { dayMonthYear } from "../../lib/format.ts";
 import { adminUserHref, USERS_HREF } from "../../lib/hrefs.ts";
 import { sameIds } from "../../lib/ids.ts";
 import { useNow } from "../../lib/now.ts";
-import { at, useSave } from "../../lib/save.ts";
+import { at } from "../../lib/save.ts";
 import { countOf } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { RowsNote } from "../../ui/Rows.tsx";
@@ -29,10 +29,10 @@ import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { fullNameProblem } from "../profile/Profile.model.ts";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
-import { AddProject, ProjectRows } from "./CredentialFields.tsx";
 import { teamsOf } from "./Credentials.model.ts";
-import { DraftFoot } from "./DraftFoot.tsx";
-import { holding, useLatest, useShownRow } from "./drafts.ts";
+import { useDraftCard } from "./DraftCard.tsx";
+import { useShownRow } from "./drafts.ts";
+import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import { type CardProps, PasswordCard, SwitchCard } from "./UserCards.tsx";
 import { UserFields, type Who } from "./UserFields.tsx";
 import {
@@ -121,31 +121,33 @@ const whoOf = (user: AdminUser): Who => ({
 });
 
 function ProfileCard({ user, saving }: CardProps) {
-  const latest = useLatest(user);
   // only the fields edited, so the user's own change of another field
   // shows through and is never sent back
-  const drafted = useSignal<Partial<Who> | null>(null);
-  const who = { ...whoOf(user), ...drafted.value };
-  const save = useSave(async () => {
-    const row = latest.current;
-    const patch = patchOf(row, { ...whoOf(row), ...drafted.value });
-    if (patch !== null) {
+  const card = useDraftCard({
+    row: user,
+    saving,
+    of: whoOf,
+    dirty: (who, row) => patchOf(row, who) !== null,
+    send: async (who, row) => {
+      const patch = patchOf(row, who);
+      if (patch === null) return;
       const from = address();
-      const saved = await holding(saving, () => updateUser(row.id, patch));
+      const saved = await updateUser(row.id, patch);
       // the address names the old handle
       if (saved.username !== row.username && address() === from) {
         navigate(adminUserHref(saved.username), true);
       }
-    }
-    drafted.value = null;
-  }, userFieldOf);
+    },
+    fieldOf: userFieldOf,
+  });
+  const who = card.d;
   const username = who.username.trim();
   const taken =
     username !== user.username &&
     (users.value ?? []).some((u) => u.username === username);
   return (
     <SettingForm
-      save={save}
+      save={card.save}
       check={() =>
         at("username", usernameProblem(who.username)) ??
         at("fullName", fullNameProblem(who.fullName)) ??
@@ -155,56 +157,37 @@ function ProfileCard({ user, saving }: CardProps) {
     >
       <Setting
         label="Profile"
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={patchOf(user, who) !== null}
-            blocked={taken}
-            locked={saving.value && !save.busy}
-            hint={
-              taken ? (
-                <span class="error">@{username} is taken.</span>
-              ) : undefined
-            }
-            onDiscard={() => {
-              drafted.value = null;
-            }}
-          />
-        }
+        foot={card.foot({
+          blocked: taken,
+          hint: taken ? (
+            <span class="error">@{username} is taken.</span>
+          ) : undefined,
+        })}
       >
-        <UserFields
-          who={who}
-          save={save}
-          onChange={(patch) => {
-            drafted.value = { ...drafted.value, ...patch };
-            save.touch();
-          }}
-        />
+        <UserFields who={who} save={card.save} onChange={card.set} />
       </Setting>
     </SettingForm>
   );
 }
 
 function RoleCard({ user, saving }: CardProps) {
-  const latest = useLatest(user);
-  const drafted = useSignal<Role | null>(null);
-  const role = drafted.value ?? user.role;
+  const card = useDraftCard({
+    row: user,
+    saving,
+    of: (row): { role: Role } => ({ role: row.role }),
+    dirty: (d, row) => d.role !== row.role,
+    send: (d, row) => updateUser(row.id, { role: d.role }),
+    fieldOf: userFieldOf,
+  });
+  const { role } = card.d;
   const lock = roleLock(
     user,
     me.value?.id ?? "",
     adminCount(users.value ?? []),
   );
-  const save = useSave(async () => {
-    const row = latest.current;
-    const next = drafted.value;
-    if (next !== null && next !== row.role) {
-      await holding(saving, () => updateUser(row.id, { role: next }));
-    }
-    drafted.value = null;
-  }, userFieldOf);
-  const refused = save.fieldError("role");
+  const refused = card.save.fieldError("role");
   return (
-    <SettingForm save={save}>
+    <SettingForm save={card.save}>
       <Setting
         title="Role"
         line={lock ?? undefined}
@@ -216,30 +199,20 @@ function RoleCard({ user, saving }: CardProps) {
             options={ROLE_CHOICES.map((c) => ({
               value: c.value,
               label: c.label,
-              disabled: save.busy || lock !== null || saving.value,
+              disabled: card.save.busy || lock !== null || saving.value,
             }))}
-            onPick={(next) => {
-              drafted.value = next;
-              save.touch();
-            }}
+            onPick={(next) => card.set({ role: next })}
           />
         }
         foot={
-          lock === null ? (
-            <DraftFoot
-              save={save}
-              dirty={role !== user.role}
-              locked={saving.value && !save.busy}
-              hint={
-                refused !== null ? (
-                  <span class="error">{refused}</span>
-                ) : undefined
-              }
-              onDiscard={() => {
-                drafted.value = null;
-              }}
-            />
-          ) : undefined
+          lock === null
+            ? card.foot({
+                hint:
+                  refused !== null ? (
+                    <span class="error">{refused}</span>
+                  ) : undefined,
+              })
+            : undefined
         }
       />
     </SettingForm>
@@ -247,24 +220,19 @@ function RoleCard({ user, saving }: CardProps) {
 }
 
 function ProjectsCard({ user, saving }: CardProps) {
-  const latest = useLatest(user);
-  const drafted = useSignal<string[] | null>(null);
-  const ids = drafted.value ?? user.projectIds;
+  const card = useDraftCard({
+    row: user,
+    saving,
+    of: (row) => ({ ids: row.projectIds }),
+    dirty: (d, row) => !sameIds(d.ids, row.projectIds),
+    send: (d, row) => setUserProjects(row, d.ids),
+  });
+  const { ids } = card.d;
+  const set = (next: string[]) => card.set({ ids: next });
   const loaded = projects.value !== null;
   const teams = teamsOf(projects.value ?? [], null);
-  const save = useSave(async () => {
-    const next = drafted.value;
-    if (next !== null) {
-      await holding(saving, () => setUserProjects(latest.current, next));
-    }
-    drafted.value = null;
-  });
-  const set = (projectIds: string[]) => {
-    drafted.value = projectIds;
-    save.touch();
-  };
   return (
-    <SettingForm save={save}>
+    <SettingForm save={card.save}>
       <Setting
         title="Projects"
         count={countOf(ids.length, ids.length)}
@@ -274,21 +242,12 @@ function ProjectsCard({ user, saving }: CardProps) {
             <AddProject
               teams={teams}
               value={ids}
-              disabled={save.busy || saving.value}
+              disabled={card.save.busy || saving.value}
               onChange={set}
             />
           )
         }
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={!sameIds(ids, user.projectIds)}
-            locked={saving.value && !save.busy}
-            onDiscard={() => {
-              drafted.value = null;
-            }}
-          />
-        }
+        foot={card.foot()}
       >
         {!loaded ? (
           <RowsNote>
@@ -297,7 +256,12 @@ function ProjectsCard({ user, saving }: CardProps) {
         ) : ids.length === 0 ? (
           <RowsNote>No projects yet.</RowsNote>
         ) : (
-          <ProjectRows teams={teams} value={ids} save={save} onChange={set} />
+          <ProjectRows
+            teams={teams}
+            value={ids}
+            save={card.save}
+            onChange={set}
+          />
         )}
       </Setting>
     </SettingForm>

@@ -30,6 +30,7 @@ import { LimitsSetting } from "./LimitsSetting.tsx";
 import { ToolRow } from "./ToolRow.tsx";
 import { totalTokens } from "./Tools.model.ts";
 import "./config-board.css";
+import { STORAGE_HREF } from "../../lib/hrefs.ts";
 
 export function ConfigBoard() {
   const state = tools.value;
@@ -58,7 +59,7 @@ export function ConfigBoard() {
       split
       actions={
         tab === "storage" ? (
-          <a class="btn btn-small" href="/admin/monitor/storage">
+          <a class="btn btn-small" href={STORAGE_HREF}>
             Disk use
           </a>
         ) : undefined

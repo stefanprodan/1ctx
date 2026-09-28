@@ -10,17 +10,12 @@ import {
   loadFacts,
   updateAgent,
 } from "../../data/agents.ts";
-import { configAgentHref } from "../../lib/hrefs.ts";
-import { nameProblem } from "../../lib/names.ts";
+import { AGENTS_HREF, configAgentHref } from "../../lib/hrefs.ts";
+import { nameProblem, nameTaken } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { Setting, SettingDelete, SettingForm } from "../../ui/Setting.tsx";
 import { AgentModel } from "./AgentModel.tsx";
-import {
-  cardBody,
-  cardFieldOf,
-  deleteLine,
-  nameTaken,
-} from "./AgentPage.model.ts";
+import { cardBody, cardFieldOf, deleteLine } from "./AgentPage.model.ts";
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
@@ -44,7 +39,7 @@ export function AgentGeneral({
         off={drafts.saving.value}
         onAsk={() => loadFacts(agent.name)}
         onDelete={() => deleteAgent(agent.id)}
-        leaveTo="/admin/config/agents"
+        leaveTo={AGENTS_HREF}
       />
     </>
   );
@@ -86,7 +81,7 @@ function Identity({
       }),
     cardFieldOf(["name", "prompt"]),
   );
-  const taken = nameTaken(d.name.value, agents.value, agent.id);
+  const taken = nameTaken(agents.value, d.name.value, agent.id);
   const kept = agent.default && agents.value?.[0]?.id === agent.id;
   return (
     <SettingForm

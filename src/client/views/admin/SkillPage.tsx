@@ -9,7 +9,11 @@ import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { skills, skillsError, skillUsage } from "../../data/skills.ts";
 import { count } from "../../lib/format.ts";
-import { configSkillHref, type SkillTab } from "../../lib/hrefs.ts";
+import {
+  configSkillHref,
+  SKILLS_HREF,
+  type SkillTab,
+} from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
@@ -23,7 +27,7 @@ import "./skill-page.css";
 
 export const SKILL_STEPS = [
   zoneStep("Config"),
-  { label: "Skills", href: "/admin/config/skills" },
+  { label: "Skills", href: SKILLS_HREF },
 ];
 
 // by index, so a skill named files opens on General

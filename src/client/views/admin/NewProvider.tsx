@@ -11,25 +11,27 @@ import {
   providers,
   providersError,
 } from "../../data/providers.ts";
-import { configProviderHref } from "../../lib/hrefs.ts";
+import { configProviderHref, PROVIDERS_HREF } from "../../lib/hrefs.ts";
 import { nameProblem, shapedInput } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Select } from "../../ui/Select.tsx";
+import { Choices } from "./Choices.tsx";
+import { NewCard } from "./NewCard.tsx";
 import {
   baseUrlProblem,
   PRESETS,
   preset,
   presetBaseUrl,
   providerFieldOf,
-} from "./Agents.model.ts";
-import { Choices } from "./Choices.tsx";
-import { NewCard } from "./NewCard.tsx";
+} from "./Providers.model.ts";
 
-const LIST = "/admin/config/providers";
-const STEPS = [zoneStep("Config"), { label: "Providers", href: LIST }];
+const STEPS = [
+  zoneStep("Config"),
+  { label: "Providers", href: PROVIDERS_HREF },
+];
 
 export function NewProvider() {
   const error = providersError.value;
@@ -87,7 +89,7 @@ function Form() {
     <NewCard
       label="New provider"
       create="Create provider"
-      cancel={LIST}
+      cancel={PROVIDERS_HREF}
       save={save}
       ready={trimmed !== "" && (chosen.fixed || baseUrl.value.trim() !== "")}
       taken={taken ? trimmed : null}

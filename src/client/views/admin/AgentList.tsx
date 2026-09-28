@@ -17,7 +17,11 @@ import { servers } from "../../data/mcp.ts";
 import { providers, providersError } from "../../data/providers.ts";
 import { skills } from "../../data/skills.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
-import { configAgentHref } from "../../lib/hrefs.ts";
+import {
+  AGENTS_HREF,
+  configAgentHref,
+  PROVIDERS_HREF,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { byName, countOf, useListSearch } from "../../lib/search.ts";
@@ -84,7 +88,7 @@ function List() {
       steps={[zoneStep("Config")]}
       title="Agents"
       split
-      actions={<PageNew href="/admin/config/agents?new" label="New agent" />}
+      actions={<PageNew href={`${AGENTS_HREF}?new`} label="New agent" />}
       loading={(list === null || rows === null) && error === null}
       error={error}
     >
@@ -218,7 +222,7 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
       <AsideSection
         label="Providers"
         action={
-          <a class="split-link" href="/admin/config/providers">
+          <a class="split-link" href={PROVIDERS_HREF}>
             Manage
           </a>
         }

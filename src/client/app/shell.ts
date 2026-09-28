@@ -7,6 +7,7 @@
 // two is the one shell.css and rail.css use.
 
 import { effect, signal } from "@preact/signals";
+import { MONITOR_HREF } from "../lib/hrefs.ts";
 import { adminFace } from "./Rail.model.ts";
 import { address, path } from "./router.ts";
 
@@ -60,7 +61,7 @@ export function watchWidth(): void {
   query.addEventListener("change", apply);
 }
 
-export const lastAdmin = signal("/admin/monitor");
+export const lastAdmin = signal(MONITOR_HREF);
 export const lastWork = signal("/");
 
 // an address with no page (an alias, a typo) is none to open again

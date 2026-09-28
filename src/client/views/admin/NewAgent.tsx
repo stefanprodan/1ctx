@@ -6,22 +6,24 @@ import { address, navigate, query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, createAgent } from "../../data/agents.ts";
 import { providers, providersError } from "../../data/providers.ts";
-import { configAgentHref, configProviderHref } from "../../lib/hrefs.ts";
-import { nameProblem } from "../../lib/names.ts";
+import {
+  AGENTS_HREF,
+  configAgentHref,
+  configProviderHref,
+  PROVIDERS_HREF,
+} from "../../lib/hrefs.ts";
+import { nameProblem, nameTaken } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
-import { cardFieldOf, nameTaken } from "./AgentPage.model.ts";
+import { cardFieldOf } from "./AgentPage.model.ts";
 import { AgentDrafts } from "./AgentPage.state.ts";
 import { ModelFields } from "./ModelFields.tsx";
 import { NameFields } from "./NameFields.tsx";
 import { NewCard } from "./NewCard.tsx";
 import "./agent-new.css";
 
-const STEPS = [
-  zoneStep("Config"),
-  { label: "Agents", href: "/admin/config/agents" },
-];
+const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
 
 export function NewAgent() {
   const rows = providers.value;
@@ -37,7 +39,7 @@ export function NewAgent() {
         (rows.length === 0 ? (
           <p class="page-state">
             An agent runs on a provider's model.{" "}
-            <a href="/admin/config/providers">Add a provider</a> first.
+            <a href={PROVIDERS_HREF}>Add a provider</a> first.
           </p>
         ) : (
           <Form
@@ -84,7 +86,7 @@ function Form({ providerId }: { providerId: string }) {
   const cancel =
     asked !== null && providers.value?.some((p) => p.name === asked)
       ? configProviderHref(asked)
-      : "/admin/config/agents";
+      : AGENTS_HREF;
   return (
     <NewCard
       label="New agent"
@@ -92,7 +94,7 @@ function Form({ providerId }: { providerId: string }) {
       cancel={cancel}
       save={save}
       ready={name !== "" && d.model.value !== null && !d.changing.value}
-      taken={nameTaken(name, agents.value, "") ? `@${name}` : null}
+      taken={nameTaken(agents.value, name) ? `@${name}` : null}
       first="name"
       onSubmit={() =>
         void save.run(at("name", nameProblem(d.name.value)) ?? d.modelProblem())
