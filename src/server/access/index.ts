@@ -42,17 +42,14 @@ import { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
 export {
   type Auth,
-  type AuthDeps,
   auth,
   COOKIE,
   cookieValue,
   LOGIN_TTL_MS,
-  type Resolution,
   TOUCH_AFTER_MS,
 } from "./auth.ts";
 export {
   type ActivityPort,
-  type DirectoryDeps,
   directoryRoutes,
 } from "./directory.ts";
 export {
@@ -63,12 +60,11 @@ export {
   parseUsername,
   parseUserPassword,
 } from "./parse.ts";
-export { type ProfileDeps, profileRoutes } from "./profile.ts";
-export { type RoutesDeps, routes } from "./routes.ts";
-export { type Login, LoginStore } from "./store.ts";
+export { profileRoutes } from "./profile.ts";
+export { routes } from "./routes.ts";
+export { LoginStore } from "./store.ts";
 export {
   type UsersPort as AdminUsersPort,
-  type UsersRoutesDeps,
   usersRoutes,
 } from "./users.ts";
 export { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
@@ -85,13 +81,11 @@ export type AccessDeps = {
     AdminUsersPort &
     DirectoryUsersPort;
   projects: AuthProjectsPort & DirectoryProjectsPort & UsersProjectsPort;
-  // the users pages' last 30 days of a personal project
   usage: UsersUsagePort & BoardUsagePort;
   // a person's posts, chats and manual runs: a closure, since sessions
   // is built after access
   activity: ActivityPort;
-  // the users with a tab open: a closure, since the socket is built
-  // after access
+  // a closure, the socket is built after access
   presence: PresencePort;
 };
 

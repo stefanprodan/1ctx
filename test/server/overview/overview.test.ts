@@ -15,7 +15,7 @@ import {
   KEEP_MS,
   overviewArea,
   type Probe,
-  parseLoadQuery,
+  parseNoQuery,
   parseOverviewQuery,
   parseUsageQuery,
   parseZoneQuery,
@@ -221,7 +221,7 @@ describe("the overview queries", () => {
   const zone = (query: string) =>
     parseZoneQuery(new URL(`http://x/api/admin/overview${query}`));
   const loadQuery = (query: string) =>
-    parseLoadQuery(new URL(`http://x/api/admin/load${query}`));
+    parseNoQuery(new URL(`http://x/api/admin/load${query}`));
 
   test("take one zone by its canonical name", () => {
     expect(zone("?tz=Europe%2FBerlin")).toBe("Europe/Berlin");

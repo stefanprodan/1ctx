@@ -52,17 +52,15 @@ export function processProbe(): Probe {
   };
 }
 
-export type Samples = { at: number[]; cpu: number[]; rss: number[] };
+type Samples = { at: number[]; cpu: number[]; rss: number[] };
 
-export type Sampler = {
+type Sampler = {
   sample(): void;
   samples(): Samples;
 };
 
-// The first reading is the baseline and draws nothing: the CPU since
-// the process started is its startup, which spends more CPU than wall
-// time and read as 100%. Every later sample shares the time since the
-// reading before.
+// the first reading is only a baseline: startup spends more CPU than
+// wall time and would read as 100%
 export function sampler(deps: {
   clock: Clock;
   probe: Probe;

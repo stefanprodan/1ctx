@@ -1,19 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The usage page's breakdowns over one range: by project and agent
-// from the rounds, by model from the rounds and the decisions, and the
-// deciders by their decisions. A send has many
-// usage rows, so sends and tokens are summed from their own table each
-// and joined by key afterwards, never in one query.
+// A send has many usage rows, so sends and tokens are summed apart and
+// joined by key.
 
 import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
 
 export type Bounds = [number, number];
 
-// one row of a breakdown before its top is taken: the key that groups
-// it, the names the answer draws, and its sums
 export type GroupRow = {
   key: string;
   id: string | null;
@@ -30,11 +25,8 @@ type Tokens = { key: string; tokens: number; priced: number; cost: number };
 type Sends = { key: string; turns: number; runs: number };
 type Named = Pick<GroupRow, "key" | "id" | "name" | "owner" | "deleted">;
 
-// the tokens of a group from usage alone and its sends from sends
-// alone, joined by key: a send with three rounds counts once. Usage
-// outlives its project, so a key no row names is a deleted one, kept
-// by its id, or summed into one row keyed merged when it is given. A
-// deleted one without tokens is left out: its turns cost nothing
+// a send with three rounds counts once; a deleted one without tokens is
+// left out
 function grouped(
   db: Db,
   bounds: Bounds,
@@ -143,12 +135,11 @@ const projectNames = (db: Db): ProjectRow[] =>
     )
     .all();
 
-// every deleted project is one row: none has a name left to tell them
-// apart. No project id is empty
+// safe as a sentinel: no project id is empty
 const DELETED_PROJECTS = "";
 
 export function byProjects(db: Db, bounds: Bounds): GroupRow[] {
-  // a personal project is counted and never named
+  // a personal project is never named
   const names = projectNames(db).map((project) =>
     project.kind === "personal"
       ? {
@@ -179,10 +170,6 @@ export function byProjects(db: Db, bounds: Bounds): GroupRow[] {
   );
 }
 
-// the rounds and the decisions by the provider and the model that
-// answered them, one row where a model served both; a deleted
-// provider's keep their model with no provider name, left out when
-// they used no tokens
 export function byModels(db: Db, bounds: Bounds): ModelUsage[] {
   return db
     .query<
@@ -211,8 +198,8 @@ export function byModels(db: Db, bounds: Bounds): ModelUsage[] {
     }));
 }
 
-// the decisions by decider under the name of its latest one, since a
-// decider keeps its rows after a rename or a delete
+// grouped by id, named by the latest: a decider keeps its rows after a
+// rename or a delete
 export function byDeciders(db: Db, bounds: Bounds): DeciderUsage[] {
   return db
     .query<DeciderUsage & { priced: number; last: number }, Bounds>(

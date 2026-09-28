@@ -7,6 +7,8 @@
 import type {
   PatchToolRequest,
   ToolsResponse,
+  VisualCounts,
+  WebCounts,
 } from "../../shared/api/tools.ts";
 import {
   KNOWLEDGE,
@@ -58,7 +60,7 @@ import {
 } from "./offer.ts";
 import type { ToolName } from "./parse.ts";
 import { Registry } from "./registry.ts";
-import { routes, type VisualCounts, type WebCounts } from "./routes.ts";
+import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
 import type {
   MemoryScope,
@@ -82,7 +84,7 @@ export {
   parseToolPatch,
   parseWebDomains,
 } from "./parse.ts";
-export { type ToolRow, ToolStore } from "./store.ts";
+export { ToolStore } from "./store.ts";
 export type {
   ChatMemoryPort,
   KeepPort,
@@ -114,8 +116,6 @@ export type ToolsDeps = {
   credentials?: CredentialsPort & CredentialKeysPort;
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
-  // the visuals drawn and opened, and the web calls, in a window, for
-  // the Visuals and Web access pages
   usage?: {
     visuals(since: number, until: number): VisualCounts;
     web(since: number, until: number): WebCounts;

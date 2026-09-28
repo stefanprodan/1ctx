@@ -9,13 +9,13 @@
 // calls: their answers belong to the form that asked, not here.
 
 import { effect, signal } from "@preact/signals";
+import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   CatalogResponse,
   CreateProviderRequest,
   EndpointsResponse,
   ProviderResponse,
   ProvidersResponse,
-  ProviderUsageResponse,
 } from "../../shared/api/providers.ts";
 import type { CatalogKind } from "../../shared/contracts/decider.ts";
 import type {
@@ -34,7 +34,7 @@ export const providersError = signal<Failure | null>(null);
 // usage is null when the read failed
 export const providerUsage = signal<{
   providerId: string;
-  usage: ProviderUsageResponse | null;
+  usage: SendTotalsResponse | null;
 } | null>(null);
 
 let owner: string | null = null;
@@ -102,9 +102,9 @@ let usageTurn = 0;
 export async function loadProviderUsage(id: string): Promise<void> {
   const forUser = owner;
   const mine = ++usageTurn;
-  let usage: ProviderUsageResponse | null = null;
+  let usage: SendTotalsResponse | null = null;
   try {
-    usage = await api<ProviderUsageResponse>(
+    usage = await api<SendTotalsResponse>(
       `/api/providers/${encodeURIComponent(id)}/usage`,
     );
   } catch {}

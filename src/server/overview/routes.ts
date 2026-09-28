@@ -11,7 +11,7 @@ import type {
 } from "../../shared/api/admin.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import {
-  parseLoadQuery,
+  parseNoQuery,
   parseOverviewQuery,
   parseUsageQuery,
   parseZoneQuery,
@@ -50,7 +50,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/admin/attention",
       policy: "admin",
       handle(_req, ctx) {
-        parseLoadQuery(ctx.url);
+        parseNoQuery(ctx.url);
         return json(deps.attention());
       },
     },
@@ -67,7 +67,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/admin/load",
       policy: "admin",
       handle(_req, ctx) {
-        parseLoadQuery(ctx.url);
+        parseNoQuery(ctx.url);
         return json(deps.load());
       },
     },

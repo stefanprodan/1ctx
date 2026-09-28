@@ -3,9 +3,7 @@
 
 import type { Migration } from "../migration.ts";
 
-// An MCP server's page counts its calls over the last 30 days by the
-// tool rows' wire names, which start with the server's, from an index
-// that holds only tool rows.
+// read by the MCP usage routes' toolRows, by wire name prefix
 export const m0036: Migration = {
   id: "0036-mcp-activity",
   up(db) {

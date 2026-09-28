@@ -6,12 +6,12 @@
 // the server's row in the list, so what shows is what was saved.
 
 import { effect, signal } from "@preact/signals";
+import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   AgentActivity,
   AgentImpactResponse,
   AgentResponse,
   AgentsResponse,
-  AgentUsageResponse,
   SaveAgentRequest,
 } from "../../shared/api/agents.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
@@ -27,7 +27,7 @@ export const activity = signal<AgentActivity[]>([]);
 // would touch, each null when its read failed
 export type AgentFacts = {
   agentId: string;
-  usage: AgentUsageResponse | null;
+  usage: SendTotalsResponse | null;
   impact: AgentImpactResponse | null;
 };
 export const facts = signal<AgentFacts | null>(null);
@@ -105,7 +105,7 @@ export async function loadFacts(name: string): Promise<void> {
   if (facts.value?.agentId !== agent.id) facts.value = null;
   const id = encodeURIComponent(agent.id);
   const [usage, impact] = await Promise.all([
-    api<AgentUsageResponse>(`/api/agents/${id}/usage`).catch(() => null),
+    api<SendTotalsResponse>(`/api/agents/${id}/usage`).catch(() => null),
     api<AgentImpactResponse>(`/api/agents/${id}/impact`).catch(() => null),
   ]);
   if (mine === factsTurn) facts.value = { agentId: agent.id, usage, impact };

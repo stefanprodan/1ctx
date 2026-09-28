@@ -4,7 +4,6 @@
 // Archiving is for good: the row keeps why and when, and only a manual
 // archive names who.
 
-import type { AgentActivity } from "../../shared/api/agents.ts";
 import type { SendSummary } from "../../shared/contracts/session.ts";
 import type { ArchiveReason } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -57,34 +56,6 @@ export function agentRunning(db: Db, agentId: string): number {
       "select count(*) as n from sessions where agent_id = ? and status = 'running'",
     )
     .get(agentId)!.n;
-}
-
-// when each live agent last started a send and whether one runs now:
-// one seek per agent into the sends by agent, and one into the partial
-// index of those in flight; an agent that never ran has no entry
-export function agentActivity(db: Db): AgentActivity[] {
-  return db
-    .query<{ agentId: string; lastAt: number | null; running: number }, []>(
-      `select a.id as agentId,
-              (select max(s.started_at) from sends s
-                where s.agent_id = a.id) as lastAt,
-              exists (select 1 from sends s
-                where s.agent_id = a.id and s.status = 'running') as running
-         from agents a
-        where a.deleted_at is null`,
-    )
-    .all()
-    .flatMap((row) =>
-      row.lastAt === null
-        ? []
-        : [
-            {
-              agentId: row.agentId,
-              lastAt: row.lastAt,
-              running: row.running === 1,
-            },
-          ],
-    );
 }
 
 // the one envelope an archive or an attention mark publishes: the row,

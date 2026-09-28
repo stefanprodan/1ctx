@@ -4,20 +4,15 @@
 import type {
   PatchToolRequest,
   ToolsResponse,
-  VisualsUsageResponse,
-  WebUsageResponse,
+  VisualCounts,
+  WebCounts,
 } from "../../shared/api/tools.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { parseToolName, parseToolPatch, type ToolName } from "./parse.ts";
 import { visualShell } from "./visual-shell.ts";
-
-// the last 30 days the usage routes answer
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
-export type VisualCounts = Omit<VisualsUsageResponse, "since" | "until">;
-export type WebCounts = Omit<WebUsageResponse, "since" | "until">;
 
 export type RoutesDeps = {
   clock: Clock;
@@ -63,14 +58,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/usage/visuals",
       policy: "admin",
       handle() {
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const body: VisualsUsageResponse = {
-          since,
-          until,
-          ...deps.visuals(since, until),
-        };
-        return json(body);
+        return json(lastDays(deps.clock(), deps.visuals));
       },
     },
     {
@@ -78,14 +66,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/usage/web",
       policy: "admin",
       handle() {
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const body: WebUsageResponse = {
-          since,
-          until,
-          ...deps.web(since, until),
-        };
-        return json(body);
+        return json(lastDays(deps.clock(), deps.web));
       },
     },
   ];

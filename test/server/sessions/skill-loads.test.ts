@@ -77,7 +77,7 @@ const read = (name: string, path: string) => ({
 
 test("skill calls count by the name their call carried", () => {
   const { d, round } = db();
-  round("s1", 1, 100, [load("flux"), { ...load("timoni"), status: "failed" }]);
+  round("s1", 1, 50, [load("flux"), { ...load("timoni"), status: "failed" }]);
   // the same call ids in the next round and another send stay apart
   round("s1", 2, 110, [read("flux", "a.md"), read("flux", "b.md")]);
   round("s2", 1, 120, [read("flux", "a.md"), load("flux")]);
@@ -87,9 +87,9 @@ test("skill calls count by the name their call carried", () => {
     { tool: "skill", args: "{not json" },
     { tool: "skill", args: "{}" },
   ]);
-  // the window starts after since and ends at until
-  round("s4", 1, 50, [load("flux")]);
-  round("s5", 1, 200, [load("flux")]);
+  // outside [since, until)
+  round("s4", 1, 49, [load("flux")]);
+  round("s5", 1, 150, [load("flux")]);
   expect(skillLoads(d as never, 50, 150)).toEqual({
     loads: 3,
     reads: 3,

@@ -1,12 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The overview's days and all time, and the usage page's month: every
-// query an answer needs over one connection, read once in one
-// transaction and shaped into plain data the worker can post. The days
-// come as sums by quarter hour of UTC, which every zone's midnight
-// falls on, laid on the zone's days by the caller; the month's
-// breakdowns take its bounds.
+// The days come as sums by quarter hour of UTC, which every zone's
+// midnight falls on, laid on the zone's days by the caller.
 
 import { statSync } from "node:fs";
 import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
@@ -21,11 +17,9 @@ import {
   type GroupRow,
 } from "./breakdowns.ts";
 
-export type { GroupRow } from "./breakdowns.ts";
-
 export type RangeInput = {
   now: number;
-  // the slots, and a month's breakdowns, cover [since, until)
+  // [since, until)
   since: number;
   until: number;
 };
@@ -49,20 +43,22 @@ export type UsageSlot = {
   cost: number | null;
 };
 
-// the ended chat turns started in the range, oldest first: when each
-// started and how long it took
-export type Ended = { at: number[]; ms: number[] };
+// oldest first
+type Ended = { at: number[]; ms: number[] };
 
-// the users with a send in each slot, by their place in users
-export type Actives = { users: string[]; slot: number[]; user: number[] };
+// user is the place in users
+type Actives = { users: string[]; slot: number[]; user: number[] };
 
-export type RangeResult = {
+export type DayReads = {
   readAt: number;
   ended: Ended;
   actives: Actives;
   sends: SendSlot[];
   usage: UsageSlot[];
   decisions: DecisionSlot[];
+};
+
+export type RangeResult = DayReads & {
   instance: {
     users: number;
     projects: number;
@@ -72,16 +68,8 @@ export type RangeResult = {
   };
 };
 
-// a month's slots, its breakdowns, and the first send's
-// start for the months before it
-export type MonthResult = {
-  readAt: number;
-  ended: Ended;
-  actives: Actives;
+export type MonthResult = DayReads & {
   since: number | null;
-  sends: SendSlot[];
-  usage: UsageSlot[];
-  decisions: DecisionSlot[];
   by: { projects: GroupRow[]; agents: GroupRow[]; models: ModelUsage[] };
   deciders: DeciderUsage[];
 };
@@ -148,9 +136,7 @@ function instance(db: Db): RangeResult["instance"] {
   };
 }
 
-// one read transaction, so every statement sees the same WAL snapshot
-// a run's length is its task's, and a running turn has none yet; a
-// clock stepped back reads as zero long
+// a run's length is its task's; a clock stepped back reads as zero long
 function ended(db: Db, bounds: Bounds): Ended {
   const rows = db
     .query<{ at: number; ms: number }, Bounds>(
@@ -188,6 +174,7 @@ function actives(db: Db, bounds: Bounds): Actives {
   return out;
 }
 
+// one read transaction, so every statement sees the same WAL snapshot
 function snapshot<T>(db: Db, read: () => T): T {
   db.exec("begin");
   try {
@@ -197,36 +184,34 @@ function snapshot<T>(db: Db, read: () => T): T {
   }
 }
 
+function dayReads(db: Db, input: RangeInput, days: Bounds): DayReads {
+  return {
+    readAt: input.now,
+    ended: ended(db, days),
+    actives: actives(db, days),
+    sends: sendSlots(db, days),
+    usage: usageSlots(db, days),
+    decisions: decisionSlots(db, input.since, input.until, SLOT_MS),
+  };
+}
+
 export function range(db: Db, input: RangeInput): RangeResult {
-  return snapshot(db, () => {
-    const days: Bounds = [input.since, input.until];
-    return {
-      readAt: input.now,
-      ended: ended(db, days),
-      actives: actives(db, days),
-      sends: sendSlots(db, days),
-      usage: usageSlots(db, days),
-      decisions: decisionSlots(db, input.since, input.until, SLOT_MS),
-      instance: instance(db),
-    };
-  });
+  return snapshot(db, () => ({
+    ...dayReads(db, input, [input.since, input.until]),
+    instance: instance(db),
+  }));
 }
 
 export function month(db: Db, input: RangeInput): MonthResult {
   return snapshot(db, () => {
     const days: Bounds = [input.since, input.until];
     return {
-      readAt: input.now,
+      ...dayReads(db, input, days),
       since: db
         .query<{ since: number | null }, []>(
           "select min(started_at) as since from sends",
         )
         .get()!.since,
-      ended: ended(db, days),
-      actives: actives(db, days),
-      sends: sendSlots(db, days),
-      usage: usageSlots(db, days),
-      decisions: decisionSlots(db, input.since, input.until, SLOT_MS),
       by: {
         projects: byProjects(db, days),
         agents: byAgents(db, days),

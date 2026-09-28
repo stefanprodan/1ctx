@@ -29,7 +29,6 @@ import { type PicksPort, startingRoutes } from "./starting.ts";
 import { type AgentRow, AgentStore } from "./store.ts";
 
 export {
-  type DirectoryDeps,
   directoryRoutes,
   type SkillsListPort,
   type ToolsPort,
@@ -44,9 +43,7 @@ export {
   type AccessPort,
   type AutomationsPort,
   type CredentialsPort,
-  type McpPort,
   type ProvidersPort,
-  type RoutesDeps,
   type RunnerPort,
   routes,
   type SessionsPort,

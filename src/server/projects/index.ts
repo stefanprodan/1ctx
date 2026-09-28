@@ -20,7 +20,6 @@ import { type ProjectRow, ProjectStore } from "./store.ts";
 export {
   type AccessPort,
   type KnowledgePort,
-  type RoutesDeps,
   routes,
   type SessionsPort,
   type UsagePort,

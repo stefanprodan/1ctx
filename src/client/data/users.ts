@@ -8,6 +8,7 @@
 // page reads its aside's usage apart.
 
 import { effect, signal } from "@preact/signals";
+import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   AdminUser,
   CreateUserRequest,
@@ -15,7 +16,6 @@ import type {
   UpdateUserRequest,
   UserResponse,
   UsersResponse,
-  UserUsageResponse,
 } from "../../shared/api/users.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import {
@@ -30,7 +30,7 @@ export const users = signal<AdminUser[] | null>(null);
 export const usersError = signal<Failure | null>(null);
 // the user pages' asides by user id, null for a read that failed, so
 // an answer for one user never hides another's
-export const userUsage = signal<Record<string, UserUsageResponse | null>>({});
+export const userUsage = signal<Record<string, SendTotalsResponse | null>>({});
 
 let owner: string | null = null;
 
@@ -162,9 +162,9 @@ export async function setUserProjects(
 // answer lands under its own user, for the signed-in user who asked
 export async function loadUserUsage(id: string): Promise<void> {
   const forUser = owner;
-  let usage: UserUsageResponse | null = null;
+  let usage: SendTotalsResponse | null = null;
   try {
-    usage = await api<UserUsageResponse>(
+    usage = await api<SendTotalsResponse>(
       `/api/users/${encodeURIComponent(id)}/usage`,
     );
   } catch {}

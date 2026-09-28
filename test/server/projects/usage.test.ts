@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import type { ProjectUsageResponse } from "../../../src/shared/api/projects.ts";
+import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
 
 test("a team project's usage counts every turn in it, and only there", async () => {
@@ -16,14 +16,17 @@ test("a team project's usage counts every turn in it, and only there", async () 
     body: { userId: chat.memberId },
   });
   const usage = async () => {
+    // the window is [since, until): a row stamped now is not in it yet
+    chat.app.now.value += 1;
     const res = await chat.admin.call(
       "GET",
       `/api/projects/${project.id}/usage`,
     );
     expect(res.status).toBe(200);
-    return (await res.json()) as ProjectUsageResponse;
+    return (await res.json()) as SendTotalsResponse;
   };
   const agentSends = async () => {
+    chat.app.now.value += 1;
     const res = await chat.admin.call(
       "GET",
       `/api/agents/${chat.agentId}/usage`,

@@ -3,8 +3,7 @@
 
 import type { Migration } from "../migration.ts";
 
-// A provider's page adds up its last 30 days of usage, every agent on it
-// together, from an index as the agent's page does.
+// read by UsageStore.total for a provider
 export const m0033: Migration = {
   id: "0033-provider-activity",
   up(db) {

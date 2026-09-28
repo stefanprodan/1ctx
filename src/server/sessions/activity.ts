@@ -8,6 +8,14 @@
 // is theirs to count there. A run's instructions are a user message
 // too, which the chat origin leaves out.
 
+import type { AgentActivity } from "../../shared/api/agents.ts";
+import type {
+  McpCalls,
+  McpServersUsage,
+  McpUsage,
+} from "../../shared/api/mcp.ts";
+import type { SkillLoads } from "../../shared/api/skills.ts";
+import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import { splitWireName } from "../../shared/mcp.ts";
 import { SKILL_TOOLS } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -45,10 +53,9 @@ export function personDays(
   );
 }
 
-// the MCP tool rows in a window by wire name: every one starts with
-// mcp__<server>__ in both modes, since the loop writes a catalog call
-// under the tool's own name, and `~` sorts after every character a
-// wire name may hold
+// every MCP tool row starts with mcp__<server>__, a catalog call too,
+// since the loop writes it under the tool's own name; `~` sorts after
+// every character a wire name may hold
 function toolRows(db: Db, prefix: string, since: number, until: number) {
   return db
     .query<
@@ -59,56 +66,52 @@ function toolRows(db: Db, prefix: string, since: number, until: number) {
               sum(status = 'failed') as failed
          from messages
         where kind = 'tool' and tool_name >= ? and tool_name < ?
-          and created_at > ? and created_at <= ?
+          and created_at >= ? and created_at < ?
         group by tool_name`,
     )
     .all(prefix, `${prefix}~`, since, until);
 }
 
-type Calls = { calls: number; failed: number };
+const add = (into: McpCalls, row: McpCalls) => {
+  into.calls += row.calls;
+  into.failed += row.failed;
+};
 
 const byCalls = (a: { name: string; calls: number }, b: typeof a) =>
   b.calls - a.calls || a.name.localeCompare(b.name);
 
-// one server's calls, per tool; its name holds no underscore, so no
-// other server's names start with its prefix
+// no underscore in a server name, so no other server's rows start
+// with this prefix
 export function mcpCalls(
   db: Db,
   server: string,
   since: number,
   until: number,
-): Calls & { tools: { name: string; calls: number }[] } {
+): McpUsage {
   const prefix = `mcp__${server}__`;
   const rows = toolRows(db, prefix, since, until);
   const total = { calls: 0, failed: 0 };
-  for (const row of rows) {
-    total.calls += row.calls;
-    total.failed += row.failed;
-  }
+  for (const row of rows) add(total, row);
   const tools = rows
     .map((row) => ({ name: row.name.slice(prefix.length), calls: row.calls }))
     .sort(byCalls);
   return { ...total, tools };
 }
 
-// every server's calls, by the name its tool rows carry, a deleted
-// server's included
 export function mcpServerCalls(
   db: Db,
   since: number,
   until: number,
-): Calls & { servers: ({ name: string } & Calls)[] } {
+): McpServersUsage {
   const total = { calls: 0, failed: 0 };
-  const by = new Map<string, Calls>();
+  const by = new Map<string, McpCalls>();
   for (const row of toolRows(db, "mcp__", since, until)) {
     const server = splitWireName(row.name)?.server;
     if (server === undefined) continue;
     const seen = by.get(server) ?? { calls: 0, failed: 0 };
-    seen.calls += row.calls;
-    seen.failed += row.failed;
+    add(seen, row);
     by.set(server, seen);
-    total.calls += row.calls;
-    total.failed += row.failed;
+    add(total, row);
   }
   const servers = [...by]
     .map(([name, calls]) => ({ name, ...calls }))
@@ -116,10 +119,7 @@ export function mcpServerCalls(
   return { ...total, servers };
 }
 
-export type VisualCounts = { drawn: number; failed: number; opened: number };
-
-// the visualize calls in a window, and the files `open` put on a chat
-// page as visuals, found through the bash rows that carry them
+// opened visuals are found through the bash rows that carry them
 export function visualCounts(
   db: Db,
   since: number,
@@ -131,7 +131,7 @@ export function visualCounts(
               coalesce(sum(status = 'failed'), 0) as failed
          from messages
         where kind = 'tool' and tool_name = 'visualize'
-          and created_at > ? and created_at <= ?`,
+          and created_at >= ? and created_at < ?`,
     )
     .get(since, until)!;
   const files = db
@@ -140,17 +140,14 @@ export function visualCounts(
          from messages t
          join opened_files f on f.message_id = t.id
         where t.kind = 'tool' and t.tool_name = 'bash'
-          and t.created_at > ? and t.created_at <= ?
+          and t.created_at >= ? and t.created_at < ?
           and f.kind = 'visual'`,
     )
     .get(since, until)!;
   return { ...calls, opened: files.opened };
 }
 
-export type WebCounts = { fetches: number; searches: number; failed: number };
-
-// the webfetch and websearch calls in a window; curl in bash is not a
-// tool row of its own, so it is not counted
+// curl in bash is not a tool row of its own, so it is not counted
 export function webCounts(db: Db, since: number, until: number): WebCounts {
   return db
     .query<WebCounts, [number, number]>(
@@ -161,30 +158,15 @@ export function webCounts(db: Db, since: number, until: number): WebCounts {
               coalesce(sum(status = 'failed'), 0) as failed
          from messages
         where kind = 'tool' and tool_name in ('webfetch', 'websearch')
-          and created_at > ? and created_at <= ?`,
+          and created_at >= ? and created_at < ?`,
     )
     .get(since, until)!;
 }
 
-export type SkillLoads = {
-  loads: number;
-  reads: number;
-  failed: number;
-  skills: {
-    name: string;
-    loads: number;
-    reads: number;
-    failed: number;
-    files: { path: string; reads: number }[];
-  }[];
-};
-
 // a tool row holds the result only, so the skill a call named is read
-// from the call in the reply of the same round. A row pairs with its
-// call by position among the round's tool rows, as the writer pairs
-// them, since a provider may repeat a call id; the id must still match.
-// The rows come from their index, the reply and the position from the
-// send's, which a test checks in this query's plan
+// from the call in the reply of the same round, paired by position as
+// the writer pairs them, since a provider may repeat a call id. A test
+// checks this query's plan
 export const SKILL_LOADS = `
   select t.tool_name as tool, json_extract(c.value, '$.arguments') as args,
               t.status = 'failed' as failed
@@ -198,10 +180,8 @@ export const SKILL_LOADS = `
                           and o.kind = 'tool' and o.seq < t.seq)
           and json_extract(c.value, '$.id') = t.tool_call_id
         where t.kind = 'tool' and t.tool_name in (?, ?)
-          and t.created_at > ? and t.created_at <= ?`;
+          and t.created_at >= ? and t.created_at < ?`;
 
-// the skill and skill_file calls in a window by skill name, a deleted
-// skill's included
 export function skillLoads(db: Db, since: number, until: number): SkillLoads {
   const rows = db
     .query<
@@ -252,7 +232,6 @@ export function skillLoads(db: Db, since: number, until: number): SkillLoads {
   return { ...total, skills };
 }
 
-// a model may send arguments that are not JSON; such a call named no skill
 function callArgs(text: string | null): { name: string; path: string } | null {
   if (text === null) return null;
   let args: unknown;
@@ -265,4 +244,30 @@ function callArgs(text: string | null): { name: string; path: string } | null {
   const { name, path } = args as Record<string, unknown>;
   if (typeof name !== "string" || name === "") return null;
   return { name, path: typeof path === "string" ? path : "" };
+}
+
+// one seek per agent into each of the 0032 migration's indexes
+export function agentActivity(db: Db): AgentActivity[] {
+  return db
+    .query<{ agentId: string; lastAt: number | null; running: number }, []>(
+      `select a.id as agentId,
+              (select max(s.started_at) from sends s
+                where s.agent_id = a.id) as lastAt,
+              exists (select 1 from sends s
+                where s.agent_id = a.id and s.status = 'running') as running
+         from agents a
+        where a.deleted_at is null`,
+    )
+    .all()
+    .flatMap((row) =>
+      row.lastAt === null
+        ? []
+        : [
+            {
+              agentId: row.agentId,
+              lastAt: row.lastAt,
+              running: row.running === 1,
+            },
+          ],
+    );
 }

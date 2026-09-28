@@ -3,8 +3,7 @@
 
 import type { Migration } from "../migration.ts";
 
-// An agent's and a provider's last 30 days sum the cost too: with it in
-// their indexes the totals read the index alone, never the table.
+// cost in the index, so UsageStore.total never reads the table
 export const m0035: Migration = {
   id: "0035-usage-cost-index",
   up(db) {

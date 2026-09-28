@@ -5,12 +5,12 @@
 // model must be in that provider's catalog, and what the catalog says
 // about it is kept on the row so a list never asks again.
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   AgentActivity,
   AgentImpactResponse,
   AgentResponse,
   AgentsResponse,
-  AgentUsageResponse,
 } from "../../shared/api/agents.ts";
 import type {
   ProjectAgentsResponse,
@@ -32,6 +32,7 @@ import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ProviderRow } from "../providers/index.ts";
+import { lastDays } from "../usage/index.ts";
 import { type ParsedAgent, parseAgent } from "./parse.ts";
 import { type PicksPort, startingOf } from "./starting.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
@@ -42,13 +43,8 @@ export type ProvidersPort = {
   endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
 };
 
-// an agent's turns and runs, tokens and cost over a window
 export type AgentTotalPort = {
-  agentTotal(
-    agentId: string,
-    since: number,
-    until: number,
-  ): Omit<AgentUsageResponse, "since" | "until">;
+  agentTotal(agentId: string, since: number, until: number): SendTotals;
 };
 
 export type AccessPort = {
@@ -112,8 +108,6 @@ export type RoutesDeps = {
   usage: AgentTotalPort;
   clock: Clock;
 };
-
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 // a catalog that describes the model is never overridden; one that
 // lists only ids takes the admin's window and tools flag, and a model
@@ -294,14 +288,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         const agent = find(ctx.params.id);
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const body: AgentUsageResponse = {
-          since,
-          until,
-          ...deps.usage.agentTotal(agent.id, since, until),
-        };
-        return json(body);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.agentTotal(agent.id, since, until),
+          ),
+        );
       },
     },
     {

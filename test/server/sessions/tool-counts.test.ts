@@ -39,16 +39,16 @@ function db() {
 
 test("visuals count the visualize calls and the files opened as visuals", () => {
   const { d, tool, opened } = db();
-  tool("visualize", 100);
+  tool("visualize", 50);
   tool("visualize", 110);
   tool("visualize", 120, "failed");
   tool("visualize", 130, "stopped");
   opened(tool("bash", 140), ["visual", "code", "visual"]);
   opened(tool("bash", 150), ["markdown"]);
-  // outside the window: since is left out, until is kept
-  tool("visualize", 50);
-  opened(tool("bash", 50), ["visual"]);
-  tool("visualize", 300);
+  // outside [since, until)
+  tool("visualize", 49);
+  opened(tool("bash", 200), ["visual"]);
+  tool("visualize", 200);
   expect(visualCounts(d as never, 50, 200)).toEqual({
     drawn: 2,
     failed: 1,
@@ -63,16 +63,16 @@ test("visuals count the visualize calls and the files opened as visuals", () => 
 
 test("web counts the webfetch and websearch calls, done and failed", () => {
   const { d, tool } = db();
-  tool("webfetch", 100);
+  tool("webfetch", 50);
   tool("webfetch", 110);
   tool("webfetch", 120, "failed");
   tool("websearch", 130);
   tool("websearch", 140, "failed");
   tool("websearch", 150, "stopped");
   tool("bash", 160, "failed");
-  // outside the window: since is left out, until is kept
-  tool("webfetch", 50);
-  tool("websearch", 300);
+  // outside [since, until)
+  tool("webfetch", 49);
+  tool("websearch", 200);
   expect(webCounts(d as never, 50, 200)).toEqual({
     fetches: 2,
     searches: 1,

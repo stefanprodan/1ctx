@@ -4,8 +4,8 @@
 import type {
   McpResponse,
   McpServerResponse,
-  McpUsageAllResponse,
-  McpUsageResponse,
+  McpServersUsage,
+  McpUsage,
   PatchMcpEndpoint,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
@@ -21,6 +21,7 @@ import {
 } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { lastDays } from "../usage/index.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
 import type { RefreshCoordinator, RefreshKind } from "./refresh.ts";
@@ -44,20 +45,10 @@ export type RoutesDeps = {
   usage: UsagePort;
 };
 
-// a server's tool calls over a window, answered by the sessions area
 export type UsagePort = {
-  calls(
-    server: string,
-    since: number,
-    until: number,
-  ): Omit<McpUsageResponse, "since" | "until">;
-  servers(
-    since: number,
-    until: number,
-  ): Omit<McpUsageAllResponse, "since" | "until">;
+  calls(server: string, since: number, until: number): McpUsage;
+  servers(since: number, until: number): McpServersUsage;
 };
-
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 function gateway(error: unknown): BadGateway {
   return new BadGateway(error instanceof Error ? error.message : String(error));
@@ -165,14 +156,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/mcp/usage",
       policy: "admin",
       handle() {
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const body: McpUsageAllResponse = {
-          since,
-          until,
-          ...deps.usage.servers(since, until),
-        };
-        return json(body);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.servers(since, until),
+          ),
+        );
       },
     },
     {
@@ -181,14 +169,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         const server = find(ctx.params.id);
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const body: McpUsageResponse = {
-          since,
-          until,
-          ...deps.usage.calls(server.name, since, until),
-        };
-        return json(body);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.calls(server.name, since, until),
+          ),
+        );
       },
     },
     {

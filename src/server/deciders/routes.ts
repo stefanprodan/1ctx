@@ -4,14 +4,13 @@
 // The deciders and the decisions, all for admins. A decider's save names
 // a provider that serves decisions and a model its decisions catalog
 // lists; what the catalog says about it is kept on the row. Check asks
-// the fixed yes/no. A decision's save is its whole settings. Each has
-// its last 30 days of answers.
+// the fixed yes/no. A decision's save is its whole settings.
 
 import type {
   CheckDeciderResponse,
   DeciderResponse,
   DecidersResponse,
-  DecisionUsageResponse,
+  DecisionTotals,
 } from "../../shared/api/deciders.ts";
 import type {
   DecisionResponse,
@@ -26,6 +25,7 @@ import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { DecisionError, servesDecisions } from "../providers/index.ts";
+import { lastDays } from "../usage/index.ts";
 import {
   ask,
   CHECK_QUESTIONS,
@@ -43,13 +43,12 @@ import {
   summary,
 } from "./store.ts";
 
-// a decider's answers, or a decision's, over a window
 export type TotalsPort = {
   decisionTotal(
     by: { deciderId: string } | { purpose: string },
     since: number,
     until: number,
-  ): { answers: number; tokens: number; cost: number | null };
+  ): DecisionTotals;
 };
 
 export type RoutesDeps = {
@@ -62,16 +61,11 @@ export type RoutesDeps = {
   log: Log;
 };
 
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  const usage = (
-    by: { deciderId: string } | { purpose: string },
-  ): DecisionUsageResponse => {
-    const until = deps.clock();
-    const since = until - USAGE_WINDOW_MS;
-    return { since, until, ...deps.usage.decisionTotal(by, since, until) };
-  };
+  const usage = (by: { deciderId: string } | { purpose: string }) =>
+    lastDays(deps.clock(), (since, until) =>
+      deps.usage.decisionTotal(by, since, until),
+    );
   const providerName = (id: string) => deps.providers.byId(id)?.name ?? id;
   const logged = (msg: string, decider: DeciderRow) =>
     deps.log.info(msg, {

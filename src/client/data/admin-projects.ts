@@ -7,13 +7,13 @@
 // rail follows it.
 
 import { effect, signal } from "@preact/signals";
+import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   AddMemberRequest,
   CreateProjectRequest,
   DeleteProjectResponse,
   ProjectResponse,
   ProjectsResponse,
-  ProjectUsageResponse,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
@@ -32,7 +32,7 @@ export const adminProjectsError = signal<Failure | null>(null);
 export const adminProject = signal<ProjectDetail | null>(null);
 export const adminProjectError = signal<Failure | null>(null);
 // by project id: null for a read that failed, missing until it answers
-export const projectUsage = signal<Record<string, ProjectUsageResponse | null>>(
+export const projectUsage = signal<Record<string, SendTotalsResponse | null>>(
   {},
 );
 
@@ -299,9 +299,9 @@ export async function setProjectMembers(
 // a failure is the aside's "Did not load", never the page's
 export async function loadProjectUsage(id: string): Promise<void> {
   const forUser = owner;
-  let usage: ProjectUsageResponse | null = null;
+  let usage: SendTotalsResponse | null = null;
   try {
-    usage = await api<ProjectUsageResponse>(
+    usage = await api<SendTotalsResponse>(
       `/api/projects/${encodeURIComponent(id)}/usage`,
     );
   } catch {}

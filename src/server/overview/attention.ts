@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What an admin should fix, from the rows the config areas list and
-// whether each key file is there: missing keys first, since a send
-// through them fails now, then the refreshes that failed, newest first.
+// Missing keys first: a send through them fails now.
 
 import type { AttentionItem, AttentionKind } from "../../shared/api/admin.ts";
 import type { KeyState } from "../../shared/contracts/credential.ts";
@@ -18,7 +16,6 @@ export type AttentionInput = {
   }[];
   skills: { name: string; refreshFailedAt: number | null }[];
   credentials: { name: string; key: KeyState }[];
-  // the service websearch runs on, null for none, and its key file
   search: { provider: string | null; hasKey: boolean };
 };
 

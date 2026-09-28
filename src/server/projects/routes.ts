@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   DeleteProjectResponse,
   ProjectResponse,
   ProjectsResponse,
-  ProjectUsageResponse,
 } from "../../shared/api/projects.ts";
 import type {
   KnowledgeCounts,
@@ -20,6 +20,7 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { type UserRow, summary as userSummary } from "../users/index.ts";
 import {
   parseAddMember,
@@ -48,13 +49,8 @@ export type KnowledgePort = {
   latest(projectId: string, limit: number): KnowledgeFile[];
 };
 
-// a project's totals over a window, an area built earlier
 export type UsagePort = {
-  projectTotal(
-    projectId: string,
-    since: number,
-    until: number,
-  ): { sends: number; tokens: number; cost: number | null };
+  projectTotal(projectId: string, since: number, until: number): SendTotals;
 };
 
 export type RoutesDeps = {
@@ -67,8 +63,6 @@ export type RoutesDeps = {
   usage: UsagePort;
   clock: Clock;
 };
-
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 const uniqueName = (error: unknown): boolean =>
   typeof error === "object" &&
@@ -248,14 +242,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         const project = findTeam(ctx.params.id);
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const body: ProjectUsageResponse = {
-          since,
-          until,
-          ...deps.usage.projectTotal(project.id, since, until),
-        };
-        return json(body);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.projectTotal(project.id, since, until),
+          ),
+        );
       },
     },
     {

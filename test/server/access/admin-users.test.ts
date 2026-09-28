@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import type {
-  UsersResponse,
-  UserUsageResponse,
-} from "../../../src/shared/api/users.ts";
+import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
+import type { UsersResponse } from "../../../src/shared/api/users.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
 
 async function listed(chat: Awaited<ReturnType<typeof chatApp>>) {
@@ -69,6 +67,8 @@ test("a user's usage counts their personal project alone", async () => {
     body: { userId: chat.memberId },
   });
   const agentSends = async () => {
+    // the window is [since, until): a row stamped now is not in it yet
+    chat.app.now.value += 1;
     const res = await chat.admin.call(
       "GET",
       `/api/agents/${chat.agentId}/usage`,
@@ -88,7 +88,7 @@ test("a user's usage counts their personal project alone", async () => {
   started.script.reply("done");
   await settled(2);
   const res = await chat.admin.call("GET", `/api/users/${chat.memberId}/usage`);
-  const body = (await res.json()) as UserUsageResponse;
+  const body = (await res.json()) as SendTotalsResponse;
   expect(body.sends).toBe(1);
   expect(body.tokens).toBeGreaterThan(0);
   expect(body.until - body.since).toBe(30 * 24 * 60 * 60 * 1000);

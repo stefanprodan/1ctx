@@ -128,10 +128,8 @@ export type StorageResponse = {
 // it and how many of each failed, and the tokens and the cost of the
 // rounds in it. A turn is a send of a chat (a message, a regenerate, a
 // compact), a run a send of a task. cost is null when no round of the
-// day carried one. medianMs and p95Ms are the day's ended chat turns'
-// lengths, null with none. activeUsers counts the users with a turn or
-// a run started in it. start is its local midnight
-export type OverviewDay = {
+// day carried one. start is its local midnight
+export type OverviewDay = TurnLengths & {
   day: string;
   start: number;
   turns: number;
@@ -148,16 +146,13 @@ export type OverviewDay = {
   decisionTokens: number;
   pricedDecisions: number;
   decisionCost: number | null;
-  medianMs: number | null;
-  p95Ms: number | null;
   activeUsers: number;
 };
 
-// the median and the 95th percentile of ended chat turns' lengths
 export type TurnLengths = { medianMs: number | null; p95Ms: number | null };
 
-// What the days, or all time, add up to. cost sums the rounds that
-// carry one and pricedRounds counts them; cost is null when no round did
+// What the days add up to. cost sums the rounds that carry one and
+// pricedRounds counts them; cost is null when no round did
 export type OverviewTotals = {
   turns: number;
   turnsFailed: number;
@@ -177,16 +172,12 @@ export type OverviewTotals = {
   decisionCost: number | null;
 };
 
-export const USAGE_BY = ["projects", "agents", "models"] as const;
-export type UsageBy = (typeof USAGE_BY)[number];
-
 // A row of a breakdown, by prompt plus completion tokens. name is the
 // team project's or the agent's; a personal project has id and name
 // null and owner set. deleted is true for a project or an agent that
 // is gone, whose usage stays: every deleted project is summed into one
 // row with id, name and owner null, ranked like any other, and a
-// retired agent keeps its own row and name. cost sums the priced
-// rounds, null when none carried one
+// retired agent keeps its own row and name
 export type UsageRow = {
   id: string | null;
   name: string | null;
@@ -198,9 +189,6 @@ export type UsageRow = {
   runs: number;
 };
 
-// A model by the rounds and the decisions it answered: provider is the
-// provider's name, null when it is deleted; model is the one that
-// answered, a router's pick included
 export type ModelUsage = {
   provider: string | null;
   model: string;
@@ -209,7 +197,6 @@ export type ModelUsage = {
   rounds: number;
 };
 
-// A decider by the decisions it answered, under its latest name
 export type DeciderUsage = {
   name: string;
   decisions: number;
@@ -221,16 +208,10 @@ export type DeciderUsage = {
 // today last, and their totals, and the instance, as of readAt. 30d and
 // 90d are the last 30 and 90 days, all every day from the first one
 // with a send, a round or a decision (today alone before any); the
-// range is 30d when not given. Read at most once a minute per zone and
-// range
-export type OverviewResponse = {
-  readAt: number;
+// range is 30d when not given. Read at most once every 25 seconds
+// per zone and range
+export type OverviewResponse = DaysAnswer & {
   range: OverviewRange;
-  days: OverviewDay[];
-  totals: OverviewTotals;
-  // over every day of the range
-  turnLength: TurnLengths;
-  activeUsers: number;
   instance: {
     version: string;
     startedAt: number;
@@ -241,6 +222,31 @@ export type OverviewResponse = {
     databaseBytes: number;
   };
 };
+
+// what the overview and the usage page share; turnLength and
+// activeUsers are over every day
+export type DaysAnswer = {
+  readAt: number;
+  days: OverviewDay[];
+  totals: OverviewTotals;
+  turnLength: TurnLengths;
+  activeUsers: number;
+};
+
+// a rolling window's bounds, [since, until), and what it counted
+export type Windowed<T> = { since: number; until: number } & T;
+
+// cost is null when rounds ran and none was priced
+export type SendTotals = {
+  sends: number;
+  tokens: number;
+  cost: number | null;
+};
+
+// GET /api/agents/:id/usage, /api/providers/:id/usage,
+// /api/projects/:id/usage (a team project) and /api/users/:id/usage (the
+// personal project alone): the last 30 days
+export type SendTotalsResponse = Windowed<SendTotals>;
 
 export const OVERVIEW_RANGES = ["30d", "90d", "all"] as const;
 export type OverviewRange = (typeof OVERVIEW_RANGES)[number];
@@ -276,17 +282,13 @@ export type LoadResponse = {
 
 // GET /api/admin/usage?tz=&month=YYYY-MM: the month's days in the zone,
 // up to today in this month, and their totals, the ten largest rows of
-// each breakdown and the deciders by decisions, as of readAt. since is the first send's start, null
-// before any, so the page offers the months from it. Read at most once
-// a minute per zone and month
-export type UsageResponse = {
-  readAt: number;
+// each breakdown (models by tokens) and the deciders by decisions, as
+// of readAt. since is the first send's start, null before any, so the
+// page offers the months from it. Read at most once every 25 seconds
+// per zone and month
+export type UsageResponse = DaysAnswer & {
   month: string;
   since: number | null;
-  days: OverviewDay[];
-  totals: OverviewTotals;
-  turnLength: TurnLengths;
-  activeUsers: number;
   by: { projects: UsageRow[]; agents: UsageRow[]; models: ModelUsage[] };
   deciders: DeciderUsage[];
 };

@@ -31,25 +31,18 @@ export class VisitStore {
       .map((row) => row.day);
   }
 
-  // each user's latest day kept, as their own date: an instant would
-  // move the day for a reader in another zone
-  latest(): Map<string, string> {
+  // day, not at, is what a page shows: an instant would move the day for
+  // a reader in another zone
+  latest(): Map<string, { day: string; at: number }> {
     const rows = this.db
-      .query<{ user_id: string; day: string }, []>(
-        "select user_id, max(day) as day from visits group by user_id",
+      .query<{ user_id: string; day: string; at: number }, []>(
+        `select user_id, max(day) as day, max(at) as at
+           from visits group by user_id`,
       )
       .all();
-    return new Map(rows.map((row) => [row.user_id, row.day]));
-  }
-
-  // each user's latest day's first instant, for one who signed out
-  latestAt(): Map<string, number> {
-    const rows = this.db
-      .query<{ user_id: string; at: number }, []>(
-        "select user_id, max(at) as at from visits group by user_id",
-      )
-      .all();
-    return new Map(rows.map((row) => [row.user_id, row.at]));
+    return new Map(
+      rows.map((row) => [row.user_id, { day: row.day, at: row.at }]),
+    );
   }
 
   latestFor(userId: string): string | null {
@@ -62,8 +55,6 @@ export class VisitStore {
     );
   }
 
-  // the visits on the days from first to last, both included, each on
-  // its user's own date
   onDays(first: string, last: string): { userId: string; day: string }[] {
     return this.db
       .query<{ userId: string; day: string }, [string, string]>(

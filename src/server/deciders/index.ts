@@ -30,7 +30,6 @@ import { routes, type TotalsPort } from "./routes.ts";
 import { type DeciderRow, DeciderStore } from "./store.ts";
 
 export {
-  type DecisionAnswer,
   DecisionError,
   type DecisionQuestion,
 } from "../providers/index.ts";

@@ -28,15 +28,15 @@ function db() {
 
 test("a server's calls are its tools' rows inside the window", () => {
   const { d, add } = db();
-  add("mcp__github__get_me", 100);
+  add("mcp__github__get_me", 50);
   add("mcp__github__get_me", 120, "failed");
   add("mcp__github__search_code", 130);
   // another server whose name starts with this one's, and a built-in
   add("mcp__github-x__get_me", 130);
   add("bash", 130);
-  // the window starts after since and ends at until
-  add("mcp__github__get_me", 50);
-  add("mcp__github__get_me", 200);
+  // outside [since, until)
+  add("mcp__github__get_me", 49);
+  add("mcp__github__get_me", 150);
   expect(mcpCalls(d as never, "github", 50, 150)).toEqual({
     calls: 3,
     failed: 1,
@@ -59,7 +59,7 @@ test("a server's calls read the tool rows' index", () => {
       `explain query plan select tool_name, count(*), sum(status = 'failed')
          from messages
         where kind = 'tool' and tool_name >= ? and tool_name < ?
-          and created_at > ? and created_at <= ?
+          and created_at >= ? and created_at < ?
         group by tool_name`,
     )
     .all("mcp__a__", "mcp__a__~", 0, 1)

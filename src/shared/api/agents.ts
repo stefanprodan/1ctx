@@ -8,7 +8,6 @@ import type { AgentSummary } from "../contracts/agent.ts";
 import type { AgentServer } from "../contracts/mcp.ts";
 import type { Avatar, Effort, McpMode } from "../words.ts";
 
-// when an agent last started a turn or a run, and whether one runs now;
 // an agent that never ran has no entry
 export type AgentActivity = {
   agentId: string;
@@ -33,17 +32,6 @@ export type AgentImpactResponse = {
   automations: number;
   running: number;
 };
-// GET /api/agents/:id/usage, the agent's last 30 days in every project:
-// its turns and runs, their tokens, and the cost, null when rounds ran
-// and none was priced
-export type AgentUsageResponse = {
-  since: number;
-  until: number;
-  sends: number;
-  tokens: number;
-  cost: number | null;
-};
-
 // PUT /api/profile/agent, for any signed-in user: the composer's pick,
 // kept so their next new chat starts on it; answers the agent it will
 export type PickAgentRequest = { agentId: string };

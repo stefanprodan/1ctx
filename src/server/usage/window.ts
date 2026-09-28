@@ -6,6 +6,7 @@
 // so one across a DST change is 23 or 25 hours; nothing here divides a
 // timestamp, which would bucket by a fixed offset.
 
+import type { Windowed } from "../../shared/api/admin.ts";
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
 
 export type UsageWindow = {
@@ -89,8 +90,27 @@ const midnight = (day: CalendarDay, formatter: Intl.DateTimeFormat): number => {
 const dayString = ({ year, month, day }: CalendarDay): string =>
   `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-// the days ending with today in the zone; how many can hang on today's
-// weekday, so the year starts on a Monday
+export function nextDay(day: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  return dayString(addDays({ year, month, day: date }, 1));
+}
+
+// a rolling 30 days of 24 hours, not calendar days: the object pages'
+// totals, [now - LAST_DAYS_MS, now)
+export const LAST_DAYS_MS = 30 * DAY_MS;
+
+export function lastDays<T extends object>(
+  now: number,
+  read: (since: number, until: number) => T,
+): Windowed<T> {
+  const since = now - LAST_DAYS_MS;
+  return { since, until: now, ...read(since, now) };
+}
+
 const zoneFormatter = (timeZone: string): Intl.DateTimeFormat =>
   new Intl.DateTimeFormat("en", {
     timeZone,
@@ -105,6 +125,8 @@ const zoneFormatter = (timeZone: string): Intl.DateTimeFormat =>
     hourCycle: "h23",
   });
 
+// the days ending with today in the zone; how many can hang on today's
+// weekday, so the year starts on a Monday
 function calendarWindow(
   now: number,
   timeZone: string,
@@ -151,8 +173,7 @@ export function daysWindow(
   return calendarWindow(now, timeZone, () => count);
 }
 
-// the days of a calendar month ("2026-09") in the zone, up to today
-// when it is this month; a month after this one has none
+// a month after this one has none
 export function monthWindow(
   now: number,
   timeZone: string,

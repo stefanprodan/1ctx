@@ -5,7 +5,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { migrate } from "../../../src/server/db/index.ts";
 import { UsageStore } from "../../../src/server/usage/store.ts";
-import type { ProviderUsageResponse } from "../../../src/shared/api/providers.ts";
+import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -13,17 +13,19 @@ const DAY = 24 * 60 * 60 * 1000;
 test("a provider's usage sums its agents' last 30 days", async () => {
   const chat = await chatApp();
   const read = async () => {
+    // the window is [since, until): a row stamped now is not in it yet
+    chat.app.now.value += 1;
     const res = await chat.admin.call(
       "GET",
       `/api/providers/${chat.providerId}/usage`,
     );
     expect(res.status).toBe(200);
-    return (await res.json()) as ProviderUsageResponse;
+    return (await res.json()) as SendTotalsResponse;
   };
   expect(await read()).toMatchObject({ sends: 0, tokens: 0, cost: 0 });
   const started = await startChat(chat);
   started.script.reply("done");
-  let counted: ProviderUsageResponse | null = null;
+  let counted: SendTotalsResponse | null = null;
   for (let i = 0; i < 50 && counted === null; i++) {
     const body = await read();
     if (body.sends === 1) counted = body;
@@ -37,8 +39,8 @@ test("a provider's usage sums its agents' last 30 days", async () => {
   // directly, since a month on the clock would end the login too
   const later = counted.until + 30 * DAY + 1;
   expect(
-    new UsageStore(chat.app.db).providerTotal(
-      chat.providerId,
+    new UsageStore(chat.app.db).total(
+      { providerId: chat.providerId },
       later - 30 * DAY,
       later,
     ),
@@ -47,7 +49,7 @@ test("a provider's usage sums its agents' last 30 days", async () => {
   expect(gone.status).toBe(404);
 });
 
-describe("a provider's total", () => {
+describe("a usage total", () => {
   const fields = (
     providerId: string,
     now: number,
@@ -56,9 +58,9 @@ describe("a provider's total", () => {
   ) => ({
     sendId: `s${n}`,
     sessionId: "c1",
-    projectId: "p1",
+    projectId: `p-${providerId}`,
     userId: "u1",
-    agentId: "a1",
+    agentId: `a-${providerId}`,
     providerId,
     model: "m",
     round: 0,
@@ -73,25 +75,31 @@ describe("a provider's total", () => {
     now,
   });
 
-  test("counts its own rows inside the window, a priced part summed", () => {
+  test("counts its own rows in [since, until), a priced part summed", () => {
     const db = new Database(":memory:");
     migrate(db as never);
     const store = new UsageStore(db as never);
-    store.record(fields("mine", 100, 0.5, 1));
-    store.record(fields("mine", 150, null, 2));
-    store.record(fields("other", 150, 2, 3));
-    // the window starts after since and ends at until, both edges tested
-    store.record(fields("mine", 50, 9, 4));
-    store.record(fields("mine", 200, 9, 5));
-    expect(store.providerTotal("mine", 50, 150)).toMatchObject({
-      tokens: 30,
-      cost: 0.5,
-    });
-    expect(store.providerTotal("other", 50, 150)).toMatchObject({
+    store.record(fields("mine", 50, 9, 1));
+    store.record(fields("mine", 100, null, 2));
+    store.record(fields("other", 100, 2, 3));
+    store.record(fields("mine", 49, 7, 4));
+    store.record(fields("mine", 150, 7, 5));
+    for (const by of [
+      { providerId: "mine" },
+      { agentId: "a-mine" },
+      { projectId: "p-mine" },
+    ]) {
+      expect(store.total(by, 50, 150)).toMatchObject({
+        tokens: 30,
+        cost: 9,
+      });
+    }
+    expect(store.total({ providerId: "other" }, 50, 150)).toMatchObject({
       tokens: 15,
       cost: 2,
     });
-    expect(store.providerTotal("none", 50, 150)).toMatchObject({
+    expect(store.total({ agentId: "none" }, 50, 150)).toEqual({
+      sends: 0,
       tokens: 0,
       cost: 0,
     });
@@ -105,7 +113,7 @@ describe("a provider's total", () => {
         .query<{ detail: string }, [string, number, number]>(
           `explain query plan select sum(prompt_tokens + completion_tokens),
              sum(cost), count(distinct send_id) from usage
-           where ${column} = ? and created_at > ? and created_at <= ?`,
+           where ${column} = ? and created_at >= ? and created_at < ?`,
         )
         .all("x", 0, 1)
         .map((row) => row.detail)

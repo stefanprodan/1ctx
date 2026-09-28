@@ -62,7 +62,6 @@ export { parseBaseUrl, parseKeyName } from "./parse.ts";
 export {
   type AgentsPort,
   type DecidersPort,
-  type RoutesDeps,
   routes,
   type UsagePort,
 } from "./routes.ts";

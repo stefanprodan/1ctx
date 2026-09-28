@@ -177,10 +177,6 @@ export async function fetchCatalog(
   return models;
 }
 
-// the matches for what was typed, split into words: a model matches
-// when every word is in its id or its name, in any order, ignoring case.
-// An id that starts with the first word comes first, then the rest, each
-// in the catalog's order
 export function search(
   models: CatalogMatch[],
   q: string,

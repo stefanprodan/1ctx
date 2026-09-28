@@ -3,8 +3,7 @@
 
 import type { Migration } from "../migration.ts";
 
-// A decider's page and a decision's add up their last 30 days of
-// answers, each from its own index.
+// read by DecisionUsageStore.total, by decider and by decision
 export const m0034: Migration = {
   id: "0034-decision-activity",
   up(db) {

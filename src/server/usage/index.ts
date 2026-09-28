@@ -35,7 +35,9 @@ export { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
 export {
   countByDay,
   daysWindow,
+  lastDays,
   monthWindow,
+  nextDay,
   type UsageWindow,
   usageWindow,
 } from "./window.ts";
@@ -52,9 +54,7 @@ export type Usage = {
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
   // an agent's year of days in the zone, every project in one series
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
-  agentTotal: UsageStore["agentTotal"];
-  providerTotal: UsageStore["providerTotal"];
-  projectTotal: UsageStore["projectTotal"];
+  total: UsageStore["total"];
   activeProjects: UsageStore["activeProjects"];
   decisionTotal: DecisionUsageStore["total"];
   routes: RouteDescriptor[];
@@ -70,12 +70,7 @@ export function usageArea(deps: UsageDeps): Usage {
     recordDecision: (fields) => decisions.record(fields),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
-    agentTotal: (agentId, since, until) =>
-      store.agentTotal(agentId, since, until),
-    providerTotal: (providerId, since, until) =>
-      store.providerTotal(providerId, since, until),
-    projectTotal: (projectId, since, until) =>
-      store.projectTotal(projectId, since, until),
+    total: (by, since, until) => store.total(by, since, until),
     activeProjects: (ids, since, until) =>
       store.activeProjects(ids, since, until),
     decisionTotal: (by, since, until) => decisions.total(by, since, until),

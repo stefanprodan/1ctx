@@ -3,9 +3,7 @@
 
 import type { Migration } from "../migration.ts";
 
-// The agents list says when each agent last ran and whether it runs
-// now: the latest send by agent from an index, and the sends in flight
-// from a partial one that holds only those.
+// read by the agents list's agentActivity: last run and running now
 export const m0032: Migration = {
   id: "0032-agent-activity",
   up(db) {
