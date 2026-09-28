@@ -56,15 +56,6 @@ export function sourceKind(text: string): SkillSource | null {
   return sourceForm(text)?.kind ?? null;
 }
 
-// the GitHub form's one download: codeload's tarball, no API, no token
-export function codeloadUrl(form: {
-  owner: string;
-  repo: string;
-  ref: string;
-}): string {
-  return `https://codeload.github.com/${form.owner}/${form.repo}/tar.gz/${form.ref}`;
-}
-
 // < and & only, so a text cannot close its element and speak outside it
 export function escapeText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;");

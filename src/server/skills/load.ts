@@ -10,6 +10,7 @@ import { BadRequest, Conflict } from "../lib/errors.ts";
 import { cleanText } from "./clean.ts";
 import { type Fetched, fetchSource, fetchText } from "./fetch.ts";
 import { parseSkillMd } from "./frontmatter.ts";
+import { fetchGithubFolder } from "./github.ts";
 import {
   MAX_BODY_CHARS,
   MAX_DROPPED,
@@ -18,7 +19,7 @@ import {
   MAX_FILES_CHARS,
   MAX_INDEX_BYTES,
 } from "./limits.ts";
-import { parseIndex, pick, resolve } from "./source.ts";
+import { type Picked, parseIndex, pick, resolve } from "./source.ts";
 
 export type LoadedFile = { path: string; content: string; bytes: number };
 export type LoadedSkill = {
@@ -156,6 +157,12 @@ export async function discover(
   };
 }
 
+function pickFetched(fetched: Fetched, path: string): Picked {
+  return fetched.kind === "text"
+    ? { skillMd: fetched.bytes, files: new Map<string, Uint8Array>() }
+    : pick(fetched.files, path);
+}
+
 export async function loadSkill(
   fetcher: typeof fetch,
   url: string,
@@ -165,7 +172,7 @@ export async function loadSkill(
   const selected =
     "name" in selection ? selection.name : (selection.path ?? "");
   const source = resolve(url, selected);
-  let fetched: Fetched;
+  let picked: Picked;
   let sourceDigest = "";
   if (source.kind === "index") {
     if (!("name" in selection))
@@ -184,7 +191,7 @@ export async function loadSkill(
     ) {
       throw new Conflict("the index changed, look again");
     }
-    fetched = await fetchSource(fetcher, entry.url, shutdown);
+    const fetched = await fetchSource(fetcher, entry.url, shutdown);
     const actual = `sha256:${byteDigest(fetched.bytes)}`;
     if (actual !== entry.digest) {
       throw new BadRequest(`digest ${actual} does not match ${entry.digest}`);
@@ -196,18 +203,17 @@ export async function loadSkill(
       throw new BadRequest("the index entry is not an archive");
     }
     sourceDigest = entry.digest;
+    // an archive from an index holds the skill at its root; the select
+    // is the entry's name, not a path inside it
+    picked = pickFetched(fetched, "");
+  } else if (source.github !== undefined) {
+    picked = await fetchGithubFolder(fetcher, source.github, shutdown);
   } else {
-    fetched = await fetchSource(fetcher, source.fetchUrl, shutdown);
+    picked = pickFetched(
+      await fetchSource(fetcher, source.fetchUrl, shutdown),
+      source.select,
+    );
   }
-
-  // an archive from an index holds the skill at its root, so it is
-  // picked with an empty path; source.select is the index entry name,
-  // not a path inside the archive
-  const pickPath = source.kind === "index" ? "" : source.select;
-  const picked =
-    fetched.kind === "text"
-      ? { skillMd: fetched.bytes, files: new Map<string, Uint8Array>() }
-      : pick(fetched.files, pickPath);
   const skillText = decode(picked.skillMd);
   if (skillText === null) throw new BadRequest("SKILL.md is not UTF-8 text");
   const parsed = parseSkillMd(skillText);

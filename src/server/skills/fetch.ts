@@ -63,11 +63,12 @@ function checkedUrl(text: string): URL {
   return url;
 }
 
-async function download(
+export async function download(
   fetcher: typeof fetch,
   input: string,
   shutdown: AbortSignal,
   cap: number = MAX_DOWNLOAD_BYTES,
+  headers?: Record<string, string>,
 ): Promise<Uint8Array> {
   let url = checkedUrl(input);
   const timeout = AbortSignal.timeout(FETCH_DEADLINE_MS);
@@ -75,7 +76,11 @@ async function download(
   for (let redirects = 0; ; redirects++) {
     let response: Response;
     try {
-      response = await fetcher(url, { redirect: "manual", signal });
+      response = await fetcher(url, {
+        redirect: "manual",
+        signal,
+        ...(headers === undefined ? {} : { headers }),
+      });
     } catch {
       if (shutdown.aborted)
         throw new ServiceUnavailable("server is shutting down");
@@ -98,6 +103,13 @@ async function download(
     }
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
+      if (
+        response.headers.get("x-ratelimit-remaining") === "0" ||
+        ((response.status === 403 || response.status === 429) &&
+          response.headers.has("retry-after"))
+      ) {
+        throw new BadGateway(`the host ${url.host} limits requests, try later`);
+      }
       throw new BadGateway(`the host ${url.host} answered ${response.status}`);
     }
     try {
@@ -174,8 +186,9 @@ export async function fetchText(
   url: string,
   shutdown: AbortSignal,
   cap: number = MAX_DOWNLOAD_BYTES,
+  headers?: Record<string, string>,
 ): Promise<{ bytes: Uint8Array; text: string }> {
-  const bytes = await download(fetcher, url, shutdown, cap);
+  const bytes = await download(fetcher, url, shutdown, cap, headers);
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
