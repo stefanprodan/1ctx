@@ -80,3 +80,59 @@ describe("rg on bytes and times", () => {
     expect(down.stdout).toBe("a.txt\nc.txt\nb.txt\n");
   });
 });
+
+describe("rg's shortcuts keep its answers", () => {
+  const files = {
+    "/work/a.md": "# Crashloop\nrestart\n",
+    "/work/b.md": "nothing here\n",
+    "/work/c.md": "one\nCRASHLOOP twice crashloop\n",
+  };
+  const answer = async (command: string, hay: Record<string, string>) => {
+    const r = await run(command, hay);
+    return [r.stdout, r.stderr, r.exitCode];
+  };
+
+  test("-il, --files-without-match, -ic and -q answer as before", async () => {
+    expect(await answer("rg -il --sort path crashloop", files)).toEqual([
+      "a.md\nc.md\n",
+      "",
+      0,
+    ]);
+    expect(
+      await answer("rg -i --files-without-match crashloop", files),
+    ).toEqual(["b.md\n", "", 0]);
+    expect(await answer("rg -ic --sort path crashloop", files)).toEqual([
+      "a.md:1\nc.md:1\n",
+      "",
+      0,
+    ]);
+    expect(await answer("rg -qi crashloop", files)).toEqual(["", "", 0]);
+    expect(await answer("rg -q zzz", files)).toEqual(["", "", 1]);
+  });
+
+  test("-i folds as the regex does, not as toLowerCase", async () => {
+    const hay = { "/work/hay": "ſ\nΟΣ\nς\n" };
+    expect(await answer("rg -i s hay", hay)).toEqual(["ſ\n", "", 0]);
+    expect(await answer("rg -il s hay", hay)).toEqual(["hay\n", "", 0]);
+    expect(await answer("rg -iv s hay", hay)).toEqual(["ΟΣ\nς\n", "", 0]);
+    expect(await answer("rg -i σ hay", hay)).toEqual(["ΟΣ\nς\n", "", 0]);
+  });
+
+  test("-i folds ſ to s with the Kelvin sign, as ripgrep", async () => {
+    const hay = { "/work/hay": "ſ\u212a\n" };
+    expect(await answer("rg -i sk hay", hay)).toEqual(["ſ\u212a\n", "", 0]);
+  });
+
+  test("an escape is not the letter it names", async () => {
+    const hay = { "/work/hay": "\u0007\na\n" };
+    expect(await answer("rg '\\a' hay", hay)).toEqual(["\u0007\n", "", 0]);
+  });
+
+  test("--passthru with -c counts only files that match", async () => {
+    expect(await answer("rg --passthru -c hit b.md", files)).toEqual([
+      "",
+      "",
+      1,
+    ]);
+  });
+});

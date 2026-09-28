@@ -58,3 +58,23 @@ describe("grep's words", () => {
     expect(result.exitCode).toBe(2);
   });
 });
+
+describe("grep's literal shortcut", () => {
+  // GNU grep 3.12 answers each of these with the line
+  test("-i folds as the regex does, not as toLowerCase", async () => {
+    const hay = { "/work/hay": "ſ\nΟΣ\nς\n" };
+    const s = await run("grep -i s hay", hay);
+    expect([s.stdout, s.stderr, s.exitCode]).toEqual(["ſ\n", "", 0]);
+    const sigma = await run("grep -i σ hay", hay);
+    expect([sigma.stdout, sigma.stderr, sigma.exitCode]).toEqual([
+      "ΟΣ\nς\n",
+      "",
+      0,
+    ]);
+  });
+
+  test("an escape is not the letter it names", async () => {
+    const r = await run("grep -P '\\a' hay", { "/work/hay": "\u0007\na\n" });
+    expect([r.stdout, r.stderr, r.exitCode]).toEqual(["\u0007\n", "", 0]);
+  });
+});

@@ -359,6 +359,16 @@ async function searchFiles(
         invertedLines: true,
         contextWithOnlyMatching: true,
         lineTerminator: options.nullData ? "\0" : "\n",
+        // (1ctx) grep's shortcuts: a literal the pattern needs is looked
+        // for first, and a listing stops at a file's first match
+        preFilter: options.passthru ? undefined : built.preFilter,
+        selectOnly:
+          !options.json &&
+          !options.stats &&
+          !options.passthru &&
+          (options.filesWithMatches ||
+            options.filesWithoutMatch ||
+            options.quiet),
         maxWork: ctx.limits.maxLoopIterations,
         maxMatches: ctx.limits.maxArrayElements,
         signal: ctx.signal,

@@ -390,6 +390,9 @@ function extractPreFilter(
   }
 
   if (needles.length === 0) return null;
+  // (1ctx) lowercasing is not case folding beyond ASCII: σ, ς and Σ are one
+  // letter to the regex, and toLowerCase keeps ς apart
+  if (ignoreCase && needles.some((n) => /[^\x00-\x7f]/.test(n))) return null;
 
   return {
     needles: ignoreCase ? needles.map((n) => n.toLowerCase()) : needles,
@@ -464,6 +467,8 @@ function literalFromAlternative(alt: string): string | null {
       // \n, \t, \r are literal whitespace — fine. \d, \w, \s, \b, \B etc.
       // match character classes or zero-width assertions — reject.
       if (/[dDwWsSbBAZzGQE0-9ckpPNXRxuU]/.test(next)) return null;
+      // (1ctx) any other letter escape (\a is BEL, \e ESC) is not the letter
+      if (/[A-Za-z]/.test(next) && !"ntrfv".includes(next)) return null;
       // Translate common escape sequences to their literal char.
       if (next === "n") out += "\n";
       else if (next === "t") out += "\t";

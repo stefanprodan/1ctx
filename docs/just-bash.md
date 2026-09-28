@@ -103,6 +103,7 @@ without a file of their own.
 | `src/network/index.ts`, `src/index.ts` | the package exports `validateAllowList`, `matchesAllowListEntry`, `createSecureFetch` and the `FetchResult` and `SecureFetchOptions` types | a credential's URL prefix is checked and matched by the rules curl's allow-list uses, and the mount builds curl's fetch itself (see below) |
 | `src/commands/search-engine/rust-regex.ts` (new), `unicode-sets.ts` (new, moved out of `pcre.ts`), `regex.ts`, `matcher.ts` | rg's own syntax: `\w`, `\d` and `\s` are Unicode unless `--no-unicode`; `\<`, `\>`, `\b{start}` and `\b{end}` at a pattern's start or end are word edges checked in code, elsewhere RE2's `\b`; `-P` goes through grep's `-P` layer, its rewrites and its refusals, and refuses groups nested past 250 deep, as PCRE2 does | `-o '\w+'` cut `café` to `caf`, `\<foo\>` matched nothing, and `-P` was refused though ripgrep has PCRE2 |
 | `src/commands/rg/file-types.ts`, `file-types-data.ts` (new) | ripgrep 15's whole type table, written from `rg --type-list` by `scripts/rg-record.ts`, aliases included, each glob matched case-sensitively against the file's name; `--type-add` with `include:` and ripgrep's `invalid definition`, `--type-clear` in order with it, `--type-list` showing both, `-t all`, and `unrecognized file type` for an unknown `-t` or `-T` | 38 types of 224 with their own globs, `-t typescript` found nothing, `--type-add` was ignored and an unknown type searched nothing silently |
+| `src/commands/rg/rg-search.ts`, `src/commands/search-engine/regex.ts`, `matcher.ts` | rg looks for the literal a pattern needs before the regex runs, as grep does, except under `--passthru`, and `-l`, `--files-without-match` and `-q` stop at a file's first match, except under `--json`, `--stats` and `--passthru`; under `-i` a needle outside ASCII gives no shortcut and `ſ` is folded to `s`, and a letter escape other than `\n`, `\t`, `\r`, `\f`, `\v` gives none | `rg -il` over 150 docs took 170 ms against grep's 15, and grep's shortcut missed `ſ` for `-i s`, `ς` and `ΟΣ` for `-i σ`, and BEL for `-P '\a'` |
 
 ### The jq and yq dialects
 
@@ -239,6 +240,8 @@ with `accept` pins ours. Where they part:
 - `--color=always` is refused.
 - `-T` pads numbers on standard input to 19 places, as GNU does on a
   pipe, also when the shell redirected a file there.
+- `-i k` matches the Kelvin sign, which GNU folds to `k` only under
+  `-P`.
 
 ### Where our rg still differs from ripgrep
 
@@ -262,6 +265,8 @@ holds our rg to it; a case with `accept` pins ours. Where they part:
   replaced, where ripgrep prints them as they are. `-E` takes UTF-8 and
   `none` only.
 - `-p` and `--color=always` print no colour, the second refused.
+- `--stats` counts a matching line as one match, where ripgrep counts
+  every match on it.
 - The `accessed` and `created` sort keys order by mtime, the one time a
   stat gives. `--json` reports `elapsed` as zero, `--debug` prints
   nothing, and `--version` names no SIMD features.
