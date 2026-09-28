@@ -5,6 +5,7 @@ import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { migrate } from "../../../src/server/db/index.ts";
 import {
+  VISUAL_OPENS,
   visualCounts,
   webCounts,
 } from "../../../src/server/sessions/activity.ts";
@@ -83,4 +84,32 @@ test("web counts the webfetch and websearch calls, done and failed", () => {
     searches: 0,
     failed: 0,
   });
+});
+
+test("opened visuals start from the opened files and count as the join did", () => {
+  const { d, tool, opened } = db();
+  opened(tool("bash", 100), ["visual", "visual", "code"]);
+  opened(tool("bash", 120), ["markdown"]);
+  opened(tool("open", 130), ["visual"]);
+  tool("bash", 140);
+  opened(tool("bash", 300), ["visual"]);
+  const joined = d
+    .query<{ opened: number }, [number, number]>(
+      `select count(*) as opened
+         from messages t
+         join opened_files f on f.message_id = t.id
+        where t.kind = 'tool' and t.tool_name = 'bash'
+          and t.created_at >= ? and t.created_at < ?
+          and f.kind = 'visual'`,
+    )
+    .get(50, 200)!.opened;
+  expect(joined).toBe(2);
+  expect(visualCounts(d as never, 50, 200).opened).toBe(joined);
+  const plan = d
+    .query<{ detail: string }, [number, number]>(
+      `explain query plan ${VISUAL_OPENS}`,
+    )
+    .all(50, 200)
+    .map((row) => row.detail);
+  expect(plan[0]).toMatch(/^SCAN f\b/);
 });

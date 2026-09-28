@@ -579,12 +579,7 @@ describe("the schema", () => {
         "0029-agent-pick",
         "0030-archived-chats",
         "0031-deciders",
-        "0032-agent-activity",
-        "0033-provider-activity",
-        "0034-decision-activity",
-        "0035-usage-cost-index",
-        "0036-mcp-activity",
-        "0037-visits-day",
+        "0032-admin-activity",
       ]);
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
@@ -759,12 +754,7 @@ describe("the schema", () => {
         "0029-agent-pick",
         "0030-archived-chats",
         "0031-deciders",
-        "0032-agent-activity",
-        "0033-provider-activity",
-        "0034-decision-activity",
-        "0035-usage-cost-index",
-        "0036-mcp-activity",
-        "0037-visits-day",
+        "0032-admin-activity",
       ]);
       expect(
         db
@@ -1209,12 +1199,7 @@ describe("additive migrations", () => {
       "0029-agent-pick",
       "0030-archived-chats",
       "0031-deciders",
-      "0032-agent-activity",
-      "0033-provider-activity",
-      "0034-decision-activity",
-      "0035-usage-cost-index",
-      "0036-mcp-activity",
-      "0037-visits-day",
+      "0032-admin-activity",
     ]);
     expect(
       db.query("select id, run_source from sessions order by id").all(),
@@ -1282,12 +1267,7 @@ describe("0005", () => {
       "0029-agent-pick",
       "0030-archived-chats",
       "0031-deciders",
-      "0032-agent-activity",
-      "0033-provider-activity",
-      "0034-decision-activity",
-      "0035-usage-cost-index",
-      "0036-mcp-activity",
-      "0037-visits-day",
+      "0032-admin-activity",
     ]);
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
@@ -1364,12 +1344,7 @@ describe("rebuild migrations", () => {
       "0029-agent-pick",
       "0030-archived-chats",
       "0031-deciders",
-      "0032-agent-activity",
-      "0033-provider-activity",
-      "0034-decision-activity",
-      "0035-usage-cost-index",
-      "0036-mcp-activity",
-      "0037-visits-day",
+      "0032-admin-activity",
     ]);
     expect(
       db.query("select origin, automation_id from sessions").get(),
@@ -1479,12 +1454,7 @@ describe("0006 skills migration", () => {
       "0029-agent-pick",
       "0030-archived-chats",
       "0031-deciders",
-      "0032-agent-activity",
-      "0033-provider-activity",
-      "0034-decision-activity",
-      "0035-usage-cost-index",
-      "0036-mcp-activity",
-      "0037-visits-day",
+      "0032-admin-activity",
     ]);
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
@@ -1553,12 +1523,7 @@ describe("0007 user tz migration", () => {
       "0029-agent-pick",
       "0030-archived-chats",
       "0031-deciders",
-      "0032-agent-activity",
-      "0033-provider-activity",
-      "0034-decision-activity",
-      "0035-usage-cost-index",
-      "0036-mcp-activity",
-      "0037-visits-day",
+      "0032-admin-activity",
     ]);
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
@@ -1606,12 +1571,7 @@ describe("0009 mcp migration", () => {
       "0029-agent-pick",
       "0030-archived-chats",
       "0031-deciders",
-      "0032-agent-activity",
-      "0033-provider-activity",
-      "0034-decision-activity",
-      "0035-usage-cost-index",
-      "0036-mcp-activity",
-      "0037-visits-day",
+      "0032-admin-activity",
     ]);
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -1875,12 +1835,7 @@ describe("0008 search tavily migration", () => {
           "0029-agent-pick",
           "0030-archived-chats",
           "0031-deciders",
-          "0032-agent-activity",
-          "0033-provider-activity",
-          "0034-decision-activity",
-          "0035-usage-cost-index",
-          "0036-mcp-activity",
-          "0037-visits-day",
+          "0032-admin-activity",
         ]);
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(

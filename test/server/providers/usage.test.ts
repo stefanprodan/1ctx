@@ -105,10 +105,13 @@ describe("a usage total", () => {
     });
   });
 
-  test("an agent's and a provider's totals read their index alone", () => {
+  test("an agent's and a provider's totals seek their index by time", () => {
     const db = new Database(":memory:");
     migrate(db as never);
-    for (const column of ["provider_id", "agent_id"]) {
+    for (const [column, index] of [
+      ["provider_id", "usage_provider_activity"],
+      ["agent_id", "usage_agent_activity"],
+    ]) {
       const plan = db
         .query<{ detail: string }, [string, number, number]>(
           `explain query plan select sum(prompt_tokens + completion_tokens),
@@ -118,7 +121,9 @@ describe("a usage total", () => {
         .all("x", 0, 1)
         .map((row) => row.detail)
         .join(" ");
-      expect(plan).toContain("USING COVERING INDEX");
+      expect(plan).toContain(
+        `USING INDEX ${index} (${column}=? AND created_at>? AND created_at<?)`,
+      );
     }
   });
 });

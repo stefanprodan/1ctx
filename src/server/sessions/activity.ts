@@ -119,7 +119,16 @@ export function mcpServerCalls(
   return { ...total, servers };
 }
 
-// opened visuals are found through the bash rows that carry them
+// opened visuals are found through the bash rows that carry them; the
+// cross join starts from the few visual opens, not every bash row. A
+// test checks this query's plan
+export const VISUAL_OPENS = `
+  select count(*) as opened
+    from opened_files f
+    cross join messages t on t.id = f.message_id
+   where f.kind = 'visual' and t.kind = 'tool' and t.tool_name = 'bash'
+     and t.created_at >= ? and t.created_at < ?`;
+
 export function visualCounts(
   db: Db,
   since: number,
@@ -135,14 +144,7 @@ export function visualCounts(
     )
     .get(since, until)!;
   const files = db
-    .query<{ opened: number }, [number, number]>(
-      `select count(*) as opened
-         from messages t
-         join opened_files f on f.message_id = t.id
-        where t.kind = 'tool' and t.tool_name = 'bash'
-          and t.created_at >= ? and t.created_at < ?
-          and f.kind = 'visual'`,
-    )
+    .query<{ opened: number }, [number, number]>(VISUAL_OPENS)
     .get(since, until)!;
   return { ...calls, opened: files.opened };
 }
@@ -246,7 +248,7 @@ function callArgs(text: string | null): { name: string; path: string } | null {
   return { name, path: typeof path === "string" ? path : "" };
 }
 
-// one seek per agent into each of the 0032 migration's indexes
+// one seek per agent into sends_agent and sends_running
 export function agentActivity(db: Db): AgentActivity[] {
   return db
     .query<{ agentId: string; lastAt: number | null; running: number }, []>(
