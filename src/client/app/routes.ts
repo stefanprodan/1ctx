@@ -195,6 +195,11 @@ const toolsView = lazy<{ params: Params }>(() =>
   import("../views/admin/Tools.tsx").then((m) => m.Tools),
 );
 
+// addresses with no page of their own that open another in place
+export const ALIASES: Record<string, string> = {
+  "/admin": "/admin/monitor",
+};
+
 export const ROUTES: Route[] = [
   {
     path: "/login",
