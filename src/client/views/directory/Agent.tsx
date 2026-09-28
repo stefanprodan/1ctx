@@ -63,6 +63,7 @@ import {
   filesText,
   serverLine,
   serverMeta,
+  switchItems,
   thinkingText,
 } from "./Directory.model.ts";
 import "./directory.css";
@@ -258,11 +259,18 @@ export function Agent({ params }: { params: Params }) {
             label="Agents"
             current={shown.agent.id}
             name={`@${shown.agent.name}`}
-            items={(directoryAgents.value ?? []).map((a) => ({
-              id: a.id,
-              label: `@${a.name}`,
-              href: agentTabHref(a.name, tab),
-            }))}
+            items={switchItems(
+              (directoryAgents.value ?? []).map((a) => ({
+                id: a.id,
+                label: `@${a.name}`,
+                href: agentTabHref(a.name, tab),
+              })),
+              {
+                id: shown.agent.id,
+                label: `@${shown.agent.name}`,
+                href: agentTabHref(shown.agent.name, tab),
+              },
+            )}
             placeholder="Find an agent"
             none="No agent matches"
           />

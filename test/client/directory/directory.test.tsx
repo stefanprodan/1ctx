@@ -133,7 +133,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-const personOf = (username: string): DirectoryUserResponse => ({
+const userOf = (username: string): DirectoryUserResponse => ({
   user: {
     id: `id-${username}`,
     username,
@@ -162,7 +162,7 @@ function gated(answer: (name: string) => Response) {
 
 describe("the directory entity", () => {
   test.serial("an older user answer never overwrites a newer one", async () => {
-    const gates = gated((name) => Response.json(personOf(name)));
+    const gates = gated((name) => Response.json(userOf(name)));
     const first = loadUserPage("bogdan");
     const second = loadUserPage("elena");
     gates[1]();
@@ -173,8 +173,8 @@ describe("the directory entity", () => {
   });
 
   test.serial("another name drops the page shown at once", async () => {
-    userPage.value = personOf("bogdan");
-    const gates = gated((name) => Response.json(personOf(name)));
+    userPage.value = userOf("bogdan");
+    const gates = gated((name) => Response.json(userOf(name)));
     const pending = loadUserPage("dana");
     expect(userPage.value).toBeNull();
     gates[0]();
@@ -185,7 +185,7 @@ describe("the directory entity", () => {
   test.serial(
     "a page seen before is drawn at once and loaded again",
     async () => {
-      const gates = gated((name) => Response.json(personOf(name)));
+      const gates = gated((name) => Response.json(userOf(name)));
       const first = loadUserPage("radu");
       gates[0]();
       await first;
@@ -204,9 +204,7 @@ describe("the directory entity", () => {
     let status = 200;
     globalThis.fetch = (async (url: string) =>
       status === 200
-        ? Response.json(
-            personOf(decodeURIComponent(url.split("/").pop() ?? "")),
-          )
+        ? Response.json(userOf(decodeURIComponent(url.split("/").pop() ?? "")))
         : Response.json(
             { error: "no such user" },
             { status },
@@ -226,7 +224,7 @@ describe("the directory entity", () => {
   test.serial(
     "an answer that lands after the user changed is dropped",
     async () => {
-      const gates = gated((name) => Response.json(personOf(name)));
+      const gates = gated((name) => Response.json(userOf(name)));
       const pending = loadUserPage("bogdan");
       me.value = { ...casey, id: "u9", username: "someone" };
       gates[0]();

@@ -4,9 +4,10 @@
 // A user's page, open to every signed-in user: who they are, their
 // actions per day in every project, then one card whose head is tabs
 // at their own addresses: what they say about themselves, and the team
-// projects the viewer shares with them. The aside is how to reach them and when it is for
-// them; where it is hidden, the head carries the email and the local
-// time.
+// projects the viewer shares with them. The aside is how to reach them
+// and when it is for them; where it is hidden, the head carries the
+// email and the local time. The name is a switcher over the Directory's
+// users that keeps the tab.
 
 import { useMemo } from "preact/hooks";
 import type { DirectoryUserResponse } from "../../../shared/api/directory.ts";
@@ -43,6 +44,7 @@ import { membersLine } from "../projects/Project.model.ts";
 import {
   localTime,
   roleWords,
+  switchItems,
   userAnswer,
   userTab,
   userTabHref,
@@ -171,11 +173,18 @@ export function User({ params }: { params: Params }) {
             label="Users"
             current={shown.user.id}
             name={`@${shown.user.username}`}
-            items={(directoryUsers.value ?? []).map((u) => ({
-              id: u.id,
-              label: `@${u.username}`,
-              href: userTabHref(u.username, tab),
-            }))}
+            items={switchItems(
+              (directoryUsers.value ?? []).map((u) => ({
+                id: u.id,
+                label: `@${u.username}`,
+                href: userTabHref(u.username, tab),
+              })),
+              {
+                id: shown.user.id,
+                label: `@${shown.user.username}`,
+                href: userTabHref(shown.user.username, tab),
+              },
+            )}
             placeholder="Find a user"
             none="No user matches"
           />

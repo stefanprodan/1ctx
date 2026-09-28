@@ -56,6 +56,7 @@ export {
   parseAbout,
   parseEmail,
   parseFullName,
+  parseNoQuery,
   parseTz,
   parseUsername,
   parseUserPassword,

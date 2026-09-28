@@ -3,8 +3,8 @@
 //
 // The agents list and an agent's page, for every signed-in user: the
 // list is the live agents with the model's id alone; the page is how
-// an agent is configured. The
-// composer's route already sends the whole row, so the page adds only
+// an agent is configured. The composer's route already sends the whole
+// row, so the page adds only
 // what a user cannot see elsewhere: the provider's name, the skills
 // with when they were fetched and how many files they hold, the
 // built-in tools a send would offer it now with their descriptions and
@@ -22,6 +22,7 @@ import type {
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { WEB_TOOLS } from "../../shared/words.ts";
+import { parseNoQuery } from "../access/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -29,7 +30,7 @@ import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { parseAgentName, parseNoQuery } from "./parse.ts";
+import { parseAgentName } from "./parse.ts";
 import type { AgentTotalPort, ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
 

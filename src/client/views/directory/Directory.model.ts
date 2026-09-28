@@ -149,7 +149,7 @@ export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
   ];
 }
 
-// the person's actions as the heatmap's answer, one number a day in the
+// the user's actions as the heatmap's answer, one number a day in the
 // place of turns, with no tokens
 export function userAnswer(
   body: DirectoryUserDaysResponse,
@@ -239,4 +239,16 @@ export function directoryTabs(
     { label: "Users", href: DIRECTORY_HREF, count: users },
     { label: "Agents", href: DIRECTORY_AGENTS_HREF, count: agents },
   ];
+}
+
+type SwitchItem = { id: string; label: string; href: string };
+
+// the lists hold live actors alone, so a disabled user's page, or an
+// agent's deleted while open, adds its own name to be marked current
+export function switchItems(
+  listed: SwitchItem[],
+  shown: SwitchItem,
+): SwitchItem[] {
+  if (listed.some((i) => i.id === shown.id)) return listed;
+  return [...listed, shown].sort((a, b) => a.label.localeCompare(b.label));
 }

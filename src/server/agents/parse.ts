@@ -56,13 +56,6 @@ export function parseAgentName(value: unknown): string {
   return value;
 }
 
-// a route that takes no query answers a 400 to any parameter
-export function parseNoQuery(url: URL): void {
-  for (const name of url.searchParams.keys()) {
-    throw new BadRequest(`unknown parameter ${name}`);
-  }
-}
-
 function parseServers(value: unknown): AgentServer[] {
   if (!Array.isArray(value)) {
     throw new BadRequest("servers must be an array");

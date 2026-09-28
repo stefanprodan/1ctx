@@ -58,7 +58,7 @@ export function settledCounts(kind: ProjectKind, counts: TabCounts): TabCounts {
 }
 
 // every project has automations; a team's users are its Members, and
-// a personal project has one person, who describes it in Settings.
+// a personal project has one user, who describes it in Settings.
 // Members counts the users and the agents the tab lists
 export function tabsOf(
   id: string,

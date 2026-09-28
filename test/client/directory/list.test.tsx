@@ -4,7 +4,7 @@
 // The Directory draws the list its address names, the rail lights it
 // on the pages it lists, and the pages' crumbs lead back to it.
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { navLit } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
@@ -14,6 +14,8 @@ import {
   directoryAgentsError,
   directoryUsers,
   directoryUsersError,
+  loadDirectoryAgents,
+  loadDirectoryUsers,
   userPage,
 } from "../../../src/client/data/directory.ts";
 import { me } from "../../../src/client/data/me.ts";
@@ -22,10 +24,45 @@ import {
   agentTabHref,
   directoryTab,
   directoryTabs,
+  switchItems,
   userTabHref,
 } from "../../../src/client/views/directory/Directory.model.ts";
 import { Directory } from "../../../src/client/views/directory/Directory.tsx";
 import { User } from "../../../src/client/views/directory/User.tsx";
+
+const realFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
+
+const casey = {
+  id: "u1",
+  username: "casey",
+  fullName: "Casey Doe",
+  role: "member" as const,
+  mustChangePassword: false,
+};
+
+const listed = (username: string) => ({
+  id: `id-${username}`,
+  username,
+  fullName: username,
+  role: "member" as const,
+  tz: "UTC",
+});
+
+// every request waits until the test opens its gate, answering with
+// the body for its place in the order asked
+function gated(answer: (asked: number) => Response) {
+  const gates: (() => void)[] = [];
+  globalThis.fetch = (() =>
+    new Promise<Response>((resolve) => {
+      const asked = gates.length;
+      gates.push(() => resolve(answer(asked)));
+    })) as unknown as typeof fetch;
+  return gates;
+}
 
 beforeEach(() => {
   me.value = {
@@ -132,6 +169,15 @@ describe("the directory", () => {
     expect(agentTabHref("sre", 3)).toBe("/agents/sre/mcp");
   });
 
+  test("a shown user the list leaves out is added to the switcher", () => {
+    const a = { id: "a", label: "@ana", href: "/users/ana" };
+    const z = { id: "z", label: "@zed", href: "/users/zed" };
+    const off = { id: "m", label: "@mid", href: "/users/mid" };
+    expect(switchItems([a, z], a)).toEqual([a, z]);
+    expect(switchItems([a, z], off)).toEqual([a, off, z]);
+    expect(switchItems([a], off)).toHaveLength(2);
+  });
+
   test("the rail lights the Directory on its tabs and the pages it lists", () => {
     for (const at of [
       "/directory",
@@ -145,4 +191,48 @@ describe("the directory", () => {
     expect(navLit("/projects", "/projects")).toBe(true);
     expect(navLit("/projects/p1", "/projects")).toBe(false);
   });
+});
+
+describe("the directory lists", () => {
+  test.serial("an older answer never overwrites a newer one", async () => {
+    const gates = gated((asked) =>
+      Response.json({ users: [listed(asked === 0 ? "older" : "newer")] }),
+    );
+    const first = loadDirectoryUsers();
+    const second = loadDirectoryUsers();
+    gates[1]();
+    await second;
+    gates[0]();
+    await first;
+    expect(directoryUsers.value?.map((u) => u.username)).toEqual(["newer"]);
+  });
+
+  test.serial("a failed refresh keeps the list and says nothing", async () => {
+    globalThis.fetch = (async () =>
+      Response.json(
+        { error: "down" },
+        { status: 500 },
+      )) as unknown as typeof fetch;
+    await loadDirectoryUsers();
+    expect(directoryUsers.value?.length).toBe(2);
+    expect(directoryUsersError.value).toBeNull();
+    directoryAgents.value = null;
+    await loadDirectoryAgents();
+    expect(directoryAgentsError.value).toEqual({ words: "down", status: 500 });
+  });
+
+  test.serial(
+    "a change of user clears both lists and drops an answer in flight",
+    async () => {
+      const gates = gated(() => Response.json({ users: [listed("leak")] }));
+      const pending = loadDirectoryUsers();
+      me.value = { ...casey, id: "u9", username: "someone" };
+      expect(directoryUsers.value).toBeNull();
+      expect(directoryAgents.value).toBeNull();
+      gates[0]();
+      await pending;
+      expect(directoryUsers.value).toBeNull();
+      me.value = null;
+    },
+  );
 });

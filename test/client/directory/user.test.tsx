@@ -44,7 +44,7 @@ const bogdan: DirectoryUserResponse = {
   ],
 };
 
-// two days, the person busy on the second
+// two days, the user busy on the second
 const days: DirectoryUserDaysResponse = {
   since: Date.UTC(2026, 8, 14),
   until: Date.UTC(2026, 8, 16),
@@ -73,7 +73,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-describe("the person's days", () => {
+describe("the user's days", () => {
   test.serial(
     "asks for the userPage.s own days and keeps the latest",
     async () => {
@@ -161,7 +161,7 @@ describe("the user page's activity", () => {
     userPage.value = bogdan;
     let html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain('aria-label="Loading activity"');
-    // another person's days are not this one's
+    // another user's days are not this one's
     userDays.value = { username: "elena", body: days };
     html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain('aria-label="Loading activity"');
