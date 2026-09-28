@@ -77,6 +77,8 @@ export type Socket = {
   size(): number;
   // the users with a connection open
   online(): number;
+  // who they are
+  onlineUserIds(): string[];
   // stop listening to the bus
   dispose(): void;
 };
@@ -408,6 +410,9 @@ export function socketArea(deps: SocketDeps): Socket {
     },
     online() {
       return byUser.size;
+    },
+    onlineUserIds() {
+      return [...byUser.keys()];
     },
     dispose() {
       unsubscribe();

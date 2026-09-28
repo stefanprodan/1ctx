@@ -77,8 +77,14 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `GET /api/projects/:id/usage` (admin, a team project alone) sums its
   last 30 days. `GET /api/admin/access?tz=` (admin) is the Access
   board's: the users who signed in each of the reader's last 30 days
-  and over them, each visit on its user's own date, and the team
-  projects with a turn or a run. Anyone who may open a chat
+  and over them, each visit on its user's own date, the recent users
+  (ten seen in the window, none disabled, the newer of the visit and
+  the login touch, online while the socket holds a connection of
+  theirs, the online first), and the team projects with a turn or a
+  run. A visit's instant is the day's first request and a login is
+  touched hourly, so a user who signed out may read hours early.
+  Presence comes from the socket through a port `compose.ts` passes;
+  nothing records it per request. Anyone who may open a chat
   may archive it: every member of a team project, the owner of a
   personal one, and an admin wherever `access.project` lets them see
   it; rename and delete stay the owner's or an admin's. A handler gets a project

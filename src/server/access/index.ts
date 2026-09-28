@@ -15,7 +15,11 @@ import {
   type UsersPort as AuthUsersPort,
   auth,
 } from "./auth.ts";
-import { type BoardUsagePort, boardRoutes } from "./board.ts";
+import {
+  type BoardUsagePort,
+  boardRoutes,
+  type PresencePort,
+} from "./board.ts";
 import {
   type ActivityPort,
   type ProjectsPort as DirectoryProjectsPort,
@@ -86,6 +90,9 @@ export type AccessDeps = {
   // a person's posts, chats and manual runs: a closure, since sessions
   // is built after access
   activity: ActivityPort;
+  // the users with a tab open: a closure, since the socket is built
+  // after access
+  presence: PresencePort;
 };
 
 export type Access = Auth & {
@@ -137,6 +144,9 @@ export function accessArea(deps: AccessDeps): Access {
       }),
       ...boardRoutes({
         visits,
+        logins,
+        presence: deps.presence,
+        users: deps.users,
         usage: deps.usage,
         projects: deps.projects,
         clock: deps.clock,

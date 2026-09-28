@@ -302,6 +302,9 @@
   .rows-meta-bad {
     color: var(--failed);
   }
+  .rows-meta-brand {
+    color: var(--brand);
+  }
   .rows-meta-short {
     display: none;
   }

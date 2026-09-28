@@ -268,6 +268,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects,
     usage,
     activity: { personDays: (...args) => sessions.personDays(...args) },
+    presence: { onlineUserIds: () => socket.onlineUserIds() },
   });
   agents = agentsArea({
     db,

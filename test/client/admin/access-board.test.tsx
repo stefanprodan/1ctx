@@ -5,7 +5,9 @@ import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   accessBoard,
+  BOARD_EVERY_MS,
   loadAccessBoard,
+  watchAccessBoard,
 } from "../../../src/client/data/access-board.ts";
 import { adminProjects } from "../../../src/client/data/admin-projects.ts";
 import { me } from "../../../src/client/data/me.ts";
@@ -13,6 +15,8 @@ import { users } from "../../../src/client/data/users.ts";
 import {
   accountGroups,
   projectGroups,
+  recentUsers,
+  recentWhen,
   signedInHint,
 } from "../../../src/client/views/admin/AccessBoard.model.ts";
 import { AccessBoard } from "../../../src/client/views/admin/AccessBoard.tsx";
@@ -71,6 +75,7 @@ const board = (
     },
   ],
   signedIn: 2,
+  recent: [],
   activeProjectIds: [],
   ...over,
 });
@@ -81,7 +86,7 @@ afterEach(() => {
 });
 
 describe("the groups", () => {
-  test("an account is in the first group that holds it", () => {
+  test("an account is disabled, else inactive past 30 days", () => {
     const g = accountGroups(
       [
         person("u1", "fresh"),
@@ -96,8 +101,11 @@ describe("the groups", () => {
       ],
       NOW,
     );
-    expect(g.unseen.map((u) => u.username)).toEqual(["never", "gone"]);
-    expect(g.password.map((u) => u.username)).toEqual(["handed"]);
+    expect(g.inactive.map((u) => u.username)).toEqual([
+      "never",
+      "gone",
+      "handed",
+    ]);
     expect(g.disabled.map((u) => u.username)).toEqual(["off"]);
   });
 
@@ -113,7 +121,20 @@ describe("the groups", () => {
       ],
       NOW,
     );
-    expect(g.unseen.map((u) => u.username)).toEqual(["east"]);
+    expect(g.inactive.map((u) => u.username)).toEqual(["east"]);
+  });
+
+  test("the recent users keep the server's order, an unknown one left out", () => {
+    const people = [person("u1", "first"), person("u2", "second")];
+    const rows = recentUsers(
+      [
+        { userId: "u2", at: 50, online: true },
+        { userId: "gone", at: 200, online: false },
+        { userId: "u1", at: 100, online: false },
+      ],
+      people,
+    );
+    expect(rows.map((r) => r.user.username)).toEqual(["second", "first"]);
   });
 
   test("a project with nobody in it is not also quiet", () => {
@@ -123,6 +144,12 @@ describe("the groups", () => {
     );
     expect(g.empty.map((p) => p.name)).toEqual(["empty"]);
     expect(g.quiet.map((p) => p.name)).toEqual(["idle"]);
+  });
+
+  test("a recent user with a tab open is online, else how long ago", () => {
+    const at = NOW - 5 * 60_000;
+    expect(recentWhen({ userId: "u1", at, online: true }, NOW)).toBe("online");
+    expect(recentWhen({ userId: "u1", at, online: false }, NOW)).toBe("5m ago");
   });
 
   test("the chart's line says the span, or the day under the pointer", () => {
@@ -149,17 +176,44 @@ describe("the page", () => {
     accessBoard.value = board({ activeProjectIds: ["p2"] });
     const html = render(<AccessBoard />);
     expect(html).toContain(">Signed in<");
-    expect(html).toContain(">Not seen in 30 days<");
+    expect(html).toContain(">Inactive<");
     expect(html).toContain('href="/admin/access/users/never"');
     expect(html).toContain("never signed in");
     expect(html).toContain(">Projects without members<");
     expect(html).toContain('href="/admin/access/projects/p1"');
-    expect(html).not.toContain(">Password to change<");
     expect(html).not.toMatch(/class="label" id="[^"]+">Disabled</);
-    expect(html).not.toContain(">No activity in 30 days<");
+    expect(html).not.toContain(">Recently active<");
     expect(html).not.toContain('href="/admin/access/users/fresh"');
     expect(html).toContain(">Team<");
     expect(html).toContain(">Personal<");
+  });
+
+  test.serial("lists who used the app last under the chart", () => {
+    setSystemTime(NOW);
+    users.value = [person("u1", "fresh")];
+    adminProjects.value = [];
+    accessBoard.value = board({
+      recent: [{ userId: "u1", at: NOW - 5 * 60_000, online: false }],
+    });
+    const html = render(<AccessBoard />);
+    expect(html).toContain(">Recently active<");
+    expect(html).toContain('href="/admin/access/users/fresh"');
+    expect(html).toContain("5m ago");
+    expect(html.indexOf(">Signed in<")).toBeLessThan(
+      html.indexOf(">Recently active<"),
+    );
+  });
+
+  test.serial("inactive opens on projects when no user is inactive", () => {
+    setSystemTime(NOW);
+    users.value = [person("u1", "fresh")];
+    adminProjects.value = [team("p1", "idle", 1)];
+    accessBoard.value = board();
+    const html = render(<AccessBoard />);
+    expect(html).toContain(">Inactive<");
+    expect(html).toContain('href="/admin/access/projects/p1"');
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Projects</);
+    expect(html).toMatch(/aria-pressed="false"[^>]*>Users</);
   });
 
   test.serial("says nobody signed in over an empty span", () => {
@@ -189,3 +243,61 @@ test.serial("loads the board in the browser's zone", async () => {
   expect(asked).toStartWith("/api/admin/access?tz=");
   expect(accessBoard.value?.signedIn).toBe(2);
 });
+
+test.serial(
+  "asks again every period while seen, never while hidden",
+  async () => {
+    const realFetch = globalThis.fetch;
+    const asked: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      asked.push(url);
+      if (url.startsWith("/api/admin/access")) return Response.json(board());
+      if (url === "/api/users") return Response.json({ users: [] });
+      return Response.json({ projects: [] });
+    }) as unknown as typeof fetch;
+    let hidden = false;
+    let now = 0;
+    const heard = new Set<() => void>();
+    const ticks = new Set<() => void>();
+    const tab = {
+      hidden: () => hidden,
+      listen(change: () => void) {
+        heard.add(change);
+        return () => heard.delete(change);
+      },
+      now: () => now,
+      every(_ms: number, tick: () => void) {
+        ticks.add(tick);
+        return () => ticks.delete(tick);
+      },
+    };
+    const tick = () => {
+      now += BOARD_EVERY_MS;
+      for (const t of [...ticks]) t();
+    };
+    const show = (seen: boolean) => {
+      hidden = !seen;
+      for (const change of [...heard]) change();
+    };
+    try {
+      const stop = watchAccessBoard(tab);
+      // the route has just loaded: nothing at once
+      expect(asked).toEqual([]);
+      tick();
+      expect(asked).toHaveLength(3);
+      expect(asked[0]).toStartWith("/api/admin/access?tz=");
+      expect(asked.slice(1)).toEqual(["/api/users", "/api/projects"]);
+      show(false);
+      expect(ticks.size).toBe(0);
+      now += BOARD_EVERY_MS;
+      // seen again past a period: at once
+      show(true);
+      expect(asked).toHaveLength(6);
+      stop();
+      expect(ticks.size).toBe(0);
+      expect(heard.size).toBe(0);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  },
+);

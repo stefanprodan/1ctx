@@ -496,13 +496,18 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **The Access board.** `/admin/access` (`AccessBoard.tsx`, its groups
   in `AccessBoard.model.ts`) is who signed in over the last 30 days, a
   `DayBars` chart from `GET /api/admin/access`: each visit on its
-  user's own date, as the Users page reads it, so the chart and Not
-  seen agree across zones. Then a card per group that holds any:
-  accounts not seen in 30 days, with a password to change, disabled
-  (each account in the first that holds it), team projects without
-  members, and ones with no turn or run in 30 days. Every row opens
-  its page. What runs and what it costs stay on Monitor. The aside
-  counts admins, members and the disabled, then team and personal
+  user's own date, as the Users page reads it, so the chart and
+  Inactive agree across zones. Under it Recently active: the server's
+  ten users seen in those days, none disabled, the online first,
+  "online" in `--brand` (`RowsMeta brand`), else how long ago. Then a
+  card per group that holds any: Inactive, users not seen in 30 days and
+  team projects with no turn or run in 30 days under a Users | Projects
+  `Seg` in the card head, opening on Users unless only projects are
+  inactive; disabled accounts; team projects without members. Every row
+  opens its page. The board, the users and the team projects are asked
+  again every 30 seconds while the tab is seen (`watchAccessBoard()`
+  over `lib/poll.ts`). What runs and what it costs stay on Monitor. The
+  aside counts admins, members and the disabled, then team and personal
   projects.
 - **Access › Projects.** `/admin/access/projects` (`AdminProjects.tsx`,
   its words in `AdminProjects.model.ts`) is one card of links, a team
@@ -731,7 +736,12 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   While the Overview is on screen and the tab is seen, `watchOverview()`
   in `data/overview.ts` polls `GET /api/admin/load` one request at a
   time and reads the
-  overview and what needs attention again once a minute; the head's
+  overview and what needs attention again every 30 seconds, just over
+  the server's keep; Usage reads the current month again as often,
+  quietly (`watchUsage()`, the next month at midnight when the address
+  named none, a past month never), and Storage
+  only on Refresh; each poll is `pollWhileSeen()` in `lib/poll.ts`
+  unless it samples like the load; the head's
   Refresh (`refreshOverview()`) reads all three at once. Each row's head is `BoardRow` in `OverviewNow.tsx`, a
   failed read its `Trouble`. Needs attention is a `RowsCard` of `RowsGo`
   rows, each opening the page that fixes it (`attentionRow()`), or

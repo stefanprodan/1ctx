@@ -12,7 +12,7 @@
 
 import { isDecisionId } from "../../shared/contracts/decision.ts";
 import { isRunFilter } from "../../shared/words.ts";
-import { loadAccessBoard } from "../data/access-board.ts";
+import { refreshAccessBoard } from "../data/access-board.ts";
 import {
   loadAdminProject,
   loadAdminProjects,
@@ -508,9 +508,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Access",
     role: "admin",
-    load: async () => {
-      await Promise.all([loadAccessBoard(), loadUsers(), loadAdminProjects()]);
-    },
+    load: () => refreshAccessBoard(),
   },
   {
     path: "/admin/access/users",

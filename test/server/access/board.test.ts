@@ -5,6 +5,7 @@ import { expect, test } from "bun:test";
 import { UsageStore } from "../../../src/server/usage/index.ts";
 import type { AccessBoardResponse } from "../../../src/shared/api/access.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { watcher } from "../../helpers/socket.ts";
 
 type Chat = Awaited<ReturnType<typeof chatApp>>;
 
@@ -120,4 +121,83 @@ test("the board takes the zone and nothing else", async () => {
     const res = await chat.admin.call("GET", `/api/admin/access${query}`);
     expect(res.status).toBe(400);
   }
+});
+
+test("recent puts the online first, then the latest, and needs a visit", async () => {
+  const chat = await chatApp();
+  chat.app.db.query("delete from visits").run();
+  chat.app.db.query("update logins set last_seen_at = 0").run();
+  const now = chat.app.now.value;
+  const add = (userId: string, at: number) =>
+    chat.app.db
+      .query("insert into visits (user_id, day, at) values (?, ?, ?)")
+      .run(userId, "2026-01-01", at);
+  // no visit: the board calls the admin inactive, so never recent
+  add(chat.memberId, now - 5);
+  const first = await board(chat);
+  expect(first.recent).toEqual([
+    { userId: chat.memberId, at: now - 5, online: false },
+  ]);
+  add(chat.adminId, now - 3);
+  const offline = await board(chat);
+  expect(offline.recent.map((r) => r.userId)).toEqual([
+    chat.adminId,
+    chat.memberId,
+  ]);
+  // a login touched later than the visit is the newer time
+  chat.app.db
+    .query("update logins set last_seen_at = ? where user_id = ?")
+    .run(now - 1, chat.memberId);
+  expect((await board(chat)).recent[0]).toEqual({
+    userId: chat.memberId,
+    at: now - 1,
+    online: false,
+  });
+  // a tab open puts the admin first, whatever the times; two online
+  // are ordered by time
+  const admin = await watcher(chat, chat.admin);
+  expect((await board(chat)).recent[0]).toEqual({
+    userId: chat.adminId,
+    at: now - 3,
+    online: true,
+  });
+  const member = await watcher(chat, chat.member);
+  expect((await board(chat)).recent.map((r) => r.userId)).toEqual([
+    chat.memberId,
+    chat.adminId,
+  ]);
+  chat.app.socket.close(admin);
+  chat.app.socket.close(member);
+  expect((await board(chat)).recent[0]!.online).toBe(false);
+});
+
+test("recent leaves out the disabled and those not seen in the window", async () => {
+  const chat = await chatApp();
+  chat.app.now.value = Date.parse("2026-09-28T12:00:00Z");
+  const now = chat.app.now.value;
+  chat.app.db.query("delete from visits").run();
+  // a clock past the epoch's first month, the logins still alive
+  chat.app.db
+    .query("update logins set last_seen_at = ?, expires_at = ?")
+    .run(now - 31 * 86_400_000, now + 86_400_000);
+  const visit = (day: string, at: number) =>
+    chat.app.db
+      .query(
+        "insert or replace into visits (user_id, day, at) values (?, ?, ?)",
+      )
+      .run(chat.memberId, day, at);
+  // the admin reading the board is seen today
+  visit("2026-08-28", now - 31 * 86_400_000);
+  const stale = await board(chat);
+  expect(stale.recent.map((r) => r.userId)).toEqual([chat.adminId]);
+  visit("2026-09-28", now - 5);
+  expect((await board(chat)).recent.map((r) => r.userId)).toContain(
+    chat.memberId,
+  );
+  chat.app.db
+    .query("update users set disabled = 1 where id = ?")
+    .run(chat.memberId);
+  expect((await board(chat)).recent.map((r) => r.userId)).toEqual([
+    chat.adminId,
+  ]);
 });

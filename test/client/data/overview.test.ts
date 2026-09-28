@@ -4,19 +4,33 @@
 // The Overview's loads keep only the latest word: a slower answer, or
 // one for a user who left, never lands over it, and a failed refresh
 // keeps the answer on screen. The watch polls the load while the tab is
-// seen, one poll at a time, and reads the days again once a minute.
+// seen, one poll at a time, and reads the days again every 30 seconds.
+// Usage asks again for the current month alone, without dimming.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  setSystemTime,
+  test,
+} from "bun:test";
 import { me } from "../../../src/client/data/me.ts";
 import {
   loadOverview,
+  loadUsage,
   overview,
   overviewError,
   overviewLoading,
   PAST_EVERY_MS,
   serverLoad,
   serverLoadError,
+  thisMonth,
+  USAGE_EVERY_MS,
+  usageLoading,
+  usageMonth,
   watchOverview,
+  watchUsage,
 } from "../../../src/client/data/overview.ts";
 import {
   LOAD_SAMPLE_MS,
@@ -209,7 +223,7 @@ describe("watchOverview", () => {
     expect(loads(calls)).toBe(2);
   });
 
-  test.serial("reads the days again once a minute", async () => {
+  test.serial("reads the days again every period", async () => {
     const calls = held();
     const page = tab();
     const stop = watchOverview(page.tab);
@@ -225,4 +239,112 @@ describe("watchOverview", () => {
     expect(overviews(calls)).toBe(1);
     stop();
   });
+});
+
+describe("watchUsage", () => {
+  // a seen tab whose timer the test drives
+  const tab = () => {
+    const ticks = new Set<() => void>();
+    let now = 0;
+    return {
+      tab: {
+        hidden: () => false,
+        listen: () => () => {},
+        now: () => now,
+        every(_ms: number, tick: () => void) {
+          ticks.add(tick);
+          return () => ticks.delete(tick);
+        },
+      },
+      tick() {
+        now += USAGE_EVERY_MS;
+        for (const tick of [...ticks]) tick();
+      },
+    };
+  };
+  const months = (calls: { url: string }[]) =>
+    calls.filter((c) => c.url.startsWith("/api/admin/usage")).length;
+
+  test.serial("asks for the current month again, quietly", async () => {
+    const calls = held();
+    const page = tab();
+    const first = loadUsage(null);
+    calls[0]!.answer(json({}));
+    await first;
+    const stop = watchUsage(page.tab);
+    expect(months(calls)).toBe(1);
+    page.tick();
+    expect(months(calls)).toBe(2);
+    expect(calls[1]!.url).toContain(`month=${thisMonth()}`);
+    // the board stays undimmed while the poll's read is out
+    expect(usageLoading.value).toBe(false);
+    calls[1]!.answer(json({}));
+    await settle();
+    stop();
+  });
+
+  test.serial("never asks for a past month again", async () => {
+    const calls = held();
+    const page = tab();
+    const first = loadUsage("2026-01");
+    calls[0]!.answer(json({}));
+    await first;
+    expect(usageMonth.value).toBe("2026-01");
+    const stop = watchUsage(page.tab);
+    page.tick();
+    expect(months(calls)).toBe(1);
+    stop();
+  });
+
+  test.serial("two polls out at once never dim the board", async () => {
+    const calls = held();
+    const page = tab();
+    const first = loadUsage(null);
+    calls[0]!.answer(json({}));
+    await first;
+    const stop = watchUsage(page.tab);
+    page.tick();
+    page.tick();
+    expect(months(calls)).toBe(3);
+    expect(usageLoading.value).toBe(false);
+    // the older answer lands after the newer and is dropped
+    calls[2]!.answer(json({ at: 2 }));
+    calls[1]!.answer(json({ at: 1 }));
+    await settle();
+    expect(usageLoading.value).toBe(false);
+    stop();
+  });
+
+  test.serial(
+    "follows the month at its midnight when none was named",
+    async () => {
+      setSystemTime(new Date(2026, 8, 30, 23, 59, 50));
+      try {
+        const calls = held();
+        const page = tab();
+        const first = loadUsage(null);
+        calls[0]!.answer(json({}));
+        await first;
+        expect(usageMonth.value).toBe("2026-09");
+        const stop = watchUsage(page.tab);
+        setSystemTime(new Date(2026, 9, 1, 0, 0, 20));
+        page.tick();
+        expect(calls[1]!.url).toContain("month=2026-10");
+        expect(usageMonth.value).toBe("2026-10");
+        calls[1]!.answer(json({}));
+        await settle();
+        stop();
+        // a named month stays put, and a past one is never asked again
+        const named = loadUsage("2026-09");
+        calls[2]!.answer(json({}));
+        await named;
+        const again = watchUsage(page.tab);
+        page.tick();
+        expect(months(calls)).toBe(3);
+        again();
+      } finally {
+        setSystemTime();
+      }
+    },
+  );
 });

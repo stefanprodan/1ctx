@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the admin's Monitor pages read. Storage is loaded when the page
-// is reached and again on Refresh, Usage when a month is reached. The
+// is reached and again on Refresh, Usage when a month is reached and,
+// for the current month, every USAGE_EVERY_MS while seen, quietly. The
 // Overview is kept current while it is on screen and the tab is seen:
 // the server's load every LOAD_SAMPLE_MS, the days, all time and what
 // needs attention every PAST_EVERY_MS, all again as soon as the tab is
-// seen again. A load keeps the last answer on screen until the next
-// lands; a failure keeps it too.
+// seen again. The server keeps those reads a little under the period.
+// A load keeps the last answer on screen until the next lands; a
+// failure keeps it too.
 
 import { effect, signal } from "@preact/signals";
 import {
@@ -21,6 +23,7 @@ import {
   type UsageResponse,
 } from "../../shared/api/admin.ts";
 import { type Failure, failure } from "../lib/format.ts";
+import { browserTab, type PollDriver, pollWhileSeen } from "../lib/poll.ts";
 import { browserZone } from "../lib/zone.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
@@ -40,6 +43,8 @@ export const usageError = signal<Failure | null>(null);
 export const usageLoading = signal(false);
 // the month on screen, or asked for
 export const usageMonth = signal<string | null>(null);
+// the address named no month: the page follows the current one
+let usageFollows = false;
 
 export const attention = signal<AttentionResponse | null>(null);
 export const attentionError = signal<Failure | null>(null);
@@ -140,14 +145,21 @@ export function thisMonth(now = Date.now()): string {
 }
 
 // a month from the address, this month when it names none or no month
-export async function loadUsage(asked: string | null): Promise<void> {
+// quiet: a poll's read, which leaves the board undimmed
+export async function loadUsage(
+  asked: string | null,
+  quiet = false,
+): Promise<void> {
   const month =
     asked !== null && MONTH_PATTERN.test(asked) ? asked : thisMonth();
   const forUser = owner;
   const mine = ++usageTurn;
   const current = () => owner === forUser && mine === usageTurn;
   usageMonth.value = month;
-  usageLoading.value = true;
+  if (!quiet) {
+    usageFollows = asked === null;
+    usageLoading.value = true;
+  }
   try {
     const body = await api<UsageResponse>(
       `/api/admin/usage?tz=${encodeURIComponent(browserZone())}&month=${month}`,
@@ -161,6 +173,22 @@ export async function loadUsage(asked: string | null): Promise<void> {
     if (current()) usageLoading.value = false;
   }
 }
+
+// Keeps the current month current while the caller holds it and the tab
+// is seen, stepping to the next month at its midnight when the address
+// named none; a past month is closed and never asked again.
+export const watchUsage = (tab: PollDriver = browserTab): (() => void) =>
+  pollWhileSeen(
+    USAGE_EVERY_MS,
+    () => {
+      if (usageLoading.value) return;
+      if (usageFollows) void loadUsage(null, true);
+      else if (usageMonth.value === thisMonth()) {
+        void loadUsage(usageMonth.value, true);
+      }
+    },
+    tab,
+  );
 
 export async function loadAttention(): Promise<void> {
   const forUser = owner;
@@ -176,8 +204,9 @@ export async function loadAttention(): Promise<void> {
   }
 }
 
-// the server keeps the overview a minute, so asking sooner gains nothing
-export const PAST_EVERY_MS = 60_000;
+// just over the server's keep of these reads, so each ask gets a new one
+export const PAST_EVERY_MS = 30_000;
+export const USAGE_EVERY_MS = 30_000;
 
 async function pollLoad(): Promise<void> {
   if (loadAsking) return;
@@ -213,32 +242,10 @@ function dropLoad(): void {
   loadAsking = false;
 }
 
-// The tab as the watch sees it: whether it is seen, a way to hear that
-// change, the time and a repeating timer, so a test can drive them.
-export type Tab = {
-  hidden(): boolean;
-  listen(change: () => void): () => void;
-  now(): number;
-  every(ms: number, tick: () => void): () => void;
-};
-
-const browserTab: Tab = {
-  hidden: () => document.visibilityState === "hidden",
-  listen(change) {
-    document.addEventListener("visibilitychange", change);
-    return () => document.removeEventListener("visibilitychange", change);
-  },
-  now: () => Date.now(),
-  every(ms, tick) {
-    const timer = setInterval(tick, ms);
-    return () => clearInterval(timer);
-  },
-};
-
 // Keeps the Overview current while the caller holds it; the stop it
 // answers ends it. The route's load has just asked for the days, so the
 // first tick asks only for the load. A hidden tab asks nothing.
-export function watchOverview(tab: Tab = browserTab): () => void {
+export function watchOverview(tab: PollDriver = browserTab): () => void {
   let stopTimer: (() => void) | null = null;
   let pastAt = tab.now();
   const past = () => {
